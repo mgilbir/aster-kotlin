@@ -76,24 +76,19 @@ class VegaLiteFixtureTest {
 
   @Test
   fun `an unimplemented composition is refused by name rather than approximated`() {
-    // A **repetition inside a grid**. Grids nest, and a grid nests inside a concatenation, but a
-    // repeat below one is not normalised where it stands and so is refused by name rather than
-    // half-compiled. Asserting on something actually unsupported is the point of the test: it has
-    // now been repointed twice as the compositions above it were implemented.
+    // A composition **inside a layer**. This assertion has been repointed twice as the compositions
+    // it named were implemented, so it is now pointed at one that cannot be: a layer draws its
+    // members over one another, so each is a view or a layer of views, and upstream throws while
+    // normalising rather than compiling it. There is no chart here to reach later.
     val compiled =
       VegaLiteCompiler()
         .compileJson(
           """
           {
-            "data": {"values": [{"a": 1, "b": 2}]},
-            "facet": {"column": {"field": "a"}},
-            "spec": {
-              "repeat": {"column": ["a", "b"]},
-              "spec": {
-                "mark": "bar",
-                "encoding": {"x": {"field": {"repeat": "column"}, "type": "quantitative"}}
-              }
-            }
+            "data": {"values": [{"a": "p", "x": 1}]},
+            "layer": [
+              {"hconcat": [{"mark": "point", "encoding": {"x": {"field": "x", "type": "quantitative"}}}]}
+            ]
           }
           """
             .trimIndent()
@@ -102,10 +97,10 @@ class VegaLiteFixtureTest {
       compiled.diagnostics.filter { it.code == VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION }
     assertTrue(
       reported.isNotEmpty(),
-      "the repetition inside a grid should be reported, got ${compiled.diagnostics}",
+      "the composition inside a layer should be reported, got ${compiled.diagnostics}",
     )
     assertTrue(
-      reported.first().message.contains("repeat"),
+      reported.first().message.contains("hconcat"),
       "the report should name the construct: ${reported.first().message}",
     )
   }
@@ -141,21 +136,28 @@ class VegaLiteFixtureTest {
 
   @Test
   fun `a composition a grid cannot hold is reported rather than dropped`() {
-    // The worst of the three failure modes this compiler had: a concatenation inside a grid used to
-    // **compile**, and compile to the wrong chart. The facet channels were carried down into a leaf
-    // that never reads an encoding, so the grid vanished and what came out was a bare concatenation
-    // — with no diagnostic at all. A wrong chart with nothing said is the thing this repository
-    // least wants, so the assertion is on the report and not only on the refusal.
+    // A concatenation inside a grid compiles now; a **grid inside that concatenation** does not,
+    // and
+    // this is the assertion that it says so. Both of the compositions this test has named produced
+    // a
+    // plausible chart measuring the wrong rows before they were caught — which is the failure this
+    // repository least wants, and the reason the assertion is on the report and not the refusal.
     val compiled =
       VegaLiteCompiler()
         .compileJson(
           """
           {
-            "data": {"values": [{"a": "p", "x": 1}]},
+            "data": {"values": [{"a": "p", "b": "q", "x": 1}]},
             "facet": {"column": {"field": "a"}},
             "spec": {
               "hconcat": [
-                {"mark": "point", "encoding": {"x": {"field": "x", "type": "quantitative"}}}
+                {
+                  "facet": {"row": {"field": "b"}},
+                  "spec": {
+                    "mark": "point",
+                    "encoding": {"x": {"field": "x", "type": "quantitative"}}
+                  }
+                }
               ]
             }
           }
@@ -167,7 +169,7 @@ class VegaLiteFixtureTest {
       compiled.diagnostics.filter { it.code == VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION }
     assertTrue(reported.isNotEmpty(), "it should be reported, got ${compiled.diagnostics}")
     assertTrue(
-      reported.first().message.contains("hconcat"),
+      reported.first().message.contains("facet"),
       "and the report should name the composition: ${reported.first().message}",
     )
   }

@@ -456,6 +456,13 @@ internal interface FacetLayout {
     innerData: List<VegaValue>,
     innerMarks: List<VegaValue>,
     /**
+     * The scales the level below builds **inside** this cell.
+     *
+     * Empty unless the cell holds plots: a concatenation's plots keep their own position scales,
+     * and measured per cell they have to be built where the partition is the data they can see.
+     */
+    innerScales: List<VegaValue> = emptyList(),
+    /**
      * The column the level below counts its own cells by — `distinct_Cylinders`.
      *
      * Null unless that level breaks the chart down by **column**: rows stack however many there
@@ -856,6 +863,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
     innerLayout: VegaValue,
     innerData: List<VegaValue>,
     innerMarks: List<VegaValue>,
+    innerScales: List<VegaValue>,
     innerColumns: String?,
   ): VegaValue = obj {
     put("name", named("cell"))
@@ -871,6 +879,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
     if (innerData.isNotEmpty()) put("data", arr(innerData))
     put("layout", innerLayout)
     put("marks", arr(innerMarks))
+    if (innerScales.isNotEmpty()) put("scales", arr(innerScales))
   }
 
   override fun cellGroup(
@@ -1194,6 +1203,7 @@ internal class FacetWrap(
     innerLayout: VegaValue,
     innerData: List<VegaValue>,
     innerMarks: List<VegaValue>,
+    innerScales: List<VegaValue>,
     innerColumns: String?,
   ): VegaValue = obj {
     put("name", named("cell"))
@@ -1206,6 +1216,7 @@ internal class FacetWrap(
     if (innerData.isNotEmpty()) put("data", arr(innerData))
     put("layout", innerLayout)
     put("marks", arr(innerMarks))
+    if (innerScales.isNotEmpty()) put("scales", arr(innerScales))
   }
 
   override fun cellGroup(

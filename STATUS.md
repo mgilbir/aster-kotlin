@@ -4951,31 +4951,59 @@ shared `childWidth` was written into the plain plot's marks and scales. No galle
 trellis beside a plain plot of matching size, which is why 627 clean examples had not caught it;
 `facet-concat-size.vl.json` does.
 
+### A grid whose cell holds plots
+
+Every other grid here lives *inside* a plot and its cell holds that plot's views. A grid whose cell is
+a **concatenation** is the inverse — upstream has a `ConcatModel` under the `FacetModel` — and it had
+to be compiled the other way about.
+
+There is no encoding for the facet channel to be lifted out of, which is the whole difficulty: fold a
+level into a concatenation and it is simply dropped. So the peel hands the levels back untouched, the
+**concatenation is built as the chart** under the name the grid gives its cell — one `child` per
+level, which is what makes its plots `child_concat_0` and `child_concat_1` and carries through to
+their scales and sizes — and the grids are made straight from the levels and wrap the whole of it.
+
+The cell then carries what a concatenation carries, and one thing more:
+
+- its **layout**, since the plots are arranged inside it rather than across the chart;
+- the **chain each plot computes per cell**, all of them hanging off one partition, because the plots
+  share the cell and so share the rows it was handed;
+- and each plot's **own scales**. That is the part that does not follow from the naming: a position
+  scale here is measured over the rows the partition handed *this* cell, so it can only be built
+  where those rows are visible. Written once beside the grid, as a plain concatenation writes them,
+  every cell would build the same scale from every row.
+
+A plot inside such a cell carries no facet channel of its own, so the copy of its chain that stands
+beside the grid for the scales has to be told the facet's columns to group by — `cloneSubtree` adds
+them upstream, and here they are handed to the view directly.
+
+A repetition reaches the same shape, and is worth its own fixture only for *when* it is rewritten: a
+repeat at the top of a chart is normalised before anything looks at it, and one that is a grid's cell
+cannot be, because until the grids are peeled off it is not the thing being compiled.
+
 ### What a grid cannot hold, said rather than approximated
 
-Probing the compositions *around* the nesting found a worse failure than a refusal. A
-**concatenation inside a grid** used to compile, and compile to the wrong chart: the facet channels
-were carried down into a leaf that never reads an encoding, so the grid vanished and what came out
-was a bare concatenation — with no diagnostic at all. A wrong chart with nothing said is the failure
-this project least wants, and it was reachable from four lines of specification.
+Three compositions are refused by name, and the way each was found is the point.
 
-Upstream puts a `ConcatModel` under the `FacetModel` for that chart. This compiler puts a grid
-*inside* a plot and has no way to put plots inside a cell, so the two compositions work one way
-round and not the other: a grid inside a concatenation compiles, a concatenation inside a grid is
-refused by name. A `repeat` there is the same thing, becoming a concatenation before anything looks
-at it.
+**A concatenation inside a grid used to compile, to the wrong chart** — the facet channels were
+carried into a leaf that never reads an encoding, so the grid vanished and a bare concatenation came
+out, with no diagnostic. That one is now implemented, above. But implementing it produced two more of
+exactly the same kind: a **grid inside that concatenation**, and a **concatenation inside it**, both
+of which compiled to a plausible chart measuring the wrong rows. A cell holds one composition and
+arranges what it drew; a third level would need its own layout inside a cell that has none. So they
+report.
 
-Beside it, a report that named the wrong thing. A **composition inside a layer** — which is not a
-chart Vega-Lite describes, and which upstream throws on while normalising — was reported as a
-*missing mark*: a `facet` has no `mark` of its own, so the innermost check failed first and sent the
-reader looking for a mark in a specification whose trouble was the composition around it.
+**A composition inside a layer** is the one refusal that cannot become a feature: a layer draws its
+members over one another, so each is a view or a layer of views, and upstream throws on it while
+normalising. It used to be reported as a *missing mark* — a `facet` has no `mark`, so the innermost
+check failed first — which sent the reader looking for a mark in a specification whose trouble was
+the composition around it.
 
-So three compositions now report by name, and the two tests that assert an unimplemented composition
-is reported have been repointed twice as the compositions above them were implemented. That is the
-maintenance cost of asserting on a limitation rather than on a rule, and worth paying while any
-limitation is left — but the assertions worth more are the two that pin the *reporting*, because
-both of those cases were wrong in a way no fixture could have caught: one compiled the wrong chart,
-and the other blamed the wrong line.
+The assertion that an unimplemented composition is reported has now been repointed three times as the
+compositions it named were implemented. It is pointed at the layer case now, which is the only one of
+the three that will stay put. The lesson is not about the churn: it is that **every one of these was
+found by probing upstream with a specification nobody had written**, and two of them were producing
+confident wrong output that no fixture could have caught, because no fixture existed to catch it.
 
 ### A grid belongs to the plot that holds it
 

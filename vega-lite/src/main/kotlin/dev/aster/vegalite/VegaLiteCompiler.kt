@@ -170,6 +170,29 @@ private class Compilation(
   private var nestedFacets: List<VegaValue.Obj> = emptyList()
 
   /**
+   * The facet levels wrapping a **concatenation**, outermost first — a grid whose cell holds plots.
+   *
+   * Empty for every other chart, and the inverse of [facetLevels]: there a grid lives inside a plot
+   * and its cell holds that plot's views, where here the grid is above the whole composition and
+   * its cell holds the plots themselves. Upstream has a `ConcatModel` under the `FacetModel`; this
+   * is that shape, reached by building the concatenation as the chart and wrapping it.
+   */
+  private var cellLevels: List<VegaValue.Obj> = emptyList()
+
+  /** The grids [cellLevels] describes, made once the selections are known. */
+  private var cellGrids: List<FacetLayout> = emptyList()
+
+  /** Where the flow splits for a cell holding plots: one partition, shared by every plot in it. */
+  private var cellSplit: FacetNode? = null
+
+  /** The datasets that cell computes for itself, and the table its partition read. */
+  private var cellGroupData: List<VegaValue> = emptyList()
+
+  private var cellReads: String? = null
+
+  private var cellDomainsAt: Int = -1
+
+  /**
    * The chart's own facet levels, outermost first — [facet] is the innermost of them.
    *
    * The two are read in different places and mean different things: the **outermost** level
@@ -195,8 +218,29 @@ private class Compilation(
       val peeled = FacetOperator.normalize(spec, diagnostics) ?: return failed()
       spec = peeled.spec
       nestedFacets = peeled.inner
+      // A cell that is a **concatenation** is compiled the other way about. There is no encoding to
+      // lift a facet channel out of, so the concatenation is built as the chart — under the name
+      // the
+      // grid gives its cell, which is what makes its plots `child_concat_0` and `child_concat_1` —
+      // and the grids are made straight from the levels and wrap the whole of it.
+      if (peeled.cellIsComposition) cellLevels = peeled.levels
     }
+    // A **cell that is a repetition** is a concatenation of its copies, exactly as one at the top
+    // of
+    // a chart is — and it has to be normalised *after* the grids are peeled off, because until then
+    // it is not the thing being compiled.
+    if (spec.has("repeat")) spec = Repeat.normalize(spec, diagnostics) ?: return failed()
     selections = Selection.of(spec)
+    // The grids are built straight from the levels rather than lifted out of an encoding: there is
+    // no encoding here to lift them from. Everything they publish runs through the name the level
+    // above gave its cell — `child`, then `child_child` — exactly as a lifted one does.
+    cellGrids = cellLevels.mapIndexedNotNull { depth, level ->
+      gridFor(
+        level,
+        Fields.varName("child_".repeat(depth).removeSuffix("_")).takeIf { depth > 0 } ?: "",
+      )
+    }
+    if (cellLevels.isNotEmpty() && cellGrids.size != cellLevels.size) return failed()
     val plots = plots() ?: return failed()
     allPlots = plots
     concat = (plotTree as? Node.Nest)?.concat
@@ -240,6 +284,28 @@ private class Compilation(
       if (concat == null) {
         facetLevels = plot.facets
         facet = plot.facets.lastOrNull()
+      }
+    }
+    // What a grid's cell can hold is a **flat** concatenation of plain plots. A plot in it that is
+    // itself a grid, or a concatenation inside the concatenation, is a level this does not build:
+    // the cell holds one composition and arranges what that composition drew, and a third level
+    // would need its own layout inside a cell that has none. Reported rather than approximated —
+    // both came out as plausible charts measuring the wrong rows before this check.
+    if (cellGrids.isNotEmpty()) {
+      val deeper =
+        when {
+          plots.any { it.facets.isNotEmpty() } -> "facet"
+          nests().size > 1 -> "concatenation"
+          else -> null
+        }
+      if (deeper != null) {
+        diagnostics.fatal(
+          VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
+          "A `$deeper` inside the concatenation in a `facet` is not implemented; a grid's cell " +
+            "holds a concatenation of single views or layers of them.",
+          jsonPath = "$.spec",
+        )
+        return failed()
       }
     }
     // A **projection** belongs to the unit whose places it puts on the page. A view with a
@@ -305,6 +371,11 @@ private class Compilation(
 
     val views = plots.flatMap { it.views }
     views.forEach { it.selections = selections }
+    // A plot inside a **cell** carries no facet channel of its own — the grid was never lifted out
+    // of its encoding — but the copy of its chain that stands beside the grid for the scales still
+    // has to group by the facet's columns, as `cloneSubtree` adds them. So the fields are handed to
+    // it directly.
+    cellGrids.lastOrNull()?.let { grid -> views.forEach { it.facetFields = grid.fields } }
     // A selection belongs to the view that declared it, which is only known now that the views are
     // named: `brush` in the second plot of a concatenation records `"concat_1"` in every tuple, and
     // draws its brush in that plot rather than across the chart.
@@ -608,6 +679,18 @@ private class Compilation(
       val at = data.indexOfFirst { it.string("name") == reads }
       if (at >= 0) data.addAll(at + 1, domains) else data += domains
     }
+    // A grid **wrapping a concatenation** writes its own values beside the chart's table too: the
+    // cells' values are the whole table's, whatever the cell turns out to hold.
+    cellGrids.firstOrNull()?.let { current ->
+      val domains =
+        current.domainDatasets(
+          counted = emptyMap(),
+          source = cellReads ?: views.first().mainData,
+          vertical = false,
+          horizontal = false,
+        )
+      if (cellDomainsAt >= 0) data.addAll(cellDomainsAt, domains) else data += domains
+    }
     // The **outermost** level's values stand beside the chart's table; a level inside one breaks
     // that level's partition down further, so its values are computed inside that level's cell and
     // are written there instead.
@@ -699,7 +782,25 @@ private class Compilation(
           ),
         )
       }
-      concat?.let { put("layout", it.layout()) }
+      // A concatenation **wrapped in grids** arranges its plots inside the innermost cell, so its
+      // own layout is written there and what stands here is the outermost grid's.
+      if (cellGrids.isNotEmpty()) {
+        put(
+          "layout",
+          cellGrids
+            .first()
+            .layout(
+              facetSpacing(spec),
+              HEADER_OFFSET,
+              config,
+              emptySet(),
+              headings = if (cellGrids.size > 1) headingsPerLevel(cellGrids).first() else null,
+              // What this band names is a whole composition, which has no one cell to be as tall
+              // as.
+              childHasSize = false,
+            ),
+        )
+      } else concat?.let { put("layout", it.layout()) }
       // The cells' own scales are assembled before the marks that read them, the cell group being
       // where they are written.
       val grid = facet
@@ -772,17 +873,6 @@ private class Compilation(
       // The projections a chart's places are put on the page by, which stand before the marks that
       // read them — `assembleProjections`, walking the model tree.
       projections(views).takeIf { it.isNotEmpty() }?.let { put("projections", arr(it)) }
-      // A brush is drawn in **two** parts around the marks: its background under them so the data
-      // stays legible through it, and its outline over them so it can be grabbed.
-      put(
-        "marks",
-        arr(
-          if (concat != null) groups(plotTree)
-          // A facet's marks are its cell and its headers, and the brush is already inside the cell.
-          else if (facet != null) marks(views, plots.single().axes, facet, facetLevels.dropLast(1))
-          else brushed(views, marks(views, plots.single().axes))
-        ),
-      )
       // Shared scales first, then each plot's own, which is the order upstream's assembly walks the
       // model tree in: the composition's own components before it recurses into its children.
       val scales =
@@ -791,7 +881,31 @@ private class Compilation(
           // A facet's independently resolved scales are built inside its cells, where the rows
           // they measure are, so they are not written beside the grid as well.
           .filterNot { facet != null && concat == null && it.name() != prefixed(it.channel) }
-      if (scales.isNotEmpty()) put("scales", arr(scales.map { assembleScale(it) }))
+      // A cell holding **plots** keeps those plots' own scales: each is measured over the rows the
+      // partition handed one cell, so it is built there and not once beside the grid. What a
+      // composition *shares* — a colour key covering every plot — is still the chart's. Settled
+      // before the marks because the cell is one of them and carries them.
+      val ownedByPlot =
+        if (cellGrids.isEmpty()) emptyList()
+        else scales.filter { scale -> plots.any { owner[scale.name()] === it } }
+      // Measured over the rows the partition handed **this** cell, so each domain is turned to the
+      // counterpart computed inside it — the same rewrite a facet's own cell scales take. Left
+      // pointing at the copy beside the grid, every cell would build the same scale from every row.
+      cellOwnScales = ownedByPlot.map { withinCell(assembleScale(it)) }
+      val outside = scales - ownedByPlot.toSet()
+      // A brush is drawn in **two** parts around the marks: its background under them so the data
+      // stays legible through it, and its outline over them so it can be grabbed.
+      put(
+        "marks",
+        arr(
+          if (cellGrids.isNotEmpty()) cellWrapped(groups(plotTree))
+          else if (concat != null) groups(plotTree)
+          // A facet's marks are its cell and its headers, and the brush is already inside the cell.
+          else if (facet != null) marks(views, plots.single().axes, facet, facetLevels.dropLast(1))
+          else brushed(views, marks(views, plots.single().axes))
+        ),
+      )
+      if (outside.isNotEmpty()) put("scales", arr(outside.map { assembleScale(it) }))
       // A faceted chart has no axes of its own: the gridlines live in every cell and the labelled
       // axis in a header drawn once for the whole grid. A concatenation's axes live in its plots.
       if (facet == null && concat == null && plots.single().axes.isNotEmpty()) {
@@ -1203,6 +1317,35 @@ private class Compilation(
 
   private lateinit var plotTree: Node
 
+  /**
+   * A grid made straight from a facet definition, for a cell that holds plots rather than views.
+   *
+   * The same three shapes `liftFacet` builds — a crossed grid, a wrapped one, or nothing — read
+   * from the definition as written instead of from an encoding a level was lifted out of.
+   */
+  private fun gridFor(level: VegaValue.Obj, owner: String): FacetLayout? {
+    val channels = Parse(config, diagnostics, selections).facetChannels(level, "$.facet")
+    channels["facet"]?.let {
+      return FacetWrap(
+        it,
+        (spec.number("columns") ?: it.raw.number("columns"))?.toInt(),
+        owner,
+        config,
+      )
+    }
+    val row = channels["row"]?.let { Facet("row", it, owner) }
+    val column = channels["column"]?.let { Facet("column", it, owner) }
+    if (row == null && column == null) {
+      diagnostics.fatal(
+        VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
+        "A `facet` names a `row`, a `column`, or one field to wrap; this one names none.",
+        jsonPath = "$.facet",
+      )
+      return null
+    }
+    return FacetGrid(row, column, owner)
+  }
+
   private fun plots(): List<Plot>? {
     val leaves = mutableListOf<Plot>()
 
@@ -1244,9 +1387,18 @@ private class Compilation(
     // are: `getName` prefixes every scale, mark and step signal with the model's own name, so a
     // specification with `"name": "plotname"` reads `plotname_x` throughout. The sizes are the
     // exception — `width` and `height` are the chart's, not this level's.
+    // A concatenation wrapped in grids is compiled under the name the innermost grid gives its
+    // cell,
+    // which is one `child` per level: that is what makes its plots `child_concat_0` rather than
+    // `concat_0`, and their scales and sizes follow the name.
+    val root =
+      listOf(spec.string("name").orEmpty())
+        .plus(List(cellLevels.size) { "child" })
+        .filter { it.isNotEmpty() }
+        .joinToString("_")
     plotTree =
       build(
-        spec.string("name").orEmpty(),
+        root,
         spec,
         List(spec.array("transform").orEmpty().size) { spec.string("name").orEmpty() },
         nestedFacets,
@@ -2168,12 +2320,72 @@ private class Compilation(
               horizontal.isNotEmpty(),
             ),
             wrapped,
+            emptyList(),
             columnsOf(below),
           )
       below = level
     }
     return wrapped
   }
+
+  /**
+   * A concatenation's groups wrapped in the grids above them, innermost cell first.
+   *
+   * The inverse of [marks]'s wrapping, and the same shape: each level partitions the table, hands
+   * the level below the facet values it breaks that partition down by, and arranges what came out.
+   * What differs is what the innermost cell holds — **plots**, not views — so the concatenation's
+   * own layout goes in it, the chains its plots compute per cell go in it, and so do their scales,
+   * which are measured over the rows the partition handed the cell and can only be built where
+   * those rows are visible.
+   */
+  private fun cellWrapped(plotGroups: List<VegaValue>): List<VegaValue> {
+    var wrapped = plotGroups
+    var innerLayout = concat?.layout() ?: VegaValue.EmptyObject
+    var innerData = cellGroupData
+    var innerScales = cellOwnScales
+    var below: FacetLayout? = null
+    for ((depth, grid) in cellGrids.withIndex().reversed()) {
+      wrapped =
+        // No axes at any level: they belong to the plots, which keep their own.
+        grid.groups(
+          emptyList(),
+          emptyList(),
+          HEADER_OFFSET,
+          config,
+          "",
+          "",
+          headings = headingsPerLevel(cellGrids)[depth],
+        ) +
+          grid.nestedCellGroup(
+            cellGrids.getOrNull(depth - 1)?.named("facet") ?: cellReads ?: "",
+            emptyMap(),
+            innerLayout,
+            innerData,
+            wrapped,
+            innerScales,
+            below?.let { columnsOf(it) },
+          )
+      // Above the innermost level there is one cell holding one grid: its layout, and no data or
+      // scales of its own.
+      innerLayout =
+        grid.layout(
+          facetSpacing(spec),
+          HEADER_OFFSET,
+          config,
+          emptySet(),
+          headings = headingsPerLevel(cellGrids)[depth],
+          childHasSize = false,
+          insideFacet = depth > 0,
+        )
+      innerData = grid.domainDatasets(grid.named("facet"), vertical = false, horizontal = false)
+      innerScales = emptyList()
+      below = grid
+    }
+    return wrapped
+  }
+
+  /** The scales a cell holding plots builds inside itself, which is every plot's own. */
+  private var cellOwnScales: List<VegaValue> = emptyList()
 
   private fun reportUnsupportedTopLevel() = Unit
 
@@ -2341,6 +2553,13 @@ private class Compilation(
         else plot.facets.dropLast(1).map { FacetNode(it.named("facet")) }
     }
     val split = if (concat == null) allPlots.singleOrNull()?.split else null
+    // One partition for the whole cell, however many plots stand in it: they share the cell, so
+    // they
+    // share the rows it was handed, and each hangs its own chain below the one node.
+    cellSplit = cellGrids.lastOrNull()?.let { FacetNode(it.named("facet")) }
+    val cellSplitAbove =
+      if (cellSplit == null) emptyList()
+      else cellGrids.dropLast(1).map { FacetNode(it.named("facet")) }
     // `LookupNode.make`: the joined table is given a **named point** of its own on the source it
     // comes from, and the join names that point rather than the table. Two things follow, and both
     // are the reason it is done unconditionally rather than only where the chart also draws from
@@ -2379,8 +2598,15 @@ private class Compilation(
           // scales read. The pre-aggregation table a sorted domain asks for is such a point, and
           // where there is one the chain stays below the facet and a copy of it — with the facet's
           // own fields added to every grouping — is hung beside it for the scales to measure.
-          facetSplit = plotOfView(view)?.split,
-          facetAbove = plotOfView(view)?.splitAbove.orEmpty(),
+          facetSplit = plotOfView(view)?.split ?: cellSplit,
+          facetAbove =
+            plotOfView(view)
+              ?.split
+              ?.let { plotOfView(view)?.splitAbove }
+              .orEmpty()
+              .ifEmpty {
+                if (plotOfView(view)?.split == null) cellSplitAbove else emptyList()
+              },
           // Where the flow does not split, the grid is still a node in it, and a node takes a name.
           facetTail =
             if (plotOfView(view)?.split != null) null
@@ -2422,6 +2648,12 @@ private class Compilation(
         .assemble(order.map { roots[it] ?: it })
     // The facet's own values stand where the facet does: after the table it reads and before what
     // the scales derive beside it. `assembleFacetData` then gives each cell the chain below.
+    cellSplit?.let { own ->
+      cellGroupData = DataAssembler().assembleFacetData(own)
+      val read = cellSplitAbove.firstOrNull() ?: own
+      cellReads = read.data
+      cellDomainsAt = read.at
+    }
     for (plot in allPlots) {
       val own = plot.split ?: continue
       plot.groupData = DataAssembler().assembleFacetData(own)
