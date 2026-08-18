@@ -1276,17 +1276,24 @@ private class Compilation(
    */
   private fun sizeOf(node: Node, channel: String): VegaValue? =
     when (node) {
+      // A **faceted** plot contributes nothing to a merge: `parseConcatLayoutSize` reads each
+      // child's own layout size and a grid has none — the size it knows is one *cell's*, and two
+      // plots agreeing about a cell are not two plots agreeing about themselves. Offering the
+      // cell's size instead merged a trellis with the plain plot beside it whenever the two
+      // happened to be the same width, and then wrote that shared name into the plain plot's marks.
       is Node.Leaf ->
-        LayoutSize.value(
-          node.plot.views,
-          // Keyed by *channel*: `plot.scales` is keyed by scale name, and inside a concatenation
-          // those are `concat_0_x`, so looking a channel up in it finds nothing and every plot
-          // looks scale-less — which merged three plots of different depths into one signal.
-          node.plot.byChannel(),
-          config,
-          node.plot.spec,
-          channel,
-        )
+        if (node.plot.facet != null) null
+        else
+          LayoutSize.value(
+            node.plot.views,
+            // Keyed by *channel*: `plot.scales` is keyed by scale name, and inside a concatenation
+            // those are `concat_0_x`, so looking a channel up in it finds nothing and every plot
+            // looks scale-less — which merged three plots of different depths into one signal.
+            node.plot.byChannel(),
+            config,
+            node.plot.spec,
+            channel,
+          )
       // A nested concatenation contributes upward only the dimension it shares **as a whole**. A
       // column of plots is one width and a stack of heights; its `childHeight` is one cell's, not
       // the column's, so a row of columns must not merge on it. The plain name is what says which
