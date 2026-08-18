@@ -4399,6 +4399,36 @@ Two caveats on the number. It is a desktop JVM with the JIT warm, which is the m
 there is; and it measures compilation only, not the Canvas draw that follows. It is an order of
 magnitude, enough to rule an approach in, and not a substitute for measuring on hardware.
 
+## A group is picked where it paints, and nothing is picked through a clip
+
+Two defects in one rule, both reported by a tap that found something the reader could not see.
+
+**A group used to be picked anywhere inside its bounds.** `hitsPrecisely` asked
+`node.bounds.contains(point)` for a `GroupNode`, and a group's bounds are its own extent unioned with
+everything its children reach. Every compiled specification wraps its marks in such a group, so a tap on
+blank space inside a chart selected *it*: a host reported "1 mark selected" with nothing under the
+finger, and on iOS a `ChartSession` test written to expect "nothing" had been pinned to expect the frame
+instead — with a note saying it was a hit-testing decision and not a session one. It was.
+
+Upstream's rule is in `vega-scenegraph`'s `marks/group.js`. A group's background is picked when
+`group.fill || (!strokeForeground && group.stroke)`, its foreground stroke is picked on its own outline,
+and a group that paints neither is never the hit — only its children are. The rectangle tested is the
+group's own **paint rect**, its declared extent, not its bounds, and a corner radius cuts it. That is
+`hitsGroup` now, and `HitTestTest` covers each clause: a bare group does not swallow a tap, a filled
+panel is hit on its background, a child still wins where the two overlap, a panel of forty units with a
+mark drawn sixty out is picked on forty, and a border is not a panel.
+
+**And a mark the clip hid was still tappable.** Upstream returns from `pick` before testing a clipped
+group's contents at all; here the clip narrowed what was *drawn* — since #30 — and nothing else, so a
+line running past the plotting area answered a tap in the padding. `SceneHitIndex` now carries the clip
+window down as it walks and intersects every descendant's indexed bounds with it, which says the same
+thing in a flat index. `MarkClipTest` places a finger where a clipped-away symbol would have been and
+gets nothing back; it gets the symbol back before the fix.
+
+One divergence stays, and it is named in the code: a `RectNode` with a corner radius is still hit in its
+cut corners, a few square units at each corner of a rounded bar. Upstream tests the rounded path there
+too.
+
 ## What a reader should not have to rediscover
 
 Behaviours reproduced deliberately because upstream does them and a chart written against upstream

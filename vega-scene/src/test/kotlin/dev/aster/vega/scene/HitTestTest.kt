@@ -290,4 +290,127 @@ class HitTestTest {
 
     assertNull(index.hitTest(PointD(1.0, scene.height - 1.0)))
   }
+
+  // ---- groups, which are picked only where they paint ------------------------
+
+  private fun rect(x: Double, y: Double, size: Double = 10.0) =
+    RectNode(
+      id = ids.allocate(),
+      x = x,
+      y = y,
+      width = size,
+      height = size,
+      metadata = interactive,
+    )
+
+  /**
+   * The defect this pair of tests exists for.
+   *
+   * A group used to be picked anywhere inside its **bounds**, so a compiled chart — which wraps its
+   * marks in a group whose bounds are the whole plotting area — reported a selected mark for a tap
+   * on blank space. Upstream picks a group only where it *paints*: `group.fill ||
+   * (!strokeForeground && group.stroke)` for its background, and its foreground stroke on its own.
+   * A group that paints nothing is never the hit.
+   */
+  @Test
+  fun `a group that paints nothing does not swallow a tap`() {
+    val child = rect(0.0, 0.0)
+    val frame =
+      GroupNode(
+        id = ids.allocate(),
+        children = listOf(child),
+        size = SizeD(100.0, 100.0),
+        metadata = interactive,
+      )
+    val index = SceneHitIndex(sceneOf(frame))
+
+    assertEquals(child.id, assertPresent(index.hitTest(PointD(5.0, 5.0))).node.id)
+    assertNull(index.hitTest(PointD(80.0, 80.0)), "blank space inside a bare group is not a hit")
+  }
+
+  @Test
+  fun `a group that paints a background is hit on it`() {
+    val child = rect(0.0, 0.0)
+    val panel =
+      GroupNode(
+        id = ids.allocate(),
+        children = listOf(child),
+        size = SizeD(100.0, 100.0),
+        fill = Fill(ScenePaint.Black),
+        metadata = interactive,
+      )
+    val index = SceneHitIndex(sceneOf(panel))
+
+    assertEquals(panel.id, assertPresent(index.hitTest(PointD(80.0, 80.0))).node.id)
+    // And its child still wins where the two overlap, which is paint order doing its job.
+    assertEquals(child.id, assertPresent(index.hitTest(PointD(5.0, 5.0))).node.id)
+  }
+
+  /**
+   * A group is picked on its **paint rect**, not on the union of what its children reach.
+   *
+   * A panel of 40 units with a mark drawn 60 units out is 60 units of bounds and 40 of paint.
+   * Bounds are what a *layout* asks about; a pick asks what was drawn.
+   */
+  @Test
+  fun `a group is hit within its declared extent rather than its bounds`() {
+    val overflowing = rect(70.0, 70.0)
+    val panel =
+      GroupNode(
+        id = ids.allocate(),
+        children = listOf(overflowing),
+        size = SizeD(40.0, 40.0),
+        fill = Fill(ScenePaint.Black),
+        metadata = interactive,
+      )
+    val index = SceneHitIndex(sceneOf(panel))
+
+    assertEquals(panel.id, assertPresent(index.hitTest(PointD(20.0, 20.0))).node.id)
+    assertEquals(overflowing.id, assertPresent(index.hitTest(PointD(75.0, 75.0))).node.id)
+    assertNull(index.hitTest(PointD(55.0, 55.0)), "inside the bounds, outside everything drawn")
+  }
+
+  /** A stroke drawn over the children is grabbed by that outline, within the tap tolerance. */
+  @Test
+  fun `a group stroked in the foreground is hit on its outline`() {
+    val bordered =
+      GroupNode(
+        id = ids.allocate(),
+        children = emptyList(),
+        size = SizeD(50.0, 50.0),
+        stroke = Stroke(paint = ScenePaint.Black, width = 2.0),
+        strokeForeground = true,
+        metadata = interactive,
+      )
+    val index = SceneHitIndex(sceneOf(bordered), HitTestOptions(strokeTolerance = 2.0))
+
+    assertEquals(bordered.id, assertPresent(index.hitTest(PointD(50.0, 25.0))).node.id)
+    // Not its middle: a foreground stroke paints an outline, and there is no fill behind it.
+    assertNull(index.hitTest(PointD(25.0, 25.0)), "a border is not a panel")
+  }
+
+  /**
+   * A mark clipped away cannot be touched, which is the other half of applying `mark.clip`.
+   *
+   * Upstream returns from `pick` before testing a clipped group's contents at all. Drawing already
+   * hid this mark; a hit test that still found it would report a tap on something invisible — and a
+   * pan over a detail plot is exactly where that happens, because the rows outside the brushed
+   * domain are still in the scene.
+   */
+  @Test
+  fun `a clipped-away mark is not hit`() {
+    val inside = rect(5.0, 5.0)
+    val outside = rect(70.0, 70.0)
+    val clipped =
+      GroupNode(
+        id = ids.allocate(),
+        children = listOf(inside, outside),
+        clip = RectD(0.0, 0.0, 40.0, 40.0),
+        metadata = interactive,
+      )
+    val index = SceneHitIndex(sceneOf(clipped))
+
+    assertEquals(inside.id, assertPresent(index.hitTest(PointD(8.0, 8.0))).node.id)
+    assertNull(index.hitTest(PointD(75.0, 75.0)), "outside the clip is outside the chart")
+  }
 }

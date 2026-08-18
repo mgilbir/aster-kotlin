@@ -1,11 +1,15 @@
 package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.scene.GroupNode
+import dev.aster.vega.scene.HitTestOptions
 import dev.aster.vega.scene.PathNode
+import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.RectD
+import dev.aster.vega.scene.SceneHitIndex
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SymbolNode
 import dev.aster.vega.scene.TextNode
+import dev.aster.vega.scene.flatten
 import dev.aster.vega.scene.transformedBounds
 import dev.aster.vega.svg.SvgRenderer
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -52,7 +56,7 @@ class MarkClipTest {
         }}},
         {"type": "text", "from": {"data": "t"}, "encode": {"enter": {
           "x": {"scale": "x", "field": "x"}, "y": {"scale": "y", "field": "y"},
-          "text": {"field": "y"}
+          "text": {"field": "y"}, "dy": {"value": -8}
         }}}
       ]
     }
@@ -114,9 +118,9 @@ class MarkClipTest {
   }
 
   /**
-   * Clipping is a paint-time cut, not a filter: the item outside the domain is still in the scene,
-   * still hit-testable and still announced, exactly as it is upstream. Cutting it from the data
-   * would change what a reader hears as well as what they see.
+   * Clipping is a paint-time cut, not a filter: the item outside the domain is still in the scene
+   * and still announced, exactly as it is upstream. Cutting it from the data would change what a
+   * reader hears as well as what they see. What it is *not* is touchable — see the last test here.
    */
   @Test
   fun `an item outside the clip is still in the scene`() {
@@ -143,6 +147,67 @@ class MarkClipTest {
       2,
       Regex("""clip-path="url\(#vc0\)"""").findAll(svg).count(),
       "one reference per clipped mark, sharing the one definition:\n$svg",
+    )
+  }
+
+  /**
+   * A clip is not only about what is painted: what it hides cannot be touched either.
+   *
+   * Upstream's `pick` returns from a clipped group before it tests the group's contents at all, so
+   * the y=130 symbol — above a domain that stops at 100, and therefore cut off — is in the scene
+   * and in the accessibility tree but is *not* under a finger placed where it would have been. That
+   * distinction matters where it is easiest to get wrong: a chart in a scrolling list draws inside
+   * its own padding, and a tap there used to reach a mark drawn past the plotting area.
+   *
+   * The other half of the same rule: blank space inside the plotting area is blank. A clip group
+   * paints nothing, so it is never what a tap finds.
+   */
+  @Test
+  fun `a tap cannot reach what the clip hid`() {
+    val scene = scene()
+    val index = SceneHitIndex(scene, HitTestOptions.Mouse)
+    val symbols = scene.flatten().filter { it.node is SymbolNode }.sortedBy { it.worldBounds.left }
+    assertEquals(3, symbols.size, "three rows, three symbols — the middle one clipped away")
+
+    // The plotting area in scene coordinates. It is not at (5, 5): the unclipped labels reach past
+    // the
+    // chart, and `autosize: pad` grows the padding to fit them, which moves the plot down.
+    val window =
+      requireNotNull(
+        scene.flatten().firstNotNullOfOrNull { placed ->
+          (placed.node as? GroupNode)?.clip?.let { placed.worldTransform.mapBounds(it) }
+        }
+      ) {
+        "no clipped group"
+      }
+
+    val hidden = symbols[1].worldBounds
+    assertTrue(
+      hidden.bottom < window.top,
+      "the y=130 symbol should sit above the plotting area: $hidden against $window",
+    )
+    // Where the symbol would have been drawn. The labels are lifted clear of the symbols by `dy` so
+    // that this point is about one mark only — the text mark does not declare `clip`, so the label
+    // "130" *is* drawn up there and *is* tappable, which is upstream's behaviour too.
+    assertEquals(
+      null,
+      index.hitTest(PointD(hidden.centerX, hidden.centerY)),
+      "a mark the clip hid must not be tappable where it would have been drawn",
+    )
+
+    for (visible in listOf(symbols[0], symbols[2])) {
+      val bounds = visible.worldBounds
+      assertEquals(
+        visible.node.id,
+        index.hitTest(PointD(bounds.centerX, bounds.centerY))?.node?.id,
+        "a symbol inside the clip is still the hit",
+      )
+    }
+
+    assertEquals(
+      null,
+      index.hitTest(PointD(100.0, 115.0)),
+      "blank space inside the plotting area: the clip group paints nothing, so nothing is hit",
     )
   }
 }

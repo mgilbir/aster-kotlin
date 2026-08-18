@@ -97,20 +97,41 @@ public class SceneHitIndex(
   private fun buildEntries(): List<Entry> {
     val result = mutableListOf<Entry>()
     var order = 0
-    fun visit(node: SceneNode, parentTransform: Transform2D, ancestors: List<GroupNode>) {
+    /**
+     * @param window the clip every enclosing group has imposed, in **scene** coordinates, or null
+     *   where nothing clips. Upstream returns from `pick` before testing a clipped group's contents
+     *   at all, so a mark clipped away is not merely invisible: it cannot be touched. Carrying the
+     *   window down and narrowing each entry's bounds with it says the same thing in a flat index —
+     *   without it, a line running past the plotting area was still tappable in the padding, which
+     *   is a tap that hits a mark the reader cannot see.
+     */
+    fun visit(
+      node: SceneNode,
+      parentTransform: Transform2D,
+      ancestors: List<GroupNode>,
+      window: RectD?,
+    ) {
       if (!node.visible || node.opacity <= 0.0) return
       val world = parentTransform.concat(node.transform)
+      val worldBounds = world.mapBounds(node.bounds)
+      val visible = window?.let { intersectRects(worldBounds, it) } ?: worldBounds
+      if (visible.isEmpty) return
       // Pre-order numbering mirrors paint order: a group is drawn before its children, so its
       // children get higher numbers and win the hit test over their own ancestors.
       if (!options.requireInteractive || node.metadata.interactive) {
-        result.add(Entry(node, ancestors, world, world.mapBounds(node.bounds), order++))
+        result.add(Entry(node, ancestors, world, visible, order++))
       }
       if (node is GroupNode) {
         val nextAncestors = ancestors + node
-        for (child in node.children) visit(child, world, nextAncestors)
+        val nextWindow =
+          node.clip?.let { clip ->
+            val mapped = world.mapBounds(clip)
+            window?.let { intersectRects(mapped, it) } ?: mapped
+          } ?: window
+        for (child in node.children) visit(child, world, nextAncestors, nextWindow)
       }
     }
-    visit(scene.root, Transform2D.Identity, emptyList())
+    visit(scene.root, Transform2D.Identity, emptyList(), null)
     return result
   }
 
@@ -177,7 +198,7 @@ public fun hitsPrecisely(node: SceneNode, point: PointD, options: HitTestOptions
     is RectNode -> node.bounds.contains(point)
     is ImageNode -> node.rect.contains(point)
     is TextNode -> node.bounds.contains(point)
-    is GroupNode -> node.bounds.contains(point)
+    is GroupNode -> hitsGroup(node, point, options)
     is RuleNode -> {
       val tolerance =
         (if (node.stroke.isVisible) node.stroke.halfWidth else 0.0) + options.strokeTolerance
@@ -199,3 +220,73 @@ public fun hitsPrecisely(node: SceneNode, point: PointD, options: HitTestOptions
           (node.stroke?.halfWidth ?: 0.0) + options.strokeTolerance
       }
   }
+
+/**
+ * Whether a **group** is the hit, which is not the same question as whether the point is inside it.
+ *
+ * Upstream's rule is in `vega-scenegraph`'s `marks/group.js`: a group is picked only where it
+ * *paints*. Its background counts when `group.fill || (!strokeForeground && group.stroke)`, and its
+ * foreground stroke counts on its own when the stroke is drawn over the children. A group that
+ * paints nothing is never picked — only its children are.
+ *
+ * This tested `bounds.contains(point)`, so **every** group swallowed every tap inside it. The
+ * visible form of that: a compiled chart wraps its marks in a group whose bounds are the whole
+ * plotting area, so a tap on blank space selected that group and a host reported "1 mark selected"
+ * with nothing under the finger. Found by writing a Swift test that expected "nothing" and reading
+ * what came back instead.
+ *
+ * The rectangle is the group's own **paint rect** — its declared extent, or its clip — rather than
+ * its bounds, which include everything its children reach. Corner radius is honoured through
+ * `roundedPaintPath`, as upstream honours it through `hitCorner`.
+ *
+ * One divergence stays and is not this function's to fix: a `RectNode` with a corner radius is hit
+ * in its cut corners, because [hitsPrecisely] tests its bounds. Upstream tests the rounded path
+ * there too; the difference is a few square units at each corner of a rounded bar.
+ */
+private fun hitsGroup(node: GroupNode, point: PointD, options: HitTestOptions): Boolean {
+  // A clip is a hard boundary. Upstream returns before testing anything at all when the point is
+  // outside a clipped group's own rectangle, children included — which is what [SceneHitIndex]
+  // reproduces by narrowing every descendant's bounds as it walks.
+  node.clip?.let { if (!it.contains(point)) return false }
+  val rect = node.paintRect ?: return false
+  val rounded = node.roundedPaintPath
+  val stroke = node.stroke
+
+  // The foreground stroke: a group drawn over its children is grabbed by that outline, which is how
+  // a
+  // cell border stays clickable when its own bars run up to it.
+  if (node.strokeForeground && stroke != null && stroke.isVisible) {
+    val reach = stroke.halfWidth + options.strokeTolerance
+    val onOutline =
+      rounded?.let { it.distanceToOutline(point) <= reach }
+        ?: (rect.distanceToBoundary(point) <= reach)
+    if (onOutline) return true
+  }
+
+  // The background: a fill, or a stroke that is *not* drawn in the foreground.
+  val background = node.fill != null || (!node.strokeForeground && stroke != null)
+  if (!background) return false
+  return rounded?.containsEvenOdd(point) ?: rect.contains(point)
+}
+
+/**
+ * Distance from [point] to this rectangle's **boundary**: zero on it, positive both inside and out.
+ *
+ * The outline of a rectangle rather than its area, which is what a stroke covers.
+ */
+private fun RectD.distanceToBoundary(point: PointD): Double {
+  val outsideX = maxOf(left - point.x, point.x - right, 0.0)
+  val outsideY = maxOf(top - point.y, point.y - bottom, 0.0)
+  if (outsideX > 0.0 || outsideY > 0.0) return kotlin.math.hypot(outsideX, outsideY)
+  return minOf(point.x - left, right - point.x, point.y - top, bottom - point.y)
+}
+
+/** The overlap of two rectangles, or empty where they do not meet. */
+private fun intersectRects(a: RectD, b: RectD): RectD {
+  if (a.isEmpty || b.isEmpty) return RectD.Empty
+  val left = maxOf(a.left, b.left)
+  val top = maxOf(a.top, b.top)
+  val right = minOf(a.right, b.right)
+  val bottom = minOf(a.bottom, b.bottom)
+  return if (right <= left || bottom <= top) RectD.Empty else RectD(left, top, right, bottom)
+}
