@@ -109,7 +109,7 @@ what a specification describes.
 Two details are the host's responsibility, and both have bitten this project once:
 
 - **`contentScale`.** The controller divides an incoming point by it, so a chart drawn scaled-to-fit whose
-  host sent raw view coordinates would miss every mark by exactly the fit factor. `SceneCanvas` computes
+  host sent raw view coordinates would miss every mark by exactly the fit factor. `VegaChartView` computes
   its placement once and uses it for both the drawing and the touch inversion, because two copies of that
   arithmetic is how a tap lands next to the bar it looked like it hit.
 - **Serialisation.** The controller is not safe for concurrent use, and the compile deliberately runs off
@@ -182,7 +182,8 @@ is deliberate: `swift/AsterVegaRender/Package.swift` points its framework search
 framework so that `swift test` works, and an iOS build cannot use that. Compiling the five files
 directly keeps one copy of the renderer and no second manifest to keep in step.
 
-`SceneCanvas` draws into a SwiftUI `Canvas` through `withCGContext`. **It does not flip the context** —
+`VegaChartView` — in `AsterVegaRender`, not here — draws into a SwiftUI `Canvas` through
+`withCGContext`. **It does not flip the context** —
 SwiftUI's canvas already has its origin at the top left with y growing down, which is the space a scene
 is in. The package's bitmap tests *do* flip, because a bare `CGBitmapContext` has its origin at the
 bottom left. That difference belongs to the caller, which is exactly why the renderer flips nothing

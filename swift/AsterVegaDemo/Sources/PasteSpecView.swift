@@ -8,7 +8,7 @@ import SwiftUI
 /// made of it — the chart, the controls, and every part it could not honour, named.
 struct PasteSpecView: View {
   @State private var text: String = Self.startingSpecification
-  @State private var session = ChartSession()
+  @State private var session = ChartSession(loader: SpecLibrary.loader)
   @State private var editing = true
 
   var body: some View {
@@ -27,7 +27,7 @@ struct PasteSpecView: View {
     .toolbar {
       ToolbarItem(placement: .topBarTrailing) {
         Button(editing ? "Render" : "Edit") {
-          if editing { session.load(specification: text) }
+          if editing { session.load(specification: text, signals: DemoLaunch.presetSignals()) }
           editing.toggle()
         }
         .bold()
@@ -47,7 +47,7 @@ struct PasteSpecView: View {
       }
       // Rendered once on arrival, so the screen shows a chart with a working control rather than an
       // empty frame and an instruction.
-      session.load(specification: text)
+      session.load(specification: text, signals: DemoLaunch.presetSignals())
     }
   }
 
@@ -91,7 +91,9 @@ struct PasteSpecView: View {
     }
 
     if let scene = session.scene {
-      SceneCanvas(scene: scene, session: session)
+      VegaChartView(scene: scene, session: session) { placement in
+        DemoLaunch.performLaunchTap(on: session, placement: placement)
+      }
         .frame(maxWidth: .infinity)
         .background(Color(white: 0.97))
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.3)))
@@ -111,7 +113,7 @@ struct PasteSpecView: View {
         .font(.caption)
     }
 
-    if let touched = session.lastTouch {
+    if let touched = session.lastTouch.map(DemoLaunch.describe) {
       Text(touched).font(.caption).foregroundStyle(Color.accentColor)
     }
 
@@ -119,7 +121,7 @@ struct PasteSpecView: View {
     // specification read as Vega fails for a reason that reads like nonsense — and until the compiler
     // reached this side of the boundary, reading it as Vega was all this app could do.
     if let grammar = session.grammar {
-      Text(grammar).font(.caption).foregroundStyle(Color.secondary)
+      Text(DemoLaunch.describe(grammar)).font(.caption).foregroundStyle(Color.secondary)
     }
 
     // A Vega-Lite report is kept apart from the runtime's. They answer different questions — one says

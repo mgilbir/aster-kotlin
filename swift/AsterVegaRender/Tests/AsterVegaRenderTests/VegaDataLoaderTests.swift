@@ -153,8 +153,6 @@ final class VegaDataLoaderTests: XCTestCase {
       loader: loader(),
       randomSeed: 42,
       clock: ClockCompanion.shared.Fixed,
-      // Spelled out because a Kotlin default argument has no Obj-C representation: Swift names every
-      // parameter or does not compile. `EnglishUS` is what upstream produces.
       locale: VegaLocale.Companion.shared.EnglishUS,
       hostConfig: nil,
       containerSize: nil
