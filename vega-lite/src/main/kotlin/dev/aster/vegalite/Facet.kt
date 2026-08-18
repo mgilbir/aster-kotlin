@@ -388,7 +388,34 @@ internal interface FacetLayout {
     config: Config,
     /** The position channels the cells resolve **independently**, which cannot be aligned. */
     independent: Set<String> = emptySet(),
+    /** The headings this level writes, where the nest folded them together. See [groups]. */
+    headings: Map<String, String>? = null,
+    /**
+     * Whether what this level lays out **has a size of its own**.
+     *
+     * `if (!this.child.component.layoutSize.get(sizeType))` — a band whose child cannot say how
+     * tall it is takes `headerBand: 0.5` and is centred on what it names instead. A cell is such a
+     * child; another grid is not, and that is the only place this is false.
+     */
+    childHasSize: Boolean = true,
+    /**
+     * Whether this grid is **itself a cell** of a grid above it.
+     *
+     * `columnDistinctSignal` answers nothing then — "for nested facet, we will add columns to group
+     * mark instead". A column count read off a domain dataset would be the whole chart's count, and
+     * what such a grid needs is its own cell's, which the group carries as a field.
+     */
+    insideFacet: Boolean = false,
   ): VegaValue
+
+  /**
+   * The heading this level would write over the grid, by channel.
+   *
+   * Exposed because a grid whose cells are grids writes **one** heading for a channel, not one per
+   * level: `parseFacetHeader` folds the child's into its own — "Origin / Cylinders" — and nulls the
+   * child's. So the levels' own headings are collected and the outermost draws the result.
+   */
+  fun headings(config: Config): Map<String, String>
 
   /** The heading over the grid and the bands of shared axes around it, in upstream's order. */
   fun groups(
@@ -396,10 +423,46 @@ internal interface FacetLayout {
     horizontal: List<VegaValue>,
     titleOffset: Double,
     config: Config,
-    /** What a cell's width and height are called, or the expressions they are. */
+    /**
+     * What a cell's width and height are called, or the expressions they are.
+     *
+     * Empty where there is none to state, which is a level whose child is another grid: the band
+     * keeps room for a caption and the grid below sizes its own cells.
+     */
     columnSize: String = "child_width",
     rowSize: String = "child_height",
+    /**
+     * The headings to write instead of this level's own, where the levels were folded together.
+     *
+     * Null asks for its own. Empty says it has none to write — the level above absorbed them.
+     */
+    headings: Map<String, String>? = null,
   ): List<VegaValue>
+
+  /**
+   * A cell that is **itself a grid** — the group an outer level draws around the level below it.
+   *
+   * Nothing about a plotting area belongs here, and that is the whole distinction from [cellGroup]:
+   * no style, no size, no axes, no scales. An intermediate level partitions the table, hands the
+   * level below its own facet values to break that partition down further, and arranges what that
+   * level produced. The cell actually drawn in is the innermost one.
+   */
+  fun nestedCellGroup(
+    dataName: String,
+    counted: Map<String, String>,
+    /** How the level below arranges its own cells, which it does *inside* this group. */
+    innerLayout: VegaValue,
+    /** The level below's own facet values, computed from this partition rather than the table. */
+    innerData: List<VegaValue>,
+    innerMarks: List<VegaValue>,
+    /**
+     * The column the level below counts its own cells by — `distinct_Cylinders`.
+     *
+     * Null unless that level breaks the chart down by **column**: rows stack however many there
+     * are, where columns have to be counted, and counted *per cell* rather than over the chart.
+     */
+    innerColumns: String?,
+  ): VegaValue
 
   fun cellGroup(
     dataName: String,
@@ -508,14 +571,25 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
    * and is 1 when a chart is faceted by rows alone.
    */
   override fun layout(
-    /** The gap between cells: one number, or a `{row, column}` pair where the two differ. */
     spacing: VegaValue,
     titleOffset: Double,
     config: Config,
     independent: Set<String>,
+    headings: Map<String, String>?,
+    childHasSize: Boolean,
+    insideFacet: Boolean,
   ): VegaValue = obj {
-    val titled = titles(config).keys
+    val titled = (headings ?: headings(config)).keys
     put("padding", spacing)
+    // `if (!this.child.component.layoutSize.get(sizeType))`: a band naming another **grid** cannot
+    // be as tall as what it names, there being no one cell to be as tall as, so it is centred on
+    // it.
+    if (!childHasSize) {
+      val banded = listOfNotNull(row, column).map { it.channel }
+      if (banded.isNotEmpty()) {
+        put("headerBand", obj { banded.forEach { put(it, num(0.5)) } })
+      }
+    }
     val offsets =
       listOfNotNull(row?.takeIf { it.channel in titled }, column?.takeIf { it.channel in titled })
     if (offsets.isNotEmpty()) {
@@ -534,7 +608,10 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
       put("titleAnchor", obj { anchors.forEach { put(it.channel, "end") } })
     }
     when {
-      column != null -> put("columns", signalRef("length(data('${column.domainData}'))"))
+      // A **nested** column grid counts its columns per cell, off the group's own field, so there
+      // is nothing to say here; the chart's own count would be every cell's columns at once.
+      column != null ->
+        if (!insideFacet) put("columns", signalRef("length(data('${column.domainData}'))"))
       row != null -> put("columns", num(1))
     }
     put("bounds", "full")
@@ -621,20 +698,17 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
           )
         }
       }
-      put(
-        "encode",
-        obj {
-          put(
-            "update",
-            obj {
-              put(
-                if (isColumn) "width" else "height",
-                signalRef(if (isColumn) columnSize else rowSize),
-              )
-            },
-          )
-        },
-      )
+      // `makeHeaderComponent` states the size only where the child *has* one —
+      // `child.component.layoutSize.get(sizeType)`. A level whose child is another grid has none to
+      // state: the grid below sizes its own cells, and this band is only keeping room for a
+      // caption.
+      val size = if (isColumn) columnSize else rowSize
+      if (size.isNotEmpty()) {
+        put(
+          "encode",
+          obj { put("update", obj { put(if (isColumn) "width" else "height", signalRef(size)) }) },
+        )
+      }
       if (axes.isNotEmpty()) put("axes", arr(axes))
     }
   }
@@ -652,7 +726,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
    * `offset.columnTitle`, and upstream writes the offset only where there is a heading to keep
    * clear — `if (layoutHeaderComponent.title)` in `getHeaderLayoutMixins`.
    */
-  private fun titles(config: Config): Map<String, String> =
+  override fun headings(config: Config): Map<String, String> =
     listOfNotNull(row, column)
       // `"header": null` takes the whole header off — its caption, its labels and the room the
       // layout was keeping for them. It is not the same as a header with nothing in it.
@@ -678,12 +752,13 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
     config: Config,
     columnSize: String,
     rowSize: String,
+    headings: Map<String, String>?,
   ): List<VegaValue> {
     fun leading(axes: List<VegaValue>) = axes.filter {
       it.string("orient") == "left" || it.string("orient") == "top"
     }
     // Both headings first, rows before columns, then the four bands of labels around the grid.
-    val titles = titles(config)
+    val titles = headings ?: headings(config)
     return listOfNotNull(row, column).mapNotNull { facet ->
       titles[facet.channel]?.let { facet.titleGroup(it, titleOffset) }
     } +
@@ -719,6 +794,85 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
    * carries still gets a cell and the grid stays rectangular — `const cross = !!row && !!column` in
    * `compile/facet.ts`.
    */
+  /**
+   * `from.facet` — the partition Vega cuts the table into, one group per cell.
+   *
+   * Shared by the cell a grid draws and by the cell a grid draws when its cells are *themselves*
+   * grids: the partition is the same either way, being a property of this level's own channels.
+   */
+  private fun partition(dataName: String, counted: Map<String, String>): VegaValue = obj {
+    put(
+      "facet",
+      obj {
+        put("name", named("facet"))
+        put("data", dataName)
+        put("groupby", strings(fields))
+        val sorted = listOfNotNull(row, column).filter { it.cellSortAggregate != null }
+        val cardinal = counted.entries.toList()
+        val crossed = row != null && column != null
+        if (row != null && column != null || sorted.isNotEmpty() || cardinal.isNotEmpty()) {
+          put(
+            "aggregate",
+            obj {
+              if (row != null && column != null) put("cross", VegaValue.Bool(true))
+              if (sorted.isNotEmpty() || cardinal.isNotEmpty()) {
+                put(
+                  "fields",
+                  strings(
+                    sorted.map { it.cellSortSource(crossed) } +
+                      cardinal.map { it.value.removePrefix("distinct_") }
+                  ),
+                )
+                put(
+                  "ops",
+                  strings(
+                    sorted.map { it.cellSortOperation(crossed) } + cardinal.map { "distinct" }
+                  ),
+                )
+                put(
+                  "as",
+                  strings(sorted.map { it.cellSortAggregate!! } + cardinal.map { it.value }),
+                )
+              }
+            },
+          )
+        }
+      },
+    )
+  }
+
+  /** The order the cells are laid out in, which is the order their values sort in. */
+  private fun cellSort(): VegaValue = obj {
+    put(
+      "field",
+      strings(listOfNotNull(row, column).map { "datum[${quoted(it.sortKey(inCell = true))}]" }),
+    )
+    put("order", strings(listOfNotNull(row, column).map { it.order }))
+  }
+
+  override fun nestedCellGroup(
+    dataName: String,
+    counted: Map<String, String>,
+    innerLayout: VegaValue,
+    innerData: List<VegaValue>,
+    innerMarks: List<VegaValue>,
+    innerColumns: String?,
+  ): VegaValue = obj {
+    put("name", named("cell"))
+    put("type", "group")
+    put("from", partition(dataName, counted))
+    put("sort", cellSort())
+    // How many columns the grid inside this cell is wide, as a **field of this cell's own row** —
+    // upstream's note points at vega/vega#952: a nested grid's column count is per cell, and the
+    // partition counted it for exactly this.
+    innerColumns?.let {
+      put("encode", obj { put("update", obj { put("columns", obj { put("field", it) }) }) })
+    }
+    if (innerData.isNotEmpty()) put("data", arr(innerData))
+    put("layout", innerLayout)
+    put("marks", arr(innerMarks))
+  }
+
   override fun cellGroup(
     dataName: String,
     marks: List<VegaValue>,
@@ -736,59 +890,8 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
     put("name", named("cell"))
     put("type", "group")
     put("style", style)
-    put(
-      "from",
-      obj {
-        put(
-          "facet",
-          obj {
-            put("name", named("facet"))
-            put("data", dataName)
-            put("groupby", strings(fields))
-            val sorted = listOfNotNull(row, column).filter { it.cellSortAggregate != null }
-            val cardinal = counted.entries.toList()
-            val crossed = row != null && column != null
-            if (row != null && column != null || sorted.isNotEmpty() || cardinal.isNotEmpty()) {
-              put(
-                "aggregate",
-                obj {
-                  if (row != null && column != null) put("cross", VegaValue.Bool(true))
-                  if (sorted.isNotEmpty() || cardinal.isNotEmpty()) {
-                    put(
-                      "fields",
-                      strings(
-                        sorted.map { it.cellSortSource(crossed) } +
-                          cardinal.map { it.value.removePrefix("distinct_") }
-                      ),
-                    )
-                    put(
-                      "ops",
-                      strings(
-                        sorted.map { it.cellSortOperation(crossed) } + cardinal.map { "distinct" }
-                      ),
-                    )
-                    put(
-                      "as",
-                      strings(sorted.map { it.cellSortAggregate!! } + cardinal.map { it.value }),
-                    )
-                  }
-                },
-              )
-            }
-          },
-        )
-      },
-    )
-    put(
-      "sort",
-      obj {
-        put(
-          "field",
-          strings(listOfNotNull(row, column).map { "datum[${quoted(it.sortKey(inCell = true))}]" }),
-        )
-        put("order", strings(listOfNotNull(row, column).map { it.order }))
-      },
-    )
+    put("from", partition(dataName, counted))
+    put("sort", cellSort())
     put(
       "encode",
       obj {
@@ -825,6 +928,10 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
  * The caption moves too. A grid captions each column in a header band above it; a wrapped facet has
  * no such band — its columns are positions, not values — so every **cell** carries its own caption,
  * and the heading over the whole grid is a `column-title` naming the field.
+ */
+/*
+ * A wrapped facet has no heading over the grid — its cells caption themselves — so [headings] is
+ * empty and there is nothing for a level above to fold in.
  */
 internal class FacetWrap(
   val def: ChannelDef,
@@ -938,11 +1045,13 @@ internal class FacetWrap(
   }
 
   override fun layout(
-    /** The gap between cells: one number, or a `{row, column}` pair where the two differ. */
     spacing: VegaValue,
     titleOffset: Double,
     config: Config,
     independent: Set<String>,
+    headings: Map<String, String>?,
+    childHasSize: Boolean,
+    insideFacet: Boolean,
   ): VegaValue = obj {
     put("padding", spacing)
     put("bounds", "full")
@@ -952,6 +1061,8 @@ internal class FacetWrap(
     columns?.let { put("columns", num(it.toDouble())) }
   }
 
+  override fun headings(config: Config): Map<String, String> = emptyMap()
+
   override fun groups(
     vertical: List<VegaValue>,
     horizontal: List<VegaValue>,
@@ -959,6 +1070,7 @@ internal class FacetWrap(
     config: Config,
     columnSize: String,
     rowSize: String,
+    headings: Map<String, String>?,
   ): List<VegaValue> {
     fun leading(axes: List<VegaValue>) = axes.filter {
       it.string("orient") == "left" || it.string("orient") == "top"
@@ -1031,6 +1143,71 @@ internal class FacetWrap(
     }
   }
 
+  /**
+   * `from.facet` — the partition Vega cuts the table into, one group per cell.
+   *
+   * Shared with [nestedCellGroup], the partition being a property of this level's own channel
+   * whether the cell it hands over is drawn in or is another grid.
+   */
+  /** The order the cells are laid out in, which is the order their values sort in. */
+  private fun cellSort(): VegaValue = obj {
+    // The **near** edge alone orders a bucketed grid: a bucket's far edge follows from its near
+    // one, so sorting on both says the same thing twice. `facetSortFields` answers with one name:
+    // the key a stated `sort` had the cell measure, and the facet's own column otherwise.
+    val key = sortField()?.let { (_, _, name) -> "${name}_by_$field" } ?: field
+    put("field", strings(listOf("datum[${quoted(key)}]")))
+    // `facetSortOrder`: a `sort` object says which way in its `order`, a bare `"descending"` says
+    // it by itself, and anything else runs up.
+    val order =
+      (def.sort as? VegaValue.Obj)?.string("order")
+        ?: (def.sort as? VegaValue.Str)?.value?.takeIf { it == "descending" }
+        ?: "ascending"
+    put("order", strings(listOf(order)))
+  }
+
+  private fun partition(dataName: String): VegaValue = obj {
+    put(
+      "facet",
+      obj {
+        put("name", named("facet"))
+        put("data", dataName)
+        put("groupby", strings(fields))
+        // The key each cell is ordered by, measured over the cell's own rows and suffixed with the
+        // faceted column so it cannot collide with the one the domain dataset holds.
+        sortField()?.let { (source, op, name) ->
+          put(
+            "aggregate",
+            obj {
+              put("fields", strings(listOf(source)))
+              put("ops", strings(listOf(op)))
+              put("as", strings(listOf("${name}_by_$field")))
+            },
+          )
+        }
+      },
+    )
+  }
+
+  override fun nestedCellGroup(
+    dataName: String,
+    counted: Map<String, String>,
+    innerLayout: VegaValue,
+    innerData: List<VegaValue>,
+    innerMarks: List<VegaValue>,
+    innerColumns: String?,
+  ): VegaValue = obj {
+    put("name", named("cell"))
+    put("type", "group")
+    put("from", partition(dataName))
+    put("sort", cellSort())
+    innerColumns?.let {
+      put("encode", obj { put("update", obj { put("columns", obj { put("field", it) }) }) })
+    }
+    if (innerData.isNotEmpty()) put("data", arr(innerData))
+    put("layout", innerLayout)
+    put("marks", arr(innerMarks))
+  }
+
   override fun cellGroup(
     dataName: String,
     marks: List<VegaValue>,
@@ -1064,49 +1241,8 @@ internal class FacetWrap(
       },
     )
     put("style", style)
-    put(
-      "from",
-      obj {
-        put(
-          "facet",
-          obj {
-            put("name", named("facet"))
-            put("data", dataName)
-            put("groupby", strings(fields))
-            // The key each cell is ordered by, measured over the cell's own rows and suffixed with
-            // the faceted column so it cannot collide with the one the domain dataset holds.
-            sortField()?.let { (source, op, name) ->
-              put(
-                "aggregate",
-                obj {
-                  put("fields", strings(listOf(source)))
-                  put("ops", strings(listOf(op)))
-                  put("as", strings(listOf("${name}_by_$field")))
-                },
-              )
-            }
-          },
-        )
-      },
-    )
-    put(
-      "sort",
-      obj {
-        // The **near** edge alone orders a bucketed grid: a bucket's far edge follows from its
-        // near one, so sorting on both says the same thing twice. `facetSortFields` answers with
-        // one name: the key a stated `sort` had the cell measure, and the facet's own column
-        // otherwise.
-        val key = sortField()?.let { (_, _, name) -> "${name}_by_$field" } ?: field
-        put("field", strings(listOf("datum[${quoted(key)}]")))
-        // `facetSortOrder`: a `sort` object says which way in its `order`, a bare `"descending"`
-        // says it by itself, and anything else runs up.
-        val order =
-          (def.sort as? VegaValue.Obj)?.string("order")
-            ?: (def.sort as? VegaValue.Str)?.value?.takeIf { it == "descending" }
-            ?: "ascending"
-        put("order", strings(listOf(order)))
-      },
-    )
+    put("from", partition(dataName))
+    put("sort", cellSort())
     put(
       "encode",
       obj {

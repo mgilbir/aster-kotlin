@@ -299,6 +299,28 @@ internal class Parse(
     }
   }
 
+  /**
+   * A facet level's own channels, parsed on their own rather than as part of an encoding.
+   *
+   * A grid whose cells are grids has a level that never reaches any encoding: only the outermost
+   * one is folded down, the rest being kept apart so that two `row` facets do not collide. Each is
+   * parsed here when its turn to be lifted comes.
+   */
+  fun facetChannels(facet: VegaValue.Obj, path: String): Map<String, ChannelDef> {
+    val out = LinkedHashMap<String, ChannelDef>()
+    // A single field is the wrapped form and is the `facet` channel itself; `row` and `column` are
+    // the crossed one. Read in the order written, as `forEachFieldDef` walks them.
+    if (facet.has("row") || facet.has("column")) {
+      facet.fields.forEach { (channel, value) ->
+        if (channel != "row" && channel != "column") return@forEach
+        channelDef(channel, value, "$path.$channel")?.let { out[channel] = it }
+      }
+    } else {
+      channelDef("facet", facet, path)?.let { out["facet"] = it }
+    }
+    return out
+  }
+
   private fun channelDef(channel: String, value: VegaValue, path: String): ChannelDef? {
     if (value !is VegaValue.Obj) {
       diagnostics.error(

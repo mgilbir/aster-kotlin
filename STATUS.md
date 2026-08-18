@@ -698,7 +698,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **624** do now.
+**124 of 627 matched exactly** at the start, and **all 627** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -713,9 +713,9 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and **3** examples still differ. All three are one
-cause — a facet inside a **facet**, described below — and it is the only thing left refused by name.
-Nothing else in the gallery differs at all.
+The sweep has been the working list ever since, and it is now empty: **every one of the 627
+compiles to the specification upstream compiles it to**, property for property. The last cause to
+go was a facet inside a facet, described below.
 
 
 The count went 124 → 138 clean, which understates it: a cause is fixed for every file that carries
@@ -4872,24 +4872,70 @@ inline all the same, so that it tests the grid of maps it was written for rather
 The pattern is the point: four diagnoses read off a symptom, four wrong, each one plausible. The
 symptom was real every time and the cause was never where it looked.
 
-### What a facet inside a facet would take
+### A facet inside a facet
 
-The last refusal that is not geographic, and the shape of it is now known rather than guessed —
-read off upstream's own output for the three gallery charts that ask for it.
+A grid whose every cell is itself a grid is **two levels of cell group**, not one crossed grid, and
+that sentence is the whole of the design. The outer `cell` carries the inner grid's domain dataset,
+its layout and its bands; the inner `child_cell` partitions the outer partition —
+`{"facet": {"name": "child_facet", "data": "facet", …}}` — and holds the marks' own chain in its
+`data`. The names run one level deeper at each step: `child_row_header` inside `cell`, and the cell
+the marks are drawn in is `child_child_width` wide.
 
-A grid whose every cell is itself a grid is two levels of cell group. The outer `cell` carries the
-**inner grid's** domain dataset, its layout and its bands; the inner `child_cell` partitions the
-outer partition — `{"facet": {"name": "child_facet", "data": "facet", …}}` — and holds the marks'
-own chain in its `data`. The names run one level deeper at each step: `child_row_header` inside
-`cell`, and the cell's size is `child_child_width`.
+**The levels have to be kept apart from the start.** The operator form nests `facet`/`spec`
+arbitrarily deep, and folding it into one encoding would have both levels wanting the `row` channel
+— a single lift then reads them as one crossed grid. So the normalizer *peels*: it walks down to the
+view that is actually drawn, collecting a facet definition per level and inheriting data, size and
+transforms on the way, and only the **outermost** level lands in the encoding. That is what leaves
+the one-level path exactly as it was. Each remaining level is put back into an encoding when its turn
+to be lifted comes, which is the same path the outermost took, and `liftFacet` needed nothing new: it
+was already parameterised by the model that owns the grid, so calling it again with the name the last
+call gave the views is what produces `child`, then `child_child`.
 
-Three things stand between here and there. The levels have to be **kept apart**: the operator form
-writes the inner facet's channels into the same encoding as the outer's, where a single lift reads
-them as one crossed grid, so the peeling has to record a definition per level rather than merge them.
-`marks` has to **recurse**, building the innermost cell first and wrapping it in each grid outwards.
-And the data flow splits at the *inner* level: the marks' rows are computed inside `child_cell` from
-the partition it was handed, which is the machinery already written for a cell that computes its own
-rows, applied one level down.
+Everything about a **plotting area** belongs to the innermost level — its style, its size, the scales
+resolved within it, its gridlines. A level above only captions and arranges, so its cell group has no
+style, no size and no axes, and what it holds is the level below's layout, that level's own facet
+values, and what that level drew.
+
+Four rules were read off upstream rather than guessed, and each was its own difference:
+
+- **A heading is folded upward per channel**, not per level. `parseFacetHeader` appends the child's
+  caption to its own and nulls the child's, but only where the parent facets on the same channel, so
+  two row grids one inside the other caption the rows once at the top — `"region / size"` — while a
+  column grid holding row grids captions its columns at the top and its rows inside each cell. Two
+  headings where the same nesting by one channel writes one.
+- **A band naming another grid states no size.** `makeHeaderComponent` asks the child for one and a
+  grid has none to give: there is no single cell to be as tall as. It takes `headerBand: 0.5` and is
+  centred on what it names instead.
+- **Columns are counted per cell.** Rows stack however many there are; a column grid inside a cell
+  has to be counted against *that cell's* rows, so the outer partition aggregates a `distinct_` of
+  the inner level's column and the cell reads it back as the number of columns it is wide. The inner
+  layout then states no count of its own — the chart's own would be every cell's columns at once.
+  Upstream's comment points at vega/vega#952 for why it is a field on the group rather than a signal.
+- **The flow always splits.** What stands under the outer partition is the inner grid's own named
+  point, which is exactly the "fork or named output" `moveFacetDown` stops at — so the marks' chain
+  is computed inside the innermost cell from the partition it was handed, and a copy of it sits
+  beside the chart for the scales to measure. A single-level grid hoists that chain above the facet
+  instead, and both are right.
+
+One thing that only a nest could show: **a partition inside a partition still takes a name from the
+chart's own numbering**, though what hangs below it is assembled into a cell group with a numbering
+of its own. Left unnamed, every dataset the chart derived afterwards came out one number low —
+`data_1` where upstream had `data_2` — which looked like a naming convention and was an arithmetic
+error one level down.
+
+One caveat on the numbering, recorded because it is the part I could not derive: whether that inner
+partition spends a number depends on how the chart's table was written. A URL or generated source
+arrives at the fork already named and spends nothing there, so the partition takes the next number; a
+table written out in the specification was pushed above as a dataset of its own, so the fork names the
+derived one and the partition takes none. Both land on the same name from opposite sides. That is read
+off upstream's own output for a nested grid in each shape — `facet-in-facet-rows.vl.json` states its
+rows inline and the three gallery charts load theirs — rather than off the optimizer, and either rule
+alone gets one of the two shapes wrong.
+
+With this the gallery sweep reaches **627 of 627**. A nested grid inside a *concatenation* is still
+refused by name: the levels would have to be lifted per plot, and that plumbing is not here — so it
+says so rather than compiling one crossed grid, which is what folding the levels would silently
+produce.
 
 ### A grid belongs to the plot that holds it
 

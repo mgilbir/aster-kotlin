@@ -75,9 +75,49 @@ class VegaLiteFixtureTest {
 
   @Test
   fun `an unimplemented composition is refused by name rather than approximated`() {
-    // A facet inside a **facet**: a grid whose every cell is itself a grid needs a second level of
-    // cell groups, which is a layout this compiler does not have. A facet inside a concatenation
-    // does compile — the grid belongs to the plot that holds it.
+    // A grid whose cells are grids compiles at the top of a chart, where each level is lifted in
+    // turn. **Inside a concatenation** the levels would have to be lifted per plot, and that
+    // plumbing is not here — so it is refused by name rather than compiled as one crossed grid,
+    // which is what folding the levels together would silently produce.
+    val compiled =
+      VegaLiteCompiler()
+        .compileJson(
+          """
+          {
+            "data": {"values": [{"a": 1, "b": 2}]},
+            "hconcat": [
+              {
+                "facet": {"column": {"field": "a"}},
+                "spec": {
+                  "facet": {"row": {"field": "b"}},
+                  "spec": {
+                    "mark": "bar",
+                    "encoding": {"x": {"field": "a", "type": "quantitative"}}
+                  }
+                }
+              }
+            ]
+          }
+          """
+            .trimIndent()
+        )
+    val reported =
+      compiled.diagnostics.filter { it.code == VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION }
+    assertTrue(
+      reported.isNotEmpty(),
+      "the nested facet in a concatenation should be reported, got ${compiled.diagnostics}",
+    )
+    assertTrue(
+      reported.first().message.contains("facet"),
+      "the report should name the construct: ${reported.first().message}",
+    )
+  }
+
+  @Test
+  fun `a facet inside a facet compiles rather than being refused`() {
+    // The counterpart of the refusal above, and worth asserting separately: what used to be
+    // reported by name now draws. Two levels of cell group, the inner one holding the marks — so
+    // the innermost cell is named one `child` deeper than a single grid's.
     val compiled =
       VegaLiteCompiler()
         .compileJson(
@@ -93,16 +133,13 @@ class VegaLiteFixtureTest {
           """
             .trimIndent()
         )
-    val reported =
-      compiled.diagnostics.filter { it.code == VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION }
     assertTrue(
-      reported.isNotEmpty(),
-      "the nested facet should be reported, got ${compiled.diagnostics}",
+      compiled.diagnostics.none { it.code == VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION },
+      "a nested grid should compile, got ${compiled.diagnostics}",
     )
-    assertTrue(
-      reported.first().message.contains("facet"),
-      "the report should name the construct: ${reported.first().message}",
-    )
+    val vega = requireNotNull(compiled.toJson()) { "no Vega specification" }
+    assertTrue(vega.contains("child_child_width"), "the innermost cell is two levels deep")
+    assertTrue(vega.contains("child_cell"), "the inner cell group")
   }
 
   companion object {

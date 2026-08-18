@@ -238,6 +238,37 @@ internal class UnitView(
   val projectionFits: Boolean
     get() = projection?.let { it.fields["scale"] == null && it.fields["translate"] == null } == true
 
+  /**
+   * The same view with a different encoding — how a nested facet level gets its turn.
+   *
+   * A grid whose cells are grids keeps its inner levels out of any encoding, so that two `row`
+   * facets do not collide. Each is put back into one for its lift to read and take out again, which
+   * is the same path the outermost level took, and nothing else about the view changes.
+   */
+  fun withEncoding(encoding: Map<String, ChannelDef>): UnitView =
+    UnitView(
+        UnitSpec(
+          markDef = spec.markDef,
+          encoding = encoding,
+          data = spec.data,
+          transforms = spec.transforms,
+          width = spec.width,
+          height = spec.height,
+          params = spec.params,
+          projection = spec.projection,
+        ),
+        config,
+        name,
+        childName,
+        parentIsLayer,
+      )
+      .also {
+        it.transformOwners = transformOwners
+        it.widthSignal = widthSignal
+        it.heightSignal = heightSignal
+        it.selections = selections
+      }
+
   fun prefixed(suffix: String): String =
     Fields.varName(if (name.isEmpty()) suffix else "${name}_$suffix")
 

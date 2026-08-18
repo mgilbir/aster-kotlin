@@ -1027,6 +1027,9 @@ internal class DataAssembler {
   private var sourceIndex = 0
   private var datasetIndex = 0
 
+  /** Whether the fork this walk passed had to name the table it forked at. See [walk]. */
+  private var forkNamedTheTable = false
+
   private class MutableDataset(
     var name: String?,
     var source: String? = null,
@@ -1199,6 +1202,21 @@ internal class DataAssembler {
         } else {
           node.readsFrom(dataset.source!!, datasets.size)
         }
+        // A partition **inside** this one still takes a name from the chart's own numbering, even
+        // though what hangs below it is assembled into a cell group with a numbering of its own. A
+        // grid whose cells are grids is where it tells: leaving the inner partition unnamed here
+        // left every dataset the chart derived afterwards one number low.
+        // A partition **inside** this one is a node in the flow too, and a node in the flow takes a
+        // name — though what hangs below it is assembled into a cell group with a numbering of its
+        // own. Only where the fork did not already spend one on the table itself: read off
+        // upstream's output for a nested grid over a URL source and over one written out in the
+        // specification, which land on the same name from different sides. Left out altogether,
+        // every dataset the chart derived afterwards came out one number low.
+        if (!forkNamedTheTable) {
+          node.children.filterIsInstance<FacetNode>().forEach {
+            walk(it, MutableDataset(name = null, source = node.partition), node)
+          }
+        }
         // Everything below belongs to the cells, and is assembled into their group instead.
         return
       }
@@ -1224,6 +1242,12 @@ internal class DataAssembler {
         }
       1 -> walk(node.children[0], dataset, node)
       else -> {
+        // Whether the table this flow forks at had to be **named here**. A URL or generated source
+        // arrives already named and this spends nothing; a table written out in the specification
+        // was pushed above as a dataset of its own, so the fork names the derived one and spends a
+        // number doing it. The difference decides what is left for a partition inside a partition —
+        // see the note in the facet branch.
+        forkNamedTheTable = dataset.name == null
         if (dataset.name == null) dataset.name = "data_${datasetIndex++}"
         var source = dataset.name
         if (dataset.source == null || dataset.transform.isNotEmpty()) {

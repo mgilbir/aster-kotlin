@@ -76,7 +76,23 @@ private constructor(
         // as much as at the top: the grid it lays out is then this plot's rather than the chart's.
         val child =
           if (!repeated.has("facet")) repeated
-          else FacetOperator.normalize(repeated, diagnostics) ?: return null
+          else {
+            val peeled = FacetOperator.normalize(repeated, diagnostics) ?: return null
+            // A grid whose cells are grids compiles at the top of a chart, where each level is
+            // lifted in turn. Inside a concatenation the levels would have to be lifted per plot,
+            // and that plumbing is not here — so it is refused by name rather than compiled as one
+            // crossed grid, which is what folding the levels together would silently produce.
+            if (peeled.inner.isNotEmpty()) {
+              diagnostics.fatal(
+                VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
+                "A `facet` inside a `facet` inside a `$kind` is not implemented; nested grids " +
+                  "compile at the top of a chart.",
+                jsonPath = "$.$kind[$index].spec.facet",
+              )
+              return null
+            }
+            peeled.spec
+          }
         for (nested in listOf("repeat", "facet")) {
           if (child.has(nested)) {
             diagnostics.fatal(
