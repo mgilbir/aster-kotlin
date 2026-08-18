@@ -327,6 +327,41 @@ each chart together with everything the engine could not honour. `scripts/ios-de
 
 Design decisions are recorded in [docs/adr/](docs/adr/).
 
+## Releasing
+
+Tag it. `.github/workflows/release.yml` does the rest, in three jobs on the hosts that can do the
+work: verification on Linux, publishing from **macOS** because it is the only host that compiles every
+target, and the release page back on Linux.
+
+```sh
+# 1. Bump the one version line and write the changelog section. Both are checked, and the release
+#    fails before publishing anything if either is missing.
+$EDITOR build.gradle.kts CHANGELOG.md
+git commit -am "Aster Vega 0.1.0" && git push
+
+# 2. Tag. That is the trigger, so what is released is exactly what was tagged.
+git tag v0.1.0 && git push origin v0.1.0
+
+# 3. Release the deployment at central.sonatype.com/publishing/deployments — it is uploaded as
+#    USER_MANAGED and waits, because publishing to Central cannot be undone.
+```
+
+Four secrets are needed, and without them the publish step says so and skips rather than failing:
+`CENTRAL_TOKEN_USERNAME`, `CENTRAL_TOKEN_PASSWORD`, `MAVEN_GPG_PRIVATE_KEY` (ASCII-armoured) and
+`MAVEN_GPG_PASSPHRASE`.
+
+Two things in there are worth knowing rather than discovering. Everything is uploaded as **one
+bundle**, checked by `verifyCentralBundle` before it leaves the runner, because uploading publications
+separately lets the server assemble the deployment from whatever it believes arrived — and for
+`ktecma262` 0.1.3 it assembled four modules out of seven, with the dropped ones reporting success.
+And `verifyPublishedVariants` runs on macOS, because Kotlin creates a publication only for targets the
+host can compile while the root module lists every declared one: `ktecma262` 0.1.2 was published from
+Linux with no native variants at all, and a version on Central cannot be replaced.
+
+Swift consumers track `main`. `Package.swift` names an XCFramework attached to a release, and a
+checksum cannot be computed before the artefact exists — so the manifest inside a tag names the
+*previous* release's binary. The release job rewrites it on `main` once the asset is up.
+
 ## Licence
 
 BSD 3-Clause — see [LICENSE](LICENSE).

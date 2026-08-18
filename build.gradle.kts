@@ -345,6 +345,88 @@ configure(subprojects.filter { it.name in publishable }) {
 
   // Gradle cannot infer that each publication's signing task needs the shared javadoc jar first.
   tasks.withType<AbstractPublishToMaven>().configureEach { dependsOn(tasks.withType<Sign>()) }
+
+  /**
+   * Fails when a declared target would not actually be published.
+   *
+   * The root module lists a variant for every *declared* target whichever host built it, but Kotlin
+   * creates a publication only for the targets that host can compile — Apple targets need a Mac. So
+   * publishing from anywhere else uploads a root module pointing at artifacts that were never
+   * built, and nothing goes red until a consumer tries to resolve the dependency. That is how
+   * `ktecma262` 0.1.2 shipped: from Linux, with no native variants at all, immutable before anyone
+   * noticed.
+   *
+   * **Nothing is looked up while the task is registered.** An earlier attempt asked for the Kotlin
+   * and publishing extensions here and failed configuration outright: the root project configures
+   * this block before a module has applied its own plugins, and `vega-compose-multiplatform` uses
+   * the Android multiplatform plugin, whose extensions are not these types even afterwards. Both
+   * sets are read in `afterEvaluate` into properties the task resolves at execution instead, so the
+   * check adapts to whatever a module turns out to be rather than assuming.
+   *
+   * Not wired into `check`: on any host but macOS it is *expected* to fail.
+   */
+  val declaredTargets = objects.setProperty(String::class.java)
+  val publicationNames = objects.setProperty(String::class.java)
+  afterEvaluate {
+    (extensions.findByName("kotlin") as? KotlinMultiplatformExtension)?.let { kmp ->
+      declaredTargets.set(kmp.targets.names.toSortedSet())
+    }
+    extensions.findByType<PublishingExtension>()?.let { published ->
+      publicationNames.set(published.publications.names.toSortedSet())
+    }
+  }
+
+  val moduleMetadata = layout.buildDirectory.file("publications/kotlinMultiplatform/module.json")
+  val label = path
+
+  tasks.register("verifyPublishedVariants") {
+    group = "verification"
+    description = "Check every declared target of this module will really be published"
+    // Matching rather than naming it: a module with no multiplatform metadata has no such task, and
+    // asking for one by name would fail configuration on exactly the modules this skips.
+    dependsOn(tasks.matching { it.name == "generateMetadataFileForKotlinMultiplatformPublication" })
+
+    doLast {
+      val declared = declaredTargets.get()
+      if (declared.isEmpty()) {
+        logger.lifecycle("$label: not a plain multiplatform module; nothing to check")
+        return@doLast
+      }
+      // The common target's publication is named for the plugin, not the target.
+      val expected = declared.map { if (it == "metadata") "kotlinMultiplatform" else it }
+      val present = publicationNames.get()
+      check(present.isNotEmpty()) { "$label: no publications at all — the check would be vacuous" }
+
+      val missing = expected.filterNot { it in present }
+      check(missing.isEmpty()) {
+        buildString {
+          appendLine("$label: no publication for ${missing.joinToString(", ")}")
+          appendLine("Declared targets: ${declared.joinToString(", ")}")
+          appendLine("Publications:     ${present.joinToString(", ")}")
+          append("Apple targets require a macOS host.")
+        }
+      }
+
+      // Non-vacuity: the root module has to carry variants for them, not merely name publications.
+      val json = moduleMetadata.get().asFile
+      check(json.isFile) { "$label: no module metadata at ${json.path}" }
+
+      @Suppress("UNCHECKED_CAST")
+      val parsed = groovy.json.JsonSlurper().parse(json) as Map<String, Any?>
+
+      @Suppress("UNCHECKED_CAST")
+      val variants = (parsed["variants"] as? List<Map<String, Any?>>).orEmpty()
+      val names = variants.mapNotNull { it["name"] as? String }
+      val unlisted =
+        declared
+          .filter { it != "metadata" }
+          .filter { target -> names.none { it.startsWith(target) } }
+      check(unlisted.isEmpty()) {
+        "$label: the root module has no variant for ${unlisted.joinToString(", ")}"
+      }
+      logger.lifecycle("$label: ${declared.size} declared targets, ${names.size} variants")
+    }
+  }
 }
 
 /**
