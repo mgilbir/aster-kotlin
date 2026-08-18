@@ -127,8 +127,9 @@ public object Functions {
       else -> null
     }?.let { TimeStepper(it, 1, zone) }
 
-  /** The function table with d3's own `en-US` locale, which is what upstream produces. */
-  public val functions: Map<String, ExpressionFunction> = buildFunctions(VegaLocale.EnglishUS)
+  /** The function table with d3's own `en-US` locale and no container, as upstream produces. */
+  public val functions: Map<String, ExpressionFunction> =
+    buildFunctions(VegaLocale.EnglishUS, null, null)
 
   /**
    * The same table, with the seven locale-dependent functions bound to [locale].
@@ -139,10 +140,28 @@ public object Functions {
    * `SpecCompiler` takes the locale and hands it down — and the default instance above is returned
    * unchanged for the default locale so nothing pays for a feature it does not use.
    */
-  public fun functionsFor(locale: VegaLocale): Map<String, ExpressionFunction> =
-    if (locale == VegaLocale.EnglishUS) functions else buildFunctions(locale)
+  public fun functionsFor(
+    locale: VegaLocale,
+    /**
+     * The size of the surface the chart is drawn in, which `containerSize()` answers with.
+     *
+     * Null, and therefore `[null, null]`, unless a host says otherwise — see the note on
+     * `containerSize` below for why that is upstream's answer and not a shortcut.
+     */
+    containerWidth: Double? = null,
+    containerHeight: Double? = null,
+  ): Map<String, ExpressionFunction> =
+    if (locale == VegaLocale.EnglishUS && containerWidth == null && containerHeight == null) {
+      functions
+    } else {
+      buildFunctions(locale, containerWidth, containerHeight)
+    }
 
-  private fun buildFunctions(locale: VegaLocale): Map<String, ExpressionFunction> {
+  private fun buildFunctions(
+    locale: VegaLocale,
+    containerWidth: Double?,
+    containerHeight: Double?,
+  ): Map<String, ExpressionFunction> {
     val map = LinkedHashMap<String, ExpressionFunction>()
 
     // ---- arrays and sequences -----------------------------------------------
@@ -980,12 +999,22 @@ public object Functions {
      * Verified against upstream in a `renderer: 'none'` view, which is exactly the configuration
      * the differential oracle renders every fixture in.
      *
-     * A specification that sizes itself from its container therefore gets nothing here, the same
-     * nothing it gets from upstream outside a browser. Reporting the view's own width and height
-     * instead would be a different chart from the one upstream draws.
+     * A specification that sizes itself from its container therefore gets nothing here **unless a
+     * host says otherwise**, which is the same nothing it gets from upstream outside a browser.
+     * Answering with the view's own size by default would be a different chart from the one
+     * upstream draws, and the differential fixtures — `container-size` among them — depend on that.
+     *
+     * A host that *does* know its available width says so, and then `width: "container"` means what
+     * it means in a browser. That is the seam an adopter asked for: a responsive width cannot come
+     * from the specification, so it comes from the one party that knows it.
      */
     map["containerSize"] = ExpressionFunction {
-      VegaValue.Arr(listOf(VegaValue.Null, VegaValue.Null))
+      VegaValue.Arr(
+        listOf(
+          containerWidth?.let { VegaValue.Num(it) } ?: VegaValue.Null,
+          containerHeight?.let { VegaValue.Num(it) } ?: VegaValue.Null,
+        )
+      )
     }
 
     /**

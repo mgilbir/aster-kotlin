@@ -58,7 +58,8 @@ final class ChartSession {
     loader: SpecLibrary.loader,
     scheduler: nil,
     locale: VegaLocale.Companion.shared.EnglishUS,
-    hostConfig: nil
+    hostConfig: nil,
+    containerSize: nil
   )
 
   private var json = ""

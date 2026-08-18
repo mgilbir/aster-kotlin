@@ -62,7 +62,8 @@ enum SpecLibrary {
         randomSeed: 42,
         clock: ClockCompanion.shared.Fixed,
         locale: VegaLocale.Companion.shared.EnglishUS,
-        hostConfig: nil
+        hostConfig: nil,
+        containerSize: nil
       )
       .compileJson(json: request.json, signalOverrides: [:], itemEncodes: [:])
 

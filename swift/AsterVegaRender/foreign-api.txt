@@ -1321,7 +1321,7 @@ FromSpec.isEqual(_:)
 Functions
 Functions.constants
 Functions.functions
-Functions.functionsFor(locale:)
+Functions.functionsFor(locale:containerWidth:containerHeight:)
 Functions.init()
 Functions.knownUnsupported
 Functions.shared
@@ -3772,7 +3772,7 @@ SpecCompiler.Companion.shared
 SpecCompiler.companion
 SpecCompiler.compile(spec:signalOverrides:itemEncodes:)
 SpecCompiler.compileJson(json:signalOverrides:itemEncodes:)
-SpecCompiler.init(textEngine:loader:randomSeed:clock:locale:hostConfig:)
+SpecCompiler.init(textEngine:loader:randomSeed:clock:locale:hostConfig:containerSize:)
 SpecParser
 SpecParser.init()
 SpecParser.parse(root:)
@@ -4379,11 +4379,12 @@ VegaChartController.Companion.init()
 VegaChartController.Companion.shared
 VegaChartController.clearDiagnostics()
 VegaChartController.companion
+VegaChartController.containerSize
 VegaChartController.contentScale
 VegaChartController.diagnostics
 VegaChartController.dispatch(event:)
 VegaChartController.events
-VegaChartController.init(initialScene:textEngine:clock:loader:scheduler:locale:hostConfig:)
+VegaChartController.init(initialScene:textEngine:clock:loader:scheduler:locale:hostConfig:containerSize:)
 VegaChartController.inputs
 VegaChartController.lastCompiled
 VegaChartController.report(diagnostic:)
