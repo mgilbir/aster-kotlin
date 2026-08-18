@@ -32,6 +32,12 @@ internal class VegaAccessibilityHelper(private val view: VegaChartView) :
     val bounds: RectD,
     val node: SceneNode?,
     val selected: Boolean,
+    /** Whether activating it does anything — whether it is a mark. See `AccessibleElement`. */
+    val activatable: Boolean,
+    /**
+     * `aria-roledescription`, which TalkBack reads after the label as the kind of thing this is.
+     */
+    val roleDescription: String?,
   )
 
   private var cachedRevision = Long.MIN_VALUE
@@ -70,6 +76,8 @@ internal class VegaAccessibilityHelper(private val view: VegaChartView) :
         bounds = element.bounds,
         node = element.nodeId?.let { nodesById[it]?.node },
         selected = element.selected,
+        activatable = element.activatable,
+        roleDescription = element.roleDescription,
       )
     }
   }
@@ -101,13 +109,24 @@ internal class VegaAccessibilityHelper(private val view: VegaChartView) :
     }
 
     node.contentDescription = virtual.label
-    node.className = "android.widget.Button"
+    // A **button only where activating it does something.** Every element used to be announced as
+    // one, so TalkBack told a reader they could activate an axis caption and then nothing happened
+    // when they did. `AccessibleElement.activatable` is the engine's own answer to which elements
+    // are
+    // marks; a guide is announced as plain text, which is what it is.
+    node.className = if (virtual.activatable) "android.widget.Button" else "android.widget.TextView"
+    // What kind of thing it is, in words, and in the chart's own language — the engine writes this
+    // through the locale's captions, so a Dutch chart says "lijn-markering" rather than "line
+    // mark".
+    virtual.roleDescription?.let { node.roleDescription = it }
     node.isFocusable = true
     node.isSelected = virtual.selected
     node.setBoundsInParent(toViewRect(virtual.bounds))
     // Only the node's own actions belong here. ExploreByTouchHelper adds and removes the
     // accessibility-focus actions itself and rejects a callback that touches them.
-    if (virtual.node != null) node.addAction(AccessibilityNodeInfoCompat.ACTION_CLICK)
+    if (virtual.activatable && virtual.node != null) {
+      node.addAction(AccessibilityNodeInfoCompat.ACTION_CLICK)
+    }
   }
 
   override fun onPerformActionForVirtualView(

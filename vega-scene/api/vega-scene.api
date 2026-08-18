@@ -25,24 +25,30 @@ public final class dev/aster/vega/scene/AccessibilityDescriptor {
 public final class dev/aster/vega/scene/AccessibilityTree {
 	public static final field INSTANCE Ldev/aster/vega/scene/AccessibilityTree;
 	public static final field MAX_EXPOSED_MARKS I
-	public final fun elements (Ldev/aster/vega/scene/Scene;Ljava/util/Set;)Ljava/util/List;
-	public static synthetic fun elements$default (Ldev/aster/vega/scene/AccessibilityTree;Ldev/aster/vega/scene/Scene;Ljava/util/Set;ILjava/lang/Object;)Ljava/util/List;
+	public final fun elements (Ldev/aster/vega/scene/Scene;Ljava/util/Set;Ldev/aster/vega/model/locale/VegaCaptions;)Ljava/util/List;
+	public static synthetic fun elements$default (Ldev/aster/vega/scene/AccessibilityTree;Ldev/aster/vega/scene/Scene;Ljava/util/Set;Ldev/aster/vega/model/locale/VegaCaptions;ILjava/lang/Object;)Ljava/util/List;
 }
 
 public final class dev/aster/vega/scene/AccessibleElement {
-	public synthetic fun <init> (Ljava/lang/String;Ldev/aster/vega/scene/RectD;Ldev/aster/vega/scene/SceneNodeId;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Ljava/lang/String;Ldev/aster/vega/scene/RectD;Ldev/aster/vega/scene/SceneNodeId;ZZLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ldev/aster/vega/scene/RectD;Ldev/aster/vega/scene/SceneNodeId;ZZLjava/lang/String;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ldev/aster/vega/scene/RectD;Ldev/aster/vega/scene/SceneNodeId;ZZLjava/lang/String;Ljava/lang/String;ZLkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ldev/aster/vega/scene/RectD;
 	public final fun component3-0z_ufP4 ()Ldev/aster/vega/scene/SceneNodeId;
 	public final fun component4 ()Z
 	public final fun component5 ()Z
-	public final fun copy-P3yH6Bg (Ljava/lang/String;Ldev/aster/vega/scene/RectD;Ldev/aster/vega/scene/SceneNodeId;ZZ)Ldev/aster/vega/scene/AccessibleElement;
-	public static synthetic fun copy-P3yH6Bg$default (Ldev/aster/vega/scene/AccessibleElement;Ljava/lang/String;Ldev/aster/vega/scene/RectD;Ldev/aster/vega/scene/SceneNodeId;ZZILjava/lang/Object;)Ldev/aster/vega/scene/AccessibleElement;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()Z
+	public final fun copy-8YWVjd4 (Ljava/lang/String;Ldev/aster/vega/scene/RectD;Ldev/aster/vega/scene/SceneNodeId;ZZLjava/lang/String;Ljava/lang/String;Z)Ldev/aster/vega/scene/AccessibleElement;
+	public static synthetic fun copy-8YWVjd4$default (Ldev/aster/vega/scene/AccessibleElement;Ljava/lang/String;Ldev/aster/vega/scene/RectD;Ldev/aster/vega/scene/SceneNodeId;ZZLjava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Ldev/aster/vega/scene/AccessibleElement;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getActivatable ()Z
 	public final fun getBounds ()Ldev/aster/vega/scene/RectD;
 	public final fun getLabel ()Ljava/lang/String;
 	public final fun getNodeId-0z_ufP4 ()Ldev/aster/vega/scene/SceneNodeId;
+	public final fun getRole ()Ljava/lang/String;
+	public final fun getRoleDescription ()Ljava/lang/String;
 	public final fun getSelected ()Z
 	public fun hashCode ()I
 	public final fun isSummary ()Z

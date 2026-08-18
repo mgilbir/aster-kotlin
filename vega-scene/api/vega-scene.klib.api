@@ -420,8 +420,10 @@ final class dev.aster.vega.scene/AccessibilityDescriptor { // dev.aster.vega.sce
 }
 
 final class dev.aster.vega.scene/AccessibleElement { // dev.aster.vega.scene/AccessibleElement|null[0]
-    constructor <init>(kotlin/String, dev.aster.vega.scene/RectD, dev.aster.vega.scene/SceneNodeId?, kotlin/Boolean, kotlin/Boolean = ...) // dev.aster.vega.scene/AccessibleElement.<init>|<init>(kotlin.String;dev.aster.vega.scene.RectD;dev.aster.vega.scene.SceneNodeId?;kotlin.Boolean;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/String, dev.aster.vega.scene/RectD, dev.aster.vega.scene/SceneNodeId?, kotlin/Boolean, kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean = ...) // dev.aster.vega.scene/AccessibleElement.<init>|<init>(kotlin.String;dev.aster.vega.scene.RectD;dev.aster.vega.scene.SceneNodeId?;kotlin.Boolean;kotlin.Boolean;kotlin.String?;kotlin.String?;kotlin.Boolean){}[0]
 
+    final val activatable // dev.aster.vega.scene/AccessibleElement.activatable|{}activatable[0]
+        final fun <get-activatable>(): kotlin/Boolean // dev.aster.vega.scene/AccessibleElement.activatable.<get-activatable>|<get-activatable>(){}[0]
     final val bounds // dev.aster.vega.scene/AccessibleElement.bounds|{}bounds[0]
         final fun <get-bounds>(): dev.aster.vega.scene/RectD // dev.aster.vega.scene/AccessibleElement.bounds.<get-bounds>|<get-bounds>(){}[0]
     final val isSummary // dev.aster.vega.scene/AccessibleElement.isSummary|{}isSummary[0]
@@ -430,6 +432,10 @@ final class dev.aster.vega.scene/AccessibleElement { // dev.aster.vega.scene/Acc
         final fun <get-label>(): kotlin/String // dev.aster.vega.scene/AccessibleElement.label.<get-label>|<get-label>(){}[0]
     final val nodeId // dev.aster.vega.scene/AccessibleElement.nodeId|{}nodeId[0]
         final fun <get-nodeId>(): dev.aster.vega.scene/SceneNodeId? // dev.aster.vega.scene/AccessibleElement.nodeId.<get-nodeId>|<get-nodeId>(){}[0]
+    final val role // dev.aster.vega.scene/AccessibleElement.role|{}role[0]
+        final fun <get-role>(): kotlin/String? // dev.aster.vega.scene/AccessibleElement.role.<get-role>|<get-role>(){}[0]
+    final val roleDescription // dev.aster.vega.scene/AccessibleElement.roleDescription|{}roleDescription[0]
+        final fun <get-roleDescription>(): kotlin/String? // dev.aster.vega.scene/AccessibleElement.roleDescription.<get-roleDescription>|<get-roleDescription>(){}[0]
     final val selected // dev.aster.vega.scene/AccessibleElement.selected|{}selected[0]
         final fun <get-selected>(): kotlin/Boolean // dev.aster.vega.scene/AccessibleElement.selected.<get-selected>|<get-selected>(){}[0]
 
@@ -438,7 +444,10 @@ final class dev.aster.vega.scene/AccessibleElement { // dev.aster.vega.scene/Acc
     final fun component3(): dev.aster.vega.scene/SceneNodeId? // dev.aster.vega.scene/AccessibleElement.component3|component3(){}[0]
     final fun component4(): kotlin/Boolean // dev.aster.vega.scene/AccessibleElement.component4|component4(){}[0]
     final fun component5(): kotlin/Boolean // dev.aster.vega.scene/AccessibleElement.component5|component5(){}[0]
-    final fun copy(kotlin/String = ..., dev.aster.vega.scene/RectD = ..., dev.aster.vega.scene/SceneNodeId? = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): dev.aster.vega.scene/AccessibleElement // dev.aster.vega.scene/AccessibleElement.copy|copy(kotlin.String;dev.aster.vega.scene.RectD;dev.aster.vega.scene.SceneNodeId?;kotlin.Boolean;kotlin.Boolean){}[0]
+    final fun component6(): kotlin/String? // dev.aster.vega.scene/AccessibleElement.component6|component6(){}[0]
+    final fun component7(): kotlin/String? // dev.aster.vega.scene/AccessibleElement.component7|component7(){}[0]
+    final fun component8(): kotlin/Boolean // dev.aster.vega.scene/AccessibleElement.component8|component8(){}[0]
+    final fun copy(kotlin/String = ..., dev.aster.vega.scene/RectD = ..., dev.aster.vega.scene/SceneNodeId? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean = ...): dev.aster.vega.scene/AccessibleElement // dev.aster.vega.scene/AccessibleElement.copy|copy(kotlin.String;dev.aster.vega.scene.RectD;dev.aster.vega.scene.SceneNodeId?;kotlin.Boolean;kotlin.Boolean;kotlin.String?;kotlin.String?;kotlin.Boolean){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.scene/AccessibleElement.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.aster.vega.scene/AccessibleElement.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.aster.vega.scene/AccessibleElement.toString|toString(){}[0]
@@ -1616,7 +1625,7 @@ final object dev.aster.vega.scene/AccessibilityTree { // dev.aster.vega.scene/Ac
     final const val MAX_EXPOSED_MARKS // dev.aster.vega.scene/AccessibilityTree.MAX_EXPOSED_MARKS|{}MAX_EXPOSED_MARKS[0]
         final fun <get-MAX_EXPOSED_MARKS>(): kotlin/Int // dev.aster.vega.scene/AccessibilityTree.MAX_EXPOSED_MARKS.<get-MAX_EXPOSED_MARKS>|<get-MAX_EXPOSED_MARKS>(){}[0]
 
-    final fun elements(dev.aster.vega.scene/Scene, kotlin.collections/Set<dev.aster.vega.scene/SceneNodeId> = ...): kotlin.collections/List<dev.aster.vega.scene/AccessibleElement> // dev.aster.vega.scene/AccessibilityTree.elements|elements(dev.aster.vega.scene.Scene;kotlin.collections.Set<dev.aster.vega.scene.SceneNodeId>){}[0]
+    final fun elements(dev.aster.vega.scene/Scene, kotlin.collections/Set<dev.aster.vega.scene/SceneNodeId> = ..., dev.aster.vega.model.locale/VegaCaptions = ...): kotlin.collections/List<dev.aster.vega.scene/AccessibleElement> // dev.aster.vega.scene/AccessibilityTree.elements|elements(dev.aster.vega.scene.Scene;kotlin.collections.Set<dev.aster.vega.scene.SceneNodeId>;dev.aster.vega.model.locale.VegaCaptions){}[0]
 }
 
 final object dev.aster.vega.scene/ArcPath { // dev.aster.vega.scene/ArcPath|null[0]
