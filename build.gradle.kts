@@ -35,8 +35,8 @@ val publishable =
  *
  * Eleven modules are published, every one applies `explicitApi()`, and nothing made a change to
  * what they expose *visible*: a removed function or a widened signature reached a consumer's build
- * rather than this repository's diff. `checkLegacyAbi` runs as part of `check`; `./gradlew
- * updateLegacyAbi` rewrites the dumps, and that diff is reviewed as a change to the surface other
+ * rather than this repository's diff. `checkKotlinAbi` runs as part of `check`; `./gradlew
+ * updateKotlinAbi` rewrites the dumps, and that diff is reviewed as a change to the surface other
  * people compile against.
  *
  * Kotlin's own ABI validation rather than the `binary-compatibility-validator` plugin an external
@@ -54,8 +54,10 @@ val publishable =
  * than a silent one. Their surface is small (`VegaChartView`, the `VegaChart` composable and their
  * options) and it is the one place a consumer has to read the diff by hand.
  *
- * The API is `@ExperimentalAbiValidation` and says so. The tasks are `checkLegacyAbi` and
- * `updateLegacyAbi`; the dumps land under each module's `api/`.
+ * The API is `@ExperimentalAbiValidation` and says so. The tasks are `checkKotlinAbi` and
+ * `updateKotlinAbi`; the dumps land under each module's `api/`. The `*LegacyAbi` names are the same
+ * tasks under their first spelling and warn that they are deprecated — Kotlin renamed them once the
+ * feature stopped being about the *legacy* `binary-compatibility-validator` format.
  */
 @OptIn(ExperimentalAbiValidation::class)
 fun KotlinMultiplatformExtension.enableAbiDump() {

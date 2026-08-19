@@ -7,10 +7,18 @@
 # 4. write one vector file per package
 #
 # The vectors are what Vega's own test suite *asks* of Vega, with the answers Vega actually gives —
-# see oracle-js/src/record-upstream-tests.mjs for why they are recorded rather than transcribed. They
-# are checked in, so the JVM tests replay them without Node or a network. This script rewrites them;
-# review the resulting diff the way you would review a golden, because a change means either the port
-# or upstream moved.
+# see oracle-js/src/record-upstream-tests.mjs for why they are recorded rather than transcribed.
+#
+# They are **not** checked in, whatever this comment said before: ten megabytes of derived JSON, and
+# the argument that keeps the Vega-Lite scenes and rendered goldens out of the repository (see
+# docs/adr/0008) keeps these out too. The consequence is the part to remember rather than rediscover:
+# **every host that runs the tests records them first**, because the replay guards assert the harness
+# has not shrunk and therefore *fail* rather than skip on a fresh clone. Both CI jobs do it, and so
+# does the release's publish job — which did not, and that is how the first 0.1.0 attempt died sixteen
+# minutes in, on the one host where nothing had recorded them.
+#
+# This script rewrites them; review the resulting diff the way you would review a golden, because a
+# change means either the port or upstream moved.
 #
 # Upgrading to a new Vega: bump the version in oracle-js/package.json, `npm ci`, run this, read the
 # diff. That is the whole procedure — the tag below is not written down anywhere else.

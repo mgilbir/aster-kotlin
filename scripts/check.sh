@@ -2,9 +2,9 @@
 # Full local verification: formatting, the committed ABI dumps, every JVM test, the core compiled for
 # every target it claims, Android lint and the demo APK. This is the same set the CI workflow runs.
 #
-# `checkLegacyAbi` compares the `api/*.api` and `api/*.klib.api` dumps against what the modules now
+# `checkKotlinAbi` compares the `api/*.api` and `api/*.klib.api` dumps against what the modules now
 # expose, so a change to the public surface — a removed function, a widened signature, a new klib
-# symbol — fails here rather than in a consumer's build. `./gradlew updateLegacyAbi` rewrites them, and
+# symbol — fails here rather than in a consumer's build. `./gradlew updateKotlinAbi` rewrites them, and
 # that diff is reviewed as a change to what other people compile against.
 #
 # The four native compiles are what turned "the core is portable" from a claim into a fact. They cost
@@ -52,7 +52,7 @@ fi
 # A failing task still fails the build.
 ./gradlew --continue \
   spotlessCheck \
-  checkLegacyAbi \
+  checkKotlinAbi \
   test \
   compileKotlinLinuxX64 \
   "${host_tasks[@]}" \
