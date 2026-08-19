@@ -60,12 +60,27 @@ public final class ChartSession {
   ///     engine's own default and the right one: a specification is data, often pasted data, and a URL
   ///     in it asks this process to fetch an address the specification chose.
   ///   - clock: wall-clock milliseconds, for throttling an event stream. Nil uses the system clock.
+  ///   - timeZone: which zone the chart's **local** time is in. Nil is the device's own, which is what
+  ///     a browser has and is right for most charts. Pass one where the reader's zone is not the
+  ///     handset's — a profile setting, an account read from two places — because it decides which day
+  ///     a `time` axis puts a measurement on, which day a `timeunit` buckets it into, and which zone a
+  ///     timestamp with no offset in the data is read in. A `Foundation.TimeZone` is converted by its
+  ///     identifier; one the engine cannot resolve falls back to the device's and says so in
+  ///     `timeZoneFailure` rather than crashing, since an identifier usually comes from a server.
   public init(
     textEngine: MeasuredTextEngine = CoreTextTextEngine(),
     loader: VegaDataLoader? = nil,
-    clock: (@Sendable () -> Int64)? = nil
+    clock: (@Sendable () -> Int64)? = nil,
+    timeZone: Foundation.TimeZone? = nil
   ) {
     let ticker = clock ?? { Int64(Date().timeIntervalSince1970 * 1000) }
+    let resolved = timeZone.flatMap { VegaTimeZones.shared.of(zoneId: $0.identifier) }
+    if let timeZone, resolved == nil {
+      timeZoneFailure =
+        "The engine does not know the time zone '\(timeZone.identifier)', so this chart is drawn in "
+        + "the device's own zone."
+    }
+    engineTimeZone = resolved
     controller = VegaChartController(
       // Kotlin's default arguments do not cross the Obj-C boundary, so each is given explicitly.
       initialScene: Scene.companion.empty(width: 0, height: 0),
@@ -78,9 +93,24 @@ public final class ChartSession {
       scheduler: nil,
       locale: VegaLocale.Companion.shared.EnglishUS,
       hostConfig: nil,
-      containerSize: nil
+      containerSize: nil,
+      timeZone: resolved
     )
   }
+
+  /// The zone handed to the engine, or nil for the device's own.
+  ///
+  /// Kept because the Vega-Lite compiler needs it too: a selection whose `init` is a written date is
+  /// turned into a millisecond while compiling, and a store on a different clock from the axis is a
+  /// brush that starts in the wrong place.
+  private let engineTimeZone: Kotlinx_datetimeTimeZone?
+
+  /// Why a supplied time zone was not used, if it was not. Nil in every ordinary case.
+  ///
+  /// Reported rather than thrown, and reported rather than swallowed: an identifier a server chose can
+  /// be one this platform does not carry, and a chart drawn in the wrong zone silently is worse than
+  /// one that says which zone it is in.
+  public private(set) var timeZoneFailure: String?
 
   public private(set) var scene: AsterVega.Scene?
   public private(set) var diagnostics: [VegaDiagnostic] = []
@@ -157,7 +187,12 @@ public final class ChartSession {
       // `hostConfig` spelled out for the same reason every other argument here is: a Kotlin default
       // argument has no Obj-C representation, so Swift names it or does not compile. A host that themes
       // its charts passes its configuration here and through `VegaChartController`.
-      let converted = VegaLiteInput.shared.toVega(json: specification, hostConfig: nil)
+      let converted =
+        VegaLiteInput.shared.toVega(
+          json: specification,
+          hostConfig: nil,
+          timeZone: engineTimeZone
+        )
       self.grammar = converted.wasVegaLite ? .vegaLite : .vega
       self.vegaLiteDiagnostics = converted.wasVegaLite ? converted.diagnostics : []
       // Falling back to the text as written where Vega-Lite compilation produced nothing: the runtime

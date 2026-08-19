@@ -5,6 +5,7 @@ import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.spec.mergeConfig
+import kotlinx.datetime.TimeZone
 
 /** A compiled Vega-Lite specification: the Vega it became, and everything it could not honour. */
 public data class VegaLiteCompilation(
@@ -58,7 +59,18 @@ public class VegaLiteCompiler(
    * that `point` object verbatim as the overlay mark's definition. A host that has to change one of
    * those is rewriting the specification, and can inject its `config` in the same pass.
    */
-  private val hostConfig: VegaValue? = null
+  private val hostConfig: VegaValue? = null,
+  /**
+   * What **local** time means, or null for the device's own zone.
+   *
+   * Vega-Lite settles almost nothing about time itself — a `timeUnit` becomes a `timeunit`
+   * transform and a temporal channel becomes a `time` scale, both of which the runtime resolves
+   * with the zone it was given, so the seam that matters is `SpecCompiler.timeZone` and this one
+   * only has to agree with it. The exception is a **selection store**: an `init` written as
+   * `{"year": …}` is turned into a millisecond here, at compile time, and a store on a different
+   * clock from the axis is a brush that starts in the wrong place.
+   */
+  private val timeZone: TimeZone? = null,
 ) {
 
   public fun compileJson(json: String): VegaLiteCompilation {
@@ -78,7 +90,7 @@ public class VegaLiteCompiler(
       )
       return VegaLiteCompilation(null, diagnostics.diagnostics)
     }
-    return Compilation(withHostConfig(spec), diagnostics).run()
+    return Compilation(withHostConfig(spec), diagnostics, timeZone).run()
   }
 
   /** The specification with the host's configuration merged **under** its own. */
@@ -101,6 +113,8 @@ private class Compilation(
    */
   private var spec: VegaValue.Obj,
   private val diagnostics: DiagnosticCollector,
+  /** What a selection store's written date is read in; null is the device's own zone. */
+  private val timeZone: TimeZone? = null,
 ) {
 
   private val config = Config(spec.obj("config") ?: VegaValue.EmptyObject)
@@ -785,7 +799,7 @@ private class Compilation(
           selections
             .distinctBy { it.name }
             .sortedByDescending { views.indexOf(it.owner) }
-            .map { it.storeData(it.owner ?: views.firstOrNull(), it.initial) } + data
+            .map { it.storeData(it.owner ?: views.firstOrNull(), it.initial, timeZone) } + data
         ),
       )
       if (sizeSignals.isNotEmpty()) put("signals", arr(sizeSignals))

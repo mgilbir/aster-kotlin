@@ -71,6 +71,8 @@ public class ScaleResolver(
   private val diagnostics: DiagnosticCollector,
   /** Resolves scale properties that a specification supplied as signals. */
   private val numbers: NumberResolver,
+  /** What a `time` scale's local zone is; null is the device's own. See `SpecCompiler.timeZone`. */
+  private val timeZone: TimeZone? = null,
 ) {
 
   public fun resolve(specs: List<ScaleSpec>): Map<String, VegaScale> {
@@ -100,7 +102,7 @@ public class ScaleResolver(
       // that shades its lines by quarter asks for exactly that.
       ScaleType.TIME ->
         if (hasColorRange(spec)) buildSequentialColor(spec)
-        else buildTime(spec, TimeZone.currentSystemDefault())
+        else buildTime(spec, timeZone ?: TimeZone.currentSystemDefault())
       ScaleType.UTC ->
         if (hasColorRange(spec)) buildSequentialColor(spec) else buildTime(spec, TimeZone.UTC)
       ScaleType.BAND -> buildBand(spec)

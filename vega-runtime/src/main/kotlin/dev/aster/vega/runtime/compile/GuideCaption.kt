@@ -80,13 +80,15 @@ internal object GuideCaption {
     formatType: String? = null,
     /** The language every name and number in the sentence is written in. */
     locale: VegaLocale = VegaLocale.EnglishUS,
+    /** What a `formatType: "time"` domain is spoken in; null is the device's own zone. */
+    timeZone: TimeZone? = null,
   ): String? {
     if (scale == null) return null
     return locale.captions.axis(
       vertical = orient == "left" || orient == "right",
       title = title,
       scaleType = typeName(scale, declaredType),
-      domain = domain(scale, format, formatType, locale),
+      domain = domain(scale, format, formatType, locale, timeZone),
     )
   }
 
@@ -107,13 +109,15 @@ internal object GuideCaption {
     formatType: String? = null,
     /** The language every name and number in the sentence is written in. */
     locale: VegaLocale = VegaLocale.EnglishUS,
+    /** What a `formatType: "time"` domain is spoken in; null is the device's own zone. */
+    timeZone: TimeZone? = null,
   ): String? {
     if (scale == null || channels.isEmpty()) return null
     return locale.captions.legend(
       kind = kind,
       title = title,
       channels = channels.map { locale.captions.channelName(it) },
-      domain = domain(scale, format, formatType, locale),
+      domain = domain(scale, format, formatType, locale, timeZone),
     )
   }
 
@@ -141,6 +145,7 @@ internal object GuideCaption {
     format: String? = null,
     formatType: String? = null,
     locale: VegaLocale = VegaLocale.EnglishUS,
+    timeZone: TimeZone? = null,
   ): String =
     when (scale) {
       // An identity scale has no domain to describe: it maps the value itself, so a guide over one
@@ -152,10 +157,12 @@ internal object GuideCaption {
         val write = threshold(format, scale, locale)
         locale.captions.boundaryDomain(scale.thresholds.map(write))
       }
-      is BandScale -> discrete(scale.domain.map { spoken(it, format, formatType, locale) }, locale)
-      is PointScale -> discrete(scale.domain.map { spoken(it, format, formatType, locale) }, locale)
+      is BandScale ->
+        discrete(scale.domain.map { spoken(it, format, formatType, locale, timeZone) }, locale)
+      is PointScale ->
+        discrete(scale.domain.map { spoken(it, format, formatType, locale, timeZone) }, locale)
       is OrdinalScale ->
-        discrete(scale.domain.map { spoken(it, format, formatType, locale) }, locale)
+        discrete(scale.domain.map { spoken(it, format, formatType, locale, timeZone) }, locale)
       is TimeScale -> {
         // A named format wins over the full date, expanded the way a caption expands one: a `%b`
         // axis
@@ -171,19 +178,19 @@ internal object GuideCaption {
       }
       is TransformedScale ->
         continuous(scale.domain.first(), scale.domain.last(), locale) { v, _ ->
-          spokenInstant(v, format, formatType, locale)
+          spokenInstant(v, format, formatType, locale, timeZone)
             ?: spelled(format, scale.domain, locale)?.invoke(v)
             ?: scale.formatTick(v, CAPTION_TICK_COUNT, locale)
         }
       is SequentialColorScale ->
         continuous(scale.domain.first(), scale.domain.last(), locale) { v, _ ->
-          spokenInstant(v, format, formatType, locale)
+          spokenInstant(v, format, formatType, locale, timeZone)
             ?: spelled(format, scale.domain, locale)?.invoke(v)
             ?: scale.formatTick(v, CAPTION_TICK_COUNT, locale)
         }
       is LinearScale ->
         continuous(scale.domain.first(), scale.domain.last(), locale) { v, _ ->
-          spokenInstant(v, format, formatType, locale)
+          spokenInstant(v, format, formatType, locale, timeZone)
             ?: spelled(format, scale.domain, locale)?.invoke(v)
             ?: scale.formatTick(v, CAPTION_TICK_COUNT, locale)
         }
@@ -203,10 +210,11 @@ internal object GuideCaption {
     format: String?,
     formatType: String?,
     locale: VegaLocale,
+    timeZone: TimeZone?,
   ): String? {
     val zone =
       when (formatType) {
-        "time" -> TimeZone.currentSystemDefault()
+        "time" -> timeZone ?: TimeZone.currentSystemDefault()
         "utc" -> TimeZone.UTC
         else -> return null
       }
@@ -296,10 +304,11 @@ internal object GuideCaption {
     format: String?,
     formatType: String?,
     locale: VegaLocale,
+    timeZone: TimeZone?,
   ): String {
     val zone =
       when (formatType) {
-        "time" -> TimeZone.currentSystemDefault()
+        "time" -> timeZone ?: TimeZone.currentSystemDefault()
         "utc" -> TimeZone.UTC
         else -> return value
       }

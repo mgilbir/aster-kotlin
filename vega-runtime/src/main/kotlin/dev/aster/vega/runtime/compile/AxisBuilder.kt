@@ -47,6 +47,7 @@ import dev.aster.vega.scene.TextRun
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.transformedBounds
 import kotlin.math.floor
+import kotlinx.datetime.TimeZone
 
 /**
  * Generates axis scene nodes: ticks, labels, gridlines and the domain line.
@@ -96,6 +97,14 @@ public class AxisBuilder(
    * a chart compiled without one is what upstream draws.
    */
   private val locale: VegaLocale = VegaLocale.EnglishUS,
+  /**
+   * What a `formatType: "time"` label and caption are written in; null is the device's own zone.
+   *
+   * A **temporal scale** does not read this — its zone is settled when the scale is built, and
+   * `utc` stays UTC — so this is the case where a guide declares the grammar itself, over a band of
+   * instants with no temporal scale to infer one from.
+   */
+  private val timeZone: TimeZone? = null,
 ) {
 
   /** One tick's label text and its position along the axis. */
@@ -521,6 +530,7 @@ public class AxisBuilder(
                       specifier,
                       spec.formatType,
                       locale,
+                      timeZone,
                     ))
                   ?.let {
                     AccessibilityDescriptor(
@@ -1187,7 +1197,7 @@ public class AxisBuilder(
     // ones whose labels would otherwise be their own values. It is what a chart uses to label a
     // band of instants, since there is no temporal scale anywhere to infer it from.
     // `formatType` decides the grammar and the shared formatter knows how; see [GuideFormat].
-    GuideFormat.timeLabeller(format, formatType, locale)?.let { write ->
+    GuideFormat.timeLabeller(format, formatType, locale, timeZone)?.let { write ->
       return { value ->
         val instant = value.asDouble()
         if (instant.isNaN()) value.asString() else write(instant)
@@ -1414,7 +1424,7 @@ public class AxisBuilder(
     formatType: String?,
   ): (VegaValue) -> String {
     if (scale is QuantizeScale) {
-      GuideFormat.timeLabeller(specifier, formatType, locale)?.let { write ->
+      GuideFormat.timeLabeller(specifier, formatType, locale, timeZone)?.let { write ->
         return { value ->
           val instant = value.asDouble()
           if (instant.isNaN()) value.asString() else write(instant)

@@ -74,7 +74,18 @@ internal class DataResolver(
    */
   private val random: RandomStream = RandomStream(),
   private val clock: Clock = Clock.Fixed,
+  /**
+   * What **local** time means while reading this specification's data; null is the device's zone.
+   *
+   * `format.parse` is where it bites: `{"parse": {"t": "date"}}` on `2026-05-20T00:30` has to pick
+   * a zone, and `Date.parse` picks the local one. A `utc:` pattern is unaffected, as upstream's is.
+   */
+  private val timeZone: TimeZone? = null,
 ) {
+
+  /** The zone a naive date in this specification's data is read in. */
+  private val local: TimeZone
+    get() = timeZone ?: TimeZone.currentSystemDefault()
 
   /**
    * The address a `{"signal": ...}` url resolves to, or null with a diagnostic.
@@ -438,6 +449,7 @@ internal class DataResolver(
             clock,
             projections,
             refreshProjections,
+            timeZone,
           )
         values = pipeline.run(values, spec.transform, context)
         tree = context.tree
@@ -482,7 +494,7 @@ internal class DataResolver(
         if (integer && (numeric == null || numeric.value != kotlin.math.floor(numeric.value))) {
           integer = false
         }
-        if (date && DateValues.parse(value) == null) date = false
+        if (date && DateValues.parse(value, local) == null) date = false
         if (!boolean && !integer && !number && !date) break
       }
       if (!seen) continue
@@ -505,7 +517,7 @@ internal class DataResolver(
           when (kind) {
             "boolean" -> VegaValue.Bool(JsSemantics.truthy(raw) && raw.asString() != "false")
             "number" -> VegaValue.Num(raw.asDouble())
-            else -> DateValues.parse(raw) ?: raw
+            else -> DateValues.parse(raw, local) ?: raw
           }
       }
       VegaValue.Obj(fields)
@@ -526,7 +538,7 @@ internal class DataResolver(
       if (pattern.last() == pattern.first()) pattern = pattern.substring(1, pattern.length - 1)
     }
     if (pattern.isEmpty()) return null
-    val zone = if (utc) TimeZone.UTC else TimeZone.currentSystemDefault()
+    val zone = if (utc) TimeZone.UTC else local
     val millis = TimeParse.parse(raw.asString(), pattern, zone, utc) ?: return null
     return VegaValue.Timestamp(millis)
   }
@@ -553,7 +565,7 @@ internal class DataResolver(
           // to `timeParse` or `utcParse`. Without it a whole column stayed text: 406 rows of one
           // published example, whose year axis was drawn from strings.
           kind.startsWith("date:") || kind.startsWith("utc:") -> patternedDate(raw, kind)
-          kind.equals("date", ignoreCase = true) -> DateValues.parse(raw)
+          kind.equals("date", ignoreCase = true) -> DateValues.parse(raw, local)
           kind.equals("number", ignoreCase = true) -> VegaValue.Num(raw.asDouble())
           kind.equals("string", ignoreCase = true) -> VegaValue.Str(raw.asString())
           kind.equals("boolean", ignoreCase = true) -> VegaValue.Bool(JsSemantics.truthy(raw))
@@ -603,6 +615,8 @@ internal class DataResolver(
     /** See [resolve]: rebuilds them when a transform has published something a fit reads. */
     private val refreshProjections:
       ((Map<String, VegaValue>) -> Map<String, ProjectionDefinition>)?,
+    /** What `timeunit: "local"` means in this compile; null is the device's own zone. */
+    override val timeZone: TimeZone?,
   ) : TransformContext {
 
     /**

@@ -548,6 +548,7 @@ public abstract interface class dev/aster/vega/dataflow/transform/TransformConte
 	public abstract fun getDiagnostics ()Ldev/aster/vega/model/DiagnosticCollector;
 	public abstract fun getExpressions ()Ldev/aster/vega/expression/ExpressionCompiler;
 	public abstract fun getScope ()Ldev/aster/vega/expression/ExpressionScope;
+	public fun getTimeZone ()Lkotlinx/datetime/TimeZone;
 	public abstract fun getTree ()Ldev/aster/vega/dataflow/transform/TreeSource;
 	public fun measureText (Ljava/lang/String;D)D
 	public fun projection (Ljava/lang/String;)Ldev/aster/vega/dataflow/transform/ProjectionDefinition;
@@ -557,6 +558,7 @@ public abstract interface class dev/aster/vega/dataflow/transform/TransformConte
 }
 
 public final class dev/aster/vega/dataflow/transform/TransformContext$DefaultImpls {
+	public static fun getTimeZone (Ldev/aster/vega/dataflow/transform/TransformContext;)Lkotlinx/datetime/TimeZone;
 	public static fun measureText (Ldev/aster/vega/dataflow/transform/TransformContext;Ljava/lang/String;D)D
 	public static fun projection (Ldev/aster/vega/dataflow/transform/TransformContext;Ljava/lang/String;)Ldev/aster/vega/dataflow/transform/ProjectionDefinition;
 }

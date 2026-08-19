@@ -128,7 +128,7 @@ AxisBuilder.BuiltAxis.init(node:guideBounds:)
 AxisBuilder.BuiltAxis.isEqual(_:)
 AxisBuilder.BuiltAxis.node
 AxisBuilder.build(declared:extent:gridSize:)
-AxisBuilder.init(scales:scaleTypes:ids:textEngine:diagnostics:numbers:channels:locale:)
+AxisBuilder.init(scales:scaleTypes:ids:textEngine:diagnostics:numbers:channels:locale:timeZone:)
 AxisDefaults
 AxisDefaults.BAND_POSITION
 AxisDefaults.CRISP_OFFSET
@@ -1321,7 +1321,7 @@ FromSpec.isEqual(_:)
 Functions
 Functions.constants
 Functions.functions
-Functions.functionsFor(locale:containerWidth:containerHeight:)
+Functions.functionsFor(locale:containerWidth:containerHeight:timeZone:)
 Functions.init()
 Functions.knownUnsupported
 Functions.shared
@@ -3356,7 +3356,7 @@ SampleTransform.init()
 SampleTransform.shared
 SampleTransform.type
 ScaleResolver
-ScaleResolver.init(datasets:size:diagnostics:numbers:)
+ScaleResolver.init(datasets:size:diagnostics:numbers:timeZone:)
 ScaleResolver.resolve(specs:)
 ScaleSpec
 ScaleSpec.align
@@ -3772,7 +3772,7 @@ SpecCompiler.Companion.shared
 SpecCompiler.companion
 SpecCompiler.compile(spec:signalOverrides:itemEncodes:)
 SpecCompiler.compileJson(json:signalOverrides:itemEncodes:)
-SpecCompiler.init(textEngine:loader:randomSeed:clock:locale:hostConfig:containerSize:)
+SpecCompiler.init(textEngine:loader:randomSeed:clock:locale:hostConfig:containerSize:timeZone:)
 SpecParser
 SpecParser.init()
 SpecParser.parse(root:)
@@ -4278,6 +4278,7 @@ TransformContext.projection(name:)
 TransformContext.scope
 TransformContext.scopeFor(datum:)
 TransformContext.setSignal(name:value:)
+TransformContext.timeZone
 TransformContext.tree
 TransformKt
 TransformKt.compareFieldValues(left:right:)
@@ -4384,7 +4385,7 @@ VegaChartController.contentScale
 VegaChartController.diagnostics
 VegaChartController.dispatch(event:)
 VegaChartController.events
-VegaChartController.init(initialScene:textEngine:clock:loader:scheduler:locale:hostConfig:containerSize:)
+VegaChartController.init(initialScene:textEngine:clock:loader:scheduler:locale:hostConfig:containerSize:timeZone:)
 VegaChartController.inputs
 VegaChartController.lastCompiled
 VegaChartController.report(diagnostic:)
@@ -4432,7 +4433,7 @@ VegaLiteCompilation.vega
 VegaLiteCompiler
 VegaLiteCompiler.compile(spec:)
 VegaLiteCompiler.compileJson(json:)
-VegaLiteCompiler.init(hostConfig:)
+VegaLiteCompiler.init(hostConfig:timeZone:)
 VegaLiteConversion
 VegaLiteConversion.description()
 VegaLiteConversion.diagnostics
@@ -4521,6 +4522,12 @@ VegaSpecException.init(cause:)
 VegaSpecException.init(diagnostic:cause:)
 VegaSpecException.init(message:)
 VegaSpecException.init(message:cause:)
+VegaTimeZones
+VegaTimeZones.device
+VegaTimeZones.init()
+VegaTimeZones.of(zoneId:)
+VegaTimeZones.shared
+VegaTimeZones.utc
 VegaValue
 VegaValueCompanion
 VegaValueCompanion.EmptyArray
@@ -4570,7 +4577,7 @@ curve(points:kind:horizontal:tension:partOfArea:)
 toSvg(options:)
 toSvg(options:).displayLine(line:measure:)
 toSvg(options:).displayLines(measure:)
-toVega(json:hostConfig:)
+toVega(json:hostConfig:timeZone:)
 transformedBy(transform:)
 transformedBy(transform:).findNode(id:)
 transformedBy(transform:).flatten()

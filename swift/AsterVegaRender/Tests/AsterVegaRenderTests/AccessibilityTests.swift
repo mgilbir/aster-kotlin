@@ -22,7 +22,8 @@ final class AccessibilityTests: XCTestCase {
       clock: ClockCompanion.shared.Fixed,
       locale: VegaLocale.Companion.shared.EnglishUS,
       hostConfig: nil,
-      containerSize: nil
+      containerSize: nil,
+      timeZone: nil
     )
     .compileJson(json: json, signalOverrides: [:], itemEncodes: [:])
     return try XCTUnwrap(compiled.scene)

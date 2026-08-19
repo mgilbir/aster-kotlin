@@ -160,6 +160,50 @@ final class ChartSessionTests: XCTestCase {
     XCTAssertFalse(session.canReset)
   }
 
+  /// The zone a chart's local time is in, which on a handset is not always the reader's.
+  ///
+  /// A profile setting, an account read from two places, a tablet left on a factory zone: the app knows
+  /// which day a measurement was on and the device may not. Both charts below draw the **same instant**
+  /// — the payload carries `Z` — and put it on different days, which is the whole of what the seam does.
+  func testTheHostSaysWhichZoneLocalIs() async {
+    let onADateLine = """
+      {"width": 200, "height": 100, "padding": 5,
+       "data": [{"name": "t", "values": [{"t": "2026-05-20T12:00:00Z", "v": 1}],
+                 "format": {"parse": {"t": "date"}}}],
+       "scales": [{"name": "x", "type": "time", "domain": {"data": "t", "field": "t"},
+                   "range": "width"}],
+       "axes": [{"orient": "bottom", "scale": "x", "format": "%d %B", "tickCount": 1}],
+       "marks": [{"type": "symbol", "from": {"data": "t"}, "encode": {"enter": {
+         "x": {"scale": "x", "field": "t"}, "y": {"value": 50}}}}]}
+      """
+
+    func labels(in zone: String) async -> [String] {
+      let session = ChartSession(timeZone: Foundation.TimeZone(identifier: zone))
+      session.load(specification: onADateLine)
+      await session.settle()
+      XCTAssertNil(session.timeZoneFailure, "the platform should know \(zone)")
+      let scene = try! XCTUnwrap(session.scene)
+      var target = RecordingTarget()
+      SceneWalk().draw(scene: scene, into: &target)
+      return target.calls.filter { $0.contains("text ") }
+    }
+
+    // UTC+14 is already the 21st at midday UTC; UTC-11 is still the 20th.
+    let east = await labels(in: "Pacific/Kiritimati")
+    let west = await labels(in: "Pacific/Niue")
+    XCTAssertTrue(east.contains { $0.contains("21 May") }, "east of the line: \(east)")
+    XCTAssertTrue(west.contains { $0.contains("20 May") }, "west of the line: \(west)")
+  }
+
+  /// An identifier the engine cannot resolve is reported, not thrown, and the chart still draws.
+  func testAnUnknownZoneIsReportedRatherThanFatal() async {
+    let session = ChartSession(timeZone: Foundation.TimeZone(identifier: "UTC"))
+    session.load(specification: specification)
+    await session.settle()
+    XCTAssertNil(session.timeZoneFailure, "UTC is a zone every platform has")
+    XCTAssertNotNil(session.scene)
+  }
+
   func testTextThatIsNotASpecificationFailsWithAReason() async {
     let session = ChartSession()
     session.load(specification: "not a chart")

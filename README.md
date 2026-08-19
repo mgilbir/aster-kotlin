@@ -303,6 +303,43 @@ a plural with a number. `VegaCaptions.English` is upstream's own wording and the
 January in every language — d3's parsing is part of the wire format — so `TimeFormat.MONTHS` stays
 English and only what is *written* follows the locale.
 
+## Time zone example
+
+A chart of days needs to know which zone the days are in, and on a handset that is not always the
+device's. So `timeZone` sits beside `locale` — a different question with the same shape, since a Dutch
+reader in Curaçao needs one of each:
+
+```kotlin
+val controller = VegaChartController(
+    textEngine = view.chartTextEngine,
+    // Whatever the app already knows the reader's zone to be: a profile setting, an account
+    // preference, `java.util.TimeZone.getDefault().id` for the device's own.
+    timeZone = VegaTimeZones.of(profile.timeZoneId),
+)
+```
+
+`VegaTimeZones.of` answers **null** for an identifier the platform does not carry rather than throwing,
+because that string usually comes from a server; null means "the device's own zone", which is what every
+host had before this existed and is what upstream does.
+
+It settles four things, and the last is the one worth reading twice:
+
+- a `time` scale's ticks, and therefore where a mark lands and what its label says;
+- `timeunit`'s buckets — which day, week or hour a row is grouped into;
+- the local expression functions (`hours`, `timeFormat`, `datetime`, `timeOffset`, …);
+- and **`format.parse`**: a timestamp with no offset in the data, `2026-05-20T00:30`, names a different
+  instant in every zone, and `Date.parse` reads it in local time. So the zone decides what local *is*,
+  not whether it applies.
+
+The `utc` forms are untouched: a `utc` scale, a `utc:` parse pattern and the `utc*` functions stay UTC
+whatever a host says. One consequence of upstream's rules is easy to misread as a bug —
+`utchours("2026-05-20T00:30")` **parses** that string in local time and only then reads the hour in UTC,
+so its answer moves with this setting too. `TimeZoneTest` pins each of these.
+
+Since the zone is a **compile** input, it is set where the controller or `SpecCompiler` is built. The
+Compose renderer draws a scene that has already been compiled, so there is nothing to pass there;
+`ChartSession(timeZone:)` is the seam on iOS and takes a `Foundation.TimeZone`.
+
 ## Interaction example
 
 ```kotlin

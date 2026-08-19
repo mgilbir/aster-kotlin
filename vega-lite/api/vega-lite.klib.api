@@ -26,7 +26,7 @@ final class dev.aster.vegalite/VegaLiteCompilation { // dev.aster.vegalite/VegaL
 }
 
 final class dev.aster.vegalite/VegaLiteCompiler { // dev.aster.vegalite/VegaLiteCompiler|null[0]
-    constructor <init>(dev.aster.vega.model/VegaValue? = ...) // dev.aster.vegalite/VegaLiteCompiler.<init>|<init>(dev.aster.vega.model.VegaValue?){}[0]
+    constructor <init>(dev.aster.vega.model/VegaValue? = ..., kotlinx.datetime/TimeZone? = ...) // dev.aster.vegalite/VegaLiteCompiler.<init>|<init>(dev.aster.vega.model.VegaValue?;kotlinx.datetime.TimeZone?){}[0]
 
     final fun compile(dev.aster.vega.model/VegaValue): dev.aster.vegalite/VegaLiteCompilation // dev.aster.vegalite/VegaLiteCompiler.compile|compile(dev.aster.vega.model.VegaValue){}[0]
     final fun compileJson(kotlin/String): dev.aster.vegalite/VegaLiteCompilation // dev.aster.vegalite/VegaLiteCompiler.compileJson|compileJson(kotlin.String){}[0]
@@ -80,5 +80,5 @@ final object dev.aster.vegalite/VegaLiteDiagnostics { // dev.aster.vegalite/Vega
 
 final object dev.aster.vegalite/VegaLiteInput { // dev.aster.vegalite/VegaLiteInput|null[0]
     final fun isVegaLite(dev.aster.vega.model/VegaValue): kotlin/Boolean // dev.aster.vegalite/VegaLiteInput.isVegaLite|isVegaLite(dev.aster.vega.model.VegaValue){}[0]
-    final fun toVega(kotlin/String, dev.aster.vega.model/VegaValue? = ...): dev.aster.vegalite/VegaLiteConversion // dev.aster.vegalite/VegaLiteInput.toVega|toVega(kotlin.String;dev.aster.vega.model.VegaValue?){}[0]
+    final fun toVega(kotlin/String, dev.aster.vega.model/VegaValue? = ..., kotlinx.datetime/TimeZone? = ...): dev.aster.vegalite/VegaLiteConversion // dev.aster.vegalite/VegaLiteInput.toVega|toVega(kotlin.String;dev.aster.vega.model.VegaValue?;kotlinx.datetime.TimeZone?){}[0]
 }

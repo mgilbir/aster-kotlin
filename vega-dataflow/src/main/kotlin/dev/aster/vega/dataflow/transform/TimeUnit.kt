@@ -95,10 +95,13 @@ public object TimeUnitTransform : Transform {
       )
     }
     val declared = if (inferUnits) emptyList() else stated
+    // `local` is whatever the host said local is, and the device's zone where it said nothing. The
+    // fallback for an unknown name is local too, which is upstream's — it reports and carries on.
+    val local = context.timeZone ?: TimeZone.currentSystemDefault()
     val zone =
       when ((params.fields["timezone"] as? VegaValue.Str)?.value?.lowercase()) {
         null,
-        "local" -> TimeZone.currentSystemDefault()
+        "local" -> local
         "utc" -> TimeZone.UTC
         else -> {
           context.diagnostics.warn(
@@ -106,7 +109,7 @@ public object TimeUnitTransform : Transform {
             "timeunit knows only 'local' and 'utc' timezones; using local",
             operator = type,
           )
-          TimeZone.currentSystemDefault()
+          local
         }
       }
 
@@ -114,7 +117,7 @@ public object TimeUnitTransform : Transform {
       if (declared.isNotEmpty()) null
       else {
         val instants = input.mapNotNull {
-          DateValues.parse(it.field(fieldPath))?.asNumberOrNull()?.takeIf { v ->
+          DateValues.parse(it.field(fieldPath), local)?.asNumberOrNull()?.takeIf { v ->
             v.isFinite()
           }
         }
@@ -185,7 +188,7 @@ public object TimeUnitTransform : Transform {
     var lowest = Double.POSITIVE_INFINITY
     var highest = Double.NEGATIVE_INFINITY
     val bucketed = input.map { datum ->
-      val instant = DateValues.parse(datum.field(fieldPath))?.asNumberOrNull()
+      val instant = DateValues.parse(datum.field(fieldPath), local)?.asNumberOrNull()
       if (instant == null || !instant.isFinite()) {
         datum.withFields(
           if (interval) {

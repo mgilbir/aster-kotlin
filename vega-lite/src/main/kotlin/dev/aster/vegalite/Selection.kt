@@ -3,6 +3,7 @@ package dev.aster.vegalite
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.canonicalNumberString
+import kotlinx.datetime.TimeZone
 
 /**
  * A selection parameter: the set of rows a reader has picked, as Vega state.
@@ -374,7 +375,12 @@ internal class Selection(
    * reads it back. A selection that remembers rows by identity keeps the store sorted by that
    * identity, which is what makes the set comparable between one render and the next.
    */
-  fun storeData(view: UnitView?, initial: VegaValue?): VegaValue = obj {
+  /**
+   * @param timeZone what a written date in [initial] is read in; null is the device's own zone. The
+   *   store carries a millisecond rather than an expression, so this is the one place in a
+   *   selection where the zone has to be settled at compile time.
+   */
+  fun storeData(view: UnitView?, initial: VegaValue?, timeZone: TimeZone? = null): VegaValue = obj {
     put("name", store)
     // A stated starting extent is a row **already** in the store: the chart opens with the brush
     // drawn and everything reading it already filtered, rather than opening empty and waiting for a
@@ -421,7 +427,10 @@ internal class Selection(
                     when (stated) {
                       null -> VegaValue.Null
                       is VegaValue.Obj ->
-                        VegaValue.Num(Transforms(DiagnosticCollector()).dateTimeTimestamp(stated))
+                        VegaValue.Num(
+                          Transforms(DiagnosticCollector(), timeZone = timeZone)
+                            .dateTimeTimestamp(stated)
+                        )
                       else -> stated
                     }
                   }

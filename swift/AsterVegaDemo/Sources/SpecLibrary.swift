@@ -63,7 +63,8 @@ enum SpecLibrary {
         clock: ClockCompanion.shared.Fixed,
         locale: VegaLocale.Companion.shared.EnglishUS,
         hostConfig: nil,
-        containerSize: nil
+        containerSize: nil,
+        timeZone: nil
       )
       .compileJson(json: request.json, signalOverrides: [:], itemEncodes: [:])
 

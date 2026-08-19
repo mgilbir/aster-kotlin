@@ -41,6 +41,7 @@ import dev.aster.vega.scene.SizeD
 import dev.aster.vega.scene.TextEngine
 import dev.aster.vega.scene.Transform2D
 import kotlin.math.ceil
+import kotlinx.datetime.TimeZone
 
 /** A compiled specification: the scene, the scales it built, and everything it could not honour. */
 public data class CompiledSpec(
@@ -161,6 +162,30 @@ public class SpecCompiler(
    * the half it knows.
    */
   private val containerSize: SizeD? = null,
+  /**
+   * What **local** time means, or null for the device's own zone.
+   *
+   * Every date in a specification is an instant, and which day one falls on has an answer only in
+   * some zone. Upstream has two — the browser's for `time` scales, `timeunit: "local"` and the
+   * local expression functions, and UTC for the `utc` forms — and it needs no more, because a
+   * browser is always on the device it draws for. An app is not: the zone a reader lives in can
+   * differ from the zone the device is set to, and a chart of days then disagrees with the rest of
+   * the app about which day a measurement was on. A diary bucketed by day, or into morning and
+   * evening, is the same case; it has no Vega-Lite time unit at all and has to be binned against a
+   * stated zone.
+   *
+   * So a host may say which zone local is. Null keeps upstream's behaviour exactly, and keeps
+   * reading the zone when it is needed rather than capturing it, so a long-lived process follows a
+   * change of the system zone.
+   *
+   * It reaches four things: a `time` scale's ticks and labels, `timeunit`'s buckets, the local
+   * expression functions, and `format.parse`. The last is not an oversight — a naive timestamp in
+   * the data is read in local time because that is what `Date.parse` does, so this settles what
+   * local *is* rather than whether it applies. `utc` scales, `utc:` parse patterns and the `utc*`
+   * functions are unaffected. See `VegaTimeZones`, whose `of` answers null rather than throwing on
+   * an identifier that came from a server.
+   */
+  private val timeZone: TimeZone? = null,
 ) {
 
   public fun compileJson(
@@ -340,6 +365,7 @@ public class SpecCompiler(
               locale,
               containerWidth = containerSize?.width?.takeIf { it > 0.0 },
               containerHeight = containerSize?.height?.takeIf { it > 0.0 },
+              timeZone = timeZone,
             )
           )
         )
@@ -399,7 +425,7 @@ public class SpecCompiler(
     val unresolvedSignals = spec.signals.mapTo(mutableSetOf()) { it.name }
     val unbuiltScales = spec.scales.mapTo(mutableSetOf()) { it.name }
 
-    val data = DataResolver(diagnostics, expressions, loader, stream, clock)
+    val data = DataResolver(diagnostics, expressions, loader, stream, clock, timeZone)
     for (operator in order.order) {
       when (operator) {
         is Operator.Signal -> {
@@ -461,6 +487,7 @@ public class SpecCompiler(
                   plotSize(signalValues, width, height),
                   diagnostics,
                   NumberResolver(expressions, scope, diagnostics),
+                  timeZone,
                 )
                 .resolve(listOf(it))
             )
@@ -534,6 +561,7 @@ public class SpecCompiler(
         clock,
         itemEncodes,
         locale,
+        timeZone,
       )
     val scope =
       scopeCompiler.compile(

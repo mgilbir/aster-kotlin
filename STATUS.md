@@ -4399,6 +4399,53 @@ Two caveats on the number. It is a desktop JVM with the JIT warm, which is the m
 there is; and it measures compilation only, not the Canvas draw that follows. It is an order of
 magnitude, enough to rule an approach in, and not a substitute for measuring on hardware.
 
+## A host says which zone a chart's local time is in
+
+Upstream Vega has exactly two zones: the browser's own, for `time` scales, `timeunit: "local"` and the
+local expression functions, and UTC for the `utc` forms. It needs no third, because a browser is always
+running on the device it draws for. An app is not. A reader's zone comes from their profile as often as
+from their handset — somebody travelling, a tablet on a factory-set zone, an account read from two
+places — and a chart *of days* has to agree with the rest of the app about which day a measurement was
+on. The adopting team named it as an engine requirement for exactly the case that has no Vega-Lite time
+unit at all: a diary bucketed into morning, afternoon and evening, which a host has to bin itself and
+then hand to an axis on the same clock.
+
+So `SpecCompiler`, `VegaChartController`, `VegaLiteInput.toVega` and — on iOS — `ChartSession` take a
+`timeZone`, beside `locale` and for the same reason: the platform knows it and common Kotlin cannot
+reach it. It is a different question from the language, which is why it is not part of `VegaLocale`: a
+Dutch reader in Curaçao needs one of each.
+
+**Null means the device's own zone, read when it is needed rather than captured.** That keeps every
+existing host and the whole differential corpus meaning what they said, and it keeps a long-lived
+process following a change of the system zone — which a captured value would not. `VegaTimeZones.of`
+answers null for an identifier the platform does not carry instead of throwing, because the identifier
+usually arrives from a server or a profile and a Kotlin throw crossing into Swift or Java ends the app.
+
+Four things read it, and the fourth is the one to read twice:
+
+1. a `time` scale, whose zone decides its ticks and therefore where a mark lands;
+2. `timeunit`, through a new `TransformContext.timeZone`, which is what a bucket boundary is;
+3. the local expression functions, through `Functions.functionsFor(..., timeZone)`;
+4. and **`format.parse`**. A timestamp with no offset — `2026-05-20T00:30`, which is the shape a
+   captured payload actually carries — names a different instant in every zone, and `Date.parse` reads
+   it in local time. Leaving parsing on the device's zone while the axis was on the host's would put a
+   row on one day and its label on another.
+
+One upstream rule looks like an oversight and is now pinned as a test:
+`utchours("2026-05-20T00:30")` **parses** that string in local time and only then reads the hour in
+UTC. So the `utc` accessors answer differently under this setting even though they are UTC accessors —
+which is what a browser does, and is the sort of thing that gets "fixed" into a divergence.
+
+Kept out of it deliberately: a `utc` scale, a `utc:` parse pattern and `timeunit: {"timezone": "utc"}`
+are UTC whatever a host says, because a specification that names UTC has named it.
+
+Verified three ways rather than one, since the identifiers and the default are platform claims:
+`TimeZoneTest` does the arithmetic on the JVM against two real zones twenty-five hours apart
+(`Pacific/Kiritimati` and `Pacific/Niue` — an assertion about Amsterdam would pass in summer and fail
+in winter); `ChartTimeZoneInstrumentedTest` runs it on an API 37 device, where ART's own zone database
+answers and where "null is the device's zone" can be checked against `java.util.TimeZone`; and
+`ChartSessionTests` does it from Swift, where a `Foundation.TimeZone` is converted by identifier.
+
 ## A mark is picked where it is painted, and nothing is picked through a clip
 
 Four defects in one rule, every one of them reported by a tap that found something the reader could not

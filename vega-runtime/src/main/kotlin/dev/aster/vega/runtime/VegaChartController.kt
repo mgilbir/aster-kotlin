@@ -48,6 +48,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.TimeZone
 
 /** Immutable pair of scene plus interaction state, published to renderers as one unit. */
 public data class ChartSnapshot(
@@ -143,12 +144,28 @@ public class VegaChartController(
    * sets again whenever its layout changes.
    */
   containerSize: SizeD? = null,
+  /**
+   * What **local** time means for this chart, or null for the device's own zone.
+   *
+   * Beside [locale] and for the same reason: the platform knows it and the engine cannot, and it is
+   * not the same question as the language — a Dutch reader in Curaçao needs one of each. It settles
+   * a `time` scale's ticks, `timeunit`'s buckets, the local expression functions and the zone a
+   * naive timestamp in the data is read in. See `SpecCompiler.timeZone` and `VegaTimeZones`.
+   */
+  private val timeZone: TimeZone? = null,
 ) {
 
   private var compiler = newCompiler(containerSize)
 
   private fun newCompiler(size: SizeD?) =
-    SpecCompiler(textEngine, loader, locale = locale, hostConfig = hostConfig, containerSize = size)
+    SpecCompiler(
+      textEngine,
+      loader,
+      locale = locale,
+      hostConfig = hostConfig,
+      containerSize = size,
+      timeZone = timeZone,
+    )
 
   /**
    * The size of the surface the chart is drawn in, which `width: "container"` asks for.
@@ -329,7 +346,9 @@ public class VegaChartController(
   // The same locale-bound function table the compiler uses, so a handler's own `timeFormat` writes
   // the same month name the axis does.
   private val expressions =
-    CachingExpressionCompiler(VegaExpressionCompiler(Evaluator(Functions.functionsFor(locale))))
+    CachingExpressionCompiler(
+      VegaExpressionCompiler(Evaluator(Functions.functionsFor(locale, timeZone = timeZone)))
+    )
 
   /**
    * What a handler's own evaluation reported — an expression that could not be read, a function

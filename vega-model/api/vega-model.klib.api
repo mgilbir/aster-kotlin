@@ -2620,6 +2620,15 @@ final object dev.aster.vega.model.time/TimeUnits { // dev.aster.vega.model.time/
     final fun specifier(kotlin.collections/List<kotlin/String>, kotlin.collections/Map<kotlin/String, kotlin/String?> = ...): kotlin/String // dev.aster.vega.model.time/TimeUnits.specifier|specifier(kotlin.collections.List<kotlin.String>;kotlin.collections.Map<kotlin.String,kotlin.String?>){}[0]
 }
 
+final object dev.aster.vega.model.time/VegaTimeZones { // dev.aster.vega.model.time/VegaTimeZones|null[0]
+    final val device // dev.aster.vega.model.time/VegaTimeZones.device|{}device[0]
+        final fun <get-device>(): kotlinx.datetime/TimeZone // dev.aster.vega.model.time/VegaTimeZones.device.<get-device>|<get-device>(){}[0]
+    final val utc // dev.aster.vega.model.time/VegaTimeZones.utc|{}utc[0]
+        final fun <get-utc>(): kotlinx.datetime/TimeZone // dev.aster.vega.model.time/VegaTimeZones.utc.<get-utc>|<get-utc>(){}[0]
+
+    final fun of(kotlin/String): kotlinx.datetime/TimeZone? // dev.aster.vega.model.time/VegaTimeZones.of|of(kotlin.String){}[0]
+}
+
 final object dev.aster.vega.model/Decimals { // dev.aster.vega.model/Decimals|null[0]
     final fun exponential(kotlin/Double, kotlin/Int): kotlin/String // dev.aster.vega.model/Decimals.exponential|exponential(kotlin.Double;kotlin.Int){}[0]
     final fun fixed(kotlin/Double, kotlin/Int): kotlin/String // dev.aster.vega.model/Decimals.fixed|fixed(kotlin.Double;kotlin.Int){}[0]

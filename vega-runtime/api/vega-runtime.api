@@ -441,8 +441,8 @@ public final class dev/aster/vega/runtime/VegaChartController {
 	public static final field MAX_ZOOM D
 	public static final field MIN_ZOOM D
 	public fun <init> ()V
-	public fun <init> (Ldev/aster/vega/scene/Scene;Ldev/aster/vega/scene/TextEngine;Lkotlin/jvm/functions/Function0;Ldev/aster/vega/runtime/load/DataLoader;Ldev/aster/vega/runtime/interaction/Scheduler;Ldev/aster/vega/model/locale/VegaLocale;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/scene/SizeD;)V
-	public synthetic fun <init> (Ldev/aster/vega/scene/Scene;Ldev/aster/vega/scene/TextEngine;Lkotlin/jvm/functions/Function0;Ldev/aster/vega/runtime/load/DataLoader;Ldev/aster/vega/runtime/interaction/Scheduler;Ldev/aster/vega/model/locale/VegaLocale;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/scene/SizeD;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ldev/aster/vega/scene/Scene;Ldev/aster/vega/scene/TextEngine;Lkotlin/jvm/functions/Function0;Ldev/aster/vega/runtime/load/DataLoader;Ldev/aster/vega/runtime/interaction/Scheduler;Ldev/aster/vega/model/locale/VegaLocale;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/scene/SizeD;Lkotlinx/datetime/TimeZone;)V
+	public synthetic fun <init> (Ldev/aster/vega/scene/Scene;Ldev/aster/vega/scene/TextEngine;Lkotlin/jvm/functions/Function0;Ldev/aster/vega/runtime/load/DataLoader;Ldev/aster/vega/runtime/interaction/Scheduler;Ldev/aster/vega/model/locale/VegaLocale;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/scene/SizeD;Lkotlinx/datetime/TimeZone;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun clearDiagnostics ()V
 	public final fun dispatch (Ldev/aster/vega/runtime/ChartInputEvent;)V
 	public final fun getContainerSize ()Ldev/aster/vega/scene/SizeD;
@@ -474,8 +474,8 @@ public final class dev/aster/vega/runtime/VegaChartController$Companion {
 }
 
 public final class dev/aster/vega/runtime/compile/AxisBuilder {
-	public fun <init> (Ljava/util/Map;Ljava/util/Map;Ldev/aster/vega/scene/SceneNodeIdAllocator;Ldev/aster/vega/scene/TextEngine;Ldev/aster/vega/model/DiagnosticCollector;Ldev/aster/vega/runtime/compile/NumberResolver;Ldev/aster/vega/runtime/compile/MarkEncoder;Ldev/aster/vega/model/locale/VegaLocale;)V
-	public synthetic fun <init> (Ljava/util/Map;Ljava/util/Map;Ldev/aster/vega/scene/SceneNodeIdAllocator;Ldev/aster/vega/scene/TextEngine;Ldev/aster/vega/model/DiagnosticCollector;Ldev/aster/vega/runtime/compile/NumberResolver;Ldev/aster/vega/runtime/compile/MarkEncoder;Ldev/aster/vega/model/locale/VegaLocale;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/Map;Ljava/util/Map;Ldev/aster/vega/scene/SceneNodeIdAllocator;Ldev/aster/vega/scene/TextEngine;Ldev/aster/vega/model/DiagnosticCollector;Ldev/aster/vega/runtime/compile/NumberResolver;Ldev/aster/vega/runtime/compile/MarkEncoder;Ldev/aster/vega/model/locale/VegaLocale;Lkotlinx/datetime/TimeZone;)V
+	public synthetic fun <init> (Ljava/util/Map;Ljava/util/Map;Ldev/aster/vega/scene/SceneNodeIdAllocator;Ldev/aster/vega/scene/TextEngine;Ldev/aster/vega/model/DiagnosticCollector;Ldev/aster/vega/runtime/compile/NumberResolver;Ldev/aster/vega/runtime/compile/MarkEncoder;Ldev/aster/vega/model/locale/VegaLocale;Lkotlinx/datetime/TimeZone;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun build (Ldev/aster/vega/model/spec/AxisSpec;Ldev/aster/vega/runtime/compile/PlotSize;Ldev/aster/vega/runtime/compile/PlotSize;)Ldev/aster/vega/runtime/compile/AxisBuilder$BuiltAxis;
 	public static synthetic fun build$default (Ldev/aster/vega/runtime/compile/AxisBuilder;Ldev/aster/vega/model/spec/AxisSpec;Ldev/aster/vega/runtime/compile/PlotSize;Ldev/aster/vega/runtime/compile/PlotSize;ILjava/lang/Object;)Ldev/aster/vega/runtime/compile/AxisBuilder$BuiltAxis;
 }
@@ -637,7 +637,8 @@ public final class dev/aster/vega/runtime/compile/PlotSize {
 }
 
 public final class dev/aster/vega/runtime/compile/ScaleResolver {
-	public fun <init> (Ljava/util/Map;Ldev/aster/vega/runtime/compile/PlotSize;Ldev/aster/vega/model/DiagnosticCollector;Ldev/aster/vega/runtime/compile/NumberResolver;)V
+	public fun <init> (Ljava/util/Map;Ldev/aster/vega/runtime/compile/PlotSize;Ldev/aster/vega/model/DiagnosticCollector;Ldev/aster/vega/runtime/compile/NumberResolver;Lkotlinx/datetime/TimeZone;)V
+	public synthetic fun <init> (Ljava/util/Map;Ldev/aster/vega/runtime/compile/PlotSize;Ldev/aster/vega/model/DiagnosticCollector;Ldev/aster/vega/runtime/compile/NumberResolver;Lkotlinx/datetime/TimeZone;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun resolve (Ljava/util/List;)Ljava/util/Map;
 }
 
@@ -701,8 +702,8 @@ public final class dev/aster/vega/runtime/compile/SpecCompiler {
 	public static final field DEFAULT_HEIGHT D
 	public static final field DEFAULT_WIDTH D
 	public fun <init> ()V
-	public fun <init> (Ldev/aster/vega/scene/TextEngine;Ldev/aster/vega/runtime/load/DataLoader;JLdev/aster/vega/expression/Clock;Ldev/aster/vega/model/locale/VegaLocale;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/scene/SizeD;)V
-	public synthetic fun <init> (Ldev/aster/vega/scene/TextEngine;Ldev/aster/vega/runtime/load/DataLoader;JLdev/aster/vega/expression/Clock;Ldev/aster/vega/model/locale/VegaLocale;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/scene/SizeD;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ldev/aster/vega/scene/TextEngine;Ldev/aster/vega/runtime/load/DataLoader;JLdev/aster/vega/expression/Clock;Ldev/aster/vega/model/locale/VegaLocale;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/scene/SizeD;Lkotlinx/datetime/TimeZone;)V
+	public synthetic fun <init> (Ldev/aster/vega/scene/TextEngine;Ldev/aster/vega/runtime/load/DataLoader;JLdev/aster/vega/expression/Clock;Ldev/aster/vega/model/locale/VegaLocale;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/scene/SizeD;Lkotlinx/datetime/TimeZone;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun compile (Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/Map;Ljava/util/Map;)Ldev/aster/vega/runtime/compile/CompiledSpec;
 	public static synthetic fun compile$default (Ldev/aster/vega/runtime/compile/SpecCompiler;Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Ldev/aster/vega/runtime/compile/CompiledSpec;
 	public final fun compileJson (Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;)Ldev/aster/vega/runtime/compile/CompiledSpec;

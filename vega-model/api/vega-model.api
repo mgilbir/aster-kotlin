@@ -2234,3 +2234,10 @@ public final class dev/aster/vega/model/time/TimeUnits {
 	public static synthetic fun specifier$default (Ldev/aster/vega/model/time/TimeUnits;Ljava/util/List;Ljava/util/Map;ILjava/lang/Object;)Ljava/lang/String;
 }
 
+public final class dev/aster/vega/model/time/VegaTimeZones {
+	public static final field INSTANCE Ldev/aster/vega/model/time/VegaTimeZones;
+	public final fun getDevice ()Lkotlinx/datetime/TimeZone;
+	public final fun getUtc ()Lkotlinx/datetime/TimeZone;
+	public final fun of (Ljava/lang/String;)Lkotlinx/datetime/TimeZone;
+}
+
