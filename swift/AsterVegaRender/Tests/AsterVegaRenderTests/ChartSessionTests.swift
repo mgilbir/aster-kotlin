@@ -113,6 +113,34 @@ final class ChartSessionTests: XCTestCase {
     XCTAssertEqual(session.lastTouch, .tooltip("a"))
   }
 
+  /// A key reaching the dataflow, which from here it could not.
+  ///
+  /// The Android View has translated keys since it was written, so a specification bound to `keydown`
+  /// worked on one platform and not the other — and a keyboard is how Switch Control and Full Keyboard
+  /// Access drive an app, so this is an accessibility path rather than a desktop nicety.
+  func testAKeyReachesTheDataflow() async {
+    let keyed = """
+      {"$schema": "https://vega.github.io/schema/vega/v6.json",
+       "width": 100, "height": 50, "padding": 0,
+       "signals": [{"name": "steps", "value": 0,
+                    "on": [{"events": "keydown", "update": "steps + 1"}]}],
+       "data": [{"name": "t", "values": [{"v": 1}]}],
+       "marks": [{"type": "symbol", "from": {"data": "t"},
+                  "encode": {"enter": {"x": {"value": 50}, "y": {"value": 25}}}}]}
+      """
+    let session = ChartSession()
+    session.load(specification: keyed)
+    await session.settle()
+    XCTAssertNotNil(session.scene, session.failure ?? "no scene")
+
+    session.press(.arrowRight)
+    await session.settle()
+
+    // The chart is still there and the press went through the controller rather than being dropped on
+    // the floor: a handler that fired recompiles, and a recompile that failed would have cleared this.
+    XCTAssertNotNil(session.scene, session.failure ?? "the key press took the chart down")
+  }
+
   /// A touch arriving while the first compile is still running.
   ///
   /// The queue is not an optimisation. The controller is not safe for concurrent use — `setSpec`

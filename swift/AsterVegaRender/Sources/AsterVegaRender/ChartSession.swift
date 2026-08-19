@@ -488,6 +488,29 @@ public final class ChartSession {
   /// Wired anyway rather than dismissed as "iOS has no hover": a chart whose tooltips only work on one
   /// platform is a gap in this host, not a property of the device. Where there genuinely is no pointer
   /// the gesture simply never fires.
+  /// A key the chart reacts to, for a reader driving it from a keyboard.
+  ///
+  /// The Android View has translated keys since it was written; from here there was no way to reach
+  /// `ChartInputEvent.Key` at all, so a specification bound to `keydown` worked on one platform. A
+  /// SwiftUI host wires it with the modifiers SwiftUI already provides:
+  ///
+  /// ```swift
+  /// VegaChartView(scene: scene, session: session)
+  ///   .focusable()
+  ///   .onKeyPress(.leftArrow) { session.press(.arrowLeft); return .handled }
+  /// ```
+  ///
+  /// Which keys mean something is the specification's business — `ChartKey` is the set the engine
+  /// translates — and this reports what the dataflow made of it, exactly as a tap does.
+  public func press(_ key: ChartKey, modifiers: Modifiers = Modifiers.Companion.shared.None) {
+    serialised { [weak self] in
+      guard let self else { return }
+      self.controller.dispatch(event: ChartInputEventKey(key: key, modifiers: modifiers))
+      self.refreshControls()
+      self.publish()
+    }
+  }
+
   public func hover(at point: Point?) {
     serialised {
       self.controller.setHitTestOptions(options: HitTestOptions.companion.Mouse)

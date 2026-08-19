@@ -193,6 +193,11 @@ compiled.scene?.let {
 }
 ```
 
+Keyboard input is the host's own modifier on both Compose renderers — `Modifier.focusable()` and
+`onKeyEvent`, forwarding to `controller.dispatch(ChartInputEvent.Key(...))` — and `ChartSession.press(_:)`
+on iOS, wired with SwiftUI's `.onKeyPress`. The Android View translates keys itself, since a `View` owns
+its own focus and key handling.
+
 A host that ships its own face passes a resolver — `rememberVegaTextEngine { FontFamily(googleSansFlex) }`
 — and both the measurement and the drawing use it. The Android View takes the same seam as
 `VegaChartView.fontResolver`, and on iOS a registered family resolves by name; `CoreTextTextEngine` and
@@ -227,6 +232,27 @@ What the renderer owns is the part a host must not repeat: inverting the **same*
 used, and hit testing through `SceneHitIndex` (cached per scene). Two copies of that arithmetic is how a
 finger lands beside the mark it looked like it hit. Pass nothing and the chart takes no pointer input at
 all.
+
+## Diagnostics: what to do with one
+
+A specification that compiles is not the same as a specification that compiled *cleanly*, and an
+adopting team asked for a policy rather than a list of codes. `DiagnosticSeverity` **is** the policy —
+each level says what it means for the chart — and this is it spelled out for a host:
+
+| Severity | What it means | What a host should do |
+| --- | --- | --- |
+| `INFO` | The chart is unaffected. A note, often something the specification asked to be told. | Log it. Nothing else. |
+| `WARNING` | The chart renders, but not exactly as the specification asked — an approximation, a property applied differently. | Draw it. Log it where somebody will see it: this is the level that accumulates when a payload drifts away from what the engine implements. |
+| `ERROR` | A construct could not be honoured. The **surrounding chart still renders** without it. | Draw it, and decide by feature whether a chart missing that construct is worth showing. A missing legend is not a missing axis. |
+| `FATAL` | No chart could be produced. `compiled.scene` is null. | Show your own fallback — the placeholder, an error state. Do not blank a chart the reader was already looking at: `VegaChartController` deliberately keeps the previous scene, so a failed recompile leaves the old chart up. |
+
+Two things that follow from it and are easy to get wrong. **Nothing throws** — a compile returns
+diagnostics, so a host that never reads them silently accepts every approximation. And the
+severities are not a scale of *how broken*, they are a statement about **what is on screen**: an
+`ERROR` chart is drawable and a `FATAL` one is not, which is the only distinction a UI has to make.
+
+The codes are part of the public contract (`DiagnosticCodes`, `VegaLiteDiagnostics`), so a host may
+match on one to special-case a construct it knows it sends.
 
 ## Export example
 

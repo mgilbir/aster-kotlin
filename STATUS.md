@@ -4399,6 +4399,34 @@ Two caveats on the number. It is a desktop JVM with the JIT warm, which is the m
 there is; and it measures compilation only, not the Canvas draw that follows. It is an order of
 magnitude, enough to rule an approach in, and not a substitute for measuring on hardware.
 
+## A key, and a policy for a chart that compiled with complaints
+
+Two smaller things the parity audit and the original review left standing.
+
+**A key press could not reach the dataflow from iOS.** The Android View has translated keys since it was
+written — `ChartInputEvent.Key`, the `ChartKey` set, modifiers — and `ChartSession` exposed taps, long
+presses, pans, pinches and hovers and no keys at all. So a specification bound to `keydown` worked on one
+platform. That is an accessibility path rather than a desktop nicety: Switch Control and Full Keyboard
+Access drive an app by key. `press(_:modifiers:)` closes it, serialised against an in-flight compile like
+every other input here, and the documentation gives the two-line SwiftUI wiring.
+
+On the Compose renderers there is nothing to add and it is worth writing down why: keyboard handling is a
+`Modifier`, so a host composes `focusable()` and `onKeyEvent` onto the chart and forwards to its own
+controller. A library parameter would be a second way to do what the platform already does compositionally.
+
+**And a policy for diagnostics.** The adopting team asked for one — *"we would also need a policy for a
+specification that compiles with diagnostics and still renders"* — and the answer already existed in
+`DiagnosticSeverity`, where each level says what it means for the chart. It was nowhere a host would look,
+so the README now states it as a table: log an `INFO`, draw and log a `WARNING`, draw an `ERROR` and
+decide by feature whether a chart missing that construct is worth showing, and show your own fallback for
+a `FATAL` — without blanking a chart the reader was already looking at, since the controller deliberately
+keeps the previous scene.
+
+The two things that follow are the ones easiest to get wrong, so they are said explicitly: **nothing
+throws**, so a host that never reads the diagnostics silently accepts every approximation; and the
+severities are not a scale of how broken a chart is but a statement about **what is on screen** — an
+`ERROR` chart is drawable and a `FATAL` one is not, which is the only distinction a UI has to make.
+
 ## A host's font, and the reader's text size, on the renderers that lacked them
 
 The last two rows of the parity audit, and they are the same shape: each of the three renderers had one
