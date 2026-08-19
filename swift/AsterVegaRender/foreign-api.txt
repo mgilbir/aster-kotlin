@@ -1268,6 +1268,13 @@ ForceTransform.init()
 ForceTransform.publishesSignal
 ForceTransform.shared
 ForceTransform.type
+ForeignData
+ForeignData.init()
+ForeignData.instant(epochMillis:)
+ForeignData.missing()
+ForeignData.row(fields:)
+ForeignData.rowsFromJson(json:)
+ForeignData.shared
 ForeignPaint
 ForeignPaint.init()
 ForeignPaint.isGradient(paint:)
@@ -3772,7 +3779,7 @@ SpecCompiler.Companion.shared
 SpecCompiler.companion
 SpecCompiler.compile(spec:signalOverrides:itemEncodes:)
 SpecCompiler.compileJson(json:signalOverrides:itemEncodes:)
-SpecCompiler.init(textEngine:loader:randomSeed:clock:locale:hostConfig:containerSize:timeZone:)
+SpecCompiler.init(textEngine:loader:randomSeed:clock:locale:hostConfig:containerSize:hostData:timeZone:)
 SpecParser
 SpecParser.init()
 SpecParser.parse(root:)
@@ -4385,11 +4392,13 @@ VegaChartController.contentScale
 VegaChartController.diagnostics
 VegaChartController.dispatch(event:)
 VegaChartController.events
-VegaChartController.init(initialScene:textEngine:clock:loader:scheduler:locale:hostConfig:containerSize:timeZone:)
+VegaChartController.hostData
+VegaChartController.init(initialScene:textEngine:clock:loader:scheduler:locale:hostConfig:containerSize:hostData:timeZone:)
 VegaChartController.inputs
 VegaChartController.lastCompiled
 VegaChartController.report(diagnostic:)
 VegaChartController.resetViewport()
+VegaChartController.setData(name:rows:)
 VegaChartController.setHitTestOptions(options:)
 VegaChartController.setScene(scene:)
 VegaChartController.setSignal(name:value:)

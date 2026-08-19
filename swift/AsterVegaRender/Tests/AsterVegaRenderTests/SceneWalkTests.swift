@@ -26,6 +26,7 @@ final class SceneWalkTests: XCTestCase {
       locale: VegaLocale.Companion.shared.EnglishUS,
       hostConfig: nil,
       containerSize: nil,
+      hostData: nil,
       timeZone: nil
     )
     let compiled = compiler.compileJson(json: json, signalOverrides: [:], itemEncodes: [:])

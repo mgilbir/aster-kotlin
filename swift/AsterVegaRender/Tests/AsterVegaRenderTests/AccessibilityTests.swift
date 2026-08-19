@@ -23,6 +23,7 @@ final class AccessibilityTests: XCTestCase {
       locale: VegaLocale.Companion.shared.EnglishUS,
       hostConfig: nil,
       containerSize: nil,
+      hostData: nil,
       timeZone: nil
     )
     .compileJson(json: json, signalOverrides: [:], itemEncodes: [:])

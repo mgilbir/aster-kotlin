@@ -303,6 +303,52 @@ a plural with a number. `VegaCaptions.English` is upstream's own wording and the
 January in every language — d3's parsing is part of the wire format — so `TimeFormat.MONTHS` stays
 English and only what is *written* follows the locale.
 
+## Host data example
+
+A chart can be drawn from data the **app** holds rather than data the payload carried. The
+specification names a dataset and leaves it empty — `{"data": {"name": "diary"}}` in Vega-Lite,
+`{"name": "diary"}` in Vega — and the host fills it, which is upstream's `view.data(name, rows)`:
+
+```kotlin
+controller.setSpec(specificationFromServer)
+
+// Later, and again whenever the store changes.
+controller.setData("diary", entries.map { entry ->
+    ForeignData.row(mapOf(
+        "bucket" to VegaValue.Str(entry.partOfDay),
+        "at" to ForeignData.instant(entry.at.toEpochMilliseconds()),
+        "v" to VegaValue.Num(entry.value),
+    ))
+})
+```
+
+From Swift the rows are Swift values, since a Kotlin value class has no Obj-C representation:
+
+```swift
+session.setData("diary", rows: [
+    ["bucket": .text("morning"), "at": .instant(entry.at), "v": .number(3)]
+])
+```
+
+Four things worth knowing:
+
+- The rows arrive **where inline values would**, so the dataset's own `format.parse` and its transforms
+  run over them unchanged. A host does not reimplement a parse rule or a `timeunit` to get its table
+  drawn.
+- `ForeignData.instant` hands over a date **as a date**. A host holding one should not format it to a
+  string for the engine to parse back: that crosses a time zone twice, and twice is where a day goes
+  missing.
+- Setting data **recompiles**, which is how this engine answers a change of any compile input. It is a
+  seam for new data, not somewhere to write per frame; equal rows do nothing.
+- Three things are refused rather than guessed, each with a diagnostic: a name no dataset carries, a
+  **derived** dataset (filling one would discard the transforms it exists for — supply the rows for its
+  source instead), and a dataset whose `url` is then **not fetched**, which is also the way to draw a
+  chart whose payload names an address you would rather not open.
+
+A dataset declared **inside a group mark** is filled the same way, by its own name. And as with the time
+zone, this is a *compile* input: the Compose renderer draws a scene that has already been compiled, so
+it is set wherever the controller or `SpecCompiler` lives.
+
 ## Time zone example
 
 A chart of days needs to know which zone the days are in, and on a handset that is not always the

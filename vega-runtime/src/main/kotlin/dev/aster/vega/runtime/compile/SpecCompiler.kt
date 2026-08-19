@@ -163,6 +163,30 @@ public class SpecCompiler(
    */
   private val containerSize: SizeD? = null,
   /**
+   * Tables the **host** supplies, keyed by the dataset name the specification uses.
+   *
+   * Upstream's `view.data(name, rows)`, which is how a chart is drawn from data the *app* holds
+   * rather than data a payload carried: a diary in a local store, a query's result, rows assembled
+   * from a sensor. A specification declares `{"name": "diary"}` — no values, no url, no source —
+   * and this fills it. In Vega-Lite that is `{"data": {"name": "diary"}}`, and the name survives
+   * compilation, so a host uses the name it wrote.
+   *
+   * The rows arrive **as inline values would**, before anything else reads the dataset, so
+   * `format.parse` and every transform run over them unchanged — a host does not have to
+   * reimplement a parse rule to get its own table through. Rows are `VegaValue.Obj`; a row that is
+   * not an object is wrapped as `{"data": …}`, which is upstream's own normalisation.
+   *
+   * Three things are refused rather than guessed, each with a diagnostic: a name no dataset claims,
+   * a **derived** dataset (filling one would discard the transforms it exists for), and a `url` —
+   * which is *not fetched* when a host has supplied the table, so this is also the way to draw a
+   * chart whose payload names an address the host would rather not open.
+   *
+   * Named for the same half of the boundary [hostConfig] is: a compile has a local `datasets` of
+   * its own — the ones it resolved — and two things called that in one function is a bug waiting to
+   * be written.
+   */
+  private val hostData: Map<String, List<VegaValue>>? = null,
+  /**
    * What **local** time means, or null for the device's own zone.
    *
    * Every date in a specification is an instant, and which day one falls on has an answer only in
@@ -425,7 +449,7 @@ public class SpecCompiler(
     val unresolvedSignals = spec.signals.mapTo(mutableSetOf()) { it.name }
     val unbuiltScales = spec.scales.mapTo(mutableSetOf()) { it.name }
 
-    val data = DataResolver(diagnostics, expressions, loader, stream, clock, timeZone)
+    val data = DataResolver(diagnostics, expressions, loader, stream, clock, timeZone, hostData)
     for (operator in order.order) {
       when (operator) {
         is Operator.Signal -> {
@@ -573,6 +597,25 @@ public class SpecCompiler(
         root,
         plot,
       )
+
+    // A table nobody claimed. Reported here rather than where the datasets resolve, because a group
+    // mark declares datasets of its own and they are resolved through the same [DataResolver]
+    // during
+    // the scope compile above — so this is the first point at which "no dataset has this name"
+    // is a fact rather than a guess. A chart drawn without the data it was handed is the silence
+    // this
+    // engine refuses everywhere else.
+    hostData?.keys.orEmpty().forEach { name ->
+      if (name !in data.claimedHostData) {
+        diagnostics.warn(
+          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          "The host supplied a table named '$name', which no dataset in this specification is " +
+            "called. Vega-Lite writes the name from `data: {\"name\": …}` through to the compiled " +
+            "specification, so it is the name to use.",
+          operator = name,
+        )
+      }
+    }
 
     val content = frame(spec, scope.nodes, plot, root, ids, diagnostics, expressions)
 

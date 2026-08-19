@@ -43,6 +43,7 @@ final class SignalControlTests: XCTestCase {
       locale: VegaLocale.Companion.shared.EnglishUS,
       hostConfig: nil,
       containerSize: nil,
+      hostData: nil,
       timeZone: nil
     )
     .compileJson(json: specification, signalOverrides: overrides, itemEncodes: [:])
@@ -148,6 +149,7 @@ final class SignalControlTests: XCTestCase {
       locale: VegaLocale.Companion.shared.EnglishUS,
       hostConfig: nil,
       containerSize: nil,
+      hostData: nil,
       timeZone: nil
     )
     .compileJson(

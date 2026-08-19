@@ -94,6 +94,9 @@ public final class ChartSession {
       locale: VegaLocale.Companion.shared.EnglishUS,
       hostConfig: nil,
       containerSize: nil,
+      // Nil, and then filled through `setData(_:rows:)` — a session is created before the app has its
+      // data as often as after, and the controller keeps whatever arrives first.
+      hostData: nil,
       timeZone: resolved
     )
   }
@@ -234,6 +237,70 @@ public final class ChartSession {
       self.loading = false
       // Cleared so later touches run straight through rather than awaiting a finished task.
       self.work = nil
+    }
+  }
+
+  /// A value in a row a host hands over.
+  ///
+  /// Spelled out as a Swift enum rather than exposing `VegaValue`, whose cases are Kotlin *value
+  /// classes* and have no Obj-C representation at all — the same reason `ForeignSignals` exists for
+  /// signals. Five cases, which is every JSON leaf a Vega row can hold plus the one JSON cannot: an
+  /// `instant`, so a host with a `Date` never formats it to a string for the engine to parse back. That
+  /// round trip goes through a zone twice, and twice is where a day goes missing.
+  public enum ChartDatum: Sendable, Equatable {
+    case number(Double)
+    case text(String)
+    case flag(Bool)
+    case instant(Date)
+    /// Present and empty, which a chart draws as a gap rather than as a zero.
+    case missing
+  }
+
+  /// Fills a dataset the specification declared but did not carry — upstream's `view.data(name, rows)`.
+  ///
+  /// This is how a chart is drawn from data the **app** holds: a diary in a local store, a query's
+  /// result, rows assembled from a channel the chart knows nothing about. The specification says
+  /// `{"data": {"name": "diary"}}` in Vega-Lite or `{"name": "diary"}` in Vega, and the name it wrote is
+  /// the name used here. The dataset's own `format.parse` and transforms then run over these rows, so a
+  /// host does not reimplement a parse rule to get its own table drawn.
+  ///
+  /// It **recompiles**, because that is how the engine answers a change of any compile input — so it is
+  /// a seam for new data rather than somewhere to write per frame. Rows supplied before a specification
+  /// is loaded are kept and used by the load.
+  ///
+  /// Serialised against an in-flight compile for the same reason a touch is: the controller is not safe
+  /// for concurrent use, and this recompiles.
+  public func setData(_ name: String, rows: [[String: ChartDatum]]) {
+    let converted = rows.map { row in
+      ForeignData.shared.row(
+        fields: row.reduce(into: [String: any AsterVega.VegaValue]()) { fields, entry in
+          fields[entry.key] = Self.value(of: entry.value)
+        }
+      )
+    }
+    serialised { [weak self] in
+      guard let self else { return }
+      self.controller.setData(name: name, rows: converted)
+      if let compiled = self.controller.lastCompiled {
+        self.diagnostics = compiled.diagnostics
+        if compiled.scene != nil {
+          self.hasScene = true
+          self.failure = nil
+        }
+      }
+      self.refreshControls()
+      self.publish()
+    }
+  }
+
+  private static func value(of datum: ChartDatum) -> any AsterVega.VegaValue {
+    switch datum {
+    case .number(let value): return ForeignSignals.shared.ofNumber(value: value)
+    case .text(let value): return ForeignSignals.shared.ofString(value: value)
+    case .flag(let value): return ForeignSignals.shared.ofBoolean(value: value)
+    case .instant(let date):
+      return ForeignData.shared.instant(epochMillis: date.timeIntervalSince1970 * 1000)
+    case .missing: return ForeignData.shared.missing()
     }
   }
 

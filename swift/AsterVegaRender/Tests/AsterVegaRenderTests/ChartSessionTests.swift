@@ -160,6 +160,90 @@ final class ChartSessionTests: XCTestCase {
     XCTAssertFalse(session.canReset)
   }
 
+  /// A chart drawn from data the **app** holds, which is what a diary is.
+  ///
+  /// The specification names a dataset and carries no rows for it. Everything about the chart — the
+  /// scales, the axis, the marks — waits on the host, which is upstream's `view.data(name, rows)` and
+  /// the shape an app with a local store needs. The rows go in where inline values would, so the
+  /// dataset's own `format.parse` still parses and its transforms still run.
+  func testAChartIsDrawnFromATableTheHostSupplies() async {
+    let awaitingData = """
+      {"width": 200, "height": 100, "padding": 5,
+       "data": [{"name": "diary"}],
+       "scales": [
+         {"name": "x", "type": "band", "domain": {"data": "diary", "field": "bucket"},
+          "range": "width"},
+         {"name": "y", "type": "linear", "domain": {"data": "diary", "field": "v"},
+          "range": "height"}],
+       "marks": [{"type": "rect", "from": {"data": "diary"}, "encode": {"enter": {
+         "x": {"scale": "x", "field": "bucket"}, "width": {"scale": "x", "band": 1},
+         "y": {"scale": "y", "field": "v"}, "y2": {"scale": "y", "value": 0}}}}]}
+      """
+
+    let session = ChartSession()
+    session.load(specification: awaitingData)
+    await session.settle()
+    XCTAssertEqual(rectangles(in: session), 0, "nothing supplied yet, so nothing is drawn")
+
+    session.setData(
+      "diary",
+      rows: [
+        ["bucket": .text("morning"), "v": .number(3)],
+        ["bucket": .text("evening"), "v": .number(7)],
+      ]
+    )
+    XCTAssertEqual(rectangles(in: session), 2, "one bar per row the app handed over")
+
+    // And again, because data changes: a store that gained a row redraws with three.
+    session.setData(
+      "diary",
+      rows: [
+        ["bucket": .text("morning"), "v": .number(3)],
+        ["bucket": .text("afternoon"), "v": .number(5)],
+        ["bucket": .text("evening"), "v": .number(7)],
+      ]
+    )
+    XCTAssertEqual(rectangles(in: session), 3)
+  }
+
+  /// A `Date` handed over as an instant, with no parse rule in the specification at all.
+  ///
+  /// The round trip this avoids is a defect rather than an inefficiency: formatting a `Date` to a string
+  /// for the engine to parse back goes through a zone twice, and a naive string read in the wrong one
+  /// lands on the wrong day. Asserted through what is **drawn**, since a label is what a reader sees.
+  func testADateIsHandedOverAsAnInstant() async {
+    let session = ChartSession()
+    session.load(
+      specification: """
+        {"width": 200, "height": 100, "padding": 0,
+         "data": [{"name": "t"}],
+         "marks": [{"type": "text", "from": {"data": "t"}, "encode": {"enter": {
+           "x": {"value": 10}, "y": {"value": 20},
+           "text": {"signal": "utcFormat(datum.at, '%d %B %Y')"}}}}]}
+        """
+    )
+    await session.settle()
+
+    // 2026-05-20T12:00:00Z, as a `Date` — which is how an app holds one.
+    session.setData("t", rows: [["at": .instant(Date(timeIntervalSince1970: 1_779_278_400))]])
+
+    let scene = try! XCTUnwrap(session.scene, session.failure ?? "no scene")
+    var target = RecordingTarget()
+    SceneWalk().draw(scene: scene, into: &target)
+    XCTAssertTrue(
+      target.calls.contains { $0.contains("20 May 2026") },
+      "an instant needs no `format.parse` entry: \(target.calls)"
+    )
+  }
+
+  private func rectangles(in session: ChartSession) -> Int {
+    guard let scene = session.scene else { return 0 }
+    var target = RecordingTarget()
+    SceneWalk().draw(scene: scene, into: &target)
+    // Indented by group depth, so matched rather than prefixed.
+    return target.calls.filter { $0.trimmingCharacters(in: .whitespaces).hasPrefix("rect ") }.count
+  }
+
   /// The zone a chart's local time is in, which on a handset is not always the reader's.
   ///
   /// A profile setting, an account read from two places, a tablet left on a factory zone: the app knows

@@ -4399,6 +4399,60 @@ Two caveats on the number. It is a desktop JVM with the JIT warm, which is the m
 there is; and it measures compilation only, not the Canvas draw that follows. It is an order of
 magnitude, enough to rule an approach in, and not a substitute for measuring on hardware.
 
+## A chart can be drawn from data the app holds
+
+Until this, a chart could only be drawn from data a **payload** carried: values inlined in the
+specification, or a `url` for the engine to fetch. An app's own data is neither of those. A diary lives
+in a local store and was plotted offline by the apps this engine is replacing; a measurement list
+arrives over a channel the chart knows nothing about; rows get assembled from a sensor. The adopting
+team put it plainly: *"the engine must accept a data table that the app builds, not only a specification
+with its data inlined."*
+
+Upstream already has the shape, and it is worth saying why it works rather than inventing one. A Vega
+dataset with no `values`, no `url` and no `source` is an **input**: something outside the specification
+fills it, through `view.data(name, rows)`. Vega-Lite writes `{"data": {"name": "diary"}}` and passes
+that name through to the compiled specification unchanged — probed against `vega-lite@6.4.3` before any
+of this was written, and pinned as a test — so a host uses the name it wrote and never has to discover
+that its rows should have gone into `source_0`.
+
+So `SpecCompiler(hostData = …)`, `VegaChartController.hostData` and `setData(name, rows)`, and
+`ChartSession.setData(_:rows:)` on iOS. The design decision worth stating is **where** the rows go:
+they are injected as the dataset's inline values, before anything else reads it, so `format.parse`
+parses them, `timeunit` buckets them and a `filter` filters them exactly as it would have done for a
+table in the payload. A host does not reimplement a parse rule to get its own data drawn.
+
+`ForeignData` exists for the same reason `ForeignSignals` does: `VegaValue`'s variants are
+`@JvmInline value class`es and a value class has no Obj-C representation, so a foreign host cannot name
+one. It builds a row, a missing value, and an **instant** — the last of which matters more than it
+looks: a host holding a `Date` should not format it to a string for the engine to parse back, because
+that crosses a time zone twice and twice is where a day goes missing. From Swift the rows are Swift
+values (`.text`, `.number`, `.flag`, `.instant`, `.missing`), converted at the boundary.
+
+Three things are refused rather than guessed, each with a diagnostic, because a chart drawn without the
+data it was handed is the silence this engine refuses everywhere else:
+
+- a name **no dataset carries** — a typo, or a host guessing at a compiled name. Reported after the
+  whole compile, since a group mark declares datasets of its own and "nothing is called this" is only a
+  fact once they have all resolved;
+- a **derived** dataset, one with a `source`. Filling it would discard the transforms it exists for, and
+  upstream's own `view.data` on one is undone by the next pulse. The message says to supply the rows for
+  its source instead;
+- a `url`, which is **not fetched** at all when the host has supplied the table. That is one request
+  that does not happen — a specification's `url` is an address the specification chose — and it is said
+  out loud, because a request that silently did not happen is an hour of somebody's afternoon.
+
+Setting data **recompiles**. That is not a shortcut: it is how this engine answers a change of every
+compile input, and the performance note above says why it is affordable. What it means for a host is
+that this is a seam for *new data*, not somewhere to write per frame; a set whose rows equal the ones
+already loaded does nothing, which is the cheaper half of the comparison. Rows supplied before the
+specification arrives are kept and used by the load, because that is the order an app meets in practice.
+
+Verified on all three hosts: `HostDataTest` (10 tests) on the JVM, including the Vega-Lite name, the
+transforms running over supplied rows, the refusals, and that the loader is **not called**;
+`HostDataInstrumentedTest` on an API 37 device, where the store answers late and the pixels the view
+drew are counted; and `ChartSessionTests` from Swift, where the rows are Swift values and a `Date` goes
+through as an instant.
+
 ## A host says which zone a chart's local time is in
 
 Upstream Vega has exactly two zones: the browser's own, for `time` scales, `timeunit: "local"` and the

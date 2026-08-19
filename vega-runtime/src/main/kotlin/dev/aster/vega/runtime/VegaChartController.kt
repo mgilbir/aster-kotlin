@@ -145,6 +145,11 @@ public class VegaChartController(
    */
   containerSize: SizeD? = null,
   /**
+   * Tables this host supplies, by the dataset name the specification uses; see the [hostData]
+   * property, which a host sets again whenever its own data changes.
+   */
+  hostData: Map<String, List<VegaValue>>? = null,
+  /**
    * What **local** time means for this chart, or null for the device's own zone.
    *
    * Beside [locale] and for the same reason: the platform knows it and the engine cannot, and it is
@@ -155,9 +160,9 @@ public class VegaChartController(
   private val timeZone: TimeZone? = null,
 ) {
 
-  private var compiler = newCompiler(containerSize)
+  private var compiler = newCompiler(containerSize, hostData)
 
-  private fun newCompiler(size: SizeD?) =
+  private fun newCompiler(size: SizeD?, data: Map<String, List<VegaValue>>?) =
     SpecCompiler(
       textEngine,
       loader,
@@ -165,7 +170,46 @@ public class VegaChartController(
       hostConfig = hostConfig,
       containerSize = size,
       timeZone = timeZone,
+      hostData = data,
     )
+
+  /**
+   * Tables the **host** supplies, which is how a chart is drawn from data the app already holds.
+   *
+   * Upstream's `view.data(name, rows)`. A specification declares `{"name": "diary"}` — no values,
+   * no url, no source — and this fills it; in Vega-Lite that is `{"data": {"name": "diary"}}` and
+   * the name survives compilation, so a host uses the name it wrote. The rows arrive as inline
+   * values would, so the dataset's `format.parse` and its transforms run over them unchanged.
+   *
+   * Setting it **recompiles** the loaded specification, because that is how this engine answers a
+   * change of any compile input: there is no incremental dataflow, and a whole recompile of the
+   * heaviest fixture is well inside a frame. So this is a seam for *new data* — a store that
+   * changed, a query that returned — and not somewhere to write on every frame. A set whose rows
+   * are equal to the ones already loaded does nothing at all, which is the cheaper half of that
+   * comparison.
+   *
+   * The signal values a reader has set survive the recompile: new rows are not a reason to forget
+   * which bar they had selected.
+   */
+  public var hostData: Map<String, List<VegaValue>>? = hostData
+    set(value) {
+      if (field == value) return
+      field = value
+      compiler = newCompiler(containerSize, value)
+      val json = loadedSpecJson ?: return
+      publish(compiler.compileJson(json, signals.overrides, signals.itemEncodes))
+    }
+
+  /**
+   * One table, by name — `view.data(name, rows)` spelled the way a host actually calls it.
+   *
+   * Recompiles once, as [hostData] does. Passing an empty list is a table that is *there and
+   * empty*, which is a different chart from one whose dataset was never filled: the scales see no
+   * rows and the axes say so, rather than the specification's own values being used.
+   */
+  public fun setData(name: String, rows: List<VegaValue>) {
+    hostData = (hostData ?: emptyMap()) + (name to rows)
+  }
 
   /**
    * The size of the surface the chart is drawn in, which `width: "container"` asks for.
@@ -187,7 +231,7 @@ public class VegaChartController(
     set(value) {
       if (field == value) return
       field = value
-      compiler = newCompiler(value)
+      compiler = newCompiler(value, hostData)
       val json = loadedSpecJson ?: return
       publish(compiler.compileJson(json, signals.overrides, signals.itemEncodes))
     }
