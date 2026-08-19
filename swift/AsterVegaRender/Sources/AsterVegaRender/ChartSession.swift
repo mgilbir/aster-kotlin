@@ -144,6 +144,14 @@ public final class ChartSession {
   /// brush that starts in the wrong place.
   private let engineTimeZone: Kotlinx_datetimeTimeZone?
 
+  /// The pan and zoom the controller has accumulated, in the units it accumulates them in.
+  ///
+  /// A **drawing** input: `VegaChartView` composes it onto the fit so that the chart, the touch target
+  /// and the VoiceOver frames all move together. A host drawing the scene itself applies it the way the
+  /// controller documents its own inverse — translate by the offset, then scale by
+  /// `contentScale * viewportScale`.
+  public private(set) var viewport = ChartViewport(offsetX: 0, offsetY: 0, scale: 1)
+
   /// What the reader's text-size setting multiplies every font size by, as the engine measured with it.
   ///
   /// Read by `VegaChartView` so the drawing is scaled by the same number the layout reserved room for.
@@ -402,6 +410,15 @@ public final class ChartSession {
     // Nil until something has compiled, so a host draws nothing rather than drawing the empty scene the
     // controller starts with — a 0×0 chart looks like a rendering bug and reads like one in a report.
     scene = hasScene ? controller.snapshot.scene : nil
+    // The pan and the zoom, read back so the **drawing** can apply them. Published rather than left in
+    // the controller because `VegaChartView` has to see them change: without this a pan updated the
+    // controller's state, `canReset` became true, and the chart stayed exactly where it was.
+    let state = controller.snapshot.interactionState
+    viewport = ChartViewport(
+      offsetX: state.viewportOffset.dx,
+      offsetY: state.viewportOffset.dy,
+      scale: state.viewportScale
+    )
   }
 
   /// Whether anything has ever compiled to a scene in this session.

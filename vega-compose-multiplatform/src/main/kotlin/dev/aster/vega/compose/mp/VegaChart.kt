@@ -66,6 +66,12 @@ import kotlin.math.roundToInt
  * @param onZoom a pinch, as the factor since the last report, about an anchor in scene coordinates.
  * @param onHover a pointer moving over the chart, and null when it leaves. Mouse and stylus only.
  * @param hitTestOptions how generously a tap picks a mark; the default is the touch tolerance.
+ * @param viewportOffset the pan a controller has accumulated, in **pixels**, from
+ *   `InteractionState.viewportOffset`. Without it a pan updates state that nothing shows.
+ * @param viewportScale the zoom a controller has accumulated, from
+ *   `InteractionState.viewportScale`.
+ * @param onPlaced the fit scale and centring offset, whenever the slot's size changes — a host sets
+ *   `controller.contentScale` from it, which is what lets the controller invert a point correctly.
  *
  * A callback rather than a controller because this module depends on `vega-scene` alone: a scene is
  * all a renderer needs, and taking `vega-runtime` here to dispatch a tap would make every host that
@@ -87,6 +93,9 @@ public fun VegaChart(
   onZoom: ((Double, PointD, Boolean) -> Unit)? = null,
   onHover: ((PointD?, SceneNodeId?) -> Unit)? = null,
   hitTestOptions: HitTestOptions = HitTestOptions.Touch,
+  viewportOffset: VectorD = VectorD.Zero,
+  viewportScale: Double = 1.0,
+  onPlaced: ((ChartPlacement) -> Unit)? = null,
 ) {
   val walk = remember { SceneWalk() }
   val density = LocalDensity.current.density
@@ -102,10 +111,16 @@ public fun VegaChart(
       AccessibilityTree.elements(scene, selectedNodeIds, captions)
     }
 
-  Box(modifier = Modifier.size(scene.width.dp, scene.height.dp).then(modifier)) {
-    // The scene's size first, so a caller's modifier can override it and a caller without one still
-    // gets a chart. Scene units are CSS pixels, which is what a dp is on the platforms this runs
-    // on.
+  // **The caller's modifier first, then the scene's own size as a default.** The other order looks
+  // equivalent and is not: a `size` modifier fixes the constraints its child is measured with, so
+  // `Modifier.size(sceneSize).then(caller)` clamped every caller to the scene's own size — a chart
+  // could
+  // not be made bigger or filled to a slot, which quietly made `SceneFit.Contain`, the default,
+  // mean
+  // nothing outside a test that sizes the canvas itself. Scene units are CSS pixels, which is what
+  // a dp
+  // is on the platforms this runs on, so the default is the chart at its natural size.
+  Box(modifier = modifier.then(Modifier.size(scene.width.dp, scene.height.dp))) {
     Canvas(
       modifier =
         Modifier.matchParentSize()
@@ -122,9 +137,16 @@ public fun VegaChart(
             onPan = onPan,
             onZoom = onZoom,
             onHover = onHover,
+            viewportOffset = viewportOffset,
+            viewportScale = viewportScale,
           )
     ) {
-      val placement = placement(scene, size.width, size.height, fit, density)
+      // Reported before drawing, so a host that sets `contentScale` from it has done so before the
+      // first gesture can arrive. The **fit** alone: the controller applies the pan and the zoom
+      // itself, and handing it a scale that already carried them would apply each twice.
+      onPlaced?.invoke(fitPlacement(scene, size.width, size.height, fit, density))
+      val placement =
+        placement(scene, size.width, size.height, fit, density, viewportOffset, viewportScale)
       translate(left = placement.left, top = placement.top) {
         scale(scale = placement.scale, pivot = Offset.Zero) {
           walk.draw(
@@ -145,6 +167,10 @@ public fun VegaChart(
       fit = fit,
       density = density,
       onActivate = onActivate,
+      // The same pan and zoom the drawing used: a reader exploring by touch has to land on the mark
+      // where it *is* now, not where it was before the chart was moved.
+      viewportOffset = viewportOffset,
+      viewportScale = viewportScale,
       modifier = Modifier.matchParentSize(),
     )
   }
@@ -173,6 +199,8 @@ private fun AccessibilityOverlay(
   fit: SceneFit,
   density: Float,
   onActivate: ((SceneNodeId) -> Unit)?,
+  viewportOffset: VectorD,
+  viewportScale: Double,
   modifier: Modifier = Modifier,
 ) {
   if (elements.isEmpty()) return
@@ -210,6 +238,8 @@ private fun AccessibilityOverlay(
         constraints.maxHeight.toFloat(),
         fit,
         density,
+        viewportOffset,
+        viewportScale,
       )
     // At least a pixel in each direction: a rule, an axis domain line or a zero-height bar has no
     // extent on one axis, and a reader cannot land on a frame of no size.
@@ -245,6 +275,21 @@ public enum class SceneFit {
 
 /** The fit scale and the centring offset, in pixels, shared by the drawing and the overlay. */
 private data class Placement(val scale: Float, val left: Float, val top: Float)
+
+/**
+ * Where a chart ended up in its slot: the **fit** scale, and the offset it was centred by.
+ *
+ * Reported through `onPlaced` for the one thing a host has to do itself — tell its controller what
+ * the fit factor is, `controller.contentScale = placement.scale`, so that the controller can invert
+ * a point the way it documents: subtract the pan offset, then divide by `contentScale *
+ * viewportScale`.
+ *
+ * The pan and zoom **state** goes the other way, from the controller into `VegaChart`, so the same
+ * numbers move the drawing, the touch target and the accessibility frames. One placement for all
+ * three is the whole point; the Swift renderer's `ChartPlacement` exists for the same reason and
+ * says so.
+ */
+public data class ChartPlacement(val scale: Double, val left: Double, val top: Double)
 
 /**
  * Where a scene sits inside a slot, computed once and used by everything that has to agree about
@@ -285,6 +330,8 @@ private fun Modifier.chartPointerInput(
   onPan: ((VectorD, Boolean) -> Unit)?,
   onZoom: ((Double, PointD, Boolean) -> Unit)?,
   onHover: ((PointD?, SceneNodeId?) -> Unit)?,
+  viewportOffset: VectorD,
+  viewportScale: Double,
 ): Modifier {
   if (onTap == null && onLongPress == null && onPan == null && onZoom == null && onHover == null) {
     return this
@@ -292,20 +339,38 @@ private fun Modifier.chartPointerInput(
   return this.then(
       if (onTap == null && onLongPress == null) Modifier
       else
-        Modifier.pointerInput(scene, fit, density, hitIndex) {
+        Modifier.pointerInput(scene, fit, density, hitIndex, viewportOffset, viewportScale) {
+          fun reported(offset: Offset): Pair<PointD, SceneNodeId?> =
+            controllerPoint(offset, scene, fit, density, size.width, size.height) to
+              hitIndex
+                .hitTest(
+                  scenePoint(
+                    offset,
+                    scene,
+                    fit,
+                    density,
+                    size.width,
+                    size.height,
+                    viewportOffset,
+                    viewportScale,
+                  )
+                )
+                ?.node
+                ?.id
+
           detectTapGestures(
             onTap =
               onTap?.let { report ->
                 { offset ->
-                  val point = scenePoint(offset, scene, fit, density, size.width, size.height)
-                  report(point, hitIndex.hitTest(point)?.node?.id)
+                  val (point, nodeId) = reported(offset)
+                  report(point, nodeId)
                 }
               },
             onLongPress =
               onLongPress?.let { report ->
                 { offset ->
-                  val point = scenePoint(offset, scene, fit, density, size.width, size.height)
-                  report(point, hitIndex.hitTest(point)?.node?.id)
+                  val (point, nodeId) = reported(offset)
+                  report(point, nodeId)
                 }
               },
           )
@@ -314,30 +379,28 @@ private fun Modifier.chartPointerInput(
     .then(
       if (onPan == null && onZoom == null) Modifier
       else
-        Modifier.pointerInput(scene, fit, density) {
+        Modifier.pointerInput(scene, fit, density, viewportOffset, viewportScale) {
           // One detector for both, because a pinch is a two-finger drag: separate detectors would
           // each claim the pointers and a two-finger gesture would arrive as one of the two at
-          // random. `detectTransformGestures` reports pan, zoom and rotation from the same stream.
-          // `panZoomLock = false`: a two-finger gesture may pan **and** zoom, and both are
-          // reported.
-          // Locking would make a gesture one or the other, where the Android View runs its pan and
-          // scale detectors over the same stream and lets both fire — and a chart being explored is
-          // usually being moved and scaled at once.
+          // random. `detectTransformGestures` reports pan, zoom and rotation from the same stream,
+          // and `panZoomLock = false` lets a gesture be both — the Android View runs its pan and
+          // scale detectors over one stream and lets both fire, and a chart being explored is
+          // usually
+          // being moved and scaled at once.
           detectTransformGestures(panZoomLock = false) { centroid, pan, zoom, _ ->
-            val placement =
-              placement(scene, size.width.toFloat(), size.height.toFloat(), fit, density)
             if (onPan != null && (pan.x != 0f || pan.y != 0f)) {
-              // A pan is a **distance**, so only the scale comes off it — subtracting the centring
-              // offset from a delta would move the chart by the offset on every report.
-              onPan(
-                VectorD(pan.x / placement.scale.toDouble(), pan.y / placement.scale.toDouble()),
-                false,
-              )
+              // **Pixels, undivided.** A pan is a distance, so no centring comes off it; and a
+              // controller accumulates it in pixels — `InteractionState.viewportOffset` is what
+              // `visibleViewport` divides by `contentScale * viewportScale` — so dividing here
+              // would
+              // scale it twice and pan by a fraction of the finger. The Android View dispatches the
+              // raw pixel distance for the same reason.
+              onPan(VectorD(pan.x.toDouble(), pan.y.toDouble()), false)
             }
             if (onZoom != null && zoom != 1f) {
               onZoom(
                 zoom.toDouble(),
-                scenePoint(centroid, scene, fit, density, size.width, size.height),
+                controllerPoint(centroid, scene, fit, density, size.width, size.height),
                 false,
               )
             }
@@ -347,7 +410,7 @@ private fun Modifier.chartPointerInput(
     .then(
       if (onHover == null) Modifier
       else
-        Modifier.pointerInput(scene, fit, density, hitIndex) {
+        Modifier.pointerInput(scene, fit, density, hitIndex, viewportOffset, viewportScale) {
           awaitPointerEventScope {
             while (true) {
               val event = awaitPointerEvent()
@@ -355,8 +418,22 @@ private fun Modifier.chartPointerInput(
                 PointerEventType.Move,
                 PointerEventType.Enter -> {
                   val offset = event.changes.firstOrNull()?.position ?: continue
-                  val point = scenePoint(offset, scene, fit, density, size.width, size.height)
-                  onHover(point, hitIndex.hitTest(point)?.node?.id)
+                  val reported =
+                    controllerPoint(offset, scene, fit, density, size.width, size.height)
+                  val hit =
+                    hitIndex.hitTest(
+                      scenePoint(
+                        offset,
+                        scene,
+                        fit,
+                        density,
+                        size.width,
+                        size.height,
+                        viewportOffset,
+                        viewportScale,
+                      )
+                    )
+                  onHover(reported, hit?.node?.id)
                 }
                 // A pointer that left says so with a null, which is what clears a hover state. The
                 // engine's own `PointerExited` means the same thing.
@@ -370,10 +447,42 @@ private fun Modifier.chartPointerInput(
 }
 
 /**
- * A point in the slot, in **scene** coordinates: the inverse of the placement the drawing used.
+ * A point in the slot, in the space **a controller expects**: pixels with the centring taken off.
  *
- * The offset comes off and then the scale divides — in that order, and not the other way round,
- * which is the arithmetic every host of this engine has got wrong at least once.
+ * Not scene coordinates, and the difference is the whole reason this function has a long comment.
+ * `VegaChartController.toSceneSpace` documents its own inverse — *subtract the pan offset, then
+ * divide by `contentScale * viewportScale`* — so a host that hands it a point which has **already**
+ * been divided by the fit scale has it divided twice, and every tap lands at a fraction of where
+ * the finger was. What a host must remove is the part the controller cannot know about: the offset
+ * a fitted chart is *centred* by. The scale it does know, because the host sets `contentScale` from
+ * `onPlaced`.
+ *
+ * `ChartPlacement.scenePoint` in the Swift renderer is this same function and its header makes the
+ * same point; the Android View has no centring to remove, which is why it dispatches raw pixels.
+ */
+private fun controllerPoint(
+  offset: Offset,
+  scene: Scene,
+  fit: SceneFit,
+  density: Float,
+  width: Int,
+  height: Int,
+): PointD {
+  // The **fit** placement, with no pan and no zoom in it. The controller subtracts its own
+  // `viewportOffset` and divides by its own `viewportScale`, so removing either here would remove
+  // it
+  // twice — which is a tap that drifts further from the finger the further the chart has been
+  // panned.
+  val placement = placement(scene, width.toFloat(), height.toFloat(), fit, density)
+  return PointD((offset.x - placement.left).toDouble(), (offset.y - placement.top).toDouble())
+}
+
+/**
+ * The same point in **scene** coordinates, for the hit test this module runs itself.
+ *
+ * The full inverse, including the pan and the zoom, because the mark reported beside a gesture has
+ * to be the mark that was under the finger on screen — not the one that would have been there
+ * before the chart was moved.
  */
 private fun scenePoint(
   offset: Offset,
@@ -382,8 +491,11 @@ private fun scenePoint(
   density: Float,
   width: Int,
   height: Int,
+  viewportOffset: VectorD,
+  viewportScale: Double,
 ): PointD {
-  val placement = placement(scene, width.toFloat(), height.toFloat(), fit, density)
+  val placement =
+    placement(scene, width.toFloat(), height.toFloat(), fit, density, viewportOffset, viewportScale)
   val scale = if (placement.scale == 0f) 1f else placement.scale
   return PointD(
     ((offset.x - placement.left) / scale).toDouble(),
@@ -397,6 +509,8 @@ private fun placement(
   height: Float,
   fit: SceneFit,
   density: Float,
+  viewportOffset: VectorD = VectorD.Zero,
+  viewportScale: Double = 1.0,
 ): Placement {
   val scale =
     when (fit) {
@@ -419,9 +533,35 @@ private fun placement(
   // Centred in whatever is left over, which is what makes a chart in a slot of the wrong aspect
   // ratio
   // look placed rather than stuck to a corner. `None` means what it says and does not move.
+  val fitLeft = if (fit == SceneFit.None) 0f else (width - scene.width.toFloat() * scale) / 2f
+  val fitTop = if (fit == SceneFit.None) 0f else (height - scene.height.toFloat() * scale) / 2f
+  // Then the **viewport** on top of the fit, in the order the controller documents its own inverse:
+  // translate by the pan, and scale by `contentScale * viewportScale`. A pan is accumulated in
+  // pixels
+  // — `InteractionState.viewportOffset` is what `visibleViewport` divides by that product to get
+  // scene
+  // units — so it is added to the offset here and not multiplied into it. Without this the state
+  // moved
+  // and the drawing did not: a pan that made `canReset` true and left the chart where it was.
   return Placement(
-    scale = scale,
-    left = if (fit == SceneFit.None) 0f else (width - scene.width.toFloat() * scale) / 2f,
-    top = if (fit == SceneFit.None) 0f else (height - scene.height.toFloat() * scale) / 2f,
+    scale = scale * viewportScale.toFloat(),
+    left = fitLeft + viewportOffset.dx.toFloat(),
+    top = fitTop + viewportOffset.dy.toFloat(),
+  )
+}
+
+/** The fit alone, for `onPlaced`: what a host sets as `contentScale`, with no pan or zoom in it. */
+private fun fitPlacement(
+  scene: Scene,
+  width: Float,
+  height: Float,
+  fit: SceneFit,
+  density: Float,
+): ChartPlacement {
+  val placed = placement(scene, width, height, fit, density)
+  return ChartPlacement(
+    scale = placed.scale.toDouble(),
+    left = placed.left.toDouble(),
+    top = placed.top.toDouble(),
   )
 }

@@ -233,6 +233,26 @@ used, and hit testing through `SceneHitIndex` (cached per scene). Two copies of 
 finger lands beside the mark it looked like it hit. Pass nothing and the chart takes no pointer input at
 all.
 
+The points and deltas are in the space a **controller** expects: pixels with the chart's centring taken
+off, and the fit scale left on, because `VegaChartController` divides by `contentScale` itself. So a host
+sets that from `onPlaced` and passes the viewport back in:
+
+```kotlin
+val snapshot by controller.state.collectAsState()
+
+VegaChart(
+    scene = snapshot.snapshot.scene,
+    onPlaced = { controller.contentScale = it.scale },
+    // Pan and zoom are the controller's state; without these the gesture updates it and the chart
+    // does not move.
+    viewportOffset = snapshot.snapshot.interactionState.viewportOffset,
+    viewportScale = snapshot.snapshot.interactionState.viewportScale,
+    onPan = { delta, ended -> controller.dispatch(ChartInputEvent.Pan(delta, phase(ended))) },
+)
+```
+
+`VegaChartView` on iOS reads the viewport off its session, so there is nothing to pass there.
+
 ## Diagnostics: what to do with one
 
 A specification that compiles is not the same as a specification that compiled *cleanly*, and an

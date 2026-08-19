@@ -113,6 +113,97 @@ final class ChartSessionTests: XCTestCase {
     XCTAssertEqual(session.lastTouch, .tooltip("a"))
   }
 
+  /// A pan that the chart actually follows — which it did not, on this renderer or on Compose.
+  ///
+  /// `VegaChartController` owns the viewport: it accumulates a pan into `viewportOffset`, multiplies a
+  /// pinch into `viewportScale`, clamps the zoom and keeps the anchor still. The **Android View** read
+  /// that back and drew through it; this side did not, so a pan made `canReset` true and left the chart
+  /// exactly where it was. A gesture that does nothing reads as a broken renderer rather than an
+  /// unfinished one.
+  ///
+  /// Two halves, and both are here: the session **publishes** the viewport so the drawing can apply it,
+  /// and a tap after a pan still finds the mark that is now under the finger — which is the controller's
+  /// own inverse working, and the thing that breaks the moment a host subtracts the pan twice.
+  func testAPanMovesTheChartAndTapsFollowIt() async {
+    let session = await loaded()
+    let scene = try! XCTUnwrap(session.scene)
+    session.place(
+      contentScale: 1,
+      viewport: Rect(x: 0, y: 0, width: scene.width, height: scene.height)
+    )
+
+    XCTAssertEqual(session.viewport, .identity, "nothing has moved yet")
+    // Five points in from the left edge: inside the left bar, and — unlike its middle — far enough out
+    // that a pan of forty takes it off the bar entirely. A bar a hundred wide would still be under a
+    // finger at its centre after that pan, which is what makes the centre useless for this test.
+    session.tap(at: Point(x: 5, y: 90))
+    await session.settle()
+    XCTAssertEqual(session.lastTouch, .tooltip("a"))
+
+    // Now move the chart 40 points to the right and let it settle.
+    session.pan(by: Point(x: 40, y: 0), phase: GesturePhase.changed)
+    session.pan(by: Point(x: 0, y: 0), phase: GesturePhase.ended)
+    await session.settle()
+
+    XCTAssertEqual(session.viewport.offsetX, 40, "the pan was not published for the drawing")
+    XCTAssertEqual(session.viewport.scale, 1)
+    XCTAssertTrue(session.canReset)
+
+    // The bar's left edge is now forty points in, and that is where a finger finds it.
+    session.tap(at: Point(x: 45, y: 90))
+    await session.settle()
+    XCTAssertEqual(session.lastTouch, .tooltip("a"), "a tap where the bar now is did not find it")
+
+    // And where its edge used to be there is now nothing: the chart moved out from under that point.
+    session.tap(at: Point(x: 5, y: 90))
+    await session.settle()
+    XCTAssertEqual(session.lastTouch, .nothing(x: 5, y: 90))
+  }
+
+  /// The pixels move too, which is the half a session cannot show on its own.
+  ///
+  /// `VegaChartView.draw(into:size:)` is called directly, as `CoreGraphicsTargetTests` does, and the ink
+  /// is counted either side of a pan. Composing the viewport onto the fit in the wrong order — or
+  /// forgetting it, which was the defect — leaves this identical.
+  @available(macOS 14.0, iOS 17.0, *)
+  func testTheDrawingFollowsThePan() async throws {
+    let session = await loaded()
+    let scene = try XCTUnwrap(session.scene)
+    session.place(
+      contentScale: 1,
+      viewport: Rect(x: 0, y: 0, width: scene.width, height: scene.height)
+    )
+
+    func leftmostInkedColumn() throws -> Int {
+      let width = Int(scene.width)
+      let height = Int(scene.height)
+      let space = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+      let context = try XCTUnwrap(
+        CGContext(
+          data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+          space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+      VegaChartView(scene: scene, session: session)
+        .draw(into: context, size: CGSize(width: scene.width, height: scene.height))
+      let image = try XCTUnwrap(context.makeImage())
+      let data = try XCTUnwrap(image.dataProvider?.data as Data?)
+      for x in 0..<width {
+        for y in 0..<height where data[(y * width + x) * 4 + 3] > 128 {
+          return x
+        }
+      }
+      return -1
+    }
+
+    let resting = try leftmostInkedColumn()
+    XCTAssertGreaterThanOrEqual(resting, 0, "nothing was drawn at all")
+
+    session.pan(by: Point(x: 30, y: 0), phase: GesturePhase.changed)
+    await session.settle()
+    let panned = try leftmostInkedColumn()
+
+    XCTAssertEqual(panned, resting + 30, "the drawing did not follow the pan: \(resting) then \(panned)")
+  }
+
   /// A key reaching the dataflow, which from here it could not.
   ///
   /// The Android View has translated keys since it was written, so a specification bound to `keydown`

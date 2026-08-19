@@ -4399,6 +4399,48 @@ Two caveats on the number. It is a desktop JVM with the JIT warm, which is the m
 there is; and it measures compilation only, not the Canvas draw that follows. It is an order of
 magnitude, enough to rule an approach in, and not a substitute for measuring on hardware.
 
+## A pan that moved the state and not the chart
+
+Asked whether the two remaining "not at parity" notes could be closed, the first turned out not to be a
+missing nicety at all. It was a defect.
+
+`VegaChartController` owns the viewport and always has: it adds a pan's delta into `viewportOffset`,
+multiplies a pinch into `viewportScale`, clamps the zoom between 0.1× and 50×, keeps the anchor
+stationary, and emits `ViewportChanged` when the gesture ends. The **Android View** reads that state back
+and draws through it — `canvas.translate(offset)` and a pixel scale of `fit * viewportScale` — and its
+accessibility helper maps every virtual node through the same numbers. The Compose Multiplatform renderer
+and the Swift one did neither. So on those two hosts a pan updated the controller, made `canReset` true,
+and **left the chart exactly where it was**. A gesture that does nothing reads as a broken renderer
+rather than an unfinished one, and nothing caught it because no test on either host panned and then
+looked.
+
+Both draw through it now, and so do their accessibility overlays. Three things had to be got right, and
+two of them are the kind that produce a defect that looks like a rendering bug:
+
+**The order.** The controller documents its own inverse — *subtract the pan offset, then divide by
+`contentScale * viewportScale`* — so the forward transform is translate-then-scale, and the pan is added
+to the placement's offset rather than multiplied into it. `visibleViewport` is the arithmetic that pins
+which way round it goes.
+
+**Two placements, not one.** The **fit** is what a touch is inverted through and what `onPlaced` reports
+for `contentScale`; the **drawn** placement is the fit with the reader's pan and zoom on it. Using the
+drawn one to invert a touch subtracts the pan twice, and the tap drifts further from the finger the
+further the chart has been panned — which a test now pins on both hosts by tapping where a mark *is*
+after a pan and where it *was*.
+
+**The units.** A controller accumulates the pan in **pixels**. The gesture callbacks this renderer grew
+last week reported scene units, which would have been divided by the fit scale a second time inside the
+controller; they report pixels with the centring removed now, and the contract is written down in the
+module rather than left for a host to infer. The Android View has dispatched raw pixels all along, which
+is what made it the one host that worked.
+
+One more thing fell out of testing it. `VegaChart` composed its modifier as
+`Modifier.size(sceneSize).then(modifier)`, and a `size` modifier fixes the constraints its child is
+measured with — so **a caller could not make a chart any bigger than its scene**, which quietly made
+`SceneFit.Contain`, the default, mean nothing outside a test that sizes the canvas itself. The caller's
+modifier comes first now. The comment claiming a caller could override the default had been there since
+the module was written; the test that would have caught it did not exist until this one.
+
 ## A key, and a policy for a chart that compiled with complaints
 
 Two smaller things the parity audit and the original review left standing.

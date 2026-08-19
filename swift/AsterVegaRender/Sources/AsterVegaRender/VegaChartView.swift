@@ -210,9 +210,13 @@ public struct VegaChartView: View {
   }
 
   /// The accessibility elements, positioned over the chart they describe.
+  ///
+  /// Through the **drawn** placement, pan and zoom included: a reader exploring by touch has to land on
+  /// the mark where it is now. Android's `VegaAccessibilityHelper` maps its virtual nodes through the
+  /// viewport for the same reason, and this side did not until the drawing did.
   private var accessibilityOverlay: some View {
     GeometryReader { proxy in
-      let placement = placement(in: proxy.size)
+      let placement = drawnPlacement(in: proxy.size)
       ZStack(alignment: .topLeading) {
         ForEach(accessibleElements, id: \.offset) { entry in
           let scale = placement?.scale ?? 1
@@ -318,6 +322,12 @@ public struct VegaChartView: View {
   }
 
   /// The fit scale and the centring offset, computed once and used by both the drawing and the touches.
+  /// The **fit**: where the chart sits in the view before a reader has moved it.
+  ///
+  /// This is what a touch is inverted through and what is handed to `onPlaced`, and it deliberately
+  /// carries no pan or zoom: `VegaChartController` subtracts its own `viewportOffset` and divides by its
+  /// own `viewportScale`, so removing either here would remove it twice and a tap would drift further
+  /// from the finger the further the chart had been panned.
   private func placement(in size: CGSize) -> (scale: Double, left: CGFloat, top: CGFloat)? {
     guard scene.width > 0, scene.height > 0, size.width > 0, size.height > 0 else { return nil }
     let scale = min(size.width / CGFloat(scene.width), size.height / CGFloat(scene.height))
@@ -328,13 +338,28 @@ public struct VegaChartView: View {
     )
   }
 
+  /// The fit **with the reader's pan and zoom on it**: what the pixels actually go through.
+  ///
+  /// Composed in the order the controller documents — translate by the offset, then scale by
+  /// `contentScale * viewportScale` — and used by the drawing *and* by the accessibility frames, so a
+  /// reader exploring by touch lands on the mark where it is now rather than where it started.
+  private func drawnPlacement(in size: CGSize) -> (scale: Double, left: CGFloat, top: CGFloat)? {
+    guard let fit = placement(in: size) else { return nil }
+    let viewport = session?.viewport ?? .identity
+    return (
+      scale: fit.scale * viewport.scale,
+      left: fit.left + CGFloat(viewport.offsetX),
+      top: fit.top + CGFloat(viewport.offsetY)
+    )
+  }
+
   private var aspect: CGFloat {
     guard scene.width > 0, scene.height > 0 else { return 1 }
     return CGFloat(scene.width / scene.height)
   }
 
-  private func draw(into context: CGContext, size: CGSize) {
-    guard let placement = placement(in: size) else { return }
+  func draw(into context: CGContext, size: CGSize) {
+    guard let placement = drawnPlacement(in: size) else { return }
 
     context.saveGState()
     // Centred, then scaled. Scaling the context rather than the scene means stroke widths and dash
@@ -358,6 +383,28 @@ public struct VegaChartView: View {
 
     context.restoreGState()
   }
+}
+
+/// The pan and zoom a chart is drawn through, as a controller accumulated them.
+///
+/// The offset is in **pixels** and the scale is a factor, which is exactly how
+/// `InteractionState.viewportOffset` and `viewportScale` hold them — so this crosses no conversion on
+/// its way from the engine to the drawing. It is a separate type from ``ChartPlacement`` because the two
+/// are composed and not interchangeable: the placement is where the chart *sits* in a view, and this is
+/// what a reader has done to it since.
+public struct ChartViewport: Sendable, Equatable {
+  public let offsetX: Double
+  public let offsetY: Double
+  public let scale: Double
+
+  public init(offsetX: Double, offsetY: Double, scale: Double) {
+    self.offsetX = offsetX
+    self.offsetY = offsetY
+    self.scale = scale > 0 ? scale : 1
+  }
+
+  /// The identity: a chart nobody has moved.
+  public static let identity = ChartViewport(offsetX: 0, offsetY: 0, scale: 1)
 }
 
 /// Where a chart ended up inside the view: the fit scale, and the offset it was centred by.

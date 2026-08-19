@@ -1,3 +1,19 @@
+public final class dev/aster/vega/compose/mp/ChartPlacement {
+	public static final field $stable I
+	public fun <init> (DDD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun copy (DDD)Ldev/aster/vega/compose/mp/ChartPlacement;
+	public static synthetic fun copy$default (Ldev/aster/vega/compose/mp/ChartPlacement;DDDILjava/lang/Object;)Ldev/aster/vega/compose/mp/ChartPlacement;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLeft ()D
+	public final fun getScale ()D
+	public final fun getTop ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class dev/aster/vega/compose/mp/ComposeTextEngine : dev/aster/vega/scene/MeasuredTextEngine {
 	public static final field $stable I
 	public fun <init> (Landroidx/compose/ui/text/TextMeasurer;Landroidx/compose/ui/unit/Density;Lkotlin/jvm/functions/Function1;)V
@@ -344,6 +360,6 @@ public final class dev/aster/vega/compose/mp/SceneWalk {
 }
 
 public final class dev/aster/vega/compose/mp/VegaChartKt {
-	public static final fun VegaChart (Ldev/aster/vega/scene/Scene;Landroidx/compose/ui/Modifier;Ldev/aster/vega/compose/mp/SceneFit;Ldev/aster/vega/compose/mp/ComposeTextEngine;Ljava/util/Set;Ldev/aster/vega/model/locale/VegaCaptions;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Ldev/aster/vega/scene/HitTestOptions;Landroidx/compose/runtime/Composer;III)V
+	public static final fun VegaChart (Ldev/aster/vega/scene/Scene;Landroidx/compose/ui/Modifier;Ldev/aster/vega/compose/mp/SceneFit;Ldev/aster/vega/compose/mp/ComposeTextEngine;Ljava/util/Set;Ldev/aster/vega/model/locale/VegaCaptions;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Ldev/aster/vega/scene/HitTestOptions;Ldev/aster/vega/scene/VectorD;DLkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;III)V
 }
 
