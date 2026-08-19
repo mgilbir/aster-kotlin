@@ -160,6 +160,125 @@ final class ChartSessionTests: XCTestCase {
     XCTAssertFalse(session.canReset)
   }
 
+  /// A chart in Dutch, from iOS.
+  ///
+  /// The locale seam landed in the engine and was then unreachable from here: this session hard-coded
+  /// `en-US`, so an iOS app using the surface it is told to use could not render a localised chart at
+  /// all while an Android app could. Parity is the point of this test as much as the locale is.
+  func testTheLocaleReachesTheChartFromHere() async {
+    let months = """
+      {"width": 300, "height": 120, "padding": 5,
+       "data": [{"name": "t", "values": [{"t": "2026-05-20T10:00:00", "v": 1},
+                                         {"t": "2026-06-17T10:00:00", "v": 2}],
+                 "format": {"parse": {"t": "date"}}}],
+       "scales": [{"name": "x", "type": "time", "domain": {"data": "t", "field": "t"},
+                   "range": "width"}],
+       "axes": [{"orient": "bottom", "scale": "x", "format": "%b %Y", "tickCount": 2}],
+       "marks": [{"type": "symbol", "from": {"data": "t"}, "encode": {"enter": {
+         "x": {"scale": "x", "field": "t"}, "y": {"value": 60}}}}]}
+      """
+
+    func drawn(with locale: VegaLocale?) async -> [String] {
+      let session = ChartSession(locale: locale)
+      session.load(specification: months)
+      await session.settle()
+      let scene = try! XCTUnwrap(session.scene, session.failure ?? "no scene")
+      var target = RecordingTarget()
+      SceneWalk().draw(scene: scene, into: &target)
+      return target.calls.filter { $0.contains("text ") }
+    }
+
+    let english = await drawn(with: nil)
+    XCTAssertTrue(english.contains { $0.contains("May 2026") }, "the default is d3's en-US: \(english)")
+
+    let dutch = VegaLocale(
+      months: [
+        "januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september",
+        "oktober", "november", "december",
+      ],
+      shortMonths: [
+        "jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec",
+      ],
+      days: ["zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"],
+      shortDays: ["zo", "ma", "di", "wo", "do", "vr", "za"],
+      periods: ["a.m.", "p.m."],
+      date: "%d-%m-%Y",
+      time: "%H:%M:%S",
+      dateTime: "%a %e %B %Y %X",
+      decimal: ",",
+      thousands: ".",
+      grouping: [KotlinInt(value: 3)],
+      minus: "\u{2212}",
+      captions: VegaCaptionsCompanion.shared.English
+    )
+    let localised = await drawn(with: dutch)
+    XCTAssertTrue(localised.contains { $0.contains("mei 2026") }, "in Dutch: \(localised)")
+  }
+
+  /// A dark chart, themed by the app, from iOS — the other seam that was unreachable from here.
+  ///
+  /// The configuration is JSON because a theme is written as JSON, and it has to reach **both** the
+  /// Vega-Lite compiler and the runtime: Vega-Lite merges `config` before it compiles, so a theme
+  /// applied on one side only is a chart half in the app's colours.
+  func testTheHostConfigurationReachesBothCompilers() async {
+    let vegaLite = """
+      {"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+       "data": {"values": [{"a": 1, "b": 2}]},
+       "mark": "point",
+       "encoding": {"x": {"field": "a", "type": "quantitative"},
+                    "y": {"field": "b", "type": "quantitative"}}}
+      """
+
+    let theme = "{\"background\": \"#101820\", \"mark\": {\"color\": \"#7fd1b9\"}}"
+    let session = ChartSession(hostConfigJson: theme)
+    session.load(specification: vegaLite)
+    await session.settle()
+
+    XCTAssertNil(session.hostConfigFailure)
+    let scene = try! XCTUnwrap(session.scene, session.failure ?? "no scene")
+    // The background is the scene's own property, and it came from the configuration this app supplied
+    // to a specification that never mentioned one.
+    let background = try! XCTUnwrap(scene.background)
+    XCTAssertEqual(Int((background.red * 255).rounded()), 0x10)
+    XCTAssertEqual(Int((background.green * 255).rounded()), 0x18)
+    XCTAssertEqual(Int((background.blue * 255).rounded()), 0x20)
+  }
+
+  func testAHostConfigurationThatIsNotAnObjectIsReportedAndTheChartStillDraws() async {
+    let session = ChartSession(hostConfigJson: "not a configuration")
+    session.load(specification: specification)
+    await session.settle()
+
+    XCTAssertNotNil(session.hostConfigFailure, "a theme that could not be read has to say so")
+    XCTAssertNotNil(session.scene, "and the chart is drawn unthemed rather than not drawn")
+  }
+
+  /// `width: "container"`, which an iOS host could not answer at all before.
+  func testTheContainerWidthIsTheChartsWidth() async {
+    let responsive = """
+      {"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+       "width": "container",
+       "data": {"values": [{"a": 1, "b": 2}, {"a": 3, "b": 4}]},
+       "mark": "line",
+       "encoding": {"x": {"field": "a", "type": "quantitative"},
+                    "y": {"field": "b", "type": "quantitative"}}}
+      """
+
+    let narrow = ChartSession(containerSize: SizeD(width: 200, height: 400))
+    narrow.load(specification: responsive)
+    await narrow.settle()
+    let narrowWidth = try! XCTUnwrap(narrow.scene).width
+
+    let wide = ChartSession(containerSize: SizeD(width: 600, height: 400))
+    wide.load(specification: responsive)
+    await wide.settle()
+    XCTAssertGreaterThan(try! XCTUnwrap(wide.scene).width, narrowWidth + 300)
+
+    // And set again after the fact, which is what a layout change is.
+    narrow.containerSize = SizeD(width: 600, height: 400)
+    XCTAssertGreaterThan(try! XCTUnwrap(narrow.scene).width, narrowWidth + 300)
+  }
+
   /// A chart drawn from data the **app** holds, which is what a diary is.
   ///
   /// The specification names a dataset and carries no rows for it. Everything about the chart — the

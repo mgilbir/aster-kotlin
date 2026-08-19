@@ -4399,6 +4399,36 @@ Two caveats on the number. It is a desktop JVM with the JIT warm, which is the m
 there is; and it measures compilation only, not the Canvas draw that follows. It is an order of
 magnitude, enough to rule an approach in, and not a substitute for measuring on hardware.
 
+## Three seams that existed and could not be reached from iOS
+
+A parity audit, prompted by one question: is that all? It was not. `ChartSession` — the surface an
+adopting iOS app is told to use, moved into the library so that nobody owns 2,400 lines of it by hand —
+hard-coded three of the compile inputs it was passing on:
+
+```swift
+locale: VegaLocale.Companion.shared.EnglishUS,
+hostConfig: nil,
+containerSize: nil,
+```
+
+So the locale seam, host theming and `width: "container"` were all implemented, tested, documented —
+and available on Android only. Three landed requirements, true on one platform. That is worse than a
+missing feature, because the documentation says the engine has them and it does.
+
+They are all reachable now, and two details are worth keeping. The host configuration is taken as
+**JSON text** rather than as a built `VegaValue`: a theme is written as JSON, and assembling a value
+tree across the Obj-C boundary — where every variant is a Kotlin value class with no representation — is
+work for nothing. It reaches both compilers, the Vega-Lite one and the runtime, because Vega-Lite merges
+`config` before it compiles and a theme applied on one side is a chart half in the app's colours. And
+`containerSize` is a settable property that recompiles, deliberately **not** wired to the chart view's
+own geometry: a chart sized to its container changes its scene's width, the view's aspect ratio follows
+the scene, and a width read back from that view can oscillate. A host takes it from something stable and
+the documentation says why.
+
+Both failure paths report rather than throw, as the time zone does: a configuration that will not parse
+lands in `hostConfigFailure` and a chart is drawn unthemed, because both of those values usually come
+from a server and neither is worth a crash.
+
 ## A chart can be drawn from data the app holds
 
 Until this, a chart could only be drawn from data a **payload** carried: values inlined in the

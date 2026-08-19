@@ -60,6 +60,19 @@ public final class ChartSession {
   ///     engine's own default and the right one: a specification is data, often pasted data, and a URL
   ///     in it asks this process to fetch an address the specification chose.
   ///   - clock: wall-clock milliseconds, for throttling an event stream. Nil uses the system clock.
+  ///   - locale: the language everything the engine *generates* is written in — a month name on a time
+  ///     axis, a thousands separator, the sentence VoiceOver is given. Nil is d3's `en-US`, which is
+  ///     what upstream produces. Build one field for field from a d3 locale definition; it does **not**
+  ///     change how a specification's own dates are parsed, which is part of the wire format.
+  ///   - hostConfigJson: a Vega `config` block **this app** supplies, as JSON, which the
+  ///     specification's own beats key by key. How a chart drawn on a dark surface is legible when the
+  ///     server that produced it chose colours for a white page. JSON rather than a built object
+  ///     because a theme is written as JSON and building a `VegaValue` tree across this boundary is
+  ///     needless work; text that is not an object is reported in `hostConfigFailure` and the chart is
+  ///     drawn unthemed rather than not drawn.
+  ///   - containerSize: the surface the chart is laid out to, which `width: "container"` asks for. Nil
+  ///     falls back to `config.view.continuousWidth`, 300, which is what upstream does outside a
+  ///     browser. See the `containerSize` property for why a host sets this from a *stable* width.
   ///   - timeZone: which zone the chart's **local** time is in. Nil is the device's own, which is what
   ///     a browser has and is right for most charts. Pass one where the reader's zone is not the
   ///     handset's — a profile setting, an account read from two places — because it decides which day
@@ -71,9 +84,19 @@ public final class ChartSession {
     textEngine: MeasuredTextEngine = CoreTextTextEngine(),
     loader: VegaDataLoader? = nil,
     clock: (@Sendable () -> Int64)? = nil,
+    locale: VegaLocale? = nil,
+    hostConfigJson: String? = nil,
+    containerSize: SizeD? = nil,
     timeZone: Foundation.TimeZone? = nil
   ) {
     let ticker = clock ?? { Int64(Date().timeIntervalSince1970 * 1000) }
+    let theme = hostConfigJson.flatMap { Self.parsedConfig($0) }
+    if hostConfigJson != nil, theme == nil {
+      hostConfigFailure =
+        "The host configuration is not a JSON object, so this chart is drawn with the "
+        + "specification's own configuration alone."
+    }
+    hostConfig = theme
     let resolved = timeZone.flatMap { VegaTimeZones.shared.of(zoneId: $0.identifier) }
     if let timeZone, resolved == nil {
       timeZoneFailure =
@@ -91,9 +114,9 @@ public final class ChartSession {
       // right default for a specification that may be pasted data.
       loader: loader ?? DenyLoader.shared,
       scheduler: nil,
-      locale: VegaLocale.Companion.shared.EnglishUS,
-      hostConfig: nil,
-      containerSize: nil,
+      locale: locale ?? VegaLocale.Companion.shared.EnglishUS,
+      hostConfig: theme,
+      containerSize: containerSize,
       // Nil, and then filled through `setData(_:rows:)` — a session is created before the app has its
       // data as often as after, and the controller keeps whatever arrives first.
       hostData: nil,
@@ -107,6 +130,54 @@ public final class ChartSession {
   /// turned into a millisecond while compiling, and a store on a different clock from the axis is a
   /// brush that starts in the wrong place.
   private let engineTimeZone: Kotlinx_datetimeTimeZone?
+
+  /// The parsed host configuration, kept because the Vega-Lite compiler needs it as well as the
+  /// runtime: a Vega-Lite `config` is merged before the specification is compiled, and a theme applied
+  /// on only one side of that is a chart half in the app's colours.
+  private let hostConfig: (any AsterVega.VegaValue)?
+
+  /// Why a host configuration was not applied, if it was not. Nil in every ordinary case.
+  ///
+  /// Reported rather than thrown, for the same reason `timeZoneFailure` is: a theme is often assembled
+  /// from strings, and a chart in the wrong colours beats no chart at all.
+  public private(set) var hostConfigFailure: String?
+
+  /// The surface the chart is laid out to, which `width: "container"` asks for.
+  ///
+  /// Setting it **recompiles**, because Vega-Lite turns `"container"` into a signal and every scale
+  /// range, axis extent and mark position downstream is resolved from it. So a host sets this on a
+  /// layout change, not on every frame of an animation.
+  ///
+  /// Take the width from something **stable** — the parent's width, a size class, a fixed column — and
+  /// not from the chart view's own geometry: a chart sized to its container changes its scene's width,
+  /// the view's aspect ratio follows the scene, and a width read back from that view can oscillate.
+  /// That loop is why this is not wired up automatically.
+  public var containerSize: SizeD? {
+    get { controller.containerSize }
+    set {
+      guard newValue != controller.containerSize else { return }
+      serialised { [weak self] in
+        guard let self else { return }
+        self.controller.containerSize = newValue
+        if let compiled = self.controller.lastCompiled {
+          self.diagnostics = compiled.diagnostics
+          if compiled.scene != nil {
+            self.hasScene = true
+            self.failure = nil
+          }
+        }
+        self.refreshControls()
+        self.publish()
+      }
+    }
+  }
+
+  private static func parsedConfig(_ json: String) -> (any AsterVega.VegaValue)? {
+    let parsed = VegaJson.shared.parseOrNull(text: json, diagnostics: DiagnosticCollector())
+    // An object, or nothing: `mergeConfig` takes objects, and a bare array or number would be dropped
+    // silently one layer further down where nobody would connect it to what was passed in here.
+    return ForeignSignals.shared.kind(value: parsed) == "object" ? parsed : nil
+  }
 
   /// Why a supplied time zone was not used, if it was not. Nil in every ordinary case.
   ///
@@ -193,7 +264,7 @@ public final class ChartSession {
       let converted =
         VegaLiteInput.shared.toVega(
           json: specification,
-          hostConfig: nil,
+          hostConfig: self.hostConfig,
           timeZone: engineTimeZone
         )
       self.grammar = converted.wasVegaLite ? .vegaLite : .vega

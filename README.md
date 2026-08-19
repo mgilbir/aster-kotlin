@@ -349,6 +349,30 @@ A dataset declared **inside a group mark** is filled the same way, by its own na
 zone, this is a *compile* input: the Compose renderer draws a scene that has already been compiled, so
 it is set wherever the controller or `SpecCompiler` lives.
 
+### The same seams from iOS
+
+`ChartSession` takes every compile input the Kotlin controller does, because a capability that exists
+for one host and not the other is a gap in this boundary rather than a fact about the platform:
+
+```swift
+let session = ChartSession(
+    locale: dutch,                                   // month names, separators, spoken captions
+    hostConfigJson: theme,                           // a `config` block, as JSON
+    containerSize: SizeD(width: 360, height: 0),     // what `width: "container"` asks for
+    timeZone: TimeZone(identifier: profile.zone)     // which zone "local" is
+)
+session.setData("diary", rows: rows)                 // a table the app holds
+```
+
+A theme that is not a JSON object lands in `hostConfigFailure` and the chart is drawn unthemed; a time
+zone the platform cannot resolve lands in `timeZoneFailure` and the chart is drawn in the device's zone.
+Neither throws, because both usually come from a server.
+
+Take `containerSize` from something **stable** — the parent's width, a size class, a fixed column — and
+not from the chart view's own geometry: a chart sized to its container changes its scene's width, the
+view's aspect ratio follows the scene, and a width read back from that view can oscillate. That loop is
+why it is not wired up automatically.
+
 ## Time zone example
 
 A chart of days needs to know which zone the days are in, and on a handset that is not always the
