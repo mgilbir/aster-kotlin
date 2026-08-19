@@ -43,6 +43,38 @@ host.
 `iosX64`: `ktecma262` 0.2.0 does not publish that slice, so the target cannot
 resolve its dependencies. See the platform table in README.md.
 
+### What a host supplies
+
+Everything the engine cannot know is a **constructor parameter beside the text engine**, and each
+one is reachable from Kotlin *and* from Swift:
+
+- **`locale`** — every generated string: month names, number separators, the sentences a screen
+  reader is given. `VegaCaptions` is an interface rather than a table, because those sentences are
+  grammar. Parsing stays English, d3's parsing being part of the wire format.
+- **`timeZone`** — which zone *local* means, for a `time` scale's ticks, `timeunit`'s buckets, the
+  local expression functions and the zone a timestamp with no offset in the data is read in. Null is
+  the device's own. `utc` forms are untouched.
+- **`hostConfig`** — a `config` block the app supplies, which the specification's own beats key by
+  key: how a chart drawn on a dark surface is legible when the server chose colours for a white page.
+- **`containerSize`** — what `width: "container"` asks for, a responsive width having no answer
+  inside the specification.
+- **`hostData`** — a table the **app** holds rather than the payload: `setData(name, rows)`, which is
+  upstream's `view.data`. The rows arrive where inline values would, so `format.parse` and every
+  transform run over them unchanged.
+
+### What a host gets back
+
+- A **scene**, and diagnostics rather than exceptions. `DiagnosticSeverity` says what each level means
+  for the chart, and README.md states the policy a host should apply to it.
+- **Interaction**, on every renderer: tap, long press, pan, pinch, hover and keys, dispatched into the
+  specification's own event handlers. Pan and zoom are drawn, not merely accumulated.
+- **Accessibility**: one element per mark, axis, legend and title, positioned so a reader can explore
+  by touch — as virtual nodes on Android, as positioned elements in SwiftUI, as semantics in Compose.
+- **Tooltips** as rows and text in the chart's own locale, with the anchor to put them at. Drawing the
+  bubble is the app's, since what a bubble looks like is a design-system decision.
+- **Fonts and text size** from the host: a resolver for a bundled face on every renderer, and the
+  reader's text-scale setting applied to measurement *and* drawing.
+
 ### Consuming it
 
 Maven Central under `io.github.mgilbir.astervega`, one version for every module,
@@ -65,3 +97,23 @@ surface and for the native one, checked by `scripts/check.sh`.
   `usermeta` — which upstream carries onto the compiled Vega — was one of them.
 - A `$schema` naming another major version of Vega-Lite was compiled with version
   6 rules and said nothing about it.
+- A **group** was picked anywhere inside its bounds, so a tap on blank space selected
+  the frame every compiled chart wraps its marks in and a host reported one selected
+  mark with nothing under the finger. Upstream picks a group only where it paints.
+  A mark hidden by a clip was tappable for the same reason, and a rounded bar was
+  picked in the corners it does not fill.
+- **Pan and zoom updated the controller and did not move the chart** on the Compose
+  Multiplatform and Swift renderers, so a gesture made "reset" available and appeared
+  to do nothing.
+- The Compose Multiplatform renderer took **no pointer input at all**: a mark could be
+  activated by a screen reader and not by a finger.
+- Three compile inputs — the locale, the host configuration and the container width —
+  were **unreachable from Swift**, so three implemented features were available on
+  Android only.
+- The reader's text-size setting was honoured on Android and in Compose and ignored on
+  iOS; a font the app ships could not reach a chart on the Android View at all.
+- A `Modifier` passed to the Compose Multiplatform chart could not make it any bigger
+  than its scene, which made the default fit mean nothing.
+- The derived label a screen reader reads spoke a raw epoch number on a time axis, and
+  then — briefly — a datum rounded to the axis's tick precision, which is a nicer label
+  and a false statement about one measurement.
