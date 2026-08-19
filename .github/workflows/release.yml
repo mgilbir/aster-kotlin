@@ -206,6 +206,28 @@ jobs:
         # Release rather than debug: this is the binary a Swift Package Manager consumer downloads.
         run: ./gradlew :vega-runtime:assembleAsterVegaReleaseXCFramework
 
+      - name: Check the XCFramework carries the platforms the manifest promises
+        # 0.1.0 shipped a package declaring `platforms: [.macOS(.v13), .iOS(.v16)]` and an XCFramework
+        # holding the two iOS slices and nothing else, so a consumer running `swift build` on a Mac —
+        # a plain command-line build, an Xcode preview, a package-scheme check — got `no such module
+        # 'AsterVega'`. The iOS slices were fine; the platform the manifest also promised had nothing
+        # behind it. Nothing in the build failed, because nothing compared the two.
+        run: |
+          set -euo pipefail
+          python3 - "vega-runtime/build/XCFrameworks/release/AsterVega.xcframework/Info.plist" <<'PY'
+          import plistlib, sys
+          libraries = plistlib.load(open(sys.argv[1], "rb"))["AvailableLibraries"]
+          have = {
+              (library["SupportedPlatform"], library.get("SupportedPlatformVariant", "device"))
+              for library in libraries
+          }
+          want = {("ios", "device"), ("ios", "simulator"), ("macos", "device")}
+          print("slices:", sorted(have))
+          missing = sorted(want - have)
+          if missing:
+              raise SystemExit(f"::error::XCFramework is missing {missing}; Package.swift promises iOS and macOS.")
+          PY
+
       - name: Collect artifacts
         run: |
           set -euo pipefail

@@ -8,6 +8,20 @@ section here does not get released.
 
 ### Fixed
 
+- **The Swift package builds on macOS again.** 0.1.0 declared
+  `platforms: [.macOS(.v13), .iOS(.v16)]` and shipped an XCFramework carrying the
+  two iOS slices and nothing else, so a consumer running `swift build` on a Mac —
+  a plain command-line build, an Xcode preview, a package-scheme check — got `no
+  such module 'AsterVega'`. iOS itself was unaffected: both slices were there, and
+  an iOS Simulator build of the published package succeeds. The release XCFramework
+  now carries all three slices; the debug one stays iOS-only, so
+  `scripts/ios-demo.sh` keeps its fast path — the exclusion was written for that
+  speed and was applied to what ships as well, which is the whole of the defect.
+  The release workflow now asserts the slice list against the platforms the
+  manifest promises before it tags, because nothing in the build compared the two:
+  the artefact was correct by iOS's standards and wrong by the manifest's, and only
+  a consumer found out. (#56)
+
 - **A SwiftUI chart with no session installs no gestures**, and one with a session
   says which. Every handler already returned early without a session, but
   `DragGesture(minimumDistance: 0)` claimed the drag on touch-down anyway — so a
