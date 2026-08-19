@@ -1,6 +1,8 @@
 package dev.aster.vega.compose.mp
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -9,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -23,8 +27,12 @@ import androidx.compose.ui.unit.dp
 import dev.aster.vega.model.locale.VegaCaptions
 import dev.aster.vega.scene.AccessibilityTree
 import dev.aster.vega.scene.AccessibleElement
+import dev.aster.vega.scene.HitTestOptions
+import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.Scene
+import dev.aster.vega.scene.SceneHitIndex
 import dev.aster.vega.scene.SceneNodeId
+import dev.aster.vega.scene.VectorD
 import kotlin.math.roundToInt
 
 /**
@@ -49,8 +57,15 @@ import kotlin.math.roundToInt
  *   controller's interaction state where there is one.
  * @param captions the language the one sentence the tree writes itself is in — the dense-chart
  *   summary. Everything else is already in the chart's own locale, having come from the compiler.
- * @param onActivate what to do when a reader activates a mark, or a caller taps one. Null leaves
- *   the chart inert, which is right for a chart that is only being looked at.
+ * @param onActivate what to do when a **reader** activates a mark through the accessibility tree.
+ *   Null leaves the chart inert, which is right for a chart that is only being looked at.
+ * @param onTap a tap, in **scene** coordinates, with the mark under it or null where it hit
+ *   nothing.
+ * @param onLongPress the same for a long press, which most specifications bind a tooltip to.
+ * @param onPan a drag, as the increment since the last report, and whether the gesture has ended.
+ * @param onZoom a pinch, as the factor since the last report, about an anchor in scene coordinates.
+ * @param onHover a pointer moving over the chart, and null when it leaves. Mouse and stylus only.
+ * @param hitTestOptions how generously a tap picks a mark; the default is the touch tolerance.
  *
  * A callback rather than a controller because this module depends on `vega-scene` alone: a scene is
  * all a renderer needs, and taking `vega-runtime` here to dispatch a tap would make every host that
@@ -66,9 +81,19 @@ public fun VegaChart(
   selectedNodeIds: Set<SceneNodeId> = emptySet(),
   captions: VegaCaptions = VegaCaptions.English,
   onActivate: ((SceneNodeId) -> Unit)? = null,
+  onTap: ((PointD, SceneNodeId?) -> Unit)? = null,
+  onLongPress: ((PointD, SceneNodeId?) -> Unit)? = null,
+  onPan: ((VectorD, Boolean) -> Unit)? = null,
+  onZoom: ((Double, PointD, Boolean) -> Unit)? = null,
+  onHover: ((PointD?, SceneNodeId?) -> Unit)? = null,
+  hitTestOptions: HitTestOptions = HitTestOptions.Touch,
 ) {
   val walk = remember { SceneWalk() }
   val density = LocalDensity.current.density
+  // Built once per scene, not per tap: `SceneHitIndex` walks the whole tree and, past its
+  // threshold,
+  // builds a grid. A chart of five hundred marks would otherwise pay for that on every finger down.
+  val hitIndex = remember(scene, hitTestOptions) { SceneHitIndex(scene, hitTestOptions) }
   // Cached against the scene's identity and the selection, which is what the engine's own
   // documentation asks a host to do: `elements` flattens the scene, so recomputing it on every
   // recomposition would walk the tree for a pointer that moved.
@@ -87,6 +112,17 @@ public fun VegaChart(
           // The drawing says nothing on its own: every announcement belongs to an element in the
           // overlay, and a canvas that also carried a description would be read out twice.
           .clearAndSetSemantics {}
+          .chartPointerInput(
+            scene = scene,
+            fit = fit,
+            density = density,
+            hitIndex = hitIndex,
+            onTap = onTap,
+            onLongPress = onLongPress,
+            onPan = onPan,
+            onZoom = onZoom,
+            onHover = onHover,
+          )
     ) {
       val placement = placement(scene, size.width, size.height, fit, density)
       translate(left = placement.left, top = placement.top) {
@@ -219,6 +255,142 @@ private data class Placement(val scale: Float, val left: Float, val top: Float)
  * had twice, once on Android and once in the Swift renderer, which is why both of those share one
  * placement too.
  */
+/**
+ * Gestures, turned into **scene** coordinates and the mark under them.
+ *
+ * This renderer had no pointer input at all: a tap did nothing, and the only way to activate a mark
+ * was through the accessibility tree — so a screen-reader user could select one and a sighted user
+ * could not. Every other host answers a finger, and a specification saying `"tooltip": true`
+ * expects one to.
+ *
+ * What it deliberately does **not** do is dispatch. This module depends on `vega-scene` alone, so
+ * there is no dataflow here to send an event into; a host with a controller forwards these to it,
+ * and a host that only draws passes nothing and pays for nothing. What the module *does* own is the
+ * part a host must not have to repeat: inverting the **same placement** the drawing used, and hit
+ * testing through `SceneHitIndex`. Two copies of that arithmetic is how a finger lands beside the
+ * mark it looked like it hit — a defect this project has had on Android and in the Swift renderer,
+ * which is why `ChartPlacement` exists there.
+ *
+ * The phases a host will need: `onPan` and `onZoom` report an **increment** and whether the gesture
+ * is over, which maps onto `ChartInputEvent` as `GesturePhase.CHANGED` while `ended` is false and
+ * `GesturePhase.ENDED` when it is true. That is the same pairing the Swift session sends.
+ */
+private fun Modifier.chartPointerInput(
+  scene: Scene,
+  fit: SceneFit,
+  density: Float,
+  hitIndex: SceneHitIndex,
+  onTap: ((PointD, SceneNodeId?) -> Unit)?,
+  onLongPress: ((PointD, SceneNodeId?) -> Unit)?,
+  onPan: ((VectorD, Boolean) -> Unit)?,
+  onZoom: ((Double, PointD, Boolean) -> Unit)?,
+  onHover: ((PointD?, SceneNodeId?) -> Unit)?,
+): Modifier {
+  if (onTap == null && onLongPress == null && onPan == null && onZoom == null && onHover == null) {
+    return this
+  }
+  return this.then(
+      if (onTap == null && onLongPress == null) Modifier
+      else
+        Modifier.pointerInput(scene, fit, density, hitIndex) {
+          detectTapGestures(
+            onTap =
+              onTap?.let { report ->
+                { offset ->
+                  val point = scenePoint(offset, scene, fit, density, size.width, size.height)
+                  report(point, hitIndex.hitTest(point)?.node?.id)
+                }
+              },
+            onLongPress =
+              onLongPress?.let { report ->
+                { offset ->
+                  val point = scenePoint(offset, scene, fit, density, size.width, size.height)
+                  report(point, hitIndex.hitTest(point)?.node?.id)
+                }
+              },
+          )
+        }
+    )
+    .then(
+      if (onPan == null && onZoom == null) Modifier
+      else
+        Modifier.pointerInput(scene, fit, density) {
+          // One detector for both, because a pinch is a two-finger drag: separate detectors would
+          // each claim the pointers and a two-finger gesture would arrive as one of the two at
+          // random. `detectTransformGestures` reports pan, zoom and rotation from the same stream.
+          // `panZoomLock = false`: a two-finger gesture may pan **and** zoom, and both are
+          // reported.
+          // Locking would make a gesture one or the other, where the Android View runs its pan and
+          // scale detectors over the same stream and lets both fire — and a chart being explored is
+          // usually being moved and scaled at once.
+          detectTransformGestures(panZoomLock = false) { centroid, pan, zoom, _ ->
+            val placement =
+              placement(scene, size.width.toFloat(), size.height.toFloat(), fit, density)
+            if (onPan != null && (pan.x != 0f || pan.y != 0f)) {
+              // A pan is a **distance**, so only the scale comes off it — subtracting the centring
+              // offset from a delta would move the chart by the offset on every report.
+              onPan(
+                VectorD(pan.x / placement.scale.toDouble(), pan.y / placement.scale.toDouble()),
+                false,
+              )
+            }
+            if (onZoom != null && zoom != 1f) {
+              onZoom(
+                zoom.toDouble(),
+                scenePoint(centroid, scene, fit, density, size.width, size.height),
+                false,
+              )
+            }
+          }
+        }
+    )
+    .then(
+      if (onHover == null) Modifier
+      else
+        Modifier.pointerInput(scene, fit, density, hitIndex) {
+          awaitPointerEventScope {
+            while (true) {
+              val event = awaitPointerEvent()
+              when (event.type) {
+                PointerEventType.Move,
+                PointerEventType.Enter -> {
+                  val offset = event.changes.firstOrNull()?.position ?: continue
+                  val point = scenePoint(offset, scene, fit, density, size.width, size.height)
+                  onHover(point, hitIndex.hitTest(point)?.node?.id)
+                }
+                // A pointer that left says so with a null, which is what clears a hover state. The
+                // engine's own `PointerExited` means the same thing.
+                PointerEventType.Exit -> onHover(null, null)
+                else -> Unit
+              }
+            }
+          }
+        }
+    )
+}
+
+/**
+ * A point in the slot, in **scene** coordinates: the inverse of the placement the drawing used.
+ *
+ * The offset comes off and then the scale divides — in that order, and not the other way round,
+ * which is the arithmetic every host of this engine has got wrong at least once.
+ */
+private fun scenePoint(
+  offset: Offset,
+  scene: Scene,
+  fit: SceneFit,
+  density: Float,
+  width: Int,
+  height: Int,
+): PointD {
+  val placement = placement(scene, width.toFloat(), height.toFloat(), fit, density)
+  val scale = if (placement.scale == 0f) 1f else placement.scale
+  return PointD(
+    ((offset.x - placement.left) / scale).toDouble(),
+    ((offset.y - placement.top) / scale).toDouble(),
+  )
+}
+
 private fun placement(
   scene: Scene,
   width: Float,

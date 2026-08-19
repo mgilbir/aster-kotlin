@@ -196,6 +196,35 @@ compiled.scene?.let {
 A host that ships its own face passes a resolver — `rememberVegaTextEngine { FontFamily(googleSansFlex) }`
 — and both the measurement and the drawing use it.
 
+Gestures are reported in **scene** coordinates, with the mark under them, and it is the host that
+dispatches — this renderer depends on `vega-scene` alone, so a chart that is only being looked at pays
+for no dataflow:
+
+```kotlin
+VegaChart(
+    scene = scene,
+    selectedNodeIds = snapshot.interactionState.selection.nodeIds,
+    onTap = { point, _ -> controller.dispatch(ChartInputEvent.Tap(point)) },
+    onLongPress = { point, _ -> controller.dispatch(ChartInputEvent.LongPress(point)) },
+    onPan = { delta, ended ->
+        controller.dispatch(
+            ChartInputEvent.Pan(delta, if (ended) GesturePhase.ENDED else GesturePhase.CHANGED)
+        )
+    },
+    onZoom = { factor, at, ended ->
+        controller.dispatch(
+            ChartInputEvent.Zoom(factor, at, if (ended) GesturePhase.ENDED else GesturePhase.CHANGED)
+        )
+    },
+    onHover = { point, _ -> controller.dispatch(ChartInputEvent.PointerMoved(point)) },
+)
+```
+
+What the renderer owns is the part a host must not repeat: inverting the **same** placement the drawing
+used, and hit testing through `SceneHitIndex` (cached per scene). Two copies of that arithmetic is how a
+finger lands beside the mark it looked like it hit. Pass nothing and the chart takes no pointer input at
+all.
+
 ## Export example
 
 ```kotlin

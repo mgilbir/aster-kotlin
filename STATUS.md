@@ -4399,6 +4399,38 @@ Two caveats on the number. It is a desktop JVM with the JIT warm, which is the m
 there is; and it measures compilation only, not the Canvas draw that follows. It is an order of
 magnitude, enough to rule an approach in, and not a substitute for measuring on hardware.
 
+## The Compose Multiplatform renderer had no pointer input at all
+
+The second finding of the same parity audit, and the larger one. `VegaChart` drew a scene and exposed the
+accessibility tree — added in #34 — and took **no pointer input whatever**. So on that renderer a
+screen-reader user could activate a bar through the tree and a sighted user could not tap it: no
+selection, no tooltip, no pan, no zoom, no hover. Every other host answers a finger, and a payload
+saying `"tooltip": true` expects one to.
+
+It now reports five gestures — tap, long press, pan, pinch, hover — each in **scene** coordinates with
+the mark under it. Three decisions inside that:
+
+- **It reports; it does not dispatch.** The module depends on `vega-scene` alone, and taking
+  `vega-runtime` to send an event would make every host that only draws pay for a dataflow. A host with
+  a controller forwards these — the README shows the four lines — and a host that passes nothing installs
+  no pointer input at all.
+- **It owns the arithmetic a host must not repeat**: the inverse of the *same* placement the drawing
+  used, and the hit test through `SceneHitIndex`, cached per scene rather than rebuilt per tap. Two
+  copies of that inversion is how a finger lands beside the mark it looked like it hit — this project
+  has had that defect on Android and in the Swift renderer, which is why `ChartPlacement` exists there.
+- **Pan and zoom are not locked against each other.** One `detectTransformGestures` handles both, since
+  separate detectors would each claim the pointers and a two-finger gesture would arrive as whichever
+  won; and `panZoomLock = false`, because the Android View runs its pan and scale detectors over the same
+  stream and lets both fire. A chart being explored is usually being moved and scaled at once. The pair
+  each callback reports — an increment and whether the gesture ended — maps onto `GesturePhase.CHANGED`
+  and `GesturePhase.ENDED`, which is the pairing the Swift session already sends.
+
+Seven tests, driven through Compose's own harness rather than pixels: a tap on a bar reports the point in
+scene units and the mark's id, a tap on blank space reports the point and no mark, a long press is
+separate (which is where most specifications hang a tooltip), a drag reports increments in scene units
+with no vertical drift, a pinch reports factors above one about a centroid between the fingers, a mouse
+moving over a bar reports it and leaving reports null, and a chart with no callbacks is inert.
+
 ## Three seams that existed and could not be reached from iOS
 
 A parity audit, prompted by one question: is that all? It was not. `ChartSession` — the surface an

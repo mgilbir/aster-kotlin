@@ -344,6 +344,6 @@ public final class dev/aster/vega/compose/mp/SceneWalk {
 }
 
 public final class dev/aster/vega/compose/mp/VegaChartKt {
-	public static final fun VegaChart (Ldev/aster/vega/scene/Scene;Landroidx/compose/ui/Modifier;Ldev/aster/vega/compose/mp/SceneFit;Ldev/aster/vega/compose/mp/ComposeTextEngine;Ljava/util/Set;Ldev/aster/vega/model/locale/VegaCaptions;Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;II)V
+	public static final fun VegaChart (Ldev/aster/vega/scene/Scene;Landroidx/compose/ui/Modifier;Ldev/aster/vega/compose/mp/SceneFit;Ldev/aster/vega/compose/mp/ComposeTextEngine;Ljava/util/Set;Ldev/aster/vega/model/locale/VegaCaptions;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Ldev/aster/vega/scene/HitTestOptions;Landroidx/compose/runtime/Composer;III)V
 }
 
