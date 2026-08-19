@@ -25,7 +25,24 @@ import Foundation
 /// cache underneath it takes a lock.
 public final class CoreTextTextEngine: MeasuredTextEngine {
 
-  public override init() {
+  /// What the reader's text-size setting multiplies every font size by; 1 is the size as written.
+  ///
+  /// Android has honoured its device's `fontScale` since the text engines were consolidated, and the
+  /// Compose renderer honours it by measuring in `sp`. This side did not, so the same chart obeyed a
+  /// reader's accessibility text size on two hosts out of three — and a chart that ignores it is not
+  /// accessible, whatever its VoiceOver tree says.
+  ///
+  /// It has to be applied to **measuring and drawing alike**, or the labels are laid out for one size
+  /// and painted at another. `CoreTextDrawing.draw(_:fill:in:textScale:)` takes the same number, and
+  /// `VegaChartView` reads this property to pass it, so there is one source for both.
+  ///
+  /// Uncapped on purpose: a host that wants a ceiling passes one it chose, which is a decision about a
+  /// chart's legibility rather than about text. See `ChartSession.textScale`.
+  public let textScale: Double
+
+  /// - Parameter textScale: the reader's text-size factor. 1, the default, is the size as written.
+  public init(textScale: Double = 1) {
+    self.textScale = textScale > 0 ? textScale : 1
     super.init()
   }
 
@@ -78,10 +95,48 @@ public final class CoreTextTextEngine: MeasuredTextEngine {
   private func font(for style: TextStyle) -> CTFont {
     CoreTextFonts.font(
       family: style.fontFamily,
-      size: style.fontSize,
+      size: style.fontSize * textScale,
       weight: Int(style.fontWeight),
       italic: style.fontStyle == FontStyle.italic
     )
+  }
+}
+#endif
+
+#if canImport(SwiftUI)
+import SwiftUI
+
+@available(macOS 13.0, iOS 16.0, *)
+extension DynamicTypeSize {
+
+  /// The factor to build a `ChartSession` with, so a chart follows the reader's text-size setting.
+  ///
+  /// A **table** rather than `UIFontMetrics`, for two reasons. `UIFontMetrics` is UIKit, and this package
+  /// draws on macOS as well; and a chart is not a paragraph — scaling it by the metrics of one text style
+  /// would tie every label in it to whatever style was asked about. These are the ratios of Apple's own
+  /// body sizes to the default 17pt, which is the same curve `UIFontMetrics.default` applies and is the
+  /// one a reader recognises from the rest of the app.
+  ///
+  /// The accessibility sizes reach 3.1×, and nothing here caps them: a chart whose labels are three times
+  /// the size is usually *not* the right answer, and choosing a ceiling is a decision about that chart —
+  /// a host that wants one passes `min(typeSize.chartTextScale, 1.6)`. What is not a decision is ignoring
+  /// the setting entirely, which is what this side did before.
+  public var chartTextScale: Double {
+    switch self {
+    case .xSmall: return 14.0 / 17.0
+    case .small: return 15.0 / 17.0
+    case .medium: return 16.0 / 17.0
+    case .large: return 1
+    case .xLarge: return 19.0 / 17.0
+    case .xxLarge: return 21.0 / 17.0
+    case .xxxLarge: return 23.0 / 17.0
+    case .accessibility1: return 28.0 / 17.0
+    case .accessibility2: return 33.0 / 17.0
+    case .accessibility3: return 40.0 / 17.0
+    case .accessibility4: return 47.0 / 17.0
+    case .accessibility5: return 53.0 / 17.0
+    @unknown default: return 1
+    }
   }
 }
 #endif

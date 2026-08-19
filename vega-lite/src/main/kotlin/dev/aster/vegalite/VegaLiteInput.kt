@@ -4,6 +4,7 @@ import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
+import kotlinx.datetime.TimeZone
 
 /**
  * A specification a host was handed, and the Vega it turned out to be.
@@ -40,7 +41,19 @@ public object VegaLiteInput {
    *   by key. Only meaningful for a Vega-Lite specification; a Vega one passes through untouched
    *   here and the host's configuration reaches it through `SpecCompiler` instead.
    */
-  public fun toVega(json: String, hostConfig: VegaValue? = null): VegaLiteConversion {
+  public fun toVega(
+    json: String,
+    hostConfig: VegaValue? = null,
+    /**
+     * What **local** time means, or null for the device's own zone; see `SpecCompiler.timeZone`.
+     *
+     * Passed here as well as to the compiler that draws the result, because one thing is settled on
+     * this side: a selection whose `init` is a written date becomes a millisecond during
+     * compilation. A host that supplies a zone to one and not the other gets a brush on a different
+     * clock from its own axis.
+     */
+    timeZone: TimeZone? = null,
+  ): VegaLiteConversion {
     val diagnostics = DiagnosticCollector()
     val parsed = VegaJson.parseOrNull(json, diagnostics)
     // Not JSON at all: hand the text on unchanged and let the Vega parser produce the one
@@ -49,7 +62,7 @@ public object VegaLiteInput {
 
     if (!isVegaLite(parsed)) return VegaLiteConversion(json, false, emptyList())
 
-    val compiled = VegaLiteCompiler(hostConfig).compile(parsed)
+    val compiled = VegaLiteCompiler(hostConfig, timeZone).compile(parsed)
     return VegaLiteConversion(compiled.toJson(), true, compiled.diagnostics)
   }
 

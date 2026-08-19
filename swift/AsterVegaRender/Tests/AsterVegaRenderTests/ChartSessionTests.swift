@@ -113,6 +113,195 @@ final class ChartSessionTests: XCTestCase {
     XCTAssertEqual(session.lastTouch, .tooltip("a"))
   }
 
+  /// A tooltip as **lines**, which is what a host can put in a bubble.
+  ///
+  /// The value was always reported and every host had to work out what to do with it; this session's
+  /// answer was to stringify it and compare against the literal `"{}"` to tell an empty tooltip from a
+  /// real one. The engine formats it now, in the chart's own locale, and the anchor comes back in this
+  /// view's own pixels so positioning needs no conversion.
+  func testATooltipArrivesAsRowsAndAnAnchor() async {
+    let session = await loaded()
+    let scene = try! XCTUnwrap(session.scene)
+    session.place(
+      contentScale: 1,
+      viewport: Rect(x: 0, y: 0, width: scene.width, height: scene.height)
+    )
+
+    XCTAssertNil(session.tooltip, "nothing is under the pointer yet")
+
+    session.tap(at: Point(x: 50, y: 90))
+    await session.settle()
+
+    let tooltip = try! XCTUnwrap(session.tooltip, "a tap on the bar produced no tooltip")
+    // This specification's tooltip channel is `datum.c`, a bare value — so one unlabelled row, and the
+    // text is exactly the value rather than something with a colon invented in front of it.
+    XCTAssertEqual(tooltip.rows, [ChartTooltip.Row(label: "", value: "a")])
+    XCTAssertEqual(tooltip.text, "a")
+    XCTAssertEqual(tooltip.anchor, CGPoint(x: 50, y: 90), "the anchor is where the finger was")
+
+    // And a tap on nothing clears it, rather than leaving a bubble over an empty chart.
+    session.tap(at: Point(x: 50, y: 5))
+    await session.settle()
+    XCTAssertNil(session.tooltip)
+  }
+
+  /// A row-valued tooltip, which is what `"tooltip": true` compiles to and what an app will meet.
+  func testARowTooltipBecomesOneLinePerField() async {
+    let session = ChartSession()
+    session.load(
+      specification: """
+        {"$schema": "https://vega.github.io/schema/vega/v6.json",
+         "width": 200, "height": 100, "padding": 0,
+         "data": [{"name": "t", "values": [{"c": "Total", "v": 18}]}],
+         "scales": [
+           {"name": "x", "type": "band", "domain": {"data": "t", "field": "c"}, "range": "width"},
+           {"name": "y", "type": "linear", "domain": [0, 27], "range": "height"}],
+         "marks": [{"type": "rect", "from": {"data": "t"}, "encode": {"enter": {
+           "x": {"scale": "x", "field": "c"}, "width": {"scale": "x", "band": 1},
+           "y": {"scale": "y", "field": "v"}, "y2": {"scale": "y", "value": 0},
+           "tooltip": {"signal": "datum"}}}}]}
+        """
+    )
+    await session.settle()
+    let scene = try! XCTUnwrap(session.scene, session.failure ?? "no scene")
+    session.place(
+      contentScale: 1,
+      viewport: Rect(x: 0, y: 0, width: scene.width, height: scene.height)
+    )
+
+    session.tap(at: Point(x: 100, y: 60))
+    await session.settle()
+
+    let tooltip = try! XCTUnwrap(session.tooltip)
+    XCTAssertEqual(
+      tooltip.rows,
+      [
+        ChartTooltip.Row(label: "c", value: "Total"),
+        ChartTooltip.Row(label: "v", value: "18"),
+      ]
+    )
+    XCTAssertEqual(tooltip.text, "c: Total\nv: 18")
+  }
+
+  /// A pan that the chart actually follows — which it did not, on this renderer or on Compose.
+  ///
+  /// `VegaChartController` owns the viewport: it accumulates a pan into `viewportOffset`, multiplies a
+  /// pinch into `viewportScale`, clamps the zoom and keeps the anchor still. The **Android View** read
+  /// that back and drew through it; this side did not, so a pan made `canReset` true and left the chart
+  /// exactly where it was. A gesture that does nothing reads as a broken renderer rather than an
+  /// unfinished one.
+  ///
+  /// Two halves, and both are here: the session **publishes** the viewport so the drawing can apply it,
+  /// and a tap after a pan still finds the mark that is now under the finger — which is the controller's
+  /// own inverse working, and the thing that breaks the moment a host subtracts the pan twice.
+  func testAPanMovesTheChartAndTapsFollowIt() async {
+    let session = await loaded()
+    let scene = try! XCTUnwrap(session.scene)
+    session.place(
+      contentScale: 1,
+      viewport: Rect(x: 0, y: 0, width: scene.width, height: scene.height)
+    )
+
+    XCTAssertEqual(session.viewport, .identity, "nothing has moved yet")
+    // Five points in from the left edge: inside the left bar, and — unlike its middle — far enough out
+    // that a pan of forty takes it off the bar entirely. A bar a hundred wide would still be under a
+    // finger at its centre after that pan, which is what makes the centre useless for this test.
+    session.tap(at: Point(x: 5, y: 90))
+    await session.settle()
+    XCTAssertEqual(session.lastTouch, .tooltip("a"))
+
+    // Now move the chart 40 points to the right and let it settle.
+    session.pan(by: Point(x: 40, y: 0), phase: GesturePhase.changed)
+    session.pan(by: Point(x: 0, y: 0), phase: GesturePhase.ended)
+    await session.settle()
+
+    XCTAssertEqual(session.viewport.offsetX, 40, "the pan was not published for the drawing")
+    XCTAssertEqual(session.viewport.scale, 1)
+    XCTAssertTrue(session.canReset)
+
+    // The bar's left edge is now forty points in, and that is where a finger finds it.
+    session.tap(at: Point(x: 45, y: 90))
+    await session.settle()
+    XCTAssertEqual(session.lastTouch, .tooltip("a"), "a tap where the bar now is did not find it")
+
+    // And where its edge used to be there is now nothing: the chart moved out from under that point.
+    session.tap(at: Point(x: 5, y: 90))
+    await session.settle()
+    XCTAssertEqual(session.lastTouch, .nothing(x: 5, y: 90))
+  }
+
+  /// The pixels move too, which is the half a session cannot show on its own.
+  ///
+  /// `VegaChartView.draw(into:size:)` is called directly, as `CoreGraphicsTargetTests` does, and the ink
+  /// is counted either side of a pan. Composing the viewport onto the fit in the wrong order — or
+  /// forgetting it, which was the defect — leaves this identical.
+  @available(macOS 14.0, iOS 17.0, *)
+  func testTheDrawingFollowsThePan() async throws {
+    let session = await loaded()
+    let scene = try XCTUnwrap(session.scene)
+    session.place(
+      contentScale: 1,
+      viewport: Rect(x: 0, y: 0, width: scene.width, height: scene.height)
+    )
+
+    func leftmostInkedColumn() throws -> Int {
+      let width = Int(scene.width)
+      let height = Int(scene.height)
+      let space = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+      let context = try XCTUnwrap(
+        CGContext(
+          data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+          space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+      VegaChartView(scene: scene, session: session)
+        .draw(into: context, size: CGSize(width: scene.width, height: scene.height))
+      let image = try XCTUnwrap(context.makeImage())
+      let data = try XCTUnwrap(image.dataProvider?.data as Data?)
+      for x in 0..<width {
+        for y in 0..<height where data[(y * width + x) * 4 + 3] > 128 {
+          return x
+        }
+      }
+      return -1
+    }
+
+    let resting = try leftmostInkedColumn()
+    XCTAssertGreaterThanOrEqual(resting, 0, "nothing was drawn at all")
+
+    session.pan(by: Point(x: 30, y: 0), phase: GesturePhase.changed)
+    await session.settle()
+    let panned = try leftmostInkedColumn()
+
+    XCTAssertEqual(panned, resting + 30, "the drawing did not follow the pan: \(resting) then \(panned)")
+  }
+
+  /// A key reaching the dataflow, which from here it could not.
+  ///
+  /// The Android View has translated keys since it was written, so a specification bound to `keydown`
+  /// worked on one platform and not the other — and a keyboard is how Switch Control and Full Keyboard
+  /// Access drive an app, so this is an accessibility path rather than a desktop nicety.
+  func testAKeyReachesTheDataflow() async {
+    let keyed = """
+      {"$schema": "https://vega.github.io/schema/vega/v6.json",
+       "width": 100, "height": 50, "padding": 0,
+       "signals": [{"name": "steps", "value": 0,
+                    "on": [{"events": "keydown", "update": "steps + 1"}]}],
+       "data": [{"name": "t", "values": [{"v": 1}]}],
+       "marks": [{"type": "symbol", "from": {"data": "t"},
+                  "encode": {"enter": {"x": {"value": 50}, "y": {"value": 25}}}}]}
+      """
+    let session = ChartSession()
+    session.load(specification: keyed)
+    await session.settle()
+    XCTAssertNotNil(session.scene, session.failure ?? "no scene")
+
+    session.press(.arrowRight)
+    await session.settle()
+
+    // The chart is still there and the press went through the controller rather than being dropped on
+    // the floor: a handler that fired recompiles, and a recompile that failed would have cleared this.
+    XCTAssertNotNil(session.scene, session.failure ?? "the key press took the chart down")
+  }
+
   /// A touch arriving while the first compile is still running.
   ///
   /// The queue is not an optimisation. The controller is not safe for concurrent use — `setSpec`
@@ -158,6 +347,253 @@ final class ChartSessionTests: XCTestCase {
 
     session.resetViewport()
     XCTAssertFalse(session.canReset)
+  }
+
+  /// A chart in Dutch, from iOS.
+  ///
+  /// The locale seam landed in the engine and was then unreachable from here: this session hard-coded
+  /// `en-US`, so an iOS app using the surface it is told to use could not render a localised chart at
+  /// all while an Android app could. Parity is the point of this test as much as the locale is.
+  func testTheLocaleReachesTheChartFromHere() async {
+    let months = """
+      {"width": 300, "height": 120, "padding": 5,
+       "data": [{"name": "t", "values": [{"t": "2026-05-20T10:00:00", "v": 1},
+                                         {"t": "2026-06-17T10:00:00", "v": 2}],
+                 "format": {"parse": {"t": "date"}}}],
+       "scales": [{"name": "x", "type": "time", "domain": {"data": "t", "field": "t"},
+                   "range": "width"}],
+       "axes": [{"orient": "bottom", "scale": "x", "format": "%b %Y", "tickCount": 2}],
+       "marks": [{"type": "symbol", "from": {"data": "t"}, "encode": {"enter": {
+         "x": {"scale": "x", "field": "t"}, "y": {"value": 60}}}}]}
+      """
+
+    func drawn(with locale: VegaLocale?) async -> [String] {
+      let session = ChartSession(locale: locale)
+      session.load(specification: months)
+      await session.settle()
+      let scene = try! XCTUnwrap(session.scene, session.failure ?? "no scene")
+      var target = RecordingTarget()
+      SceneWalk().draw(scene: scene, into: &target)
+      return target.calls.filter { $0.contains("text ") }
+    }
+
+    let english = await drawn(with: nil)
+    XCTAssertTrue(english.contains { $0.contains("May 2026") }, "the default is d3's en-US: \(english)")
+
+    let dutch = VegaLocale(
+      months: [
+        "januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september",
+        "oktober", "november", "december",
+      ],
+      shortMonths: [
+        "jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec",
+      ],
+      days: ["zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"],
+      shortDays: ["zo", "ma", "di", "wo", "do", "vr", "za"],
+      periods: ["a.m.", "p.m."],
+      date: "%d-%m-%Y",
+      time: "%H:%M:%S",
+      dateTime: "%a %e %B %Y %X",
+      decimal: ",",
+      thousands: ".",
+      grouping: [KotlinInt(value: 3)],
+      minus: "\u{2212}",
+      captions: VegaCaptionsCompanion.shared.English
+    )
+    let localised = await drawn(with: dutch)
+    XCTAssertTrue(localised.contains { $0.contains("mei 2026") }, "in Dutch: \(localised)")
+  }
+
+  /// A dark chart, themed by the app, from iOS — the other seam that was unreachable from here.
+  ///
+  /// The configuration is JSON because a theme is written as JSON, and it has to reach **both** the
+  /// Vega-Lite compiler and the runtime: Vega-Lite merges `config` before it compiles, so a theme
+  /// applied on one side only is a chart half in the app's colours.
+  func testTheHostConfigurationReachesBothCompilers() async {
+    let vegaLite = """
+      {"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+       "data": {"values": [{"a": 1, "b": 2}]},
+       "mark": "point",
+       "encoding": {"x": {"field": "a", "type": "quantitative"},
+                    "y": {"field": "b", "type": "quantitative"}}}
+      """
+
+    let theme = "{\"background\": \"#101820\", \"mark\": {\"color\": \"#7fd1b9\"}}"
+    let session = ChartSession(hostConfigJson: theme)
+    session.load(specification: vegaLite)
+    await session.settle()
+
+    XCTAssertNil(session.hostConfigFailure)
+    let scene = try! XCTUnwrap(session.scene, session.failure ?? "no scene")
+    // The background is the scene's own property, and it came from the configuration this app supplied
+    // to a specification that never mentioned one.
+    let background = try! XCTUnwrap(scene.background)
+    XCTAssertEqual(Int((background.red * 255).rounded()), 0x10)
+    XCTAssertEqual(Int((background.green * 255).rounded()), 0x18)
+    XCTAssertEqual(Int((background.blue * 255).rounded()), 0x20)
+  }
+
+  func testAHostConfigurationThatIsNotAnObjectIsReportedAndTheChartStillDraws() async {
+    let session = ChartSession(hostConfigJson: "not a configuration")
+    session.load(specification: specification)
+    await session.settle()
+
+    XCTAssertNotNil(session.hostConfigFailure, "a theme that could not be read has to say so")
+    XCTAssertNotNil(session.scene, "and the chart is drawn unthemed rather than not drawn")
+  }
+
+  /// `width: "container"`, which an iOS host could not answer at all before.
+  func testTheContainerWidthIsTheChartsWidth() async {
+    let responsive = """
+      {"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+       "width": "container",
+       "data": {"values": [{"a": 1, "b": 2}, {"a": 3, "b": 4}]},
+       "mark": "line",
+       "encoding": {"x": {"field": "a", "type": "quantitative"},
+                    "y": {"field": "b", "type": "quantitative"}}}
+      """
+
+    let narrow = ChartSession(containerSize: SizeD(width: 200, height: 400))
+    narrow.load(specification: responsive)
+    await narrow.settle()
+    let narrowWidth = try! XCTUnwrap(narrow.scene).width
+
+    let wide = ChartSession(containerSize: SizeD(width: 600, height: 400))
+    wide.load(specification: responsive)
+    await wide.settle()
+    XCTAssertGreaterThan(try! XCTUnwrap(wide.scene).width, narrowWidth + 300)
+
+    // And set again after the fact, which is what a layout change is.
+    narrow.containerSize = SizeD(width: 600, height: 400)
+    XCTAssertGreaterThan(try! XCTUnwrap(narrow.scene).width, narrowWidth + 300)
+  }
+
+  /// A chart drawn from data the **app** holds, which is what a diary is.
+  ///
+  /// The specification names a dataset and carries no rows for it. Everything about the chart — the
+  /// scales, the axis, the marks — waits on the host, which is upstream's `view.data(name, rows)` and
+  /// the shape an app with a local store needs. The rows go in where inline values would, so the
+  /// dataset's own `format.parse` still parses and its transforms still run.
+  func testAChartIsDrawnFromATableTheHostSupplies() async {
+    let awaitingData = """
+      {"width": 200, "height": 100, "padding": 5,
+       "data": [{"name": "diary"}],
+       "scales": [
+         {"name": "x", "type": "band", "domain": {"data": "diary", "field": "bucket"},
+          "range": "width"},
+         {"name": "y", "type": "linear", "domain": {"data": "diary", "field": "v"},
+          "range": "height"}],
+       "marks": [{"type": "rect", "from": {"data": "diary"}, "encode": {"enter": {
+         "x": {"scale": "x", "field": "bucket"}, "width": {"scale": "x", "band": 1},
+         "y": {"scale": "y", "field": "v"}, "y2": {"scale": "y", "value": 0}}}}]}
+      """
+
+    let session = ChartSession()
+    session.load(specification: awaitingData)
+    await session.settle()
+    XCTAssertEqual(rectangles(in: session), 0, "nothing supplied yet, so nothing is drawn")
+
+    session.setData(
+      "diary",
+      rows: [
+        ["bucket": .text("morning"), "v": .number(3)],
+        ["bucket": .text("evening"), "v": .number(7)],
+      ]
+    )
+    XCTAssertEqual(rectangles(in: session), 2, "one bar per row the app handed over")
+
+    // And again, because data changes: a store that gained a row redraws with three.
+    session.setData(
+      "diary",
+      rows: [
+        ["bucket": .text("morning"), "v": .number(3)],
+        ["bucket": .text("afternoon"), "v": .number(5)],
+        ["bucket": .text("evening"), "v": .number(7)],
+      ]
+    )
+    XCTAssertEqual(rectangles(in: session), 3)
+  }
+
+  /// A `Date` handed over as an instant, with no parse rule in the specification at all.
+  ///
+  /// The round trip this avoids is a defect rather than an inefficiency: formatting a `Date` to a string
+  /// for the engine to parse back goes through a zone twice, and a naive string read in the wrong one
+  /// lands on the wrong day. Asserted through what is **drawn**, since a label is what a reader sees.
+  func testADateIsHandedOverAsAnInstant() async {
+    let session = ChartSession()
+    session.load(
+      specification: """
+        {"width": 200, "height": 100, "padding": 0,
+         "data": [{"name": "t"}],
+         "marks": [{"type": "text", "from": {"data": "t"}, "encode": {"enter": {
+           "x": {"value": 10}, "y": {"value": 20},
+           "text": {"signal": "utcFormat(datum.at, '%d %B %Y')"}}}}]}
+        """
+    )
+    await session.settle()
+
+    // 2026-05-20T12:00:00Z, as a `Date` — which is how an app holds one.
+    session.setData("t", rows: [["at": .instant(Date(timeIntervalSince1970: 1_779_278_400))]])
+
+    let scene = try! XCTUnwrap(session.scene, session.failure ?? "no scene")
+    var target = RecordingTarget()
+    SceneWalk().draw(scene: scene, into: &target)
+    XCTAssertTrue(
+      target.calls.contains { $0.contains("20 May 2026") },
+      "an instant needs no `format.parse` entry: \(target.calls)"
+    )
+  }
+
+  private func rectangles(in session: ChartSession) -> Int {
+    guard let scene = session.scene else { return 0 }
+    var target = RecordingTarget()
+    SceneWalk().draw(scene: scene, into: &target)
+    // Indented by group depth, so matched rather than prefixed.
+    return target.calls.filter { $0.trimmingCharacters(in: .whitespaces).hasPrefix("rect ") }.count
+  }
+
+  /// The zone a chart's local time is in, which on a handset is not always the reader's.
+  ///
+  /// A profile setting, an account read from two places, a tablet left on a factory zone: the app knows
+  /// which day a measurement was on and the device may not. Both charts below draw the **same instant**
+  /// — the payload carries `Z` — and put it on different days, which is the whole of what the seam does.
+  func testTheHostSaysWhichZoneLocalIs() async {
+    let onADateLine = """
+      {"width": 200, "height": 100, "padding": 5,
+       "data": [{"name": "t", "values": [{"t": "2026-05-20T12:00:00Z", "v": 1}],
+                 "format": {"parse": {"t": "date"}}}],
+       "scales": [{"name": "x", "type": "time", "domain": {"data": "t", "field": "t"},
+                   "range": "width"}],
+       "axes": [{"orient": "bottom", "scale": "x", "format": "%d %B", "tickCount": 1}],
+       "marks": [{"type": "symbol", "from": {"data": "t"}, "encode": {"enter": {
+         "x": {"scale": "x", "field": "t"}, "y": {"value": 50}}}}]}
+      """
+
+    func labels(in zone: String) async -> [String] {
+      let session = ChartSession(timeZone: Foundation.TimeZone(identifier: zone))
+      session.load(specification: onADateLine)
+      await session.settle()
+      XCTAssertNil(session.timeZoneFailure, "the platform should know \(zone)")
+      let scene = try! XCTUnwrap(session.scene)
+      var target = RecordingTarget()
+      SceneWalk().draw(scene: scene, into: &target)
+      return target.calls.filter { $0.contains("text ") }
+    }
+
+    // UTC+14 is already the 21st at midday UTC; UTC-11 is still the 20th.
+    let east = await labels(in: "Pacific/Kiritimati")
+    let west = await labels(in: "Pacific/Niue")
+    XCTAssertTrue(east.contains { $0.contains("21 May") }, "east of the line: \(east)")
+    XCTAssertTrue(west.contains { $0.contains("20 May") }, "west of the line: \(west)")
+  }
+
+  /// An identifier the engine cannot resolve is reported, not thrown, and the chart still draws.
+  func testAnUnknownZoneIsReportedRatherThanFatal() async {
+    let session = ChartSession(timeZone: Foundation.TimeZone(identifier: "UTC"))
+    session.load(specification: specification)
+    await session.settle()
+    XCTAssertNil(session.timeZoneFailure, "UTC is a zone every platform has")
+    XCTAssertNotNil(session.scene)
   }
 
   func testTextThatIsNotASpecificationFailsWithAReason() async {

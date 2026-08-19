@@ -129,7 +129,7 @@ public object Functions {
 
   /** The function table with d3's own `en-US` locale and no container, as upstream produces. */
   public val functions: Map<String, ExpressionFunction> =
-    buildFunctions(VegaLocale.EnglishUS, null, null)
+    buildFunctions(VegaLocale.EnglishUS, null, null, null)
 
   /**
    * The same table, with the seven locale-dependent functions bound to [locale].
@@ -150,19 +150,44 @@ public object Functions {
      */
     containerWidth: Double? = null,
     containerHeight: Double? = null,
+    /**
+     * Which zone the **local** time functions work in, or null for the device's own.
+     *
+     * `datetime`, `time`, `hours`, `timeFormat`, `timeParse`, `timeOffset`, `timeSequence` and
+     * `timezoneoffset` all answer in local time, and a host may say what local means — see
+     * `VegaTimeZones`. Null keeps today's behaviour exactly, including that the zone is read at
+     * each call rather than captured, so a long-lived process follows a change of the system zone.
+     *
+     * The `utc` twins are unaffected, and one detail of them is worth stating because it looks like
+     * an oversight and is upstream's rule: `utchours("2026-05-20T00:30")` **parses** that naive
+     * string in local time — `Date.parse` does — and only then reads the hour in UTC. So the zone
+     * supplied here reaches the utc functions too, as the zone a bare string is read in.
+     */
+    timeZone: TimeZone? = null,
   ): Map<String, ExpressionFunction> =
-    if (locale == VegaLocale.EnglishUS && containerWidth == null && containerHeight == null) {
+    if (
+      locale == VegaLocale.EnglishUS &&
+        containerWidth == null &&
+        containerHeight == null &&
+        timeZone == null
+    ) {
       functions
     } else {
-      buildFunctions(locale, containerWidth, containerHeight)
+      buildFunctions(locale, containerWidth, containerHeight, timeZone)
     }
 
   private fun buildFunctions(
     locale: VegaLocale,
     containerWidth: Double?,
     containerHeight: Double?,
+    timeZone: TimeZone? = null,
   ): Map<String, ExpressionFunction> {
     val map = LinkedHashMap<String, ExpressionFunction>()
+
+    // Where "now" is, for every function that reads a local calendar. A **function** rather than a
+    // captured value because a null zone means "the device's, whenever you ask": capturing it would
+    // freeze the zone of whichever thread built this table.
+    fun localZone(): TimeZone = timeZone ?: TimeZone.currentSystemDefault()
 
     // ---- arrays and sequences -----------------------------------------------
 
@@ -819,21 +844,25 @@ public object Functions {
       VegaValue.Timestamp(construct(args, localZone()))
     }
     map["utc"] = ExpressionFunction { args -> VegaValue.Num(construct(args, TimeZone.UTC)) }
-    map["toDate"] = ExpressionFunction { args -> DateValues.parse(args.at(0)) ?: VegaValue.Null }
-    map["time"] = ExpressionFunction { args -> VegaValue.Num(instantOf(args.at(0))) }
+    map["toDate"] = ExpressionFunction { args ->
+      DateValues.parse(args.at(0), localZone()) ?: VegaValue.Null
+    }
+    map["time"] = ExpressionFunction { args ->
+      VegaValue.Num(instantOf(args.at(0), localZone()))
+    }
 
     // Month and day-of-week are zero-based, as JavaScript's are; quarter and day-of-year are not.
-    dateField(map, "year") { it.year.toDouble() }
-    dateField(map, "quarter") { ((it.month.number - 1) / 3 + 1).toDouble() }
-    dateField(map, "month") { (it.month.number - 1).toDouble() }
-    dateField(map, "date") { it.day.toDouble() }
-    dateField(map, "day") { (it.date.dayOfWeek.isoDayNumber % 7).toDouble() }
-    dateField(map, "dayofyear") { it.date.dayOfYear.toDouble() }
+    dateField(map, "year", { localZone() }) { it.year.toDouble() }
+    dateField(map, "quarter", { localZone() }) { ((it.month.number - 1) / 3 + 1).toDouble() }
+    dateField(map, "month", { localZone() }) { (it.month.number - 1).toDouble() }
+    dateField(map, "date", { localZone() }) { it.day.toDouble() }
+    dateField(map, "day", { localZone() }) { (it.date.dayOfWeek.isoDayNumber % 7).toDouble() }
+    dateField(map, "dayofyear", { localZone() }) { it.date.dayOfYear.toDouble() }
     // `week` counts **Sundays since the start of the year**, not ISO weeks: `timeWeek.count(year -
     // 1
     // ms, d)`, so the days before the first Sunday are week 0 and a year beginning on a Sunday has
     // its first day in week 1. Reading it as an ISO week number puts the turn of the year one out.
-    dateField(map, "week") { sundaysBefore(it) }
+    dateField(map, "week", { localZone() }) { sundaysBefore(it) }
 
     // The month and weekday **names**, which upstream produces by formatting a date it builds for
     // the purpose: `monthFormat(m)` is `%B` of 1 January 2000 with the month set to `m`, and
@@ -853,10 +882,10 @@ public object Functions {
     map["dayAbbrevFormat"] = ExpressionFunction { args ->
       weekdayName(args.at(0), abbreviate = true, locale)
     }
-    dateField(map, "hours") { it.hour.toDouble() }
-    dateField(map, "minutes") { it.minute.toDouble() }
-    dateField(map, "seconds") { it.second.toDouble() }
-    dateField(map, "milliseconds") { (it.nanosecond / 1_000_000).toDouble() }
+    dateField(map, "hours", { localZone() }) { it.hour.toDouble() }
+    dateField(map, "minutes", { localZone() }) { it.minute.toDouble() }
+    dateField(map, "seconds", { localZone() }) { it.second.toDouble() }
+    dateField(map, "milliseconds", { localZone() }) { (it.nanosecond / 1_000_000).toDouble() }
 
     /**
      * `timeUnitSpecifier(units[, specifiers])` — the format the buckets of a `timeunit` read as.
@@ -878,8 +907,12 @@ public object Functions {
       VegaValue.Str(TimeUnits.specifier(units, overrides.orEmpty()))
     }
 
-    map["timeFormat"] = ExpressionFunction { args -> formatted(args, localZone(), locale) }
-    map["utcFormat"] = ExpressionFunction { args -> formatted(args, TimeZone.UTC, locale) }
+    map["timeFormat"] = ExpressionFunction { args ->
+      formatted(args, localZone(), localZone(), locale)
+    }
+    map["utcFormat"] = ExpressionFunction { args ->
+      formatted(args, localZone(), TimeZone.UTC, locale)
+    }
 
     /**
      * `timeParse(text, specifier)` and `utcParse` — a date read back out of a formatted string.
@@ -895,7 +928,7 @@ public object Functions {
     map["timezoneoffset"] = ExpressionFunction { args ->
       // JavaScript reports the offset as minutes *behind* UTC, so a zone east of Greenwich is
       // negative. Reproducing the sign matters more than it looks: specifications subtract it.
-      val instant = instantOf(args.at(0))
+      val instant = instantOf(args.at(0), localZone())
       if (instant.isNaN()) VegaValue.Num(Double.NaN)
       else {
         val seconds =
@@ -1417,23 +1450,35 @@ public object Functions {
     }
   }
 
+  /**
+   * A calendar accessor and its `utc` twin, which differ in **one** of the two zones they use.
+   *
+   * A bare string argument is parsed in local time by both — `Date.parse` has no other mode — and
+   * only the calendar the result is read in changes. Keeping the two apart is what makes
+   * `utchours("2026-05-20T00:30")` agree with a browser in Amsterdam: parsed at 00:30 local, read
+   * as 22:00 the day before in UTC.
+   */
   private fun dateField(
     map: MutableMap<String, ExpressionFunction>,
     name: String,
+    zone: () -> TimeZone,
     read: (LocalDateTime) -> Double,
   ) {
-    map[name] = ExpressionFunction { args -> fieldOf(args.at(0), localZone(), read) }
-    map["utc$name"] = ExpressionFunction { args -> fieldOf(args.at(0), TimeZone.UTC, read) }
+    map[name] = ExpressionFunction { args -> fieldOf(args.at(0), zone(), zone(), read) }
+    map["utc$name"] = ExpressionFunction { args ->
+      fieldOf(args.at(0), zone(), TimeZone.UTC, read)
+    }
   }
 
   private fun fieldOf(
     value: VegaValue,
-    zone: TimeZone,
+    parseIn: TimeZone,
+    readIn: TimeZone,
     read: (LocalDateTime) -> Double,
   ): VegaValue {
-    val instant = instantOf(value)
+    val instant = instantOf(value, parseIn)
     if (instant.isNaN()) return VegaValue.Num(Double.NaN)
-    return VegaValue.Num(read(TimeFormat.at(instant, zone)))
+    return VegaValue.Num(read(TimeFormat.at(instant, readIn)))
   }
 
   private fun parsed(args: List<VegaValue>, zone: TimeZone, utc: Boolean): VegaValue {
@@ -1446,15 +1491,26 @@ public object Functions {
     return VegaValue.Timestamp(millis)
   }
 
-  private fun formatted(args: List<VegaValue>, zone: TimeZone, locale: VegaLocale): VegaValue {
-    val instant = instantOf(args.at(0))
+  private fun formatted(
+    args: List<VegaValue>,
+    parseIn: TimeZone,
+    readIn: TimeZone,
+    locale: VegaLocale,
+  ): VegaValue {
+    val instant = instantOf(args.at(0), parseIn)
     if (instant.isNaN()) return VegaValue.Str("Invalid Date")
-    return VegaValue.Str(TimeFormat.format(instant, args.string(1), zone, locale))
+    return VegaValue.Str(TimeFormat.format(instant, args.string(1), readIn, locale))
   }
 
-  /** Epoch milliseconds for a value that is already an instant, or that reads as an ISO date. */
-  private fun instantOf(value: VegaValue): Double =
-    (DateValues.parse(value) as? VegaValue.Num)?.value ?: JsSemantics.toNumber(value)
+  /**
+   * Epoch milliseconds for a value that is already an instant, or that reads as an ISO date.
+   *
+   * [parseIn] is the zone a naive string is read in, which is local time in a browser and therefore
+   * whatever the host said local means. A string carrying its own offset, and a value that is
+   * already a number, ignore it.
+   */
+  private fun instantOf(value: VegaValue, parseIn: TimeZone): Double =
+    (DateValues.parse(value, parseIn) as? VegaValue.Num)?.value ?: JsSemantics.toNumber(value)
 
   /**
    * `datetime(year, month, ...)`, where every component past the year is optional and out-of-range
@@ -1491,9 +1547,6 @@ public object Functions {
 
   private fun List<VegaValue>.numberOr(index: Int, fallback: Double): Double =
     if (index < size && at(index) != VegaValue.Null) JsSemantics.toNumber(at(index)) else fallback
-
-  /** Where "now" is, for the accessors that read a local calendar. */
-  private fun localZone(): TimeZone = TimeZone.currentSystemDefault()
 
   // ---- helpers --------------------------------------------------------------
 

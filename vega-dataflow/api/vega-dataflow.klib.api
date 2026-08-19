@@ -73,6 +73,8 @@ abstract interface dev.aster.vega.dataflow.transform/TransformContext { // dev.a
         abstract fun <get-expressions>(): dev.aster.vega.expression/ExpressionCompiler // dev.aster.vega.dataflow.transform/TransformContext.expressions.<get-expressions>|<get-expressions>(){}[0]
     abstract val scope // dev.aster.vega.dataflow.transform/TransformContext.scope|{}scope[0]
         abstract fun <get-scope>(): dev.aster.vega.expression/ExpressionScope // dev.aster.vega.dataflow.transform/TransformContext.scope.<get-scope>|<get-scope>(){}[0]
+    open val timeZone // dev.aster.vega.dataflow.transform/TransformContext.timeZone|{}timeZone[0]
+        open fun <get-timeZone>(): kotlinx.datetime/TimeZone? // dev.aster.vega.dataflow.transform/TransformContext.timeZone.<get-timeZone>|<get-timeZone>(){}[0]
 
     abstract var tree // dev.aster.vega.dataflow.transform/TransformContext.tree|{}tree[0]
         abstract fun <get-tree>(): dev.aster.vega.dataflow.transform/TreeSource? // dev.aster.vega.dataflow.transform/TransformContext.tree.<get-tree>|<get-tree>(){}[0]

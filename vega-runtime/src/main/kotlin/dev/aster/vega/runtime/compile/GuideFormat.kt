@@ -30,10 +30,12 @@ internal object GuideFormat {
     format: String?,
     formatType: String?,
     locale: VegaLocale = VegaLocale.EnglishUS,
+    /** What `formatType: "time"` means; null is the device's own zone. */
+    timeZone: TimeZone? = null,
   ): ((Double) -> String)? {
     val zone =
       when (formatType) {
-        "time" -> TimeZone.currentSystemDefault()
+        "time" -> timeZone ?: TimeZone.currentSystemDefault()
         "utc" -> TimeZone.UTC
         else -> return null
       }

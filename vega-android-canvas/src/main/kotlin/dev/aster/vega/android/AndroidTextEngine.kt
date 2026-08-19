@@ -43,7 +43,26 @@ public class AndroidTextEngine(
    * a caller building an engine by hand passes whatever its host uses, and 1 means "the size the
    * specification asked for".
    */
-  private val fontScale: Float = 1f
+  private val fontScale: Float = 1f,
+  /**
+   * A face this **host** ships, by the family name a specification asks for.
+   *
+   * Android resolves a family name against the *system's* families, so an app that bundles a font —
+   * which most design systems do — could not get a chart to use it: `Typeface.create("Google Sans
+   * Flex", …)` finds nothing and falls back to the default, silently. The Compose renderer took a
+   * resolver for exactly this reason and this side did not, so the same specification drew in the
+   * app's face on one renderer and not on the other.
+   *
+   * Answer null to leave a name to the platform, which is what the default does for every name: the
+   * generic families still map onto Android's built-ins and anything else is passed through as
+   * before. The result is cached per family, weight and slant, so a resolver may load a font file —
+   * but it is asked on a *compile* thread as well as a drawing one, so it must be safe to call from
+   * either.
+   *
+   * `ResourcesCompat.getFont(context, R.font.…)` is the usual answer; a `Typeface.Builder` over an
+   * asset is the other.
+   */
+  private val typefaceResolver: (String) -> Typeface? = { null },
 ) : MeasuredTextEngine() {
 
   /**
@@ -154,6 +173,12 @@ public class AndroidTextEngine(
   }
 
   private fun createTypeface(family: String, weight: Int, italic: Boolean): Typeface {
+    // The host's face first, and then weight and slant applied to *it* rather than to a system
+    // family: an app's bold is its own face, and asking the platform for "some bold font" is how a
+    // label comes out in a face nothing in the chart mentions.
+    typefaceResolver(family)?.let { supplied ->
+      return styled(supplied, weight, italic)
+    }
     // Vega's generic families map onto Android's built-in families; anything else is passed through
     // to the platform, which falls back rather than failing.
     val base =
@@ -169,7 +194,12 @@ public class AndroidTextEngine(
         "courier new" -> Typeface.MONOSPACE
         else -> Typeface.create(family, Typeface.NORMAL)
       }
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+    return styled(base, weight, italic)
+  }
+
+  /** A face at a weight and slant, through the widest API the device has. */
+  private fun styled(base: Typeface, weight: Int, italic: Boolean): Typeface =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
       Typeface.create(base, weight.coerceIn(1, 1000), italic)
     } else {
       val legacyStyle =
@@ -181,7 +211,6 @@ public class AndroidTextEngine(
         }
       Typeface.create(base, legacyStyle)
     }
-  }
 
   private companion object {
     /**

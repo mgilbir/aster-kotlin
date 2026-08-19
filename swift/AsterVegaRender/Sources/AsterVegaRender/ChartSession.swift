@@ -54,33 +54,176 @@ public final class ChartSession {
   /// Creates a session.
   ///
   /// - Parameters:
-  ///   - textEngine: how text is measured. The default measures with CoreText, which is what the
-  ///     renderer draws with — the two have to agree or every label sits where a different font put it.
+  ///   - textEngine: how text is measured. Nil measures with CoreText, which is what the renderer draws
+  ///     with — the two have to agree or every label sits where a different font put it.
+  ///   - textScale: the reader's text-size factor, applied to every font size when measuring **and**
+  ///     drawing. 1 is the size as written. Android has honoured its device's `fontScale` since the
+  ///     engines were consolidated and Compose honours it through `sp`; this is that, here. Fixed for
+  ///     the session's lifetime, as it is on Android — where a text-size change recreates the view and
+  ///     its engine — so a host that follows the setting live builds a new session, which is what
+  ///     keying one on `DynamicTypeSize.chartTextScale` does.
   ///   - loader: how a specification's `url` data is fetched. Nil refuses everything, which is the
   ///     engine's own default and the right one: a specification is data, often pasted data, and a URL
   ///     in it asks this process to fetch an address the specification chose.
   ///   - clock: wall-clock milliseconds, for throttling an event stream. Nil uses the system clock.
+  ///   - locale: the language everything the engine *generates* is written in — a month name on a time
+  ///     axis, a thousands separator, the sentence VoiceOver is given. Nil is d3's `en-US`, which is
+  ///     what upstream produces. Build one field for field from a d3 locale definition; it does **not**
+  ///     change how a specification's own dates are parsed, which is part of the wire format.
+  ///   - hostConfigJson: a Vega `config` block **this app** supplies, as JSON, which the
+  ///     specification's own beats key by key. How a chart drawn on a dark surface is legible when the
+  ///     server that produced it chose colours for a white page. JSON rather than a built object
+  ///     because a theme is written as JSON and building a `VegaValue` tree across this boundary is
+  ///     needless work; text that is not an object is reported in `hostConfigFailure` and the chart is
+  ///     drawn unthemed rather than not drawn.
+  ///   - containerSize: the surface the chart is laid out to, which `width: "container"` asks for. Nil
+  ///     falls back to `config.view.continuousWidth`, 300, which is what upstream does outside a
+  ///     browser. See the `containerSize` property for why a host sets this from a *stable* width.
+  ///   - timeZone: which zone the chart's **local** time is in. Nil is the device's own, which is what
+  ///     a browser has and is right for most charts. Pass one where the reader's zone is not the
+  ///     handset's — a profile setting, an account read from two places — because it decides which day
+  ///     a `time` axis puts a measurement on, which day a `timeunit` buckets it into, and which zone a
+  ///     timestamp with no offset in the data is read in. A `Foundation.TimeZone` is converted by its
+  ///     identifier; one the engine cannot resolve falls back to the device's and says so in
+  ///     `timeZoneFailure` rather than crashing, since an identifier usually comes from a server.
   public init(
-    textEngine: MeasuredTextEngine = CoreTextTextEngine(),
+    textEngine: MeasuredTextEngine? = nil,
+    textScale: Double = 1,
     loader: VegaDataLoader? = nil,
-    clock: (@Sendable () -> Int64)? = nil
+    clock: (@Sendable () -> Int64)? = nil,
+    locale: VegaLocale? = nil,
+    hostConfigJson: String? = nil,
+    containerSize: SizeD? = nil,
+    timeZone: Foundation.TimeZone? = nil
   ) {
     let ticker = clock ?? { Int64(Date().timeIntervalSince1970 * 1000) }
+    let engine = textEngine ?? CoreTextTextEngine(textScale: textScale)
+    // Read back off the engine where it is one of ours, so a host that built its own
+    // `CoreTextTextEngine(textScale:)` and passed it gets its glyphs *drawn* at that size too. A host
+    // with an engine of its own keeps whatever it measured with, and the drawing is told 1 — its
+    // metrics are its business.
+    self.textScale = (engine as? CoreTextTextEngine)?.textScale ?? 1
+    let theme = hostConfigJson.flatMap { Self.parsedConfig($0) }
+    if hostConfigJson != nil, theme == nil {
+      hostConfigFailure =
+        "The host configuration is not a JSON object, so this chart is drawn with the "
+        + "specification's own configuration alone."
+    }
+    hostConfig = theme
+    let resolved = timeZone.flatMap { VegaTimeZones.shared.of(zoneId: $0.identifier) }
+    if let timeZone, resolved == nil {
+      timeZoneFailure =
+        "The engine does not know the time zone '\(timeZone.identifier)', so this chart is drawn in "
+        + "the device's own zone."
+    }
+    engineTimeZone = resolved
     controller = VegaChartController(
       // Kotlin's default arguments do not cross the Obj-C boundary, so each is given explicitly.
       initialScene: Scene.companion.empty(width: 0, height: 0),
-      textEngine: textEngine,
+      textEngine: engine,
       clock: { KotlinLong(value: ticker()) },
       // Every argument spelled out: a Kotlin default does not cross the Obj-C boundary, so Swift has
       // to name each one. `DenyLoader` is the engine's own default and refuses every URL, which is the
       // right default for a specification that may be pasted data.
       loader: loader ?? DenyLoader.shared,
       scheduler: nil,
-      locale: VegaLocale.Companion.shared.EnglishUS,
-      hostConfig: nil,
-      containerSize: nil
+      locale: locale ?? VegaLocale.Companion.shared.EnglishUS,
+      hostConfig: theme,
+      containerSize: containerSize,
+      // Nil, and then filled through `setData(_:rows:)` — a session is created before the app has its
+      // data as often as after, and the controller keeps whatever arrives first.
+      hostData: nil,
+      timeZone: resolved
     )
   }
+
+  /// The zone handed to the engine, or nil for the device's own.
+  ///
+  /// Kept because the Vega-Lite compiler needs it too: a selection whose `init` is a written date is
+  /// turned into a millisecond while compiling, and a store on a different clock from the axis is a
+  /// brush that starts in the wrong place.
+  private let engineTimeZone: Kotlinx_datetimeTimeZone?
+
+  /// What to show in a tooltip, and where — nil when there is nothing under the pointer.
+  ///
+  /// The engine turns the dataflow's tooltip value into lines in the chart's own locale, so a number in
+  /// a bubble is written the way the number on the axis beside it is. The **anchor** is in this view's
+  /// own pixels, being the point that was dispatched, so a host positions a bubble without converting
+  /// anything.
+  ///
+  /// No renderer draws one, deliberately: a bubble is a design-system decision. What was missing was
+  /// this step, and its absence showed here — the session used to tell an empty tooltip from a real one
+  /// by stringifying the value and comparing it against `"{}"`.
+  public private(set) var tooltip: ChartTooltip?
+
+  /// The pan and zoom the controller has accumulated, in the units it accumulates them in.
+  ///
+  /// A **drawing** input: `VegaChartView` composes it onto the fit so that the chart, the touch target
+  /// and the VoiceOver frames all move together. A host drawing the scene itself applies it the way the
+  /// controller documents its own inverse — translate by the offset, then scale by
+  /// `contentScale * viewportScale`.
+  public private(set) var viewport = ChartViewport(offsetX: 0, offsetY: 0, scale: 1)
+
+  /// What the reader's text-size setting multiplies every font size by, as the engine measured with it.
+  ///
+  /// Read by `VegaChartView` so the drawing is scaled by the same number the layout reserved room for.
+  /// One source rather than two, which is the whole reason it is published at all.
+  public let textScale: Double
+
+  /// The parsed host configuration, kept because the Vega-Lite compiler needs it as well as the
+  /// runtime: a Vega-Lite `config` is merged before the specification is compiled, and a theme applied
+  /// on only one side of that is a chart half in the app's colours.
+  private let hostConfig: (any AsterVega.VegaValue)?
+
+  /// Why a host configuration was not applied, if it was not. Nil in every ordinary case.
+  ///
+  /// Reported rather than thrown, for the same reason `timeZoneFailure` is: a theme is often assembled
+  /// from strings, and a chart in the wrong colours beats no chart at all.
+  public private(set) var hostConfigFailure: String?
+
+  /// The surface the chart is laid out to, which `width: "container"` asks for.
+  ///
+  /// Setting it **recompiles**, because Vega-Lite turns `"container"` into a signal and every scale
+  /// range, axis extent and mark position downstream is resolved from it. So a host sets this on a
+  /// layout change, not on every frame of an animation.
+  ///
+  /// Take the width from something **stable** — the parent's width, a size class, a fixed column — and
+  /// not from the chart view's own geometry: a chart sized to its container changes its scene's width,
+  /// the view's aspect ratio follows the scene, and a width read back from that view can oscillate.
+  /// That loop is why this is not wired up automatically.
+  public var containerSize: SizeD? {
+    get { controller.containerSize }
+    set {
+      guard newValue != controller.containerSize else { return }
+      serialised { [weak self] in
+        guard let self else { return }
+        self.controller.containerSize = newValue
+        if let compiled = self.controller.lastCompiled {
+          self.diagnostics = compiled.diagnostics
+          if compiled.scene != nil {
+            self.hasScene = true
+            self.failure = nil
+          }
+        }
+        self.refreshControls()
+        self.publish()
+      }
+    }
+  }
+
+  private static func parsedConfig(_ json: String) -> (any AsterVega.VegaValue)? {
+    let parsed = VegaJson.shared.parseOrNull(text: json, diagnostics: DiagnosticCollector())
+    // An object, or nothing: `mergeConfig` takes objects, and a bare array or number would be dropped
+    // silently one layer further down where nobody would connect it to what was passed in here.
+    return ForeignSignals.shared.kind(value: parsed) == "object" ? parsed : nil
+  }
+
+  /// Why a supplied time zone was not used, if it was not. Nil in every ordinary case.
+  ///
+  /// Reported rather than thrown, and reported rather than swallowed: an identifier a server chose can
+  /// be one this platform does not carry, and a chart drawn in the wrong zone silently is worse than
+  /// one that says which zone it is in.
+  public private(set) var timeZoneFailure: String?
 
   public private(set) var scene: AsterVega.Scene?
   public private(set) var diagnostics: [VegaDiagnostic] = []
@@ -157,7 +300,12 @@ public final class ChartSession {
       // `hostConfig` spelled out for the same reason every other argument here is: a Kotlin default
       // argument has no Obj-C representation, so Swift names it or does not compile. A host that themes
       // its charts passes its configuration here and through `VegaChartController`.
-      let converted = VegaLiteInput.shared.toVega(json: specification, hostConfig: nil)
+      let converted =
+        VegaLiteInput.shared.toVega(
+          json: specification,
+          hostConfig: self.hostConfig,
+          timeZone: engineTimeZone
+        )
       self.grammar = converted.wasVegaLite ? .vegaLite : .vega
       self.vegaLiteDiagnostics = converted.wasVegaLite ? converted.diagnostics : []
       // Falling back to the text as written where Vega-Lite compilation produced nothing: the runtime
@@ -202,6 +350,70 @@ public final class ChartSession {
     }
   }
 
+  /// A value in a row a host hands over.
+  ///
+  /// Spelled out as a Swift enum rather than exposing `VegaValue`, whose cases are Kotlin *value
+  /// classes* and have no Obj-C representation at all — the same reason `ForeignSignals` exists for
+  /// signals. Five cases, which is every JSON leaf a Vega row can hold plus the one JSON cannot: an
+  /// `instant`, so a host with a `Date` never formats it to a string for the engine to parse back. That
+  /// round trip goes through a zone twice, and twice is where a day goes missing.
+  public enum ChartDatum: Sendable, Equatable {
+    case number(Double)
+    case text(String)
+    case flag(Bool)
+    case instant(Date)
+    /// Present and empty, which a chart draws as a gap rather than as a zero.
+    case missing
+  }
+
+  /// Fills a dataset the specification declared but did not carry — upstream's `view.data(name, rows)`.
+  ///
+  /// This is how a chart is drawn from data the **app** holds: a diary in a local store, a query's
+  /// result, rows assembled from a channel the chart knows nothing about. The specification says
+  /// `{"data": {"name": "diary"}}` in Vega-Lite or `{"name": "diary"}` in Vega, and the name it wrote is
+  /// the name used here. The dataset's own `format.parse` and transforms then run over these rows, so a
+  /// host does not reimplement a parse rule to get its own table drawn.
+  ///
+  /// It **recompiles**, because that is how the engine answers a change of any compile input — so it is
+  /// a seam for new data rather than somewhere to write per frame. Rows supplied before a specification
+  /// is loaded are kept and used by the load.
+  ///
+  /// Serialised against an in-flight compile for the same reason a touch is: the controller is not safe
+  /// for concurrent use, and this recompiles.
+  public func setData(_ name: String, rows: [[String: ChartDatum]]) {
+    let converted = rows.map { row in
+      ForeignData.shared.row(
+        fields: row.reduce(into: [String: any AsterVega.VegaValue]()) { fields, entry in
+          fields[entry.key] = Self.value(of: entry.value)
+        }
+      )
+    }
+    serialised { [weak self] in
+      guard let self else { return }
+      self.controller.setData(name: name, rows: converted)
+      if let compiled = self.controller.lastCompiled {
+        self.diagnostics = compiled.diagnostics
+        if compiled.scene != nil {
+          self.hasScene = true
+          self.failure = nil
+        }
+      }
+      self.refreshControls()
+      self.publish()
+    }
+  }
+
+  private static func value(of datum: ChartDatum) -> any AsterVega.VegaValue {
+    switch datum {
+    case .number(let value): return ForeignSignals.shared.ofNumber(value: value)
+    case .text(let value): return ForeignSignals.shared.ofString(value: value)
+    case .flag(let value): return ForeignSignals.shared.ofBoolean(value: value)
+    case .instant(let date):
+      return ForeignData.shared.instant(epochMillis: date.timeIntervalSince1970 * 1000)
+    case .missing: return ForeignData.shared.missing()
+    }
+  }
+
   /// Reads the controller's current scene.
   ///
   /// `snapshot` is synchronous, which is the only way a Kotlin `StateFlow` is usefully consumed from
@@ -210,6 +422,27 @@ public final class ChartSession {
     // Nil until something has compiled, so a host draws nothing rather than drawing the empty scene the
     // controller starts with — a 0×0 chart looks like a rendering bug and reads like one in a report.
     scene = hasScene ? controller.snapshot.scene : nil
+    // The pan and the zoom, read back so the **drawing** can apply them. Published rather than left in
+    // the controller because `VegaChartView` has to see them change: without this a pan updated the
+    // controller's state, `canReset` became true, and the chart stayed exactly where it was.
+    // The tooltip as **lines**, from the engine, in the chart's own locale — replacing the check this
+    // file used to make against the literal `"{}"`. See `TooltipContent`.
+    if let content = controller.tooltipContent {
+      let anchor = controller.snapshot.interactionState.tooltipAnchor
+      tooltip = ChartTooltip(
+        rows: content.rows.map { ChartTooltip.Row(label: $0.label, value: $0.value) },
+        text: content.text,
+        anchor: anchor.map { CGPoint(x: $0.x, y: $0.y) }
+      )
+    } else {
+      tooltip = nil
+    }
+    let state = controller.snapshot.interactionState
+    viewport = ChartViewport(
+      offsetX: state.viewportOffset.dx,
+      offsetY: state.viewportOffset.dy,
+      scale: state.viewportScale
+    )
   }
 
   /// Whether anything has ever compiled to a scene in this session.
@@ -296,6 +529,29 @@ public final class ChartSession {
   /// Wired anyway rather than dismissed as "iOS has no hover": a chart whose tooltips only work on one
   /// platform is a gap in this host, not a property of the device. Where there genuinely is no pointer
   /// the gesture simply never fires.
+  /// A key the chart reacts to, for a reader driving it from a keyboard.
+  ///
+  /// The Android View has translated keys since it was written; from here there was no way to reach
+  /// `ChartInputEvent.Key` at all, so a specification bound to `keydown` worked on one platform. A
+  /// SwiftUI host wires it with the modifiers SwiftUI already provides:
+  ///
+  /// ```swift
+  /// VegaChartView(scene: scene, session: session)
+  ///   .focusable()
+  ///   .onKeyPress(.leftArrow) { session.press(.arrowLeft); return .handled }
+  /// ```
+  ///
+  /// Which keys mean something is the specification's business — `ChartKey` is the set the engine
+  /// translates — and this reports what the dataflow made of it, exactly as a tap does.
+  public func press(_ key: ChartKey, modifiers: Modifiers = Modifiers.Companion.shared.None) {
+    serialised { [weak self] in
+      guard let self else { return }
+      self.controller.dispatch(event: ChartInputEventKey(key: key, modifiers: modifiers))
+      self.refreshControls()
+      self.publish()
+    }
+  }
+
   public func hover(at point: Point?) {
     serialised {
       self.controller.setHitTestOptions(options: HitTestOptions.companion.Mouse)
@@ -384,12 +640,12 @@ public final class ChartSession {
     let selection = state.selection
 
     // A tooltip only counts if it has something in it. A mark with no `tooltip` channel still gets an
-    // empty object here, and preferring that over the selection reported a touch as `tooltip:` with
-    // nothing after it — which looked like a broken tooltip rather than a working tap.
-    let tooltip = state.tooltip.map { ForeignSignals.shared.text(value: $0) } ?? ""
-    let described = tooltip.trimmingCharacters(in: .whitespacesAndNewlines)
+    // **empty object** here, and preferring that over the selection reported a touch as `tooltip:` with
+    // nothing after it — which looked like a broken tooltip rather than a working tap. That rule is the
+    // engine's now, in `TooltipContent.of`, rather than a comparison against `"{}"` made here.
+    let described = tooltip?.text ?? ""
 
-    if !described.isEmpty, described != "{}" {
+    if !described.isEmpty {
       lastTouch = .tooltip(described)
     } else if !selection.isEmpty {
       // `nodeIds` counts the marks the hit test found. `datumIds` is empty unless the data carries an

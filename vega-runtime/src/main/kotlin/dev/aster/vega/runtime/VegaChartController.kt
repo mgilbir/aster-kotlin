@@ -48,6 +48,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.TimeZone
 
 /** Immutable pair of scene plus interaction state, published to renderers as one unit. */
 public data class ChartSnapshot(
@@ -143,12 +144,72 @@ public class VegaChartController(
    * sets again whenever its layout changes.
    */
   containerSize: SizeD? = null,
+  /**
+   * Tables this host supplies, by the dataset name the specification uses; see the [hostData]
+   * property, which a host sets again whenever its own data changes.
+   */
+  hostData: Map<String, List<VegaValue>>? = null,
+  /**
+   * What **local** time means for this chart, or null for the device's own zone.
+   *
+   * Beside [locale] and for the same reason: the platform knows it and the engine cannot, and it is
+   * not the same question as the language — a Dutch reader in Curaçao needs one of each. It settles
+   * a `time` scale's ticks, `timeunit`'s buckets, the local expression functions and the zone a
+   * naive timestamp in the data is read in. See `SpecCompiler.timeZone` and `VegaTimeZones`.
+   */
+  private val timeZone: TimeZone? = null,
 ) {
 
-  private var compiler = newCompiler(containerSize)
+  private var compiler = newCompiler(containerSize, hostData)
 
-  private fun newCompiler(size: SizeD?) =
-    SpecCompiler(textEngine, loader, locale = locale, hostConfig = hostConfig, containerSize = size)
+  private fun newCompiler(size: SizeD?, data: Map<String, List<VegaValue>>?) =
+    SpecCompiler(
+      textEngine,
+      loader,
+      locale = locale,
+      hostConfig = hostConfig,
+      containerSize = size,
+      timeZone = timeZone,
+      hostData = data,
+    )
+
+  /**
+   * Tables the **host** supplies, which is how a chart is drawn from data the app already holds.
+   *
+   * Upstream's `view.data(name, rows)`. A specification declares `{"name": "diary"}` — no values,
+   * no url, no source — and this fills it; in Vega-Lite that is `{"data": {"name": "diary"}}` and
+   * the name survives compilation, so a host uses the name it wrote. The rows arrive as inline
+   * values would, so the dataset's `format.parse` and its transforms run over them unchanged.
+   *
+   * Setting it **recompiles** the loaded specification, because that is how this engine answers a
+   * change of any compile input: there is no incremental dataflow, and a whole recompile of the
+   * heaviest fixture is well inside a frame. So this is a seam for *new data* — a store that
+   * changed, a query that returned — and not somewhere to write on every frame. A set whose rows
+   * are equal to the ones already loaded does nothing at all, which is the cheaper half of that
+   * comparison.
+   *
+   * The signal values a reader has set survive the recompile: new rows are not a reason to forget
+   * which bar they had selected.
+   */
+  public var hostData: Map<String, List<VegaValue>>? = hostData
+    set(value) {
+      if (field == value) return
+      field = value
+      compiler = newCompiler(containerSize, value)
+      val json = loadedSpecJson ?: return
+      publish(compiler.compileJson(json, signals.overrides, signals.itemEncodes))
+    }
+
+  /**
+   * One table, by name — `view.data(name, rows)` spelled the way a host actually calls it.
+   *
+   * Recompiles once, as [hostData] does. Passing an empty list is a table that is *there and
+   * empty*, which is a different chart from one whose dataset was never filled: the scales see no
+   * rows and the axes say so, rather than the specification's own values being used.
+   */
+  public fun setData(name: String, rows: List<VegaValue>) {
+    hostData = (hostData ?: emptyMap()) + (name to rows)
+  }
 
   /**
    * The size of the surface the chart is drawn in, which `width: "container"` asks for.
@@ -170,7 +231,7 @@ public class VegaChartController(
     set(value) {
       if (field == value) return
       field = value
-      compiler = newCompiler(value)
+      compiler = newCompiler(value, hostData)
       val json = loadedSpecJson ?: return
       publish(compiler.compileJson(json, signals.overrides, signals.itemEncodes))
     }
@@ -329,7 +390,9 @@ public class VegaChartController(
   // The same locale-bound function table the compiler uses, so a handler's own `timeFormat` writes
   // the same month name the axis does.
   private val expressions =
-    CachingExpressionCompiler(VegaExpressionCompiler(Evaluator(Functions.functionsFor(locale))))
+    CachingExpressionCompiler(
+      VegaExpressionCompiler(Evaluator(Functions.functionsFor(locale, timeZone = timeZone)))
+    )
 
   /**
    * What a handler's own evaluation reported — an expression that could not be read, a function
@@ -845,6 +908,22 @@ public class VegaChartController(
     publishInteraction(zoomed)
     if (event.phase == GesturePhase.ENDED) emit(ChartEvent.ViewportChanged(visibleViewport(zoomed)))
   }
+
+  /**
+   * The tooltip under the pointer, as lines a host can show, or null where there is nothing to
+   * show.
+   *
+   * The value itself is in `snapshot.interactionState.tooltip`, and every host reported it and then
+   * had to work out what to do with it. This is that step, done once and in the chart's own
+   * **locale**, so a number in a tooltip is written the way the number on the axis beside it is
+   * written. Null covers the case that used to trip hosts up as well as the obvious one: a mark
+   * with no `tooltip` channel produces an *empty object*, which is not a tooltip.
+   *
+   * `interactionState.tooltipAnchor` is where to put it — the point the host dispatched, in its own
+   * pixels, so no conversion is needed on the way back.
+   */
+  public val tooltipContent: TooltipContent?
+    get() = TooltipContent.of(snapshot.interactionState.tooltip, locale, timeZone)
 
   public fun resetViewport() {
     publishInteraction(

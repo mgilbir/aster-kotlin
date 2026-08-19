@@ -410,7 +410,7 @@ final object dev.aster.vega.expression/Functions { // dev.aster.vega.expression/
     final val knownUnsupported // dev.aster.vega.expression/Functions.knownUnsupported|{}knownUnsupported[0]
         final fun <get-knownUnsupported>(): kotlin.collections/Map<kotlin/String, kotlin/String> // dev.aster.vega.expression/Functions.knownUnsupported.<get-knownUnsupported>|<get-knownUnsupported>(){}[0]
 
-    final fun functionsFor(dev.aster.vega.model.locale/VegaLocale, kotlin/Double? = ..., kotlin/Double? = ...): kotlin.collections/Map<kotlin/String, dev.aster.vega.expression/ExpressionFunction> // dev.aster.vega.expression/Functions.functionsFor|functionsFor(dev.aster.vega.model.locale.VegaLocale;kotlin.Double?;kotlin.Double?){}[0]
+    final fun functionsFor(dev.aster.vega.model.locale/VegaLocale, kotlin/Double? = ..., kotlin/Double? = ..., kotlinx.datetime/TimeZone? = ...): kotlin.collections/Map<kotlin/String, dev.aster.vega.expression/ExpressionFunction> // dev.aster.vega.expression/Functions.functionsFor|functionsFor(dev.aster.vega.model.locale.VegaLocale;kotlin.Double?;kotlin.Double?;kotlinx.datetime.TimeZone?){}[0]
 }
 
 final object dev.aster.vega.expression/JsSemantics { // dev.aster.vega.expression/JsSemantics|null[0]

@@ -51,6 +51,15 @@ internal class Transforms(
   private val lookupOrdinal: Int = 0,
   /** The chart's selections, which a `{"param": …}` predicate is tested against. */
   private val selections: List<Selection> = emptyList(),
+  /**
+   * What **local** time means when a written date is turned into a number; null is the device's
+   * zone.
+   *
+   * Only [dateTimeTimestamp] reads it. The expression form does not need it — `datetime(…)` is
+   * evaluated by the runtime, which has the same zone — but a selection *store* carries the
+   * millisecond itself, and it has to be the millisecond the axis agrees with.
+   */
+  private val timeZone: TimeZone? = null,
 ) {
 
   /**
@@ -995,7 +1004,7 @@ internal class Transforms(
     val date = part("date") ?: part("day")?.plus(1) ?: 1
     val zone =
       if (value.fields["utc"] == VegaValue.Bool(true)) TimeZone.UTC
-      else TimeZone.currentSystemDefault()
+      else timeZone ?: TimeZone.currentSystemDefault()
     val clock =
       LocalDateTime(
         year = year,

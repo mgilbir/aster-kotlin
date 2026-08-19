@@ -74,7 +74,41 @@ internal class DataResolver(
    */
   private val random: RandomStream = RandomStream(),
   private val clock: Clock = Clock.Fixed,
+  /**
+   * What **local** time means while reading this specification's data; null is the device's zone.
+   *
+   * `format.parse` is where it bites: `{"parse": {"t": "date"}}` on `2026-05-20T00:30` has to pick
+   * a zone, and `Date.parse` picks the local one. A `utc:` pattern is unaffected, as upstream's is.
+   */
+  private val timeZone: TimeZone? = null,
+  /**
+   * Tables the **host** supplies, by the name the specification gives the dataset.
+   *
+   * Upstream's `view.data(name, rows)`: a specification declares `{"name": "diary"}` with no
+   * values, no url and no source, and whoever runs it fills that table. It is how a chart is drawn
+   * from data the app already holds — a local store, a query, rows assembled from a device sensor —
+   * rather than from data a payload carried.
+   *
+   * The rows are used exactly as inline `values` would be, before anything else looks at the
+   * dataset, so `format.parse` and every transform run over them unchanged. That is the point: a
+   * host should not have to reimplement a parse rule to get its own table through.
+   */
+  private val hostData: Map<String, List<VegaValue>>? = null,
 ) {
+
+  /**
+   * Which host tables were actually claimed by a dataset, so the rest can be reported.
+   *
+   * Mutable and read after the whole compile because datasets are not all in one place: a group
+   * mark declares its own, and this resolver is shared with [ScopeCompiler] so that one is resolved
+   * through the same path. A name nobody claimed is a chart drawn without the data it was given,
+   * which is exactly the silence this engine refuses everywhere else.
+   */
+  internal val claimedHostData: MutableSet<String> = mutableSetOf()
+
+  /** The zone a naive date in this specification's data is read in. */
+  private val local: TimeZone
+    get() = timeZone ?: TimeZone.currentSystemDefault()
 
   /**
    * The address a `{"signal": ...}` url resolves to, or null with a diagnostic.
@@ -137,6 +171,52 @@ internal class DataResolver(
       rows.map { row ->
         if (row is VegaValue.Obj) row else VegaValue.Obj(linkedMapOf("data" to row))
       }
+
+  /**
+   * The host's rows for this dataset, or null where it has none — with everything it displaced
+   * said.
+   *
+   * Three refusals, and each is a diagnostic rather than a silence:
+   * - a **derived** dataset, one with a `source`, is not an input. Filling it would mean discarding
+   *   the transforms it exists for, and upstream's own `view.data` on one is undone by the next
+   *   pulse. Reported and ignored, and marked claimed so it is not reported twice.
+   * - a `url` the host has pre-empted is **not fetched**. Said out loud because it is a request
+   *   that did not happen, which is the kind of thing somebody debugs for an hour.
+   * - inline `values` a host replaced are noted at `info`: it is usually deliberate — a fixture in
+   *   the payload, real rows from the app — and worth being able to see.
+   */
+  private fun suppliedRows(spec: DataSpec): List<VegaValue>? {
+    val rows = hostData?.get(spec.name) ?: return null
+    if (spec.sources.isNotEmpty()) {
+      claimedHostData.add(spec.name)
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "Dataset '${spec.name}' derives from ${spec.sources.joinToString(", ")}, so the rows " +
+          "supplied for it are ignored: filling a derived dataset would discard the transforms it " +
+          "is there for. Supply the rows for the dataset it sources from instead.",
+        operator = spec.name,
+      )
+      return null
+    }
+    claimedHostData.add(spec.name)
+    if (spec.url != null || spec.urlSignal != null) {
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "Dataset '${spec.name}' was supplied by the host, so its `url` was not fetched.",
+        operator = spec.name,
+      )
+    } else if (!spec.values.isNullOrEmpty() || spec.document != null) {
+      diagnostics.info(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "Dataset '${spec.name}' was supplied by the host, replacing the values in the " +
+          "specification.",
+        operator = spec.name,
+      )
+    }
+    // Through the same normalisation inline values get: a row that is not an object becomes one, so
+    // a table of bare numbers reads as `datum.data` exactly as upstream's does.
+    return ingest(rows)
+  }
 
   /**
    * Fetches and reads one dataset's `url`.
@@ -383,18 +463,27 @@ internal class DataResolver(
       // through the same `format` it would use for a url. Upstream applies the format to inline
       // values and to a loaded file alike; reading only the array form dropped every such dataset
       // without a word, which for a map means every feature.
+      // A table the host handed in for this name, which is upstream's `view.data(name, rows)`.
+      // Taken **before** the url is looked at, so a dataset a host has filled is not also fetched:
+      // that is one fewer request, and a specification's `url` is an address the specification
+      // chose.
+      val supplied = suppliedRows(spec)
       var values =
-        spec.document?.let { document ->
-          when (spec.formatType) {
-            "topojson" -> readTopoJson(spec, document)
-            else -> readJson(spec, document)
+        supplied
+          ?: spec.document?.let { document ->
+            when (spec.formatType) {
+              "topojson" -> readTopoJson(spec, document)
+              else -> readJson(spec, document)
+            }
           }
-        } ?: ingest(spec.values ?: emptyList())
+          ?: ingest(spec.values ?: emptyList())
       // A `url` may itself be a signal — how a control swaps the file a chart is reading. It is
       // resolved here rather than at parse time because only now are the signals known, and a
       // signal that cannot be worked out before the data is one this cannot use.
-      val address = spec.url ?: spec.urlSignal?.let { urlFromSignal(spec, it, signals) }
-      address?.let { values = loadUrl(spec, it) }
+      if (supplied == null) {
+        val address = spec.url ?: spec.urlSignal?.let { urlFromSignal(spec, it, signals) }
+        address?.let { values = loadUrl(spec, it) }
+      }
       // A dataset that sources from another starts with that one's tree as well as its rows, which
       // is what lets `treelinks` sit in a dataset of its own.
       var tree: TreeSource? = null
@@ -438,6 +527,7 @@ internal class DataResolver(
             clock,
             projections,
             refreshProjections,
+            timeZone,
           )
         values = pipeline.run(values, spec.transform, context)
         tree = context.tree
@@ -482,7 +572,7 @@ internal class DataResolver(
         if (integer && (numeric == null || numeric.value != kotlin.math.floor(numeric.value))) {
           integer = false
         }
-        if (date && DateValues.parse(value) == null) date = false
+        if (date && DateValues.parse(value, local) == null) date = false
         if (!boolean && !integer && !number && !date) break
       }
       if (!seen) continue
@@ -505,7 +595,7 @@ internal class DataResolver(
           when (kind) {
             "boolean" -> VegaValue.Bool(JsSemantics.truthy(raw) && raw.asString() != "false")
             "number" -> VegaValue.Num(raw.asDouble())
-            else -> DateValues.parse(raw) ?: raw
+            else -> DateValues.parse(raw, local) ?: raw
           }
       }
       VegaValue.Obj(fields)
@@ -526,7 +616,7 @@ internal class DataResolver(
       if (pattern.last() == pattern.first()) pattern = pattern.substring(1, pattern.length - 1)
     }
     if (pattern.isEmpty()) return null
-    val zone = if (utc) TimeZone.UTC else TimeZone.currentSystemDefault()
+    val zone = if (utc) TimeZone.UTC else local
     val millis = TimeParse.parse(raw.asString(), pattern, zone, utc) ?: return null
     return VegaValue.Timestamp(millis)
   }
@@ -553,7 +643,7 @@ internal class DataResolver(
           // to `timeParse` or `utcParse`. Without it a whole column stayed text: 406 rows of one
           // published example, whose year axis was drawn from strings.
           kind.startsWith("date:") || kind.startsWith("utc:") -> patternedDate(raw, kind)
-          kind.equals("date", ignoreCase = true) -> DateValues.parse(raw)
+          kind.equals("date", ignoreCase = true) -> DateValues.parse(raw, local)
           kind.equals("number", ignoreCase = true) -> VegaValue.Num(raw.asDouble())
           kind.equals("string", ignoreCase = true) -> VegaValue.Str(raw.asString())
           kind.equals("boolean", ignoreCase = true) -> VegaValue.Bool(JsSemantics.truthy(raw))
@@ -603,6 +693,8 @@ internal class DataResolver(
     /** See [resolve]: rebuilds them when a transform has published something a fit reads. */
     private val refreshProjections:
       ((Map<String, VegaValue>) -> Map<String, ProjectionDefinition>)?,
+    /** What `timeunit: "local"` means in this compile; null is the device's own zone. */
+    override val timeZone: TimeZone?,
   ) : TransformContext {
 
     /**

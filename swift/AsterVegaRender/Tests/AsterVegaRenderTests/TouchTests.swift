@@ -44,7 +44,9 @@ final class TouchTests: XCTestCase {
       scheduler: nil,
       locale: VegaLocale.Companion.shared.EnglishUS,
       hostConfig: nil,
-      containerSize: nil
+      containerSize: nil,
+      hostData: nil,
+      timeZone: nil
     )
   }
 

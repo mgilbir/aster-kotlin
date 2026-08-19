@@ -43,6 +43,7 @@ import dev.aster.vega.scene.transformedBounds
 import dev.aster.vega.scene.withMetadata
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlinx.datetime.TimeZone
 
 /**
  * Everything visible from one point in a specification: the top level, or the inside of a group
@@ -131,6 +132,10 @@ internal class ScopeCompiler(
   private val itemEncodes: Map<dev.aster.vega.scene.SceneNodeId, ItemEncode> = emptyMap(),
   /** The language every generated name, number and spoken sentence is written in. */
   private val locale: VegaLocale = VegaLocale.EnglishUS,
+  /**
+   * What **local** time means in this compile; null is the device's own zone. See `SpecCompiler`.
+   */
+  private val timeZone: TimeZone? = null,
 ) {
 
   /**
@@ -234,6 +239,7 @@ internal class ScopeCompiler(
         numbers,
         encoder,
         locale,
+        timeZone,
       )
 
     val children = mutableListOf<SceneNode>()
@@ -393,7 +399,16 @@ internal class ScopeCompiler(
       content = content.union(built.guideBounds)
     }
     val legendNodes =
-      LegendBuilder(scope.scales, ids, textEngine, diagnostics, numbers, encoder, locale)
+      LegendBuilder(
+          scope.scales,
+          ids,
+          textEngine,
+          diagnostics,
+          numbers,
+          encoder,
+          locale,
+          timeZone,
+        )
         .build(
           legends,
           extent,
@@ -924,7 +939,7 @@ internal class ScopeCompiler(
     encoder: MarkEncoder,
   ): MarkTransformResult {
     if (spec.transform.isEmpty()) return MarkTransformResult(scope, emptyList(), null)
-    val context = MarkTransformScope(diagnostics, expressions, scope, textEngine)
+    val context = MarkTransformScope(diagnostics, expressions, scope, textEngine, timeZone)
     // The **items**, encoded: `{"field": "datum.contour"}` reaches for the row under `datum`, and
     // `{"force": "x", "x": "xfocus"}` reaches for a channel the encoding resolved. Running these
     // over the rows instead would answer the first and silently miss the second.
@@ -961,6 +976,8 @@ internal class ScopeCompiler(
     override val expressions: ExpressionCompiler,
     private val outer: CompileScope,
     private val textEngine: TextEngine,
+    /** What `timeunit: "local"` means in this compile; null is the device's own zone. */
+    override val timeZone: kotlinx.datetime.TimeZone?,
   ) : TransformContext {
     override var tree: dev.aster.vega.dataflow.transform.TreeSource? = null
 
@@ -1226,7 +1243,8 @@ internal class ScopeCompiler(
 
     val numbers = NumberResolver(expressions, signals, diagnostics)
     val scales =
-      outer.scales + ScaleResolver(datasets, rangeSize, diagnostics, numbers).resolve(spec.scales)
+      outer.scales +
+        ScaleResolver(datasets, rangeSize, diagnostics, numbers, timeZone).resolve(spec.scales)
     return CompileScope(
       resolved,
       signals,

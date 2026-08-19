@@ -11,6 +11,7 @@ import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
 import dev.aster.vega.model.isMissing
+import kotlinx.datetime.TimeZone
 
 /**
  * Everything a transform may read or report.
@@ -26,6 +27,18 @@ public interface TransformContext {
 
   /** Signals and datasets an expression can read. Datum is supplied per tuple. */
   public val scope: ExpressionScope
+
+  /**
+   * What **local** time means for this compile, or null for the device's own zone.
+   *
+   * Only `timeunit` reads it — `{"timezone": "local"}` and the default — and it reads it for the
+   * two things a bucket needs a zone for: which day an instant falls on, and which zone a naive
+   * date string in the data was written in. Upstream has no such input because a browser is always
+   * on the device it draws for; an app whose reader lives in a different zone from the device is
+   * exactly the case that needs it. See `VegaTimeZones`.
+   */
+  public val timeZone: TimeZone?
+    get() = null
 
   /** Transforms like `extent` publish a signal rather than changing the data. */
   public fun setSignal(name: String, value: VegaValue)

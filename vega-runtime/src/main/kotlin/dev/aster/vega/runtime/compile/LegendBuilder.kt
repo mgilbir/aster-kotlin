@@ -110,6 +110,10 @@ internal class LegendBuilder(
    * a chart compiled without one is what upstream draws.
    */
   private val locale: VegaLocale = VegaLocale.EnglishUS,
+  /**
+   * What a `formatType: "time"` label and caption are written in; null is the device's own zone.
+   */
+  private val timeZone: TimeZone? = null,
 ) {
 
   /** Upstream's `3 * 10`: three ticks at ten times the resolution, for a band label's precision. */
@@ -1269,7 +1273,7 @@ internal class LegendBuilder(
   ): ((Double) -> String)? {
     // `formatType` decides the grammar before the scale or the specifier gets a say, which is how a
     // legend over instants reads as dates: its scale is a colour ramp and knows nothing about time.
-    GuideFormat.timeLabeller(spec.format, spec.formatType, locale)?.let {
+    GuideFormat.timeLabeller(spec.format, spec.formatType, locale, timeZone)?.let {
       return it
     }
     val specifier = spec.format ?: return null
@@ -1286,7 +1290,7 @@ internal class LegendBuilder(
   private fun discreteDateLabeller(spec: LegendSpec, scaleName: String): ((String) -> String)? {
     val zone =
       when (spec.formatType) {
-        "time" -> TimeZone.currentSystemDefault()
+        "time" -> timeZone ?: TimeZone.currentSystemDefault()
         "utc" -> TimeZone.UTC
         else -> return null
       }
@@ -1553,7 +1557,16 @@ internal class LegendBuilder(
     // `array(item.text).join(' ')`. The lines reach here already joined by the newline the text
     // node draws on, and turning them back into spaces is the same operation.
     val title = titleTextOf(spec, scaleName)?.replace("\n", " ")
-    return GuideCaption.legend(kind, title, channels, scale, spec.format, spec.formatType, locale)
+    return GuideCaption.legend(
+      kind,
+      title,
+      channels,
+      scale,
+      spec.format,
+      spec.formatType,
+      locale,
+      timeZone,
+    )
   }
 
   private fun node(built: Built, x: Double, y: Double): SceneNode {

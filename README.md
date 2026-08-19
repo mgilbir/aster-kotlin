@@ -193,8 +193,119 @@ compiled.scene?.let {
 }
 ```
 
+Keyboard input is the host's own modifier on both Compose renderers — `Modifier.focusable()` and
+`onKeyEvent`, forwarding to `controller.dispatch(ChartInputEvent.Key(...))` — and `ChartSession.press(_:)`
+on iOS, wired with SwiftUI's `.onKeyPress`. The Android View translates keys itself, since a `View` owns
+its own focus and key handling.
+
 A host that ships its own face passes a resolver — `rememberVegaTextEngine { FontFamily(googleSansFlex) }`
-— and both the measurement and the drawing use it.
+— and both the measurement and the drawing use it. The Android View takes the same seam as
+`VegaChartView.fontResolver`, and on iOS a registered family resolves by name; `CoreTextTextEngine` and
+`ChartSession` take a `textScale` for the reader's text-size setting, which
+`DynamicTypeSize.chartTextScale` maps for a SwiftUI host.
+
+Gestures are reported in **scene** coordinates, with the mark under them, and it is the host that
+dispatches — this renderer depends on `vega-scene` alone, so a chart that is only being looked at pays
+for no dataflow:
+
+```kotlin
+VegaChart(
+    scene = scene,
+    selectedNodeIds = snapshot.interactionState.selection.nodeIds,
+    onTap = { point, _ -> controller.dispatch(ChartInputEvent.Tap(point)) },
+    onLongPress = { point, _ -> controller.dispatch(ChartInputEvent.LongPress(point)) },
+    onPan = { delta, ended ->
+        controller.dispatch(
+            ChartInputEvent.Pan(delta, if (ended) GesturePhase.ENDED else GesturePhase.CHANGED)
+        )
+    },
+    onZoom = { factor, at, ended ->
+        controller.dispatch(
+            ChartInputEvent.Zoom(factor, at, if (ended) GesturePhase.ENDED else GesturePhase.CHANGED)
+        )
+    },
+    onHover = { point, _ -> controller.dispatch(ChartInputEvent.PointerMoved(point)) },
+)
+```
+
+What the renderer owns is the part a host must not repeat: inverting the **same** placement the drawing
+used, and hit testing through `SceneHitIndex` (cached per scene). Two copies of that arithmetic is how a
+finger lands beside the mark it looked like it hit. Pass nothing and the chart takes no pointer input at
+all.
+
+The points and deltas are in the space a **controller** expects: pixels with the chart's centring taken
+off, and the fit scale left on, because `VegaChartController` divides by `contentScale` itself. So a host
+sets that from `onPlaced` and passes the viewport back in:
+
+```kotlin
+val snapshot by controller.state.collectAsState()
+
+VegaChart(
+    scene = snapshot.snapshot.scene,
+    onPlaced = { controller.contentScale = it.scale },
+    // Pan and zoom are the controller's state; without these the gesture updates it and the chart
+    // does not move.
+    viewportOffset = snapshot.snapshot.interactionState.viewportOffset,
+    viewportScale = snapshot.snapshot.interactionState.viewportScale,
+    onPan = { delta, ended -> controller.dispatch(ChartInputEvent.Pan(delta, phase(ended))) },
+)
+```
+
+`VegaChartView` on iOS reads the viewport off its session, so there is nothing to pass there.
+
+## Tooltips
+
+A specification's `"tooltip": true` reaches the host as a **value**, and no renderer draws a bubble: what
+a bubble looks like is a design-system decision. What the engine does own is the step in between —
+turning that value into lines a host can show:
+
+```kotlin
+// Kotlin, any renderer.
+val tooltip = controller.tooltipContent            // null when there is nothing under the pointer
+tooltip?.rows                                       // [("Question", "Total score"), ("Value", "18")]
+tooltip?.text                                       // "Question: Total score\nValue: 18"
+controller.snapshot.interactionState.tooltipAnchor  // where to put it, in the pixels you dispatched
+```
+
+```swift
+// Swift: the same thing, published on the session.
+if let tooltip = session.tooltip {
+    TooltipBubble(rows: tooltip.rows).position(tooltip.anchor ?? .zero)
+}
+```
+
+Three details that are easy to get wrong and are handled here:
+
+- a mark with **no** tooltip channel produces an *empty object*, which is not a tooltip — treating it as
+  one puts an empty bubble on every mark;
+- a number is formatted with the chart's own locale, the way the axis beside it is, so a tooltip and a
+  tick label never disagree in front of a reader;
+- an instant is written with the locale's own date-and-time format rather than a hardcoded one.
+
+`TooltipContent` reproduces `vega-tooltip`'s *shape* — an object becomes a row per field, in order,
+anything else becomes one value — and does not claim byte-fidelity with its HTML, which this repository
+does not pin and therefore cannot verify differentially.
+
+## Diagnostics: what to do with one
+
+A specification that compiles is not the same as a specification that compiled *cleanly*, and an
+adopting team asked for a policy rather than a list of codes. `DiagnosticSeverity` **is** the policy —
+each level says what it means for the chart — and this is it spelled out for a host:
+
+| Severity | What it means | What a host should do |
+| --- | --- | --- |
+| `INFO` | The chart is unaffected. A note, often something the specification asked to be told. | Log it. Nothing else. |
+| `WARNING` | The chart renders, but not exactly as the specification asked — an approximation, a property applied differently. | Draw it. Log it where somebody will see it: this is the level that accumulates when a payload drifts away from what the engine implements. |
+| `ERROR` | A construct could not be honoured. The **surrounding chart still renders** without it. | Draw it, and decide by feature whether a chart missing that construct is worth showing. A missing legend is not a missing axis. |
+| `FATAL` | No chart could be produced. `compiled.scene` is null. | Show your own fallback — the placeholder, an error state. Do not blank a chart the reader was already looking at: `VegaChartController` deliberately keeps the previous scene, so a failed recompile leaves the old chart up. |
+
+Two things that follow from it and are easy to get wrong. **Nothing throws** — a compile returns
+diagnostics, so a host that never reads them silently accepts every approximation. And the
+severities are not a scale of *how broken*, they are a statement about **what is on screen**: an
+`ERROR` chart is drawable and a `FATAL` one is not, which is the only distinction a UI has to make.
+
+The codes are part of the public contract (`DiagnosticCodes`, `VegaLiteDiagnostics`), so a host may
+match on one to special-case a construct it knows it sends.
 
 ## Export example
 
@@ -302,6 +413,113 @@ a plural with a number. `VegaCaptions.English` is upstream's own wording and the
 **Parsing is deliberately not localised.** A specification writing `"Jan 5 2026"` in its own data means
 January in every language — d3's parsing is part of the wire format — so `TimeFormat.MONTHS` stays
 English and only what is *written* follows the locale.
+
+## Host data example
+
+A chart can be drawn from data the **app** holds rather than data the payload carried. The
+specification names a dataset and leaves it empty — `{"data": {"name": "diary"}}` in Vega-Lite,
+`{"name": "diary"}` in Vega — and the host fills it, which is upstream's `view.data(name, rows)`:
+
+```kotlin
+controller.setSpec(specificationFromServer)
+
+// Later, and again whenever the store changes.
+controller.setData("diary", entries.map { entry ->
+    ForeignData.row(mapOf(
+        "bucket" to VegaValue.Str(entry.partOfDay),
+        "at" to ForeignData.instant(entry.at.toEpochMilliseconds()),
+        "v" to VegaValue.Num(entry.value),
+    ))
+})
+```
+
+From Swift the rows are Swift values, since a Kotlin value class has no Obj-C representation:
+
+```swift
+session.setData("diary", rows: [
+    ["bucket": .text("morning"), "at": .instant(entry.at), "v": .number(3)]
+])
+```
+
+Four things worth knowing:
+
+- The rows arrive **where inline values would**, so the dataset's own `format.parse` and its transforms
+  run over them unchanged. A host does not reimplement a parse rule or a `timeunit` to get its table
+  drawn.
+- `ForeignData.instant` hands over a date **as a date**. A host holding one should not format it to a
+  string for the engine to parse back: that crosses a time zone twice, and twice is where a day goes
+  missing.
+- Setting data **recompiles**, which is how this engine answers a change of any compile input. It is a
+  seam for new data, not somewhere to write per frame; equal rows do nothing.
+- Three things are refused rather than guessed, each with a diagnostic: a name no dataset carries, a
+  **derived** dataset (filling one would discard the transforms it exists for — supply the rows for its
+  source instead), and a dataset whose `url` is then **not fetched**, which is also the way to draw a
+  chart whose payload names an address you would rather not open.
+
+A dataset declared **inside a group mark** is filled the same way, by its own name. And as with the time
+zone, this is a *compile* input: the Compose renderer draws a scene that has already been compiled, so
+it is set wherever the controller or `SpecCompiler` lives.
+
+### The same seams from iOS
+
+`ChartSession` takes every compile input the Kotlin controller does, because a capability that exists
+for one host and not the other is a gap in this boundary rather than a fact about the platform:
+
+```swift
+let session = ChartSession(
+    locale: dutch,                                   // month names, separators, spoken captions
+    hostConfigJson: theme,                           // a `config` block, as JSON
+    containerSize: SizeD(width: 360, height: 0),     // what `width: "container"` asks for
+    timeZone: TimeZone(identifier: profile.zone)     // which zone "local" is
+)
+session.setData("diary", rows: rows)                 // a table the app holds
+```
+
+A theme that is not a JSON object lands in `hostConfigFailure` and the chart is drawn unthemed; a time
+zone the platform cannot resolve lands in `timeZoneFailure` and the chart is drawn in the device's zone.
+Neither throws, because both usually come from a server.
+
+Take `containerSize` from something **stable** — the parent's width, a size class, a fixed column — and
+not from the chart view's own geometry: a chart sized to its container changes its scene's width, the
+view's aspect ratio follows the scene, and a width read back from that view can oscillate. That loop is
+why it is not wired up automatically.
+
+## Time zone example
+
+A chart of days needs to know which zone the days are in, and on a handset that is not always the
+device's. So `timeZone` sits beside `locale` — a different question with the same shape, since a Dutch
+reader in Curaçao needs one of each:
+
+```kotlin
+val controller = VegaChartController(
+    textEngine = view.chartTextEngine,
+    // Whatever the app already knows the reader's zone to be: a profile setting, an account
+    // preference, `java.util.TimeZone.getDefault().id` for the device's own.
+    timeZone = VegaTimeZones.of(profile.timeZoneId),
+)
+```
+
+`VegaTimeZones.of` answers **null** for an identifier the platform does not carry rather than throwing,
+because that string usually comes from a server; null means "the device's own zone", which is what every
+host had before this existed and is what upstream does.
+
+It settles four things, and the last is the one worth reading twice:
+
+- a `time` scale's ticks, and therefore where a mark lands and what its label says;
+- `timeunit`'s buckets — which day, week or hour a row is grouped into;
+- the local expression functions (`hours`, `timeFormat`, `datetime`, `timeOffset`, …);
+- and **`format.parse`**: a timestamp with no offset in the data, `2026-05-20T00:30`, names a different
+  instant in every zone, and `Date.parse` reads it in local time. So the zone decides what local *is*,
+  not whether it applies.
+
+The `utc` forms are untouched: a `utc` scale, a `utc:` parse pattern and the `utc*` functions stay UTC
+whatever a host says. One consequence of upstream's rules is easy to misread as a bug —
+`utchours("2026-05-20T00:30")` **parses** that string in local time and only then reads the hour in UTC,
+so its answer moves with this setting too. `TimeZoneTest` pins each of these.
+
+Since the zone is a **compile** input, it is set where the controller or `SpecCompiler` is built. The
+Compose renderer draws a scene that has already been compiled, so there is nothing to pass there;
+`ChartSession(timeZone:)` is the seam on iOS and takes a `Foundation.TimeZone`.
 
 ## Interaction example
 

@@ -34,6 +34,8 @@ public struct VegaChartView: View {
   private let onPlaced: ((ChartPlacement) -> Void)?
   /// The language the accessibility tree's own summary sentence is written in.
   private let captions: VegaCaptions?
+  /// What every font size is multiplied by when drawing; see ``ChartSession/textScale``.
+  private let textScaleOverride: Double?
 
   /// Creates a chart view.
   ///
@@ -46,17 +48,26 @@ public struct VegaChartView: View {
   ///     accessibility overlay use the same numbers internally.
   ///   - captions: the language the accessibility tree's dense-chart summary is written in. Every other
   ///     label reaches the scene already in the chart's own language, from the compiler's locale.
+  ///   - textScale: what every font size is multiplied by when drawing. Nil takes the session's, which
+  ///     is what the layout was measured with — the two must agree or every label is painted at a
+  ///     different size from the box reserved for it. Only a view drawing a scene it compiled itself,
+  ///     with no session, needs to pass one.
   public init(
     scene: AsterVega.Scene,
     session: ChartSession? = nil,
     captions: VegaCaptions? = nil,
+    textScale: Double? = nil,
     onPlaced: ((ChartPlacement) -> Void)? = nil
   ) {
     self.scene = scene
     self.session = session
     self.captions = captions
+    self.textScaleOverride = textScale
     self.onPlaced = onPlaced
   }
+
+  /// The factor the glyphs are drawn at: the session's, or one a caller stated.
+  private var textScale: Double { textScaleOverride ?? session?.textScale ?? 1 }
 
   /// The canvas's size, remembered so a gesture can undo the same placement the drawing used.
   @State private var canvasSize: CGSize = .zero
@@ -199,9 +210,13 @@ public struct VegaChartView: View {
   }
 
   /// The accessibility elements, positioned over the chart they describe.
+  ///
+  /// Through the **drawn** placement, pan and zoom included: a reader exploring by touch has to land on
+  /// the mark where it is now. Android's `VegaAccessibilityHelper` maps its virtual nodes through the
+  /// viewport for the same reason, and this side did not until the drawing did.
   private var accessibilityOverlay: some View {
     GeometryReader { proxy in
-      let placement = placement(in: proxy.size)
+      let placement = drawnPlacement(in: proxy.size)
       ZStack(alignment: .topLeading) {
         ForEach(accessibleElements, id: \.offset) { entry in
           let scale = placement?.scale ?? 1
@@ -307,6 +322,12 @@ public struct VegaChartView: View {
   }
 
   /// The fit scale and the centring offset, computed once and used by both the drawing and the touches.
+  /// The **fit**: where the chart sits in the view before a reader has moved it.
+  ///
+  /// This is what a touch is inverted through and what is handed to `onPlaced`, and it deliberately
+  /// carries no pan or zoom: `VegaChartController` subtracts its own `viewportOffset` and divides by its
+  /// own `viewportScale`, so removing either here would remove it twice and a tap would drift further
+  /// from the finger the further the chart had been panned.
   private func placement(in size: CGSize) -> (scale: Double, left: CGFloat, top: CGFloat)? {
     guard scene.width > 0, scene.height > 0, size.width > 0, size.height > 0 else { return nil }
     let scale = min(size.width / CGFloat(scene.width), size.height / CGFloat(scene.height))
@@ -317,13 +338,28 @@ public struct VegaChartView: View {
     )
   }
 
+  /// The fit **with the reader's pan and zoom on it**: what the pixels actually go through.
+  ///
+  /// Composed in the order the controller documents — translate by the offset, then scale by
+  /// `contentScale * viewportScale` — and used by the drawing *and* by the accessibility frames, so a
+  /// reader exploring by touch lands on the mark where it is now rather than where it started.
+  private func drawnPlacement(in size: CGSize) -> (scale: Double, left: CGFloat, top: CGFloat)? {
+    guard let fit = placement(in: size) else { return nil }
+    let viewport = session?.viewport ?? .identity
+    return (
+      scale: fit.scale * viewport.scale,
+      left: fit.left + CGFloat(viewport.offsetX),
+      top: fit.top + CGFloat(viewport.offsetY)
+    )
+  }
+
   private var aspect: CGFloat {
     guard scene.width > 0, scene.height > 0 else { return 1 }
     return CGFloat(scene.width / scene.height)
   }
 
-  private func draw(into context: CGContext, size: CGSize) {
-    guard let placement = placement(in: size) else { return }
+  func draw(into context: CGContext, size: CGSize) {
+    guard let placement = drawnPlacement(in: size) else { return }
 
     context.saveGState()
     // Centred, then scaled. Scaling the context rather than the scene means stroke widths and dash
@@ -337,11 +373,69 @@ public struct VegaChartView: View {
 
     // CoreText is lent to the renderer here. Without it a chart draws every mark and no label, which
     // is the renderer's deliberate answer to "shaping text is the platform's job".
-    var target = CoreGraphicsTarget(context: context, drawText: CoreTextDrawing.draw)
+    // The scale the *layout* was measured with, so the glyphs fill the boxes the engine reserved.
+    let scale = textScale
+    var target = CoreGraphicsTarget(
+      context: context,
+      drawText: { run, fill, ctx in CoreTextDrawing.draw(run, fill, ctx, textScale: scale) }
+    )
     SceneWalk().draw(scene: scene, into: &target)
 
     context.restoreGState()
   }
+}
+
+/// A tooltip to show, and where to put it.
+///
+/// Rows as well as text, because a design system will want its own layout — a two-column bubble, a
+/// header and a value, a card — and the engine has no business choosing one. The `anchor` is in the
+/// chart view's own coordinate space, so positioning is `.position(x:y:)` and nothing else.
+public struct ChartTooltip: Sendable, Equatable {
+
+  /// One line: what the field is called, and what it says. An unlabelled row is a bare value.
+  public struct Row: Sendable, Equatable {
+    public let label: String
+    public let value: String
+
+    public init(label: String, value: String) {
+      self.label = label
+      self.value = value
+    }
+  }
+
+  public let rows: [Row]
+  /// Every row as one string, `label: value` a line at a time — for a host with no opinion.
+  public let text: String
+  /// Where the touch was, in this view's pixels. Nil for a tooltip that arrived without one.
+  public let anchor: CGPoint?
+
+  public init(rows: [Row], text: String, anchor: CGPoint?) {
+    self.rows = rows
+    self.text = text
+    self.anchor = anchor
+  }
+}
+
+/// The pan and zoom a chart is drawn through, as a controller accumulated them.
+///
+/// The offset is in **pixels** and the scale is a factor, which is exactly how
+/// `InteractionState.viewportOffset` and `viewportScale` hold them — so this crosses no conversion on
+/// its way from the engine to the drawing. It is a separate type from ``ChartPlacement`` because the two
+/// are composed and not interchangeable: the placement is where the chart *sits* in a view, and this is
+/// what a reader has done to it since.
+public struct ChartViewport: Sendable, Equatable {
+  public let offsetX: Double
+  public let offsetY: Double
+  public let scale: Double
+
+  public init(offsetX: Double, offsetY: Double, scale: Double) {
+    self.offsetX = offsetX
+    self.offsetY = offsetY
+    self.scale = scale > 0 ? scale : 1
+  }
+
+  /// The identity: a chart nobody has moved.
+  public static let identity = ChartViewport(offsetX: 0, offsetY: 0, scale: 1)
 }
 
 /// Where a chart ended up inside the view: the fit scale, and the offset it was centred by.

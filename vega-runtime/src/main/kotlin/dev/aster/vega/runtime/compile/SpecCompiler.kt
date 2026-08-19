@@ -41,6 +41,7 @@ import dev.aster.vega.scene.SizeD
 import dev.aster.vega.scene.TextEngine
 import dev.aster.vega.scene.Transform2D
 import kotlin.math.ceil
+import kotlinx.datetime.TimeZone
 
 /** A compiled specification: the scene, the scales it built, and everything it could not honour. */
 public data class CompiledSpec(
@@ -161,6 +162,54 @@ public class SpecCompiler(
    * the half it knows.
    */
   private val containerSize: SizeD? = null,
+  /**
+   * Tables the **host** supplies, keyed by the dataset name the specification uses.
+   *
+   * Upstream's `view.data(name, rows)`, which is how a chart is drawn from data the *app* holds
+   * rather than data a payload carried: a diary in a local store, a query's result, rows assembled
+   * from a sensor. A specification declares `{"name": "diary"}` — no values, no url, no source —
+   * and this fills it. In Vega-Lite that is `{"data": {"name": "diary"}}`, and the name survives
+   * compilation, so a host uses the name it wrote.
+   *
+   * The rows arrive **as inline values would**, before anything else reads the dataset, so
+   * `format.parse` and every transform run over them unchanged — a host does not have to
+   * reimplement a parse rule to get its own table through. Rows are `VegaValue.Obj`; a row that is
+   * not an object is wrapped as `{"data": …}`, which is upstream's own normalisation.
+   *
+   * Three things are refused rather than guessed, each with a diagnostic: a name no dataset claims,
+   * a **derived** dataset (filling one would discard the transforms it exists for), and a `url` —
+   * which is *not fetched* when a host has supplied the table, so this is also the way to draw a
+   * chart whose payload names an address the host would rather not open.
+   *
+   * Named for the same half of the boundary [hostConfig] is: a compile has a local `datasets` of
+   * its own — the ones it resolved — and two things called that in one function is a bug waiting to
+   * be written.
+   */
+  private val hostData: Map<String, List<VegaValue>>? = null,
+  /**
+   * What **local** time means, or null for the device's own zone.
+   *
+   * Every date in a specification is an instant, and which day one falls on has an answer only in
+   * some zone. Upstream has two — the browser's for `time` scales, `timeunit: "local"` and the
+   * local expression functions, and UTC for the `utc` forms — and it needs no more, because a
+   * browser is always on the device it draws for. An app is not: the zone a reader lives in can
+   * differ from the zone the device is set to, and a chart of days then disagrees with the rest of
+   * the app about which day a measurement was on. A diary bucketed by day, or into morning and
+   * evening, is the same case; it has no Vega-Lite time unit at all and has to be binned against a
+   * stated zone.
+   *
+   * So a host may say which zone local is. Null keeps upstream's behaviour exactly, and keeps
+   * reading the zone when it is needed rather than capturing it, so a long-lived process follows a
+   * change of the system zone.
+   *
+   * It reaches four things: a `time` scale's ticks and labels, `timeunit`'s buckets, the local
+   * expression functions, and `format.parse`. The last is not an oversight — a naive timestamp in
+   * the data is read in local time because that is what `Date.parse` does, so this settles what
+   * local *is* rather than whether it applies. `utc` scales, `utc:` parse patterns and the `utc*`
+   * functions are unaffected. See `VegaTimeZones`, whose `of` answers null rather than throwing on
+   * an identifier that came from a server.
+   */
+  private val timeZone: TimeZone? = null,
 ) {
 
   public fun compileJson(
@@ -340,6 +389,7 @@ public class SpecCompiler(
               locale,
               containerWidth = containerSize?.width?.takeIf { it > 0.0 },
               containerHeight = containerSize?.height?.takeIf { it > 0.0 },
+              timeZone = timeZone,
             )
           )
         )
@@ -399,7 +449,7 @@ public class SpecCompiler(
     val unresolvedSignals = spec.signals.mapTo(mutableSetOf()) { it.name }
     val unbuiltScales = spec.scales.mapTo(mutableSetOf()) { it.name }
 
-    val data = DataResolver(diagnostics, expressions, loader, stream, clock)
+    val data = DataResolver(diagnostics, expressions, loader, stream, clock, timeZone, hostData)
     for (operator in order.order) {
       when (operator) {
         is Operator.Signal -> {
@@ -461,6 +511,7 @@ public class SpecCompiler(
                   plotSize(signalValues, width, height),
                   diagnostics,
                   NumberResolver(expressions, scope, diagnostics),
+                  timeZone,
                 )
                 .resolve(listOf(it))
             )
@@ -534,6 +585,7 @@ public class SpecCompiler(
         clock,
         itemEncodes,
         locale,
+        timeZone,
       )
     val scope =
       scopeCompiler.compile(
@@ -545,6 +597,25 @@ public class SpecCompiler(
         root,
         plot,
       )
+
+    // A table nobody claimed. Reported here rather than where the datasets resolve, because a group
+    // mark declares datasets of its own and they are resolved through the same [DataResolver]
+    // during
+    // the scope compile above — so this is the first point at which "no dataset has this name"
+    // is a fact rather than a guess. A chart drawn without the data it was handed is the silence
+    // this
+    // engine refuses everywhere else.
+    hostData?.keys.orEmpty().forEach { name ->
+      if (name !in data.claimedHostData) {
+        diagnostics.warn(
+          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          "The host supplied a table named '$name', which no dataset in this specification is " +
+            "called. Vega-Lite writes the name from `data: {\"name\": …}` through to the compiled " +
+            "specification, so it is the name to use.",
+          operator = name,
+        )
+      }
+    }
 
     val content = frame(spec, scope.nodes, plot, root, ids, diagnostics, expressions)
 

@@ -447,7 +447,7 @@ abstract class dev.aster.vega.runtime.scale/TransformedScale : dev.aster.vega.ru
 }
 
 final class dev.aster.vega.runtime.compile/AxisBuilder { // dev.aster.vega.runtime.compile/AxisBuilder|null[0]
-    constructor <init>(kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.scale/VegaScale>, kotlin.collections/Map<kotlin/String, dev.aster.vega.model.spec/ScaleType>, dev.aster.vega.scene/SceneNodeIdAllocator, dev.aster.vega.scene/TextEngine, dev.aster.vega.model/DiagnosticCollector, dev.aster.vega.runtime.compile/NumberResolver, dev.aster.vega.runtime.compile/MarkEncoder? = ..., dev.aster.vega.model.locale/VegaLocale = ...) // dev.aster.vega.runtime.compile/AxisBuilder.<init>|<init>(kotlin.collections.Map<kotlin.String,dev.aster.vega.runtime.scale.VegaScale>;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.spec.ScaleType>;dev.aster.vega.scene.SceneNodeIdAllocator;dev.aster.vega.scene.TextEngine;dev.aster.vega.model.DiagnosticCollector;dev.aster.vega.runtime.compile.NumberResolver;dev.aster.vega.runtime.compile.MarkEncoder?;dev.aster.vega.model.locale.VegaLocale){}[0]
+    constructor <init>(kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.scale/VegaScale>, kotlin.collections/Map<kotlin/String, dev.aster.vega.model.spec/ScaleType>, dev.aster.vega.scene/SceneNodeIdAllocator, dev.aster.vega.scene/TextEngine, dev.aster.vega.model/DiagnosticCollector, dev.aster.vega.runtime.compile/NumberResolver, dev.aster.vega.runtime.compile/MarkEncoder? = ..., dev.aster.vega.model.locale/VegaLocale = ..., kotlinx.datetime/TimeZone? = ...) // dev.aster.vega.runtime.compile/AxisBuilder.<init>|<init>(kotlin.collections.Map<kotlin.String,dev.aster.vega.runtime.scale.VegaScale>;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.spec.ScaleType>;dev.aster.vega.scene.SceneNodeIdAllocator;dev.aster.vega.scene.TextEngine;dev.aster.vega.model.DiagnosticCollector;dev.aster.vega.runtime.compile.NumberResolver;dev.aster.vega.runtime.compile.MarkEncoder?;dev.aster.vega.model.locale.VegaLocale;kotlinx.datetime.TimeZone?){}[0]
 
     final fun build(dev.aster.vega.model.spec/AxisSpec, dev.aster.vega.runtime.compile/PlotSize, dev.aster.vega.runtime.compile/PlotSize = ...): dev.aster.vega.runtime.compile/AxisBuilder.BuiltAxis? // dev.aster.vega.runtime.compile/AxisBuilder.build|build(dev.aster.vega.model.spec.AxisSpec;dev.aster.vega.runtime.compile.PlotSize;dev.aster.vega.runtime.compile.PlotSize){}[0]
 
@@ -555,7 +555,7 @@ final class dev.aster.vega.runtime.compile/PlotSize { // dev.aster.vega.runtime.
 }
 
 final class dev.aster.vega.runtime.compile/ScaleResolver { // dev.aster.vega.runtime.compile/ScaleResolver|null[0]
-    constructor <init>(kotlin.collections/Map<kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>>, dev.aster.vega.runtime.compile/PlotSize, dev.aster.vega.model/DiagnosticCollector, dev.aster.vega.runtime.compile/NumberResolver) // dev.aster.vega.runtime.compile/ScaleResolver.<init>|<init>(kotlin.collections.Map<kotlin.String,kotlin.collections.List<dev.aster.vega.model.VegaValue>>;dev.aster.vega.runtime.compile.PlotSize;dev.aster.vega.model.DiagnosticCollector;dev.aster.vega.runtime.compile.NumberResolver){}[0]
+    constructor <init>(kotlin.collections/Map<kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>>, dev.aster.vega.runtime.compile/PlotSize, dev.aster.vega.model/DiagnosticCollector, dev.aster.vega.runtime.compile/NumberResolver, kotlinx.datetime/TimeZone? = ...) // dev.aster.vega.runtime.compile/ScaleResolver.<init>|<init>(kotlin.collections.Map<kotlin.String,kotlin.collections.List<dev.aster.vega.model.VegaValue>>;dev.aster.vega.runtime.compile.PlotSize;dev.aster.vega.model.DiagnosticCollector;dev.aster.vega.runtime.compile.NumberResolver;kotlinx.datetime.TimeZone?){}[0]
 
     final fun resolve(kotlin.collections/List<dev.aster.vega.model.spec/ScaleSpec>): kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.scale/VegaScale> // dev.aster.vega.runtime.compile/ScaleResolver.resolve|resolve(kotlin.collections.List<dev.aster.vega.model.spec.ScaleSpec>){}[0]
 }
@@ -611,7 +611,7 @@ final class dev.aster.vega.runtime.compile/SignalScope : dev.aster.vega.expressi
 }
 
 final class dev.aster.vega.runtime.compile/SpecCompiler { // dev.aster.vega.runtime.compile/SpecCompiler|null[0]
-    constructor <init>(dev.aster.vega.scene/TextEngine = ..., dev.aster.vega.runtime.load/DataLoader = ..., kotlin/Long = ..., dev.aster.vega.expression/Clock = ..., dev.aster.vega.model.locale/VegaLocale = ..., dev.aster.vega.model/VegaValue? = ..., dev.aster.vega.scene/SizeD? = ...) // dev.aster.vega.runtime.compile/SpecCompiler.<init>|<init>(dev.aster.vega.scene.TextEngine;dev.aster.vega.runtime.load.DataLoader;kotlin.Long;dev.aster.vega.expression.Clock;dev.aster.vega.model.locale.VegaLocale;dev.aster.vega.model.VegaValue?;dev.aster.vega.scene.SizeD?){}[0]
+    constructor <init>(dev.aster.vega.scene/TextEngine = ..., dev.aster.vega.runtime.load/DataLoader = ..., kotlin/Long = ..., dev.aster.vega.expression/Clock = ..., dev.aster.vega.model.locale/VegaLocale = ..., dev.aster.vega.model/VegaValue? = ..., dev.aster.vega.scene/SizeD? = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>>? = ..., kotlinx.datetime/TimeZone? = ...) // dev.aster.vega.runtime.compile/SpecCompiler.<init>|<init>(dev.aster.vega.scene.TextEngine;dev.aster.vega.runtime.load.DataLoader;kotlin.Long;dev.aster.vega.expression.Clock;dev.aster.vega.model.locale.VegaLocale;dev.aster.vega.model.VegaValue?;dev.aster.vega.scene.SizeD?;kotlin.collections.Map<kotlin.String,kotlin.collections.List<dev.aster.vega.model.VegaValue>>?;kotlinx.datetime.TimeZone?){}[0]
 
     final fun compile(dev.aster.vega.model.spec/VegaSpec, kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ..., kotlin.collections/Map<dev.aster.vega.scene/SceneNodeId, dev.aster.vega.runtime.compile/ItemEncode> = ...): dev.aster.vega.runtime.compile/CompiledSpec // dev.aster.vega.runtime.compile/SpecCompiler.compile|compile(dev.aster.vega.model.spec.VegaSpec;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<dev.aster.vega.scene.SceneNodeId,dev.aster.vega.runtime.compile.ItemEncode>){}[0]
     final fun compileJson(kotlin/String, kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ..., kotlin.collections/Map<dev.aster.vega.scene/SceneNodeId, dev.aster.vega.runtime.compile/ItemEncode> = ...): dev.aster.vega.runtime.compile/CompiledSpec // dev.aster.vega.runtime.compile/SpecCompiler.compileJson|compileJson(kotlin.String;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<dev.aster.vega.scene.SceneNodeId,dev.aster.vega.runtime.compile.ItemEncode>){}[0]
@@ -1220,8 +1220,44 @@ final class dev.aster.vega.runtime/SignalInput { // dev.aster.vega.runtime/Signa
     }
 }
 
+final class dev.aster.vega.runtime/TooltipContent { // dev.aster.vega.runtime/TooltipContent|null[0]
+    constructor <init>(kotlin.collections/List<dev.aster.vega.runtime/TooltipRow>, kotlin/String) // dev.aster.vega.runtime/TooltipContent.<init>|<init>(kotlin.collections.List<dev.aster.vega.runtime.TooltipRow>;kotlin.String){}[0]
+
+    final val rows // dev.aster.vega.runtime/TooltipContent.rows|{}rows[0]
+        final fun <get-rows>(): kotlin.collections/List<dev.aster.vega.runtime/TooltipRow> // dev.aster.vega.runtime/TooltipContent.rows.<get-rows>|<get-rows>(){}[0]
+    final val text // dev.aster.vega.runtime/TooltipContent.text|{}text[0]
+        final fun <get-text>(): kotlin/String // dev.aster.vega.runtime/TooltipContent.text.<get-text>|<get-text>(){}[0]
+
+    final fun component1(): kotlin.collections/List<dev.aster.vega.runtime/TooltipRow> // dev.aster.vega.runtime/TooltipContent.component1|component1(){}[0]
+    final fun component2(): kotlin/String // dev.aster.vega.runtime/TooltipContent.component2|component2(){}[0]
+    final fun copy(kotlin.collections/List<dev.aster.vega.runtime/TooltipRow> = ..., kotlin/String = ...): dev.aster.vega.runtime/TooltipContent // dev.aster.vega.runtime/TooltipContent.copy|copy(kotlin.collections.List<dev.aster.vega.runtime.TooltipRow>;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.runtime/TooltipContent.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.runtime/TooltipContent.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.runtime/TooltipContent.toString|toString(){}[0]
+
+    final object Companion { // dev.aster.vega.runtime/TooltipContent.Companion|null[0]
+        final fun of(dev.aster.vega.model/VegaValue?, dev.aster.vega.model.locale/VegaLocale = ..., kotlinx.datetime/TimeZone? = ...): dev.aster.vega.runtime/TooltipContent? // dev.aster.vega.runtime/TooltipContent.Companion.of|of(dev.aster.vega.model.VegaValue?;dev.aster.vega.model.locale.VegaLocale;kotlinx.datetime.TimeZone?){}[0]
+    }
+}
+
+final class dev.aster.vega.runtime/TooltipRow { // dev.aster.vega.runtime/TooltipRow|null[0]
+    constructor <init>(kotlin/String, kotlin/String) // dev.aster.vega.runtime/TooltipRow.<init>|<init>(kotlin.String;kotlin.String){}[0]
+
+    final val label // dev.aster.vega.runtime/TooltipRow.label|{}label[0]
+        final fun <get-label>(): kotlin/String // dev.aster.vega.runtime/TooltipRow.label.<get-label>|<get-label>(){}[0]
+    final val value // dev.aster.vega.runtime/TooltipRow.value|{}value[0]
+        final fun <get-value>(): kotlin/String // dev.aster.vega.runtime/TooltipRow.value.<get-value>|<get-value>(){}[0]
+
+    final fun component1(): kotlin/String // dev.aster.vega.runtime/TooltipRow.component1|component1(){}[0]
+    final fun component2(): kotlin/String // dev.aster.vega.runtime/TooltipRow.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ...): dev.aster.vega.runtime/TooltipRow // dev.aster.vega.runtime/TooltipRow.copy|copy(kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.runtime/TooltipRow.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.runtime/TooltipRow.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.runtime/TooltipRow.toString|toString(){}[0]
+}
+
 final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runtime/VegaChartController|null[0]
-    constructor <init>(dev.aster.vega.scene/Scene = ..., dev.aster.vega.scene/TextEngine = ..., kotlin/Function0<kotlin/Long> = ..., dev.aster.vega.runtime.load/DataLoader = ..., dev.aster.vega.runtime.interaction/Scheduler? = ..., dev.aster.vega.model.locale/VegaLocale = ..., dev.aster.vega.model/VegaValue? = ..., dev.aster.vega.scene/SizeD? = ...) // dev.aster.vega.runtime/VegaChartController.<init>|<init>(dev.aster.vega.scene.Scene;dev.aster.vega.scene.TextEngine;kotlin.Function0<kotlin.Long>;dev.aster.vega.runtime.load.DataLoader;dev.aster.vega.runtime.interaction.Scheduler?;dev.aster.vega.model.locale.VegaLocale;dev.aster.vega.model.VegaValue?;dev.aster.vega.scene.SizeD?){}[0]
+    constructor <init>(dev.aster.vega.scene/Scene = ..., dev.aster.vega.scene/TextEngine = ..., kotlin/Function0<kotlin/Long> = ..., dev.aster.vega.runtime.load/DataLoader = ..., dev.aster.vega.runtime.interaction/Scheduler? = ..., dev.aster.vega.model.locale/VegaLocale = ..., dev.aster.vega.model/VegaValue? = ..., dev.aster.vega.scene/SizeD? = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>>? = ..., kotlinx.datetime/TimeZone? = ...) // dev.aster.vega.runtime/VegaChartController.<init>|<init>(dev.aster.vega.scene.Scene;dev.aster.vega.scene.TextEngine;kotlin.Function0<kotlin.Long>;dev.aster.vega.runtime.load.DataLoader;dev.aster.vega.runtime.interaction.Scheduler?;dev.aster.vega.model.locale.VegaLocale;dev.aster.vega.model.VegaValue?;dev.aster.vega.scene.SizeD?;kotlin.collections.Map<kotlin.String,kotlin.collections.List<dev.aster.vega.model.VegaValue>>?;kotlinx.datetime.TimeZone?){}[0]
 
     final val diagnostics // dev.aster.vega.runtime/VegaChartController.diagnostics|{}diagnostics[0]
         final fun <get-diagnostics>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic>> // dev.aster.vega.runtime/VegaChartController.diagnostics.<get-diagnostics>|<get-diagnostics>(){}[0]
@@ -1233,6 +1269,8 @@ final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runti
         final fun <get-snapshot>(): dev.aster.vega.runtime/ChartSnapshot // dev.aster.vega.runtime/VegaChartController.snapshot.<get-snapshot>|<get-snapshot>(){}[0]
     final val state // dev.aster.vega.runtime/VegaChartController.state|{}state[0]
         final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<dev.aster.vega.runtime/ChartState> // dev.aster.vega.runtime/VegaChartController.state.<get-state>|<get-state>(){}[0]
+    final val tooltipContent // dev.aster.vega.runtime/VegaChartController.tooltipContent|{}tooltipContent[0]
+        final fun <get-tooltipContent>(): dev.aster.vega.runtime/TooltipContent? // dev.aster.vega.runtime/VegaChartController.tooltipContent.<get-tooltipContent>|<get-tooltipContent>(){}[0]
 
     final var containerSize // dev.aster.vega.runtime/VegaChartController.containerSize|{}containerSize[0]
         final fun <get-containerSize>(): dev.aster.vega.scene/SizeD? // dev.aster.vega.runtime/VegaChartController.containerSize.<get-containerSize>|<get-containerSize>(){}[0]
@@ -1240,6 +1278,9 @@ final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runti
     final var contentScale // dev.aster.vega.runtime/VegaChartController.contentScale|{}contentScale[0]
         final fun <get-contentScale>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.contentScale.<get-contentScale>|<get-contentScale>(){}[0]
         final fun <set-contentScale>(kotlin/Double) // dev.aster.vega.runtime/VegaChartController.contentScale.<set-contentScale>|<set-contentScale>(kotlin.Double){}[0]
+    final var hostData // dev.aster.vega.runtime/VegaChartController.hostData|{}hostData[0]
+        final fun <get-hostData>(): kotlin.collections/Map<kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>>? // dev.aster.vega.runtime/VegaChartController.hostData.<get-hostData>|<get-hostData>(){}[0]
+        final fun <set-hostData>(kotlin.collections/Map<kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>>?) // dev.aster.vega.runtime/VegaChartController.hostData.<set-hostData>|<set-hostData>(kotlin.collections.Map<kotlin.String,kotlin.collections.List<dev.aster.vega.model.VegaValue>>?){}[0]
     final var lastCompiled // dev.aster.vega.runtime/VegaChartController.lastCompiled|{}lastCompiled[0]
         final fun <get-lastCompiled>(): dev.aster.vega.runtime.compile/CompiledSpec? // dev.aster.vega.runtime/VegaChartController.lastCompiled.<get-lastCompiled>|<get-lastCompiled>(){}[0]
 
@@ -1247,6 +1288,7 @@ final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runti
     final fun dispatch(dev.aster.vega.runtime/ChartInputEvent) // dev.aster.vega.runtime/VegaChartController.dispatch|dispatch(dev.aster.vega.runtime.ChartInputEvent){}[0]
     final fun report(dev.aster.vega.model/VegaDiagnostic) // dev.aster.vega.runtime/VegaChartController.report|report(dev.aster.vega.model.VegaDiagnostic){}[0]
     final fun resetViewport() // dev.aster.vega.runtime/VegaChartController.resetViewport|resetViewport(){}[0]
+    final fun setData(kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>) // dev.aster.vega.runtime/VegaChartController.setData|setData(kotlin.String;kotlin.collections.List<dev.aster.vega.model.VegaValue>){}[0]
     final fun setHitTestOptions(dev.aster.vega.scene/HitTestOptions) // dev.aster.vega.runtime/VegaChartController.setHitTestOptions|setHitTestOptions(dev.aster.vega.scene.HitTestOptions){}[0]
     final fun setScene(dev.aster.vega.scene/Scene) // dev.aster.vega.runtime/VegaChartController.setScene|setScene(dev.aster.vega.scene.Scene){}[0]
     final fun setSignal(kotlin/String, dev.aster.vega.model/VegaValue) // dev.aster.vega.runtime/VegaChartController.setSignal|setSignal(kotlin.String;dev.aster.vega.model.VegaValue){}[0]
@@ -1452,6 +1494,13 @@ final object dev.aster.vega.runtime.scale/TimeTicks { // dev.aster.vega.runtime.
     final fun nice(kotlin/Double, kotlin/Double, kotlin/Int, kotlinx.datetime/TimeZone): kotlin/Pair<kotlin/Double, kotlin/Double> // dev.aster.vega.runtime.scale/TimeTicks.nice|nice(kotlin.Double;kotlin.Double;kotlin.Int;kotlinx.datetime.TimeZone){}[0]
     final fun tickStepper(kotlin/Double, kotlin/Double, kotlin/Int, kotlinx.datetime/TimeZone): dev.aster.vega.model.time/TimeStepper // dev.aster.vega.runtime.scale/TimeTicks.tickStepper|tickStepper(kotlin.Double;kotlin.Double;kotlin.Int;kotlinx.datetime.TimeZone){}[0]
     final fun ticks(kotlin/Double, kotlin/Double, kotlin/Int, kotlinx.datetime/TimeZone): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/TimeTicks.ticks|ticks(kotlin.Double;kotlin.Double;kotlin.Int;kotlinx.datetime.TimeZone){}[0]
+}
+
+final object dev.aster.vega.runtime/ForeignData { // dev.aster.vega.runtime/ForeignData|null[0]
+    final fun instant(kotlin/Double): dev.aster.vega.model/VegaValue // dev.aster.vega.runtime/ForeignData.instant|instant(kotlin.Double){}[0]
+    final fun missing(): dev.aster.vega.model/VegaValue // dev.aster.vega.runtime/ForeignData.missing|missing(){}[0]
+    final fun row(kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue>): dev.aster.vega.model/VegaValue // dev.aster.vega.runtime/ForeignData.row|row(kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>){}[0]
+    final fun rowsFromJson(kotlin/String): kotlin.collections/List<dev.aster.vega.model/VegaValue>? // dev.aster.vega.runtime/ForeignData.rowsFromJson|rowsFromJson(kotlin.String){}[0]
 }
 
 final object dev.aster.vega.runtime/ForeignSignals { // dev.aster.vega.runtime/ForeignSignals|null[0]

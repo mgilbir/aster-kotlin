@@ -4400,6 +4400,306 @@ Two caveats on the number. It is a desktop JVM with the JIT warm, which is the m
 there is; and it measures compilation only, not the Canvas draw that follows. It is an order of
 magnitude, enough to rule an approach in, and not a substitute for measuring on hardware.
 
+## A tooltip nobody could show
+
+The second of the two notes, and it was half true. No renderer draws a bubble and none should: what a
+bubble looks like belongs to a design system. But the step in between — turning the dataflow's tooltip
+*value* into lines — belonged here and was missing, so every host improvised it. The improvisation on
+iOS was the tell: `ChartSession` stringified the value and compared it against the literal `"{}"` to
+tell an empty tooltip from a real one, because a mark with **no** tooltip channel still gets an empty
+object and treating that as a tooltip puts an empty bubble on every mark in the chart.
+
+`TooltipContent` is that step: rows of label and value, plus a plain-text rendering for a host with no
+opinion, from `VegaChartController.tooltipContent` in Kotlin and `ChartSession.tooltip` in Swift, with
+`interactionState.tooltipAnchor` — the point the host itself dispatched, in its own pixels — saying
+where to put it.
+
+Two formatting decisions, and both are about a chart not disagreeing with itself. A **number** goes
+through the same `formatTickLabel` an axis label goes through, so a tooltip saying `1.234,5` sits under
+an axis that says `1.234,5` rather than under one that says `1,234.5`. An **instant** takes the locale's
+own `dateTime` format, which for d3's `en-US` is `%x, %X` — so the default output is upstream's wording
+and not something chosen here.
+
+What is deliberately *not* claimed: fidelity with `vega-tooltip`'s HTML. That package is not among the
+ones this repository pins, so nothing here is differentially verified against it, and the KDoc says so
+in those words. What is reproduced is its **shape** — an object becomes a row per field in order,
+anything else becomes a single value — which is the part a reader sees.
+
+One number rule worth keeping: the places come from `String(x)`, the shortest form that identifies a
+double, capped at six. Past the cap the value is *rounded* and asked again rather than formatted at the
+cap, because formatting at the cap pads — `0.1 + 0.2` came out as `0.300000` where a reader would have
+written `0.3`.
+
+## A pan that moved the state and not the chart
+
+Asked whether the two remaining "not at parity" notes could be closed, the first turned out not to be a
+missing nicety at all. It was a defect.
+
+`VegaChartController` owns the viewport and always has: it adds a pan's delta into `viewportOffset`,
+multiplies a pinch into `viewportScale`, clamps the zoom between 0.1× and 50×, keeps the anchor
+stationary, and emits `ViewportChanged` when the gesture ends. The **Android View** reads that state back
+and draws through it — `canvas.translate(offset)` and a pixel scale of `fit * viewportScale` — and its
+accessibility helper maps every virtual node through the same numbers. The Compose Multiplatform renderer
+and the Swift one did neither. So on those two hosts a pan updated the controller, made `canReset` true,
+and **left the chart exactly where it was**. A gesture that does nothing reads as a broken renderer
+rather than an unfinished one, and nothing caught it because no test on either host panned and then
+looked.
+
+Both draw through it now, and so do their accessibility overlays. Three things had to be got right, and
+two of them are the kind that produce a defect that looks like a rendering bug:
+
+**The order.** The controller documents its own inverse — *subtract the pan offset, then divide by
+`contentScale * viewportScale`* — so the forward transform is translate-then-scale, and the pan is added
+to the placement's offset rather than multiplied into it. `visibleViewport` is the arithmetic that pins
+which way round it goes.
+
+**Two placements, not one.** The **fit** is what a touch is inverted through and what `onPlaced` reports
+for `contentScale`; the **drawn** placement is the fit with the reader's pan and zoom on it. Using the
+drawn one to invert a touch subtracts the pan twice, and the tap drifts further from the finger the
+further the chart has been panned — which a test now pins on both hosts by tapping where a mark *is*
+after a pan and where it *was*.
+
+**The units.** A controller accumulates the pan in **pixels**. The gesture callbacks this renderer grew
+last week reported scene units, which would have been divided by the fit scale a second time inside the
+controller; they report pixels with the centring removed now, and the contract is written down in the
+module rather than left for a host to infer. The Android View has dispatched raw pixels all along, which
+is what made it the one host that worked.
+
+One more thing fell out of testing it. `VegaChart` composed its modifier as
+`Modifier.size(sceneSize).then(modifier)`, and a `size` modifier fixes the constraints its child is
+measured with — so **a caller could not make a chart any bigger than its scene**, which quietly made
+`SceneFit.Contain`, the default, mean nothing outside a test that sizes the canvas itself. The caller's
+modifier comes first now. The comment claiming a caller could override the default had been there since
+the module was written; the test that would have caught it did not exist until this one.
+
+## A key, and a policy for a chart that compiled with complaints
+
+Two smaller things the parity audit and the original review left standing.
+
+**A key press could not reach the dataflow from iOS.** The Android View has translated keys since it was
+written — `ChartInputEvent.Key`, the `ChartKey` set, modifiers — and `ChartSession` exposed taps, long
+presses, pans, pinches and hovers and no keys at all. So a specification bound to `keydown` worked on one
+platform. That is an accessibility path rather than a desktop nicety: Switch Control and Full Keyboard
+Access drive an app by key. `press(_:modifiers:)` closes it, serialised against an in-flight compile like
+every other input here, and the documentation gives the two-line SwiftUI wiring.
+
+On the Compose renderers there is nothing to add and it is worth writing down why: keyboard handling is a
+`Modifier`, so a host composes `focusable()` and `onKeyEvent` onto the chart and forwards to its own
+controller. A library parameter would be a second way to do what the platform already does compositionally.
+
+**And a policy for diagnostics.** The adopting team asked for one — *"we would also need a policy for a
+specification that compiles with diagnostics and still renders"* — and the answer already existed in
+`DiagnosticSeverity`, where each level says what it means for the chart. It was nowhere a host would look,
+so the README now states it as a table: log an `INFO`, draw and log a `WARNING`, draw an `ERROR` and
+decide by feature whether a chart missing that construct is worth showing, and show your own fallback for
+a `FATAL` — without blanking a chart the reader was already looking at, since the controller deliberately
+keeps the previous scene.
+
+The two things that follow are the ones easiest to get wrong, so they are said explicitly: **nothing
+throws**, so a host that never reads the diagnostics silently accepts every approximation; and the
+severities are not a scale of how broken a chart is but a statement about **what is on screen** — an
+`ERROR` chart is drawable and a `FATAL` one is not, which is the only distinction a UI has to make.
+
+## A host's font, and the reader's text size, on the renderers that lacked them
+
+The last two rows of the parity audit, and they are the same shape: each of the three renderers had one
+half of the text story and not the other.
+
+**A bundled font could not reach an Android chart.** `AndroidTextEngine` resolved a family name through
+`Typeface.create(family, …)`, which searches the *system's* families — so an app shipping its own face,
+which most design systems do, got the default and no diagnostic. The Compose renderer has taken a
+`fontFamilyResolver` since it got a text engine; the View now takes `fontResolver`, and
+`newCompatibleTextEngine()` carries it so a controller compiling off the main thread measures with the
+faces the view draws with. Weight and slant are applied to the **supplied** face rather than asked of
+the platform, because asking for "some bold font" is how a label arrives in a face nothing in the chart
+mentions — the same argument `CoreTextFonts` already makes for anchoring a family before its traits.
+
+**The reader's text size reached two renderers out of three.** Android has scaled by its device's
+`fontScale` since the engines were consolidated, and Compose scales by measuring in `sp`. iOS did not, so
+the same chart obeyed an accessibility setting on Android and ignored it on iPhone — and a chart that
+ignores it is not accessible, whatever its VoiceOver tree says. `CoreTextTextEngine(textScale:)` applies
+it to every metric and `CoreTextDrawing.draw(…, textScale:)` to every glyph, and `VegaChartView` reads
+the factor off the session rather than being told it separately: a scaled layout drawn unscaled is small
+text floating in a box reserved for bigger text, which is precisely the defect the CoreText engine was
+written to end.
+
+Two decisions worth keeping. The scale is **fixed for a session's lifetime**, as it is on Android, where
+a text-size change restarts the activity and rebuilds the view's engine; a host following the setting
+live builds a new session, which is what keying one on `DynamicTypeSize.chartTextScale` does. And that
+mapping is a **table** of Apple's own body-size ratios rather than `UIFontMetrics`: the latter is UIKit,
+this package draws on macOS too, and scaling a whole chart by the metrics of one text style would tie
+every label in it to that style. Nothing caps it — the accessibility sizes reach 3.1× and a chart whose
+labels are three times the size is usually not the right answer, but choosing a ceiling is a judgement
+about a particular chart, so a host passes `min(scale, 1.6)` and the engine does not decide.
+
+One finding fell out of testing it, and it is in the test: 1.6× the point size measured **1.50×** the
+width, because the system font is variable and optically sized, so its advances are not proportional
+across sizes. The assertion is a band rather than a factor, which is this repository's stated policy for
+text tolerances and here is also the platform being right.
+
+## The Compose Multiplatform renderer had no pointer input at all
+
+The second finding of the same parity audit, and the larger one. `VegaChart` drew a scene and exposed the
+accessibility tree — added in #34 — and took **no pointer input whatever**. So on that renderer a
+screen-reader user could activate a bar through the tree and a sighted user could not tap it: no
+selection, no tooltip, no pan, no zoom, no hover. Every other host answers a finger, and a payload
+saying `"tooltip": true` expects one to.
+
+It now reports five gestures — tap, long press, pan, pinch, hover — each in **scene** coordinates with
+the mark under it. Three decisions inside that:
+
+- **It reports; it does not dispatch.** The module depends on `vega-scene` alone, and taking
+  `vega-runtime` to send an event would make every host that only draws pay for a dataflow. A host with
+  a controller forwards these — the README shows the four lines — and a host that passes nothing installs
+  no pointer input at all.
+- **It owns the arithmetic a host must not repeat**: the inverse of the *same* placement the drawing
+  used, and the hit test through `SceneHitIndex`, cached per scene rather than rebuilt per tap. Two
+  copies of that inversion is how a finger lands beside the mark it looked like it hit — this project
+  has had that defect on Android and in the Swift renderer, which is why `ChartPlacement` exists there.
+- **Pan and zoom are not locked against each other.** One `detectTransformGestures` handles both, since
+  separate detectors would each claim the pointers and a two-finger gesture would arrive as whichever
+  won; and `panZoomLock = false`, because the Android View runs its pan and scale detectors over the same
+  stream and lets both fire. A chart being explored is usually being moved and scaled at once. The pair
+  each callback reports — an increment and whether the gesture ended — maps onto `GesturePhase.CHANGED`
+  and `GesturePhase.ENDED`, which is the pairing the Swift session already sends.
+
+Seven tests, driven through Compose's own harness rather than pixels: a tap on a bar reports the point in
+scene units and the mark's id, a tap on blank space reports the point and no mark, a long press is
+separate (which is where most specifications hang a tooltip), a drag reports increments in scene units
+with no vertical drift, a pinch reports factors above one about a centroid between the fingers, a mouse
+moving over a bar reports it and leaving reports null, and a chart with no callbacks is inert.
+
+## Three seams that existed and could not be reached from iOS
+
+A parity audit, prompted by one question: is that all? It was not. `ChartSession` — the surface an
+adopting iOS app is told to use, moved into the library so that nobody owns 2,400 lines of it by hand —
+hard-coded three of the compile inputs it was passing on:
+
+```swift
+locale: VegaLocale.Companion.shared.EnglishUS,
+hostConfig: nil,
+containerSize: nil,
+```
+
+So the locale seam, host theming and `width: "container"` were all implemented, tested, documented —
+and available on Android only. Three landed requirements, true on one platform. That is worse than a
+missing feature, because the documentation says the engine has them and it does.
+
+They are all reachable now, and two details are worth keeping. The host configuration is taken as
+**JSON text** rather than as a built `VegaValue`: a theme is written as JSON, and assembling a value
+tree across the Obj-C boundary — where every variant is a Kotlin value class with no representation — is
+work for nothing. It reaches both compilers, the Vega-Lite one and the runtime, because Vega-Lite merges
+`config` before it compiles and a theme applied on one side is a chart half in the app's colours. And
+`containerSize` is a settable property that recompiles, deliberately **not** wired to the chart view's
+own geometry: a chart sized to its container changes its scene's width, the view's aspect ratio follows
+the scene, and a width read back from that view can oscillate. A host takes it from something stable and
+the documentation says why.
+
+Both failure paths report rather than throw, as the time zone does: a configuration that will not parse
+lands in `hostConfigFailure` and a chart is drawn unthemed, because both of those values usually come
+from a server and neither is worth a crash.
+
+## A chart can be drawn from data the app holds
+
+Until this, a chart could only be drawn from data a **payload** carried: values inlined in the
+specification, or a `url` for the engine to fetch. An app's own data is neither of those. A diary lives
+in a local store and was plotted offline by the apps this engine is replacing; a measurement list
+arrives over a channel the chart knows nothing about; rows get assembled from a sensor. The adopting
+team put it plainly: *"the engine must accept a data table that the app builds, not only a specification
+with its data inlined."*
+
+Upstream already has the shape, and it is worth saying why it works rather than inventing one. A Vega
+dataset with no `values`, no `url` and no `source` is an **input**: something outside the specification
+fills it, through `view.data(name, rows)`. Vega-Lite writes `{"data": {"name": "diary"}}` and passes
+that name through to the compiled specification unchanged — probed against `vega-lite@6.4.3` before any
+of this was written, and pinned as a test — so a host uses the name it wrote and never has to discover
+that its rows should have gone into `source_0`.
+
+So `SpecCompiler(hostData = …)`, `VegaChartController.hostData` and `setData(name, rows)`, and
+`ChartSession.setData(_:rows:)` on iOS. The design decision worth stating is **where** the rows go:
+they are injected as the dataset's inline values, before anything else reads it, so `format.parse`
+parses them, `timeunit` buckets them and a `filter` filters them exactly as it would have done for a
+table in the payload. A host does not reimplement a parse rule to get its own data drawn.
+
+`ForeignData` exists for the same reason `ForeignSignals` does: `VegaValue`'s variants are
+`@JvmInline value class`es and a value class has no Obj-C representation, so a foreign host cannot name
+one. It builds a row, a missing value, and an **instant** — the last of which matters more than it
+looks: a host holding a `Date` should not format it to a string for the engine to parse back, because
+that crosses a time zone twice and twice is where a day goes missing. From Swift the rows are Swift
+values (`.text`, `.number`, `.flag`, `.instant`, `.missing`), converted at the boundary.
+
+Three things are refused rather than guessed, each with a diagnostic, because a chart drawn without the
+data it was handed is the silence this engine refuses everywhere else:
+
+- a name **no dataset carries** — a typo, or a host guessing at a compiled name. Reported after the
+  whole compile, since a group mark declares datasets of its own and "nothing is called this" is only a
+  fact once they have all resolved;
+- a **derived** dataset, one with a `source`. Filling it would discard the transforms it exists for, and
+  upstream's own `view.data` on one is undone by the next pulse. The message says to supply the rows for
+  its source instead;
+- a `url`, which is **not fetched** at all when the host has supplied the table. That is one request
+  that does not happen — a specification's `url` is an address the specification chose — and it is said
+  out loud, because a request that silently did not happen is an hour of somebody's afternoon.
+
+Setting data **recompiles**. That is not a shortcut: it is how this engine answers a change of every
+compile input, and the performance note above says why it is affordable. What it means for a host is
+that this is a seam for *new data*, not somewhere to write per frame; a set whose rows equal the ones
+already loaded does nothing, which is the cheaper half of the comparison. Rows supplied before the
+specification arrives are kept and used by the load, because that is the order an app meets in practice.
+
+Verified on all three hosts: `HostDataTest` (10 tests) on the JVM, including the Vega-Lite name, the
+transforms running over supplied rows, the refusals, and that the loader is **not called**;
+`HostDataInstrumentedTest` on an API 37 device, where the store answers late and the pixels the view
+drew are counted; and `ChartSessionTests` from Swift, where the rows are Swift values and a `Date` goes
+through as an instant.
+
+## A host says which zone a chart's local time is in
+
+Upstream Vega has exactly two zones: the browser's own, for `time` scales, `timeunit: "local"` and the
+local expression functions, and UTC for the `utc` forms. It needs no third, because a browser is always
+running on the device it draws for. An app is not. A reader's zone comes from their profile as often as
+from their handset — somebody travelling, a tablet on a factory-set zone, an account read from two
+places — and a chart *of days* has to agree with the rest of the app about which day a measurement was
+on. The adopting team named it as an engine requirement for exactly the case that has no Vega-Lite time
+unit at all: a diary bucketed into morning, afternoon and evening, which a host has to bin itself and
+then hand to an axis on the same clock.
+
+So `SpecCompiler`, `VegaChartController`, `VegaLiteInput.toVega` and — on iOS — `ChartSession` take a
+`timeZone`, beside `locale` and for the same reason: the platform knows it and common Kotlin cannot
+reach it. It is a different question from the language, which is why it is not part of `VegaLocale`: a
+Dutch reader in Curaçao needs one of each.
+
+**Null means the device's own zone, read when it is needed rather than captured.** That keeps every
+existing host and the whole differential corpus meaning what they said, and it keeps a long-lived
+process following a change of the system zone — which a captured value would not. `VegaTimeZones.of`
+answers null for an identifier the platform does not carry instead of throwing, because the identifier
+usually arrives from a server or a profile and a Kotlin throw crossing into Swift or Java ends the app.
+
+Four things read it, and the fourth is the one to read twice:
+
+1. a `time` scale, whose zone decides its ticks and therefore where a mark lands;
+2. `timeunit`, through a new `TransformContext.timeZone`, which is what a bucket boundary is;
+3. the local expression functions, through `Functions.functionsFor(..., timeZone)`;
+4. and **`format.parse`**. A timestamp with no offset — `2026-05-20T00:30`, which is the shape a
+   captured payload actually carries — names a different instant in every zone, and `Date.parse` reads
+   it in local time. Leaving parsing on the device's zone while the axis was on the host's would put a
+   row on one day and its label on another.
+
+One upstream rule looks like an oversight and is now pinned as a test:
+`utchours("2026-05-20T00:30")` **parses** that string in local time and only then reads the hour in
+UTC. So the `utc` accessors answer differently under this setting even though they are UTC accessors —
+which is what a browser does, and is the sort of thing that gets "fixed" into a divergence.
+
+Kept out of it deliberately: a `utc` scale, a `utc:` parse pattern and `timeunit: {"timezone": "utc"}`
+are UTC whatever a host says, because a specification that names UTC has named it.
+
+Verified three ways rather than one, since the identifiers and the default are platform claims:
+`TimeZoneTest` does the arithmetic on the JVM against two real zones twenty-five hours apart
+(`Pacific/Kiritimati` and `Pacific/Niue` — an assertion about Amsterdam would pass in summer and fail
+in winter); `ChartTimeZoneInstrumentedTest` runs it on an API 37 device, where ART's own zone database
+answers and where "null is the device's zone" can be checked against `java.util.TimeZone`; and
+`ChartSessionTests` does it from Swift, where a `Foundation.TimeZone` is converted by identifier.
+
 ## A mark is picked where it is painted, and nothing is picked through a clip
 
 Four defects in one rule, every one of them reported by a tap that found something the reader could not

@@ -25,7 +25,9 @@ final class SceneWalkTests: XCTestCase {
       clock: ClockCompanion.shared.Fixed,
       locale: VegaLocale.Companion.shared.EnglishUS,
       hostConfig: nil,
-      containerSize: nil
+      containerSize: nil,
+      hostData: nil,
+      timeZone: nil
     )
     let compiled = compiler.compileJson(json: json, signalOverrides: [:], itemEncodes: [:])
     let complaints = compiled.diagnostics.filter {
