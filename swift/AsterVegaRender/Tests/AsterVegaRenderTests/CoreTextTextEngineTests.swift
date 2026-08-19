@@ -156,4 +156,81 @@ final class CoreTextTextEngineTests: XCTestCase {
       )
     }
   }
+
+  /// The reader's text-size setting, which this side ignored while the other two honoured it.
+  ///
+  /// Android has scaled by its device's `fontScale` since the engines were consolidated, and the Compose
+  /// renderer scales by measuring in `sp`. Here every font size went through unscaled, so the same chart
+  /// obeyed an accessibility setting on two hosts out of three — and a chart that ignores it is not
+  /// accessible, whatever its VoiceOver tree says.
+  func testTheReadersTextScaleReachesTheMeasurement() {
+    let plain = CoreTextTextEngine()
+    let larger = CoreTextTextEngine(textScale: 1.6)
+
+    let asWritten = plain.measure(text: run("17 June"), constraint: nil)
+    let scaled = larger.measure(text: run("17 June"), constraint: nil)
+
+    // Bigger by roughly the factor, and **not** by exactly it — which is the platform being right
+    // rather than this being loose. The system font is variable and optically sized, so its advances
+    // are not proportional across sizes: 1.6× the point size measured 1.50× the width here. Pinning
+    // 1.6 exactly would be pinning this machine's font version, which is the policy this file already
+    // states for text tolerances. What matters is that the *layout* grows with the setting, so the box
+    // an axis reserves grows with the glyphs that will be drawn in it.
+    XCTAssertGreaterThan(scaled.width, asWritten.width * 1.3)
+    XCTAssertLessThan(scaled.width, asWritten.width * 1.9)
+    XCTAssertGreaterThan(scaled.ascent, asWritten.ascent * 1.3)
+    XCTAssertLessThan(scaled.ascent, asWritten.ascent * 1.9)
+    XCTAssertEqual(larger.textScale, 1.6)
+    XCTAssertEqual(plain.textScale, 1, "the default is the size as written")
+  }
+
+  /// A scale of zero or below is not a chart with no text; it is a mistake, and it is ignored.
+  func testANonsensicalScaleIsIgnored() {
+    XCTAssertEqual(CoreTextTextEngine(textScale: 0).textScale, 1)
+    XCTAssertEqual(CoreTextTextEngine(textScale: -2).textScale, 1)
+  }
+
+  /// The **drawing** honours the same factor, which is the half that keeps labels in their boxes.
+  ///
+  /// Measured as ink: the same run drawn at 1 and at 2 into two bitmaps, and the larger one covers more
+  /// pixels. A scaled layout drawn unscaled is small text floating in a box reserved for bigger text —
+  /// the defect this engine exists to prevent, arriving through the seam meant to prevent it.
+  func testTheDrawingHonoursTheSameFactor() throws {
+    func inkedPixels(textScale: Double) throws -> Int {
+      let width = 200
+      let height = 60
+      let space = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+      let context = try XCTUnwrap(
+        CGContext(
+          data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+          space: space,
+          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+      context.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
+      context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+
+      let run = DrawTextRun(
+        text: "17 June",
+        origin: Point(x: 10, y: 40),
+        anchor: Point(x: 10, y: 40),
+        ascent: 11,
+        fontFamily: "sans-serif",
+        fontSize: 14,
+        fontWeight: 400,
+        italic: false,
+        angleDegrees: 0
+      )
+      CoreTextDrawing.draw(run, Brush.solid(Paint(red: 0, green: 0, blue: 0, alpha: 1)), context, textScale: textScale)
+
+      let image = try XCTUnwrap(context.makeImage())
+      let data = try XCTUnwrap(image.dataProvider?.data as Data?)
+      var inked = 0
+      for pixel in stride(from: 0, to: data.count, by: 4) where data[pixel] < 200 { inked += 1 }
+      return inked
+    }
+
+    let small = try inkedPixels(textScale: 1)
+    let large = try inkedPixels(textScale: 2)
+    XCTAssertGreaterThan(small, 0, "nothing was drawn at all")
+    XCTAssertGreaterThan(large, small * 2, "the glyphs were not drawn larger: \(large) vs \(small)")
+  }
 }

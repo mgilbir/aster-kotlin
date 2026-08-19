@@ -4399,6 +4399,43 @@ Two caveats on the number. It is a desktop JVM with the JIT warm, which is the m
 there is; and it measures compilation only, not the Canvas draw that follows. It is an order of
 magnitude, enough to rule an approach in, and not a substitute for measuring on hardware.
 
+## A host's font, and the reader's text size, on the renderers that lacked them
+
+The last two rows of the parity audit, and they are the same shape: each of the three renderers had one
+half of the text story and not the other.
+
+**A bundled font could not reach an Android chart.** `AndroidTextEngine` resolved a family name through
+`Typeface.create(family, …)`, which searches the *system's* families — so an app shipping its own face,
+which most design systems do, got the default and no diagnostic. The Compose renderer has taken a
+`fontFamilyResolver` since it got a text engine; the View now takes `fontResolver`, and
+`newCompatibleTextEngine()` carries it so a controller compiling off the main thread measures with the
+faces the view draws with. Weight and slant are applied to the **supplied** face rather than asked of
+the platform, because asking for "some bold font" is how a label arrives in a face nothing in the chart
+mentions — the same argument `CoreTextFonts` already makes for anchoring a family before its traits.
+
+**The reader's text size reached two renderers out of three.** Android has scaled by its device's
+`fontScale` since the engines were consolidated, and Compose scales by measuring in `sp`. iOS did not, so
+the same chart obeyed an accessibility setting on Android and ignored it on iPhone — and a chart that
+ignores it is not accessible, whatever its VoiceOver tree says. `CoreTextTextEngine(textScale:)` applies
+it to every metric and `CoreTextDrawing.draw(…, textScale:)` to every glyph, and `VegaChartView` reads
+the factor off the session rather than being told it separately: a scaled layout drawn unscaled is small
+text floating in a box reserved for bigger text, which is precisely the defect the CoreText engine was
+written to end.
+
+Two decisions worth keeping. The scale is **fixed for a session's lifetime**, as it is on Android, where
+a text-size change restarts the activity and rebuilds the view's engine; a host following the setting
+live builds a new session, which is what keying one on `DynamicTypeSize.chartTextScale` does. And that
+mapping is a **table** of Apple's own body-size ratios rather than `UIFontMetrics`: the latter is UIKit,
+this package draws on macOS too, and scaling a whole chart by the metrics of one text style would tie
+every label in it to that style. Nothing caps it — the accessibility sizes reach 3.1× and a chart whose
+labels are three times the size is usually not the right answer, but choosing a ceiling is a judgement
+about a particular chart, so a host passes `min(scale, 1.6)` and the engine does not decide.
+
+One finding fell out of testing it, and it is in the test: 1.6× the point size measured **1.50×** the
+width, because the system font is variable and optically sized, so its advances are not proportional
+across sizes. The assertion is a band rather than a factor, which is this repository's stated policy for
+text tolerances and here is also the platform being right.
+
 ## The Compose Multiplatform renderer had no pointer input at all
 
 The second finding of the same parity audit, and the larger one. `VegaChart` drew a scene and exposed the

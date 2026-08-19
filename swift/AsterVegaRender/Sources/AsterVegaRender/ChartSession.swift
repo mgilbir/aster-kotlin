@@ -54,8 +54,14 @@ public final class ChartSession {
   /// Creates a session.
   ///
   /// - Parameters:
-  ///   - textEngine: how text is measured. The default measures with CoreText, which is what the
-  ///     renderer draws with — the two have to agree or every label sits where a different font put it.
+  ///   - textEngine: how text is measured. Nil measures with CoreText, which is what the renderer draws
+  ///     with — the two have to agree or every label sits where a different font put it.
+  ///   - textScale: the reader's text-size factor, applied to every font size when measuring **and**
+  ///     drawing. 1 is the size as written. Android has honoured its device's `fontScale` since the
+  ///     engines were consolidated and Compose honours it through `sp`; this is that, here. Fixed for
+  ///     the session's lifetime, as it is on Android — where a text-size change recreates the view and
+  ///     its engine — so a host that follows the setting live builds a new session, which is what
+  ///     keying one on `DynamicTypeSize.chartTextScale` does.
   ///   - loader: how a specification's `url` data is fetched. Nil refuses everything, which is the
   ///     engine's own default and the right one: a specification is data, often pasted data, and a URL
   ///     in it asks this process to fetch an address the specification chose.
@@ -81,7 +87,8 @@ public final class ChartSession {
   ///     identifier; one the engine cannot resolve falls back to the device's and says so in
   ///     `timeZoneFailure` rather than crashing, since an identifier usually comes from a server.
   public init(
-    textEngine: MeasuredTextEngine = CoreTextTextEngine(),
+    textEngine: MeasuredTextEngine? = nil,
+    textScale: Double = 1,
     loader: VegaDataLoader? = nil,
     clock: (@Sendable () -> Int64)? = nil,
     locale: VegaLocale? = nil,
@@ -90,6 +97,12 @@ public final class ChartSession {
     timeZone: Foundation.TimeZone? = nil
   ) {
     let ticker = clock ?? { Int64(Date().timeIntervalSince1970 * 1000) }
+    let engine = textEngine ?? CoreTextTextEngine(textScale: textScale)
+    // Read back off the engine where it is one of ours, so a host that built its own
+    // `CoreTextTextEngine(textScale:)` and passed it gets its glyphs *drawn* at that size too. A host
+    // with an engine of its own keeps whatever it measured with, and the drawing is told 1 — its
+    // metrics are its business.
+    self.textScale = (engine as? CoreTextTextEngine)?.textScale ?? 1
     let theme = hostConfigJson.flatMap { Self.parsedConfig($0) }
     if hostConfigJson != nil, theme == nil {
       hostConfigFailure =
@@ -107,7 +120,7 @@ public final class ChartSession {
     controller = VegaChartController(
       // Kotlin's default arguments do not cross the Obj-C boundary, so each is given explicitly.
       initialScene: Scene.companion.empty(width: 0, height: 0),
-      textEngine: textEngine,
+      textEngine: engine,
       clock: { KotlinLong(value: ticker()) },
       // Every argument spelled out: a Kotlin default does not cross the Obj-C boundary, so Swift has
       // to name each one. `DenyLoader` is the engine's own default and refuses every URL, which is the
@@ -130,6 +143,12 @@ public final class ChartSession {
   /// turned into a millisecond while compiling, and a store on a different clock from the axis is a
   /// brush that starts in the wrong place.
   private let engineTimeZone: Kotlinx_datetimeTimeZone?
+
+  /// What the reader's text-size setting multiplies every font size by, as the engine measured with it.
+  ///
+  /// Read by `VegaChartView` so the drawing is scaled by the same number the layout reserved room for.
+  /// One source rather than two, which is the whole reason it is published at all.
+  public let textScale: Double
 
   /// The parsed host configuration, kept because the Vega-Lite compiler needs it as well as the
   /// runtime: a Vega-Lite `config` is merged before the specification is compiled, and a theme applied

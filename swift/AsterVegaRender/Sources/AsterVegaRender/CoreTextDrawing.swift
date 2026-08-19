@@ -24,7 +24,26 @@ public enum CoreTextDrawing {
   ///
   /// A function rather than a stored closure because Swift 6 will not have a non-`Sendable` closure as
   /// a static property, and a function reference is both concurrency-safe and shorter at the call site.
+  /// Draws a run at the size it was written at, which is the export default and the plain case.
+  ///
+  /// Kept as its own three-argument entry point so it can still be *named* where a
+  /// `(DrawTextRun, Brush?, CGContext) -> Void` is wanted — `SceneExport` passes it as a default
+  /// argument, and a defaulted fourth parameter does not satisfy that type.
   public static func draw(_ run: DrawTextRun, _ fill: Brush?, _ context: CGContext) {
+    draw(run, fill, context, textScale: 1)
+  }
+
+  /// Draws a run at the size it was **measured** at.
+  ///
+  /// `textScale` is the reader's text-size factor and must be the one `CoreTextTextEngine` measured
+  /// with: the layout reserved a box for the scaled glyphs, and painting unscaled ones inside it leaves
+  /// every label small and off its baseline. `VegaChartView` takes both from the same place.
+  public static func draw(
+    _ run: DrawTextRun,
+    _ fill: Brush?,
+    _ context: CGContext,
+    textScale: Double
+  ) {
     guard !run.text.isEmpty else { return }
 
     let colour: CGColor
@@ -46,7 +65,7 @@ public enum CoreTextDrawing {
     let attributed = NSAttributedString(
       string: run.text,
       attributes: [
-        NSAttributedString.Key(kCTFontAttributeName as String): font(for: run),
+        NSAttributedString.Key(kCTFontAttributeName as String): font(for: run, textScale: textScale),
         NSAttributedString.Key(kCTForegroundColorAttributeName as String): colour,
       ]
     )
@@ -72,10 +91,10 @@ public enum CoreTextDrawing {
     context.restoreGState()
   }
 
-  private static func font(for run: DrawTextRun) -> CTFont {
+  private static func font(for run: DrawTextRun, textScale: Double) -> CTFont {
     CoreTextFonts.font(
       family: run.fontFamily,
-      size: run.fontSize,
+      size: run.fontSize * textScale,
       weight: run.fontWeight,
       italic: run.italic
     )

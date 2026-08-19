@@ -194,7 +194,10 @@ compiled.scene?.let {
 ```
 
 A host that ships its own face passes a resolver — `rememberVegaTextEngine { FontFamily(googleSansFlex) }`
-— and both the measurement and the drawing use it.
+— and both the measurement and the drawing use it. The Android View takes the same seam as
+`VegaChartView.fontResolver`, and on iOS a registered family resolves by name; `CoreTextTextEngine` and
+`ChartSession` take a `textScale` for the reader's text-size setting, which
+`DynamicTypeSize.chartTextScale` maps for a SwiftUI host.
 
 Gestures are reported in **scene** coordinates, with the mark under them, and it is the host that
 dispatches — this renderer depends on `vega-scene` alone, so a chart that is only being looked at pays

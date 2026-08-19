@@ -201,4 +201,67 @@ class AndroidTextEngineTest {
     val second = styles.map { engine.measure(TextRun("cache", it)).width }
     assertEquals(first, second)
   }
+
+  /**
+   * A face this app ships, reaching the chart by the family name a specification asks for.
+   *
+   * Android resolves a family name against the *system's* families, so a bundled font could not be
+   * used at all: the name finds nothing, the default is substituted, and nothing says so. Asserted
+   * on a device because it is the platform's resolution that was the problem — `Typeface.create`
+   * answering with a fallback is exactly what happens on a real device and cannot be seen in a unit
+   * test.
+   */
+  @Test
+  fun aHostSuppliedFaceIsWhatMeasuresAndDraws() {
+    val monospace = android.graphics.Typeface.MONOSPACE
+    val supplied =
+      AndroidTextEngine(
+        typefaceResolver = { family -> if (family == "Design System") monospace else null }
+      )
+    val plain = AndroidTextEngine()
+    val style = TextStyle(fontFamily = "Design System", fontSize = 14.0)
+
+    // Measured with the resolver's face: a monospaced one is not the proportional default, so the
+    // advances differ. This is asserted on the **widths** rather than on the identity of the
+    // paint's
+    // typeface, because the engine applies weight and slant through `Typeface.create`, which
+    // returns a
+    // new object even at a regular weight — identity would fail while everything worked.
+    val proportional = plain.measure(TextRun("Illiterate", style)).width
+    val fixed = supplied.measure(TextRun("Illiterate", style)).width
+    assertTrue(
+      "a monospaced face measured the same as a proportional one: $fixed vs $proportional",
+      kotlin.math.abs(fixed - proportional) > 0.5,
+    )
+
+    // A name the resolver declines is still the platform's business, exactly as before.
+    assertEquals(
+      plain.measure(TextRun("Illiterate", style.copy(fontFamily = "serif"))).width,
+      supplied.measure(TextRun("Illiterate", style.copy(fontFamily = "serif"))).width,
+      0.01,
+    )
+  }
+
+  @Test
+  fun aHostSuppliedFaceKeepsItsWeightAndSlant() {
+    // A **proportional** supplied face, deliberately: a monospaced bold has the same advances as
+    // its
+    // regular by definition, so it could not show that the weight reached the measurement.
+    val serif = android.graphics.Typeface.SERIF
+    val engine = AndroidTextEngine(typefaceResolver = { serif })
+    val style = TextStyle(fontFamily = "Design System", fontSize = 14.0)
+
+    // Bold is applied to the *supplied* face rather than by asking the platform for "some bold
+    // font",
+    // which is how a label ends up in a face nothing in the chart mentions.
+    val regular = engine.paintFor(style).typeface
+    val bold = engine.paintFor(style.copy(fontWeight = 700)).typeface
+    assertTrue("a bold weight produced the same typeface object", regular !== bold || bold.isBold)
+    assertTrue("the bold face is not bold", bold.isBold)
+    assertTrue(
+      "bold is not wider",
+      engine.measure(TextRun("Illiterate", style.copy(fontWeight = 700))).width >
+        engine.measure(TextRun("Illiterate", style)).width,
+    )
+  }
 }

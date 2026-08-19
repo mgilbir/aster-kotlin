@@ -34,6 +34,8 @@ public struct VegaChartView: View {
   private let onPlaced: ((ChartPlacement) -> Void)?
   /// The language the accessibility tree's own summary sentence is written in.
   private let captions: VegaCaptions?
+  /// What every font size is multiplied by when drawing; see ``ChartSession/textScale``.
+  private let textScaleOverride: Double?
 
   /// Creates a chart view.
   ///
@@ -46,17 +48,26 @@ public struct VegaChartView: View {
   ///     accessibility overlay use the same numbers internally.
   ///   - captions: the language the accessibility tree's dense-chart summary is written in. Every other
   ///     label reaches the scene already in the chart's own language, from the compiler's locale.
+  ///   - textScale: what every font size is multiplied by when drawing. Nil takes the session's, which
+  ///     is what the layout was measured with — the two must agree or every label is painted at a
+  ///     different size from the box reserved for it. Only a view drawing a scene it compiled itself,
+  ///     with no session, needs to pass one.
   public init(
     scene: AsterVega.Scene,
     session: ChartSession? = nil,
     captions: VegaCaptions? = nil,
+    textScale: Double? = nil,
     onPlaced: ((ChartPlacement) -> Void)? = nil
   ) {
     self.scene = scene
     self.session = session
     self.captions = captions
+    self.textScaleOverride = textScale
     self.onPlaced = onPlaced
   }
+
+  /// The factor the glyphs are drawn at: the session's, or one a caller stated.
+  private var textScale: Double { textScaleOverride ?? session?.textScale ?? 1 }
 
   /// The canvas's size, remembered so a gesture can undo the same placement the drawing used.
   @State private var canvasSize: CGSize = .zero
@@ -337,7 +348,12 @@ public struct VegaChartView: View {
 
     // CoreText is lent to the renderer here. Without it a chart draws every mark and no label, which
     // is the renderer's deliberate answer to "shaping text is the platform's job".
-    var target = CoreGraphicsTarget(context: context, drawText: CoreTextDrawing.draw)
+    // The scale the *layout* was measured with, so the glyphs fill the boxes the engine reserved.
+    let scale = textScale
+    var target = CoreGraphicsTarget(
+      context: context,
+      drawText: { run, fill, ctx in CoreTextDrawing.draw(run, fill, ctx, textScale: scale) }
+    )
     SceneWalk().draw(scene: scene, into: &target)
 
     context.restoreGState()

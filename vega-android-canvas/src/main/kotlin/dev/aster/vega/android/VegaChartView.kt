@@ -57,8 +57,33 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
    * that *does* declare it keeps the old scale until it builds a new engine and recompiles, which
    * is the note on [newCompatibleTextEngine].
    */
-  private val textEngine = AndroidTextEngine(context.resources.configuration.fontScale)
-  private val renderer = AndroidCanvasSceneRenderer(textEngine)
+  private var textEngine = AndroidTextEngine(context.resources.configuration.fontScale)
+  private var renderer = AndroidCanvasSceneRenderer(textEngine)
+
+  /**
+   * A face this app ships, by the family name a specification asks for; null leaves it to Android.
+   *
+   * Android resolves a family name against the *system's* families, so a bundled font — which most
+   * design systems ship — could not reach a chart at all: the name finds nothing and the default is
+   * used, silently. The Compose renderer has taken a resolver for this since it got a text engine;
+   * this is the same seam, and until now the same specification drew in the app's face on one
+   * renderer and not the other.
+   *
+   * Set it **before** the first compile. Text metrics are decided when a specification is compiled,
+   * so a chart already on screen was measured with whatever this was then; setting it rebuilds this
+   * view's engine and repaints, and a host that changes it afterwards recompiles.
+   * [newCompatibleTextEngine] carries it, so a controller compiling off the main thread measures
+   * with the same faces this view draws with.
+   */
+  public var fontResolver: ((String) -> android.graphics.Typeface?)? = null
+    set(value) {
+      if (field === value) return
+      field = value
+      textEngine = newCompatibleTextEngine()
+      renderer = AndroidCanvasSceneRenderer(textEngine)
+      invalidate()
+    }
+
   private val viewport = RectF()
 
   /** Revision last drawn; `invalidate()` is only called when this falls behind. */
@@ -118,11 +143,16 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
    * side locking. Two *threads* sharing one engine is what is not safe.
    */
   public fun newCompatibleTextEngine(): AndroidTextEngine =
-    // The **same font scale**, or the claim above is false: an engine measuring at 1 while this
-    // view
-    // draws at 1.3 lays every label out in a box that is too small, which is the defect the scale
-    // exists to avoid, arriving through the seam meant to prevent it.
-    AndroidTextEngine(context.resources.configuration.fontScale)
+    // The **same font scale and the same faces**, or the claim above is false: an engine measuring
+    // at
+    // 1 while this view draws at 1.3 lays every label out in a box that is too small, and one
+    // resolving a family the platform's way while this view draws the app's own face measures the
+    // wrong advances. Both are the defect the seams exist to avoid, arriving through the seam meant
+    // to prevent it.
+    AndroidTextEngine(
+      context.resources.configuration.fontScale,
+      fontResolver ?: { null },
+    )
 
   init {
     isFocusable = true
