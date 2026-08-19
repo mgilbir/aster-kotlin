@@ -385,6 +385,37 @@ public struct VegaChartView: View {
   }
 }
 
+/// A tooltip to show, and where to put it.
+///
+/// Rows as well as text, because a design system will want its own layout — a two-column bubble, a
+/// header and a value, a card — and the engine has no business choosing one. The `anchor` is in the
+/// chart view's own coordinate space, so positioning is `.position(x:y:)` and nothing else.
+public struct ChartTooltip: Sendable, Equatable {
+
+  /// One line: what the field is called, and what it says. An unlabelled row is a bare value.
+  public struct Row: Sendable, Equatable {
+    public let label: String
+    public let value: String
+
+    public init(label: String, value: String) {
+      self.label = label
+      self.value = value
+    }
+  }
+
+  public let rows: [Row]
+  /// Every row as one string, `label: value` a line at a time — for a host with no opinion.
+  public let text: String
+  /// Where the touch was, in this view's pixels. Nil for a tooltip that arrived without one.
+  public let anchor: CGPoint?
+
+  public init(rows: [Row], text: String, anchor: CGPoint?) {
+    self.rows = rows
+    self.text = text
+    self.anchor = anchor
+  }
+}
+
 /// The pan and zoom a chart is drawn through, as a controller accumulated them.
 ///
 /// The offset is in **pixels** and the scale is a factor, which is exactly how

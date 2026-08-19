@@ -113,6 +113,76 @@ final class ChartSessionTests: XCTestCase {
     XCTAssertEqual(session.lastTouch, .tooltip("a"))
   }
 
+  /// A tooltip as **lines**, which is what a host can put in a bubble.
+  ///
+  /// The value was always reported and every host had to work out what to do with it; this session's
+  /// answer was to stringify it and compare against the literal `"{}"` to tell an empty tooltip from a
+  /// real one. The engine formats it now, in the chart's own locale, and the anchor comes back in this
+  /// view's own pixels so positioning needs no conversion.
+  func testATooltipArrivesAsRowsAndAnAnchor() async {
+    let session = await loaded()
+    let scene = try! XCTUnwrap(session.scene)
+    session.place(
+      contentScale: 1,
+      viewport: Rect(x: 0, y: 0, width: scene.width, height: scene.height)
+    )
+
+    XCTAssertNil(session.tooltip, "nothing is under the pointer yet")
+
+    session.tap(at: Point(x: 50, y: 90))
+    await session.settle()
+
+    let tooltip = try! XCTUnwrap(session.tooltip, "a tap on the bar produced no tooltip")
+    // This specification's tooltip channel is `datum.c`, a bare value — so one unlabelled row, and the
+    // text is exactly the value rather than something with a colon invented in front of it.
+    XCTAssertEqual(tooltip.rows, [ChartTooltip.Row(label: "", value: "a")])
+    XCTAssertEqual(tooltip.text, "a")
+    XCTAssertEqual(tooltip.anchor, CGPoint(x: 50, y: 90), "the anchor is where the finger was")
+
+    // And a tap on nothing clears it, rather than leaving a bubble over an empty chart.
+    session.tap(at: Point(x: 50, y: 5))
+    await session.settle()
+    XCTAssertNil(session.tooltip)
+  }
+
+  /// A row-valued tooltip, which is what `"tooltip": true` compiles to and what an app will meet.
+  func testARowTooltipBecomesOneLinePerField() async {
+    let session = ChartSession()
+    session.load(
+      specification: """
+        {"$schema": "https://vega.github.io/schema/vega/v6.json",
+         "width": 200, "height": 100, "padding": 0,
+         "data": [{"name": "t", "values": [{"c": "Total", "v": 18}]}],
+         "scales": [
+           {"name": "x", "type": "band", "domain": {"data": "t", "field": "c"}, "range": "width"},
+           {"name": "y", "type": "linear", "domain": [0, 27], "range": "height"}],
+         "marks": [{"type": "rect", "from": {"data": "t"}, "encode": {"enter": {
+           "x": {"scale": "x", "field": "c"}, "width": {"scale": "x", "band": 1},
+           "y": {"scale": "y", "field": "v"}, "y2": {"scale": "y", "value": 0},
+           "tooltip": {"signal": "datum"}}}}]}
+        """
+    )
+    await session.settle()
+    let scene = try! XCTUnwrap(session.scene, session.failure ?? "no scene")
+    session.place(
+      contentScale: 1,
+      viewport: Rect(x: 0, y: 0, width: scene.width, height: scene.height)
+    )
+
+    session.tap(at: Point(x: 100, y: 60))
+    await session.settle()
+
+    let tooltip = try! XCTUnwrap(session.tooltip)
+    XCTAssertEqual(
+      tooltip.rows,
+      [
+        ChartTooltip.Row(label: "c", value: "Total"),
+        ChartTooltip.Row(label: "v", value: "18"),
+      ]
+    )
+    XCTAssertEqual(tooltip.text, "c: Total\nv: 18")
+  }
+
   /// A pan that the chart actually follows — which it did not, on this renderer or on Compose.
   ///
   /// `VegaChartController` owns the viewport: it accumulates a pan into `viewportOffset`, multiplies a

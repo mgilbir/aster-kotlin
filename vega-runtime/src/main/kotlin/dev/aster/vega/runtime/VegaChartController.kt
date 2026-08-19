@@ -909,6 +909,22 @@ public class VegaChartController(
     if (event.phase == GesturePhase.ENDED) emit(ChartEvent.ViewportChanged(visibleViewport(zoomed)))
   }
 
+  /**
+   * The tooltip under the pointer, as lines a host can show, or null where there is nothing to
+   * show.
+   *
+   * The value itself is in `snapshot.interactionState.tooltip`, and every host reported it and then
+   * had to work out what to do with it. This is that step, done once and in the chart's own
+   * **locale**, so a number in a tooltip is written the way the number on the axis beside it is
+   * written. Null covers the case that used to trip hosts up as well as the obvious one: a mark
+   * with no `tooltip` channel produces an *empty object*, which is not a tooltip.
+   *
+   * `interactionState.tooltipAnchor` is where to put it — the point the host dispatched, in its own
+   * pixels, so no conversion is needed on the way back.
+   */
+  public val tooltipContent: TooltipContent?
+    get() = TooltipContent.of(snapshot.interactionState.tooltip, locale, timeZone)
+
   public fun resetViewport() {
     publishInteraction(
       _state.value.snapshot.interactionState.copy(

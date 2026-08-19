@@ -253,6 +253,39 @@ VegaChart(
 
 `VegaChartView` on iOS reads the viewport off its session, so there is nothing to pass there.
 
+## Tooltips
+
+A specification's `"tooltip": true` reaches the host as a **value**, and no renderer draws a bubble: what
+a bubble looks like is a design-system decision. What the engine does own is the step in between —
+turning that value into lines a host can show:
+
+```kotlin
+// Kotlin, any renderer.
+val tooltip = controller.tooltipContent            // null when there is nothing under the pointer
+tooltip?.rows                                       // [("Question", "Total score"), ("Value", "18")]
+tooltip?.text                                       // "Question: Total score\nValue: 18"
+controller.snapshot.interactionState.tooltipAnchor  // where to put it, in the pixels you dispatched
+```
+
+```swift
+// Swift: the same thing, published on the session.
+if let tooltip = session.tooltip {
+    TooltipBubble(rows: tooltip.rows).position(tooltip.anchor ?? .zero)
+}
+```
+
+Three details that are easy to get wrong and are handled here:
+
+- a mark with **no** tooltip channel produces an *empty object*, which is not a tooltip — treating it as
+  one puts an empty bubble on every mark;
+- a number is formatted with the chart's own locale, the way the axis beside it is, so a tooltip and a
+  tick label never disagree in front of a reader;
+- an instant is written with the locale's own date-and-time format rather than a hardcoded one.
+
+`TooltipContent` reproduces `vega-tooltip`'s *shape* — an object becomes a row per field, in order,
+anything else becomes one value — and does not claim byte-fidelity with its HTML, which this repository
+does not pin and therefore cannot verify differentially.
+
 ## Diagnostics: what to do with one
 
 A specification that compiles is not the same as a specification that compiled *cleanly*, and an

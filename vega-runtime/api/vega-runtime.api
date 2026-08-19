@@ -444,6 +444,38 @@ public final class dev/aster/vega/runtime/SignalInput$Companion {
 	public final fun resolve (Ldev/aster/vega/model/spec/SignalBind;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/spec/SignalBind;
 }
 
+public final class dev/aster/vega/runtime/TooltipContent {
+	public static final field Companion Ldev/aster/vega/runtime/TooltipContent$Companion;
+	public fun <init> (Ljava/util/List;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/util/List;Ljava/lang/String;)Ldev/aster/vega/runtime/TooltipContent;
+	public static synthetic fun copy$default (Ldev/aster/vega/runtime/TooltipContent;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/runtime/TooltipContent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRows ()Ljava/util/List;
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/runtime/TooltipContent$Companion {
+	public final fun of (Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/locale/VegaLocale;Lkotlinx/datetime/TimeZone;)Ldev/aster/vega/runtime/TooltipContent;
+	public static synthetic fun of$default (Ldev/aster/vega/runtime/TooltipContent$Companion;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/locale/VegaLocale;Lkotlinx/datetime/TimeZone;ILjava/lang/Object;)Ldev/aster/vega/runtime/TooltipContent;
+}
+
+public final class dev/aster/vega/runtime/TooltipRow {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Ldev/aster/vega/runtime/TooltipRow;
+	public static synthetic fun copy$default (Ldev/aster/vega/runtime/TooltipRow;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/runtime/TooltipRow;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class dev/aster/vega/runtime/VegaChartController {
 	public static final field Companion Ldev/aster/vega/runtime/VegaChartController$Companion;
 	public static final field MAX_ZOOM D
@@ -462,6 +494,7 @@ public final class dev/aster/vega/runtime/VegaChartController {
 	public final fun getLastCompiled ()Ldev/aster/vega/runtime/compile/CompiledSpec;
 	public final fun getSnapshot ()Ldev/aster/vega/runtime/ChartSnapshot;
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getTooltipContent ()Ldev/aster/vega/runtime/TooltipContent;
 	public final fun report (Ldev/aster/vega/model/VegaDiagnostic;)V
 	public final fun resetViewport ()V
 	public final fun setContainerSize (Ldev/aster/vega/scene/SizeD;)V

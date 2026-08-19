@@ -144,6 +144,18 @@ public final class ChartSession {
   /// brush that starts in the wrong place.
   private let engineTimeZone: Kotlinx_datetimeTimeZone?
 
+  /// What to show in a tooltip, and where — nil when there is nothing under the pointer.
+  ///
+  /// The engine turns the dataflow's tooltip value into lines in the chart's own locale, so a number in
+  /// a bubble is written the way the number on the axis beside it is. The **anchor** is in this view's
+  /// own pixels, being the point that was dispatched, so a host positions a bubble without converting
+  /// anything.
+  ///
+  /// No renderer draws one, deliberately: a bubble is a design-system decision. What was missing was
+  /// this step, and its absence showed here — the session used to tell an empty tooltip from a real one
+  /// by stringifying the value and comparing it against `"{}"`.
+  public private(set) var tooltip: ChartTooltip?
+
   /// The pan and zoom the controller has accumulated, in the units it accumulates them in.
   ///
   /// A **drawing** input: `VegaChartView` composes it onto the fit so that the chart, the touch target
@@ -413,6 +425,18 @@ public final class ChartSession {
     // The pan and the zoom, read back so the **drawing** can apply them. Published rather than left in
     // the controller because `VegaChartView` has to see them change: without this a pan updated the
     // controller's state, `canReset` became true, and the chart stayed exactly where it was.
+    // The tooltip as **lines**, from the engine, in the chart's own locale — replacing the check this
+    // file used to make against the literal `"{}"`. See `TooltipContent`.
+    if let content = controller.tooltipContent {
+      let anchor = controller.snapshot.interactionState.tooltipAnchor
+      tooltip = ChartTooltip(
+        rows: content.rows.map { ChartTooltip.Row(label: $0.label, value: $0.value) },
+        text: content.text,
+        anchor: anchor.map { CGPoint(x: $0.x, y: $0.y) }
+      )
+    } else {
+      tooltip = nil
+    }
     let state = controller.snapshot.interactionState
     viewport = ChartViewport(
       offsetX: state.viewportOffset.dx,
@@ -616,12 +640,12 @@ public final class ChartSession {
     let selection = state.selection
 
     // A tooltip only counts if it has something in it. A mark with no `tooltip` channel still gets an
-    // empty object here, and preferring that over the selection reported a touch as `tooltip:` with
-    // nothing after it — which looked like a broken tooltip rather than a working tap.
-    let tooltip = state.tooltip.map { ForeignSignals.shared.text(value: $0) } ?? ""
-    let described = tooltip.trimmingCharacters(in: .whitespacesAndNewlines)
+    // **empty object** here, and preferring that over the selection reported a touch as `tooltip:` with
+    // nothing after it — which looked like a broken tooltip rather than a working tap. That rule is the
+    // engine's now, in `TooltipContent.of`, rather than a comparison against `"{}"` made here.
+    let described = tooltip?.text ?? ""
 
-    if !described.isEmpty, described != "{}" {
+    if !described.isEmpty {
       lastTouch = .tooltip(described)
     } else if !selection.isEmpty {
       // `nodeIds` counts the marks the hit test found. `datumIds` is empty unless the data carries an

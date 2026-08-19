@@ -4399,6 +4399,36 @@ Two caveats on the number. It is a desktop JVM with the JIT warm, which is the m
 there is; and it measures compilation only, not the Canvas draw that follows. It is an order of
 magnitude, enough to rule an approach in, and not a substitute for measuring on hardware.
 
+## A tooltip nobody could show
+
+The second of the two notes, and it was half true. No renderer draws a bubble and none should: what a
+bubble looks like belongs to a design system. But the step in between — turning the dataflow's tooltip
+*value* into lines — belonged here and was missing, so every host improvised it. The improvisation on
+iOS was the tell: `ChartSession` stringified the value and compared it against the literal `"{}"` to
+tell an empty tooltip from a real one, because a mark with **no** tooltip channel still gets an empty
+object and treating that as a tooltip puts an empty bubble on every mark in the chart.
+
+`TooltipContent` is that step: rows of label and value, plus a plain-text rendering for a host with no
+opinion, from `VegaChartController.tooltipContent` in Kotlin and `ChartSession.tooltip` in Swift, with
+`interactionState.tooltipAnchor` — the point the host itself dispatched, in its own pixels — saying
+where to put it.
+
+Two formatting decisions, and both are about a chart not disagreeing with itself. A **number** goes
+through the same `formatTickLabel` an axis label goes through, so a tooltip saying `1.234,5` sits under
+an axis that says `1.234,5` rather than under one that says `1,234.5`. An **instant** takes the locale's
+own `dateTime` format, which for d3's `en-US` is `%x, %X` — so the default output is upstream's wording
+and not something chosen here.
+
+What is deliberately *not* claimed: fidelity with `vega-tooltip`'s HTML. That package is not among the
+ones this repository pins, so nothing here is differentially verified against it, and the KDoc says so
+in those words. What is reproduced is its **shape** — an object becomes a row per field in order,
+anything else becomes a single value — which is the part a reader sees.
+
+One number rule worth keeping: the places come from `String(x)`, the shortest form that identifies a
+double, capped at six. Past the cap the value is *rounded* and asked again rather than formatted at the
+cap, because formatting at the cap pads — `0.1 + 0.2` came out as `0.300000` where a reader would have
+written `0.3`.
+
 ## A pan that moved the state and not the chart
 
 Asked whether the two remaining "not at parity" notes could be closed, the first turned out not to be a
