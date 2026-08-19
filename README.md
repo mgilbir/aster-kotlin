@@ -739,7 +739,7 @@ with no native variants at all, and a version on Central cannot be replaced.
 Every published module carries a committed ABI dump under `api/` — `.api` for the JVM surface and
 `.klib.api` for the native one an iOS consumer links against. `./scripts/check.sh` compares them, so a
 change to what other people compile against shows up in this repository's diff rather than in their
-build. `./gradlew updateLegacyAbi` rewrites the dumps; review that diff as an API change.
+build. `./gradlew updateKotlinAbi` rewrites the dumps; review that diff as an API change.
 
 `vega-compose` and `vega-android-canvas` are the two modules **not** covered, and the reason is a
 tooling gap rather than a decision: since AGP 9 their Kotlin support comes from the Android plugin's own

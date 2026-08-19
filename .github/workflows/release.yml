@@ -109,10 +109,32 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - name: Set up node
+        # The recorder below is a Node script that reads the pinned packages and clones upstream's own
+        # test files. Pinned here as in the verify job rather than taken from whatever the runner image
+        # ships, because what it records is the reference the JVM replays against.
+        uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
 
+      - name: Record upstream's test vectors
+        # **The gate needs its inputs on this host too.** `build` below runs every test, and the
+        # replay guards assert the harness has not shrunk — `replayed >= 60` — so without the vectors
+        # they *fail* rather than skip. The verify job records them on its own runner and this one is
+        # a different machine with a fresh clone, which is exactly how the 0.1.0 attempt died: sixteen
+        # minutes of green compiles and then `UpstreamTransformVectorsTest`, on the one host where
+        # nothing had recorded them. CI does this on both hosts for the same reason.
+        run: ./scripts/record-upstream-vectors.sh
+
       - name: Build every target
+        # The Vega-Lite *scene* references are deliberately not rendered here. Their gate answers a
+        # missing reference with an assumption rather than a failure, so it skips quietly; the verify
+        # job has already run that comparison in full on Linux, and re-rendering sixteen megabytes on
+        # a macOS runner would buy nothing but minutes. This job exists to compile the Apple targets —
+        # the only host that can — and to publish.
         run: ./gradlew build --stacktrace
 
       - name: Check every declared target is in the module metadata
