@@ -5648,6 +5648,28 @@ around it would only record the disagreement" — was **wrong**, and expensively
 disagreement is precisely what a differential fixture is for: it fails, it names the gap, and it
 passes when the gap closes. Every example taken up since has followed that route.
 
+### A warning printed above the code that answers it
+
+`tickCount` takes a number, a signal **or a time interval**, and the interval has two spellings —
+`"day"` and `{"interval": "day", "step": 20}`, which are `nice`'s. The parser read the field twice.
+Once through `numberOrSignal`, which sees a string or an object it can make no number of and warns
+`PARSE_UNKNOWN_PROPERTY`; and then again, correctly, into `tickInterval` and `tickStep`, in the lines
+directly below. So a document was laid out exactly as it asked and complained about at the same
+time. Measured on a device: one warning per axis, four on one page, every one of them false.
+
+That is worse than an unhelpful message. A host that routes diagnostics by severity — and README.md
+tells one to — cannot tell a false warning from a property the engine really did drop, so the whole
+channel is worth less. Both guides had the pair; the scale parser's `nice` never did, which is where
+the two spellings came from in the first place.
+
+One reading now, `VegaValue.Obj.tickCount`, and the warning moved to where a reading really does
+fail. Two cases used to fall through to a count in **silence**, which is the opposite failure and the
+more expensive one — the specification asked for tick marks on calendar boundaries and got whatever
+round number the algorithm liked. An interval that is not a calendar unit (`TimeInterval.forUnit`
+answers null) is one; an interval named by a signal is the other, and that one is a real gap rather
+than a typo, since tick intervals are resolved while the axis is built and no signal is available
+there yet.
+
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
 PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.

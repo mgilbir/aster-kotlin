@@ -355,4 +355,76 @@ class UnhandledPropertiesTest {
         .map { it.message },
     )
   }
+
+  /**
+   * An interval tick count is read, and warned about by nothing.
+   *
+   * `tickCount` used to be read **twice**: once through `numberOrSignal`, which sees a string or an
+   * `{"interval": …}` object and has nothing to make a number of, so it warned; and then again,
+   * correctly, into `tickInterval` and `tickStep`. So a document was laid out exactly right and
+   * complained about at the same time. Measured on a device, every chart carrying an interval tick
+   * count produced one warning per axis, four on one page, all false — and a false warning is worse
+   * than no warning, because it is indistinguishable from a property the engine really did drop.
+   *
+   * The four spellings are asserted together deliberately: the two interval forms have to stay
+   * silent and the number and the signal have to keep reaching `tickCount`, which is the reading
+   * the interval branch could have eaten.
+   */
+  @Test
+  fun `an interval tick count is read without a diagnostic`() {
+    val json =
+      spec(
+        """"scales": [{"name": "t", "type": "time",
+             "domain": [{"signal": "datetime(2026, 0, 1)"}, {"signal": "datetime(2026, 11, 1)"}],
+             "range": "width"},
+            {"name": "s", "type": "linear", "domain": [0, 1], "range": "width"}],
+           "axes": [{"scale": "t", "orient": "bottom", "tickCount": {"interval": "day", "step": 20}},
+            {"scale": "t", "orient": "top", "tickCount": "month"},
+            {"scale": "s", "orient": "left", "tickCount": 5},
+            {"scale": "s", "orient": "right", "tickCount": {"signal": "3"}}],
+           "legends": [{"fill": "t", "tickCount": {"interval": "month"}}]"""
+      )
+    assertEquals(emptyList<String>(), ignored(json).sorted())
+
+    val axes = SpecParser().parseJson(json).spec!!.axes
+    assertEquals("day", axes[0].tickInterval)
+    assertEquals(20, axes[0].tickStep)
+    assertEquals("month", axes[1].tickInterval)
+    assertEquals(null, axes[1].tickStep)
+    // The number and the signal still land on `tickCount`, and neither is mistaken for an interval.
+    assertEquals(NumberValue.Constant(5.0), axes[2].tickCount)
+    assertEquals(NumberValue.Signal("3"), axes[3].tickCount)
+    assertEquals(null, axes[2].tickInterval)
+    assertEquals(null, axes[3].tickInterval)
+    assertEquals("month", SpecParser().parseJson(json).spec!!.legends.single().tickInterval)
+  }
+
+  /**
+   * The warning moves to where a reading really does fail.
+   *
+   * Both of these used to fall through to a count **in silence**, which is the opposite failure
+   * from the one above and the more expensive one: the specification asked for tick marks on
+   * calendar boundaries and got whatever round number the algorithm liked. `"fortnight"` is not a
+   * unit `TimeInterval.forUnit` knows, and an interval named by a signal cannot be resolved at the
+   * point the axis is built.
+   */
+  @Test
+  fun `a tick interval nothing can read is reported`() {
+    val reported =
+      diagnostics(
+          spec(
+            """"signals": [{"name": "grain", "value": "day"}],
+               "scales": [{"name": "t", "type": "time",
+                 "domain": [{"signal": "datetime(2026, 0, 1)"}, {"signal": "now()"}],
+                 "range": "width"}],
+               "axes": [{"scale": "t", "orient": "bottom", "tickCount": "fortnight"},
+                {"scale": "t", "orient": "top", "tickCount": {"interval": {"signal": "grain"}}}]"""
+          )
+        )
+        .filter { it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY }
+        .map { it.message }
+    assertEquals(2, reported.size, reported.toString())
+    assertTrue(reported.any { "'fortnight'" in it }, reported.toString())
+    assertTrue(reported.any { "supplied by a signal" in it }, reported.toString())
+  }
 }

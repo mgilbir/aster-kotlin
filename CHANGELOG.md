@@ -18,6 +18,15 @@ section here does not get released.
   and `checkBytecodeLevel` asserts it against the class files themselves rather
   than against the configuration that was wrong. (#68)
 
+- **`tickCount` in its interval form is no longer warned about.** The field was
+  read twice — once as a number, which warned `PARSE_UNKNOWN_PROPERTY` for
+  `"day"` or `{"interval": "day", "step": 20}`, and then again, correctly, as an
+  interval. A chart was laid out exactly as it asked and complained about at the
+  same time: one warning per axis, four on a page, all false. The warning now
+  fires only where a reading really fails — an interval that is not a calendar
+  unit, or one named by a signal, both of which used to fall through to a
+  chosen count in silence. (#69)
+
 ## 0.1.0
 
 First release.

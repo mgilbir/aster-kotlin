@@ -8,6 +8,7 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asBoolean
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.time.TimeInterval
 
 /**
  * The aggregate operations a domain over several fields may be sorted by.
@@ -2143,6 +2144,8 @@ public class SpecParser {
           null
         }
 
+    val tickCount = obj.tickCount("$path.tickCount")
+
     return AxisSpec(
       scale = scale,
       orient = orient,
@@ -2156,23 +2159,12 @@ public class SpecParser {
       ticks = obj.fields["ticks"]?.asBoolean() ?: true,
       labels = obj.fields["labels"]?.asBoolean() ?: true,
       domainLine = obj.fields["domain"]?.asBoolean() ?: true,
-      tickCount = obj.numberOrSignal("tickCount", "$path.tickCount"),
+      tickCount = tickCount.count,
       tickMinStep = obj.numberOrSignal("tickMinStep", "$path.tickMinStep"),
-      // `tickCount` also takes a time interval, in the same two spellings `nice` does. Read here
-      // rather than through `numberOrSignal`, which sees a string or an object and has nothing to
-      // make a number of — so the interval form was dropped in silence and the axis fell back to a
-      // count, labelling a night at whatever round number the algorithm liked.
-      tickInterval =
-        when (val count = obj.fields["tickCount"]) {
-          is VegaValue.Str -> count.value.lowercase()
-          is VegaValue.Obj -> count.fields["interval"]?.asString()?.lowercase()
-          else -> null
-        },
-      tickStep =
-        ((obj.fields["tickCount"] as? VegaValue.Obj)?.fields?.get("step") as? VegaValue.Num)
-          ?.value
-          ?.toInt()
-          ?.takeIf { it >= 1 },
+      // `tickCount` also takes a time interval, in the same two spellings `nice` does; see
+      // `VegaValue.Obj.tickCount`, which is the *one* reading of the field.
+      tickInterval = tickCount.interval,
+      tickStep = tickCount.step,
       tickSize = obj.numberOrSignal("tickSize", "$path.tickSize"),
       labelPadding = obj.numberOrSignal("labelPadding", "$path.labelPadding"),
       labelFontSize = obj.numberOrSignal("labelFontSize", "$path.labelFontSize"),
@@ -2725,6 +2717,8 @@ public class SpecParser {
       GuideConfig.merge(own, config.legendDefaults())
         .withGuideEncode(legendEncodeParts(own), "Legend", path)
 
+    val tickCount = obj.tickCount("$path.tickCount")
+
     val spec =
       LegendSpec(
         fill = obj.fields["fill"]?.asString(),
@@ -2753,23 +2747,11 @@ public class SpecParser {
         format = obj.fields["format"]?.takeIf { it is VegaValue.Str }?.asString(),
         formatExpression =
           (obj.fields["format"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
-        tickCount = obj.numberOrSignal("tickCount", "$path.tickCount"),
-        // `tickCount` also takes a time interval, in the same two spellings `nice` does. Read here
-        // rather than through `numberOrSignal`, which sees a string or an object and has nothing to
-        // make a number of — so the interval form was dropped in silence and the axis fell back to
-        // a
-        // count, labelling a night at whatever round number the algorithm liked.
-        tickInterval =
-          when (val count = obj.fields["tickCount"]) {
-            is VegaValue.Str -> count.value.lowercase()
-            is VegaValue.Obj -> count.fields["interval"]?.asString()?.lowercase()
-            else -> null
-          },
-        tickStep =
-          ((obj.fields["tickCount"] as? VegaValue.Obj)?.fields?.get("step") as? VegaValue.Num)
-            ?.value
-            ?.toInt()
-            ?.takeIf { it >= 1 },
+        tickCount = tickCount.count,
+        // `tickCount` also takes a time interval, in the same two spellings `nice` does; see
+        // `VegaValue.Obj.tickCount`, which is the *one* reading of the field.
+        tickInterval = tickCount.interval,
+        tickStep = tickCount.step,
         offset = obj.numberOrSignal("offset", "$path.offset"),
         padding = obj.numberOrSignal("padding", "$path.padding"),
         titlePadding = obj.numberOrSignal("titlePadding", "$path.titlePadding"),
@@ -3431,6 +3413,80 @@ public class SpecParser {
     return array.values.mapIndexedNotNull { index, item ->
       parse(item, "$ownerPath.$key[$index]")
     }
+  }
+
+  /**
+   * `tickCount`, read as a number, a signal **or a time interval** — whichever it is.
+   *
+   * One reading, not two. This field used to be read twice: once through [numberOrSignal], which
+   * sees a string or an `{"interval": …}` object and has nothing to make a number of, so it warned
+   * `PARSE_UNKNOWN_PROPERTY`; and then again, correctly, into `tickInterval` and `tickStep`. So a
+   * document carrying `"tickCount": {"interval": "day", "step": 20}` was laid out exactly right and
+   * warned about at the same time. Measured on a device: one warning per axis, four on one page,
+   * every one of them false — and a host that routes diagnostics by severity cannot tell that from
+   * a property the engine really did drop.
+   *
+   * The two interval spellings are `nice`'s, which is upstream's own choice and not a coincidence:
+   * `"day"`, and `{"interval": "day", "step": 20}`.
+   *
+   * The warning moves to where a reading really does fail — a name that is not a calendar unit, or
+   * an interval named by a signal, which cannot be resolved at parse time. Both of those used to
+   * fall through to a count in silence, which is the opposite of the case above: the specification
+   * asked for boundaries and got whatever round number the algorithm liked.
+   */
+  private class TickCount(
+    val count: NumberValue?,
+    val interval: String?,
+    val step: Int?,
+  ) {
+    companion object {
+      val Absent = TickCount(null, null, null)
+    }
+  }
+
+  private fun VegaValue.Obj.tickCount(path: String): TickCount {
+    val value = fields["tickCount"] ?: return TickCount.Absent
+    val named: VegaValue
+    val step: Int?
+    when (value) {
+      is VegaValue.Str -> {
+        named = value
+        step = null
+      }
+      is VegaValue.Obj -> {
+        // A signal reference and a scaled value are numbers as far as this field is concerned, and
+        // `numberOrSignal` is what reads both. Only an `interval` key makes it a calendar unit.
+        val interval =
+          value.fields["interval"]
+            ?: return TickCount(numberOrSignal("tickCount", path), null, null)
+        named = interval
+        step = (value.fields["step"] as? VegaValue.Num)?.value?.toInt()?.takeIf { it >= 1 }
+      }
+      else -> return TickCount(numberOrSignal("tickCount", path), null, null)
+    }
+    if (named !is VegaValue.Str) {
+      // Upstream's schema allows a signal here. This engine resolves tick intervals while it builds
+      // the axis, before signals are available to it, so it cannot honour that form — and says so
+      // rather than quietly labelling the axis at some other granularity.
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "'tickCount' takes a number, a signal, or a time interval named by a string; an interval " +
+          "supplied by a signal is not supported, so the tick count was chosen by the axis",
+        jsonPath = path,
+      )
+      return TickCount.Absent
+    }
+    val unit = named.value.lowercase()
+    if (TimeInterval.forUnit(unit) == null) {
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "'tickCount' names the time interval '${named.value}', which is not a calendar unit, so " +
+          "the tick count was chosen by the axis",
+        jsonPath = path,
+      )
+      return TickCount.Absent
+    }
+    return TickCount(null, unit, step)
   }
 
   private fun <T> unexpected(what: String, path: String): T? {
