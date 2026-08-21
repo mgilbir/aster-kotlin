@@ -7,6 +7,12 @@
 # symbol — fails here rather than in a consumer's build. `./gradlew updateKotlinAbi` rewrites them, and
 # that diff is reviewed as a change to what other people compile against.
 #
+# `checkBytecodeLevel` reads the class files themselves, because the configuration cannot be trusted to
+# describe them: 0.1.0 shipped its jars at Java 17 and its Android AAR at Java 21, since the pin named a
+# Kotlin target *type* and the AGP Kotlin Multiplatform Android target is not one. A consumer who reads
+# the jars and pins 17 is then fine until an Android compilation resolves the AAR. One release, one
+# level, asserted against the bytes.
+#
 # The four native compiles are what turned "the core is portable" from a claim into a fact. They cost
 # well under a minute incrementally and they earn it: a JVM-only API in common code fails *here* and
 # nowhere else — a grep for `java.` never saw a `LinkedHashMap` subclassed for its access-order mode,
@@ -53,6 +59,7 @@ fi
 ./gradlew --continue \
   spotlessCheck \
   checkKotlinAbi \
+  checkBytecodeLevel \
   test \
   compileKotlinLinuxX64 \
   "${host_tasks[@]}" \

@@ -4,6 +4,20 @@ Notable changes, newest first. The release workflow reads the section for the
 version it is publishing and uses it as the release notes, so a version without a
 section here does not get released.
 
+## Unreleased
+
+### Fixed
+
+- **One bytecode level per release.** 0.1.0 published its jars at Java 17 and
+  `vega-compose-multiplatform`'s Android AAR at Java 21, because the pin named a
+  Kotlin target *type* and the AGP Kotlin Multiplatform Android target is not one
+  of those — so the AAR took the level of whichever JDK cut the release. A
+  Robolectric test on a JDK 17 runtime, in a build that resolves the Android
+  variant, died with `UnsupportedClassVersionError` at the first composable it
+  reached. The level is now pinned per compile *task*, so no target can escape it,
+  and `checkBytecodeLevel` asserts it against the class files themselves rather
+  than against the configuration that was wrong. (#68)
+
 ## 0.1.0
 
 First release.

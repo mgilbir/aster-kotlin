@@ -7,7 +7,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
-import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 /**
  * Modules that are libraries someone consumes, and so publish and carry an ABI dump.
@@ -71,6 +71,94 @@ fun KotlinMultiplatformExtension.enableAbiDump() {
 fun KotlinJvmProjectExtension.enableAbiDump() {
   abiValidation()
 }
+
+/**
+ * The bytecode level every publishable module is compiled to, and the class file major it produces.
+ *
+ * One constant for the two, because the pair is the whole point: `JVM_17` is what the compilers are
+ * told and 61 is what a consumer's `javap` reads back, and a release whose artifacts disagree about
+ * it is a release with two toolchain requirements in it. See `checkBytecodeLevel`.
+ */
+val PUBLISHED_JVM_TARGET = JvmTarget.JVM_17
+val PUBLISHED_CLASS_FILE_MAJOR = 61
+
+/**
+ * Asserts that every class file a publishable module compiles is at [PUBLISHED_CLASS_FILE_MAJOR].
+ *
+ * The pin itself is one line per plugin below; this is what makes it *checkable*. Version 0.1.0
+ * shipped its jars at 61 and its Android AAR at 65 because the pin named a Kotlin **target type**
+ * and the AGP Kotlin Multiplatform Android target is not one of those, so the AAR silently took the
+ * level of whichever JDK cut the release. Nothing in the build said so and nothing could: the level
+ * a consumer must reach was a property of the release machine.
+ *
+ * So the level is asserted against the bytes rather than against the configuration. Reading the
+ * class files is the only check that cannot be fooled by a target nobody enumerated — which is the
+ * exact failure this replaces.
+ *
+ * [directories] must not be empty and each one must contain a class, so the gate cannot pass having
+ * looked at nothing (PROJECT_BRIEF.md 18).
+ */
+abstract class CheckBytecodeLevel : DefaultTask() {
+  @get:InputFiles abstract val directories: ConfigurableFileCollection
+
+  @get:Input abstract val expectedMajor: Property<Int>
+
+  @TaskAction
+  fun check() {
+    val expected = expectedMajor.get()
+    val wrong = mutableListOf<String>()
+    val empty = mutableListOf<String>()
+    var counted = 0
+    for (directory in directories.files) {
+      if (!directory.isDirectory) continue
+      var inDirectory = 0
+      directory
+        .walkTopDown()
+        .filter { it.isFile && it.extension == "class" }
+        .forEach { file ->
+          inDirectory++
+          counted++
+          // Bytes 6 and 7 of a class file are the major version, big-endian, straight after the
+          // magic and the minor. Read rather than parsed: nothing else in the file is wanted.
+          val header = file.inputStream().use { stream -> ByteArray(8).also { stream.read(it) } }
+          val major = ((header[6].toInt() and 0xff) shl 8) or (header[7].toInt() and 0xff)
+          if (major != expected) wrong += "$file is class file major $major"
+        }
+      if (inDirectory == 0) empty += directory.toString()
+    }
+    if (counted == 0) {
+      throw GradleException(
+        "checkBytecodeLevel found no class files at all, so it has checked nothing. " +
+          "Its inputs are ${directories.files.size} directories; run it through `assemble` " +
+          "rather than on its own."
+      )
+    }
+    if (empty.isNotEmpty()) {
+      logger.lifecycle(
+        "note: ${empty.size} compilation output directories held no classes " +
+          "(${empty.joinToString(", ")}); a compilation with no sources is expected, one that " +
+          "was skipped is not."
+      )
+    }
+    if (wrong.isNotEmpty()) {
+      throw GradleException(
+        "A publishable module compiled to a bytecode level other than $expected:\n" +
+          wrong.take(20).joinToString("\n") { "  $it" } +
+          (if (wrong.size > 20) "\n  … and ${wrong.size - 20} more" else "") +
+          "\n\nOne release has one level. Pin the compile that produced these — see " +
+          "PUBLISHED_JVM_TARGET in the root build file — rather than raising the expectation."
+      )
+    }
+    logger.lifecycle("==> $counted published class files, all at major $expected")
+  }
+}
+
+val checkBytecodeLevel =
+  tasks.register<CheckBytecodeLevel>("checkBytecodeLevel") {
+    group = "verification"
+    description = "Asserts every publishable module's class files are at one bytecode level."
+    expectedMajor.set(PUBLISHED_CLASS_FILE_MAJOR)
+  }
 
 /**
  * The zone every test runs in.
@@ -145,8 +233,19 @@ subprojects {
       // Bytecode level, not a toolchain: the same JDK builds everything, and 17 is what the Android
       // modules consume. Asking for a 17 *toolchain* would demand a second JDK on every machine
       // that builds this for no gain.
-      targets.withType<KotlinJvmTarget>().configureEach {
-        compilerOptions.jvmTarget.set(JvmTarget.JVM_17)
+      //
+      // Every task that emits JVM bytecode, **not** `targets.withType<KotlinJvmTarget>()`. The AGP
+      // Kotlin Multiplatform Android target is not a `KotlinJvmTarget`, so `withType` never saw it
+      // and its compile took the level of whichever JDK cut the release. Measured on 0.1.0: every
+      // `*-jvm-0.1.0.jar` is class file major 61 and `vega-compose-multiplatform.aar` is 65, which
+      // is a release with two levels in it and only one of them written down. A consumer reading
+      // the jars concludes 17 and is right until an Android compilation resolves the AAR, and then
+      // a Robolectric test on a JDK 17 runtime dies with `UnsupportedClassVersionError` at the
+      // first composable it reaches. Selecting on the *task* covers the Android target, any target
+      // AGP adds later, and the `jvm` one this used to name — one release, one level, by
+      // construction rather than by enumeration.
+      tasks.withType<KotlinJvmCompile>().configureEach {
+        compilerOptions.jvmTarget.set(PUBLISHED_JVM_TARGET)
       }
       // `test` means `jvmTest` here. Without this alias `./gradlew test` matches **no task** in a
       // multiplatform module and reports success — which is precisely the "gate that prints passed
@@ -185,7 +284,7 @@ subprojects {
   plugins.withId("org.jetbrains.kotlin.jvm") {
     extensions.configure<KotlinJvmProjectExtension> {
       compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
+        jvmTarget.set(PUBLISHED_JVM_TARGET)
         allWarningsAsErrors.set(true)
       }
       explicitApi()
@@ -202,6 +301,21 @@ subprojects {
       add("testImplementation", rootProject.libs.junit.jupiter)
       add("testRuntimeOnly", rootProject.libs.junit.platform.launcher)
     }
+  }
+}
+
+/**
+ * Hands each publishable module's compiled classes to the root `checkBytecodeLevel`.
+ *
+ * Selected by **task**, exactly as the pin above is, and for the same reason: the compilation that
+ * shipped 0.1.0 at the wrong level was one nobody had enumerated. Test compilations are left out —
+ * they are not published, and depending on them would make a verification task build the whole test
+ * tree.
+ */
+subprojects {
+  if (name in publishable) {
+    val compilations = tasks.withType<KotlinJvmCompile>().matching { !it.name.contains("Test") }
+    checkBytecodeLevel.configure { directories.from(compilations.map { it.destinationDirectory }) }
   }
 }
 
