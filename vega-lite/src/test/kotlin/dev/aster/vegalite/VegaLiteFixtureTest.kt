@@ -3,6 +3,7 @@ package dev.aster.vegalite
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.locale.VegaLocale
 import java.io.File
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -256,8 +257,18 @@ class VegaLiteFixtureTest {
     private fun reference(name: String, kind: String) =
       File(repositoryRoot, "test-fixtures/vega-lite-reference/$name.$kind.json")
 
+    /**
+     * The locale upstream's own tests assume, **named** rather than defaulted.
+     *
+     * Every fixture here is compared against what upstream's compiler emitted, and since a locale
+     * now decides the order of a date's fields, the locale a fixture compiles under is part of what
+     * is being compared. `VegaLocale.EnglishUS` is the only one that states its specifier table
+     * instead of deriving one from its own `%x`, and it states upstream's — so naming it here is
+     * what makes these 283 comparisons a statement about the compiler rather than about a default
+     * parameter.
+     */
     fun compile(name: String): VegaLiteCompilation =
-      VegaLiteCompiler().compileJson(specFile(name).readText())
+      VegaLiteCompiler(locale = VegaLocale.EnglishUS).compileJson(specFile(name).readText())
 
     fun referenceSpec(name: String): VegaValue = VegaJson.parse(reference(name, "vega").readText())
 

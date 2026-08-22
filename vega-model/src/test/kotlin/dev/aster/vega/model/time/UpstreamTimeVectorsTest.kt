@@ -1,5 +1,6 @@
 package dev.aster.vega.model.time
 
+import dev.aster.vega.model.locale.VegaLocale
 import java.io.File
 import kotlinx.datetime.TimeZone
 import kotlinx.serialization.json.Json
@@ -105,7 +106,13 @@ class UpstreamTimeVectorsTest {
               (args.getOrNull(1) as? JsonObject)?.mapValues { (_, value) ->
                 value.jsonPrimitive.contentOrNull
               } ?: emptyMap()
-            TimeUnits.specifier(units, overrides)
+            // **The locale upstream's own tests assume, named rather than defaulted.** These
+            // vectors are upstream's recorded answers, so the locale this replays them under has to
+            // be the one that reproduces them — and since `EnglishUS` is now the only locale that
+            // states its specifier table instead of deriving one from its `%x`, naming it here is
+            // what makes these vectors the assertion that it still does. A default parameter would
+            // have gone on passing if that pinning were removed.
+            TimeUnits.specifier(units, overrides, VegaLocale.EnglishUS)
           }
           "timeOffset",
           "utcOffset" -> {

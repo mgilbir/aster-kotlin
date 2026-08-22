@@ -4,6 +4,7 @@ import dev.aster.vega.fixtures.VegaHeadlessTextEngine
 import dev.aster.vega.loader.FileDataLoader
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaJson
+import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.runtime.compile.CompiledSpec
 import dev.aster.vega.runtime.compile.SpecCompiler
 import dev.aster.vega.scene.flatten
@@ -43,7 +44,9 @@ class VegaLiteFixtureDifferentialTest {
       "no upstream scene at ${scene.path} — run scripts/vega-lite-oracle.sh to draw them",
     )
     val reference = Differential.readReference(scene)
-    return reference to SpecCompiler(VegaHeadlessTextEngine(), fixtureLoader).compileJson(vega)
+    return reference to
+      SpecCompiler(VegaHeadlessTextEngine(), fixtureLoader, locale = VegaLocale.EnglishUS)
+        .compileJson(vega)
   }
 
   @ParameterizedTest(name = "{0}")

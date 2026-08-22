@@ -6082,6 +6082,44 @@ The wrapper that records is what `DrawScopeTarget` is given, not the caller's ow
 drawing resolves through the same path the measurement did. A wrapper only one side used would be a new
 way to have the defect this class exists to prevent.
 
+### The locale threaded for real, and the pin that keeps the fixtures honest
+
+The first cut of this gave a host two override maps and derived nothing, which left the *default*
+wrong: a locale copied field for field out of a d3 locale JSON still read `mei 21, 2026` unless its
+author knew to write a pattern by hand. So the locale is threaded properly now, and the divergence
+from upstream is deliberate and stated rather than avoided.
+
+`VegaLocale.date` is d3's `%x` — "the date order this language writes" — and it was the only place in
+the engine that knew that order while being read by nothing that decided a label. It is derived from
+now. `time` is `%X` and goes the same way: a pattern written with `%H` gives a temporal axis 24-hour
+ticks in place of d3's `%I %p`, which is an afternoon in a place that writes 14:00.
+
+**Two derivations, because there are two tables and they are not the same shape.** `TimeUnits`'s
+entries are numeric, so the whole pattern transfers and the compound runs are `%x` with fields
+*dropped* — which is what keeps prose in it, so `%e de %B de %Y` yields `%B de %Y` for a month within a
+year. Which separator goes with a dropped field is the entire arithmetic: a leading or middle field
+takes the one after it, so `%b %d, %Y` without its date is `%b %Y` and not `%b, %Y`. Vega-Lite's table
+spells the month as a **name**, which is what it exists for, so only the *order* transfers and the
+directives stay `%b %d %Y`; substituting a name into a numeric pattern gives `21-mei-2026`.
+
+**The pin.** `VegaLocale.EnglishUS` states both tables empty instead of deriving, so it answers exactly
+what upstream answers, and it is the locale every differential comparison runs under. That pin exists
+because upstream is internally inconsistent and a derivation cannot be both faithful and consistent:
+d3's `en-US` writes `%x` as `%-m/%-d/%Y` while `vega-time`'s table writes a full date as `%Y-%m-%d`.
+
+And it is pinned where it can be read. `LocaleDefaultsTest` asserts that `EnglishUS` derives nothing
+and that upstream's five landmark specifiers come out of it, so removing the pin fails there rather
+than in 283 fixture comparisons whose diff would be four hundred moved labels and no explanation.
+`UpstreamTimeVectorsTest` — which replays upstream's own recorded tests — now **names** the locale
+instead of defaulting it, which turns those vectors into the same assertion. So do the three
+differential gates: `FixtureDifferentialTest`, `VegaLiteFixtureTest` and
+`VegaLiteFixtureDifferentialTest` all say `VegaLocale.EnglishUS` at the call site, because "the locale
+upstream's tests assume" is a claim worth being able to read where the comparison happens rather than
+inferring from a default parameter.
+
+`DateField` is public for one reason: the order is a fact `vega-model` can read and `:vega-lite` has to
+apply, and neither can do the other's half.
+
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
 PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.

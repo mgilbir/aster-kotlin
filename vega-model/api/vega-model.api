@@ -267,6 +267,15 @@ public final class dev/aster/vega/model/VegaValueKt {
 	public static final fun parseFieldPath (Ljava/lang/String;)Ljava/util/List;
 }
 
+public final class dev/aster/vega/model/locale/DateField : java/lang/Enum {
+	public static final field DATE Ldev/aster/vega/model/locale/DateField;
+	public static final field MONTH Ldev/aster/vega/model/locale/DateField;
+	public static final field YEAR Ldev/aster/vega/model/locale/DateField;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/model/locale/DateField;
+	public static fun values ()[Ldev/aster/vega/model/locale/DateField;
+}
+
 public abstract interface class dev/aster/vega/model/locale/VegaCaptions {
 	public static final field Companion Ldev/aster/vega/model/locale/VegaCaptions$Companion;
 	public abstract fun axis (ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
@@ -309,6 +318,7 @@ public final class dev/aster/vega/model/locale/VegaLocale {
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCaptions ()Ldev/aster/vega/model/locale/VegaCaptions;
 	public final fun getDate ()Ljava/lang/String;
+	public final fun getDateFieldOrder ()Ljava/util/List;
 	public final fun getDateTime ()Ljava/lang/String;
 	public final fun getDays ()Ljava/util/List;
 	public final fun getDecimal ()Ljava/lang/String;
@@ -320,7 +330,9 @@ public final class dev/aster/vega/model/locale/VegaLocale {
 	public final fun getShortMonths ()Ljava/util/List;
 	public final fun getThousands ()Ljava/lang/String;
 	public final fun getTime ()Ljava/lang/String;
+	public final fun getTimeTickFormatOverrides ()Ljava/util/Map;
 	public final fun getTimeTickFormats ()Ljava/util/Map;
+	public final fun getTimeUnitSpecifierOverrides ()Ljava/util/Map;
 	public final fun getTimeUnitSpecifiers ()Ljava/util/Map;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;

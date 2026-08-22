@@ -360,20 +360,29 @@ class LocaleTest {
     fun drawn(locale: VegaLocale) =
       labels(requireNotNull(VegaLiteInput.toVega(bucketed, locale = locale).vegaJson), locale)
 
+    // `EnglishUS` is the locale upstream's own tests assume, and it answers what upstream answers —
+    // comma and all. It is the only locale that states its tables rather than deriving them, which
+    // is
+    // what keeps the 283 Vega-Lite fixture comparisons meaningful.
     assertTrue(
       drawn(VegaLocale.EnglishUS).contains("May 21, 2026"),
       drawn(VegaLocale.EnglishUS).toString(),
     )
 
-    // Dutch names, American order — the defect, stated as a test so it cannot come back quietly.
-    assertTrue(drawn(dutch).contains("mei 21, 2026"), drawn(dutch).toString())
-
-    val dayFirst = dutch.copy(timeUnitSpecifiers = mapOf("year-month-date" to "%-d %b %Y "))
-    assertTrue(drawn(dayFirst).contains("21 mei 2026"), drawn(dayFirst).toString())
+    // And Dutch reads the day first **without being told to**, because its own `date` — d3's `%x`,
+    // `%d-%m-%Y` — says so and nothing was reading it. The month keeps its name: the order comes
+    // from
+    // the locale and the directives stay Vega-Lite's, so this is `21 mei 2026` and not
+    // `21-05-2026`.
+    assertTrue(drawn(dutch).contains("21 mei 2026"), drawn(dutch).toString())
     assertTrue(
-      drawn(dayFirst).none { it.contains("mei 21") },
-      "the American order is gone, not merely joined: ${drawn(dayFirst)}",
+      drawn(dutch).none { it.contains("mei 21") },
+      "the American order is gone, not merely joined: ${drawn(dutch)}",
     )
+
+    // A locale that states a table has said what it wants, and it wins.
+    val stated = dutch.copy(timeUnitSpecifierOverrides = mapOf("year-month-date" to "%-d/%-m/%Y "))
+    assertTrue(drawn(stated).contains("21/5/2026"), drawn(stated).toString())
   }
 
   /**
@@ -409,20 +418,27 @@ class LocaleTest {
       return labels(json, locale)
     }
 
-    val dayFirst = dutch.copy(timeUnitSpecifiers = mapOf("year-month-date" to "%-d %b %Y "))
+    // Upstream's own answer, from the locale upstream's tests assume.
     assertEquals(
       listOf("%Y-%m-%d"),
+      specifierOf(VegaLocale.EnglishUS, "timeUnitSpecifier(['year','month','date'])"),
+    )
+    // And Dutch, derived from its own `%x`. This table's entries are **numeric**, so the whole
+    // pattern transfers — separators included — where Vega-Lite's name-bearing table takes only the
+    // order. Two tables, two derivations, one order.
+    assertEquals(
+      listOf("%d-%m-%Y"),
       specifierOf(dutch, "timeUnitSpecifier(['year','month','date'])"),
     )
-    assertEquals(
-      listOf("%-d %b %Y"),
-      specifierOf(dayFirst, "timeUnitSpecifier(['year','month','date'])"),
-    )
-    // Written by the document, so it wins.
+    assertEquals(listOf("%m-%Y"), specifierOf(dutch, "timeUnitSpecifier(['year','month'])"))
+    // An hour has no date order in it to disagree about, so it falls back to upstream's table.
+    assertEquals(listOf("%H:00"), specifierOf(dutch, "timeUnitSpecifier(['hours'])"))
+
+    // Written by the document, so it wins over the locale.
     assertEquals(
       listOf("%d/%m/%y"),
       specifierOf(
-        dayFirst,
+        dutch,
         "timeUnitSpecifier(['year','month','date'], {'year-month-date': '%d/%m/%y'})",
       ),
     )
@@ -434,8 +450,9 @@ class LocaleTest {
    * The other place a date's shape was fixed, and a different table: an axis with no `timeUnit` has
    * no single granularity, so each tick is labelled by the finest field that is not zero. That
    * cascade is d3's `scale.tickFormat` and its `%I %p` is an afternoon in a place that writes
-   * 14:00. `VegaLocale.timeTickFormats` is keyed by d3's own names for the eight steps, and is
-   * empty by default because a fixture compares these labels against upstream's.
+   * 14:00. The locale's own `time` — d3's `%X` — is what says which clock a language keeps, and
+   * nothing was reading it; `EnglishUS` states an empty table so d3's cascade survives for every
+   * fixture that compares against it.
    */
   @Test
   fun `a locale decides the clock a plain time axis labels its ticks with`() {
@@ -453,15 +470,20 @@ class LocaleTest {
       """
         .trimIndent()
 
-    // The locale's own half-day markers, on a twelve-hour clock the locale had no say in — which is
-    // the same shape of gap as the month name on an American date order.
+    // d3's cascade, from the locale upstream's tests assume: a twelve-hour clock with `%p`.
     assertEquals(
-      listOf("06 a.m.", "09 a.m.", "12 p.m.", "03 p.m.", "06 p.m."),
-      labels(hours, dutch),
+      listOf("06 AM", "09 AM", "12 PM", "03 PM", "06 PM"),
+      labels(hours, VegaLocale.EnglishUS),
     )
+    // And Dutch keeps a 24-hour clock **without being told to**, because its own `time` is
+    // `%H:%M:%S`. Before this it read `06 a.m.` — the locale's half-day markers on a clock the
+    // locale had no say in, which is the same shape of gap as a month name on an American date
+    // order.
+    assertEquals(listOf("06:00", "09:00", "12:00", "15:00", "18:00"), labels(hours, dutch))
+    // A stated table wins, and states the whole cascade for the keys it names.
     assertEquals(
-      listOf("06:00", "09:00", "12:00", "15:00", "18:00"),
-      labels(hours, dutch.copy(timeTickFormats = mapOf("hour" to "%H:00"))),
+      listOf("06h", "09h", "12h", "15h", "18h"),
+      labels(hours, dutch.copy(timeTickFormatOverrides = mapOf("hour" to "%Hh"))),
     )
   }
 }

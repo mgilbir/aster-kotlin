@@ -450,20 +450,34 @@ English and only what is *written* follows the locale.
 `%b` resolves to the reader's month abbreviation, so a Dutch axis has always said `mei`. What it also
 said was `mei 21, 2026`, because the *pattern* — the order of the fields and what separates them —
 came from tables with no locale in them: `%Y-%m-%d` in `TimeUnits`, and `%b %d, %Y` in the two entries
-Vega-Lite writes into a bucketed axis's format. Upstream has no lever for that either; its
-`timeUnitSpecifier` takes no locale. So the two tables below are **empty by default**, and a chart
-that does not ask is byte-for-byte what it was.
+Vega-Lite writes into a bucketed axis's format.
+
+**A locale now decides that too, and it needs nothing from you to do it.** `VegaLocale.date` is d3's
+`%x`, "the date order this language writes", and it is derived from — so a locale copied field for
+field out of a d3 locale JSON reads `21 mei 2026` because its own `%x` is `%d-%m-%Y`. The clock comes
+from `time` the same way: `%H:%M:%S` gives a temporal axis 24-hour ticks instead of `%I %p`.
+
+Two derivations, because there are two tables and they are not the same shape. `TimeUnits`'s entries
+are **numeric**, so the whole pattern transfers, separators and all. Vega-Lite's spell the month as a
+**name** — that is what it is for — so only the *order* transfers and the directives stay `%b %d %Y`:
+substituting a name into a numeric pattern would give `21-mei-2026`.
+
+This is a deliberate **divergence from upstream**, whose `timeUnitSpecifier` takes no locale at all.
+`VegaLocale.EnglishUS` is therefore pinned to upstream's own answers — it states both tables empty
+rather than deriving — and it is the locale the differential fixtures and the recorded upstream vectors
+compare against. It is also the only locale that is pinned; state an empty map yourself to opt another
+one in, or state a table to say exactly what you want:
 
 ```kotlin
 val dutch = VegaLocale(
-    /* … the names above … */
-    // A bucketed axis or legend: `timeUnit`, and `timeUnitSpecifier()` in an expression. Keyed by a
-    // unit or a recognised run of units, coarsest first, exactly as `TimeUnits` keys them. A null
-    // value *removes* an entry, which is how you say "do not combine these two".
-    timeUnitSpecifiers = mapOf("year-month-date" to "%-d %b %Y ", "month-date" to "%-d %b "),
-    // A plain `time` axis, which has no single granularity and labels each tick by the finest field
-    // that is not zero. d3's `scale.tickFormat` cascade, keyed by d3's own eight step names.
-    timeTickFormats = mapOf("hour" to "%H:00", "minute" to "%H:%M"),
+    /* … the names … */
+    date = "%d-%m-%Y",              // derived from: `21 mei 2026`, and `%d-%m-%Y` for numerals
+    time = "%H:%M:%S",              // derived from: 24-hour ticks on a temporal axis
+    // Only where you want something else. Keyed by a unit or a recognised run of units, coarsest
+    // first, exactly as `TimeUnits` keys them; a null value *removes* an entry, which is how you say
+    // "do not combine these two".
+    timeUnitSpecifierOverrides = mapOf("year-month-date" to "%-d %b %Y "),
+    timeTickFormatOverrides = mapOf("hour" to "%Hh"),
 )
 ```
 

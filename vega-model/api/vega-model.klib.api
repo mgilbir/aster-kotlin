@@ -6,6 +6,18 @@
 // - Show declarations: true
 
 // Library unique name: <io.github.mgilbir.astervega:vega-model>
+final enum class dev.aster.vega.model.locale/DateField : kotlin/Enum<dev.aster.vega.model.locale/DateField> { // dev.aster.vega.model.locale/DateField|null[0]
+    enum entry DATE // dev.aster.vega.model.locale/DateField.DATE|null[0]
+    enum entry MONTH // dev.aster.vega.model.locale/DateField.MONTH|null[0]
+    enum entry YEAR // dev.aster.vega.model.locale/DateField.YEAR|null[0]
+
+    final val entries // dev.aster.vega.model.locale/DateField.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<dev.aster.vega.model.locale/DateField> // dev.aster.vega.model.locale/DateField.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): dev.aster.vega.model.locale/DateField // dev.aster.vega.model.locale/DateField.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<dev.aster.vega.model.locale/DateField> // dev.aster.vega.model.locale/DateField.values|values#static(){}[0]
+}
+
 final enum class dev.aster.vega.model.spec/Anchor : kotlin/Enum<dev.aster.vega.model.spec/Anchor> { // dev.aster.vega.model.spec/Anchor|null[0]
     enum entry END // dev.aster.vega.model.spec/Anchor.END|null[0]
     enum entry MIDDLE // dev.aster.vega.model.spec/Anchor.MIDDLE|null[0]
@@ -1085,12 +1097,14 @@ sealed interface dev.aster.vega.model/VegaValue { // dev.aster.vega.model/VegaVa
 }
 
 final class dev.aster.vega.model.locale/VegaLocale { // dev.aster.vega.model.locale/VegaLocale|null[0]
-    constructor <init>(kotlin.collections/List<kotlin/String>, kotlin.collections/List<kotlin/String>, kotlin.collections/List<kotlin/String>, kotlin.collections/List<kotlin/String>, kotlin.collections/List<kotlin/String>, kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin.collections/Map<kotlin/String, kotlin/String?> = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin/String = ..., kotlin/String = ..., kotlin.collections/List<kotlin/Int> = ..., kotlin/String = ..., dev.aster.vega.model.locale/VegaCaptions = ...) // dev.aster.vega.model.locale/VegaLocale.<init>|<init>(kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.String;kotlin.String;kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.String?>;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.String;kotlin.String;kotlin.collections.List<kotlin.Int>;kotlin.String;dev.aster.vega.model.locale.VegaCaptions){}[0]
+    constructor <init>(kotlin.collections/List<kotlin/String>, kotlin.collections/List<kotlin/String>, kotlin.collections/List<kotlin/String>, kotlin.collections/List<kotlin/String>, kotlin.collections/List<kotlin/String>, kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin.collections/Map<kotlin/String, kotlin/String?>? = ..., kotlin.collections/Map<kotlin/String, kotlin/String>? = ..., kotlin/String = ..., kotlin/String = ..., kotlin.collections/List<kotlin/Int> = ..., kotlin/String = ..., dev.aster.vega.model.locale/VegaCaptions = ...) // dev.aster.vega.model.locale/VegaLocale.<init>|<init>(kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.String;kotlin.String;kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.String?>?;kotlin.collections.Map<kotlin.String,kotlin.String>?;kotlin.String;kotlin.String;kotlin.collections.List<kotlin.Int>;kotlin.String;dev.aster.vega.model.locale.VegaCaptions){}[0]
 
     final val captions // dev.aster.vega.model.locale/VegaLocale.captions|{}captions[0]
         final fun <get-captions>(): dev.aster.vega.model.locale/VegaCaptions // dev.aster.vega.model.locale/VegaLocale.captions.<get-captions>|<get-captions>(){}[0]
     final val date // dev.aster.vega.model.locale/VegaLocale.date|{}date[0]
         final fun <get-date>(): kotlin/String // dev.aster.vega.model.locale/VegaLocale.date.<get-date>|<get-date>(){}[0]
+    final val dateFieldOrder // dev.aster.vega.model.locale/VegaLocale.dateFieldOrder|{}dateFieldOrder[0]
+        final fun <get-dateFieldOrder>(): kotlin.collections/List<dev.aster.vega.model.locale/DateField> // dev.aster.vega.model.locale/VegaLocale.dateFieldOrder.<get-dateFieldOrder>|<get-dateFieldOrder>(){}[0]
     final val dateTime // dev.aster.vega.model.locale/VegaLocale.dateTime|{}dateTime[0]
         final fun <get-dateTime>(): kotlin/String // dev.aster.vega.model.locale/VegaLocale.dateTime.<get-dateTime>|<get-dateTime>(){}[0]
     final val days // dev.aster.vega.model.locale/VegaLocale.days|{}days[0]
@@ -1113,13 +1127,17 @@ final class dev.aster.vega.model.locale/VegaLocale { // dev.aster.vega.model.loc
         final fun <get-thousands>(): kotlin/String // dev.aster.vega.model.locale/VegaLocale.thousands.<get-thousands>|<get-thousands>(){}[0]
     final val time // dev.aster.vega.model.locale/VegaLocale.time|{}time[0]
         final fun <get-time>(): kotlin/String // dev.aster.vega.model.locale/VegaLocale.time.<get-time>|<get-time>(){}[0]
+    final val timeTickFormatOverrides // dev.aster.vega.model.locale/VegaLocale.timeTickFormatOverrides|{}timeTickFormatOverrides[0]
+        final fun <get-timeTickFormatOverrides>(): kotlin.collections/Map<kotlin/String, kotlin/String>? // dev.aster.vega.model.locale/VegaLocale.timeTickFormatOverrides.<get-timeTickFormatOverrides>|<get-timeTickFormatOverrides>(){}[0]
     final val timeTickFormats // dev.aster.vega.model.locale/VegaLocale.timeTickFormats|{}timeTickFormats[0]
         final fun <get-timeTickFormats>(): kotlin.collections/Map<kotlin/String, kotlin/String> // dev.aster.vega.model.locale/VegaLocale.timeTickFormats.<get-timeTickFormats>|<get-timeTickFormats>(){}[0]
+    final val timeUnitSpecifierOverrides // dev.aster.vega.model.locale/VegaLocale.timeUnitSpecifierOverrides|{}timeUnitSpecifierOverrides[0]
+        final fun <get-timeUnitSpecifierOverrides>(): kotlin.collections/Map<kotlin/String, kotlin/String?>? // dev.aster.vega.model.locale/VegaLocale.timeUnitSpecifierOverrides.<get-timeUnitSpecifierOverrides>|<get-timeUnitSpecifierOverrides>(){}[0]
     final val timeUnitSpecifiers // dev.aster.vega.model.locale/VegaLocale.timeUnitSpecifiers|{}timeUnitSpecifiers[0]
         final fun <get-timeUnitSpecifiers>(): kotlin.collections/Map<kotlin/String, kotlin/String?> // dev.aster.vega.model.locale/VegaLocale.timeUnitSpecifiers.<get-timeUnitSpecifiers>|<get-timeUnitSpecifiers>(){}[0]
 
     final fun component1(): kotlin.collections/List<kotlin/String> // dev.aster.vega.model.locale/VegaLocale.component1|component1(){}[0]
-    final fun component10(): kotlin.collections/Map<kotlin/String, kotlin/String> // dev.aster.vega.model.locale/VegaLocale.component10|component10(){}[0]
+    final fun component10(): kotlin.collections/Map<kotlin/String, kotlin/String>? // dev.aster.vega.model.locale/VegaLocale.component10|component10(){}[0]
     final fun component11(): kotlin/String // dev.aster.vega.model.locale/VegaLocale.component11|component11(){}[0]
     final fun component12(): kotlin/String // dev.aster.vega.model.locale/VegaLocale.component12|component12(){}[0]
     final fun component13(): kotlin.collections/List<kotlin/Int> // dev.aster.vega.model.locale/VegaLocale.component13|component13(){}[0]
@@ -1132,8 +1150,8 @@ final class dev.aster.vega.model.locale/VegaLocale { // dev.aster.vega.model.loc
     final fun component6(): kotlin/String // dev.aster.vega.model.locale/VegaLocale.component6|component6(){}[0]
     final fun component7(): kotlin/String // dev.aster.vega.model.locale/VegaLocale.component7|component7(){}[0]
     final fun component8(): kotlin/String // dev.aster.vega.model.locale/VegaLocale.component8|component8(){}[0]
-    final fun component9(): kotlin.collections/Map<kotlin/String, kotlin/String?> // dev.aster.vega.model.locale/VegaLocale.component9|component9(){}[0]
-    final fun copy(kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin.collections/Map<kotlin/String, kotlin/String?> = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin/String = ..., kotlin/String = ..., kotlin.collections/List<kotlin/Int> = ..., kotlin/String = ..., dev.aster.vega.model.locale/VegaCaptions = ...): dev.aster.vega.model.locale/VegaLocale // dev.aster.vega.model.locale/VegaLocale.copy|copy(kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.String;kotlin.String;kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.String?>;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.String;kotlin.String;kotlin.collections.List<kotlin.Int>;kotlin.String;dev.aster.vega.model.locale.VegaCaptions){}[0]
+    final fun component9(): kotlin.collections/Map<kotlin/String, kotlin/String?>? // dev.aster.vega.model.locale/VegaLocale.component9|component9(){}[0]
+    final fun copy(kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin.collections/Map<kotlin/String, kotlin/String?>? = ..., kotlin.collections/Map<kotlin/String, kotlin/String>? = ..., kotlin/String = ..., kotlin/String = ..., kotlin.collections/List<kotlin/Int> = ..., kotlin/String = ..., dev.aster.vega.model.locale/VegaCaptions = ...): dev.aster.vega.model.locale/VegaLocale // dev.aster.vega.model.locale/VegaLocale.copy|copy(kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.String;kotlin.String;kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.String?>?;kotlin.collections.Map<kotlin.String,kotlin.String>?;kotlin.String;kotlin.String;kotlin.collections.List<kotlin.Int>;kotlin.String;dev.aster.vega.model.locale.VegaCaptions){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.model.locale/VegaLocale.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.aster.vega.model.locale/VegaLocale.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.aster.vega.model.locale/VegaLocale.toString|toString(){}[0]

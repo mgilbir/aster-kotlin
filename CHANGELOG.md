@@ -130,17 +130,22 @@ section here does not get released.
   have been called every frame. `ImageCache` and `rememberVegaImageCache` are
   the seam; it is bounded and least-recently-used. (#58)
 
-- **A locale can decide the order of a date, not only its names.** `%b` always
+- **A locale decides the order of a date, not only its names.** `%b` always
   resolved to the reader's month abbreviation, but the *pattern* came from tables
-  with no locale in them, so a Dutch axis read `mei 21, 2026`.
-  `VegaLocale.timeUnitSpecifiers` overrides the table a **bucketed** instant is
-  labelled with and `VegaLocale.timeTickFormats` the cascade a **plain** `time`
-  axis uses; both are empty by default, so nothing changes for a chart that does
-  not ask. The Vega-Lite compiler carries a locale for the first time — the
-  pattern is written on that side — so `VegaLiteCompiler`, `VegaLiteInput.toVega`
-  and `Config` take one, and `ChartSession` passes its own. `VegaLocale.init`,
-  `doCopy`, `TimeUnits.specifier` and `toVega` change signature at the Obj-C
-  boundary; recorded in `foreign-api.txt`. (#62)
+  with no locale in them, so a Dutch axis read `mei 21, 2026`. `VegaLocale.date`
+  is d3's `%x` and is now derived from, and `time` likewise for the clock — so a
+  locale copied out of a d3 locale JSON reads `21 mei 2026` and gets 24-hour ticks
+  without being told to. This is a deliberate **divergence from upstream**, whose
+  `timeUnitSpecifier` takes no locale: `VegaLocale.EnglishUS` is pinned to
+  upstream's own answers and is the locale every differential comparison runs
+  under, which `LocaleDefaultsTest` and the upstream vector replay now assert.
+  `timeUnitSpecifierOverrides` and `timeTickFormatOverrides` state a table
+  outright where derivation is not wanted. The Vega-Lite compiler carries a locale
+  for the first time — the pattern is written on that side — so
+  `VegaLiteCompiler`, `VegaLiteInput.toVega` and `Config` take one, and
+  `ChartSession` passes its own. `VegaLocale.init`, `doCopy`,
+  `TimeUnits.specifier` and `toVega` change signature at the Obj-C boundary, and
+  `DateField` is new; recorded in `foreign-api.txt`. (#62)
 
 - **A specification that reads `containerSize()` with no host size supplied now
   says so**, per dimension, as `EXPRESSION_CONTAINER_SIZE_UNANSWERED` at INFO.

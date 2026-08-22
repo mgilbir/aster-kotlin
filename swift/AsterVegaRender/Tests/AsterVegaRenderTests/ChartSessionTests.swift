@@ -396,8 +396,10 @@ final class ChartSessionTests: XCTestCase {
       dateTime: "%a %e %B %Y %X",
       // The order of a date's fields, which is the part a locale could not reach: the axis format
       // came from a table with no locale in it, so a Dutch chart read `mei 21, 2026`.
-      timeUnitSpecifiers: ["year-month-date": "%-d %b %Y ", "year-month": "%b %Y "],
-      timeTickFormats: ["hour": "%H:00", "minute": "%H:%M"],
+      // Nil, so both are derived from `date` and `time` above — which is what a host copying a d3
+      // locale JSON across gets, and the whole of the fix.
+      timeUnitSpecifierOverrides: nil,
+      timeTickFormatOverrides: nil,
       decimal: ",",
       thousands: ".",
       grouping: [KotlinInt(value: 3)],
@@ -512,10 +514,12 @@ final class ChartSessionTests: XCTestCase {
     let english = await labels(nil)
     XCTAssertTrue(english.contains { $0.contains("May 21, 2026") }, "en-US: \(english)")
 
+    // Pinned to upstream's table, which is what a host got for *every* locale before this: the names
+    // move and the order does not.
     let namesOnly = await labels(Self.dutch(dayFirst: false))
     XCTAssertTrue(
       namesOnly.contains { $0.contains("mei 21, 2026") },
-      "the names move and the order does not, which is what a host used to get: \(namesOnly)")
+      "an upstream-pinned locale keeps the American order: \(namesOnly)")
 
     let dayFirst = await labels(Self.dutch(dayFirst: true))
     XCTAssertTrue(dayFirst.contains { $0.contains("21 mei 2026") }, "day first: \(dayFirst)")
@@ -524,7 +528,7 @@ final class ChartSessionTests: XCTestCase {
       "the American order is gone rather than joined: \(dayFirst)")
   }
 
-  /// Dutch, with or without a say in how a date is ordered.
+  /// Dutch, deriving its date order from its own `%x` or pinned to upstream's table.
   private static func dutch(dayFirst: Bool) -> VegaLocale {
     VegaLocale(
       months: [
@@ -540,8 +544,12 @@ final class ChartSessionTests: XCTestCase {
       date: "%d-%m-%Y",
       time: "%H:%M:%S",
       dateTime: "%a %e %B %Y %X",
-      timeUnitSpecifiers: dayFirst ? ["year-month-date": "%-d %b %Y "] : [:],
-      timeTickFormats: [:],
+      // **Nil derives from `date` above**, which is the whole of the fix: `%d-%m-%Y` says this
+      // language writes the day first, and until now nothing read it — so a Dutch chart said
+      // `mei 21, 2026`, the right month name in the American order. An empty map pins a locale to
+      // upstream's own table instead, and `VegaLocale.EnglishUS` is the only one that does.
+      timeUnitSpecifierOverrides: dayFirst ? nil : [:],
+      timeTickFormatOverrides: dayFirst ? nil : [:],
       decimal: ",",
       thousands: ".",
       grouping: [KotlinInt(value: 3)],

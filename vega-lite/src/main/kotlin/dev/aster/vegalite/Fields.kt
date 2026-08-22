@@ -2,6 +2,7 @@ package dev.aster.vegalite
 
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.canonicalNumberString
+import dev.aster.vega.model.locale.DateField
 import dev.aster.vega.model.locale.VegaLocale
 
 /**
@@ -154,17 +155,7 @@ internal object Fields {
    */
   fun timeUnitSpecifier(timeUnit: String, locale: VegaLocale = VegaLocale.EnglishUS): String {
     val parts = timeUnitParts(timeUnit).joinToString(",") { "\"$it\"" }
-    // Upstream's `VEGALITE_TIMEFORMAT`, with whatever the **host's language** says about those two
-    // entries substituted in. Only those two: everything else in the table lives in `TimeUnits`,
-    // which merges the locale under a call's own overrides — so a locale that speaks about
-    // `hours-minutes` is honoured there and does not need repeating here.
-    //
-    // The order of a date's fields is the part a locale could not reach before this. `%b` has
-    // always
-    // resolved to the reader's month abbreviation, so a Dutch axis said `mei`; it said
-    // `mei 21, 2026` all the same.
-    val table =
-      VEGA_LITE_TIME_FORMAT + locale.timeUnitSpecifiers.filterKeys { it in VEGA_LITE_TIME_FORMAT }
+    val table = localeTimeFormat(locale)
     val written =
       table.entries.joinToString(",") { (key, value) ->
         "\"$key\":" + if (value == null) "null" else "\"${escaped(value)}\""
@@ -173,14 +164,61 @@ internal object Fields {
   }
 
   /**
-   * Upstream's `VEGALITE_TIMEFORMAT`: a month within one year reads `Jan`, a month spanning several
-   * reads `Jan 2009`.
+   * Upstream's `VEGALITE_TIMEFORMAT`, reordered by the reader's language.
+   *
+   * The **order** comes from the locale and the directives stay Vega-Lite's own, and that split is
+   * the point. This table is the one that spells the month as a *name*, which is what it exists for
+   * — `Jan 2009` rather than `2009-01`. Substituting a name into a locale's numeric `%x` gives
+   * `21-mei-2026`, because those separators were chosen for numbers; so the fields are placed in
+   * the language's order with a single space between them, and the comma before the year goes with
+   * the English form that has one.
+   *
+   * `TimeUnits.SPECIFIERS` takes the other route — the locale's whole pattern, numerals and all —
+   * because its entries *are* numeric. Two tables, two derivations, one order.
+   *
+   * A locale that states `timeUnitSpecifierOverrides` has said what it wants outright, so those win
+   * for the keys they name; and `VegaLocale.EnglishUS` states an empty map, which is how upstream's
+   * own `%b %d, %Y ` survives unchanged for every fixture.
    *
    * The trailing spaces are load-bearing — `TimeUnits.specifier` concatenates the pieces and trims
-   * the result — and the insertion order is what keeps the emitted expression identical to the one
-   * upstream writes.
+   * the result — and the insertion order is what keeps the emitted expression identical to
+   * upstream's for that locale.
    */
-  private val VEGA_LITE_TIME_FORMAT: Map<String, String?> =
+  private fun localeTimeFormat(locale: VegaLocale): Map<String, String?> {
+    val order = locale.dateFieldOrder
+    val stated = locale.timeUnitSpecifierOverrides
+    val derived =
+      // **A locale that states a table has said what it wants**, so nothing here is derived beside
+      // it: two answers about the same date would be worse than one that is merely American.
+      // `VegaLocale.EnglishUS` states an empty one for exactly this reason — it is the locale
+      // upstream's tests assume, so it has to answer what upstream answers, comma and all — and
+      // that
+      // is what keeps the 283 fixture comparisons meaningful.
+      if (
+        stated == null && order.containsAll(listOf(DateField.YEAR, DateField.MONTH, DateField.DATE))
+      ) {
+        val directive =
+          mapOf(DateField.YEAR to "%Y", DateField.MONTH to "%b", DateField.DATE to "%d")
+        linkedMapOf<String, String?>(
+          "year-month" to
+            order.filter { it != DateField.DATE }.joinToString(" ") { directive.getValue(it) } +
+              " ",
+          "year-month-date" to order.joinToString(" ") { directive.getValue(it) } + " ",
+        )
+      } else {
+        UPSTREAM_TIME_FORMAT
+      }
+    return derived + stated.orEmpty().filterKeys { it in derived }
+  }
+
+  /**
+   * Upstream's table verbatim: a month within one year reads `Jan`, a month spanning several reads
+   * `Jan 2009`.
+   *
+   * The fallback for a locale whose `date` names fewer than the three fields — not a date order,
+   * and not something to invent one from.
+   */
+  private val UPSTREAM_TIME_FORMAT: Map<String, String?> =
     linkedMapOf("year-month" to "%b %Y ", "year-month-date" to "%b %d, %Y ")
 
   /** A pattern going into a JSON string inside a generated expression. */
