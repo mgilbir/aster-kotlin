@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -53,7 +54,11 @@ import kotlin.math.roundToInt
  * it describes so a reader can *touch* it rather than only swipe through it. Without that the chart
  * was one silent drawing on this renderer while the Android View and the Swift one both spoke.
  *
- * @param fit how a scene that is not the size of its slot is placed in it.
+ * @param fit how a scene that is not the size of its slot is placed in it. It only has something to
+ *   do where the slot and the scene differ — see [sizing], which is what decides whether they can.
+ * @param sizing where the chart's size comes from where [modifier] leaves a dimension free.
+ *   [SceneSizing.Scene] is the scene's own, which is the default and what this always did;
+ *   [SceneSizing.Fill] takes the slot instead and leaves [fit] to place the scene inside it.
  * @param selectedNodeIds the marks currently selected, so a reader is told which. From a
  *   controller's interaction state where there is one.
  * @param captions the language the one sentence the tree writes itself is in — the dense-chart
@@ -102,6 +107,7 @@ public fun VegaChart(
   scene: Scene,
   modifier: Modifier = Modifier,
   fit: SceneFit = SceneFit.Contain,
+  sizing: SceneSizing = SceneSizing.Scene,
   textEngine: ComposeTextEngine = rememberVegaTextEngine(),
   selectedNodeIds: Set<SceneNodeId> = emptySet(),
   captions: VegaCaptions = VegaCaptions.English,
@@ -133,16 +139,32 @@ public fun VegaChart(
       AccessibilityTree.elements(scene, selectedNodeIds, captions, accessibilityMaxExposedMarks)
     }
 
-  // **The caller's modifier first, then the scene's own size as a default.** The other order looks
-  // equivalent and is not: a `size` modifier fixes the constraints its child is measured with, so
+  // **The caller's modifier first, then a size.** The other order looks equivalent and is not: a
+  // `size` modifier fixes the constraints its child is measured with, so
   // `Modifier.size(sceneSize).then(caller)` clamped every caller to the scene's own size — a chart
-  // could
-  // not be made bigger or filled to a slot, which quietly made `SceneFit.Contain`, the default,
-  // mean
-  // nothing outside a test that sizes the canvas itself. Scene units are CSS pixels, which is what
-  // a dp
-  // is on the platforms this runs on, so the default is the chart at its natural size.
-  Box(modifier = modifier.then(Modifier.size(scene.width.dp, scene.height.dp))) {
+  // could not be made bigger or filled to a slot, which quietly made `SceneFit.Contain`, the
+  // default, mean nothing outside a test that sizes the canvas itself.
+  //
+  // What the size *is* comes from [sizing], and this is the order that makes both answers work.
+  // `Modifier.size` coerces the size it wants into the constraints it is handed, so a caller that
+  // bounds a dimension already wins; what it decides is the dimension a caller left free, and there
+  // it used to be the scene's own — about 300 units plus axes for a `width: "container"` chart,
+  // whatever room was going, with nothing to say `fit` had done nothing. `fillMaxSize` in front of
+  // it
+  // fills a **bounded** dimension and passes an unbounded one through untouched, so `Fill` takes
+  // the
+  // slot where there is one and falls back to the scene's size where there is not — which is the
+  // only
+  // thing it can do inside a scrolling column.
+  //
+  // Scene units are CSS pixels, which is what a dp is on the platforms this runs on, so the
+  // `Scene` answer is the chart at its natural size.
+  val sized =
+    when (sizing) {
+      SceneSizing.Scene -> Modifier
+      SceneSizing.Fill -> Modifier.fillMaxSize()
+    }
+  Box(modifier = modifier.then(sized).then(Modifier.size(scene.width.dp, scene.height.dp))) {
     Canvas(
       modifier =
         Modifier.matchParentSize()
@@ -286,6 +308,35 @@ private fun AccessibilityOverlay(
       }
     }
   }
+}
+
+/**
+ * Where a chart's size comes from where its `modifier` leaves a dimension free.
+ *
+ * The two are not alternatives to [SceneFit] but the question in front of it: `fit` decides how a
+ * scene is placed in a slot of a different size, and it has nothing to do until something decides
+ * that the slot may *be* a different size.
+ */
+public enum class SceneSizing {
+  /**
+   * The scene's own size — one scene unit per dp.
+   *
+   * A specification declares a width and a height, so that is the size it wants, and this is the
+   * default for that reason. The trap it comes with is worth stating: a caller that bounds neither
+   * dimension gets this whatever `fit` says, and for a `width: "container"` chart that is
+   * `config.view.continuousWidth` — 300 — plus its axes, however much room was available.
+   */
+  Scene,
+
+  /**
+   * Whatever the slot allows, leaving `fit` to place the scene inside it.
+   *
+   * A bounded dimension is filled; an unbounded one falls back to the scene's own size, because
+   * there is nothing else it could be — a chart inside a scrolling column has as much height as it
+   * asks for. So this is safe to pass anywhere and does something wherever there is room to do it
+   * in.
+   */
+  Fill,
 }
 
 /** How a scene is placed in a slot that is not its own size. */

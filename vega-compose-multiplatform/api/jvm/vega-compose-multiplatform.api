@@ -362,6 +362,14 @@ public final class dev/aster/vega/compose/mp/SceneFit : java/lang/Enum {
 	public static fun values ()[Ldev/aster/vega/compose/mp/SceneFit;
 }
 
+public final class dev/aster/vega/compose/mp/SceneSizing : java/lang/Enum {
+	public static final field Fill Ldev/aster/vega/compose/mp/SceneSizing;
+	public static final field Scene Ldev/aster/vega/compose/mp/SceneSizing;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/compose/mp/SceneSizing;
+	public static fun values ()[Ldev/aster/vega/compose/mp/SceneSizing;
+}
+
 public final class dev/aster/vega/compose/mp/SceneWalk {
 	public static final field $stable I
 	public fun <init> ()V
@@ -369,7 +377,7 @@ public final class dev/aster/vega/compose/mp/SceneWalk {
 }
 
 public final class dev/aster/vega/compose/mp/VegaChartKt {
-	public static final fun VegaChart (Ldev/aster/vega/scene/Scene;Landroidx/compose/ui/Modifier;Ldev/aster/vega/compose/mp/SceneFit;Ldev/aster/vega/compose/mp/ComposeTextEngine;Ljava/util/Set;Ldev/aster/vega/model/locale/VegaCaptions;ILkotlin/jvm/functions/Function1;Ldev/aster/vega/compose/mp/ImageCache;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Ldev/aster/vega/scene/HitTestOptions;Ldev/aster/vega/scene/VectorD;DLkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;III)V
+	public static final fun VegaChart (Ldev/aster/vega/scene/Scene;Landroidx/compose/ui/Modifier;Ldev/aster/vega/compose/mp/SceneFit;Ldev/aster/vega/compose/mp/SceneSizing;Ldev/aster/vega/compose/mp/ComposeTextEngine;Ljava/util/Set;Ldev/aster/vega/model/locale/VegaCaptions;ILkotlin/jvm/functions/Function1;Ldev/aster/vega/compose/mp/ImageCache;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Ldev/aster/vega/scene/HitTestOptions;Ldev/aster/vega/scene/VectorD;DLkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;III)V
 	public static final fun rememberVegaImageCache (ILandroidx/compose/runtime/Composer;II)Ldev/aster/vega/compose/mp/ImageCache;
 }
 

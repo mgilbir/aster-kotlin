@@ -103,6 +103,14 @@ section here does not get released.
 
 ### Added
 
+- **`VegaChart(sizing = SceneSizing.Fill)`**, so `fit` has something to do. The
+  composable appended `Modifier.size(scene.width.dp, scene.height.dp)`
+  unconditionally, so a caller that bounded neither dimension got the scene's own
+  size whatever `fit` said — for a `width: "container"` chart, about 300 units plus
+  axes in however much room was going. `Fill` takes the slot where there is one
+  and falls back to the scene's size where there is not. `SceneSizing.Scene`
+  remains the default. (#67)
+
 - **An image resolver on both public view APIs.** `DrawScopeTarget` and
   `CoreGraphicsTarget` have each taken one from the start and neither
   `VegaChart` nor `VegaChartView` had a parameter for it, so a chart with a

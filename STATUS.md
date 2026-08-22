@@ -6028,6 +6028,30 @@ answer. The targets collect it — `unresolvedImages` and `unresolved` — and a
 it built. Reporting it from a composable means a callback fired during the draw phase, which is not
 something to add without a reason to.
 
+### A chart 300 units wide in a slot of any size
+
+`Box(modifier = modifier.then(Modifier.size(scene.width.dp, scene.height.dp)))`. The order there is
+right and deliberate — the caller's modifier first, so a bound it states wins, which a previous fix
+established — but the trailing `size` is unconditional. A caller that bounds *neither* dimension
+therefore gets the scene's own size whatever `fit` says, and `fit` is documented as how a scene that is
+not the size of its slot is placed in it: in that case the slot and the scene are the same size by
+construction, so it has nothing to do and nothing says so.
+
+Which matters most for exactly the chart that cannot state its own width. `width: "container"` falls
+back to `config.view.continuousWidth` — 300 — plus the axis extent, so a host that forgot to bound the
+chart got about 300 units of chart in however much room was going.
+
+`SceneSizing` is the question in front of `fit` rather than an alternative to it. `Scene` is what this
+always did and stays the default: a specification declares a size and that is the size it wants.
+`Fill` puts `fillMaxSize` in front of the same `size` modifier, which fills a **bounded** dimension and
+passes an unbounded one straight through — so it takes the slot where there is one and falls back to
+the scene's size where there is not, which is the only thing it can do inside a scrolling column. Safe
+to pass anywhere, and it does something wherever there is room to do it in.
+
+`ComposeSizingTest` asserts all three answers through Compose's own test harness rather than by reading
+the modifier chain: the scene's size in a 600×300 slot by default, the slot with `Fill`, and a caller's
+own `width` beating both. The last of those is the order, and it is now a test rather than a comment.
+
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
 PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.

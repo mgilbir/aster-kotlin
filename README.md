@@ -205,6 +205,19 @@ compiled.scene?.let {
 }
 ```
 
+**Where the size comes from.** A chart takes the scene's own size — one scene unit per dp — wherever
+`modifier` leaves a dimension free, because a specification declares a width and a height and that is
+the size it asked for. The trap is that this happens whatever `fit` says: bound neither dimension and
+the slot *is* the scene, so `fit` has nothing to place. For a `width: "container"` chart that means
+`config.view.continuousWidth`, 300, plus its axes, however much room was going. Either bound the chart
+— `Modifier.fillMaxWidth()`, a column, a size — or pass `sizing = SceneSizing.Fill`, which takes the
+slot where there is one and leaves `fit` to place the scene inside it. The caller's `modifier` is
+applied **first**, so a bound it states wins over both.
+
+```kotlin
+VegaChart(scene = it, sizing = SceneSizing.Fill, textEngine = textEngine)
+```
+
 Keyboard input is the host's own modifier on both Compose renderers — `Modifier.focusable()` and
 `onKeyEvent`, forwarding to `controller.dispatch(ChartInputEvent.Key(...))` — and `ChartSession.press(_:)`
 on iOS, wired with SwiftUI's `.onKeyPress`. The Android View translates keys itself, since a `View` owns
