@@ -25,7 +25,7 @@ end to end — expressions, signals, 49 of upstream's 51 documented data transfo
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-193 Vega differential fixtures and 282 Vega-Lite fixtures pass, every one of them matching upstream
+193 Vega differential fixtures and 283 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -192,7 +192,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 193 Vega differential fixtures and 282 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 193 Vega differential fixtures and 283 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -5647,6 +5647,588 @@ And the reasoning that no fixture could cover it — "upstream draws it correctl
 around it would only record the disagreement" — was **wrong**, and expensively so. Recording the
 disagreement is precisely what a differential fixture is for: it fails, it names the gap, and it
 passes when the gap closes. Every example taken up since has followed that route.
+
+### A warning printed above the code that answers it
+
+`tickCount` takes a number, a signal **or a time interval**, and the interval has two spellings —
+`"day"` and `{"interval": "day", "step": 20}`, which are `nice`'s. The parser read the field twice.
+Once through `numberOrSignal`, which sees a string or an object it can make no number of and warns
+`PARSE_UNKNOWN_PROPERTY`; and then again, correctly, into `tickInterval` and `tickStep`, in the lines
+directly below. So a document was laid out exactly as it asked and complained about at the same
+time. Measured on a device: one warning per axis, four on one page, every one of them false.
+
+That is worse than an unhelpful message. A host that routes diagnostics by severity — and README.md
+tells one to — cannot tell a false warning from a property the engine really did drop, so the whole
+channel is worth less. Both guides had the pair; the scale parser's `nice` never did, which is where
+the two spellings came from in the first place.
+
+One reading now, `VegaValue.Obj.tickCount`, and the warning moved to where a reading really does
+fail. Two cases used to fall through to a count in **silence**, which is the opposite failure and the
+more expensive one — the specification asked for tick marks on calendar boundaries and got whatever
+round number the algorithm liked. An interval that is not a calendar unit (`TimeInterval.forUnit`
+answers null) is one; an interval named by a signal is the other, and that one is a real gap rather
+than a typo, since tick intervals are resolved while the axis is built and no signal is available
+there yet.
+
+### A document that draws nothing, said rather than shown
+
+`{}` is a valid Vega specification. Upstream renders it: an empty surface, no complaint. So this
+engine cannot make it an error without disagreeing with the grammar — and it was not making it
+anything at all. `parse` is fatal only on unparseable JSON or a non-object root; `parseArray` returns
+an empty list for an absent key with no diagnostic; and a `VegaSpec` with no marks compiles to a
+non-null, empty `Scene`. `{"width": 100, "height": 50}` produced, end to end, **no diagnostic
+whatsoever**. (A bare `{}` did report that it declared no size, which is a different fact and no help
+in deciding whether a chart came of the document.)
+
+That leaves a host that reads "no diagnostics" as "there is a chart" unable to tell an empty
+placeholder object from a server apart from a chart that drew, and the two want opposite things put
+in front of a reader.
+
+`PARSE_NOTHING_TO_DRAW`, at INFO — the severity documented as leaving the chart unaffected, so a host
+filtering for warnings and errors sees nothing new and one that asks "did anything come of this?"
+gets an answer.
+
+Four keys are tested, not one. A guide draws on its own: `log-axis-labels.vg.json` carries
+`"marks": []` and draws a pair of axes, `legend-columns.vg.json` draws nothing but a legend, and both
+are charts. What is not a chart is a document with no marks, no axes, no legends and no title.
+
+The message carries the root's **own** top-level keys, which is what makes it useful without
+`vega-model` having to know another grammar's spellings: a Vega-Lite document handed to this parser
+reads `mark, encoding`, and a reader sees the mistake in the sentence. That case, too, used to be
+completely silent.
+
+One test changed shape rather than expectation. `UnhandledPropertiesTest`'s shared fixture had data
+and no marks, so three assertions of the form "this fragment produces no diagnostic at all" were
+resting on a document that was not a chart. It has a mark now, which is what those assertions were
+always claiming to be about.
+
+### `usermeta` reaches the host it was written for
+
+`usermeta` is the one top-level property whose whole purpose is to survive compilation. Upstream's
+schema says so — "optional metadata that will be passed to Vega" — and the Vega-Lite compiler on this
+side already carried it onto the Vega it emits, last property, matching upstream.
+
+The Vega parser then threw it away. It was the sole entry in a `reportUnsupportedTopLevel` table:
+`usermeta is ignored`, one warning per compile whatever the block held, and no field on `VegaSpec` for
+its content to live in. So the diagnostic *was* the feature. A document carrying supplementary data
+for the host to consume — the case the property exists for — lost it unconditionally, and the only
+thing a host learned was that something had gone.
+
+It is now `VegaSpec.usermeta`, read from a compiled chart as `CompiledSpec.spec?.usermeta` on both
+hosts. `CompiledSpec.spec` is already the parsed specification, so this needs no second field on the
+compiled result to duplicate and keep in step.
+
+Three states, not two. Absent is null and `{}` is an empty map, because a host reading those as one
+cannot tell a document that carries no metadata from one whose metadata was filtered to nothing. And
+upstream's type is an object, so a `usermeta` that is anything else is reported rather than coerced
+into something a host would look in and find empty.
+
+The boundary moved: `VegaSpec.init` and `doCopy` gained a parameter, which is source-compatible in
+Kotlin and a new signature in Obj-C. `foreign-api.txt` records it, which is what that snapshot is for.
+Nothing constructs a `VegaSpec` from Swift — hosts read one — so the change is additive in practice
+and shown rather than assumed.
+
+### A question asked and not answered
+
+`containerSize()` is `[null, null]` with no host size. That is upstream's answer, not an invention —
+verified in a `renderer: 'none'` view, which is the configuration every differential fixture is
+rendered in — and the `container-size` fixture depends on it. So the answer had to stay.
+
+The silence around it did not. A specification that sizes itself from its container, or branches on a
+breakpoint to change a layout, quietly takes its "no container" arm until a host says how much room
+there is, and there was nothing anywhere to explain the layout that came out.
+`EXPRESSION_CONTAINER_SIZE_UNANSWERED`, at INFO — the chart is exactly the one upstream draws, and
+the missing fact is only that a question was asked and nobody answered it. Per dimension, because a
+host that knows only its width supplies only its width and `containerSize()[1]` is then still null.
+
+**How the compile knows.** `width: "container"` does not reach the engine as a property; Vega-Lite
+turns it into a signal whose `update` calls `containerSize()`, and a specification may call it from an
+encode channel or a transform parameter just as well. So the fact has to come from the expressions,
+and it comes from a new one: `Expression.functionDependencies`, the names actually called. Every other
+dependency set on that interface answers "what has to exist before this runs"; this one answers "was
+this capability asked for". It is collected in the walk `collectDeferred` already makes over every
+`Call` node, so it costs nothing where a second traversal would.
+
+`SpecCompiler` observes it with a decorator *inside* the expression cache, so each distinct expression
+is examined once per compile rather than once per datum. A callback on the function table was the
+other option and was rejected: the table is shared for the default locale with no host size
+precisely so a chart pays nothing for a feature it does not use, and an observer would build 119
+closures per compile to learn one boolean.
+
+The probe rejects on the text first — the identifier has to appear literally for a call to exist,
+there being no `eval` in a Vega expression — and only then confirms against the tree. That second step
+is the one that matters: `datum.containerSize` and a label with the word in it are **not** calls, and a
+false diagnostic is indistinguishable from a real one to a host routing by severity.
+
+The same fact is published as `CompiledSpec.readsContainerSize`, because it answers a question a host
+asks on every rotation and every split-view drag: is a resize worth a recompile at all? False for the
+overwhelming majority of charts, which declare their own width and height.
+
+### `labelExpr` on the guide that had it and the guide that did not
+
+`labelExpr` is not a Vega property on either guide. Upstream destructures it out of the component and
+writes `encode.labels.update.text` from it — `assembleAxis` does, and `assembleLegend` does the same
+thing fifty lines away. This compiler had the axis half and not the legend half, so a
+`legend.labelExpr` was copied through with every other legend property and the **Vega** parser
+reported `PARSE_UNKNOWN_PROPERTY at $.legends[0].labelExpr`: the right complaint, two stages after
+the mistake, which is a confusing place to read it.
+
+The labels were then drawn from the scale's domain unchanged, and that is the part a host cannot work
+around. `labelExpr` is how a document shortens labels that would otherwise not fit; the untruncated
+labels are what the legend's **width** is computed from, so a colour legend over sixty-character
+categories was laid out at full width and the chart it belonged to overflowed its container.
+
+Applied last, after the encode parts are assembled, which is where upstream applies it and not an
+accident of ordering: where a block already states the labels' text — a custom number format type
+writes one — `datum.label` in the expression means *that* text rather than the scale's, so the two
+compose instead of one replacing the other. It is the axis's own `withLabelText`; the rule is the same
+on both guides, which is why it was worth having one function for it.
+
+`legend-label-expr.vl.json` arms both gates and both of them failed before the fix — the specification
+comparison on the stray property, and the scene comparison on labels drawn at full length. 283
+Vega-Lite fixtures now.
+
+### The order of a date, which the locale seam could not reach
+
+`%b` has always resolved to the reader's month abbreviation, so a Dutch axis said `mei`. It said
+`mei 21, 2026` all the same, and that is the whole of this: the *pattern* came from tables with no
+locale in them. `TimeUnits.SPECIFIERS` carries `%Y-%m-%d`; `Fields.timeUnitSpecifier` wrote
+`{"year-month": "%b %Y ", "year-month-date": "%b %d, %Y "}` into a bucketed axis's format as a
+literal; and `Functions` had a locale in scope for `monthFormat` and every other date function and
+did not pass it to `TimeUnits.specifier`.
+
+Upstream has no lever for it either — its `timeUnitSpecifier` takes no locale, and `VEGALITE_TIMEFORMAT`
+is a module constant — so this is an addition rather than a port. Both new tables are therefore
+**empty by default** and the emitted specification is byte-for-byte what it was, which is what the 283
+Vega-Lite fixtures compare against.
+
+Two tables, because there are two places a date's shape is decided and they are different tables.
+`VegaLocale.timeUnitSpecifiers` overrides what a **bucketed** instant is labelled with, keyed the way
+`TimeUnits` keys it — a unit or a recognised run of units, coarsest first — with a null value
+*removing* an entry, which is upstream's own way of saying "do not combine these two".
+`VegaLocale.timeTickFormats` overrides the cascade a **plain** `time` axis uses, which has no single
+granularity and labels each tick by the finest field that is not zero; the keys are d3's own names for
+its eight steps, because that cascade is d3's `scale.tickFormat` and `%I %p` is an afternoon in a
+place that writes 14:00.
+
+**Vega-Lite needed the locale for the first time.** The pattern is written on that side, so
+`VegaLiteCompiler`, `VegaLiteInput.toVega` and the internal `Config` all carry one now, and
+`ChartSession` passes its own — a locale given to the runtime and not to the compiler is an axis whose
+field order and whose month names come from different places. That is the same argument `timeZone`
+already made for being passed to both.
+
+Precedence is upstream's and deliberately not clever: defaults, then the host's locale, then a
+document's own second argument to `timeUnitSpecifier(units, specifiers)` — which the document asked
+for by name. Vega-Lite's generated table looks like an exception and is not one: `Fields` builds it
+**from** the locale, so the two agree by construction rather than by out-ranking each other.
+
+### A dense chart, counted by the wrong thing
+
+`MAX_EXPOSED_MARKS` is 120 and the count it was compared against was every **focusable element** — a
+mark, an axis, a legend and a title alike. Past it the whole tree became one sentence.
+
+Measured on a compiled chart: 118 points coloured by a category is 118 marks, two axes and a legend,
+which is 121 focusable elements. So the tree collapsed at 118 marks. The data was not dense, and a
+reader lost per-mark exploration of the entire chart rather than of the crowded part — and lost the
+axes and the legend with it, which are three elements and are exactly what is worth reading when the
+marks cannot be walked.
+
+Two changes. Only nodes whose `NodeMetadata.role` is `mark` count, which is the same fact
+`AccessibleElement.activatable` already reports, so there is no second definition of "is this a data
+point". And when the threshold is crossed the summary stands in for the **marks**, with the guides
+still exposed one by one, summary first: a reader meets the overview and can then read the axes and
+the key that make it mean something. The sentence counts the marks it collapsed rather than
+everything focusable, which used to tell a reader there were more data points than the chart had.
+
+The threshold is a parameter on every host, because 120 is this engine's judgement and not a fact — a
+host knows the size of the screen, whether the chart is the page or a thumbnail on it, and what its
+own users have said. `AccessibilityTree.elements(maxExposedMarks = …)`,
+`VegaChart(accessibilityMaxExposedMarks = …)` in Compose, `VegaChartView(accessibilityMaxExposedMarks:)`
+in SwiftUI, and `accessibilityMaxExposedMarks` on the Android View, which invalidates its cached tree
+when it changes. Zero or less summarises any chart with a mark in it, which is a legitimate thing to
+ask for and is documented rather than guarded.
+
+The test helper in `AccessibilityTreeTest` had to change too, and that is worth recording: `mark()`
+built nodes with no `role` at all, so every threshold test was built out of things that were focusable
+and were not data. It sets `role = "mark"` now, and there is a `guide()` beside it.
+
+### A resize nobody asked for, and a wait that did not cover it
+
+Two defects that turn out to be one thing: what happens when a host tells a chart how much room it
+has.
+
+**The recompile was unconditional.** `VegaChartController.containerSize` returned early only when the
+size was unchanged or no specification was loaded; nothing in it looked at whether the loaded document
+reads `containerSize()`. So a host that reports its layout size on every resize — which is what a host
+with any responsive chart on the page will do — paid a full compile per step of a split-view drag for
+every chart it draws, including every chart that states its own width and height, which is most of
+them. `CompiledSpec.readsContainerSize` is the exact answer, and it comes from the expressions rather
+than from the text: `width: "container"` reaches the engine as a signal whose `update` calls the
+function. The size is still *recorded* when the compile is skipped, or the saving would be a bug — a
+specification loaded after a skipped resize has to compile against the size the host stated.
+
+**And it ran on the calling thread.** `setContainerSizeAsync` is the same work on a dispatcher,
+serialized against every other compile through the same lock, and awaitable. Which mattered because
+`ChartSession` is `@MainActor` and wrapped the *synchronous* setter, so a resize compiled on the main
+thread.
+
+**Making it asynchronous exposed the second defect, which is why these landed together.**
+`ChartSession.settle()` awaited one handle — the compile — and `serialised` started everything it
+deferred as a `Task` nobody kept. With a synchronous body that was survivable by luck: the deferred
+block ran to completion before the caller of `settle()` was resumed. With a body that *awaits*, it is
+a plain race, and the existing `testTheContainerWidthIsTheChartsWidth` failed on it immediately — the
+chart was still 200 units wide when `settle()` returned.
+
+So the queue is a **chain**. Each block begins by awaiting the one before it, so awaiting the tail is
+awaiting all of them, and `settle()` loops until the queue is empty rather than awaiting whichever
+task happened to be last — a block may queue more work, which is exactly what the container-size
+setter does. The tail clears itself when nothing has arrived behind it, using a counter rather than
+task identity, which keeps the inline fast path open for a tap on a settled chart. The compile is
+queued too, and that closes a narrower hazard of its own: a load used to start immediately while a
+deferred block sat awaiting the *previous* compile, so the block ran with the new compile already
+under way, against a controller that is documented as unsafe for concurrent use. Cancellation is
+still aimed at the compile alone, through a separate handle, since a load supersedes the compile before
+it and not a queued touch.
+
+Setting `containerSize` from Swift is therefore no longer synchronous, and says so. It never reliably
+was.
+
+### A Vega-Lite document read as Vega after it had already failed
+
+`let vega = converted.vegaJson ?? specification`. Where Vega-Lite compilation produced nothing, the
+session handed the text **as written** to a controller that only understands Vega, on the stated
+theory that the runtime would then report on it and that this beat inventing a failure.
+
+Measured, on a `layer` containing an `hconcat` — a construct the compiler refuses by name, with a
+paragraph explaining why upstream rejects it. What a host actually got, with the fallback in place:
+
+- `'data' must be an array`
+- `This document declares nothing that draws: no 'marks', no 'axes', no 'legends' and no 'title' …
+  Its top-level keys are $schema, data, layer.`
+- `Specification declares no width or height; the surface is measured from its contents`
+
+— three complaints about the wrong grammar, a 0×0 empty scene published as the chart, and
+`failure` **nil**. So the session reported success for a document it had already decided it could not
+compile. The one true thing anybody knew at that point was sitting unread in
+`converted.diagnostics`.
+
+It stops there now: the conversion's own diagnostics become the chart's, `failure` carries the first
+of them a reader can act on, and the chart on screen is left alone, as it is for any compile that
+produces no scene. A nil `vegaJson` means exactly this and nothing else — text that is not JSON, or
+JSON that is not Vega-Lite, comes back unchanged with `wasVegaLite` false and goes on to the runtime
+as it always did, which is the half the test also pins.
+
+Worth noting how the old failure became legible: the second of those three diagnostics is
+`PARSE_NOTHING_TO_DRAW`, which did not exist until this stack. Before it, the fallback's answer to a
+broken Vega-Lite document was one complaint about `data` and an empty chart.
+
+### A label the axis hid, painted black by the other renderer
+
+An axis hides a label that would overlap its neighbour by setting the label's **opacity to zero**
+rather than by removing it. `AxisBuilder` says so outright, and for a reason: the mark count then does
+not change with the chart's width.
+
+The Swift walk guarded on `visible` and not on opacity, so the node arrived at the text branch,
+`brush` answered nil for it — as it does for a mark with no fill at all — and `CoreTextDrawing` read
+that nil as a paint it could not express and drew `CGColor(gray: 0, alpha: 1)`, on the reasoning that
+black beats an invisible label. One nil meaning two opposite things at the two ends of one call.
+
+Measured on `label-overlap.vg.json`, a committed document: 43 labels, 24 of them hidden. This renderer
+produced 43 text calls. The Compose walk produced 19.
+
+**The Compose walk was right, and the reason is one line.** It has always had
+`if (node.opacity <= 0.0 && node !is GroupNode) return`, with the comment that nothing paints anything
+at zero opacity so leaving early is the same picture drawn faster. The Swift walk had only the
+`visible` check. So the fix is that line, mirrored — which covers every mark type rather than text
+alone, and puts the two walks back in step. That is what they are for: "the same calls in the same
+order" is the claim both files make, and there are two copies of that logic, one per language, so they
+can drift and had.
+
+Two narrower guards went in beside it, because either end of the call could still be got wrong on its
+own. The text branch declines to hand over a run with **no paint at all**, which covers `fillOpacity:
+0` on a node whose own opacity is one. And `CoreTextDrawing` no longer paints a nil brush: nil is
+nothing to paint, and only a brush it genuinely cannot express — a gradient — still falls back to
+black.
+
+Worth stating as a gap rather than leaving implied: nothing compares the two walks' call sequences
+against each other. Their recording targets write different formats, and this defect is what that
+costs.
+
+### A chart nobody could touch, claiming every touch
+
+`VegaChartView` attached `.gesture(touch)`, two `.simultaneousGesture` calls and `.onContinuousHover`
+**unconditionally**. Every handler opened `guard let session else { return }`, so with no session the
+gestures did nothing — and `DragGesture(minimumDistance: 0)` still claims the drag the moment a finger
+lands. The `session` parameter's own documentation said the opposite: "Nil draws a chart nobody can
+touch".
+
+What that cost: a chart wider than its slot goes in a horizontal scroll view inside a page that
+scrolls vertically, and neither scrolled. The same host code on Compose scrolled both ways, because
+`Modifier.chartPointerInput` returns its receiver untouched when every callback is null. So the fix is
+that shape, in three parts.
+
+**No session, no gestures.** Every mask is `.none`, and hit testing is off on the drawing — which is
+also the workaround an adopter had to apply from outside, so applying it here is what makes the
+parameter's documentation true. The VoiceOver overlay is unaffected: it is a sibling in the `ZStack`
+with its own `allowsHitTesting(false)`, and activation goes through `accessibilityAction`, which does
+not need hit testing.
+
+**The button trait is gated on the same condition as the action it advertises.** `traits(for:)`'s own
+header records this exact failure — "Both hosts used to say button for everything, which is a promise
+the chart does not keep" — and the gate that landed was on `activatable` while the gate on `session`
+did not. VoiceOver announced every mark of a session-less chart as a button, a reader activated one,
+and `accessibilityAction` opened `guard let session else { return }`. There is one `activatable(_:)`
+now, read by the trait, by `accessibilityRespondsToUserInteraction` and by the action, so the three
+cannot disagree again. The Compose renderer gates the *role* rather than the action, and this is that.
+
+**The tap and the pan are separate detectors**, as they are on Compose, where `detectTapGestures` and
+`detectTransformGestures` are separate `pointerInput` blocks installed per callback. `SpatialTapGesture`
+reports its location, which is the only reason a zero-distance drag was standing in for a tap; it
+claims nothing until it has recognised one. The pan is a `DragGesture` with a real minimum distance,
+and the hand-rolled slop that used to tell the two apart inside one gesture is gone.
+
+`ChartGestures` is how a host says which. `.withoutDrag` is the tap and the hover — the two that claim
+nothing — and it exists for the scroll-view case; tooltips still work through it, a tap being a hover
+as well on a screen with no pointer. A long press is **not** in it, and that is the one honest cost
+left: SwiftUI reports no location for a long press, so the place the finger landed has to come from a
+zero-distance drag.
+
+What is not verifiable from `swift test`: that a gesture is or is not installed in a SwiftUI hierarchy.
+`activatable(_:)` and `traits(for:)` are internal so the promise itself is asserted, and the gesture
+sets are asserted as sets; the attachment is a reading of `GestureMask` and `allowsHitTesting`.
+
+### An image resolver both draw targets had and neither view could reach
+
+`DrawScopeTarget` and `CoreGraphicsTarget` have each taken a `resolveImage` from the start, with the
+same argument for why it is the host's decision that `DataLoader` makes about data: a URL is not an
+image, and a chart is often data a reader pasted, so following the address is a policy the host owns.
+Neither public view had a parameter for it, so both were always built with it defaulted to nothing. A
+chart with a remote image mark drew every other mark and a hole where the image would be, on both
+platforms, and an unresolved image is recorded and skipped rather than aborting the draw — so the hole
+was all a host saw, with no supported way to supply a fetcher.
+
+Both views take one now, `VegaChart(resolveImage =)` and `VegaChartView(resolveImage:)`, and both
+tests draw through the view's own path rather than through a target built in the test, which is what
+could have passed and proved nothing. The Swift one reads a pixel: white where there is no resolver,
+the resolver's own blue where there is.
+
+**And the Compose cache had to move, or exposing the resolver would have been a performance bug.** A
+`DrawScopeTarget` is constructed inside the `Canvas` draw lambda, so its `cachedRasters` and
+`cachedUrls` had a lifetime of one frame. That was already costing something — a heatmap's raster was
+PNG-encoded and decoded on every draw — and with a resolver reachable it would have called a host's
+fetcher once per image per frame. `ImageCache` is the caller's to own, `rememberVegaImageCache`
+remembers one against the composition, and `VegaChart` does that for its caller. Bounded by **count**
+rather than by bytes, because an `ImageBitmap`'s footprint is a platform's business and this module has
+no way to ask; least recently used goes first, the same three-line policy `CachingExpressionCompiler`
+and `TextLayoutCache` use, `LinkedHashMap`'s access-order mode being JVM-only. The Apple side needed
+nothing: `CoreGraphicsTarget`'s cache is already static.
+
+A gap left stated rather than closed: neither view exposes the list of URLs the resolver could not
+answer. The targets collect it — `unresolvedImages` and `unresolved` — and a view discards the target
+it built. Reporting it from a composable means a callback fired during the draw phase, which is not
+something to add without a reason to.
+
+### A chart 300 units wide in a slot of any size
+
+`Box(modifier = modifier.then(Modifier.size(scene.width.dp, scene.height.dp)))`. The order there is
+right and deliberate — the caller's modifier first, so a bound it states wins, which a previous fix
+established — but the trailing `size` is unconditional. A caller that bounds *neither* dimension
+therefore gets the scene's own size whatever `fit` says, and `fit` is documented as how a scene that is
+not the size of its slot is placed in it: in that case the slot and the scene are the same size by
+construction, so it has nothing to do and nothing says so.
+
+Which matters most for exactly the chart that cannot state its own width. `width: "container"` falls
+back to `config.view.continuousWidth` — 300 — plus the axis extent, so a host that forgot to bound the
+chart got about 300 units of chart in however much room was going.
+
+`SceneSizing` is the question in front of `fit` rather than an alternative to it. `Scene` is what this
+always did and stays the default: a specification declares a size and that is the size it wants.
+`Fill` puts `fillMaxSize` in front of the same `size` modifier, which fills a **bounded** dimension and
+passes an unbounded one straight through — so it takes the slot where there is one and falls back to
+the scene's size where there is not, which is the only thing it can do inside a scrolling column. Safe
+to pass anywhere, and it does something wherever there is room to do it in.
+
+`ComposeSizingTest` asserts all three answers through Compose's own test harness rather than by reading
+the modifier chain: the scene's size in a 600×300 slot by default, the slot with `Fill`, and a caller's
+own `width` beating both. The last of those is the order, and it is now a test rather than a comment.
+
+### A face the chart asked for, drawn as whatever the platform had
+
+`genericFontFamily` matched eight strings — the CSS generics and their `ui-*` spellings — and answered
+null for everything else, which its own doc says means the platform's default face. So a themed
+specification naming a real installed family, or a family the host bundles, was drawn in the default
+one, and nothing said so.
+
+The asymmetry is what makes this the one renderer that needed work. `CoreTextFonts` resolves a family
+by font descriptor and `AndroidTextEngine` through `Typeface.create`, so a name that exists on the
+device is found on both of those. Common Compose code reaches neither: a `FontFamily` comes from a
+`Font` resource or a loaded typeface, so **only a host that already holds one** can map a name to it.
+That is why the answer is a registry rather than a lookup.
+
+`namedFontFamily(mapOf("Google Sans Flex" to FontFamily(…)))` is that registry, with
+`rememberVegaTextEngine(fontFamilies)` as the ergonomic form. Matched without regard to case, because a
+specification's `"Helvetica Neue"` and a host's `"helvetica neue"` are the same face and a chart should
+not turn on which was typed; and a comma-separated stack is read left to right as CSS reads it, so a
+registered name beats a generic written after it. It falls through to `genericFontFamily`, so
+registering nothing changes nothing.
+
+And the silence is closed the way the image resolver's is. A text engine has no diagnostics channel —
+it is handed to a compiler, not built by one — so `ComposeTextEngine.unresolvedFontFamilies` collects
+the names its resolver declined, while **measuring**, which is before anything is drawn. A well-formed
+stack never lands there: `"Helvetica Neue, Arial, sans-serif"` resolves on its last entry. What lands
+there is a name with nothing generic behind it, which is exactly the case that used to be invisible.
+
+The wrapper that records is what `DrawScopeTarget` is given, not the caller's own function, so the
+drawing resolves through the same path the measurement did. A wrapper only one side used would be a new
+way to have the defect this class exists to prevent.
+
+### The locale threaded for real, and the pin that keeps the fixtures honest
+
+The first cut of this gave a host two override maps and derived nothing, which left the *default*
+wrong: a locale copied field for field out of a d3 locale JSON still read `mei 21, 2026` unless its
+author knew to write a pattern by hand. So the locale is threaded properly now, and the divergence
+from upstream is deliberate and stated rather than avoided.
+
+`VegaLocale.date` is d3's `%x` — "the date order this language writes" — and it was the only place in
+the engine that knew that order while being read by nothing that decided a label. It is derived from
+now. `time` is `%X` and goes the same way: a pattern written with `%H` gives a temporal axis 24-hour
+ticks in place of d3's `%I %p`, which is an afternoon in a place that writes 14:00.
+
+**Two derivations, because there are two tables and they are not the same shape.** `TimeUnits`'s
+entries are numeric, so the whole pattern transfers and the compound runs are `%x` with fields
+*dropped* — which is what keeps prose in it, so `%e de %B de %Y` yields `%B de %Y` for a month within a
+year. Which separator goes with a dropped field is the entire arithmetic: a leading or middle field
+takes the one after it, so `%b %d, %Y` without its date is `%b %Y` and not `%b, %Y`. Vega-Lite's table
+spells the month as a **name**, which is what it exists for, so only the *order* transfers and the
+directives stay `%b %d %Y`; substituting a name into a numeric pattern gives `21-mei-2026`.
+
+**The pin.** `VegaLocale.EnglishUS` states both tables empty instead of deriving, so it answers exactly
+what upstream answers, and it is the locale every differential comparison runs under. That pin exists
+because upstream is internally inconsistent and a derivation cannot be both faithful and consistent:
+d3's `en-US` writes `%x` as `%-m/%-d/%Y` while `vega-time`'s table writes a full date as `%Y-%m-%d`.
+
+And it is pinned where it can be read. `LocaleDefaultsTest` asserts that `EnglishUS` derives nothing
+and that upstream's five landmark specifiers come out of it, so removing the pin fails there rather
+than in 283 fixture comparisons whose diff would be four hundred moved labels and no explanation.
+`UpstreamTimeVectorsTest` — which replays upstream's own recorded tests — now **names** the locale
+instead of defaulting it, which turns those vectors into the same assertion. So do the three
+differential gates: `FixtureDifferentialTest`, `VegaLiteFixtureTest` and
+`VegaLiteFixtureDifferentialTest` all say `VegaLocale.EnglishUS` at the call site, because "the locale
+upstream's tests assume" is a claim worth being able to read where the comparison happens rather than
+inferring from a default parameter.
+
+`DateField` is public for one reason: the order is a fact `vega-model` can read and `:vega-lite` has to
+apply, and neither can do the other's half.
+
+### A hole in a chart, and the callback that could not have worked
+
+The gap left stated at the end of the image work: neither view exposed the URLs a resolver could not
+answer. The reason given was that reporting from a composable means a callback fired during the draw
+phase — which is true, and turned out to be the *second* problem rather than the first.
+
+The first was that **only successes were cached**. A URL that could not be resolved was handed back to
+the host's resolver on every frame, so a chart with one missing image made a fetch attempt per frame
+forever. That is a defect on its own, and it is also what made a report unusable: fired from the draw
+against an uncached refusal, it would have fired per frame.
+
+So refusals are cached, on both sides — `ImageCache` on Compose, the static cache behind
+`CoreGraphicsTarget` on Apple — and the callback fires when the cache **learns** something rather than
+when a draw meets a hole. Once per URL. `VegaChart(onUnresolvedImage =)` and
+`VegaChartView(onUnresolvedImage:)`, both additive with defaults, so no existing call site moves.
+
+Two details worth keeping. The Swift view hands the callback *to* the target rather than reading
+`target.unresolved` back off it afterwards: that list is what one draw met, so reporting from it would
+have reported per frame — the same trap one level up. And a cached refusal has to be forgettable, since
+a fetch that failed while the network was down would otherwise stay failed forever:
+`ImageCache.clear()` and `CoreGraphicsTarget.clearImageCache()`, both documented as being for that and
+not for tidiness.
+
+`ImageCache.unresolvedImages` is the same facts without a callback, for a host that would rather poll.
+It lives on the cache rather than the target for the reason the whole thing exists: the cache is the
+host's and outlives a frame.
+
+**A test that proved nothing, caught by writing it.** The first draft called
+`ImageComposeScene.render()` three times and asserted one fetch. `render()` does nothing when nothing
+has invalidated, so it drew once and the assertion was vacuous — the "gate that passed without having
+run" this repository keeps finding. It now counts draws through `onPlaced`, forces the redraw with a
+state change, and puts two marks on one URL so the per-draw half is testable without any redraw at
+all.
+
+### The two walks, compared against each other at last
+
+Left as a stated gap at the end of the hidden-label work: nothing compared the two `SceneWalk`
+implementations' call sequences. Each says in its own header that it emits "the same calls in the same
+order" as the other, and each renderer's tests assert about that renderer — so a divergence passed both,
+which is exactly how the Apple renderer came to paint 43 text runs where Compose painted 19.
+
+`test-fixtures/scene-walk/*.calls.txt`, nine fixtures, ~410 lines. `SceneWalkGoldenTest` writes each
+from the Compose walk and `SceneWalkParityTests` asserts the Swift walk reproduces it, naming the first
+differing line rather than printing two thousand characters of diff.
+
+**Why a third recorder.** `RecordingTarget` exists on each side and their formats had drifted the way
+two copies of anything do — `->` against ` -> `, `@` against ` a`, a path summarised by a tally here and
+by its first and last command there. Aligning them would churn every assertion written against either,
+so `CanonicalCalls` is a third one per side whose only job is to be byte-identical. It writes every
+field always, with no shorthand for a default: a recorder that omits what it thinks is uninteresting
+cannot prove agreement about it. And a path goes down command by command, control points included,
+because a summary is precisely what hides a curve drawn through the wrong controls.
+
+Two things had to be got right or the comparison would have been about something else. Numbers are
+rounded **by hand** — three decimals, ties away from zero — because Java's `%.3f` rounds a tie up and
+C's rounds it to even, which would have surfaced as a parity failure once in a thousand coordinates
+with nothing to read. And the scene has to be identical **by construction**, so every compile input is
+spelled out on both sides: the text engine's ratios, the fixed clock, seed 42, `EnglishUS`, and UTC.
+The zone is the one that would have slipped — a `time` scale is local, the JVM tests pin
+`Europe/Amsterdam` through Gradle and `swift test` pins nothing, so a golden written without it would
+have been a golden about this machine.
+
+**It found something on its first run.** The Swift `DrawTextRun` had no `letterSpacing`, and
+`CoreTextTextEngine` applies `kCTKernAttributeName` from the style when it *measures* — so a
+specification with letter spacing was laid out in a box reserved for spaced glyphs and painted with
+unspaced ones. That is the defect `CoreTextDrawing`'s own header warns about, in a field nobody had
+noticed was absent. The run carries it now and the drawing applies the same attribute the measurement
+used.
+
+Verified against the defect it exists for: with both of the hidden-label guards removed, the parity
+test fails with `label-overlap: 104 calls here against 80 from the Compose walk`.
+
+### Rules rather than tables, and the precedence that makes them safe
+
+A fair criticism of the locale work as it stood: it was all a lookup table. Names, separators, three
+patterns, and — after the derivation — two override maps. Which stands out, because **every other host
+seam in this engine is an interface**: `TextEngine`, `DataLoader`, `Clock`, `Scheduler`,
+`HttpTransport`, and `VegaCaptions`, that last one specifically because the repository had already
+decided sentences are grammar and not a string table. Formatting was the only host-facing concern
+expressed purely as data.
+
+Two things a table provably cannot answer, both from real languages. **A contextual name**: Polish
+writes `stycznia` beside a day number and `styczeń` alone, so the month's form is a function of the
+*format* and no arrangement of lists can hold it. And **a numbering system**: `TimeFormat` and
+`NumberFormat` write `value.toString()`, so `١٢` was unreachable however the locale was filled in.
+
+`VegaLocale.rules: VegaFormatRules?` is the seam, and the shape of it comes from a rule about
+precedence rather than from the list of things a host might want: **a specification's format decides
+the shape and the host decides the details inside it.** So the interface is two methods — what a
+name-bearing directive says, and what digits a number is written with — and it cannot reorder a date,
+drop a field, change a width, or substitute a pattern of its own. That constraint is what makes it
+*smaller* than a formatter interface would have been, and it is why it needed no plumbing: `TimeFormat`
+and `NumberFormat` already receive the locale on every path, so the rules ride along with it.
+
+**The API changed shape once, because the first draft failed its own test.** `name` was given the raw
+`pattern` and the first rule written against it tested `pattern.contains("%d")` — which is wrong,
+because the pattern was `%-d`: a pad modifier sits between the percent and the letter. Asking a host to
+re-parse strftime is the engine pushing its own work outward, and it fails quietly. So the directives
+arrive parsed, as a `DateNameContext` that answers `hasDayOfMonth`, `hasYear`, `hasTimeOfDay` and
+`isAlone`, with the letter set and the pattern there for anything else.
+
+Every method may answer null — a host implements the rules it has and inherits the rest — and
+`EnglishUS` carries none, so the 193 and 283 differential comparisons are untouched by construction.
+
+What it deliberately does not reach is written down in `VegaFormatRules`: the day a week starts on
+(`%U`/`%W` is a field the document chose), calendars and eras (`%Y` means "the year, four digits", and
+an era year is a different field), and any format a platform *composes* rather than names. That last
+one is not a limitation to fix later — handing in `getBestDateTimePattern` would replace the document's
+format, which is exactly what this shape exists to prevent.
 
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but

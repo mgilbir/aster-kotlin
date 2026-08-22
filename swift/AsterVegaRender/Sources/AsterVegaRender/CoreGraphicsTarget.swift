@@ -32,14 +32,23 @@ public struct CoreGraphicsTarget: DrawTarget {
   /// the opposite of this project's discipline about silence.
   public private(set) var unresolved: [String] = []
 
+  /// Told the first time a URL cannot be resolved, and not again for that URL.
+  ///
+  /// Not read off ``unresolved``, and the difference is the point: that list is what *this draw* could
+  /// not resolve, so a caller reporting from it would report on every frame. A refusal is cached, so
+  /// this fires when the cache learns something — once per URL until `clearImageCache()`.
+  private let onUnresolvedImage: ((String) -> Void)?
+
   public init(
     context: CGContext,
     drawText: ((DrawTextRun, Brush?, CGContext) -> Void)? = nil,
-    resolveImage: ((String) -> CGImage?)? = nil
+    resolveImage: ((String) -> CGImage?)? = nil,
+    onUnresolvedImage: ((String) -> Void)? = nil
   ) {
     self.context = context
     self.drawText = drawText
     self.resolver = resolveImage
+    self.onUnresolvedImage = onUnresolvedImage
   }
 
   public mutating func beginGroup(clip: Rect?) {
@@ -125,12 +134,37 @@ public struct CoreGraphicsTarget: DrawTarget {
       return decoded
     }
     guard !url.isEmpty else { return nil }
-    if let cached = Self.cache.image(forURL: url) { return cached }
+    switch Self.cache.answer(forURL: url) {
+    case .image(let cached): return cached
+    // **The failure is cached too**, and that is not only tidiness. Nothing remembered a URL that
+    // could not be resolved, so a host's fetcher was called again on every frame for an address that
+    // had already said no — and any report of it would have fired once per frame with it. Once per
+    // URL is both the cheaper answer and the one a host can act on. `clearImageCache()` is how a
+    // transient failure gets a second chance.
+    case .unresolvable: return nil
+    case .unknown: break
+    }
     // A `data:` URL needs no host at all, so it is answered here rather than pushed onto a resolver that
     // would have to know how. Anything else is the host's business.
     let decoded = url.hasPrefix("data:") ? Self.decode(dataURL: url) : resolver?(url)
-    if let decoded { Self.cache.store(decoded, forURL: url) }
+    if let decoded {
+      Self.cache.store(decoded, forURL: url)
+    } else if Self.cache.storeUnresolvable(url) {
+      // Only where the cache **learned** it. `unresolved` below still records every hole this draw
+      // met, which is what a caller inspecting one draw wants; a report to a host has to be once per
+      // URL or it is once per frame.
+      onUnresolvedImage?(url)
+    }
     return decoded
+  }
+
+  /// Forgets every decoded image, and every URL that could not be decoded.
+  ///
+  /// The second half is why this is public. Failures are remembered so a resolver is asked once per
+  /// URL rather than once per frame, which means a fetch that failed because the network was down
+  /// stays failed — so a host that recovers has to be able to say so.
+  public static func clearImageCache() {
+    cache.clear()
   }
 
   /// Fits an image inside `rect`, centred, preserving its aspect ratio.
@@ -321,10 +355,44 @@ public struct CoreGraphicsTarget: DrawTarget {
   /// Keyed by a raster's digest, which is stable for identical pixels, or by the URL.
   private static let cache = ImageCache()
 
+  /// What the cache knows about a URL: an image, a refusal, or nothing yet.
+  ///
+  /// Three cases rather than an optional, because "no image" was two different facts sharing one
+  /// answer — never asked, and asked and refused — and telling them apart is what stops a resolver
+  /// being called once per frame for an address that has already declined.
+  private enum Answer {
+    case image(CGImage)
+    case unresolvable
+    case unknown
+  }
+
   private final class ImageCache: @unchecked Sendable {
     private var byDigest: [Int64: CGImage] = [:]
     private var byURL: [String: CGImage] = [:]
+    private var unresolvable: Set<String> = []
     private let lock = NSLock()
+
+    func answer(forURL url: String) -> Answer {
+      lock.lock()
+      defer { lock.unlock() }
+      if let image = byURL[url] { return .image(image) }
+      return unresolvable.contains(url) ? .unresolvable : .unknown
+    }
+
+    /// Records a refusal, answering whether it was news.
+    func storeUnresolvable(_ url: String) -> Bool {
+      lock.lock()
+      defer { lock.unlock() }
+      return unresolvable.insert(url).inserted
+    }
+
+    func clear() {
+      lock.lock()
+      defer { lock.unlock() }
+      byDigest.removeAll()
+      byURL.removeAll()
+      unresolvable.removeAll()
+    }
 
     func image(forRaster digest: Int64) -> CGImage? {
       lock.lock()
@@ -336,12 +404,6 @@ public struct CoreGraphicsTarget: DrawTarget {
       lock.lock()
       defer { lock.unlock() }
       byDigest[digest] = image
-    }
-
-    func image(forURL url: String) -> CGImage? {
-      lock.lock()
-      defer { lock.unlock() }
-      return byURL[url]
     }
 
     func store(_ image: CGImage, forURL url: String) {

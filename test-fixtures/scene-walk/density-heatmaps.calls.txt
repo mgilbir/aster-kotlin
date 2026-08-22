@@ -1,0 +1,105 @@
+group clip=-
+  group clip=-
+    group clip=-
+      line (40.500,272.500)-(35.500,272.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+      line (40.500,247.500)-(35.500,247.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+      line (40.500,222.500)-(35.500,222.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+      line (40.500,197.500)-(35.500,197.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+      line (40.500,172.500)-(35.500,172.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+      line (40.500,147.500)-(35.500,147.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+      line (40.500,122.500)-(35.500,122.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+      line (40.500,97.500)-(35.500,97.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+      line (40.500,72.500)-(35.500,72.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+      line (40.500,47.500)-(35.500,47.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+      line (40.500,22.500)-(35.500,22.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+      text "0" origin=(27.500,275.500) anchor=(33.500,272.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      text "5" origin=(27.500,250.500) anchor=(33.500,247.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      text "10" origin=(21.500,225.500) anchor=(33.500,222.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      text "15" origin=(21.500,200.500) anchor=(33.500,197.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      text "20" origin=(21.500,175.500) anchor=(33.500,172.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      text "25" origin=(21.500,150.500) anchor=(33.500,147.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      text "30" origin=(21.500,125.500) anchor=(33.500,122.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      text "35" origin=(21.500,100.500) anchor=(33.500,97.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      text "40" origin=(21.500,75.500) anchor=(33.500,72.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      text "45" origin=(21.500,50.500) anchor=(33.500,47.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      text "50" origin=(21.500,25.500) anchor=(33.500,22.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      text "Miles per Gallon" origin=(-36.300,145.300) anchor=(16.500,147.500) ascent=8.800 font="sans-serif" size=11.000 weight=700 italic=0 angle=-90.000 spacing=0.000 fill=#000000ff stroke=-
+    end
+    group clip=-
+      group clip=-
+        line (42.500,272.500)-(42.500,277.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+        line (90.500,272.500)-(90.500,277.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+        line (138.500,272.500)-(138.500,277.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+        line (186.500,272.500)-(186.500,277.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+        line (234.500,272.500)-(234.500,277.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+        line (282.500,272.500)-(282.500,277.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+        text "0" origin=(42.500,287.500) anchor=(42.500,279.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "5" origin=(87.500,287.500) anchor=(90.500,279.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "10" origin=(132.500,287.500) anchor=(138.500,279.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "15" origin=(180.500,287.500) anchor=(186.500,279.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "20" origin=(228.500,287.500) anchor=(234.500,279.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "25" origin=(276.500,287.500) anchor=(282.500,279.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "Acceleration" origin=(127.900,302.300) anchor=(167.500,293.500) ascent=8.800 font="sans-serif" size=11.000 weight=700 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      end
+      image url="" raster=62x62 (42.000,22.000,250.000,250.000) fit=fill smooth=1 opacity=1.000
+      group clip=-
+        text "Europe" origin=(143.600,15.400) anchor=(167.000,5.000) ascent=10.400 font="sans-serif" size=13.000 weight=700 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      end
+    end
+    group clip=-
+      group clip=-
+        line (302.500,272.500)-(302.500,277.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+        line (350.500,272.500)-(350.500,277.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+        line (398.500,272.500)-(398.500,277.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+        line (446.500,272.500)-(446.500,277.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+        line (494.500,272.500)-(494.500,277.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+        line (542.500,272.500)-(542.500,277.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+        text "0" origin=(302.500,287.500) anchor=(302.500,279.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "5" origin=(347.500,287.500) anchor=(350.500,279.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "10" origin=(392.500,287.500) anchor=(398.500,279.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "15" origin=(440.500,287.500) anchor=(446.500,279.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "20" origin=(488.500,287.500) anchor=(494.500,279.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "25" origin=(536.500,287.500) anchor=(542.500,279.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "Acceleration" origin=(387.900,302.300) anchor=(427.500,293.500) ascent=8.800 font="sans-serif" size=11.000 weight=700 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      end
+      image url="" raster=62x62 (302.000,22.000,250.000,250.000) fit=fill smooth=1 opacity=1.000
+      group clip=-
+        text "Japan" origin=(407.500,15.400) anchor=(427.000,5.000) ascent=10.400 font="sans-serif" size=13.000 weight=700 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      end
+    end
+    group clip=-
+      group clip=-
+        line (562.500,272.500)-(562.500,277.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+        line (610.500,272.500)-(610.500,277.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+        line (658.500,272.500)-(658.500,277.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+        line (706.500,272.500)-(706.500,277.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+        line (754.500,272.500)-(754.500,277.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+        line (802.500,272.500)-(802.500,277.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+        text "0" origin=(562.500,287.500) anchor=(562.500,279.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "5" origin=(607.500,287.500) anchor=(610.500,279.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "10" origin=(652.500,287.500) anchor=(658.500,279.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "15" origin=(700.500,287.500) anchor=(706.500,279.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "20" origin=(748.500,287.500) anchor=(754.500,279.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "25" origin=(796.500,287.500) anchor=(802.500,279.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "Acceleration" origin=(647.900,302.300) anchor=(687.500,293.500) ascent=8.800 font="sans-serif" size=11.000 weight=700 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      end
+      image url="" raster=62x62 (562.000,22.000,250.000,250.000) fit=fill smooth=1 opacity=1.000
+      group clip=-
+        text "USA" origin=(675.300,15.400) anchor=(687.000,5.000) ascent=10.400 font="sans-serif" size=13.000 weight=700 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      end
+    end
+    group clip=-
+      group clip=-
+        rect (830.000,51.000,16.000,222.000) corners=[0.000,0.000,0.000,0.000] fill=linear(830.000,273.000)-(830.000,51.000)[0.000=#440154ff,0.050=#481467ff,0.100=#482575ff,0.150=#463580ff,0.200=#414487ff,0.250=#3b528bff,0.300=#35608dff,0.350=#2f6c8eff,0.400=#2a788eff,0.450=#25858eff,0.500=#21918dff,0.550=#1f9c8aff,0.600=#22a884ff,0.650=#30b47cff,0.700=#43bf71ff,0.750=#5dc963ff,0.800=#7ad151ff,0.850=#9ad93dff,0.900=#bcdf27ff,0.950=#dee41bff,1.000=#fde725ff] stroke=-
+        text "0.0" origin=(848.000,271.000) anchor=(848.000,273.000) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "0.2" origin=(848.000,231.600) anchor=(848.000,228.600) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "0.4" origin=(848.000,187.200) anchor=(848.000,184.200) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "0.6" origin=(848.000,142.800) anchor=(848.000,139.800) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "0.8" origin=(848.000,98.400) anchor=(848.000,95.400) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+        text "1.0" origin=(848.000,59.000) anchor=(848.000,51.000) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      end
+      text "Local Density" origin=(830.000,30.800) anchor=(830.000,22.000) ascent=8.800 font="sans-serif" size=11.000 weight=700 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      text "(Normalized)" origin=(830.000,43.800) anchor=(830.000,22.000) ascent=8.800 font="sans-serif" size=11.000 weight=700 italic=0 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+    end
+  end
+end

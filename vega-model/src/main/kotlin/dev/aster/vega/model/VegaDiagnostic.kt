@@ -53,11 +53,31 @@ public object DiagnosticCodes {
   public const val PARSE_UNKNOWN_PROPERTY: String = "VEGA_PARSE_UNKNOWN_PROPERTY"
   public const val PARSE_MISSING_PROPERTY: String = "VEGA_PARSE_MISSING_PROPERTY"
 
+  /**
+   * A parsed document declares nothing that draws.
+   *
+   * Informational, because `{}` is valid Vega and upstream renders it as an empty surface. What is
+   * not acceptable is silence: a host that reads "no diagnostics" as "there is a chart" cannot
+   * otherwise tell an empty placeholder object apart from a chart that drew.
+   */
+  public const val PARSE_NOTHING_TO_DRAW: String = "VEGA_PARSE_NOTHING_TO_DRAW"
+
   public const val EXPRESSION_PARSE_ERROR: String = "VEGA_EXPRESSION_PARSE_ERROR"
   public const val EXPRESSION_UNSUPPORTED_FUNCTION: String = "VEGA_EXPRESSION_UNSUPPORTED_FUNCTION"
 
   /** A message a specification asked for itself, through `warn()`, `info()` or `debug()`. */
   public const val EXPRESSION_LOG: String = "VEGA_EXPRESSION_LOG"
+
+  /**
+   * A specification read `containerSize()` and no host size was supplied.
+   *
+   * Informational: `[null, null]` is what a browser answers outside a container and so what
+   * upstream answers, and the chart is exactly the one upstream draws. What the code cannot say for
+   * itself is that a specification which branches on its container took the "no container" arm,
+   * which is the one thing a host looking at an unexpected layout needs told.
+   */
+  public const val EXPRESSION_CONTAINER_SIZE_UNANSWERED: String =
+    "VEGA_EXPRESSION_CONTAINER_SIZE_UNANSWERED"
 
   public const val SCALE_UNSUPPORTED_TYPE: String = "VEGA_SCALE_UNSUPPORTED_TYPE"
   public const val SCALE_INVALID_DOMAIN: String = "VEGA_SCALE_INVALID_DOMAIN"

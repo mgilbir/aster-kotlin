@@ -4,6 +4,202 @@ Notable changes, newest first. The release workflow reads the section for the
 version it is publishing and uses it as the release notes, so a version without a
 section here does not get released.
 
+## Unreleased
+
+### Fixed
+
+- **A SwiftUI chart with no session installs no gestures**, and one with a session
+  says which. Every handler already returned early without a session, but
+  `DragGesture(minimumDistance: 0)` claimed the drag on touch-down anyway — so a
+  chart in a horizontal scroll view inside a scrolling page stopped both from
+  scrolling, where the same host code on Compose scrolled both ways. The button
+  trait and `accessibilityRespondsToUserInteraction` are now gated on the same
+  condition as the action they advertise, so VoiceOver no longer offers an
+  activation that does nothing. And the tap is a `SpatialTapGesture` separate from
+  the pan, so `VegaChartView(gestures: .withoutDrag)` keeps taps, hover and
+  tooltips without claiming a touch. (#72)
+
+- **The Apple renderer no longer paints a label the axis deliberately hid.** An
+  overlapping axis label is hidden at zero opacity rather than removed, and the
+  Swift walk guarded on `visible` alone — so the node reached the text branch,
+  `brush` answered nil, and `CoreTextDrawing` read that as a paint it could not
+  express and drew black. Measured on `label-overlap.vg.json`: 43 labels, 24
+  hidden, 43 drawn where the Compose renderer drew 19. The Compose walk's
+  zero-opacity guard is now mirrored here, so every mark type is covered and the
+  two walks are back in step; the text branch also declines a run with no paint at
+  all, and a nil brush is no longer painted. (#71)
+
+- **A Vega-Lite document that will not compile is reported, not reinterpreted as
+  Vega.** `ChartSession` fell back to the unconverted text, which a parser that
+  only understands Vega then complained about in the wrong grammar's terms —
+  measured on a refused construct, three diagnostics about `data`, a missing
+  size and nothing to draw, a 0×0 scene published as the chart, and `failure`
+  nil. The conversion's own diagnostics are now the chart's, `failure` says why,
+  and the chart on screen is left alone. Text that is not Vega-Lite still reaches
+  the Vega parser untouched. (#61)
+
+- **A resize only recompiles a chart that asked for one, and no longer on the
+  calling thread.** `VegaChartController.containerSize` recompiled
+  unconditionally, so a host reporting its layout size on every resize paid a
+  full compile per step of a drag for every chart on the page — including every
+  chart that states its own width and height. It now skips the compile when the
+  loaded document never reads `containerSize()`, and `setContainerSizeAsync` does
+  the same work off the calling thread. (#59)
+- **`ChartSession.settle()` waits for everything queued, not only the compile.**
+  Work `serialised` deferred was started as a task nobody held, so a caller that
+  set `containerSize` during a compile and then settled returned before the resize
+  had run. The queue is a chain now and `settle()` loops until it is empty. The
+  compile is queued with everything else, closing a narrower hazard where a load
+  ran beside a deferred touch against a controller documented as unsafe for
+  concurrent use. **Setting `ChartSession.containerSize` is asynchronous** — await
+  `settle()` where the new scene is needed. (#60)
+
+- **The accessibility summary threshold counts data marks, and the guides survive
+  it.** It counted every focusable element, so a chart's axes and legend pushed it
+  over before the data was dense — measured: 118 points, two axes and a legend is
+  121 focusable elements, and the whole tree collapsed at 118 marks. A reader lost
+  per-mark exploration of the entire chart rather than of the crowded part, and
+  lost the axes and the legend too. The summary now stands in for the marks alone
+  and counts only those, and the threshold is a parameter on every host —
+  `AccessibilityTree.elements(maxExposedMarks =)`, the Compose and SwiftUI views,
+  and the Android view's `accessibilityMaxExposedMarks`. (#65)
+
+- **`legend.labelExpr` is honoured**, as `axis.labelExpr` already was. Upstream
+  destructures it out and writes `encode.labels.update.text` from it on both
+  guides; this compiler did it for the axis only, so a `legend.labelExpr`
+  survived into the emitted Vega and the *Vega* parser reported it as an unknown
+  property two stages later, while the labels were drawn from the scale's domain
+  at full length. Since the untruncated labels are what the legend's width is
+  computed from, a chart over long category names overflowed whatever held it,
+  with no host workaround. (#70)
+
+- **One bytecode level per release.** 0.1.0 published its jars at Java 17 and
+  `vega-compose-multiplatform`'s Android AAR at Java 21, because the pin named a
+  Kotlin target *type* and the AGP Kotlin Multiplatform Android target is not one
+  of those — so the AAR took the level of whichever JDK cut the release. A
+  Robolectric test on a JDK 17 runtime, in a build that resolves the Android
+  variant, died with `UnsupportedClassVersionError` at the first composable it
+  reached. The level is now pinned per compile *task*, so no target can escape it,
+  and `checkBytecodeLevel` asserts it against the class files themselves rather
+  than against the configuration that was wrong. (#68)
+
+- **`tickCount` in its interval form is no longer warned about.** The field was
+  read twice — once as a number, which warned `PARSE_UNKNOWN_PROPERTY` for
+  `"day"` or `{"interval": "day", "step": 20}`, and then again, correctly, as an
+  interval. A chart was laid out exactly as it asked and complained about at the
+  same time: one warning per axis, four on a page, all false. The warning now
+  fires only where a reading really fails — an interval that is not a calendar
+  unit, or one named by a signal, both of which used to fall through to a
+  chosen count in silence. (#69)
+
+- **A document that draws nothing says so.** A specification with no marks, no
+  axes, no legends and no title now reports `PARSE_NOTHING_TO_DRAW` at INFO.
+  `{"width": 100, "height": 50}` used to compile to a usable, empty chart with
+  no diagnostic of any kind, so a host reading "no diagnostics" as "there is a
+  chart" could not tell an empty placeholder object from one that drew. The
+  message lists the document's own top-level keys, which is what makes a
+  Vega-Lite specification handed to the Vega parser — previously silent —
+  legible: it reads `mark, encoding`. (#57)
+
+### Added
+
+- **A host can supply its own rules for a locale, not just tables.**
+  `VegaLocale.rules: VegaFormatRules?` decides what a name-bearing directive says
+  and what digits a number is written with — the two things a lookup table
+  provably cannot express, being a contextual name (Polish `stycznia` beside a day
+  number, `styczeń` alone) and a numbering system, since the engine wrote
+  `value.toString()` and that is ASCII always. It is also where a *device's* own
+  preferences can get in. **A specification's format decides the shape and the
+  rules decide the details inside it**: `"format": "%b %d, %Y"` keeps that order,
+  those fields and those widths whatever a host supplies, and literal text the
+  document typed is never passed to a rule. Every method may answer null, and
+  `EnglishUS` carries no rules, so the differential comparisons are untouched.
+
+- **The two renderers' draw-call sequences are compared against each other.** Both
+  `SceneWalk` implementations claim to emit "the same calls in the same order" and
+  nothing checked it — which is how the Apple renderer came to paint labels the
+  axis had hidden while Compose did not, with both renderers' own tests green.
+  `test-fixtures/scene-walk/*.calls.txt` is written from the Compose walk by
+  `SceneWalkGoldenTest` and asserted against the Swift walk by
+  `SceneWalkParityTests`. It found a second divergence immediately: the Swift
+  `DrawTextRun` carried no `letterSpacing`, so a spaced label was **measured**
+  with spacing and **drawn** without it. Fixed. (#71)
+
+- **A host is told which image URL could not be resolved**, once per URL:
+  `VegaChart(onUnresolvedImage =)` and `VegaChartView(onUnresolvedImage:)`, both
+  additive. Making it usable required fixing something else first — only
+  successful decodes were cached, so a URL that had already failed was handed back
+  to the host's resolver on **every frame**, and a report fired from the draw
+  would have fired with it. Refusals are cached now on both renderers, and
+  `ImageCache.clear()` / `CoreGraphicsTarget.clearImageCache()` give a host that
+  has recovered another go. `ImageCache.unresolvedImages` is the same facts
+  without a callback. (#58)
+
+- **A host can register named font families with the Compose renderer**, through
+  `namedFontFamily` or `rememberVegaTextEngine(fontFamilies)`. The default
+  resolver matched the generic CSS keywords and nothing else, so a themed
+  specification naming a real face was drawn in the platform's default one — and
+  said nothing about it. The Apple and Android engines resolve a device family by
+  name; common Compose code cannot, so only a host holding the `FontFamily` can.
+  `ComposeTextEngine.unresolvedFontFamilies` names what went unresolved, a text
+  engine having no diagnostics channel of its own. (#66)
+
+- **`VegaChart(sizing = SceneSizing.Fill)`**, so `fit` has something to do. The
+  composable appended `Modifier.size(scene.width.dp, scene.height.dp)`
+  unconditionally, so a caller that bounded neither dimension got the scene's own
+  size whatever `fit` said — for a `width: "container"` chart, about 300 units plus
+  axes in however much room was going. `Fill` takes the slot where there is one
+  and falls back to the scene's size where there is not. `SceneSizing.Scene`
+  remains the default. (#67)
+
+- **An image resolver on both public view APIs.** `DrawScopeTarget` and
+  `CoreGraphicsTarget` have each taken one from the start and neither
+  `VegaChart` nor `VegaChartView` had a parameter for it, so a chart with a
+  remote image mark drew every other mark and a hole where the image would be,
+  with no supported way to supply a fetcher. Exposing it also required the
+  Compose decode cache to outlive a frame: a target is built per draw, so a
+  heatmap's raster was being re-decoded every frame and a host's fetcher would
+  have been called every frame. `ImageCache` and `rememberVegaImageCache` are
+  the seam; it is bounded and least-recently-used. (#58)
+
+- **A locale decides the order of a date, not only its names.** `%b` always
+  resolved to the reader's month abbreviation, but the *pattern* came from tables
+  with no locale in them, so a Dutch axis read `mei 21, 2026`. `VegaLocale.date`
+  is d3's `%x` and is now derived from, and `time` likewise for the clock — so a
+  locale copied out of a d3 locale JSON reads `21 mei 2026` and gets 24-hour ticks
+  without being told to. This is a deliberate **divergence from upstream**, whose
+  `timeUnitSpecifier` takes no locale: `VegaLocale.EnglishUS` is pinned to
+  upstream's own answers and is the locale every differential comparison runs
+  under, which `LocaleDefaultsTest` and the upstream vector replay now assert.
+  `timeUnitSpecifierOverrides` and `timeTickFormatOverrides` state a table
+  outright where derivation is not wanted. The Vega-Lite compiler carries a locale
+  for the first time — the pattern is written on that side — so
+  `VegaLiteCompiler`, `VegaLiteInput.toVega` and `Config` take one, and
+  `ChartSession` passes its own. `VegaLocale.init`, `doCopy`,
+  `TimeUnits.specifier` and `toVega` change signature at the Obj-C boundary, and
+  `DateField` is new; recorded in `foreign-api.txt`. (#62)
+
+- **A specification that reads `containerSize()` with no host size supplied now
+  says so**, per dimension, as `EXPRESSION_CONTAINER_SIZE_UNANSWERED` at INFO.
+  The answer is unchanged — `[null, null]` is what a browser gives outside a
+  container and what upstream gives headless — but a document branching on a
+  breakpoint used to take its "no container" arm with nothing in the diagnostics
+  channel to explain the layout. `CompiledSpec.readsContainerSize` publishes the
+  same fact, so a host can decide whether a resize is worth a recompile at all;
+  it is false for any chart that declares its own width and height.
+  `Expression.functionDependencies` is the new seam behind both. (#63)
+
+- **`usermeta` reaches the host**, as `VegaSpec.usermeta` and so as
+  `CompiledSpec.spec?.usermeta`, on Kotlin and Swift alike. It was previously
+  discarded with one `usermeta is ignored` warning per compile, whatever it
+  carried — so the diagnostic was the whole of the feature, and a document
+  carrying supplementary data for the host to consume lost it unconditionally.
+  Absent is null and `{}` is an empty map; a non-object `usermeta` is reported
+  and dropped. Vega-Lite already carried it onto the Vega it emits, so a
+  document in either grammar arrives with it intact. `VegaSpec.init` and
+  `doCopy` gain a parameter, which is a new Obj-C signature — recorded in
+  `foreign-api.txt`. (#64)
+
 ## 0.1.0
 
 First release.

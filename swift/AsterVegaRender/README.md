@@ -43,6 +43,12 @@ specification's own bound controls, and reports what a touch found. `VegaChartVi
 taps, long presses, pans, pinches and a hovering pointer, and lays a **positioned** VoiceOver element
 over every mark, axis, legend and title.
 
+Pass no session and the view installs **no gestures** and turns hit testing off, so a chart that is
+only being looked at cannot swallow a swipe meant for the scroll view around it. With a session,
+`gestures:` chooses: `.withoutDrag` installs the tap and the hover, which claim nothing, and leaves out
+the long press, the pan and the pinch, which claim the touch. Tooltips still work through it, a tap
+being a hover as well on a screen with no pointer.
+
 Both were in the demo app until an adopter pointed out what that costs: about 2,400 lines of this
 renderer owned by hand, including the parts that took real bug fixes to get right — the aspect-fit
 arithmetic shared between drawing and hit testing, the drag-as-tap slop, the `@MainActor` isolation with

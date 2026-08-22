@@ -72,6 +72,29 @@ public data class VegaSpec(
    * `config.mark.fill` meant for the bars must not paint the whole plotting area.
    */
   val styleAboveDefaults: Map<String, VegaValue> = emptyMap(),
+  /**
+   * `usermeta` — metadata the document carries for the **host**, not for the engine.
+   *
+   * Nothing here reads it, and that is what it is for: upstream's schema calls it "optional
+   * metadata that will be passed to Vega" and it is the one top-level property whose whole purpose
+   * is to survive compilation. Vega-Lite carries it through to the Vega it emits
+   * (`VegaLiteCompiler`, last property), so a document written in either grammar arrives here with
+   * it intact.
+   *
+   * It used to be *reported* instead: one `usermeta is ignored` warning per compile, whatever it
+   * held, and no field on this class to hold it — so a specification carrying, say, a table of the
+   * values behind marks that have no accessible text of their own lost that table unconditionally,
+   * and the only thing a host learned was that something had been dropped.
+   *
+   * Null when absent, and an empty map when written as `{}`: the two are different statements and a
+   * host reading them as one would not be able to tell a document that carries no metadata from one
+   * whose metadata was filtered to nothing. Non-object values are reported rather than coerced,
+   * since upstream's type is an object.
+   *
+   * Reachable from a compiled chart as `CompiledSpec.spec?.usermeta`, and from Swift by the same
+   * path.
+   */
+  val usermeta: Map<String, VegaValue>? = null,
 )
 
 /**

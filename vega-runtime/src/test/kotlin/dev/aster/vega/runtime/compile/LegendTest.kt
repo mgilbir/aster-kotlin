@@ -1,6 +1,7 @@
 package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.fixtures.VegaHeadlessTextEngine
+import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.RectD
@@ -11,6 +12,7 @@ import dev.aster.vega.scene.SymbolNode
 import dev.aster.vega.scene.TextBaseline
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.flatten
+import dev.aster.vegalite.VegaLiteInput
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -567,5 +569,55 @@ class LegendTest {
     val legend = legends(json).single()
     assertEquals(74.0, legend.size?.width)
     assertEquals(37.0, legend.size?.height)
+  }
+
+  /**
+   * `legend.labelExpr` shortens the labels, and the Vega parser has nothing to complain about.
+   *
+   * This is the pair of symptoms the gap produced, end to end. The Vega-Lite compiler used to pass
+   * `labelExpr` through as though it were a Vega legend property, so the Vega parser reported
+   * `PARSE_UNKNOWN_PROPERTY at $.legends[0].labelExpr` — two stages after the mistake, which is a
+   * confusing place to read it — and the labels were drawn from the scale's domain at full length.
+   *
+   * The length is what matters to a host. `labelExpr` is how a document shortens labels that would
+   * otherwise not fit, and the untruncated labels are what the legend's width is computed from — so
+   * without this a chart overflows whatever holds it and there is nothing a host can do about it.
+   */
+  @Test
+  fun `a legend's labelExpr shortens its labels and reports nothing`() {
+    val vegaLite =
+      """
+      {"data": {"values": [
+         {"c": "Ambulatory care sensitive conditions", "v": 3},
+         {"c": "Chronic obstructive pulmonary disease", "v": 5}]},
+       "mark": "bar",
+       "encoding": {
+         "x": {"field": "v", "type": "quantitative"},
+         "y": {"field": "c", "type": "nominal", "axis": null},
+         "color": {"field": "c", "type": "nominal",
+                   "legend": {"labelExpr": "slice(datum.value, 0, 12)"}}}}
+      """
+        .trimIndent()
+    val vega = requireNotNull(VegaLiteInput.toVega(vegaLite).vegaJson)
+    val compiled = compile(vega)
+
+    assertEquals(
+      emptyList<String>(),
+      compiled.diagnostics
+        .filter { it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY }
+        .map { "${it.jsonPath}: ${it.message}" },
+    )
+
+    val labels =
+      requireNotNull(compiled.scene)
+        .flatten()
+        .map { it.node }
+        .filterIsInstance<TextNode>()
+        .map { it.text }
+    assertTrue("Ambulatory c" in labels, "the first entry, sliced to twelve: $labels")
+    assertTrue("Chronic obst" in labels, "and the second: $labels")
+    // Nothing in the drawing is longer than the slice, which is the whole point: the legend's width
+    // is computed from the labels, so an untruncated one is what overflows the chart around it.
+    assertTrue(labels.none { it.length > 12 }, "everything drawn is within the slice: $labels")
   }
 }

@@ -21,7 +21,7 @@ It is checked against upstream rather than against itself. `./scripts/oracle.sh`
 with the pinned `vega@6.3.1` and compares the resulting scene mark by mark and scale by scale;
 `./scripts/vega-lite-oracle.sh` compiles every Vega-Lite fixture with the pinned `vega-lite@6.4.3` and
 compares the emitted Vega **property by property**, then draws both and compares those scenes too. 193
-Vega differential fixtures and 282 Vega-Lite fixtures are committed together with their references, and
+Vega differential fixtures and 283 Vega-Lite fixtures are committed together with their references, and
 [`test-fixtures/INDEX.md`](test-fixtures/INDEX.md) is the generated index of what each one covers.
 
 Anything unsupported produces a structured diagnostic rather than a wrong picture.
@@ -142,6 +142,39 @@ if let scene = session.scene {
 .task { session.load(specification: specification) }
 ```
 
+Two things a host inside a scroll view needs. **No session means no gestures** — the view installs
+none and turns hit testing off, which is what the `session` parameter has always documented. And where
+there *is* a session, `gestures:` says which to install: a long press and a pan claim the touch, so a
+chart in a horizontal scroll view inside a scrolling page passes `.withoutDrag` and keeps its taps,
+its hover and its tooltips.
+
+```swift
+VegaChartView(scene: scene, session: session, gestures: .withoutDrag)
+```
+
+A tap is a hover as well on a screen with no pointer, so `"tooltip": true` answers one.
+
+### A hole in a chart, said rather than left
+
+An `image` mark whose URL nothing can resolve leaves a gap and the draw carries on — a chart is better
+with one mark missing than not drawn at all. Both views now say which URL it was, once per URL rather
+than once per frame:
+
+```kotlin
+VegaChart(scene = it, resolveImage = ::fetch, onUnresolvedImage = { url -> log(url) })
+```
+
+```swift
+VegaChartView(scene: scene, resolveImage: fetch, onUnresolvedImage: { url in log(url) })
+```
+
+It is called **from the draw**, so treat it as a report: log, enqueue, launch — not a place to set
+state a recomposition or a `body` would read. Once per URL is what makes that safe, and it comes from
+caching the refusal alongside the decodes, which also stops a failing resolver being asked again on
+every frame. A host that has recovered clears it: `ImageCache.clear()` on Compose,
+`CoreGraphicsTarget.clearImageCache()` on Apple. `ImageCache.unresolvedImages` is the same facts
+without a callback, for a host that would rather poll.
+
 ## View example
 
 ```kotlin
@@ -193,13 +226,32 @@ compiled.scene?.let {
 }
 ```
 
+**Where the size comes from.** A chart takes the scene's own size — one scene unit per dp — wherever
+`modifier` leaves a dimension free, because a specification declares a width and a height and that is
+the size it asked for. The trap is that this happens whatever `fit` says: bound neither dimension and
+the slot *is* the scene, so `fit` has nothing to place. For a `width: "container"` chart that means
+`config.view.continuousWidth`, 300, plus its axes, however much room was going. Either bound the chart
+— `Modifier.fillMaxWidth()`, a column, a size — or pass `sizing = SceneSizing.Fill`, which takes the
+slot where there is one and leaves `fit` to place the scene inside it. The caller's `modifier` is
+applied **first**, so a bound it states wins over both.
+
+```kotlin
+VegaChart(scene = it, sizing = SceneSizing.Fill, textEngine = textEngine)
+```
+
 Keyboard input is the host's own modifier on both Compose renderers — `Modifier.focusable()` and
 `onKeyEvent`, forwarding to `controller.dispatch(ChartInputEvent.Key(...))` — and `ChartSession.press(_:)`
 on iOS, wired with SwiftUI's `.onKeyPress`. The Android View translates keys itself, since a `View` owns
 its own focus and key handling.
 
-A host that ships its own face passes a resolver — `rememberVegaTextEngine { FontFamily(googleSansFlex) }`
-— and both the measurement and the drawing use it. The Android View takes the same seam as
+A host that ships its own face registers it **by name** —
+`rememberVegaTextEngine(mapOf("Google Sans Flex" to FontFamily(googleSansFlex)))` — or passes a resolver
+of its own, and both the measurement and the drawing use it. The default resolver knows the generic CSS
+keywords and nothing else, which is a real limit rather than an omission: common Compose code cannot
+reach an installed family, so only a host that already holds the `FontFamily` can map a name to one.
+A family nothing resolves is drawn in the platform's default face and named in
+`ComposeTextEngine.unresolvedFontFamilies`, since a text engine has no diagnostics channel to report it
+through. The Android View takes the same seam as
 `VegaChartView.fontResolver`, and on iOS a registered family resolves by name; `CoreTextTextEngine` and
 `ChartSession` take a `textScale` for the reader's text-size setting, which
 `DynamicTypeSize.chartTextScale` maps for a SwiftUI host.
@@ -414,6 +466,99 @@ a plural with a number. `VegaCaptions.English` is upstream's own wording and the
 January in every language — d3's parsing is part of the wire format — so `TimeFormat.MONTHS` stays
 English and only what is *written* follows the locale.
 
+### The order of a date, not only its names
+
+`%b` resolves to the reader's month abbreviation, so a Dutch axis has always said `mei`. What it also
+said was `mei 21, 2026`, because the *pattern* — the order of the fields and what separates them —
+came from tables with no locale in them: `%Y-%m-%d` in `TimeUnits`, and `%b %d, %Y` in the two entries
+Vega-Lite writes into a bucketed axis's format.
+
+**A locale now decides that too, and it needs nothing from you to do it.** `VegaLocale.date` is d3's
+`%x`, "the date order this language writes", and it is derived from — so a locale copied field for
+field out of a d3 locale JSON reads `21 mei 2026` because its own `%x` is `%d-%m-%Y`. The clock comes
+from `time` the same way: `%H:%M:%S` gives a temporal axis 24-hour ticks instead of `%I %p`.
+
+Two derivations, because there are two tables and they are not the same shape. `TimeUnits`'s entries
+are **numeric**, so the whole pattern transfers, separators and all. Vega-Lite's spell the month as a
+**name** — that is what it is for — so only the *order* transfers and the directives stay `%b %d %Y`:
+substituting a name into a numeric pattern would give `21-mei-2026`.
+
+This is a deliberate **divergence from upstream**, whose `timeUnitSpecifier` takes no locale at all.
+`VegaLocale.EnglishUS` is therefore pinned to upstream's own answers — it states both tables empty
+rather than deriving — and it is the locale the differential fixtures and the recorded upstream vectors
+compare against. It is also the only locale that is pinned; state an empty map yourself to opt another
+one in, or state a table to say exactly what you want:
+
+```kotlin
+val dutch = VegaLocale(
+    /* … the names … */
+    date = "%d-%m-%Y",              // derived from: `21 mei 2026`, and `%d-%m-%Y` for numerals
+    time = "%H:%M:%S",              // derived from: 24-hour ticks on a temporal axis
+    // Only where you want something else. Keyed by a unit or a recognised run of units, coarsest
+    // first, exactly as `TimeUnits` keys them; a null value *removes* an entry, which is how you say
+    // "do not combine these two".
+    timeUnitSpecifierOverrides = mapOf("year-month-date" to "%-d %b %Y "),
+    timeTickFormatOverrides = mapOf("hour" to "%Hh"),
+)
+```
+
+Give the **same** locale to `VegaLiteInput.toVega` and to the compiler or controller that draws the
+result. The pattern is written on the Vega-Lite side and the month names are resolved on the runtime
+side, so a locale supplied to one and not the other is an axis whose order and whose names come from
+different places. `ChartSession` does this for you from its own `locale`.
+
+A specification's own second argument to `timeUnitSpecifier(units, specifiers)` still wins: the
+document asked for that by name, and a host's language is a default beneath it.
+
+### Rules, not only tables
+
+Everything above is **data**, and data only answers what somebody thought to tabulate. Two things it
+cannot: a name whose form depends on the rest of the format — Polish writes `stycznia` beside a day
+number and `styczeń` alone — and a numbering system, because the engine writes numbers with
+`value.toString()` and that is ASCII whatever the locale says.
+
+`VegaLocale.rules` is the seam for those, and for anything else a *device* knows and a table does not.
+The precedence is the point: **a specification's format decides the shape and a host decides the
+details inside it.**
+
+```kotlin
+object PlatformRules : VegaFormatRules {
+    // What `%B`, `%b`, `%A`, `%a` and `%p` say. Null inherits the locale's own list.
+    override fun name(
+        field: DateName,
+        index: Int,
+        context: DateNameContext,
+        locale: VegaLocale,
+    ): String? =
+        // `hasDayOfMonth` rather than searching the pattern: a pad modifier sits between the percent
+        // and the letter, so `contains("%d")` misses `%-d`.
+        if (field == DateName.MONTH && context.hasDayOfMonth) genitive[index] else null
+
+    // The digits any number is written with, after grouping and padding. Null keeps ASCII.
+    override fun digits(number: String): String? = numberingSystem.transliterate(number)
+}
+
+VegaLocale(/* … */, rules = PlatformRules)
+```
+
+A document writing `"format": "%b %d, %Y"` gets an abbreviated month, a day and a four-digit year in
+that order whatever a host supplies — this cannot reorder a date, drop a field, change a width or
+substitute a pattern of its own. Literal text a document typed is never passed to a rule either, so
+`"Q%q 2026"` keeps its `2026` exactly as written.
+
+Every method may answer null, so a host implements the rules it has and inherits the rest, and a
+locale with no rules is byte-for-byte what it was — which is what keeps `VegaLocale.EnglishUS`
+reproducing upstream.
+
+What it deliberately does **not** reach, so a specification's format stays the specification's:
+
+- Which day a week starts on. `%U` is Sunday-based and `%W` Monday-based; that is a field the document
+  chose, not a rendering of one.
+- Calendars and eras. `%Y` means "the year, four digits"; a Japanese era year is a different field.
+- Any format a platform *composes* rather than names — `getBestDateTimePattern`, `Date.FormatStyle`.
+  Handing one of those in would replace the document's format, which is the thing this shape exists to
+  prevent. A host that wants one formats the text itself and passes it as data.
+
 ## Host data example
 
 A chart can be drawn from data the **app** holds rather than data the payload carried. The
@@ -483,6 +628,32 @@ Take `containerSize` from something **stable** — the parent's width, a size cl
 not from the chart view's own geometry: a chart sized to its container changes its scene's width, the
 view's aspect ratio follows the scene, and a width read back from that view can oscillate. That loop is
 why it is not wired up automatically.
+
+## Metadata a document carries for you
+
+`usermeta` is the one top-level property whose whole purpose is to survive compilation — upstream's
+schema calls it "optional metadata that will be passed to Vega" — and nothing in the engine reads it.
+It is how whoever wrote the chart hands the app something the grammar has no channel for: a table of
+the values behind marks that carry no accessible text of their own, a version to branch on, an
+identifier to log against.
+
+```kotlin
+val compiled = controller.setSpec(specificationFromServer)
+val source = compiled.spec?.usermeta?.get("source")?.asString()
+```
+
+```swift
+let source = session.usermeta?["source"]
+```
+
+Null when the document has none, and an **empty map** when it wrote `{}` — those are two different
+statements and reading them as one loses the difference between a document that carries no metadata
+and one whose metadata was filtered to nothing. A `usermeta` that is not an object is reported and
+dropped, since a host reading it back by key would otherwise find nothing and have no way to know
+why.
+
+Vega-Lite carries it through to the Vega it emits, so a document written in either grammar arrives
+with it intact.
 
 ## Time zone example
 
@@ -641,6 +812,13 @@ regenerate deliberately:
 ```
 
 Review the resulting diff as a rendering change, not as noise.
+
+`test-fixtures/scene-walk/*.calls.txt` are a third kind, and they are read by **two** test suites.
+`SceneWalkGoldenTest` writes them from the Compose walk, and `SceneWalkParityTests` in
+`swift/AsterVegaRender` asserts the Swift walk produces the same bytes — which is how "the two
+renderers emit the same calls in the same order", a claim both files make about themselves, is checked
+rather than believed. When those two disagree, one of the walks changed; read the diff before
+regenerating.
 
 ### Formatting
 

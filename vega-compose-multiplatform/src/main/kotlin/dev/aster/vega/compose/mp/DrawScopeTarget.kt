@@ -67,13 +67,38 @@ public class DrawScopeTarget(
    * belongs to the host — the same argument `DataLoader` makes for data.
    */
   private val resolveImage: ((String) -> ImageBitmap?)? = null,
+  /**
+   * Where decoded images are kept, across frames.
+   *
+   * A target is built **per frame** — `VegaChart` constructs one inside the `Canvas` draw lambda —
+   * so a cache held in this object is a cache with a lifetime of one draw. That was survivable
+   * while the only images were engine-produced rasters and nothing else could reach them; it
+   * stopped being survivable the moment a host could supply a resolver, because then every frame
+   * calls the host's fetcher once per image. A heatmap's raster was already being PNG-decoded per
+   * frame.
+   *
+   * So the cache is the caller's to own, and `VegaChart` remembers one against the composition. The
+   * default is a fresh one, which is right for a caller drawing a scene once — an export, a test.
+   */
+  private val imageCache: ImageCache = ImageCache(),
+  /**
+   * Told the first time a URL cannot be resolved, and not again.
+   *
+   * "The first time" is what [imageCache] makes possible: a refusal is remembered there, so this
+   * fires once per URL per cache rather than once per frame — which is what a callback from a
+   * *draw* has to do to be usable at all. See `VegaChart`'s parameter of the same name for what a
+   * host may safely do in it.
+   */
+  private val onUnresolvedImage: ((String) -> Unit)? = null,
 ) : SceneDrawTarget {
 
-  /** URLs the resolver could not answer, for a caller that wants to say so. */
+  /**
+   * URLs the resolver could not answer, for a caller that wants to say so.
+   *
+   * This target's own, so it holds what *this draw* could not resolve. The set that outlives a
+   * frame is [ImageCache.unresolvedImages], which is where a host reads them.
+   */
   public val unresolvedImages: MutableList<String> = mutableListOf()
-
-  private val cachedRasters = HashMap<Long, ImageBitmap>()
-  private val cachedUrls = HashMap<String, ImageBitmap>()
 
   /**
    * The clips still open, innermost last.
@@ -263,20 +288,31 @@ public class DrawScopeTarget(
    */
   private fun resolve(url: String, raster: RasterImage?): ImageBitmap? {
     if (raster != null) {
-      cachedRasters[raster.digest]?.let {
+      imageCache.raster(raster.digest)?.let {
         return it
       }
-      return decodeRaster(raster)?.also { cachedRasters[raster.digest] = it }
+      return decodeRaster(raster)?.also { imageCache.putRaster(raster.digest, it) }
     }
     if (url.isEmpty()) return null
-    cachedUrls[url]?.let {
+    imageCache.url(url)?.let {
       return it
     }
+    // **A refusal is remembered too.** Only successes were cached, so an address that had already
+    // said no went back to the host's resolver on every frame — a fetch per frame for an image that
+    // will never appear. Once per URL is both the cheaper answer and the only one a report of it
+    // could be built on. `ImageCache.clear()` gives a transient failure a second chance.
+    if (imageCache.isUnresolvable(url)) return null
     // A `data:` URL needs no host, so it is answered here rather than pushed onto a resolver that
     // would
     // have to know how. Anything else is the host's business.
     val decoded = if (url.startsWith("data:")) decodeDataUrl(url) else resolveImage?.invoke(url)
-    return decoded?.also { cachedUrls[url] = it }
+    if (decoded == null) {
+      imageCache.putUnresolvable(url)
+      onUnresolvedImage?.invoke(url)
+      return null
+    }
+    imageCache.putUrl(url, decoded)
+    return decoded
   }
 
   @OptIn(ExperimentalEncodingApi::class)
@@ -424,4 +460,93 @@ public class DrawScopeTarget(
     }
 
   private fun radius(value: Double): CornerRadius = CornerRadius(value.toFloat(), value.toFloat())
+}
+
+/**
+ * Decoded images, kept across frames.
+ *
+ * A [DrawScopeTarget] is built once per frame, so its own fields cannot cache anything: an
+ * engine-produced raster was PNG-decoded on every draw, and a URL image would call the host's
+ * resolver on every draw. `rememberVegaImageCache` is how a composable gets one that outlives a
+ * frame; [VegaChart] does that for its caller.
+ *
+ * Bounded, and by **count** rather than by bytes, which is the honest limit to offer here: an
+ * `ImageBitmap`'s footprint is a platform's business and this module has no way to ask. A chart
+ * draws a handful of images, so the default is three orders of magnitude more than a real
+ * specification needs and exists only so a generated one cannot grow the map without bound.
+ *
+ * Insertion-ordered with a hit moved back to the young end by hand — `LinkedHashMap`'s access-order
+ * mode is JVM-only, and this is the same policy in three lines. `CachingExpressionCompiler` and
+ * `TextLayoutCache` cache the same way for the same reason.
+ *
+ * Not thread-safe: a cache belongs to one composition, as a draw does.
+ */
+public class ImageCache(private val maxEntries: Int = 64) {
+  private val rasters = LinkedHashMap<Long, ImageBitmap>()
+  private val urls = LinkedHashMap<String, ImageBitmap>()
+  private val unresolvable = LinkedHashSet<String>()
+
+  /** How many images are held, for a host that wants to say so or a test that wants to check. */
+  public val size: Int
+    get() = rasters.size + urls.size
+
+  /**
+   * URLs no resolver could answer, in the order they were first met.
+   *
+   * The half of the image seam a host could not see. An unresolved image leaves a hole in the chart
+   * and the draw carries on, which is right — a chart is better with one mark missing than not
+   * drawn — but the hole was all a host got, because the target that collected these is built per
+   * frame and discarded with it. They live here because this object is the host's and outlives a
+   * draw.
+   *
+   * Kept per URL rather than per attempt: a refusal is cached, so a resolver is asked once and this
+   * grows once. [clear] empties it along with the images, which is how a host that has recovered
+   * from a failed fetch asks for another go.
+   */
+  public val unresolvedImages: Set<String>
+    get() = unresolvable.toSet()
+
+  internal fun isUnresolvable(url: String): Boolean = url in unresolvable
+
+  internal fun putUnresolvable(url: String) {
+    unresolvable.add(url)
+  }
+
+  internal fun raster(digest: Long): ImageBitmap? = youngest(rasters, digest)
+
+  internal fun putRaster(digest: Long, image: ImageBitmap) {
+    rasters[digest] = image
+    evict(rasters)
+  }
+
+  internal fun url(url: String): ImageBitmap? = youngest(urls, url)
+
+  internal fun putUrl(url: String, image: ImageBitmap) {
+    urls[url] = image
+    evict(urls)
+  }
+
+  /**
+   * Empties it, for a host whose images have changed behind a URL that has not.
+   *
+   * And for one that has **recovered**: a refusal is remembered so a resolver is asked once per URL
+   * rather than once per frame, which means a fetch that failed while the network was down stays
+   * failed until somebody says otherwise.
+   */
+  public fun clear() {
+    rasters.clear()
+    urls.clear()
+    unresolvable.clear()
+  }
+
+  private fun <K> youngest(map: LinkedHashMap<K, ImageBitmap>, key: K): ImageBitmap? {
+    val hit = map.remove(key) ?: return null
+    map[key] = hit
+    return hit
+  }
+
+  private fun <K> evict(map: LinkedHashMap<K, ImageBitmap>) {
+    // Insertion order puts the least recently used first, which is the one to drop.
+    while (map.size > maxEntries) map.remove(map.keys.first())
+  }
 }

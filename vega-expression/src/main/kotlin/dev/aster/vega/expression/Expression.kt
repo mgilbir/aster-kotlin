@@ -69,6 +69,22 @@ public interface Expression {
    */
   public val writtenDatasets: Set<String>
 
+  /**
+   * Functions this expression **calls**, by the name written at the call site.
+   *
+   * Every other dependency set here answers "what has to exist before this runs". This one answers
+   * a different question — "was this capability asked for at all" — and it exists because a
+   * capability a specification asks for and a host has not supplied is exactly the kind of thing
+   * this engine reports rather than answers with a shrug. `containerSize()` is the case that
+   * prompted it: it returns `[null, null]` outside a browser, which is upstream's own answer, so a
+   * specification branching on a breakpoint silently takes the "no container" arm until a host says
+   * how much room there is.
+   *
+   * Only a name written as an identifier in call position counts. That is the whole grammar — there
+   * is no `eval` in a Vega expression, so a function cannot be reached any other way.
+   */
+  public val functionDependencies: Set<String>
+
   public fun evaluate(scope: ExpressionScope): VegaValue
 }
 

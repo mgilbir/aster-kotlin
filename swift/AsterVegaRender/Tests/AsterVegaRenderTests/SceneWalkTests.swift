@@ -210,4 +210,50 @@ final class SceneWalkTests: XCTestCase {
     )
     XCTAssertFalse(drawn.isEmpty, "the groups themselves are still reported")
   }
+
+  /// A label an axis has **hidden** is not drawn.
+  ///
+  /// An overlapping label stays in the scene at zero opacity rather than being removed —
+  /// `AxisBuilder` says so, so the mark count does not change with the chart's width — and `brush`
+  /// answers nil for that, exactly as it does for a mark with no fill. At the other end of the same
+  /// call, `CoreTextDrawing` read a nil brush as a paint it could not express and fell back to black,
+  /// on the reasoning that black beats an invisible label. One nil meaning two opposite things: every
+  /// label the overlap pass had hidden was drawn at full strength, so a dense temporal axis came out
+  /// as an unreadable band.
+  ///
+  /// `label-overlap.vg.json` is the committed document for this: three axes whose labels are too
+  /// crowded to all be drawn, at three different `labelOverlap` policies.
+  func testALabelTheAxisHidHasNoDrawCall() throws {
+    var directory = URL(fileURLWithPath: #filePath)
+    // AsterVegaRenderTests, Tests, AsterVegaRender, swift, and then the repository.
+    for _ in 0..<5 { directory = directory.deletingLastPathComponent() }
+    let fixture = directory.appendingPathComponent("test-fixtures/specs/label-overlap.vg.json")
+    let drawnScene = try scene(try String(contentsOf: fixture, encoding: .utf8))
+
+    // The scene really does carry hidden labels, or this test proves nothing.
+    let placed: [any SceneNode] = drawnScene.flatten().map { $0.node }
+    let labels: [TextNode] = placed.compactMap { $0 as? TextNode }
+    let hidden = labels.filter { $0.opacity == 0.0 }
+    XCTAssertGreaterThan(hidden.count, 0, "no hidden labels in the fixture: nothing to assert about")
+    XCTAssertGreaterThan(labels.count, hidden.count, "and some are drawn")
+
+    var target = RecordingTarget()
+    SceneWalk().draw(scene: drawnScene, into: &target)
+    let drawn = target.calls.filter { $0.contains("text ") }
+
+    // Counted rather than matched by text: the same digits appear on more than one guide in this
+    // fixture — the y axis hides "30" while the legend draws its own — so looking for a label's
+    // string in the output cannot tell which guide's it was.
+    let visible = labels.filter { $0.opacity != 0.0 && !$0.absent }
+    XCTAssertEqual(
+      drawn.count, visible.count,
+      "one call per visible label and none for the \(hidden.count) hidden ones:\n"
+        + drawn.joined(separator: "\n"))
+    // The measured numbers, so a regression reads as a number rather than as a relationship: 43
+    // labels, 24 of them hidden, 19 drawn. Before the fix this renderer produced 43 calls where the
+    // Compose walk — which has always had the zero-opacity guard — produced 19.
+    XCTAssertEqual(labels.count, 43)
+    XCTAssertEqual(hidden.count, 24)
+    XCTAssertEqual(drawn.count, 19)
+  }
 }

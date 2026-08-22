@@ -227,14 +227,90 @@ public class VegaChartController(
    * The signal values a reader has set survive the recompile: a resize is not a reason to forget
    * them.
    */
-  public var containerSize: SizeD? = containerSize
+  public var containerSize: SizeD?
+    get() = container
     set(value) {
-      if (field == value) return
-      field = value
-      compiler = newCompiler(value, hostData)
-      val json = loadedSpecJson ?: return
-      publish(compiler.compileJson(json, signals.overrides, signals.itemEncodes))
+      // Runs on the calling thread, like [setSpec]. A host that reports its layout size on every
+      // resize should prefer [setContainerSizeAsync], which is the same work on a dispatcher.
+      val work = adoptContainerSize(value) ?: return
+      publish(work.compiler.compileJson(work.json, signals.overrides, signals.itemEncodes))
     }
+
+  private var container: SizeD? = containerSize
+
+  /** A recompile that is worth doing, with the compiler that was current when it was decided. */
+  private class SizeRecompile(val json: String, val compiler: SpecCompiler)
+
+  /**
+   * Records a new container size, and answers the recompile it implies — or null for none.
+   *
+   * Three reasons there may be none, and the third is the one that was missing. The size may be
+   * unchanged. There may be no specification loaded. Or **the loaded document may never ask**: the
+   * setter used to recompile unconditionally, so a host that reports its layout size on every
+   * resize paid a full compile for every chart it draws, including every chart that declares its
+   * own width and height — which is most of them. `CompiledSpec.readsContainerSize` is the exact
+   * answer to that question, and it comes from the expressions rather than from the text, because
+   * `width: "container"` reaches the engine as a signal whose `update` calls `containerSize()`.
+   *
+   * The size is recorded and the compiler replaced whatever happens, so a specification loaded
+   * *after* a skipped resize still compiles against the size the host stated.
+   *
+   * The compiler is carried out with the decision rather than read again later: two overlapping
+   * asynchronous sets would otherwise both compile with whichever size arrived last, and one of
+   * them would publish a scene that does not match the size it was asked for.
+   */
+  private fun adoptContainerSize(value: SizeD?): SizeRecompile? {
+    if (container == value) return null
+    container = value
+    compiler = newCompiler(value, hostData)
+    val json = loadedSpecJson ?: return null
+    if (lastCompiled?.readsContainerSize == false) return null
+    return SizeRecompile(json, compiler)
+  }
+
+  /**
+   * The same as assigning [containerSize], off the calling thread.
+   *
+   * Why this exists rather than being advice. A resize arrives on whatever thread runs a host's
+   * layout, which on both hosts is the main one, and the assignment above recompiles inline — so a
+   * chart sized to its container paid a compile on the main thread for every step of a split-view
+   * drag. This is that work on a dispatcher, serialized against every other compile through the
+   * same lock, and awaitable, which is what lets a host or a test synchronise on the chart having
+   * caught up.
+   *
+   * Answers **null** where nothing was recompiled: the size was already this, no specification is
+   * loaded, or — the common case — the loaded document never reads `containerSize()`. Null is not a
+   * failure; it means the chart a reader is looking at is still the right one.
+   */
+  public suspend fun setContainerSizeAsync(size: SizeD?): CompiledSpec? =
+    setContainerSizeAsync(size, Dispatchers.Default)
+
+  /**
+   * The same, on a dispatcher of the caller's choosing.
+   *
+   * A host that is not Kotlin should call the single-argument form: a default argument does not
+   * survive the Obj-C boundary, so from Swift this overload demands a `CoroutineDispatcher` that no
+   * exported symbol can produce. The same reason [setSpecAsync] is spelled twice.
+   */
+  public suspend fun setContainerSizeAsync(
+    size: SizeD?,
+    dispatcher: CoroutineDispatcher = Dispatchers.Default,
+  ): CompiledSpec? {
+    val work = adoptContainerSize(size) ?: return null
+    _state.value = _state.value.copy(isLoading = true)
+    val compiled =
+      try {
+        compileLock.withLock {
+          withContext(dispatcher) {
+            work.compiler.compileJson(work.json, signals.overrides, signals.itemEncodes)
+          }
+        }
+      } catch (e: CancellationException) {
+        _state.value = _state.value.copy(isLoading = false)
+        throw e
+      }
+    return publish(compiled)
+  }
 
   /** The debounced handlers waiting, by the signal and delay that identify them. */
   private val pendingDebounces = mutableMapOf<Pair<String, Double>, ScheduledTask>()

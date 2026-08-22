@@ -47,14 +47,22 @@ public enum CoreTextDrawing {
     guard !run.text.isEmpty else { return }
 
     let colour: CGColor
-    if case .solid(let paint) = fill {
+    switch fill {
+    case .solid(let paint):
       colour = CGColor(
         colorSpace: sRGB,
         components: [
           CGFloat(paint.red), CGFloat(paint.green), CGFloat(paint.blue), CGFloat(paint.alpha),
         ]
       ) ?? CGColor(gray: 0, alpha: 1)
-    } else {
+    case nil:
+      // **Nothing to paint.** Not the same case as the one below, and treating it as if it were is
+      // what painted every label an axis had hidden: an overlapping label is hidden at zero opacity
+      // rather than removed, `SceneWalk.brush` answers nil for that, and black was drawn instead.
+      // The caller now also declines to hand over a run with no paint at all; this is the same
+      // decision at the other end of the call, so neither end can be got wrong on its own.
+      return
+    default:
       // A gradient-filled label is not something a specification can express through this engine's
       // scene, and black is a better answer than an invisible label.
       colour = CGColor(gray: 0, alpha: 1)
@@ -62,13 +70,19 @@ public enum CoreTextDrawing {
 
     // The CoreText attribute names, not UIKit's `.font`/`.foregroundColor` — this file deliberately
     // imports neither UIKit nor AppKit so that it is the same code on iOS and on macOS.
-    let attributed = NSAttributedString(
-      string: run.text,
-      attributes: [
-        NSAttributedString.Key(kCTFontAttributeName as String): font(for: run, textScale: textScale),
-        NSAttributedString.Key(kCTForegroundColorAttributeName as String): colour,
-      ]
-    )
+    var attributes: [NSAttributedString.Key: Any] = [
+      NSAttributedString.Key(kCTFontAttributeName as String): font(for: run, textScale: textScale),
+      NSAttributedString.Key(kCTForegroundColorAttributeName as String): colour,
+    ]
+    // The **same attribute the measurement used**, which is the whole point of setting it here:
+    // `CoreTextTextEngine` applies `kCTKernAttributeName` from the style, so a run measured with
+    // spacing has to be drawn with it or the glyphs sit inside a box that was reserved for something
+    // wider. Scaled like the font, since the spacing is in scene units as the size is.
+    if run.letterSpacing != 0 {
+      attributes[NSAttributedString.Key(kCTKernAttributeName as String)] =
+        run.letterSpacing * textScale
+    }
+    let attributed = NSAttributedString(string: run.text, attributes: attributes)
     let line = CTLineCreateWithAttributedString(attributed)
 
     context.saveGState()

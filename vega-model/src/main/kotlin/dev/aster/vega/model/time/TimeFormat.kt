@@ -1,5 +1,7 @@
 package dev.aster.vega.model.time
 
+import dev.aster.vega.model.locale.DateName
+import dev.aster.vega.model.locale.DateNameContext
 import dev.aster.vega.model.locale.VegaLocale
 import kotlin.time.Instant
 import kotlinx.datetime.DateTimeUnit
@@ -111,6 +113,9 @@ public object TimeFormat {
     val out = StringBuilder(pattern.length + 8)
     // Sunday-first, because that is the week d3 labels against.
     val weekday = at.date.dayOfWeek.isoDayNumber % 7
+    // Lazily, and only where a rule exists to read it: parsing the pattern a second time for every
+    // label a chart draws would be a cost paid by every chart that supplies no rules at all.
+    var context: DateNameContext? = null
     var i = 0
     while (i < pattern.length) {
       val c = pattern[i]
@@ -127,48 +132,78 @@ public object TimeFormat {
         cursor++
       }
       val directive = pattern[cursor]
+      // Each numeric piece goes through the host's numbering system, if it has one — **after**
+      // padding, so a rule cannot change how wide a field is. That width is the specification's:
+      // `%02d` said two digits and it gets two digits, in whatever digits the host writes.
+      fun digits(text: String): String = locale.rules?.digits(text) ?: text
+
       fun number(value: Int, width: Int, default: Char = '0') {
         val text = value.toString()
         out.append(
-          when (padWith) {
-            '-' -> text
-            '_' -> text.padStart(width, ' ')
-            '0' -> text.padStart(width, '0')
-            else -> if (default == ' ') text.padStart(width, ' ') else text.padStart(width, '0')
-          }
+          digits(
+            when (padWith) {
+              '-' -> text
+              '_' -> text.padStart(width, ' ')
+              '0' -> text.padStart(width, '0')
+              else -> if (default == ' ') text.padStart(width, ' ') else text.padStart(width, '0')
+            }
+          )
         )
       }
+
+      /**
+       * A name the host may have a better answer for than the locale's list.
+       *
+       * The whole `pattern` goes with it, which is the point: a language whose month form depends
+       * on a day number beside it cannot be tabulated, only asked.
+       */
+      fun named(field: DateName, index: Int, fallback: String): String {
+        val rules = locale.rules ?: return fallback
+        val known = context ?: DateNameContext(pattern, directivesIn(pattern)).also { context = it }
+        return rules.name(field, index, known, locale) ?: fallback
+      }
       when (directive) {
-        'Y' -> out.append(padSigned(at.year % 10000, 4))
-        'y' -> out.append(padSigned(at.year % 100, 2))
+        'Y' -> out.append(digits(padSigned(at.year % 10000, 4)))
+        'y' -> out.append(digits(padSigned(at.year % 100, 2)))
         'm' -> number(at.month.number, 2)
-        'B' -> out.append(locale.months[at.month.number - 1])
-        'b' -> out.append(locale.shortMonths[at.month.number - 1])
-        'A' -> out.append(locale.days[weekday])
-        'a' -> out.append(locale.shortDays[weekday])
+        'B' ->
+          out.append(named(DateName.MONTH, at.month.number - 1, locale.months[at.month.number - 1]))
+        'b' ->
+          out.append(
+            named(
+              DateName.MONTH_SHORT,
+              at.month.number - 1,
+              locale.shortMonths[at.month.number - 1],
+            )
+          )
+        'A' -> out.append(named(DateName.WEEKDAY, weekday, locale.days[weekday]))
+        'a' -> out.append(named(DateName.WEEKDAY_SHORT, weekday, locale.shortDays[weekday]))
         'd' -> number(at.day, 2)
         'e' -> number(at.day, 2, default = ' ')
         'j' -> number(at.date.dayOfYear, 3)
         // Vega's own addition to d3's directives, and the only way to write a quarter.
-        'q' -> out.append((at.month.number - 1) / 3 + 1)
+        'q' -> out.append(digits(((at.month.number - 1) / 3 + 1).toString()))
         'U' -> number(sundayWeek(at), 2)
         'W' -> number(mondayWeek(at), 2)
         'V' -> number(isoWeek(at), 2)
-        'G' -> out.append(padSigned(isoWeekYear(at) % 10000, 4))
-        'g' -> out.append(padSigned(isoWeekYear(at) % 100, 2))
-        'u' -> out.append(at.date.dayOfWeek.isoDayNumber)
-        'w' -> out.append(weekday)
+        'G' -> out.append(digits(padSigned(isoWeekYear(at) % 10000, 4)))
+        'g' -> out.append(digits(padSigned(isoWeekYear(at) % 100, 2)))
+        'u' -> out.append(digits(at.date.dayOfWeek.isoDayNumber.toString()))
+        'w' -> out.append(digits(weekday.toString()))
         'H' -> number(at.hour, 2)
         // Twelve-hour clock, where midnight and noon both read 12 rather than 0.
         'I' -> number((at.hour % 12).let { if (it == 0) 12 else it }, 2)
-        'p' -> out.append(if (at.hour < 12) locale.periods[0] else locale.periods[1])
+        'p' -> {
+          val half = if (at.hour < 12) 0 else 1
+          out.append(named(DateName.HALF_DAY, half, locale.periods[half]))
+        }
         'M' -> number(at.minute, 2)
         'S' -> number(at.second, 2)
         'L' -> number(at.nanosecond / 1_000_000, 3)
         'f' -> number(at.nanosecond / 1_000, 6)
-        'Q' -> out.append(millis.toLong())
-        's' -> out.append((millis / 1000.0).toLong())
-        'Z' -> out.append(offset(millis, zone))
+        'Q' -> out.append(digits(millis.toLong().toString()))
+        's' -> out.append(digits((millis / 1000.0).toLong().toString()))
+        'Z' -> out.append(digits(offset(millis, zone)))
         // The locale's own compositions. d3's en-US spells these three out as the defaults on
         // `VegaLocale`, and a locale that writes its dates the other way round says so there rather
         // than by rewriting every specification that uses `%x`.
@@ -186,6 +221,30 @@ public object TimeFormat {
       i = cursor + 1
     }
     return out.toString()
+  }
+
+  /**
+   * Every directive letter in a pattern, pad modifiers stripped.
+   *
+   * For [DateNameContext], so a host asking "is a day number in this format" is answered rather
+   * than left to read strftime itself — where `%-d` is exactly the case that catches a
+   * `pattern.contains("%d")`, as the first rule written against an earlier draft of this seam
+   * discovered.
+   */
+  private fun directivesIn(pattern: String): Set<Char> {
+    val letters = mutableSetOf<Char>()
+    var index = 0
+    while (index < pattern.length) {
+      if (pattern[index] != '%') {
+        index += 1
+        continue
+      }
+      var cursor = index + 1
+      if (cursor < pattern.length && pattern[cursor] in "-_0") cursor += 1
+      if (cursor < pattern.length) letters.add(pattern[cursor])
+      index = cursor + 1
+    }
+    return letters
   }
 
   /**

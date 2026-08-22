@@ -1300,7 +1300,8 @@ internal object Marks {
           stated != null -> "${prefix}Format($accessor, \"$stated\")"
           // A bucketed instant is otherwise spoken with the specifier Vega chooses at render time,
           // the same one its axis labels use — so the description and the axis never disagree.
-          timeUnit != null -> "${prefix}Format($accessor, ${Fields.timeUnitSpecifier(timeUnit)})"
+          timeUnit != null ->
+            "${prefix}Format($accessor, ${Fields.timeUnitSpecifier(timeUnit, config.locale)})"
           else -> "${prefix}Format($accessor, \"${config.timeFormat}\")"
         }
       }

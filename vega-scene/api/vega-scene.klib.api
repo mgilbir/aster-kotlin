@@ -1625,7 +1625,7 @@ final object dev.aster.vega.scene/AccessibilityTree { // dev.aster.vega.scene/Ac
     final const val MAX_EXPOSED_MARKS // dev.aster.vega.scene/AccessibilityTree.MAX_EXPOSED_MARKS|{}MAX_EXPOSED_MARKS[0]
         final fun <get-MAX_EXPOSED_MARKS>(): kotlin/Int // dev.aster.vega.scene/AccessibilityTree.MAX_EXPOSED_MARKS.<get-MAX_EXPOSED_MARKS>|<get-MAX_EXPOSED_MARKS>(){}[0]
 
-    final fun elements(dev.aster.vega.scene/Scene, kotlin.collections/Set<dev.aster.vega.scene/SceneNodeId> = ..., dev.aster.vega.model.locale/VegaCaptions = ...): kotlin.collections/List<dev.aster.vega.scene/AccessibleElement> // dev.aster.vega.scene/AccessibilityTree.elements|elements(dev.aster.vega.scene.Scene;kotlin.collections.Set<dev.aster.vega.scene.SceneNodeId>;dev.aster.vega.model.locale.VegaCaptions){}[0]
+    final fun elements(dev.aster.vega.scene/Scene, kotlin.collections/Set<dev.aster.vega.scene/SceneNodeId> = ..., dev.aster.vega.model.locale/VegaCaptions = ..., kotlin/Int = ...): kotlin.collections/List<dev.aster.vega.scene/AccessibleElement> // dev.aster.vega.scene/AccessibilityTree.elements|elements(dev.aster.vega.scene.Scene;kotlin.collections.Set<dev.aster.vega.scene.SceneNodeId>;dev.aster.vega.model.locale.VegaCaptions;kotlin.Int){}[0]
 }
 
 final object dev.aster.vega.scene/ArcPath { // dev.aster.vega.scene/ArcPath|null[0]

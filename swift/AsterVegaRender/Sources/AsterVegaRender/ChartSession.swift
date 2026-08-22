@@ -117,6 +117,7 @@ public final class ChartSession {
         + "the device's own zone."
     }
     engineTimeZone = resolved
+    engineLocale = locale ?? VegaLocale.Companion.shared.EnglishUS
     controller = VegaChartController(
       // Kotlin's default arguments do not cross the Obj-C boundary, so each is given explicitly.
       initialScene: Scene.companion.empty(width: 0, height: 0),
@@ -127,7 +128,7 @@ public final class ChartSession {
       // right default for a specification that may be pasted data.
       loader: loader ?? DenyLoader.shared,
       scheduler: nil,
-      locale: locale ?? VegaLocale.Companion.shared.EnglishUS,
+      locale: engineLocale,
       hostConfig: theme,
       containerSize: containerSize,
       // Nil, and then filled through `setData(_:rows:)` — a session is created before the app has its
@@ -143,6 +144,15 @@ public final class ChartSession {
   /// turned into a millisecond while compiling, and a store on a different clock from the axis is a
   /// brush that starts in the wrong place.
   private let engineTimeZone: Kotlinx_datetimeTimeZone?
+
+  /// The locale handed to the engine, or d3's `en-US`.
+  ///
+  /// Kept for the same reason `engineTimeZone` is: the Vega-Lite compiler needs it too. A month name
+  /// is resolved by the runtime from the pattern the compiler writes, so `%b` is enough and always
+  /// was — but the *pattern* is written on the Vega-Lite side, and the order of a date's fields is a
+  /// property of a language. Supplying a locale to one and not the other gives an axis whose field
+  /// order and whose month names come from different places.
+  private let engineLocale: VegaLocale
 
   /// What to show in a tooltip, and where — nil when there is nothing under the pointer.
   ///
@@ -191,19 +201,33 @@ public final class ChartSession {
   /// not from the chart view's own geometry: a chart sized to its container changes its scene's width,
   /// the view's aspect ratio follows the scene, and a width read back from that view can oscillate.
   /// That loop is why this is not wired up automatically.
+  ///
+  /// **Setting it is asynchronous**, and the recompile is skipped entirely where the loaded document
+  /// never reads `containerSize()` — which is every chart that states its own width and height. Await
+  /// ``settle()`` where you need the new scene, as a screenshot or a test does.
   public var containerSize: SizeD? {
     get { controller.containerSize }
     set {
       guard newValue != controller.containerSize else { return }
-      serialised { [weak self] in
+      let size = newValue
+      // **Off this actor**, like the compile a load does. This used to run a whole recompile inline,
+      // and the class is `@MainActor`, so a host that reported its layout size on every resize paid a
+      // compile on the main thread for every step of a split-view drag. Queued, so it lands behind a
+      // compile that is still running rather than beside it, and awaited by ``settle()`` like
+      // everything else here — so setting this is **not** synchronous. It never reliably was: with a
+      // compile in flight it was already deferred, into a task nobody held.
+      enqueue { [weak self] in
         guard let self else { return }
-        self.controller.containerSize = newValue
-        if let compiled = self.controller.lastCompiled {
-          self.diagnostics = compiled.diagnostics
-          if compiled.scene != nil {
-            self.hasScene = true
-            self.failure = nil
-          }
+        // Nil where nothing was recompiled — most often because the loaded document never reads
+        // `containerSize()`, which is true of every chart that states its own width and height.
+        // Nothing to publish then: the chart on screen is still the right one.
+        guard let compiled = try? await self.controller.setContainerSizeAsync(size: size) else {
+          return
+        }
+        self.diagnostics = compiled.diagnostics
+        if compiled.scene != nil {
+          self.hasScene = true
+          self.failure = nil
         }
         self.refreshControls()
         self.publish()
@@ -246,6 +270,23 @@ public final class ChartSession {
 
   public private(set) var vegaLiteDiagnostics: [VegaDiagnostic] = []
 
+  /// `usermeta` — metadata the document carries for **this app**, not for the engine.
+  ///
+  /// Nothing in the engine reads it, which is the whole point: upstream's schema calls it "optional
+  /// metadata that will be passed to Vega", and it is how whoever wrote the chart hands a host
+  /// something the grammar has no channel for — a table of the values behind marks that carry no
+  /// accessible text of their own, a version to branch on, an identifier to log against. Vega-Lite
+  /// carries it onto the Vega it emits, so a document in either grammar arrives with it intact.
+  ///
+  /// Nil where the document carried none, and where nothing has compiled yet; **empty** where it wrote
+  /// `{}`. Those are different statements, and reading them as one loses the difference between a
+  /// document with no metadata and one whose metadata was filtered to nothing.
+  ///
+  /// Published here rather than left behind `controller.lastCompiled` for the reason every other seam
+  /// on this class exists: a capability Kotlin has and Swift does not is a gap in this boundary rather
+  /// than a fact about the platform.
+  public private(set) var usermeta: [String: any AsterVega.VegaValue]?
+
   /// The controller owns the compiled dataflow and the interaction state.
   ///
   /// Held for the session's lifetime, because a tap is only meaningful against the dataflow the scene
@@ -254,7 +295,29 @@ public final class ChartSession {
 
   private var json = ""
   private var overrides: [String: VegaValue] = [:]
-  private var work: Task<Void, Never>?
+
+  /// The **tail** of everything queued: the compile in flight, or the last block handed to
+  /// ``serialised(_:)``, whichever came last.
+  ///
+  /// A chain rather than a single tracked task, and that is the fix. Each queued block begins by
+  /// awaiting the one before it, so awaiting the tail is awaiting all of them — where before only the
+  /// *compile* was held and everything `serialised` deferred was started as a task nobody kept. A
+  /// caller that set `containerSize` during a compile and then called ``settle()`` returned before the
+  /// resize had run, which is exactly the race a screenshot test exists to rule out.
+  private var pending: Task<Void, Never>?
+
+  /// How many blocks have been queued, so the last of them can tell that it *is* the last.
+  ///
+  /// A counter rather than comparing task identities: it answers "did anything arrive behind me"
+  /// without depending on `Task` equality, and it is what lets the tail clear itself so the inline
+  /// fast path in ``serialised(_:)`` reopens without anybody having to await.
+  private var queued = 0
+
+  /// The compile in flight, held separately because a new load **cancels** it.
+  ///
+  /// Not the same handle as ``pending``: cancelling the tail would cancel a queued touch as readily
+  /// as a compile, and a load supersedes the previous compile alone.
+  private var compileTask: Task<Void, Never>?
 
   // MARK: - Loading
 
@@ -270,9 +333,34 @@ public final class ChartSession {
     compile()
   }
 
-  /// Waits for the compile in flight, so a screenshot or a test can be sure the chart is drawn.
+  /// Waits for **everything** queued, so a screenshot or a test can be sure the chart is drawn.
+  ///
+  /// A loop rather than one await, because a queued block may queue more: setting `containerSize`
+  /// recompiles, and a recompile started from inside the queue is a task that did not exist when the
+  /// first await began. "Settled" has to mean the queue is empty, not that whichever task happened to
+  /// be last when you asked has finished — and it used to mean neither, since only the compile was
+  /// held at all and everything else ran as a task nobody kept.
+  ///
+  /// It terminates because the tail clears itself once nothing has arrived behind it; each further
+  /// turn of the loop is another block that really was queued.
   public func settle() async {
-    await work?.value
+    while let tail = pending {
+      await tail.value
+      if pending == nil { return }
+    }
+  }
+
+  /// Appends `body` to the queue and makes it what ``settle()`` waits for.
+  private func enqueue(_ body: @escaping @MainActor () async -> Void) {
+    let previous = pending
+    queued += 1
+    let mine = queued
+    pending = Task { @MainActor in
+      await previous?.value
+      await body()
+      // The queue is empty again only if nothing arrived behind this one.
+      if self.queued == mine { self.pending = nil }
+    }
   }
 
   private func compile() {
@@ -284,15 +372,20 @@ public final class ChartSession {
       failure = nil
       grammar = nil
       vegaLiteDiagnostics = []
+      usermeta = nil
       return
     }
 
-    work?.cancel()
+    compileTask?.cancel()
     let specification = json
     let presets = overrides
     loading = true
 
-    work = Task { [weak self] in
+    // Queued like everything else, so a load cannot run *beside* a touch that was already waiting.
+    // The controller is not safe for concurrent use, and the old code started a compile immediately
+    // while a deferred block sat awaiting the previous compile's task — which meant the deferred
+    // block ran as soon as that finished, with the new compile already under way.
+    enqueue { [weak self] in
       guard let self else { return }
       // **Either grammar.** Translating Vega-Lite is a compile of its own, so it happens here rather
       // than on the main actor, for the same reason the engine's own compile does. A specification
@@ -304,13 +397,39 @@ public final class ChartSession {
         VegaLiteInput.shared.toVega(
           json: specification,
           hostConfig: self.hostConfig,
-          timeZone: engineTimeZone
+          timeZone: engineTimeZone,
+          locale: self.engineLocale
         )
       self.grammar = converted.wasVegaLite ? .vegaLite : .vega
       self.vegaLiteDiagnostics = converted.wasVegaLite ? converted.diagnostics : []
-      // Falling back to the text as written where Vega-Lite compilation produced nothing: the runtime
-      // will then report on it, which is a better failure than this layer inventing one.
-      let vega = converted.vegaJson ?? specification
+      // **Stop here** where Vega-Lite compilation produced nothing.
+      //
+      // This used to fall back to `specification` — the text as written — on the theory that the
+      // runtime would report on it and that beat inventing a failure. It does not: a document that
+      // Vega-Lite could not compile is then handed to a parser that only understands Vega, where its
+      // `mark` and `encoding` are unknown properties and its `marks` are absent, so what a reader
+      // gets is either a confusing complaint about the wrong grammar or an empty chart. The
+      // conversion error is the one true thing anybody knows at this point, and it is already in
+      // `converted.diagnostics`.
+      //
+      // A nil `vegaJson` means exactly this and nothing else: text that is not JSON, or JSON that is
+      // not Vega-Lite, comes back **unchanged** with `wasVegaLite` false, and goes on to the runtime
+      // as it always did.
+      guard let vega = converted.vegaJson else {
+        let fatal =
+          converted.diagnostics.first {
+            $0.severity == DiagnosticSeverity.fatal || $0.severity == DiagnosticSeverity.error
+          }
+        // Published as the chart's diagnostics too, not only as `vegaLiteDiagnostics`: a host that
+        // shows one channel is showing the one that says nothing about this.
+        self.diagnostics = converted.diagnostics
+        self.failure =
+          fatal?.message ?? "the Vega-Lite specification compiled to nothing"
+        // The chart on screen is left alone, as it is for any compile that produces no scene — a
+        // reader keeps what they were looking at, and `failure` says why it did not change.
+        self.loading = false
+        return
+      }
       // The engine's own off-thread compile, on its default dispatcher. This is the single-argument
       // overload, which exists because a Kotlin default argument does not cross the Obj-C boundary:
       // the two-argument form demands a `CoroutineDispatcher` that no exported symbol can produce, so
@@ -325,6 +444,9 @@ public final class ChartSession {
       }
 
       if let compiled { self.diagnostics = compiled.diagnostics }
+      // Republished with every compile, like the diagnostics: it belongs to the document now loaded,
+      // and carrying the previous one's metadata forward would be worse than carrying none.
+      self.usermeta = compiled?.spec?.usermeta
       // **Whether there is a chart is decided here**, from the compilation, and not from the snapshot.
       // `ChartSnapshot.scene` is not optional — the controller always holds one, the empty scene before
       // anything has compiled and the *previous* chart after a compile that failed, which is deliberate
@@ -345,9 +467,8 @@ public final class ChartSession {
       self.refreshControls()
       self.publish()
       self.loading = false
-      // Cleared so later touches run straight through rather than awaiting a finished task.
-      self.work = nil
     }
+    compileTask = pending
   }
 
   /// A value in a row a host hands over.
@@ -621,14 +742,13 @@ public final class ChartSession {
   /// queued touch is also better behaviour than a dropped one — a tap during a slow remote load lands
   /// when the chart appears.
   private func serialised(_ body: @escaping @MainActor () -> Void) {
-    if work == nil {
+    // Inline while the queue is empty, which is most touches: a tap on a settled chart should be
+    // readable by its caller on the same turn rather than a task hop later.
+    if pending == nil {
       body()
       return
     }
-    Task { @MainActor in
-      await self.settle()
-      body()
-    }
+    enqueue { body() }
   }
 
   /// Reads back what the touch did: a selection, a tooltip, or neither.

@@ -394,14 +394,260 @@ final class ChartSessionTests: XCTestCase {
       date: "%d-%m-%Y",
       time: "%H:%M:%S",
       dateTime: "%a %e %B %Y %X",
+      // The order of a date's fields, which is the part a locale could not reach: the axis format
+      // came from a table with no locale in it, so a Dutch chart read `mei 21, 2026`.
+      // Nil, so both are derived from `date` and `time` above — which is what a host copying a d3
+      // locale JSON across gets, and the whole of the fix.
+      timeUnitSpecifierOverrides: nil,
+      timeTickFormatOverrides: nil,
       decimal: ",",
       thousands: ".",
       grouping: [KotlinInt(value: 3)],
       minus: "\u{2212}",
-      captions: VegaCaptionsCompanion.shared.English
+      captions: VegaCaptionsCompanion.shared.English,
+      // No rules: this locale's tables are enough for what it asserts.
+      rules: nil
     )
     let localised = await drawn(with: dutch)
     XCTAssertTrue(localised.contains { $0.contains("mei 2026") }, "in Dutch: \(localised)")
+  }
+
+  /// A Vega-Lite document that will not compile is reported as one, not reinterpreted as Vega.
+  ///
+  /// The session used to fall back to the text as written when Vega-Lite compilation produced
+  /// nothing, on the theory that the runtime would report on it. It does not: the unconverted text
+  /// goes to a parser that only understands Vega, where `mark` and `encoding` are unknown properties
+  /// and `marks` is absent — so a reader got a complaint about the wrong grammar, or an empty chart.
+  ///
+  /// The construct here is one the compiler refuses by name: a `layer` containing an `hconcat`.
+  /// `VegaLiteTests` already asserts that `toVega` answers nil and says why; this is about what the
+  /// session does with that.
+  func testAVegaLiteDocumentThatWillNotCompileIsReportedAsOne() async {
+    let session = ChartSession()
+    session.load(
+      specification: """
+        {"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+         "data": {"values": [{"a": 1}]},
+         "layer": [{"hconcat": [{"mark": "bar",
+           "encoding": {"x": {"field": "a", "type": "quantitative"}}}]}]}
+        """)
+    await session.settle()
+
+    XCTAssertEqual(session.grammar, .vegaLite, "it was read as Vega-Lite, and stays read that way")
+    XCTAssertNil(session.scene, "no chart, rather than a chart of the wrong grammar's leftovers")
+    XCTAssertNotNil(session.failure, "a host has to be able to put something in front of a reader")
+    XCTAssertFalse(session.vegaLiteDiagnostics.isEmpty)
+    // The **conversion**'s own report, and in the channel a host that shows one channel is showing.
+    XCTAssertEqual(
+      session.diagnostics.map { $0.message }, session.vegaLiteDiagnostics.map { $0.message },
+      "the diagnostics are the conversion's, not a second opinion from the Vega parser")
+    XCTAssertFalse(session.loading)
+
+    // The other half: text that is not Vega-Lite at all still reaches the Vega parser untouched.
+    session.load(specification: specification)
+    await session.settle()
+    XCTAssertEqual(session.grammar, .vega)
+    XCTAssertNotNil(session.scene)
+    XCTAssertNil(session.failure)
+  }
+
+  /// `settle()` waits for work queued **during** a compile, not only for the compile.
+  ///
+  /// Only the compile was ever held. Everything `serialised` deferred — a container-size recompile, a
+  /// tap that arrived mid-load, a reset — was started as a task nobody kept, so a caller that set a
+  /// size while a compile was in flight and then settled returned before the resize had run. That is
+  /// the race a screenshot test exists to rule out, and it was in the synchronising primitive itself.
+  ///
+  /// The size is set **without** awaiting the load first, which is the whole point: it has to land in
+  /// the queue behind a compile that is still running.
+  func testSettleWaitsForWorkQueuedDuringACompile() async {
+    let responsive = """
+      {"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+       "width": "container",
+       "data": {"values": [{"a": 1, "b": 2}, {"a": 3, "b": 4}]},
+       "mark": "line",
+       "encoding": {"x": {"field": "a", "type": "quantitative"},
+                    "y": {"field": "b", "type": "quantitative"}}}
+      """
+
+    let session = ChartSession(containerSize: SizeD(width: 200, height: 400))
+    session.load(specification: responsive)
+    // No await here. The compile is in flight, so this goes into the queue behind it.
+    session.containerSize = SizeD(width: 600, height: 400)
+
+    await session.settle()
+
+    let width = try! XCTUnwrap(session.scene, session.failure ?? "no scene").width
+    XCTAssertGreaterThan(
+      width, 500,
+      "settle() returned before the queued resize had run: the chart is still 200 wide")
+  }
+
+  /// The **order** of a date's fields, which the locale seam could not reach from here at all.
+  ///
+  /// Two things had to be true for this to work, and neither was. The pattern a bucketed axis is
+  /// formatted with is written by the *Vega-Lite* compiler, and this session never gave that compiler
+  /// its locale — so the pattern was `%b %d, %Y` whatever the host said. And `TimeUnits`'s table took
+  /// no locale, so nothing downstream could move it either.
+  ///
+  /// The middle assertion is the defect itself: Dutch month names in American order, which is what a
+  /// host got for supplying a locale.
+  func testALocaleDecidesTheOrderOfADateOnABucketedAxis() async {
+    let bucketed = """
+      {"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+       "width": 400, "height": 120,
+       "data": {"values": [{"t": "2026-05-20T10:00:00", "v": 1},
+                           {"t": "2026-06-17T10:00:00", "v": 2}]},
+       "mark": "point",
+       "encoding": {"x": {"field": "t", "type": "temporal", "timeUnit": "yearmonthdate"},
+                    "y": {"field": "v", "type": "quantitative"}}}
+      """
+
+    func labels(_ locale: VegaLocale?) async -> [String] {
+      let session = ChartSession(locale: locale)
+      session.load(specification: bucketed)
+      await session.settle()
+      let scene = try! XCTUnwrap(session.scene, session.failure ?? "no scene")
+      var target = RecordingTarget()
+      SceneWalk().draw(scene: scene, into: &target)
+      return target.calls.filter { $0.contains("text ") }
+    }
+
+    let english = await labels(nil)
+    XCTAssertTrue(english.contains { $0.contains("May 21, 2026") }, "en-US: \(english)")
+
+    // Pinned to upstream's table, which is what a host got for *every* locale before this: the names
+    // move and the order does not.
+    let namesOnly = await labels(Self.dutch(dayFirst: false))
+    XCTAssertTrue(
+      namesOnly.contains { $0.contains("mei 21, 2026") },
+      "an upstream-pinned locale keeps the American order: \(namesOnly)")
+
+    let dayFirst = await labels(Self.dutch(dayFirst: true))
+    XCTAssertTrue(dayFirst.contains { $0.contains("21 mei 2026") }, "day first: \(dayFirst)")
+    XCTAssertFalse(
+      dayFirst.contains { $0.contains("mei 21") },
+      "the American order is gone rather than joined: \(dayFirst)")
+  }
+
+  /// A host's own **rules** reach a chart's labels, and cannot change what the format asked for.
+  ///
+  /// The seam that is behaviour rather than data, and the one place a *device's* preferences can get
+  /// in: everything else about a locale is a table, and a table only answers what somebody thought to
+  /// tabulate. The two cases here are the ones it provably cannot — a numbering system, since the
+  /// engine writes `value.toString()` and that is ASCII always, and a name whose form depends on the
+  /// rest of the format.
+  ///
+  /// The precedence is what the assertions are really about. The specification writes
+  /// `"format": "%d/%m/%Y"`, and it keeps that order, those fields and those separators: what the
+  /// rules decide is which digits write them. A real host would read the numbering system off
+  /// `Locale.current` here rather than hard-coding one.
+  func testAHostsOwnRulesReachTheLabelsWithoutChangingTheFormat() async {
+    let months = """
+      {"width": 300, "height": 120, "padding": 5,
+       "data": [{"name": "t", "values": [{"t": "2026-05-21T10:00:00", "v": 1}],
+                 "format": {"parse": {"t": "date"}}}],
+       "scales": [{"name": "x", "type": "time", "domain": {"data": "t", "field": "t"},
+                   "range": "width"}],
+       "axes": [{"orient": "bottom", "scale": "x", "format": "%d/%m/%Y", "tickCount": 1}],
+       "marks": [{"type": "symbol", "from": {"data": "t"}, "encode": {"enter": {
+         "x": {"scale": "x", "field": "t"}, "y": {"value": 60}}}}]}
+      """
+
+    func drawn(with locale: VegaLocale?) async -> [String] {
+      let session = ChartSession(locale: locale)
+      session.load(specification: months)
+      await session.settle()
+      let scene = try! XCTUnwrap(session.scene, session.failure ?? "no scene")
+      var target = RecordingTarget()
+      SceneWalk().draw(scene: scene, into: &target)
+      return target.calls.filter { $0.contains("text ") }
+    }
+
+    let ascii = await drawn(with: nil)
+    XCTAssertTrue(ascii.contains { $0.contains("21/05/2026") }, "ASCII by default: \(ascii)")
+
+    let eastern = await drawn(
+      with: VegaLocale.Companion.shared.EnglishUS.doCopy(
+        months: VegaLocale.Companion.shared.EnglishUS.months,
+        shortMonths: VegaLocale.Companion.shared.EnglishUS.shortMonths,
+        days: VegaLocale.Companion.shared.EnglishUS.days,
+        shortDays: VegaLocale.Companion.shared.EnglishUS.shortDays,
+        periods: VegaLocale.Companion.shared.EnglishUS.periods,
+        date: VegaLocale.Companion.shared.EnglishUS.date,
+        time: VegaLocale.Companion.shared.EnglishUS.time,
+        dateTime: VegaLocale.Companion.shared.EnglishUS.dateTime,
+        timeUnitSpecifierOverrides: [:],
+        timeTickFormatOverrides: [:],
+        decimal: VegaLocale.Companion.shared.EnglishUS.decimal,
+        thousands: VegaLocale.Companion.shared.EnglishUS.thousands,
+        grouping: VegaLocale.Companion.shared.EnglishUS.grouping,
+        minus: VegaLocale.Companion.shared.EnglishUS.minus,
+        captions: VegaLocale.Companion.shared.EnglishUS.captions,
+        rules: EasternArabicRules()
+      ))
+
+    // The digits are the host's; the order, the fields and the slashes are still the document's.
+    XCTAssertTrue(
+      eastern.contains { $0.contains("٢١/٠٥/٢٠٢٦") },
+      "the host's numbering system, in the specification's own format: \(eastern)")
+    XCTAssertFalse(
+      eastern.contains { $0.contains("21/05/2026") }, "and not both: \(eastern)")
+  }
+
+  /// A numbering system a `VegaLocale` field could not have expressed.
+  ///
+  /// `name` abstains, which is the ordinary case: a host implements the rules it has and inherits the
+  /// rest, because every method may answer nil.
+  private final class EasternArabicRules: VegaFormatRules {
+    private static let arabic = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"]
+
+    func name(field: DateName, index: Int32, context: DateNameContext, locale: VegaLocale) -> String?
+    {
+      nil
+    }
+
+    func digits(number: String) -> String? {
+      String(
+        number.map { character in
+          guard let digit = character.wholeNumberValue, character.isNumber, digit < 10 else {
+            return character
+          }
+          return Character(Self.arabic[digit])
+        })
+    }
+  }
+
+  /// Dutch, deriving its date order from its own `%x` or pinned to upstream's table.
+  private static func dutch(dayFirst: Bool) -> VegaLocale {
+    VegaLocale(
+      months: [
+        "januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september",
+        "oktober", "november", "december",
+      ],
+      shortMonths: [
+        "jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec",
+      ],
+      days: ["zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"],
+      shortDays: ["zo", "ma", "di", "wo", "do", "vr", "za"],
+      periods: ["a.m.", "p.m."],
+      date: "%d-%m-%Y",
+      time: "%H:%M:%S",
+      dateTime: "%a %e %B %Y %X",
+      // **Nil derives from `date` above**, which is the whole of the fix: `%d-%m-%Y` says this
+      // language writes the day first, and until now nothing read it — so a Dutch chart said
+      // `mei 21, 2026`, the right month name in the American order. An empty map pins a locale to
+      // upstream's own table instead, and `VegaLocale.EnglishUS` is the only one that does.
+      timeUnitSpecifierOverrides: dayFirst ? nil : [:],
+      timeTickFormatOverrides: dayFirst ? nil : [:],
+      decimal: ",",
+      thousands: ".",
+      grouping: [KotlinInt(value: 3)],
+      minus: "\u{2212}",
+      captions: VegaCaptionsCompanion.shared.English,
+      // No rules: this locale's tables are enough for what it asserts.
+      rules: nil
+    )
   }
 
   /// A dark chart, themed by the app, from iOS — the other seam that was unreachable from here.
@@ -463,8 +709,12 @@ final class ChartSessionTests: XCTestCase {
     await wide.settle()
     XCTAssertGreaterThan(try! XCTUnwrap(wide.scene).width, narrowWidth + 300)
 
-    // And set again after the fact, which is what a layout change is.
+    // And set again after the fact, which is what a layout change is. Awaited, because the setter
+    // queues a recompile off this actor rather than running one inline — a resize arrives on the
+    // main thread and a compile does not belong there. It was never reliably synchronous anyway:
+    // with a compile in flight it was already deferred, and the deferred task was one nobody held.
     narrow.containerSize = SizeD(width: 600, height: 400)
+    await narrow.settle()
     XCTAssertGreaterThan(try! XCTUnwrap(narrow.scene).width, narrowWidth + 300)
   }
 
@@ -603,6 +853,45 @@ final class ChartSessionTests: XCTestCase {
 
     XCTAssertNil(session.scene)
     XCTAssertNotNil(session.failure, "a failure a host can put in front of a reader")
+  }
+
+  /// `usermeta` reaches the host, from either grammar.
+  ///
+  /// It used to reach nobody: the Vega parser dropped it with a warning, so the only property whose
+  /// purpose is to survive compilation did not. And a Swift host had no path to it even once the
+  /// parser kept it, because `ChartSession` publishes what a host reads and did not publish this —
+  /// the same shape of gap as a capability that exists for Kotlin alone.
+  ///
+  /// Both grammars are asserted because a Vega-Lite document loses it in two places otherwise: the
+  /// Vega-Lite compiler has to carry it onto the Vega it emits, and the Vega parser has to keep it.
+  func testUsermetaReachesTheHostFromEitherGrammar() async {
+    let session = ChartSession()
+
+    session.load(
+      specification: specification.replacingOccurrences(
+        of: "\"width\": 200", with: "\"usermeta\": {\"source\": \"diary\"}, \"width\": 200"))
+    await session.settle()
+    XCTAssertEqual(
+      VegaValueKt.asString(session.usermeta?["source"] ?? VegaValueNull.shared), "diary")
+
+    session.load(
+      specification: """
+        {"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+         "usermeta": {"source": "diary"},
+         "data": {"values": [{"c": "a", "v": 30}]},
+         "mark": "bar",
+         "encoding": {"x": {"field": "c", "type": "nominal"},
+                      "y": {"field": "v", "type": "quantitative"}}}
+        """)
+    await session.settle()
+    XCTAssertEqual(session.grammar, .vegaLite)
+    XCTAssertEqual(
+      VegaValueKt.asString(session.usermeta?["source"] ?? VegaValueNull.shared), "diary")
+
+    // A document that carries none says none, rather than keeping the last one's.
+    session.load(specification: specification)
+    await session.settle()
+    XCTAssertNil(session.usermeta)
   }
 }
 

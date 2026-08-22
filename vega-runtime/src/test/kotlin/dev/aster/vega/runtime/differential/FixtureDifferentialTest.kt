@@ -3,6 +3,7 @@ package dev.aster.vega.runtime.differential
 import dev.aster.vega.fixtures.VegaHeadlessTextEngine
 import dev.aster.vega.loader.FileDataLoader
 import dev.aster.vega.model.DiagnosticSeverity
+import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.runtime.compile.CompiledSpec
 import dev.aster.vega.runtime.compile.SpecCompiler
 import dev.aster.vega.scene.Scene
@@ -38,7 +39,8 @@ class FixtureDifferentialTest {
     // The engine that reproduces upstream's headless text measurement, so layout — which depends on
     // how wide the labels are — is comparable too. See VegaHeadlessTextEngine.
     return reference to
-      SpecCompiler(VegaHeadlessTextEngine(), fixtureLoader).compileJson(spec.readText())
+      SpecCompiler(VegaHeadlessTextEngine(), fixtureLoader, locale = VegaLocale.EnglishUS)
+        .compileJson(spec.readText())
   }
 
   @ParameterizedTest(name = "{0}")
@@ -120,8 +122,12 @@ class FixtureDifferentialTest {
   @MethodSource("fixtures")
   fun `compilation is deterministic`(name: String) {
     val spec = File(repositoryRoot, "test-fixtures/specs/$name.vg.json").readText()
-    val once = SpecCompiler(VegaHeadlessTextEngine(), fixtureLoader).compileJson(spec)
-    val again = SpecCompiler(VegaHeadlessTextEngine(), fixtureLoader).compileJson(spec)
+    val once =
+      SpecCompiler(VegaHeadlessTextEngine(), fixtureLoader, locale = VegaLocale.EnglishUS)
+        .compileJson(spec)
+    val again =
+      SpecCompiler(VegaHeadlessTextEngine(), fixtureLoader, locale = VegaLocale.EnglishUS)
+        .compileJson(spec)
     assertEquals(
       Differential.flattenScene(requireNotNull(once.scene)).map { it.toString() },
       Differential.flattenScene(requireNotNull(again.scene)).map { it.toString() },

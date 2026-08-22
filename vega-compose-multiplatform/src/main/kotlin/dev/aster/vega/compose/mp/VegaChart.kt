@@ -4,11 +4,13 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -52,11 +54,44 @@ import kotlin.math.roundToInt
  * it describes so a reader can *touch* it rather than only swipe through it. Without that the chart
  * was one silent drawing on this renderer while the Android View and the Swift one both spoke.
  *
- * @param fit how a scene that is not the size of its slot is placed in it.
+ * @param fit how a scene that is not the size of its slot is placed in it. It only has something to
+ *   do where the slot and the scene differ — see [sizing], which is what decides whether they can.
+ * @param sizing where the chart's size comes from where [modifier] leaves a dimension free.
+ *   [SceneSizing.Scene] is the scene's own, which is the default and what this always did;
+ *   [SceneSizing.Fill] takes the slot instead and leaves [fit] to place the scene inside it.
  * @param selectedNodeIds the marks currently selected, so a reader is told which. From a
  *   controller's interaction state where there is one.
  * @param captions the language the one sentence the tree writes itself is in — the dense-chart
  *   summary. Everything else is already in the chart's own locale, having come from the compiler.
+ * @param accessibilityMaxExposedMarks how many **data marks** a reader may explore one by one
+ *   before a summary stands in for them. [AccessibilityTree.MAX_EXPOSED_MARKS] by default, which is
+ *   the engine's judgement rather than a fact — a host knows the size of the screen, whether the
+ *   chart is the page or a thumbnail on it, and what its own users have said. Only marks count
+ *   toward it and the guides are exposed either way, so a chart of many small points does not
+ *   collapse on the strength of its axis labels.
+ * @param resolveImage turns an `image` mark's URL into something drawable. Null draws no URL
+ *   images, which is the default and is deliberate: a URL is not an image, and fetching one is a
+ *   decision about following an address the *specification* chose — the same argument `DataLoader`
+ *   makes for data. `data:` URLs and engine-produced rasters need no resolver and are drawn without
+ *   one. An image this cannot answer leaves a hole in the chart rather than aborting the draw; the
+ *   lower-level `DrawScopeTarget` collects those URLs, and this composable has nowhere to hand
+ *   them.
+ * @param imageCache where decoded images are kept **across frames**. A draw target is built once
+ *   per frame, so a cache inside one lives for a single draw: a heatmap's raster was PNG-decoded on
+ *   every frame, and a resolver would be called on every frame. The default is remembered against
+ *   the composition, which is what a caller wants; pass one to share it between charts, or to clear
+ *   it when the image behind a URL has changed.
+ * @param onUnresolvedImage told the first time an `image` mark's URL cannot be resolved, and not
+ *   again for that URL. An unresolved image leaves a hole in the chart and the draw carries on,
+ *   which is right — a chart is better with one mark missing than not drawn at all — and until now
+ *   the hole was all a host got, since the target that collects these is built per frame and
+ *   discarded with it.
+ *
+ *   **Called from the draw**, so treat it as a report and not as a place to set state a
+ *   recomposition would read: launch, log, enqueue. It fires once per URL per [imageCache] rather
+ *   than once per frame, which is what makes it safe to have at all; [ImageCache.unresolvedImages]
+ *   is the same facts without a callback, for a host that would rather poll.
+ *
  * @param onActivate what to do when a **reader** activates a mark through the accessibility tree.
  *   Null leaves the chart inert, which is right for a chart that is only being looked at.
  * @param onTap a tap, in **scene** coordinates, with the mark under it or null where it hit
@@ -83,9 +118,14 @@ public fun VegaChart(
   scene: Scene,
   modifier: Modifier = Modifier,
   fit: SceneFit = SceneFit.Contain,
+  sizing: SceneSizing = SceneSizing.Scene,
   textEngine: ComposeTextEngine = rememberVegaTextEngine(),
   selectedNodeIds: Set<SceneNodeId> = emptySet(),
   captions: VegaCaptions = VegaCaptions.English,
+  accessibilityMaxExposedMarks: Int = AccessibilityTree.MAX_EXPOSED_MARKS,
+  resolveImage: ((String) -> ImageBitmap?)? = null,
+  imageCache: ImageCache = rememberVegaImageCache(),
+  onUnresolvedImage: ((String) -> Unit)? = null,
   onActivate: ((SceneNodeId) -> Unit)? = null,
   onTap: ((PointD, SceneNodeId?) -> Unit)? = null,
   onLongPress: ((PointD, SceneNodeId?) -> Unit)? = null,
@@ -107,20 +147,36 @@ public fun VegaChart(
   // documentation asks a host to do: `elements` flattens the scene, so recomputing it on every
   // recomposition would walk the tree for a pointer that moved.
   val elements =
-    remember(scene, selectedNodeIds, captions) {
-      AccessibilityTree.elements(scene, selectedNodeIds, captions)
+    remember(scene, selectedNodeIds, captions, accessibilityMaxExposedMarks) {
+      AccessibilityTree.elements(scene, selectedNodeIds, captions, accessibilityMaxExposedMarks)
     }
 
-  // **The caller's modifier first, then the scene's own size as a default.** The other order looks
-  // equivalent and is not: a `size` modifier fixes the constraints its child is measured with, so
+  // **The caller's modifier first, then a size.** The other order looks equivalent and is not: a
+  // `size` modifier fixes the constraints its child is measured with, so
   // `Modifier.size(sceneSize).then(caller)` clamped every caller to the scene's own size — a chart
-  // could
-  // not be made bigger or filled to a slot, which quietly made `SceneFit.Contain`, the default,
-  // mean
-  // nothing outside a test that sizes the canvas itself. Scene units are CSS pixels, which is what
-  // a dp
-  // is on the platforms this runs on, so the default is the chart at its natural size.
-  Box(modifier = modifier.then(Modifier.size(scene.width.dp, scene.height.dp))) {
+  // could not be made bigger or filled to a slot, which quietly made `SceneFit.Contain`, the
+  // default, mean nothing outside a test that sizes the canvas itself.
+  //
+  // What the size *is* comes from [sizing], and this is the order that makes both answers work.
+  // `Modifier.size` coerces the size it wants into the constraints it is handed, so a caller that
+  // bounds a dimension already wins; what it decides is the dimension a caller left free, and there
+  // it used to be the scene's own — about 300 units plus axes for a `width: "container"` chart,
+  // whatever room was going, with nothing to say `fit` had done nothing. `fillMaxSize` in front of
+  // it
+  // fills a **bounded** dimension and passes an unbounded one through untouched, so `Fill` takes
+  // the
+  // slot where there is one and falls back to the scene's size where there is not — which is the
+  // only
+  // thing it can do inside a scrolling column.
+  //
+  // Scene units are CSS pixels, which is what a dp is on the platforms this runs on, so the
+  // `Scene` answer is the chart at its natural size.
+  val sized =
+    when (sizing) {
+      SceneSizing.Scene -> Modifier
+      SceneSizing.Fill -> Modifier.fillMaxSize()
+    }
+  Box(modifier = modifier.then(sized).then(Modifier.size(scene.width.dp, scene.height.dp))) {
     Canvas(
       modifier =
         Modifier.matchParentSize()
@@ -155,6 +211,9 @@ public fun VegaChart(
               scope = this,
               textMeasurer = textEngine.measurer,
               fontFamilyResolver = textEngine.fontFamilyResolver,
+              resolveImage = resolveImage,
+              imageCache = imageCache,
+              onUnresolvedImage = onUnresolvedImage,
             ),
           )
         }
@@ -262,6 +321,35 @@ private fun AccessibilityOverlay(
       }
     }
   }
+}
+
+/**
+ * Where a chart's size comes from where its `modifier` leaves a dimension free.
+ *
+ * The two are not alternatives to [SceneFit] but the question in front of it: `fit` decides how a
+ * scene is placed in a slot of a different size, and it has nothing to do until something decides
+ * that the slot may *be* a different size.
+ */
+public enum class SceneSizing {
+  /**
+   * The scene's own size — one scene unit per dp.
+   *
+   * A specification declares a width and a height, so that is the size it wants, and this is the
+   * default for that reason. The trap it comes with is worth stating: a caller that bounds neither
+   * dimension gets this whatever `fit` says, and for a `width: "container"` chart that is
+   * `config.view.continuousWidth` — 300 — plus its axes, however much room was available.
+   */
+  Scene,
+
+  /**
+   * Whatever the slot allows, leaving `fit` to place the scene inside it.
+   *
+   * A bounded dimension is filled; an unbounded one falls back to the scene's own size, because
+   * there is nothing else it could be — a chart inside a scrolling column has as much height as it
+   * asks for. So this is safe to pass anywhere and does something wherever there is room to do it
+   * in.
+   */
+  Fill,
 }
 
 /** How a scene is placed in a slot that is not its own size. */
@@ -565,3 +653,20 @@ private fun fitPlacement(
     top = placed.top.toDouble(),
   )
 }
+
+/**
+ * An [ImageCache] that outlives a frame.
+ *
+ * Remembered against nothing, so it survives every recomposition and every redraw of the composable
+ * that owns it — which is the point. A draw target is built once per frame, so a cache inside one
+ * caches nothing across frames: an engine-produced raster was PNG-decoded on every draw, and a
+ * host-supplied resolver would be called on every draw.
+ *
+ * [VegaChart] calls this for its caller. Hoist it where two charts should share one, or where the
+ * image behind a URL can change and the cache has to be cleared.
+ */
+@Composable
+public fun rememberVegaImageCache(maxEntries: Int = 64): ImageCache =
+  remember(maxEntries) {
+    ImageCache(maxEntries)
+  }

@@ -1,6 +1,7 @@
 package dev.aster.vega.model.spec
 
 import dev.aster.vega.model.DiagnosticCodes
+import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaValue
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -31,11 +32,19 @@ class UnhandledPropertiesTest {
       .filter { it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY }
       .mapNotNull { it.jsonPath?.substringAfterLast('.') }
 
+  /**
+   * A chart, with the fragment under test in it.
+   *
+   * The mark is not decoration. A document that declares nothing that draws now reports
+   * `PARSE_NOTHING_TO_DRAW`, and several assertions here are that a fragment produces **no**
+   * diagnostic at all — which is a much weaker claim if the surrounding document is not a chart.
+   */
   private fun spec(body: String) =
     """
     {
       "width": 100, "height": 60,
       "data": [{"name": "t", "values": [{"c": "a", "v": 1}]}],
+      "marks": [{"type": "rect", "from": {"data": "t"}}],
       $body
     }
     """
@@ -354,5 +363,179 @@ class UnhandledPropertiesTest {
         )
         .map { it.message },
     )
+  }
+
+  /**
+   * An interval tick count is read, and warned about by nothing.
+   *
+   * `tickCount` used to be read **twice**: once through `numberOrSignal`, which sees a string or an
+   * `{"interval": …}` object and has nothing to make a number of, so it warned; and then again,
+   * correctly, into `tickInterval` and `tickStep`. So a document was laid out exactly right and
+   * complained about at the same time. Measured on a device, every chart carrying an interval tick
+   * count produced one warning per axis, four on one page, all false — and a false warning is worse
+   * than no warning, because it is indistinguishable from a property the engine really did drop.
+   *
+   * The four spellings are asserted together deliberately: the two interval forms have to stay
+   * silent and the number and the signal have to keep reaching `tickCount`, which is the reading
+   * the interval branch could have eaten.
+   */
+  @Test
+  fun `an interval tick count is read without a diagnostic`() {
+    val json =
+      spec(
+        """"scales": [{"name": "t", "type": "time",
+             "domain": [{"signal": "datetime(2026, 0, 1)"}, {"signal": "datetime(2026, 11, 1)"}],
+             "range": "width"},
+            {"name": "s", "type": "linear", "domain": [0, 1], "range": "width"}],
+           "axes": [{"scale": "t", "orient": "bottom", "tickCount": {"interval": "day", "step": 20}},
+            {"scale": "t", "orient": "top", "tickCount": "month"},
+            {"scale": "s", "orient": "left", "tickCount": 5},
+            {"scale": "s", "orient": "right", "tickCount": {"signal": "3"}}],
+           "legends": [{"fill": "t", "tickCount": {"interval": "month"}}]"""
+      )
+    assertEquals(emptyList<String>(), ignored(json).sorted())
+
+    val axes = SpecParser().parseJson(json).spec!!.axes
+    assertEquals("day", axes[0].tickInterval)
+    assertEquals(20, axes[0].tickStep)
+    assertEquals("month", axes[1].tickInterval)
+    assertEquals(null, axes[1].tickStep)
+    // The number and the signal still land on `tickCount`, and neither is mistaken for an interval.
+    assertEquals(NumberValue.Constant(5.0), axes[2].tickCount)
+    assertEquals(NumberValue.Signal("3"), axes[3].tickCount)
+    assertEquals(null, axes[2].tickInterval)
+    assertEquals(null, axes[3].tickInterval)
+    assertEquals("month", SpecParser().parseJson(json).spec!!.legends.single().tickInterval)
+  }
+
+  /**
+   * The warning moves to where a reading really does fail.
+   *
+   * Both of these used to fall through to a count **in silence**, which is the opposite failure
+   * from the one above and the more expensive one: the specification asked for tick marks on
+   * calendar boundaries and got whatever round number the algorithm liked. `"fortnight"` is not a
+   * unit `TimeInterval.forUnit` knows, and an interval named by a signal cannot be resolved at the
+   * point the axis is built.
+   */
+  @Test
+  fun `a tick interval nothing can read is reported`() {
+    val reported =
+      diagnostics(
+          spec(
+            """"signals": [{"name": "grain", "value": "day"}],
+               "scales": [{"name": "t", "type": "time",
+                 "domain": [{"signal": "datetime(2026, 0, 1)"}, {"signal": "now()"}],
+                 "range": "width"}],
+               "axes": [{"scale": "t", "orient": "bottom", "tickCount": "fortnight"},
+                {"scale": "t", "orient": "top", "tickCount": {"interval": {"signal": "grain"}}}]"""
+          )
+        )
+        .filter { it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY }
+        .map { it.message }
+    assertEquals(2, reported.size, reported.toString())
+    assertTrue(reported.any { "'fortnight'" in it }, reported.toString())
+    assertTrue(reported.any { "supplied by a signal" in it }, reported.toString())
+  }
+
+  /**
+   * A document that declares nothing that draws says so, and a chart does not.
+   *
+   * `{}` parses. The root is an object, `marks` is absent so it reads as an empty list, and a
+   * non-null `VegaSpec` with no marks compiles to a non-null, empty `Scene` — with, until now, no
+   * diagnostic anywhere. A host that reads "no diagnostics" as "there is a chart" could not tell an
+   * empty placeholder object from a server apart from a chart that drew.
+   *
+   * Informational, not an error: `{}` is valid Vega and upstream renders it as an empty surface, so
+   * anything louder would be this engine disagreeing with the grammar.
+   *
+   * The negative half is the part that keeps it usable. A guide draws on its own, so two committed
+   * fixtures — `log-axis-labels.vg.json`, which carries `"marks": []` and a pair of axes, and
+   * `legend-columns.vg.json`, which draws only a legend — must stay silent.
+   */
+  @Test
+  fun `a document that draws nothing says so, and one that draws does not`() {
+    val bare = SpecParser().parseJson("{}").diagnostics.single()
+    assertEquals(DiagnosticCodes.PARSE_NOTHING_TO_DRAW, bare.code)
+    assertEquals(DiagnosticSeverity.INFO, bare.severity)
+    assertTrue("the root object is empty" in bare.message, bare.message)
+
+    // A Vega-Lite document handed to the Vega parser: its own keys name the mistake, which is why
+    // the message carries them. This case used to produce no diagnostic whatsoever.
+    val vegaLite =
+      SpecParser()
+        .parseJson("""{"mark": "bar", "encoding": {"x": {"field": "a", "type": "nominal"}}}""")
+        .diagnostics
+        .single { it.code == DiagnosticCodes.PARSE_NOTHING_TO_DRAW }
+    assertTrue("mark, encoding" in vegaLite.message, vegaLite.message)
+
+    val drawn =
+      listOf(
+        // A chart of marks.
+        """{"width": 10, "height": 10,
+           "marks": [{"type": "rect", "encode": {"update": {"x": {"value": 1}}}}]}""",
+        // `log-axis-labels.vg.json`: an empty mark list and a pair of axes.
+        """{"width": 10, "height": 10, "marks": [],
+           "scales": [{"name": "s", "type": "linear", "domain": [0, 1], "range": "width"}],
+           "axes": [{"scale": "s", "orient": "bottom"}]}""",
+        // `legend-columns.vg.json`: no marks at all, and a legend.
+        """{"width": 10, "height": 10,
+           "scales": [{"name": "s", "type": "ordinal", "domain": ["a"], "range": ["#000"]}],
+           "legends": [{"fill": "s"}]}""",
+        // A title is ink too.
+        """{"width": 10, "height": 10, "title": {"text": "T"}}""",
+      )
+    for (json in drawn) {
+      assertEquals(
+        emptyList<String>(),
+        SpecParser()
+          .parseJson(json)
+          .diagnostics
+          .filter { it.code == DiagnosticCodes.PARSE_NOTHING_TO_DRAW }
+          .map { it.message },
+        json,
+      )
+    }
+  }
+
+  /**
+   * `usermeta` reaches the host instead of being reported at it.
+   *
+   * It used to be the sole entry in a table of unsupported top-level sections: one `usermeta is
+   * ignored` warning per compile, whatever the block held, and no field on `VegaSpec` to hold it.
+   * So a document carrying supplementary data for the host — the case upstream's schema describes,
+   * "optional metadata that will be passed to Vega" — lost it unconditionally, and all a host
+   * learned was that something had gone.
+   *
+   * The three states are asserted together because they are three different statements: absent is
+   * null, `{}` is an empty map, and content is content. A host reading absent and empty as one
+   * cannot tell a document that carries no metadata from one whose metadata was filtered to
+   * nothing.
+   */
+  @Test
+  fun `usermeta is carried to the host, and a non-object one is reported`() {
+    val absent = SpecParser().parseJson(spec(""""width": 100"""))
+    assertEquals(null, absent.spec!!.usermeta)
+    assertEquals(emptyList<String>(), ignored(spec(""""width": 100""")))
+
+    val empty = SpecParser().parseJson(spec(""""usermeta": {}"""))
+    assertEquals(emptyMap<String, VegaValue>(), empty.spec!!.usermeta)
+    assertEquals(emptyList<String>(), ignored(spec(""""usermeta": {}""")))
+
+    val carried =
+      SpecParser()
+        .parseJson(spec(""""usermeta": {"table": [{"c": "a", "v": 1}], "source": "diary"}"""))
+    assertEquals(emptyList<String>(), ignored(spec(""""usermeta": {"source": "diary"}""")))
+    val meta = carried.spec!!.usermeta!!
+    assertEquals(setOf("table", "source"), meta.keys)
+    assertEquals(VegaValue.Str("diary"), meta["source"])
+    // Nested content arrives whole, which is the point of carrying the value rather than a summary.
+    assertEquals(1, (meta["table"] as VegaValue.Arr).values.size)
+
+    // Upstream's type is an object. Anything else cannot be read back by key, so it is reported
+    // rather than coerced into something a host would look in and find nothing.
+    val wrong = diagnostics(spec(""""usermeta": [1, 2]""")).single()
+    assertEquals(DiagnosticCodes.PARSE_UNKNOWN_PROPERTY, wrong.code)
+    assertTrue("must be an object" in wrong.message, wrong.message)
+    assertEquals(null, SpecParser().parseJson(spec(""""usermeta": [1, 2]""")).spec!!.usermeta)
   }
 }

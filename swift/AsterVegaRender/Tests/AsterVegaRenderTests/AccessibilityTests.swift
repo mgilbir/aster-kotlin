@@ -46,7 +46,12 @@ final class AccessibilityTests: XCTestCase {
     """
 
   func testAChartsMarksAreReadableAsAccessibleElements() throws {
-    let elements = AccessibilityTree.shared.elements(scene: try scene(bars), selectedNodeIds: [], captions: VegaCaptionsCompanion.shared.English)
+    let elements = AccessibilityTree.shared.elements(
+      scene: try scene(bars),
+      selectedNodeIds: [],
+      captions: VegaCaptionsCompanion.shared.English,
+      maxExposedMarks: AccessibilityTree.shared.MAX_EXPOSED_MARKS
+    )
 
     XCTAssertFalse(elements.isEmpty, "a chart with described marks has elements to announce")
     // The engine builds each label from the mark's own description, which is what a reader hears.
@@ -87,7 +92,8 @@ final class AccessibilityTests: XCTestCase {
         """
       ),
       selectedNodeIds: [],
-      captions: VegaCaptionsCompanion.shared.English
+      captions: VegaCaptionsCompanion.shared.English,
+      maxExposedMarks: AccessibilityTree.shared.MAX_EXPOSED_MARKS
     )
 
     XCTAssertEqual(elements.count, 1, "a dense chart says what it is instead of enumerating itself")
@@ -95,8 +101,116 @@ final class AccessibilityTests: XCTestCase {
     XCTAssertTrue(elements[0].label.contains("marks"), elements[0].label)
   }
 
+  /// The threshold counts **data marks**, and an app may set it itself.
+  ///
+  /// It used to count every focusable element, so a chart's axes and its legend pushed it over before
+  /// the data was dense — measured: 118 points, two axes and a legend is 121 focusable elements, and
+  /// the whole tree collapsed at 118 marks. A reader then lost per-mark exploration of the entire
+  /// chart rather than of the crowded part, and lost the axes and the legend with it, which are a
+  /// handful of elements and are exactly what is worth reading when the data cannot be walked.
+  func testTheThresholdCountsMarksAndTheHostMaySetIt() throws {
+    let cap = Int(AccessibilityTree.shared.MAX_EXPOSED_MARKS)
+    let points = (0..<(cap - 2)).map { "{\"c\": \"p\($0)\", \"v\": \($0 % 90 + 5)}" }
+      .joined(separator: ", ")
+    let withGuides = try scene(
+      """
+      {"$schema": "https://vega.github.io/schema/vega/v6.json",
+       "width": 400, "height": 200, "padding": 0,
+       "data": [{"name": "t", "values": [\(points)]}],
+       "scales": [
+         {"name": "x", "type": "band", "domain": {"data": "t", "field": "c"}, "range": "width"},
+         {"name": "y", "domain": [0, 100], "range": "height"}],
+       "axes": [{"orient": "bottom", "scale": "x"}, {"orient": "left", "scale": "y"}],
+       "marks": [{"type": "rect", "from": {"data": "t"},
+         "encode": {"enter": {
+           "x": {"scale": "x", "field": "c"}, "width": {"scale": "x", "band": 1},
+           "y": {"scale": "y", "field": "v"}, "y2": {"scale": "y", "value": 0},
+           "description": {"signal": "'point ' + datum.c"}}}}]}
+      """
+    )
+
+    let all = AccessibilityTree.shared.elements(
+      scene: withGuides,
+      selectedNodeIds: [],
+      captions: VegaCaptionsCompanion.shared.English,
+      maxExposedMarks: AccessibilityTree.shared.MAX_EXPOSED_MARKS
+    )
+    // `cap - 2` marks plus two axes is `cap` focusable elements, which the old rule left alone —
+    // one more point and it would have collapsed the axes too.
+    XCTAssertEqual(all.count, cap)
+    XCTAssertFalse(all.contains { $0.isSummary }, "the data is not dense")
+
+    // And an app that wants a shorter list says so. The axes survive the collapse.
+    let tight = AccessibilityTree.shared.elements(
+      scene: withGuides,
+      selectedNodeIds: [],
+      captions: VegaCaptionsCompanion.shared.English,
+      maxExposedMarks: 10
+    )
+    XCTAssertEqual(tight.count, 3, "a summary and the two axes: \(tight.map { $0.label })")
+    XCTAssertTrue(tight[0].isSummary)
+    XCTAssertFalse(tight[1].isSummary)
+    XCTAssertFalse(tight[2].isSummary)
+  }
+
   /// The cap is one number, shared, so the two hosts cannot describe the same chart differently.
   func testTheCapIsTheEnginesOwn() {
     XCTAssertEqual(AccessibilityTree.shared.MAX_EXPOSED_MARKS, 120)
+  }
+
+  /// A mark is announced as a button only where activating it does something.
+  ///
+  /// `traits(for:)`'s own header says both hosts used to say button for everything, "which is a promise
+  /// the chart does not keep" — and the gate that landed was on `activatable` while the gate on
+  /// `session` did not. So a chart drawn with no session announced every mark as a button, VoiceOver
+  /// offered the activation, the reader took it, and `accessibilityAction` opened
+  /// `guard let session else { return }` and did nothing. The Compose renderer gates the **role**
+  /// instead of the action: `role = Role.Button` only where the activation exists.
+  ///
+  /// Three conditions, read by the trait, by `accessibilityRespondsToUserInteraction` and by the action
+  /// through one function, so they cannot disagree again.
+  @MainActor
+  func testAMarkIsAButtonOnlyWhereActivatingItDoesSomething() throws {
+    let scene = try scene(bars)
+    let elements = AccessibilityTree.shared.elements(
+      scene: scene,
+      selectedNodeIds: [],
+      captions: VegaCaptionsCompanion.shared.English,
+      maxExposedMarks: AccessibilityTree.shared.MAX_EXPOSED_MARKS
+    )
+    let mark = try XCTUnwrap(elements.first { $0.activatable && $0.nodeId != nil })
+
+    let lookedAt = VegaChartView(scene: scene)
+    XCTAssertFalse(
+      lookedAt.activatable(mark),
+      "no session, so nothing to dispatch into and nothing to promise")
+    XCTAssertFalse(lookedAt.traits(for: mark).contains(.isButton))
+
+    let touchable = VegaChartView(scene: scene, session: ChartSession())
+    XCTAssertTrue(touchable.activatable(mark))
+    XCTAssertTrue(touchable.traits(for: mark).contains(.isButton))
+
+    // A guide is not a button either way, which is the rule that landed first and must not regress.
+    if let guide = elements.first(where: { !$0.activatable }) {
+      XCTAssertFalse(touchable.activatable(guide))
+      XCTAssertFalse(touchable.traits(for: guide).contains(.isButton))
+    }
+  }
+
+  /// The gesture sets, whose whole purpose is that a host can ask for the ones that claim nothing.
+  func testTheGestureSetsSayWhichClaimATouch() {
+    XCTAssertEqual(ChartGestures.all, [.tap, .longPress, .pan, .zoom, .hover])
+
+    // The set that exists for a chart inside a scroll view: neither of these claims the touch.
+    XCTAssertTrue(ChartGestures.withoutDrag.contains(.tap))
+    XCTAssertTrue(ChartGestures.withoutDrag.contains(.hover))
+    // And none of the three that do.
+    XCTAssertFalse(ChartGestures.withoutDrag.contains(.pan))
+    XCTAssertFalse(ChartGestures.withoutDrag.contains(.zoom))
+    XCTAssertFalse(
+      ChartGestures.withoutDrag.contains(.longPress),
+      "a long press reports no location in SwiftUI, so it needs a zero-distance drag to source one")
+
+    XCTAssertTrue(ChartGestures.none.isEmpty)
   }
 }

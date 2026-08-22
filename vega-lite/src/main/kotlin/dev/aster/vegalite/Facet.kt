@@ -1,6 +1,7 @@
 package dev.aster.vegalite
 
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.locale.VegaLocale
 
 /**
  * A cell's caption: the value the cell holds, written the way that column is written elsewhere.
@@ -40,7 +41,10 @@ private fun headerText(def: ChannelDef, field: String, config: Config? = null): 
   if (def.type == MeasureType.TEMPORAL || timeUnit != null) {
     val utc = timeUnit?.contains("utc") == true || def.scale.string("type") == "utc"
     val prefix = if (utc) "utc" else "time"
-    val specifier = if (timeUnit != null) Fields.timeUnitSpecifier(timeUnit) else "\"%b %d, %Y\""
+    val specifier =
+      if (timeUnit != null)
+        Fields.timeUnitSpecifier(timeUnit, config?.locale ?: VegaLocale.EnglishUS)
+      else "\"%b %d, %Y\""
     return "${prefix}Format($accessor, $specifier)"
   }
   return "isValid($accessor) ? $accessor : \"\"+$accessor"

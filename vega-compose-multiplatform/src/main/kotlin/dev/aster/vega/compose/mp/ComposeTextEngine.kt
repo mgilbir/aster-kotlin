@@ -50,15 +50,56 @@ import dev.aster.vega.scene.TextStyle
  *
  * @param measurer the platform's text measurement, which must have been built with [density].
  * @param density the composition's density **and font scale**; see above.
- * @param fontFamilyResolver turns a specification's family name into a Compose family. The default
- *   maps the generic CSS names and answers `null` for anything else, which means the platform's
- *   default face.
+ * @param fontFamilyResolver turns a specification's family name into a Compose family. The default,
+ *   [genericFontFamily], maps the **generic CSS keywords only** — `sans-serif`, `serif`,
+ *   `monospace`, `cursive` and the `ui-*` and `system-ui` spellings — and answers null for anything
+ *   else, which means the platform's default face. That is a real limit rather than an omission:
+ *   Compose reaches an installed family through platform APIs that common code has none of, so a
+ *   name can only be resolved by a host that already holds the `FontFamily`. [namedFontFamily] is
+ *   how one is registered, and [ComposeTextEngine.unresolvedFontFamilies] is what a chart drew in
+ *   the default face without anybody saying so. The Apple and Android engines resolve a device
+ *   family by name, which is why this is the one renderer that needs the registry.
  */
 public class ComposeTextEngine(
   internal val measurer: TextMeasurer,
   private val density: Density,
-  internal val fontFamilyResolver: (String) -> FontFamily? = ::genericFontFamily,
+  fontFamilyResolver: (String) -> FontFamily? = ::genericFontFamily,
 ) : MeasuredTextEngine() {
+
+  private val unresolved = LinkedHashSet<String>()
+
+  /**
+   * Family names this engine's resolver could not answer, in the order they were first met.
+   *
+   * A chart naming a face the resolver does not know is drawn in the platform's default one, which
+   * is legible and is not what the specification asked for — and nothing said so. There is no
+   * diagnostics channel through a text engine, so this is the same shape as
+   * `DrawScopeTarget.unresolvedImages`: the facts are collected and a host reads them when it wants
+   * to. Empty for a chart that names only the generic families, which is most of them.
+   *
+   * A well-formed CSS stack is *not* in here: `genericFontFamily` reads a stack left to right, so
+   * `"Helvetica Neue, Arial, sans-serif"` resolves on its last entry. What lands here is a name
+   * with nothing generic behind it.
+   *
+   * Filled while **measuring**, so it is complete once a specification has been compiled with this
+   * engine — which is before anything is drawn.
+   */
+  public val unresolvedFontFamilies: Set<String>
+    get() = unresolved.toSet()
+
+  /**
+   * The resolver, wrapped so a name it declines is recorded.
+   *
+   * The wrapper rather than the caller's own function is what [DrawScopeTarget] is given, so the
+   * drawing resolves through the same path the measurement did — measuring with one font and
+   * drawing with another is the defect this class exists to prevent, and a wrapper that only one
+   * side used would be a new way to have it.
+   */
+  internal val fontFamilyResolver: (String) -> FontFamily? = { family ->
+    fontFamilyResolver(family).also {
+      if (it == null && family.isNotBlank()) unresolved.add(family)
+    }
+  }
 
   /** Ascent, descent and line height for one style, which cost a measurement each to find out. */
   private class LineMetrics(val ascent: Double, val descent: Double, val lineHeight: Double)
@@ -158,6 +199,28 @@ public fun rememberVegaTextEngine(
 }
 
 /**
+ * The same, for a host that has faces of its own and wants them found **by name**.
+ *
+ * A themed specification names a real family — the one the app bundles, the one its design system
+ * uses — and the default resolver knows only the generic CSS keywords, so the chart came out in the
+ * platform's default face. This is the registry the other two renderers get from their platforms:
+ * `CoreTextFonts` resolves an installed family through a font descriptor and `AndroidTextEngine`
+ * through `Typeface.create`, and Compose Multiplatform reaches neither from common code — a
+ * `FontFamily` can only come from a host that already holds it.
+ *
+ * ```kotlin
+ * val engine = rememberVegaTextEngine(mapOf("Google Sans Flex" to FontFamily(googleSansFlex)))
+ * ```
+ *
+ * Names are matched without regard to case and a comma-separated stack is read left to right, as
+ * CSS reads it, so a registered name wins over a generic fallback written after it. Anything not
+ * registered falls through to [genericFontFamily].
+ */
+@Composable
+public fun rememberVegaTextEngine(fontFamilies: Map<String, FontFamily>): ComposeTextEngine =
+  rememberVegaTextEngine(remember(fontFamilies) { namedFontFamily(fontFamilies) })
+
+/**
  * The generic CSS families, and `null` for anything else.
  *
  * A specification names a font as a string, and resolving that string to a face installed on the
@@ -169,6 +232,36 @@ public fun rememberVegaTextEngine(
  * generic family answers. Anything else is a face this function cannot know about, so it declines
  * rather than guessing — `null` means [FontFamily.Default].
  */
+/**
+ * A resolver that answers **registered names first**, then the generic keywords.
+ *
+ * The seam the issue behind this was about: a specification that names a real face got the
+ * platform's default one, because the only resolver on offer knew the CSS generics. A host holds
+ * its own `FontFamily` objects — that is the only way a Compose family exists — so it is the only
+ * party that can map a name to one, and this is the mapping.
+ *
+ * Matched without regard to case, because a specification's `"Helvetica Neue"` and a host's
+ * `"helvetica neue"` are the same face and a chart should not turn on which was typed. A
+ * comma-separated stack is read **left to right** as CSS reads it, so a registered name beats a
+ * generic fallback written after it — `"Google Sans Flex, sans-serif"` resolves to the registered
+ * family and not to `FontFamily.SansSerif`.
+ *
+ * Falls through to [genericFontFamily], so registering nothing changes nothing.
+ */
+public fun namedFontFamily(families: Map<String, FontFamily>): (String) -> FontFamily? {
+  // Lower-cased once rather than per label: a chart resolves a family for every distinct text
+  // style,
+  // and this closure outlives all of them.
+  val byLowerName = families.entries.associate { (name, family) -> name.lowercase() to family }
+  return { family ->
+    family
+      .split(',')
+      .asSequence()
+      .map { it.trim().trim('"', '\'').lowercase() }
+      .firstNotNullOfOrNull { byLowerName[it] } ?: genericFontFamily(family)
+  }
+}
+
 public fun genericFontFamily(family: String): FontFamily? {
   for (name in family.split(',')) {
     val trimmed = name.trim().trim('"', '\'').lowercase()

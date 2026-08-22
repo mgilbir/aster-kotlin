@@ -498,6 +498,9 @@ public final class dev/aster/vega/runtime/VegaChartController {
 	public final fun report (Ldev/aster/vega/model/VegaDiagnostic;)V
 	public final fun resetViewport ()V
 	public final fun setContainerSize (Ldev/aster/vega/scene/SizeD;)V
+	public final fun setContainerSizeAsync (Ldev/aster/vega/scene/SizeD;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun setContainerSizeAsync (Ldev/aster/vega/scene/SizeD;Lkotlinx/coroutines/CoroutineDispatcher;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun setContainerSizeAsync$default (Ldev/aster/vega/runtime/VegaChartController;Ldev/aster/vega/scene/SizeD;Lkotlinx/coroutines/CoroutineDispatcher;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun setContentScale (D)V
 	public final fun setData (Ljava/lang/String;Ljava/util/List;)V
 	public final fun setHitTestOptions (Ldev/aster/vega/scene/HitTestOptions;)V
@@ -562,19 +565,21 @@ public final class dev/aster/vega/runtime/compile/AxisDefaults {
 }
 
 public final class dev/aster/vega/runtime/compile/CompiledSpec {
-	public fun <init> (Ldev/aster/vega/scene/Scene;Ljava/util/Map;Ldev/aster/vega/runtime/compile/SignalScope;Ljava/util/List;Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/Map;)V
-	public synthetic fun <init> (Ldev/aster/vega/scene/Scene;Ljava/util/Map;Ldev/aster/vega/runtime/compile/SignalScope;Ljava/util/List;Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ldev/aster/vega/scene/Scene;Ljava/util/Map;Ldev/aster/vega/runtime/compile/SignalScope;Ljava/util/List;Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/Map;Z)V
+	public synthetic fun <init> (Ldev/aster/vega/scene/Scene;Ljava/util/Map;Ldev/aster/vega/runtime/compile/SignalScope;Ljava/util/List;Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/Map;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ldev/aster/vega/scene/Scene;
 	public final fun component2 ()Ljava/util/Map;
 	public final fun component3 ()Ldev/aster/vega/runtime/compile/SignalScope;
 	public final fun component4 ()Ljava/util/List;
 	public final fun component5 ()Ldev/aster/vega/model/spec/VegaSpec;
 	public final fun component6 ()Ljava/util/Map;
-	public final fun copy (Ldev/aster/vega/scene/Scene;Ljava/util/Map;Ldev/aster/vega/runtime/compile/SignalScope;Ljava/util/List;Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/Map;)Ldev/aster/vega/runtime/compile/CompiledSpec;
-	public static synthetic fun copy$default (Ldev/aster/vega/runtime/compile/CompiledSpec;Ldev/aster/vega/scene/Scene;Ljava/util/Map;Ldev/aster/vega/runtime/compile/SignalScope;Ljava/util/List;Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/Map;ILjava/lang/Object;)Ldev/aster/vega/runtime/compile/CompiledSpec;
+	public final fun component7 ()Z
+	public final fun copy (Ldev/aster/vega/scene/Scene;Ljava/util/Map;Ldev/aster/vega/runtime/compile/SignalScope;Ljava/util/List;Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/Map;Z)Ldev/aster/vega/runtime/compile/CompiledSpec;
+	public static synthetic fun copy$default (Ldev/aster/vega/runtime/compile/CompiledSpec;Ldev/aster/vega/scene/Scene;Ljava/util/Map;Ldev/aster/vega/runtime/compile/SignalScope;Ljava/util/List;Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/Map;ZILjava/lang/Object;)Ldev/aster/vega/runtime/compile/CompiledSpec;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDiagnostics ()Ljava/util/List;
 	public final fun getHoverVariants ()Ljava/util/Map;
+	public final fun getReadsContainerSize ()Z
 	public final fun getScales ()Ljava/util/Map;
 	public final fun getScene ()Ldev/aster/vega/scene/Scene;
 	public final fun getSignals ()Ldev/aster/vega/runtime/compile/SignalScope;

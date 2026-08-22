@@ -40,12 +40,14 @@ public final class dev/aster/vega/model/DelimitedText {
 public final class dev/aster/vega/model/DiagnosticCodes {
 	public static final field EXPORT_IMAGE_UNRESOLVED Ljava/lang/String;
 	public static final field EXPORT_UNSUPPORTED_OPERATION Ljava/lang/String;
+	public static final field EXPRESSION_CONTAINER_SIZE_UNANSWERED Ljava/lang/String;
 	public static final field EXPRESSION_LOG Ljava/lang/String;
 	public static final field EXPRESSION_PARSE_ERROR Ljava/lang/String;
 	public static final field EXPRESSION_UNSUPPORTED_FUNCTION Ljava/lang/String;
 	public static final field INSTANCE Ldev/aster/vega/model/DiagnosticCodes;
 	public static final field PARSE_INVALID_JSON Ljava/lang/String;
 	public static final field PARSE_MISSING_PROPERTY Ljava/lang/String;
+	public static final field PARSE_NOTHING_TO_DRAW Ljava/lang/String;
 	public static final field PARSE_UNKNOWN_MARK Ljava/lang/String;
 	public static final field PARSE_UNKNOWN_PROPERTY Ljava/lang/String;
 	public static final field RENDER_UNSUPPORTED_BLEND_MODE Ljava/lang/String;
@@ -265,6 +267,36 @@ public final class dev/aster/vega/model/VegaValueKt {
 	public static final fun parseFieldPath (Ljava/lang/String;)Ljava/util/List;
 }
 
+public final class dev/aster/vega/model/locale/DateField : java/lang/Enum {
+	public static final field DATE Ldev/aster/vega/model/locale/DateField;
+	public static final field MONTH Ldev/aster/vega/model/locale/DateField;
+	public static final field YEAR Ldev/aster/vega/model/locale/DateField;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/model/locale/DateField;
+	public static fun values ()[Ldev/aster/vega/model/locale/DateField;
+}
+
+public final class dev/aster/vega/model/locale/DateName : java/lang/Enum {
+	public static final field HALF_DAY Ldev/aster/vega/model/locale/DateName;
+	public static final field MONTH Ldev/aster/vega/model/locale/DateName;
+	public static final field MONTH_SHORT Ldev/aster/vega/model/locale/DateName;
+	public static final field WEEKDAY Ldev/aster/vega/model/locale/DateName;
+	public static final field WEEKDAY_SHORT Ldev/aster/vega/model/locale/DateName;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/model/locale/DateName;
+	public static fun values ()[Ldev/aster/vega/model/locale/DateName;
+}
+
+public final class dev/aster/vega/model/locale/DateNameContext {
+	public final fun getDirectives ()Ljava/util/Set;
+	public final fun getHasDayOfMonth ()Z
+	public final fun getHasTimeOfDay ()Z
+	public final fun getHasYear ()Z
+	public final fun getPattern ()Ljava/lang/String;
+	public final fun isAlone ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
 public abstract interface class dev/aster/vega/model/locale/VegaCaptions {
 	public static final field Companion Ldev/aster/vega/model/locale/VegaCaptions$Companion;
 	public abstract fun axis (ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
@@ -283,15 +315,23 @@ public final class dev/aster/vega/model/locale/VegaCaptions$Companion {
 	public final fun getEnglish ()Ldev/aster/vega/model/locale/VegaCaptions;
 }
 
+public abstract interface class dev/aster/vega/model/locale/VegaFormatRules {
+	public abstract fun digits (Ljava/lang/String;)Ljava/lang/String;
+	public abstract fun name (Ldev/aster/vega/model/locale/DateName;ILdev/aster/vega/model/locale/DateNameContext;Ldev/aster/vega/model/locale/VegaLocale;)Ljava/lang/String;
+}
+
 public final class dev/aster/vega/model/locale/VegaLocale {
 	public static final field Companion Ldev/aster/vega/model/locale/VegaLocale$Companion;
-	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ldev/aster/vega/model/locale/VegaCaptions;)V
-	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ldev/aster/vega/model/locale/VegaCaptions;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ldev/aster/vega/model/locale/VegaCaptions;Ldev/aster/vega/model/locale/VegaFormatRules;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ldev/aster/vega/model/locale/VegaCaptions;Ldev/aster/vega/model/locale/VegaFormatRules;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/util/List;
-	public final fun component10 ()Ljava/lang/String;
-	public final fun component11 ()Ljava/util/List;
+	public final fun component10 ()Ljava/util/Map;
+	public final fun component11 ()Ljava/lang/String;
 	public final fun component12 ()Ljava/lang/String;
-	public final fun component13 ()Ldev/aster/vega/model/locale/VegaCaptions;
+	public final fun component13 ()Ljava/util/List;
+	public final fun component14 ()Ljava/lang/String;
+	public final fun component15 ()Ldev/aster/vega/model/locale/VegaCaptions;
+	public final fun component16 ()Ldev/aster/vega/model/locale/VegaFormatRules;
 	public final fun component2 ()Ljava/util/List;
 	public final fun component3 ()Ljava/util/List;
 	public final fun component4 ()Ljava/util/List;
@@ -299,12 +339,13 @@ public final class dev/aster/vega/model/locale/VegaLocale {
 	public final fun component6 ()Ljava/lang/String;
 	public final fun component7 ()Ljava/lang/String;
 	public final fun component8 ()Ljava/lang/String;
-	public final fun component9 ()Ljava/lang/String;
-	public final fun copy (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ldev/aster/vega/model/locale/VegaCaptions;)Ldev/aster/vega/model/locale/VegaLocale;
-	public static synthetic fun copy$default (Ldev/aster/vega/model/locale/VegaLocale;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ldev/aster/vega/model/locale/VegaCaptions;ILjava/lang/Object;)Ldev/aster/vega/model/locale/VegaLocale;
+	public final fun component9 ()Ljava/util/Map;
+	public final fun copy (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ldev/aster/vega/model/locale/VegaCaptions;Ldev/aster/vega/model/locale/VegaFormatRules;)Ldev/aster/vega/model/locale/VegaLocale;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/locale/VegaLocale;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ldev/aster/vega/model/locale/VegaCaptions;Ldev/aster/vega/model/locale/VegaFormatRules;ILjava/lang/Object;)Ldev/aster/vega/model/locale/VegaLocale;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCaptions ()Ldev/aster/vega/model/locale/VegaCaptions;
 	public final fun getDate ()Ljava/lang/String;
+	public final fun getDateFieldOrder ()Ljava/util/List;
 	public final fun getDateTime ()Ljava/lang/String;
 	public final fun getDays ()Ljava/util/List;
 	public final fun getDecimal ()Ljava/lang/String;
@@ -312,10 +353,15 @@ public final class dev/aster/vega/model/locale/VegaLocale {
 	public final fun getMinus ()Ljava/lang/String;
 	public final fun getMonths ()Ljava/util/List;
 	public final fun getPeriods ()Ljava/util/List;
+	public final fun getRules ()Ldev/aster/vega/model/locale/VegaFormatRules;
 	public final fun getShortDays ()Ljava/util/List;
 	public final fun getShortMonths ()Ljava/util/List;
 	public final fun getThousands ()Ljava/lang/String;
 	public final fun getTime ()Ljava/lang/String;
+	public final fun getTimeTickFormatOverrides ()Ljava/util/Map;
+	public final fun getTimeTickFormats ()Ljava/util/Map;
+	public final fun getTimeUnitSpecifierOverrides ()Ljava/util/Map;
+	public final fun getTimeUnitSpecifiers ()Ljava/util/Map;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -2117,8 +2163,8 @@ public final class dev/aster/vega/model/spec/TitleSpec {
 }
 
 public final class dev/aster/vega/model/spec/VegaSpec {
-	public fun <init> (Ljava/lang/Double;Ljava/lang/Double;Ldev/aster/vega/model/spec/Padding;Ldev/aster/vega/model/spec/Autosize;Ljava/lang/String;Ljava/util/Map;Ldev/aster/vega/model/spec/EventConfig;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/TitleSpec;Ldev/aster/vega/model/spec/LayoutSpec;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/EncodeSpec;Ljava/lang/String;Ljava/util/Map;)V
-	public synthetic fun <init> (Ljava/lang/Double;Ljava/lang/Double;Ldev/aster/vega/model/spec/Padding;Ldev/aster/vega/model/spec/Autosize;Ljava/lang/String;Ljava/util/Map;Ldev/aster/vega/model/spec/EventConfig;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/TitleSpec;Ldev/aster/vega/model/spec/LayoutSpec;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/EncodeSpec;Ljava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/Double;Ljava/lang/Double;Ldev/aster/vega/model/spec/Padding;Ldev/aster/vega/model/spec/Autosize;Ljava/lang/String;Ljava/util/Map;Ldev/aster/vega/model/spec/EventConfig;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/TitleSpec;Ldev/aster/vega/model/spec/LayoutSpec;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/EncodeSpec;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/lang/Double;Ljava/lang/Double;Ldev/aster/vega/model/spec/Padding;Ldev/aster/vega/model/spec/Autosize;Ljava/lang/String;Ljava/util/Map;Ldev/aster/vega/model/spec/EventConfig;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/TitleSpec;Ldev/aster/vega/model/spec/LayoutSpec;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/EncodeSpec;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/Double;
 	public final fun component10 ()Ljava/util/List;
 	public final fun component11 ()Ljava/util/List;
@@ -2131,6 +2177,7 @@ public final class dev/aster/vega/model/spec/VegaSpec {
 	public final fun component18 ()Ljava/lang/String;
 	public final fun component19 ()Ljava/util/Map;
 	public final fun component2 ()Ljava/lang/Double;
+	public final fun component20 ()Ljava/util/Map;
 	public final fun component3 ()Ldev/aster/vega/model/spec/Padding;
 	public final fun component4 ()Ldev/aster/vega/model/spec/Autosize;
 	public final fun component5 ()Ljava/lang/String;
@@ -2138,8 +2185,8 @@ public final class dev/aster/vega/model/spec/VegaSpec {
 	public final fun component7 ()Ldev/aster/vega/model/spec/EventConfig;
 	public final fun component8 ()Ljava/util/List;
 	public final fun component9 ()Ljava/util/List;
-	public final fun copy (Ljava/lang/Double;Ljava/lang/Double;Ldev/aster/vega/model/spec/Padding;Ldev/aster/vega/model/spec/Autosize;Ljava/lang/String;Ljava/util/Map;Ldev/aster/vega/model/spec/EventConfig;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/TitleSpec;Ldev/aster/vega/model/spec/LayoutSpec;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/EncodeSpec;Ljava/lang/String;Ljava/util/Map;)Ldev/aster/vega/model/spec/VegaSpec;
-	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/VegaSpec;Ljava/lang/Double;Ljava/lang/Double;Ldev/aster/vega/model/spec/Padding;Ldev/aster/vega/model/spec/Autosize;Ljava/lang/String;Ljava/util/Map;Ldev/aster/vega/model/spec/EventConfig;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/TitleSpec;Ldev/aster/vega/model/spec/LayoutSpec;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/EncodeSpec;Ljava/lang/String;Ljava/util/Map;ILjava/lang/Object;)Ldev/aster/vega/model/spec/VegaSpec;
+	public final fun copy (Ljava/lang/Double;Ljava/lang/Double;Ldev/aster/vega/model/spec/Padding;Ldev/aster/vega/model/spec/Autosize;Ljava/lang/String;Ljava/util/Map;Ldev/aster/vega/model/spec/EventConfig;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/TitleSpec;Ldev/aster/vega/model/spec/LayoutSpec;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/EncodeSpec;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;)Ldev/aster/vega/model/spec/VegaSpec;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/VegaSpec;Ljava/lang/Double;Ljava/lang/Double;Ldev/aster/vega/model/spec/Padding;Ldev/aster/vega/model/spec/Autosize;Ljava/lang/String;Ljava/util/Map;Ldev/aster/vega/model/spec/EventConfig;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/TitleSpec;Ldev/aster/vega/model/spec/LayoutSpec;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/EncodeSpec;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Ldev/aster/vega/model/spec/VegaSpec;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAutosize ()Ldev/aster/vega/model/spec/Autosize;
 	public final fun getAxes ()Ljava/util/List;
@@ -2159,6 +2206,7 @@ public final class dev/aster/vega/model/spec/VegaSpec {
 	public final fun getSignals ()Ljava/util/List;
 	public final fun getStyleAboveDefaults ()Ljava/util/Map;
 	public final fun getTitle ()Ldev/aster/vega/model/spec/TitleSpec;
+	public final fun getUsermeta ()Ljava/util/Map;
 	public final fun getWidth ()Ljava/lang/Double;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -2230,8 +2278,8 @@ public final class dev/aster/vega/model/time/TimeUnits {
 	public static final field INSTANCE Ldev/aster/vega/model/time/TimeUnits;
 	public final fun detect (Ljava/util/List;Lkotlinx/datetime/TimeZone;)Lkotlin/Pair;
 	public final fun getALL ()Ljava/util/List;
-	public final fun specifier (Ljava/util/List;Ljava/util/Map;)Ljava/lang/String;
-	public static synthetic fun specifier$default (Ldev/aster/vega/model/time/TimeUnits;Ljava/util/List;Ljava/util/Map;ILjava/lang/Object;)Ljava/lang/String;
+	public final fun specifier (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/model/locale/VegaLocale;)Ljava/lang/String;
+	public static synthetic fun specifier$default (Ldev/aster/vega/model/time/TimeUnits;Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/model/locale/VegaLocale;ILjava/lang/Object;)Ljava/lang/String;
 }
 
 public final class dev/aster/vega/model/time/VegaTimeZones {

@@ -96,9 +96,22 @@ public object NumberFormat {
   ): String {
     val parsed =
       parse(specifier)
-        ?: return withTypographicMinus(JsSemantics.numberToString(value), locale.minus)
+        ?: return digits(
+          withTypographicMinus(JsSemantics.numberToString(value), locale.minus),
+          locale,
+        )
     return format(value, parsed, locale = locale)
   }
+
+  /**
+   * The host's numbering system, applied to a formatted number.
+   *
+   * At the very end, so grouping, padding, the decimal separator and any currency or SI affix are
+   * already in place: this transliterates digits and cannot move a separator or change a width,
+   * both of which the specification's own format decided. A `$`, a `%` or an SI `M` carries no
+   * digits and is therefore untouched by a rule that maps digits.
+   */
+  private fun digits(text: String, locale: VegaLocale): String = locale.rules?.digits(text) ?: text
 
   /**
    * Formats [value] with an already-parsed specifier, and an [extra] suffix that participates in
@@ -245,15 +258,20 @@ public object NumberFormat {
       padding = ""
     }
 
-    return when (spec.align) {
-      '<' -> prefix + body + suffix + padding
-      '=' -> prefix + padding + body + suffix
-      '^' -> {
-        val half = padding.length / 2
-        padding.substring(0, half) + prefix + body + suffix + padding.substring(half)
-      }
-      else -> padding + prefix + body + suffix
-    }
+    // The host's numbering system last of all, so it sees the number the specification asked for
+    // and can only change which digits write it.
+    return digits(
+      when (spec.align) {
+        '<' -> prefix + body + suffix + padding
+        '=' -> prefix + padding + body + suffix
+        '^' -> {
+          val half = padding.length / 2
+          padding.substring(0, half) + prefix + body + suffix + padding.substring(half)
+        }
+        else -> padding + prefix + body + suffix
+      },
+      locale,
+    )
   }
 
   /**

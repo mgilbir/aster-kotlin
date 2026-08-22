@@ -43,7 +43,7 @@ final class VegaLiteTests: XCTestCase {
     """
 
   func testAVegaLiteSpecificationIsRecognisedAndCompiled() throws {
-    let converted = VegaLiteInput.shared.toVega(json: vegaLite, hostConfig: nil, timeZone: nil)
+    let converted = VegaLiteInput.shared.toVega(json: vegaLite, hostConfig: nil, timeZone: nil, locale: VegaLocale.Companion.shared.EnglishUS)
 
     XCTAssertTrue(converted.wasVegaLite, "the schema says Vega-Lite, so it should be read as such")
     let vega = try XCTUnwrap(converted.vegaJson, "compilation produced nothing")
@@ -59,7 +59,7 @@ final class VegaLiteTests: XCTestCase {
 
   /// The whole point: the compiled specification **draws**, through this runtime and this renderer.
   func testAVegaLiteSpecificationDrawsThroughTheSwiftRenderer() throws {
-    let vega = try XCTUnwrap(VegaLiteInput.shared.toVega(json: vegaLite, hostConfig: nil, timeZone: nil).vegaJson)
+    let vega = try XCTUnwrap(VegaLiteInput.shared.toVega(json: vegaLite, hostConfig: nil, timeZone: nil, locale: VegaLocale.Companion.shared.EnglishUS).vegaJson)
     let compiled = compiler().compileJson(json: vega, signalOverrides: [:], itemEncodes: [:])
     let serious = compiled.diagnostics.filter {
       $0.severity == DiagnosticSeverity.error || $0.severity == DiagnosticSeverity.fatal
@@ -83,10 +83,10 @@ final class VegaLiteTests: XCTestCase {
 
   /// Either grammar, one picture — which is what lets a host stop asking which it was given.
   func testTheTwoGrammarsEndAtTheSameDrawing() throws {
-    let viaVegaLite = try XCTUnwrap(VegaLiteInput.shared.toVega(json: vegaLite, hostConfig: nil, timeZone: nil).vegaJson)
+    let viaVegaLite = try XCTUnwrap(VegaLiteInput.shared.toVega(json: vegaLite, hostConfig: nil, timeZone: nil, locale: VegaLocale.Companion.shared.EnglishUS).vegaJson)
     // The same chart handed over as Vega, by compiling it once and feeding the result back. A host
     // may be given either, and neither is a special case for it.
-    let asVega = VegaLiteInput.shared.toVega(json: viaVegaLite, hostConfig: nil, timeZone: nil)
+    let asVega = VegaLiteInput.shared.toVega(json: viaVegaLite, hostConfig: nil, timeZone: nil, locale: VegaLocale.Companion.shared.EnglishUS)
     XCTAssertFalse(asVega.wasVegaLite, "Vega in, Vega out, and no compilation attempted")
     XCTAssertEqual(asVega.vegaJson, viaVegaLite, "and unchanged")
 
@@ -105,7 +105,7 @@ final class VegaLiteTests: XCTestCase {
       {"$schema": "https://vega.github.io/schema/vega/v6.json",
        "width": 50, "height": 50, "marks": []}
       """
-    let converted = VegaLiteInput.shared.toVega(json: vega, hostConfig: nil, timeZone: nil)
+    let converted = VegaLiteInput.shared.toVega(json: vega, hostConfig: nil, timeZone: nil, locale: VegaLocale.Companion.shared.EnglishUS)
     XCTAssertFalse(converted.wasVegaLite)
     XCTAssertEqual(converted.vegaJson, vega)
     XCTAssertTrue(converted.diagnostics.isEmpty, "nothing was compiled, so nothing is reported")
@@ -121,7 +121,8 @@ final class VegaLiteTests: XCTestCase {
            "encoding": {"x": {"field": "a", "type": "quantitative"}}}]}]}
         """,
       hostConfig: nil,
-      timeZone: nil
+      timeZone: nil,
+      locale: VegaLocale.Companion.shared.EnglishUS
     )
     XCTAssertTrue(converted.wasVegaLite, "it was read as Vega-Lite")
     XCTAssertNil(converted.vegaJson, "and produced nothing, rather than a chart nobody asked for")

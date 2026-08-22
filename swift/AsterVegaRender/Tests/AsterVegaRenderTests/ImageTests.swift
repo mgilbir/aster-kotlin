@@ -279,4 +279,174 @@ final class ImageTests: XCTestCase {
       height: 40
     )
   }
+
+  /// A host's resolver reaches the drawing **through `VegaChartView`**.
+  ///
+  /// `CoreGraphicsTarget` has taken `resolveImage:` from the start and the view had no parameter for
+  /// it, so it was always built without one. A chart with a remote image therefore drew every other
+  /// mark and a hole where the image would be, with no way through the supported entry point to supply
+  /// a fetcher — the same gap the Compose composable had.
+  ///
+  /// Drawn through the view's own `draw(into:size:)`, which is the code path a `Canvas` runs, rather
+  /// than through a target built here: a target built here is what could pass and prove nothing.
+  @available(macOS 14.0, iOS 17.0, *)
+  @MainActor
+  func testAHostsResolverReachesTheDrawingThroughTheView() throws {
+    let drawn = try scene(
+      """
+      {"$schema": "https://vega.github.io/schema/vega/v6.json",
+       "width": 40, "height": 40, "padding": 0, "background": "white",
+       "marks": [{"type": "image", "encode": {"enter": {
+         "x": {"value": 0}, "y": {"value": 0},
+         "width": {"value": 40}, "height": {"value": 40},
+         "url": {"value": "https://example.com/tile.png"}}}}]}
+      """
+    )
+
+    // A one-pixel image the resolver answers with, so a drawn pixel is unmistakably its.
+    let space = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+    let source = try XCTUnwrap(
+      CGContext(
+        data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+        space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+      )
+    )
+    // Blue, so it cannot be confused with the white background this chart declares.
+    source.setFillColor(red: 0, green: 0, blue: 1, alpha: 1)
+    source.fill(CGRect(x: 0, y: 0, width: 1, height: 1))
+    let tile = try XCTUnwrap(source.makeImage())
+
+    // The context owns its own buffer, read back through `context.data`: handing `CGContext` a
+    // pointer into a Swift array would let that pointer escape the closure that produced it.
+    func drawnPixel(resolver: ((String) -> CGImage?)?) throws -> (UInt8, UInt8, UInt8) {
+      let context = try XCTUnwrap(
+        CGContext(
+          data: nil, width: 40, height: 40, bitsPerComponent: 8, bytesPerRow: 160,
+          space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )
+      )
+      context.setFillColor(gray: 1, alpha: 1)
+      context.fill(CGRect(x: 0, y: 0, width: 40, height: 40))
+      let view = VegaChartView(scene: drawn, resolveImage: resolver)
+      view.draw(into: context, size: CGSize(width: 40, height: 40))
+      let pixels = try XCTUnwrap(context.data).assumingMemoryBound(to: UInt8.self)
+      let middle = (20 * 160) + (20 * 4)
+      return (pixels[middle], pixels[middle + 1], pixels[middle + 2])
+    }
+
+    // Without a resolver: the white background, and a hole where the image would be. This is the
+    // state a host was stuck in — every other mark drawn, and nothing to do about the image.
+    CoreGraphicsTarget.clearImageCache()
+    let unresolved = try drawnPixel(resolver: nil)
+    XCTAssertEqual(
+      [unresolved.0, unresolved.1, unresolved.2], [255, 255, 255],
+      "no resolver, so the background shows through: \(unresolved)")
+
+    // Cleared, because the pass above **recorded the refusal**: a URL nothing could answer is
+    // remembered so a resolver is asked once per URL rather than once per frame, and that is the
+    // only reason a host recovering from a failed fetch needs this call at all.
+    CoreGraphicsTarget.clearImageCache()
+    var asked: [String] = []
+    let resolved = try drawnPixel(resolver: { url in
+      asked.append(url)
+      return url == "https://example.com/tile.png" ? tile : nil
+    })
+    XCTAssertEqual(asked, ["https://example.com/tile.png"], "asked for exactly the URL in the chart")
+    XCTAssertEqual(
+      [resolved.0, resolved.1, resolved.2], [0, 0, 255],
+      "the resolver's blue pixel was drawn: \(resolved)")
+  }
+
+  /// A host is **told** about a hole in its chart, once per URL.
+  ///
+  /// An unresolved image leaves a hole and the draw carries on, which is right — a chart is better
+  /// with one mark missing than not drawn at all — but the hole was all a host got. The target
+  /// collected the URLs and this view builds a target per draw and discards it, so there was nowhere
+  /// for them to arrive.
+  ///
+  /// Once per URL rather than once per draw, which is what makes a callback from the draw phase
+  /// usable: three draws, one report.
+  @available(macOS 14.0, iOS 17.0, *)
+  @MainActor
+  func testAHostIsToldAboutAnUnresolvedImageOncePerURL() throws {
+    let drawn = try scene(
+      """
+      {"$schema": "https://vega.github.io/schema/vega/v6.json",
+       "width": 20, "height": 20, "padding": 0,
+       "marks": [{"type": "image", "encode": {"enter": {
+         "x": {"value": 0}, "y": {"value": 0},
+         "width": {"value": 20}, "height": {"value": 20},
+         "url": {"value": "https://example.com/missing.png"}}}}]}
+      """
+    )
+    CoreGraphicsTarget.clearImageCache()
+
+    var reported: [String] = []
+    let view = VegaChartView(
+      scene: drawn,
+      resolveImage: { _ in nil },
+      onUnresolvedImage: { reported.append($0) }
+    )
+    let space = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+    for _ in 0..<3 {
+      let context = try XCTUnwrap(
+        CGContext(
+          data: nil, width: 20, height: 20, bitsPerComponent: 8, bytesPerRow: 80,
+          space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )
+      )
+      view.draw(into: context, size: CGSize(width: 20, height: 20))
+    }
+    XCTAssertEqual(reported, ["https://example.com/missing.png"], "three draws, one report")
+  }
+
+  /// A resolver that declines is asked **once**, not once per frame.
+  ///
+  /// Only successes were cached, so an address that had already said no was handed to the host's
+  /// fetcher again on every draw — a network call per frame for a chart that will never show that
+  /// image. It is also what made a report of it unusable: fired from the draw, it would have fired
+  /// per frame.
+  @available(macOS 14.0, iOS 17.0, *)
+  @MainActor
+  func testAResolverThatDeclinesIsAskedOnce() throws {
+    let drawn = try scene(
+      """
+      {"$schema": "https://vega.github.io/schema/vega/v6.json",
+       "width": 20, "height": 20, "padding": 0,
+       "marks": [{"type": "image", "encode": {"enter": {
+         "x": {"value": 0}, "y": {"value": 0},
+         "width": {"value": 20}, "height": {"value": 20},
+         "url": {"value": "https://example.com/never.png"}}}}]}
+      """
+    )
+    CoreGraphicsTarget.clearImageCache()
+
+    var asked = 0
+    let view = VegaChartView(scene: drawn, resolveImage: { _ in
+      asked += 1
+      return nil
+    })
+    let space = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+    for _ in 0..<3 {
+      let context = try XCTUnwrap(
+        CGContext(
+          data: nil, width: 20, height: 20, bitsPerComponent: 8, bytesPerRow: 80,
+          space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )
+      )
+      view.draw(into: context, size: CGSize(width: 20, height: 20))
+    }
+    XCTAssertEqual(asked, 1, "three draws, one fetch")
+
+    // And a host that has recovered can say so.
+    CoreGraphicsTarget.clearImageCache()
+    let context = try XCTUnwrap(
+      CGContext(
+        data: nil, width: 20, height: 20, bitsPerComponent: 8, bytesPerRow: 80,
+        space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+      )
+    )
+    view.draw(into: context, size: CGSize(width: 20, height: 20))
+    XCTAssertEqual(asked, 2)
+  }
 }
