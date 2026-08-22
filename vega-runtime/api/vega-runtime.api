@@ -498,6 +498,9 @@ public final class dev/aster/vega/runtime/VegaChartController {
 	public final fun report (Ldev/aster/vega/model/VegaDiagnostic;)V
 	public final fun resetViewport ()V
 	public final fun setContainerSize (Ldev/aster/vega/scene/SizeD;)V
+	public final fun setContainerSizeAsync (Ldev/aster/vega/scene/SizeD;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun setContainerSizeAsync (Ldev/aster/vega/scene/SizeD;Lkotlinx/coroutines/CoroutineDispatcher;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun setContainerSizeAsync$default (Ldev/aster/vega/runtime/VegaChartController;Ldev/aster/vega/scene/SizeD;Lkotlinx/coroutines/CoroutineDispatcher;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun setContentScale (D)V
 	public final fun setData (Ljava/lang/String;Ljava/util/List;)V
 	public final fun setHitTestOptions (Ldev/aster/vega/scene/HitTestOptions;)V

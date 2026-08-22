@@ -8,6 +8,22 @@ section here does not get released.
 
 ### Fixed
 
+- **A resize only recompiles a chart that asked for one, and no longer on the
+  calling thread.** `VegaChartController.containerSize` recompiled
+  unconditionally, so a host reporting its layout size on every resize paid a
+  full compile per step of a drag for every chart on the page — including every
+  chart that states its own width and height. It now skips the compile when the
+  loaded document never reads `containerSize()`, and `setContainerSizeAsync` does
+  the same work off the calling thread. (#59)
+- **`ChartSession.settle()` waits for everything queued, not only the compile.**
+  Work `serialised` deferred was started as a task nobody held, so a caller that
+  set `containerSize` during a compile and then settled returned before the resize
+  had run. The queue is a chain now and `settle()` loops until it is empty. The
+  compile is queued with everything else, closing a narrower hazard where a load
+  ran beside a deferred touch against a controller documented as unsafe for
+  concurrent use. **Setting `ChartSession.containerSize` is asynchronous** — await
+  `settle()` where the new scene is needed. (#60)
+
 - **The accessibility summary threshold counts data marks, and the guides survive
   it.** It counted every focusable element, so a chart's axes and legend pushed it
   over before the data was dense — measured: 118 points, two axes and a legend is

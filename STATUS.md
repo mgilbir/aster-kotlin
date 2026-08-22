@@ -5852,6 +5852,47 @@ The test helper in `AccessibilityTreeTest` had to change too, and that is worth 
 built nodes with no `role` at all, so every threshold test was built out of things that were focusable
 and were not data. It sets `role = "mark"` now, and there is a `guide()` beside it.
 
+### A resize nobody asked for, and a wait that did not cover it
+
+Two defects that turn out to be one thing: what happens when a host tells a chart how much room it
+has.
+
+**The recompile was unconditional.** `VegaChartController.containerSize` returned early only when the
+size was unchanged or no specification was loaded; nothing in it looked at whether the loaded document
+reads `containerSize()`. So a host that reports its layout size on every resize — which is what a host
+with any responsive chart on the page will do — paid a full compile per step of a split-view drag for
+every chart it draws, including every chart that states its own width and height, which is most of
+them. `CompiledSpec.readsContainerSize` is the exact answer, and it comes from the expressions rather
+than from the text: `width: "container"` reaches the engine as a signal whose `update` calls the
+function. The size is still *recorded* when the compile is skipped, or the saving would be a bug — a
+specification loaded after a skipped resize has to compile against the size the host stated.
+
+**And it ran on the calling thread.** `setContainerSizeAsync` is the same work on a dispatcher,
+serialized against every other compile through the same lock, and awaitable. Which mattered because
+`ChartSession` is `@MainActor` and wrapped the *synchronous* setter, so a resize compiled on the main
+thread.
+
+**Making it asynchronous exposed the second defect, which is why these landed together.**
+`ChartSession.settle()` awaited one handle — the compile — and `serialised` started everything it
+deferred as a `Task` nobody kept. With a synchronous body that was survivable by luck: the deferred
+block ran to completion before the caller of `settle()` was resumed. With a body that *awaits*, it is
+a plain race, and the existing `testTheContainerWidthIsTheChartsWidth` failed on it immediately — the
+chart was still 200 units wide when `settle()` returned.
+
+So the queue is a **chain**. Each block begins by awaiting the one before it, so awaiting the tail is
+awaiting all of them, and `settle()` loops until the queue is empty rather than awaiting whichever
+task happened to be last — a block may queue more work, which is exactly what the container-size
+setter does. The tail clears itself when nothing has arrived behind it, using a counter rather than
+task identity, which keeps the inline fast path open for a tap on a settled chart. The compile is
+queued too, and that closes a narrower hazard of its own: a load used to start immediately while a
+deferred block sat awaiting the *previous* compile, so the block ran with the new compile already
+under way, against a controller that is documented as unsafe for concurrent use. Cancellation is
+still aimed at the compile alone, through a separate handle, since a load supersedes the compile before
+it and not a queued touch.
+
+Setting `containerSize` from Swift is therefore no longer synchronous, and says so. It never reliably
+was.
+
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
 PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.

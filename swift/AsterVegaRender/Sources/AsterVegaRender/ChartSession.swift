@@ -201,19 +201,33 @@ public final class ChartSession {
   /// not from the chart view's own geometry: a chart sized to its container changes its scene's width,
   /// the view's aspect ratio follows the scene, and a width read back from that view can oscillate.
   /// That loop is why this is not wired up automatically.
+  ///
+  /// **Setting it is asynchronous**, and the recompile is skipped entirely where the loaded document
+  /// never reads `containerSize()` — which is every chart that states its own width and height. Await
+  /// ``settle()`` where you need the new scene, as a screenshot or a test does.
   public var containerSize: SizeD? {
     get { controller.containerSize }
     set {
       guard newValue != controller.containerSize else { return }
-      serialised { [weak self] in
+      let size = newValue
+      // **Off this actor**, like the compile a load does. This used to run a whole recompile inline,
+      // and the class is `@MainActor`, so a host that reported its layout size on every resize paid a
+      // compile on the main thread for every step of a split-view drag. Queued, so it lands behind a
+      // compile that is still running rather than beside it, and awaited by ``settle()`` like
+      // everything else here — so setting this is **not** synchronous. It never reliably was: with a
+      // compile in flight it was already deferred, into a task nobody held.
+      enqueue { [weak self] in
         guard let self else { return }
-        self.controller.containerSize = newValue
-        if let compiled = self.controller.lastCompiled {
-          self.diagnostics = compiled.diagnostics
-          if compiled.scene != nil {
-            self.hasScene = true
-            self.failure = nil
-          }
+        // Nil where nothing was recompiled — most often because the loaded document never reads
+        // `containerSize()`, which is true of every chart that states its own width and height.
+        // Nothing to publish then: the chart on screen is still the right one.
+        guard let compiled = try? await self.controller.setContainerSizeAsync(size: size) else {
+          return
+        }
+        self.diagnostics = compiled.diagnostics
+        if compiled.scene != nil {
+          self.hasScene = true
+          self.failure = nil
         }
         self.refreshControls()
         self.publish()
@@ -281,7 +295,29 @@ public final class ChartSession {
 
   private var json = ""
   private var overrides: [String: VegaValue] = [:]
-  private var work: Task<Void, Never>?
+
+  /// The **tail** of everything queued: the compile in flight, or the last block handed to
+  /// ``serialised(_:)``, whichever came last.
+  ///
+  /// A chain rather than a single tracked task, and that is the fix. Each queued block begins by
+  /// awaiting the one before it, so awaiting the tail is awaiting all of them — where before only the
+  /// *compile* was held and everything `serialised` deferred was started as a task nobody kept. A
+  /// caller that set `containerSize` during a compile and then called ``settle()`` returned before the
+  /// resize had run, which is exactly the race a screenshot test exists to rule out.
+  private var pending: Task<Void, Never>?
+
+  /// How many blocks have been queued, so the last of them can tell that it *is* the last.
+  ///
+  /// A counter rather than comparing task identities: it answers "did anything arrive behind me"
+  /// without depending on `Task` equality, and it is what lets the tail clear itself so the inline
+  /// fast path in ``serialised(_:)`` reopens without anybody having to await.
+  private var queued = 0
+
+  /// The compile in flight, held separately because a new load **cancels** it.
+  ///
+  /// Not the same handle as ``pending``: cancelling the tail would cancel a queued touch as readily
+  /// as a compile, and a load supersedes the previous compile alone.
+  private var compileTask: Task<Void, Never>?
 
   // MARK: - Loading
 
@@ -297,9 +333,34 @@ public final class ChartSession {
     compile()
   }
 
-  /// Waits for the compile in flight, so a screenshot or a test can be sure the chart is drawn.
+  /// Waits for **everything** queued, so a screenshot or a test can be sure the chart is drawn.
+  ///
+  /// A loop rather than one await, because a queued block may queue more: setting `containerSize`
+  /// recompiles, and a recompile started from inside the queue is a task that did not exist when the
+  /// first await began. "Settled" has to mean the queue is empty, not that whichever task happened to
+  /// be last when you asked has finished — and it used to mean neither, since only the compile was
+  /// held at all and everything else ran as a task nobody kept.
+  ///
+  /// It terminates because the tail clears itself once nothing has arrived behind it; each further
+  /// turn of the loop is another block that really was queued.
   public func settle() async {
-    await work?.value
+    while let tail = pending {
+      await tail.value
+      if pending == nil { return }
+    }
+  }
+
+  /// Appends `body` to the queue and makes it what ``settle()`` waits for.
+  private func enqueue(_ body: @escaping @MainActor () async -> Void) {
+    let previous = pending
+    queued += 1
+    let mine = queued
+    pending = Task { @MainActor in
+      await previous?.value
+      await body()
+      // The queue is empty again only if nothing arrived behind this one.
+      if self.queued == mine { self.pending = nil }
+    }
   }
 
   private func compile() {
@@ -315,12 +376,16 @@ public final class ChartSession {
       return
     }
 
-    work?.cancel()
+    compileTask?.cancel()
     let specification = json
     let presets = overrides
     loading = true
 
-    work = Task { [weak self] in
+    // Queued like everything else, so a load cannot run *beside* a touch that was already waiting.
+    // The controller is not safe for concurrent use, and the old code started a compile immediately
+    // while a deferred block sat awaiting the previous compile's task — which meant the deferred
+    // block ran as soon as that finished, with the new compile already under way.
+    enqueue { [weak self] in
       guard let self else { return }
       // **Either grammar.** Translating Vega-Lite is a compile of its own, so it happens here rather
       // than on the main actor, for the same reason the engine's own compile does. A specification
@@ -377,9 +442,8 @@ public final class ChartSession {
       self.refreshControls()
       self.publish()
       self.loading = false
-      // Cleared so later touches run straight through rather than awaiting a finished task.
-      self.work = nil
     }
+    compileTask = pending
   }
 
   /// A value in a row a host hands over.
@@ -653,14 +717,13 @@ public final class ChartSession {
   /// queued touch is also better behaviour than a dropped one — a tap during a slow remote load lands
   /// when the chart appears.
   private func serialised(_ body: @escaping @MainActor () -> Void) {
-    if work == nil {
+    // Inline while the queue is empty, which is most touches: a tap on a settled chart should be
+    // readable by its caller on the same turn rather than a task hop later.
+    if pending == nil {
       body()
       return
     }
-    Task { @MainActor in
-      await self.settle()
-      body()
-    }
+    enqueue { body() }
   }
 
   /// Reads back what the touch did: a selection, a tooltip, or neither.

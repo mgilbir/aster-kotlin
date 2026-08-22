@@ -408,6 +408,38 @@ final class ChartSessionTests: XCTestCase {
     XCTAssertTrue(localised.contains { $0.contains("mei 2026") }, "in Dutch: \(localised)")
   }
 
+  /// `settle()` waits for work queued **during** a compile, not only for the compile.
+  ///
+  /// Only the compile was ever held. Everything `serialised` deferred — a container-size recompile, a
+  /// tap that arrived mid-load, a reset — was started as a task nobody kept, so a caller that set a
+  /// size while a compile was in flight and then settled returned before the resize had run. That is
+  /// the race a screenshot test exists to rule out, and it was in the synchronising primitive itself.
+  ///
+  /// The size is set **without** awaiting the load first, which is the whole point: it has to land in
+  /// the queue behind a compile that is still running.
+  func testSettleWaitsForWorkQueuedDuringACompile() async {
+    let responsive = """
+      {"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+       "width": "container",
+       "data": {"values": [{"a": 1, "b": 2}, {"a": 3, "b": 4}]},
+       "mark": "line",
+       "encoding": {"x": {"field": "a", "type": "quantitative"},
+                    "y": {"field": "b", "type": "quantitative"}}}
+      """
+
+    let session = ChartSession(containerSize: SizeD(width: 200, height: 400))
+    session.load(specification: responsive)
+    // No await here. The compile is in flight, so this goes into the queue behind it.
+    session.containerSize = SizeD(width: 600, height: 400)
+
+    await session.settle()
+
+    let width = try! XCTUnwrap(session.scene, session.failure ?? "no scene").width
+    XCTAssertGreaterThan(
+      width, 500,
+      "settle() returned before the queued resize had run: the chart is still 200 wide")
+  }
+
   /// The **order** of a date's fields, which the locale seam could not reach from here at all.
   ///
   /// Two things had to be true for this to work, and neither was. The pattern a bucketed axis is
@@ -538,8 +570,12 @@ final class ChartSessionTests: XCTestCase {
     await wide.settle()
     XCTAssertGreaterThan(try! XCTUnwrap(wide.scene).width, narrowWidth + 300)
 
-    // And set again after the fact, which is what a layout change is.
+    // And set again after the fact, which is what a layout change is. Awaited, because the setter
+    // queues a recompile off this actor rather than running one inline — a resize arrives on the
+    // main thread and a compile does not belong there. It was never reliably synchronous anyway:
+    // with a compile in flight it was already deferred, and the deferred task was one nobody held.
     narrow.containerSize = SizeD(width: 600, height: 400)
+    await narrow.settle()
     XCTAssertGreaterThan(try! XCTUnwrap(narrow.scene).width, narrowWidth + 300)
   }
 

@@ -1297,6 +1297,8 @@ final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runti
     final fun setSignal(kotlin/String, dev.aster.vega.model/VegaValue) // dev.aster.vega.runtime/VegaChartController.setSignal|setSignal(kotlin.String;dev.aster.vega.model.VegaValue){}[0]
     final fun setSpec(kotlin/String): dev.aster.vega.runtime.compile/CompiledSpec // dev.aster.vega.runtime/VegaChartController.setSpec|setSpec(kotlin.String){}[0]
     final fun stop() // dev.aster.vega.runtime/VegaChartController.stop|stop(){}[0]
+    final suspend fun setContainerSizeAsync(dev.aster.vega.scene/SizeD?): dev.aster.vega.runtime.compile/CompiledSpec? // dev.aster.vega.runtime/VegaChartController.setContainerSizeAsync|setContainerSizeAsync(dev.aster.vega.scene.SizeD?){}[0]
+    final suspend fun setContainerSizeAsync(dev.aster.vega.scene/SizeD?, kotlinx.coroutines/CoroutineDispatcher = ...): dev.aster.vega.runtime.compile/CompiledSpec? // dev.aster.vega.runtime/VegaChartController.setContainerSizeAsync|setContainerSizeAsync(dev.aster.vega.scene.SizeD?;kotlinx.coroutines.CoroutineDispatcher){}[0]
     final suspend fun setSpecAsync(kotlin/String): dev.aster.vega.runtime.compile/CompiledSpec // dev.aster.vega.runtime/VegaChartController.setSpecAsync|setSpecAsync(kotlin.String){}[0]
     final suspend fun setSpecAsync(kotlin/String, kotlinx.coroutines/CoroutineDispatcher = ...): dev.aster.vega.runtime.compile/CompiledSpec // dev.aster.vega.runtime/VegaChartController.setSpecAsync|setSpecAsync(kotlin.String;kotlinx.coroutines.CoroutineDispatcher){}[0]
 
