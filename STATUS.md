@@ -5670,6 +5670,38 @@ answers null) is one; an interval named by a signal is the other, and that one i
 than a typo, since tick intervals are resolved while the axis is built and no signal is available
 there yet.
 
+### A document that draws nothing, said rather than shown
+
+`{}` is a valid Vega specification. Upstream renders it: an empty surface, no complaint. So this
+engine cannot make it an error without disagreeing with the grammar — and it was not making it
+anything at all. `parse` is fatal only on unparseable JSON or a non-object root; `parseArray` returns
+an empty list for an absent key with no diagnostic; and a `VegaSpec` with no marks compiles to a
+non-null, empty `Scene`. `{"width": 100, "height": 50}` produced, end to end, **no diagnostic
+whatsoever**. (A bare `{}` did report that it declared no size, which is a different fact and no help
+in deciding whether a chart came of the document.)
+
+That leaves a host that reads "no diagnostics" as "there is a chart" unable to tell an empty
+placeholder object from a server apart from a chart that drew, and the two want opposite things put
+in front of a reader.
+
+`PARSE_NOTHING_TO_DRAW`, at INFO — the severity documented as leaving the chart unaffected, so a host
+filtering for warnings and errors sees nothing new and one that asks "did anything come of this?"
+gets an answer.
+
+Four keys are tested, not one. A guide draws on its own: `log-axis-labels.vg.json` carries
+`"marks": []` and draws a pair of axes, `legend-columns.vg.json` draws nothing but a legend, and both
+are charts. What is not a chart is a document with no marks, no axes, no legends and no title.
+
+The message carries the root's **own** top-level keys, which is what makes it useful without
+`vega-model` having to know another grammar's spellings: a Vega-Lite document handed to this parser
+reads `mark, encoding`, and a reader sees the mistake in the sentence. That case, too, used to be
+completely silent.
+
+One test changed shape rather than expectation. `UnhandledPropertiesTest`'s shared fixture had data
+and no marks, so three assertions of the form "this fragment produces no diagnostic at all" were
+resting on a document that was not a chart. It has a mark now, which is what those assertions were
+always claiming to be about.
+
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
 PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.

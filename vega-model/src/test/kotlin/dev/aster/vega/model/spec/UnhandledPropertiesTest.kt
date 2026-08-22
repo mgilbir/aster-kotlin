@@ -1,6 +1,7 @@
 package dev.aster.vega.model.spec
 
 import dev.aster.vega.model.DiagnosticCodes
+import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaValue
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -31,11 +32,19 @@ class UnhandledPropertiesTest {
       .filter { it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY }
       .mapNotNull { it.jsonPath?.substringAfterLast('.') }
 
+  /**
+   * A chart, with the fragment under test in it.
+   *
+   * The mark is not decoration. A document that declares nothing that draws now reports
+   * `PARSE_NOTHING_TO_DRAW`, and several assertions here are that a fragment produces **no**
+   * diagnostic at all — which is a much weaker claim if the surrounding document is not a chart.
+   */
   private fun spec(body: String) =
     """
     {
       "width": 100, "height": 60,
       "data": [{"name": "t", "values": [{"c": "a", "v": 1}]}],
+      "marks": [{"type": "rect", "from": {"data": "t"}}],
       $body
     }
     """
@@ -426,5 +435,65 @@ class UnhandledPropertiesTest {
     assertEquals(2, reported.size, reported.toString())
     assertTrue(reported.any { "'fortnight'" in it }, reported.toString())
     assertTrue(reported.any { "supplied by a signal" in it }, reported.toString())
+  }
+
+  /**
+   * A document that declares nothing that draws says so, and a chart does not.
+   *
+   * `{}` parses. The root is an object, `marks` is absent so it reads as an empty list, and a
+   * non-null `VegaSpec` with no marks compiles to a non-null, empty `Scene` — with, until now, no
+   * diagnostic anywhere. A host that reads "no diagnostics" as "there is a chart" could not tell an
+   * empty placeholder object from a server apart from a chart that drew.
+   *
+   * Informational, not an error: `{}` is valid Vega and upstream renders it as an empty surface, so
+   * anything louder would be this engine disagreeing with the grammar.
+   *
+   * The negative half is the part that keeps it usable. A guide draws on its own, so two committed
+   * fixtures — `log-axis-labels.vg.json`, which carries `"marks": []` and a pair of axes, and
+   * `legend-columns.vg.json`, which draws only a legend — must stay silent.
+   */
+  @Test
+  fun `a document that draws nothing says so, and one that draws does not`() {
+    val bare = SpecParser().parseJson("{}").diagnostics.single()
+    assertEquals(DiagnosticCodes.PARSE_NOTHING_TO_DRAW, bare.code)
+    assertEquals(DiagnosticSeverity.INFO, bare.severity)
+    assertTrue("the root object is empty" in bare.message, bare.message)
+
+    // A Vega-Lite document handed to the Vega parser: its own keys name the mistake, which is why
+    // the message carries them. This case used to produce no diagnostic whatsoever.
+    val vegaLite =
+      SpecParser()
+        .parseJson("""{"mark": "bar", "encoding": {"x": {"field": "a", "type": "nominal"}}}""")
+        .diagnostics
+        .single { it.code == DiagnosticCodes.PARSE_NOTHING_TO_DRAW }
+    assertTrue("mark, encoding" in vegaLite.message, vegaLite.message)
+
+    val drawn =
+      listOf(
+        // A chart of marks.
+        """{"width": 10, "height": 10,
+           "marks": [{"type": "rect", "encode": {"update": {"x": {"value": 1}}}}]}""",
+        // `log-axis-labels.vg.json`: an empty mark list and a pair of axes.
+        """{"width": 10, "height": 10, "marks": [],
+           "scales": [{"name": "s", "type": "linear", "domain": [0, 1], "range": "width"}],
+           "axes": [{"scale": "s", "orient": "bottom"}]}""",
+        // `legend-columns.vg.json`: no marks at all, and a legend.
+        """{"width": 10, "height": 10,
+           "scales": [{"name": "s", "type": "ordinal", "domain": ["a"], "range": ["#000"]}],
+           "legends": [{"fill": "s"}]}""",
+        // A title is ink too.
+        """{"width": 10, "height": 10, "title": {"text": "T"}}""",
+      )
+    for (json in drawn) {
+      assertEquals(
+        emptyList<String>(),
+        SpecParser()
+          .parseJson(json)
+          .diagnostics
+          .filter { it.code == DiagnosticCodes.PARSE_NOTHING_TO_DRAW }
+          .map { it.message },
+        json,
+      )
+    }
   }
 }

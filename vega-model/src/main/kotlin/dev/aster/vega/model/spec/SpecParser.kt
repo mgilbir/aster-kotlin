@@ -1033,7 +1033,54 @@ public class SpecParser {
       )
 
     reportUnsupportedTopLevel(root)
+    reportNothingToDraw(root, spec)
     return ParsedSpec(spec, diagnostics.diagnostics)
+  }
+
+  /**
+   * Says so when a document declares nothing that draws.
+   *
+   * `{}` is a **valid** Vega specification and upstream renders it — an empty surface, no
+   * diagnostics — so this cannot be an error without diverging from the grammar, and the chart is
+   * genuinely unaffected. It cannot be silence either. `parse` is fatal only on unparseable JSON or
+   * a non-object root, and `parseArray` returns an empty list for an absent key without a word, so
+   * `{}` produced a non-null `VegaSpec` with no marks, a non-null empty `Scene`, and nothing at all
+   * to read. A host that treats "no diagnostics" as "there is a chart" then cannot tell an empty
+   * placeholder object from a server apart from a chart that drew, and those two want opposite
+   * things put in front of a reader.
+   *
+   * INFO is exactly that severity — [DiagnosticSeverity.INFO] is documented as leaving the chart
+   * unaffected — so a host filtering for warnings and errors sees nothing new, and one that asks
+   * "did anything come of this?" gets an answer.
+   *
+   * **Four keys, not just `marks`.** A guide draws on its own: `log-axis-labels.vg.json` carries
+   * `"marks": []` and draws a pair of axes, and `legend-columns.vg.json` draws nothing but a
+   * legend. Both are charts. What is not a chart is a document with none of the four.
+   *
+   * The root's own keys go into the message, which is what makes it useful without this module
+   * needing to know another grammar's spellings: a Vega-Lite document handed to the Vega parser
+   * reads `mark, encoding` and a reader sees the mistake in the sentence. That case used to produce
+   * no diagnostic whatsoever — measured, before this existed, on `{"mark": "bar", "encoding": …}`.
+   */
+  private fun reportNothingToDraw(root: VegaValue.Obj, spec: VegaSpec) {
+    if (
+      spec.marks.isNotEmpty() ||
+        spec.axes.isNotEmpty() ||
+        spec.legends.isNotEmpty() ||
+        spec.title != null
+    ) {
+      return
+    }
+    val declared = root.fields.keys
+    diagnostics.info(
+      DiagnosticCodes.PARSE_NOTHING_TO_DRAW,
+      "This document declares nothing that draws: no 'marks', no 'axes', no 'legends' and no " +
+        "'title', so the chart is an empty surface. Its top-level keys are " +
+        (if (declared.isEmpty()) "none at all — the root object is empty"
+        else declared.joinToString(", ")) +
+        ".",
+      jsonPath = "$",
+    )
   }
 
   // ---- config ---------------------------------------------------------------

@@ -2669,6 +2669,8 @@ final object dev.aster.vega.model/DiagnosticCodes { // dev.aster.vega.model/Diag
         final fun <get-PARSE_INVALID_JSON>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.PARSE_INVALID_JSON.<get-PARSE_INVALID_JSON>|<get-PARSE_INVALID_JSON>(){}[0]
     final const val PARSE_MISSING_PROPERTY // dev.aster.vega.model/DiagnosticCodes.PARSE_MISSING_PROPERTY|{}PARSE_MISSING_PROPERTY[0]
         final fun <get-PARSE_MISSING_PROPERTY>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.PARSE_MISSING_PROPERTY.<get-PARSE_MISSING_PROPERTY>|<get-PARSE_MISSING_PROPERTY>(){}[0]
+    final const val PARSE_NOTHING_TO_DRAW // dev.aster.vega.model/DiagnosticCodes.PARSE_NOTHING_TO_DRAW|{}PARSE_NOTHING_TO_DRAW[0]
+        final fun <get-PARSE_NOTHING_TO_DRAW>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.PARSE_NOTHING_TO_DRAW.<get-PARSE_NOTHING_TO_DRAW>|<get-PARSE_NOTHING_TO_DRAW>(){}[0]
     final const val PARSE_UNKNOWN_MARK // dev.aster.vega.model/DiagnosticCodes.PARSE_UNKNOWN_MARK|{}PARSE_UNKNOWN_MARK[0]
         final fun <get-PARSE_UNKNOWN_MARK>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.PARSE_UNKNOWN_MARK.<get-PARSE_UNKNOWN_MARK>|<get-PARSE_UNKNOWN_MARK>(){}[0]
     final const val PARSE_UNKNOWN_PROPERTY // dev.aster.vega.model/DiagnosticCodes.PARSE_UNKNOWN_PROPERTY|{}PARSE_UNKNOWN_PROPERTY[0]

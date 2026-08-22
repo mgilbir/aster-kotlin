@@ -46,6 +46,7 @@ public final class dev/aster/vega/model/DiagnosticCodes {
 	public static final field INSTANCE Ldev/aster/vega/model/DiagnosticCodes;
 	public static final field PARSE_INVALID_JSON Ljava/lang/String;
 	public static final field PARSE_MISSING_PROPERTY Ljava/lang/String;
+	public static final field PARSE_NOTHING_TO_DRAW Ljava/lang/String;
 	public static final field PARSE_UNKNOWN_MARK Ljava/lang/String;
 	public static final field PARSE_UNKNOWN_PROPERTY Ljava/lang/String;
 	public static final field RENDER_UNSUPPORTED_BLEND_MODE Ljava/lang/String;

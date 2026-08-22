@@ -53,6 +53,15 @@ public object DiagnosticCodes {
   public const val PARSE_UNKNOWN_PROPERTY: String = "VEGA_PARSE_UNKNOWN_PROPERTY"
   public const val PARSE_MISSING_PROPERTY: String = "VEGA_PARSE_MISSING_PROPERTY"
 
+  /**
+   * A parsed document declares nothing that draws.
+   *
+   * Informational, because `{}` is valid Vega and upstream renders it as an empty surface. What is
+   * not acceptable is silence: a host that reads "no diagnostics" as "there is a chart" cannot
+   * otherwise tell an empty placeholder object apart from a chart that drew.
+   */
+  public const val PARSE_NOTHING_TO_DRAW: String = "VEGA_PARSE_NOTHING_TO_DRAW"
+
   public const val EXPRESSION_PARSE_ERROR: String = "VEGA_EXPRESSION_PARSE_ERROR"
   public const val EXPRESSION_UNSUPPORTED_FUNCTION: String = "VEGA_EXPRESSION_UNSUPPORTED_FUNCTION"
 

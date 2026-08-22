@@ -27,6 +27,15 @@ section here does not get released.
   unit, or one named by a signal, both of which used to fall through to a
   chosen count in silence. (#69)
 
+- **A document that draws nothing says so.** A specification with no marks, no
+  axes, no legends and no title now reports `PARSE_NOTHING_TO_DRAW` at INFO.
+  `{"width": 100, "height": 50}` used to compile to a usable, empty chart with
+  no diagnostic of any kind, so a host reading "no diagnostics" as "there is a
+  chart" could not tell an empty placeholder object from one that drew. The
+  message lists the document's own top-level keys, which is what makes a
+  Vega-Lite specification handed to the Vega parser — previously silent —
+  legible: it reads `mark, encoding`. (#57)
+
 ## 0.1.0
 
 First release.
