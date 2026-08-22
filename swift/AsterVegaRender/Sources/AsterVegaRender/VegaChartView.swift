@@ -83,6 +83,8 @@ public struct VegaChartView: View {
   private let gestures: ChartGestures
   /// Turns an `image` mark's URL into something drawable; see the initialiser.
   private let resolveImage: ((String) -> CGImage?)?
+  /// Told the first time a URL cannot be resolved; see the initialiser.
+  private let onUnresolvedImage: ((String) -> Void)?
 
   /// Creates a chart view.
   ///
@@ -118,6 +120,16 @@ public struct VegaChartView: View {
   ///     without one. `CoreGraphicsTarget` has taken one from the start; there was no way to reach it
   ///     through this view, so a chart with a remote image drew every other mark and a hole where the
   ///     image would be, with no supported way to supply a fetcher.
+  ///   - onUnresolvedImage: told the first time an `image` mark's URL cannot be resolved, and not
+  ///     again for that URL. An unresolved image leaves a hole in the chart and the draw carries on,
+  ///     which is right — a chart is better with one mark missing than not drawn at all — and until
+  ///     now the hole was all a host got, since `CoreGraphicsTarget` collects these into a target this
+  ///     view builds per draw and discards with it.
+  ///
+  ///     **Called from the draw**, so treat it as a report rather than a place to set observable
+  ///     state: log it, enqueue it, start a task. It fires once per URL because a refusal is cached
+  ///     alongside the decodes — which is what makes it safe to have at all, and why
+  ///     `CoreGraphicsTarget.clearImageCache()` exists for a host that has recovered.
   public init(
     scene: AsterVega.Scene,
     session: ChartSession? = nil,
@@ -126,6 +138,7 @@ public struct VegaChartView: View {
     accessibilityMaxExposedMarks: Int32 = AccessibilityTree.shared.MAX_EXPOSED_MARKS,
     gestures: ChartGestures = .all,
     resolveImage: ((String) -> CGImage?)? = nil,
+    onUnresolvedImage: ((String) -> Void)? = nil,
     onPlaced: ((ChartPlacement) -> Void)? = nil
   ) {
     self.scene = scene
@@ -135,6 +148,7 @@ public struct VegaChartView: View {
     self.accessibilityMaxExposedMarks = accessibilityMaxExposedMarks
     self.gestures = gestures
     self.resolveImage = resolveImage
+    self.onUnresolvedImage = onUnresolvedImage
     self.onPlaced = onPlaced
   }
 
@@ -524,7 +538,11 @@ public struct VegaChartView: View {
       drawText: { run, fill, ctx in CoreTextDrawing.draw(run, fill, ctx, textScale: scale) },
       // The seam `CoreGraphicsTarget` has always had and this view never passed. Its decode cache is
       // static, so a resolver is asked once per URL for the process rather than once per frame.
-      resolveImage: resolveImage
+      resolveImage: resolveImage,
+      // Handed to the target rather than read back off it: `unresolved` is what *this draw* met, so
+      // reporting from it would report on every frame. The target fires this when its cache learns a
+      // refusal, which is once per URL.
+      onUnresolvedImage: onUnresolvedImage
     )
     SceneWalk().draw(scene: scene, into: &target)
 

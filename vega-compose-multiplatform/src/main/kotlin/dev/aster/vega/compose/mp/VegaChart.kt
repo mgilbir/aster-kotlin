@@ -81,6 +81,17 @@ import kotlin.math.roundToInt
  *   every frame, and a resolver would be called on every frame. The default is remembered against
  *   the composition, which is what a caller wants; pass one to share it between charts, or to clear
  *   it when the image behind a URL has changed.
+ * @param onUnresolvedImage told the first time an `image` mark's URL cannot be resolved, and not
+ *   again for that URL. An unresolved image leaves a hole in the chart and the draw carries on,
+ *   which is right — a chart is better with one mark missing than not drawn at all — and until now
+ *   the hole was all a host got, since the target that collects these is built per frame and
+ *   discarded with it.
+ *
+ *   **Called from the draw**, so treat it as a report and not as a place to set state a
+ *   recomposition would read: launch, log, enqueue. It fires once per URL per [imageCache] rather
+ *   than once per frame, which is what makes it safe to have at all; [ImageCache.unresolvedImages]
+ *   is the same facts without a callback, for a host that would rather poll.
+ *
  * @param onActivate what to do when a **reader** activates a mark through the accessibility tree.
  *   Null leaves the chart inert, which is right for a chart that is only being looked at.
  * @param onTap a tap, in **scene** coordinates, with the mark under it or null where it hit
@@ -114,6 +125,7 @@ public fun VegaChart(
   accessibilityMaxExposedMarks: Int = AccessibilityTree.MAX_EXPOSED_MARKS,
   resolveImage: ((String) -> ImageBitmap?)? = null,
   imageCache: ImageCache = rememberVegaImageCache(),
+  onUnresolvedImage: ((String) -> Unit)? = null,
   onActivate: ((SceneNodeId) -> Unit)? = null,
   onTap: ((PointD, SceneNodeId?) -> Unit)? = null,
   onLongPress: ((PointD, SceneNodeId?) -> Unit)? = null,
@@ -201,6 +213,7 @@ public fun VegaChart(
               fontFamilyResolver = textEngine.fontFamilyResolver,
               resolveImage = resolveImage,
               imageCache = imageCache,
+              onUnresolvedImage = onUnresolvedImage,
             ),
           )
         }

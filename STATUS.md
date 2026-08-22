@@ -6120,6 +6120,40 @@ inferring from a default parameter.
 `DateField` is public for one reason: the order is a fact `vega-model` can read and `:vega-lite` has to
 apply, and neither can do the other's half.
 
+### A hole in a chart, and the callback that could not have worked
+
+The gap left stated at the end of the image work: neither view exposed the URLs a resolver could not
+answer. The reason given was that reporting from a composable means a callback fired during the draw
+phase — which is true, and turned out to be the *second* problem rather than the first.
+
+The first was that **only successes were cached**. A URL that could not be resolved was handed back to
+the host's resolver on every frame, so a chart with one missing image made a fetch attempt per frame
+forever. That is a defect on its own, and it is also what made a report unusable: fired from the draw
+against an uncached refusal, it would have fired per frame.
+
+So refusals are cached, on both sides — `ImageCache` on Compose, the static cache behind
+`CoreGraphicsTarget` on Apple — and the callback fires when the cache **learns** something rather than
+when a draw meets a hole. Once per URL. `VegaChart(onUnresolvedImage =)` and
+`VegaChartView(onUnresolvedImage:)`, both additive with defaults, so no existing call site moves.
+
+Two details worth keeping. The Swift view hands the callback *to* the target rather than reading
+`target.unresolved` back off it afterwards: that list is what one draw met, so reporting from it would
+have reported per frame — the same trap one level up. And a cached refusal has to be forgettable, since
+a fetch that failed while the network was down would otherwise stay failed forever:
+`ImageCache.clear()` and `CoreGraphicsTarget.clearImageCache()`, both documented as being for that and
+not for tidiness.
+
+`ImageCache.unresolvedImages` is the same facts without a callback, for a host that would rather poll.
+It lives on the cache rather than the target for the reason the whole thing exists: the cache is the
+host's and outlives a frame.
+
+**A test that proved nothing, caught by writing it.** The first draft called
+`ImageComposeScene.render()` three times and asserted one fetch. `render()` does nothing when nothing
+has invalidated, so it drew once and the assertion was vacuous — the "gate that passed without having
+run" this repository keeps finding. It now counts draws through `onPlaced`, forces the redraw with a
+state change, and puts two marks on one URL so the per-draw half is testable without any redraw at
+all.
+
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
 PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.

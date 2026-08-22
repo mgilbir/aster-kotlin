@@ -154,6 +154,27 @@ VegaChartView(scene: scene, session: session, gestures: .withoutDrag)
 
 A tap is a hover as well on a screen with no pointer, so `"tooltip": true` answers one.
 
+### A hole in a chart, said rather than left
+
+An `image` mark whose URL nothing can resolve leaves a gap and the draw carries on — a chart is better
+with one mark missing than not drawn at all. Both views now say which URL it was, once per URL rather
+than once per frame:
+
+```kotlin
+VegaChart(scene = it, resolveImage = ::fetch, onUnresolvedImage = { url -> log(url) })
+```
+
+```swift
+VegaChartView(scene: scene, resolveImage: fetch, onUnresolvedImage: { url in log(url) })
+```
+
+It is called **from the draw**, so treat it as a report: log, enqueue, launch — not a place to set
+state a recomposition or a `body` would read. Once per URL is what makes that safe, and it comes from
+caching the refusal alongside the decodes, which also stops a failing resolver being asked again on
+every frame. A host that has recovered clears it: `ImageCache.clear()` on Compose,
+`CoreGraphicsTarget.clearImageCache()` on Apple. `ImageCache.unresolvedImages` is the same facts
+without a callback, for a host that would rather poll.
+
 ## View example
 
 ```kotlin

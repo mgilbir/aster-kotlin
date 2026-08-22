@@ -103,6 +103,16 @@ section here does not get released.
 
 ### Added
 
+- **A host is told which image URL could not be resolved**, once per URL:
+  `VegaChart(onUnresolvedImage =)` and `VegaChartView(onUnresolvedImage:)`, both
+  additive. Making it usable required fixing something else first — only
+  successful decodes were cached, so a URL that had already failed was handed back
+  to the host's resolver on **every frame**, and a report fired from the draw
+  would have fired with it. Refusals are cached now on both renderers, and
+  `ImageCache.clear()` / `CoreGraphicsTarget.clearImageCache()` give a host that
+  has recovered another go. `ImageCache.unresolvedImages` is the same facts
+  without a callback. (#58)
+
 - **A host can register named font families with the Compose renderer**, through
   `namedFontFamily` or `rememberVegaTextEngine(fontFamilies)`. The default
   resolver matched the generic CSS keywords and nothing else, so a themed
