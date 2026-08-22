@@ -36,6 +36,8 @@ public struct VegaChartView: View {
   private let captions: VegaCaptions?
   /// What every font size is multiplied by when drawing; see ``ChartSession/textScale``.
   private let textScaleOverride: Double?
+  /// How many data marks a reader may explore one by one; see the initialiser.
+  private let accessibilityMaxExposedMarks: Int32
 
   /// Creates a chart view.
   ///
@@ -52,17 +54,25 @@ public struct VegaChartView: View {
   ///     is what the layout was measured with — the two must agree or every label is painted at a
   ///     different size from the box reserved for it. Only a view drawing a scene it compiled itself,
   ///     with no session, needs to pass one.
+  ///   - accessibilityMaxExposedMarks: how many **data marks** a reader may explore one by one before
+  ///     a summary stands in for them. The engine's own `AccessibilityTree.MAX_EXPOSED_MARKS` by
+  ///     default, which is a judgement rather than a fact — this app knows the size of the screen,
+  ///     whether the chart is the page or a thumbnail on it, and what its own users have said. Only
+  ///     marks count toward it and the axes and legend are exposed either way, so a chart of many
+  ///     small points does not collapse on the strength of its axis labels.
   public init(
     scene: AsterVega.Scene,
     session: ChartSession? = nil,
     captions: VegaCaptions? = nil,
     textScale: Double? = nil,
+    accessibilityMaxExposedMarks: Int32 = AccessibilityTree.shared.MAX_EXPOSED_MARKS,
     onPlaced: ((ChartPlacement) -> Void)? = nil
   ) {
     self.scene = scene
     self.session = session
     self.captions = captions
     self.textScaleOverride = textScale
+    self.accessibilityMaxExposedMarks = accessibilityMaxExposedMarks
     self.onPlaced = onPlaced
   }
 
@@ -290,7 +300,8 @@ public struct VegaChartView: View {
         // The one sentence the tree writes itself — the dense-chart summary. English here because a
         // view has no locale of its own to consult; a host drawing charts in another language passes its
         // own captions to the compiler, and everything else in the tree is already in that language.
-        captions: captions ?? VegaCaptionsCompanion.shared.English
+        captions: captions ?? VegaCaptionsCompanion.shared.English,
+        maxExposedMarks: accessibilityMaxExposedMarks
       )
       .enumerated()
     ).map { (offset: $0.offset, element: $0.element) }

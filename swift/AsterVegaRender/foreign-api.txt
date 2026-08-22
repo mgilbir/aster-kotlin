@@ -13,7 +13,7 @@ AccessibilityDescriptor.traversalIndex
 AccessibilityDescriptor.value
 AccessibilityTree
 AccessibilityTree.MAX_EXPOSED_MARKS
-AccessibilityTree.elements(scene:selectedNodeIds:captions:)
+AccessibilityTree.elements(scene:selectedNodeIds:captions:maxExposedMarks:)
 AccessibilityTree.init()
 AccessibilityTree.shared
 AccessibleElement

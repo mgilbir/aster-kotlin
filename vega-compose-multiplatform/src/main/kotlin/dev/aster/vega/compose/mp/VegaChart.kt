@@ -57,6 +57,12 @@ import kotlin.math.roundToInt
  *   controller's interaction state where there is one.
  * @param captions the language the one sentence the tree writes itself is in — the dense-chart
  *   summary. Everything else is already in the chart's own locale, having come from the compiler.
+ * @param accessibilityMaxExposedMarks how many **data marks** a reader may explore one by one
+ *   before a summary stands in for them. [AccessibilityTree.MAX_EXPOSED_MARKS] by default, which is
+ *   the engine's judgement rather than a fact — a host knows the size of the screen, whether the
+ *   chart is the page or a thumbnail on it, and what its own users have said. Only marks count
+ *   toward it and the guides are exposed either way, so a chart of many small points does not
+ *   collapse on the strength of its axis labels.
  * @param onActivate what to do when a **reader** activates a mark through the accessibility tree.
  *   Null leaves the chart inert, which is right for a chart that is only being looked at.
  * @param onTap a tap, in **scene** coordinates, with the mark under it or null where it hit
@@ -86,6 +92,7 @@ public fun VegaChart(
   textEngine: ComposeTextEngine = rememberVegaTextEngine(),
   selectedNodeIds: Set<SceneNodeId> = emptySet(),
   captions: VegaCaptions = VegaCaptions.English,
+  accessibilityMaxExposedMarks: Int = AccessibilityTree.MAX_EXPOSED_MARKS,
   onActivate: ((SceneNodeId) -> Unit)? = null,
   onTap: ((PointD, SceneNodeId?) -> Unit)? = null,
   onLongPress: ((PointD, SceneNodeId?) -> Unit)? = null,
@@ -107,8 +114,8 @@ public fun VegaChart(
   // documentation asks a host to do: `elements` flattens the scene, so recomputing it on every
   // recomposition would walk the tree for a pointer that moved.
   val elements =
-    remember(scene, selectedNodeIds, captions) {
-      AccessibilityTree.elements(scene, selectedNodeIds, captions)
+    remember(scene, selectedNodeIds, captions, accessibilityMaxExposedMarks) {
+      AccessibilityTree.elements(scene, selectedNodeIds, captions, accessibilityMaxExposedMarks)
     }
 
   // **The caller's modifier first, then the scene's own size as a default.** The other order looks

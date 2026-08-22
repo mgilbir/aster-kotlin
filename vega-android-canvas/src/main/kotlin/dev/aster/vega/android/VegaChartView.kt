@@ -17,6 +17,7 @@ import dev.aster.vega.runtime.GesturePhase
 import dev.aster.vega.runtime.Modifiers
 import dev.aster.vega.runtime.PointerDevice
 import dev.aster.vega.runtime.VegaChartController
+import dev.aster.vega.scene.AccessibilityTree
 import dev.aster.vega.scene.HitTestOptions
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.Scene
@@ -93,6 +94,26 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
   private var reportedSize: Pair<Int, Int>? = null
 
   private val accessibilityHelper = VegaAccessibilityHelper(this)
+
+  /**
+   * How many **data marks** a screen reader may explore one by one before a summary stands in for
+   * them.
+   *
+   * [AccessibilityTree.MAX_EXPOSED_MARKS] by default, which is the engine's judgement rather than a
+   * fact: a host knows things it does not — the size of the screen, whether the chart is the page
+   * or a thumbnail on it, what its own users have said. The guides are exposed either way, so
+   * raising this trades a longer swipe list for per-mark exploration and lowering it does the
+   * reverse.
+   *
+   * Only marks count, so a chart of many small points does not cross it on the strength of its axis
+   * labels.
+   */
+  public var accessibilityMaxExposedMarks: Int = AccessibilityTree.MAX_EXPOSED_MARKS
+    set(value) {
+      if (field == value) return
+      field = value
+      accessibilityHelper.invalidateSemanticTree()
+    }
 
   /** Watches the current controller's snapshot while the view is attached. */
   private var snapshotObserver: Job? = null

@@ -22,6 +22,14 @@ class AccessibilityTreeTest {
     value: String? = null,
     focusable: Boolean = true,
     order: Int = 0,
+    /**
+     * `"mark"` for a data mark, and a guide's own role for a guide.
+     *
+     * Load-bearing rather than decoration: only marks count toward the summary threshold, so a
+     * helper that left this null would build a scene of things that are focusable and are not data
+     * — which is precisely the case the threshold used to get wrong.
+     */
+    role: String = "mark",
   ) =
     RectNode(
       id = ids.allocate(),
@@ -31,15 +39,20 @@ class AccessibilityTreeTest {
       height = 10.0,
       metadata =
         NodeMetadata(
+          role = role,
           accessibility =
             AccessibilityDescriptor(
               label = label,
               value = value,
               focusable = focusable,
               traversalIndex = order,
-            )
+            ),
         ),
     )
+
+  /** An axis, a legend or a title: focusable, describable, and not a data point. */
+  private fun guide(label: String, role: String = "axis", order: Int = 0) =
+    mark(label, focusable = true, order = order, role = role)
 
   private fun sceneOf(vararg nodes: SceneNode) =
     Scene(
@@ -75,17 +88,65 @@ class AccessibilityTreeTest {
   }
 
   @Test
-  fun `a dense chart becomes one summary rather than an unusable list`() {
-    val many = (1..AccessibilityTree.MAX_EXPOSED_MARKS + 1).map { mark("point $it") }
-    val elements = AccessibilityTree.elements(sceneOf(*many.toTypedArray()))
+  fun `a dense chart summarises its marks and keeps its guides`() {
+    val many = (1..AccessibilityTree.MAX_EXPOSED_MARKS + 1).map { mark("point $it", order = 1) }
+    val elements =
+      AccessibilityTree.elements(
+        sceneOf(
+          guide("X-axis", order = 0),
+          guide("Key", role = "legend", order = 2),
+          *many.toTypedArray(),
+        )
+      )
 
     // The point of the cap: a reader swiping through four thousand points is stuck, so the chart
-    // says
-    // what it is instead of enumerating itself.
-    assertEquals(1, elements.size)
-    assertTrue(elements.single().isSummary)
-    assertTrue(elements.single().label.contains("${AccessibilityTree.MAX_EXPOSED_MARKS + 1} marks"))
-    assertEquals(null, elements.single().nodeId)
+    // says what it is instead of enumerating itself.
+    val summary = elements.first()
+    assertTrue(summary.isSummary)
+    assertTrue(summary.label.contains("${AccessibilityTree.MAX_EXPOSED_MARKS + 1} marks"))
+    assertEquals(null, summary.nodeId)
+
+    // And the axes and the legend survive it, which is the whole difference. They are a handful of
+    // elements and they are exactly what is worth reading when the data cannot be walked;
+    // collapsing
+    // them with the marks left a reader with one sentence and no way to find out what the chart was
+    // of.
+    assertEquals(listOf("X-axis", "Key"), elements.drop(1).map { it.label })
+    assertFalse(elements.drop(1).any { it.isSummary })
+  }
+
+  @Test
+  fun `guides do not count toward the threshold`() {
+    // Measured on a real chart before this: 118 points, two axes and a legend is 121 focusable
+    // elements, so counting everything collapsed the whole tree at 118 marks — the data was not
+    // dense and the reader lost it anyway.
+    val marks = (1..AccessibilityTree.MAX_EXPOSED_MARKS).map { mark("point $it") }
+    val elements =
+      AccessibilityTree.elements(
+        sceneOf(
+          guide("X-axis"),
+          guide("Y-axis"),
+          guide("Key", role = "legend"),
+          *marks.toTypedArray(),
+        )
+      )
+    assertEquals(AccessibilityTree.MAX_EXPOSED_MARKS + 3, elements.size)
+    assertFalse(elements.any { it.isSummary })
+  }
+
+  @Test
+  fun `a host may set the threshold itself`() {
+    val marks = (1..5).map { mark("point $it") }
+    val scene = sceneOf(guide("X-axis"), *marks.toTypedArray())
+
+    assertEquals(6, AccessibilityTree.elements(scene, maxExposedMarks = 5).size)
+    // One over, so the marks collapse and the axis stays.
+    val tight = AccessibilityTree.elements(scene, maxExposedMarks = 4)
+    assertEquals(2, tight.size)
+    assertTrue(tight.first().isSummary)
+    assertEquals("X-axis", tight.last().label)
+    // Zero summarises any chart with a mark in it, which is a legitimate thing to ask for.
+    assertTrue(AccessibilityTree.elements(scene, maxExposedMarks = 0).first().isSummary)
   }
 
   @Test

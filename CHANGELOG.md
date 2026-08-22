@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **The accessibility summary threshold counts data marks, and the guides survive
+  it.** It counted every focusable element, so a chart's axes and legend pushed it
+  over before the data was dense — measured: 118 points, two axes and a legend is
+  121 focusable elements, and the whole tree collapsed at 118 marks. A reader lost
+  per-mark exploration of the entire chart rather than of the crowded part, and
+  lost the axes and the legend too. The summary now stands in for the marks alone
+  and counts only those, and the threshold is a parameter on every host —
+  `AccessibilityTree.elements(maxExposedMarks =)`, the Compose and SwiftUI views,
+  and the Android view's `accessibilityMaxExposedMarks`. (#65)
+
 - **`legend.labelExpr` is honoured**, as `axis.labelExpr` already was. Upstream
   destructures it out and writes `encode.labels.update.text` from it on both
   guides; this compiler did it for the axis only, so a `legend.labelExpr`

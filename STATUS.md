@@ -5822,6 +5822,36 @@ document's own second argument to `timeUnitSpecifier(units, specifiers)` — whi
 for by name. Vega-Lite's generated table looks like an exception and is not one: `Fields` builds it
 **from** the locale, so the two agree by construction rather than by out-ranking each other.
 
+### A dense chart, counted by the wrong thing
+
+`MAX_EXPOSED_MARKS` is 120 and the count it was compared against was every **focusable element** — a
+mark, an axis, a legend and a title alike. Past it the whole tree became one sentence.
+
+Measured on a compiled chart: 118 points coloured by a category is 118 marks, two axes and a legend,
+which is 121 focusable elements. So the tree collapsed at 118 marks. The data was not dense, and a
+reader lost per-mark exploration of the entire chart rather than of the crowded part — and lost the
+axes and the legend with it, which are three elements and are exactly what is worth reading when the
+marks cannot be walked.
+
+Two changes. Only nodes whose `NodeMetadata.role` is `mark` count, which is the same fact
+`AccessibleElement.activatable` already reports, so there is no second definition of "is this a data
+point". And when the threshold is crossed the summary stands in for the **marks**, with the guides
+still exposed one by one, summary first: a reader meets the overview and can then read the axes and
+the key that make it mean something. The sentence counts the marks it collapsed rather than
+everything focusable, which used to tell a reader there were more data points than the chart had.
+
+The threshold is a parameter on every host, because 120 is this engine's judgement and not a fact — a
+host knows the size of the screen, whether the chart is the page or a thumbnail on it, and what its
+own users have said. `AccessibilityTree.elements(maxExposedMarks = …)`,
+`VegaChart(accessibilityMaxExposedMarks = …)` in Compose, `VegaChartView(accessibilityMaxExposedMarks:)`
+in SwiftUI, and `accessibilityMaxExposedMarks` on the Android View, which invalidates its cached tree
+when it changes. Zero or less summarises any chart with a mark in it, which is a legitimate thing to
+ask for and is documented rather than guarded.
+
+The test helper in `AccessibilityTreeTest` had to change too, and that is worth recording: `mark()`
+built nodes with no `role` at all, so every threshold test was built out of things that were focusable
+and were not data. It sets `role = "mark"` now, and there is a `guide()` beside it.
+
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
 PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.

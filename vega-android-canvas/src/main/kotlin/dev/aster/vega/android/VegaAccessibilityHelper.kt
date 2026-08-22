@@ -69,17 +69,22 @@ internal class VegaAccessibilityHelper(private val view: VegaChartView) :
     // chart
     // was an Android detail. All that is left here is the translation into Android's own node type.
     val nodesById = scene.flatten().associateBy { it.node.id }
-    return AccessibilityTree.elements(scene, selectedIds).mapIndexed { index, element ->
-      VirtualNode(
-        id = index,
-        label = element.label,
-        bounds = element.bounds,
-        node = element.nodeId?.let { nodesById[it]?.node },
-        selected = element.selected,
-        activatable = element.activatable,
-        roleDescription = element.roleDescription,
+    return AccessibilityTree.elements(
+        scene,
+        selectedIds,
+        maxExposedMarks = view.accessibilityMaxExposedMarks,
       )
-    }
+      .mapIndexed { index, element ->
+        VirtualNode(
+          id = index,
+          label = element.label,
+          bounds = element.bounds,
+          node = element.nodeId?.let { nodesById[it]?.node },
+          selected = element.selected,
+          activatable = element.activatable,
+          roleDescription = element.roleDescription,
+        )
+      }
   }
 
   override fun getVirtualViewAt(x: Float, y: Float): Int {

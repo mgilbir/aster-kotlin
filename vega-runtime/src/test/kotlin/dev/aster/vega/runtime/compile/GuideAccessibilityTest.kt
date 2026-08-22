@@ -1,11 +1,15 @@
 package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.fixtures.VegaHeadlessTextEngine
+import dev.aster.vega.scene.AccessibilityTree
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.flatten
+import dev.aster.vegalite.VegaLiteInput
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
@@ -107,5 +111,64 @@ class GuideAccessibilityTest {
       guide(spec("", ""), "axis").metadata.accessibility?.label,
       blank.metadata.accessibility?.label,
     )
+  }
+
+  /**
+   * The summary threshold counts **data marks**, measured on a real compiled chart.
+   *
+   * The numbers are the point. 118 points, two axes and a legend is 121 focusable elements, so a
+   * rule that counted everything collapsed the whole tree at 118 marks — the data was not dense and
+   * a reader lost it anyway, together with the axes and the legend, which are three elements and
+   * are exactly what is worth reading when the marks cannot be walked.
+   *
+   * Compiled through Vega-Lite because the legend is what makes the arithmetic tip, and this is the
+   * shape a host actually has: a scatter plot coloured by a category.
+   */
+  @Test
+  fun `a chart just under the cap keeps its marks, and its guides survive a chart over it`() {
+    fun scene(points: Int) =
+      requireNotNull(
+        SpecCompiler(VegaHeadlessTextEngine())
+          .compileJson(
+            requireNotNull(
+              VegaLiteInput.toVega(
+                  """
+                {"width": 300, "height": 150,
+                 "data": {"values": [${(1..points).joinToString(", ") {
+                  """{"c": $it, "v": ${it % 7}, "g": "cat ${it % 12}"}"""
+                }}]},
+                 "mark": "point",
+                 "encoding": {"x": {"field": "c", "type": "quantitative"},
+                              "y": {"field": "v", "type": "quantitative"},
+                              "color": {"field": "g", "type": "nominal"}}}
+                """
+                    .trimIndent()
+                )
+                .vegaJson
+            )
+          )
+          .scene
+      )
+
+    val underTheCap = scene(AccessibilityTree.MAX_EXPOSED_MARKS - 2)
+    val focusable =
+      underTheCap.flatten().count {
+        val descriptor = it.node.metadata.accessibility
+        it.node.visible && descriptor != null && descriptor.focusable
+      }
+    val marks = underTheCap.flatten().count { it.node.metadata.role == "mark" }
+    // Two axes and a legend past the mark count: the arithmetic the old rule got wrong.
+    assertEquals(AccessibilityTree.MAX_EXPOSED_MARKS + 1, focusable)
+    assertEquals(AccessibilityTree.MAX_EXPOSED_MARKS - 2, marks)
+
+    val elements = AccessibilityTree.elements(underTheCap)
+    assertFalse(elements.any { it.isSummary }, "the data is not dense: ${elements.size} elements")
+    assertEquals(focusable, elements.size)
+
+    // One mark over the cap, and the guides are still there beside the summary.
+    val over = AccessibilityTree.elements(scene(AccessibilityTree.MAX_EXPOSED_MARKS + 1))
+    assertTrue(over.first().isSummary)
+    assertEquals(3, over.size - 1, "two axes and a legend: ${over.drop(1).map { it.label }}")
+    assertFalse(over.drop(1).any { it.isSummary })
   }
 }

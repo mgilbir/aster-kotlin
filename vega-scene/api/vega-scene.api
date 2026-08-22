@@ -25,8 +25,8 @@ public final class dev/aster/vega/scene/AccessibilityDescriptor {
 public final class dev/aster/vega/scene/AccessibilityTree {
 	public static final field INSTANCE Ldev/aster/vega/scene/AccessibilityTree;
 	public static final field MAX_EXPOSED_MARKS I
-	public final fun elements (Ldev/aster/vega/scene/Scene;Ljava/util/Set;Ldev/aster/vega/model/locale/VegaCaptions;)Ljava/util/List;
-	public static synthetic fun elements$default (Ldev/aster/vega/scene/AccessibilityTree;Ldev/aster/vega/scene/Scene;Ljava/util/Set;Ldev/aster/vega/model/locale/VegaCaptions;ILjava/lang/Object;)Ljava/util/List;
+	public final fun elements (Ldev/aster/vega/scene/Scene;Ljava/util/Set;Ldev/aster/vega/model/locale/VegaCaptions;I)Ljava/util/List;
+	public static synthetic fun elements$default (Ldev/aster/vega/scene/AccessibilityTree;Ldev/aster/vega/scene/Scene;Ljava/util/Set;Ldev/aster/vega/model/locale/VegaCaptions;IILjava/lang/Object;)Ljava/util/List;
 }
 
 public final class dev/aster/vega/scene/AccessibleElement {

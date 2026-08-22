@@ -67,9 +67,11 @@ public data class AccessibleElement(
  *   about what is worth announcing;
  * - ordered by [AccessibilityDescriptor.traversalIndex] rather than by paint order, because a
  *   reader moves through a chart the way it reads rather than the way it was drawn;
- * - and past [MAX_EXPOSED_MARKS], a single summary instead. A scatter plot of four thousand points
- *   is not explorable point by point, and pretending otherwise produces a control a reader cannot
- *   escape.
+ * - and past [MAX_EXPOSED_MARKS] **data marks**, a summary in place of the marks — the guides are
+ *   still exposed one by one. A scatter plot of four thousand points is not explorable point by
+ *   point, and pretending otherwise produces a control a reader cannot escape; its axes and its
+ *   legend are a handful of elements and are exactly what a reader needs when the data is too dense
+ *   to walk.
  *
  * It lived in `VegaAccessibilityHelper` on Android and nowhere else, which meant iOS had no
  * accessibility at all and a second host would have needed a second copy of these rules. A screen
@@ -102,37 +104,21 @@ public object AccessibilityTree {
      * Everything else here is a label the compiler already produced in the chart's own locale.
      */
     captions: VegaCaptions = VegaCaptions.English,
+    /**
+     * How many **data marks** may be exposed one by one before a summary stands in for them.
+     *
+     * A parameter because [MAX_EXPOSED_MARKS] is this engine's judgement and not a fact: a host
+     * knows things this does not — the size of the screen, whether the chart is the page or a
+     * thumbnail on it, what its own users have said. Zero or less summarises any chart that has a
+     * mark at all, which is a legitimate thing to ask for and worth stating rather than guarding.
+     */
+    maxExposedMarks: Int = MAX_EXPOSED_MARKS,
   ): List<AccessibleElement> {
-    val describable =
-      scene
-        .flatten()
-        .filter { placed ->
-          val descriptor = placed.node.metadata.accessibility
-          placed.node.visible && descriptor != null && descriptor.focusable
-        }
-        .sortedBy { it.node.metadata.accessibility?.traversalIndex ?: 0 }
-
-    if (describable.size > MAX_EXPOSED_MARKS) {
-      return listOf(
-        AccessibleElement(
-          label = captions.denseChartSummary(describable.size),
-          bounds = scene.viewport,
-          nodeId = null,
-          selected = false,
-          isSummary = true,
-          // A summary stands for the whole drawing, which is upstream's `graphics-document`.
-          role = "graphics-document",
-          roleDescription = null,
-        )
-      )
-    }
-
-    return describable.map { placed ->
+    fun exposed(placed: PlacedNode): AccessibleElement {
       val descriptor = requireNotNull(placed.node.metadata.accessibility)
-      AccessibleElement(
+      return AccessibleElement(
         // "label: value" — a mark's label alone rarely says what it is worth: "Sales" is a column,
-        // and
-        // "Sales: 42" is the datum a reader wanted.
+        // and "Sales: 42" is the datum a reader wanted.
         label = descriptor.value?.let { "${descriptor.label}: $it" } ?: descriptor.label,
         bounds = placed.worldBounds,
         nodeId = placed.node.id,
@@ -142,5 +128,42 @@ public object AccessibilityTree {
         activatable = placed.node.metadata.role == "mark",
       )
     }
+
+    val describable =
+      scene
+        .flatten()
+        .filter { placed ->
+          val descriptor = placed.node.metadata.accessibility
+          placed.node.visible && descriptor != null && descriptor.focusable
+        }
+        .sortedBy { it.node.metadata.accessibility?.traversalIndex ?: 0 }
+
+    // **Marks**, not everything focusable. The count used to include the axes, the legend and the
+    // title, so a chart of many small marks could cross the threshold before its *data* was dense —
+    // and then a reader lost per-mark exploration of the whole chart rather than of the crowded
+    // part, along with the axes and the legend, which are a handful of elements and are precisely
+    // what is worth reading when the data cannot be walked.
+    val marks = describable.filter { it.node.metadata.role == "mark" }
+    if (marks.size > maxExposedMarks) {
+      val summary =
+        AccessibleElement(
+          // The number of *marks* collapsed, which is what the sentence is about. Counting the
+          // guides in it told a reader there were more data points than the chart had.
+          label = captions.denseChartSummary(marks.size),
+          bounds = scene.viewport,
+          nodeId = null,
+          selected = false,
+          isSummary = true,
+          // A summary stands for the whole drawing, which is upstream's `graphics-document`.
+          role = "graphics-document",
+          roleDescription = null,
+        )
+      // The summary first, then the guides in traversal order: a reader meets the overview and can
+      // then read the axes and the key that make it mean something.
+      return listOf(summary) +
+        describable.filterNot { it.node.metadata.role == "mark" }.map(::exposed)
+    }
+
+    return describable.map(::exposed)
   }
 }
