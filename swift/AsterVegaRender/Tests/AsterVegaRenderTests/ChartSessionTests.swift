@@ -404,7 +404,9 @@ final class ChartSessionTests: XCTestCase {
       thousands: ".",
       grouping: [KotlinInt(value: 3)],
       minus: "\u{2212}",
-      captions: VegaCaptionsCompanion.shared.English
+      captions: VegaCaptionsCompanion.shared.English,
+      // No rules: this locale's tables are enough for what it asserts.
+      rules: nil
     )
     let localised = await drawn(with: dutch)
     XCTAssertTrue(localised.contains { $0.contains("mei 2026") }, "in Dutch: \(localised)")
@@ -528,6 +530,94 @@ final class ChartSessionTests: XCTestCase {
       "the American order is gone rather than joined: \(dayFirst)")
   }
 
+  /// A host's own **rules** reach a chart's labels, and cannot change what the format asked for.
+  ///
+  /// The seam that is behaviour rather than data, and the one place a *device's* preferences can get
+  /// in: everything else about a locale is a table, and a table only answers what somebody thought to
+  /// tabulate. The two cases here are the ones it provably cannot — a numbering system, since the
+  /// engine writes `value.toString()` and that is ASCII always, and a name whose form depends on the
+  /// rest of the format.
+  ///
+  /// The precedence is what the assertions are really about. The specification writes
+  /// `"format": "%d/%m/%Y"`, and it keeps that order, those fields and those separators: what the
+  /// rules decide is which digits write them. A real host would read the numbering system off
+  /// `Locale.current` here rather than hard-coding one.
+  func testAHostsOwnRulesReachTheLabelsWithoutChangingTheFormat() async {
+    let months = """
+      {"width": 300, "height": 120, "padding": 5,
+       "data": [{"name": "t", "values": [{"t": "2026-05-21T10:00:00", "v": 1}],
+                 "format": {"parse": {"t": "date"}}}],
+       "scales": [{"name": "x", "type": "time", "domain": {"data": "t", "field": "t"},
+                   "range": "width"}],
+       "axes": [{"orient": "bottom", "scale": "x", "format": "%d/%m/%Y", "tickCount": 1}],
+       "marks": [{"type": "symbol", "from": {"data": "t"}, "encode": {"enter": {
+         "x": {"scale": "x", "field": "t"}, "y": {"value": 60}}}}]}
+      """
+
+    func drawn(with locale: VegaLocale?) async -> [String] {
+      let session = ChartSession(locale: locale)
+      session.load(specification: months)
+      await session.settle()
+      let scene = try! XCTUnwrap(session.scene, session.failure ?? "no scene")
+      var target = RecordingTarget()
+      SceneWalk().draw(scene: scene, into: &target)
+      return target.calls.filter { $0.contains("text ") }
+    }
+
+    let ascii = await drawn(with: nil)
+    XCTAssertTrue(ascii.contains { $0.contains("21/05/2026") }, "ASCII by default: \(ascii)")
+
+    let eastern = await drawn(
+      with: VegaLocale.Companion.shared.EnglishUS.doCopy(
+        months: VegaLocale.Companion.shared.EnglishUS.months,
+        shortMonths: VegaLocale.Companion.shared.EnglishUS.shortMonths,
+        days: VegaLocale.Companion.shared.EnglishUS.days,
+        shortDays: VegaLocale.Companion.shared.EnglishUS.shortDays,
+        periods: VegaLocale.Companion.shared.EnglishUS.periods,
+        date: VegaLocale.Companion.shared.EnglishUS.date,
+        time: VegaLocale.Companion.shared.EnglishUS.time,
+        dateTime: VegaLocale.Companion.shared.EnglishUS.dateTime,
+        timeUnitSpecifierOverrides: [:],
+        timeTickFormatOverrides: [:],
+        decimal: VegaLocale.Companion.shared.EnglishUS.decimal,
+        thousands: VegaLocale.Companion.shared.EnglishUS.thousands,
+        grouping: VegaLocale.Companion.shared.EnglishUS.grouping,
+        minus: VegaLocale.Companion.shared.EnglishUS.minus,
+        captions: VegaLocale.Companion.shared.EnglishUS.captions,
+        rules: EasternArabicRules()
+      ))
+
+    // The digits are the host's; the order, the fields and the slashes are still the document's.
+    XCTAssertTrue(
+      eastern.contains { $0.contains("٢١/٠٥/٢٠٢٦") },
+      "the host's numbering system, in the specification's own format: \(eastern)")
+    XCTAssertFalse(
+      eastern.contains { $0.contains("21/05/2026") }, "and not both: \(eastern)")
+  }
+
+  /// A numbering system a `VegaLocale` field could not have expressed.
+  ///
+  /// `name` abstains, which is the ordinary case: a host implements the rules it has and inherits the
+  /// rest, because every method may answer nil.
+  private final class EasternArabicRules: VegaFormatRules {
+    private static let arabic = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"]
+
+    func name(field: DateName, index: Int32, context: DateNameContext, locale: VegaLocale) -> String?
+    {
+      nil
+    }
+
+    func digits(number: String) -> String? {
+      String(
+        number.map { character in
+          guard let digit = character.wholeNumberValue, character.isNumber, digit < 10 else {
+            return character
+          }
+          return Character(Self.arabic[digit])
+        })
+    }
+  }
+
   /// Dutch, deriving its date order from its own `%x` or pinned to upstream's table.
   private static func dutch(dayFirst: Bool) -> VegaLocale {
     VegaLocale(
@@ -554,7 +644,9 @@ final class ChartSessionTests: XCTestCase {
       thousands: ".",
       grouping: [KotlinInt(value: 3)],
       minus: "\u{2212}",
-      captions: VegaCaptionsCompanion.shared.English
+      captions: VegaCaptionsCompanion.shared.English,
+      // No rules: this locale's tables are enough for what it asserts.
+      rules: nil
     )
   }
 

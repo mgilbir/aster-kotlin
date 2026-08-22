@@ -510,6 +510,55 @@ different places. `ChartSession` does this for you from its own `locale`.
 A specification's own second argument to `timeUnitSpecifier(units, specifiers)` still wins: the
 document asked for that by name, and a host's language is a default beneath it.
 
+### Rules, not only tables
+
+Everything above is **data**, and data only answers what somebody thought to tabulate. Two things it
+cannot: a name whose form depends on the rest of the format — Polish writes `stycznia` beside a day
+number and `styczeń` alone — and a numbering system, because the engine writes numbers with
+`value.toString()` and that is ASCII whatever the locale says.
+
+`VegaLocale.rules` is the seam for those, and for anything else a *device* knows and a table does not.
+The precedence is the point: **a specification's format decides the shape and a host decides the
+details inside it.**
+
+```kotlin
+object PlatformRules : VegaFormatRules {
+    // What `%B`, `%b`, `%A`, `%a` and `%p` say. Null inherits the locale's own list.
+    override fun name(
+        field: DateName,
+        index: Int,
+        context: DateNameContext,
+        locale: VegaLocale,
+    ): String? =
+        // `hasDayOfMonth` rather than searching the pattern: a pad modifier sits between the percent
+        // and the letter, so `contains("%d")` misses `%-d`.
+        if (field == DateName.MONTH && context.hasDayOfMonth) genitive[index] else null
+
+    // The digits any number is written with, after grouping and padding. Null keeps ASCII.
+    override fun digits(number: String): String? = numberingSystem.transliterate(number)
+}
+
+VegaLocale(/* … */, rules = PlatformRules)
+```
+
+A document writing `"format": "%b %d, %Y"` gets an abbreviated month, a day and a four-digit year in
+that order whatever a host supplies — this cannot reorder a date, drop a field, change a width or
+substitute a pattern of its own. Literal text a document typed is never passed to a rule either, so
+`"Q%q 2026"` keeps its `2026` exactly as written.
+
+Every method may answer null, so a host implements the rules it has and inherits the rest, and a
+locale with no rules is byte-for-byte what it was — which is what keeps `VegaLocale.EnglishUS`
+reproducing upstream.
+
+What it deliberately does **not** reach, so a specification's format stays the specification's:
+
+- Which day a week starts on. `%U` is Sunday-based and `%W` Monday-based; that is a field the document
+  chose, not a rendering of one.
+- Calendars and eras. `%Y` means "the year, four digits"; a Japanese era year is a different field.
+- Any format a platform *composes* rather than names — `getBestDateTimePattern`, `Date.FormatStyle`.
+  Handing one of those in would replace the document's format, which is the thing this shape exists to
+  prevent. A host that wants one formats the text itself and passes it as data.
+
 ## Host data example
 
 A chart can be drawn from data the **app** holds rather than data the payload carried. The

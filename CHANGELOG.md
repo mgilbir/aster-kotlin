@@ -103,6 +103,18 @@ section here does not get released.
 
 ### Added
 
+- **A host can supply its own rules for a locale, not just tables.**
+  `VegaLocale.rules: VegaFormatRules?` decides what a name-bearing directive says
+  and what digits a number is written with — the two things a lookup table
+  provably cannot express, being a contextual name (Polish `stycznia` beside a day
+  number, `styczeń` alone) and a numbering system, since the engine wrote
+  `value.toString()` and that is ASCII always. It is also where a *device's* own
+  preferences can get in. **A specification's format decides the shape and the
+  rules decide the details inside it**: `"format": "%b %d, %Y"` keeps that order,
+  those fields and those widths whatever a host supplies, and literal text the
+  document typed is never passed to a rule. Every method may answer null, and
+  `EnglishUS` carries no rules, so the differential comparisons are untouched.
+
 - **The two renderers' draw-call sequences are compared against each other.** Both
   `SceneWalk` implementations claim to emit "the same calls in the same order" and
   nothing checked it — which is how the Apple renderer came to paint labels the

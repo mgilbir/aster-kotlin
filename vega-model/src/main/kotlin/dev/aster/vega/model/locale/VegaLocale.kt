@@ -129,6 +129,23 @@ public data class VegaLocale(
   public val minus: String = "−",
   /** The sentences a screen reader is given; see [VegaCaptions]. */
   public val captions: VegaCaptions = VegaCaptions.English,
+  /**
+   * The host's own **rules** for the pieces a format is made of, or null for this locale's tables.
+   *
+   * Everything else on this class is data, and data can only answer what somebody thought to
+   * tabulate. Two things it provably cannot: a name whose form depends on the rest of the format —
+   * Polish writes `stycznia` beside a day number and `styczeń` alone — and a numbering system,
+   * since the engine writes `value.toString()` and that is ASCII always.
+   *
+   * The precedence is the important part. **A specification's format decides the shape and this
+   * decides the details inside it**: a document writing `"format": "%b %d, %Y"` gets that order and
+   * those fields whatever a host supplies, and what a host supplies is what `%b` says and what a
+   * digit looks like. See [VegaFormatRules], which is also where the boundaries are written down.
+   *
+   * Null for [EnglishUS] and for any locale that does not ask, so a chart drawn without rules is
+   * byte-for-byte what it was.
+   */
+  public val rules: VegaFormatRules? = null,
 ) {
   /**
    * The table `timeUnitSpecifier` reads: [timeUnitSpecifierOverrides] where stated, and otherwise

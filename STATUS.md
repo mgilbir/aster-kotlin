@@ -6192,6 +6192,44 @@ used.
 Verified against the defect it exists for: with both of the hidden-label guards removed, the parity
 test fails with `label-overlap: 104 calls here against 80 from the Compose walk`.
 
+### Rules rather than tables, and the precedence that makes them safe
+
+A fair criticism of the locale work as it stood: it was all a lookup table. Names, separators, three
+patterns, and — after the derivation — two override maps. Which stands out, because **every other host
+seam in this engine is an interface**: `TextEngine`, `DataLoader`, `Clock`, `Scheduler`,
+`HttpTransport`, and `VegaCaptions`, that last one specifically because the repository had already
+decided sentences are grammar and not a string table. Formatting was the only host-facing concern
+expressed purely as data.
+
+Two things a table provably cannot answer, both from real languages. **A contextual name**: Polish
+writes `stycznia` beside a day number and `styczeń` alone, so the month's form is a function of the
+*format* and no arrangement of lists can hold it. And **a numbering system**: `TimeFormat` and
+`NumberFormat` write `value.toString()`, so `١٢` was unreachable however the locale was filled in.
+
+`VegaLocale.rules: VegaFormatRules?` is the seam, and the shape of it comes from a rule about
+precedence rather than from the list of things a host might want: **a specification's format decides
+the shape and the host decides the details inside it.** So the interface is two methods — what a
+name-bearing directive says, and what digits a number is written with — and it cannot reorder a date,
+drop a field, change a width, or substitute a pattern of its own. That constraint is what makes it
+*smaller* than a formatter interface would have been, and it is why it needed no plumbing: `TimeFormat`
+and `NumberFormat` already receive the locale on every path, so the rules ride along with it.
+
+**The API changed shape once, because the first draft failed its own test.** `name` was given the raw
+`pattern` and the first rule written against it tested `pattern.contains("%d")` — which is wrong,
+because the pattern was `%-d`: a pad modifier sits between the percent and the letter. Asking a host to
+re-parse strftime is the engine pushing its own work outward, and it fails quietly. So the directives
+arrive parsed, as a `DateNameContext` that answers `hasDayOfMonth`, `hasYear`, `hasTimeOfDay` and
+`isAlone`, with the letter set and the pattern there for anything else.
+
+Every method may answer null — a host implements the rules it has and inherits the rest — and
+`EnglishUS` carries none, so the 193 and 283 differential comparisons are untouched by construction.
+
+What it deliberately does not reach is written down in `VegaFormatRules`: the day a week starts on
+(`%U`/`%W` is a field the document chose), calendars and eras (`%Y` means "the year, four digits", and
+an era year is a different field), and any format a platform *composes* rather than names. That last
+one is not a limitation to fix later — handing in `getBestDateTimePattern` would replace the document's
+format, which is exactly what this shape exists to prevent.
+
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
 PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.
