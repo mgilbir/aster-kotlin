@@ -873,7 +873,19 @@ internal object Guides {
         null -> Unit
         else -> if (gradient) put("direction", "horizontal")
       }
-      def.legend?.fields?.forEach { (key, value) -> put(key, asSignal(value)) }
+      // `labelExpr` is **not** a Vega legend property, exactly as it is not a Vega axis property:
+      // upstream's `assembleLegend` destructures it out of the component and writes
+      // `encode.labels.update.text` from it. Passed through, it survived into the emitted Vega and
+      // the Vega parser reported `PARSE_UNKNOWN_PROPERTY at $.legends[0].labelExpr` two stages
+      // downstream, while the labels were drawn from the scale's domain unchanged. `labelExpr` is
+      // how a document shortens labels that would otherwise not fit, so a colour legend over
+      // sixty-character categories was drawn at full width and overflowed the chart around it — and
+      // a host cannot compensate, because the untruncated labels are what the layout is computed
+      // from. Applied below, after the encode parts are assembled, which is where upstream applies
+      // it too.
+      def.legend?.fields?.forEach { (key, value) ->
+        if (key != "labelExpr") put(key, asSignal(value))
+      }
       if (gradient) {
         // A ramp is painted at the mark's own opacity, so a legend beside a chart of translucent
         // points is as translucent as they are — `gradient` in `legend/encode.ts`. Zero and absent
@@ -904,9 +916,15 @@ internal object Guides {
             ?.forEach { (key, value) -> parts[key] = value }
         }
       }
-      if (parts.isNotEmpty()) {
-        put("encode", obj { parts.forEach { (key, value) -> put(key, value) } })
-      }
+      // Last, as `assembleLegend` does it, and for a reason: where an encode block already states
+      // the labels' text — a custom number format type writes one — `datum.label` in the expression
+      // means *that* text rather than the scale's, so the two compose instead of one replacing the
+      // other. `withLabelText` is the axis's own function; the rule is the same on both guides.
+      val labelExpr = def.legend?.string("labelExpr")
+      val own =
+        if (parts.isEmpty()) null else obj { parts.forEach { (key, value) -> put(key, value) } }
+      val encode = if (labelExpr == null) own else withLabelText(own, labelExpr)
+      encode?.let { put("encode", it) }
     }
   }
 

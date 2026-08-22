@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **`legend.labelExpr` is honoured**, as `axis.labelExpr` already was. Upstream
+  destructures it out and writes `encode.labels.update.text` from it on both
+  guides; this compiler did it for the axis only, so a `legend.labelExpr`
+  survived into the emitted Vega and the *Vega* parser reported it as an unknown
+  property two stages later, while the labels were drawn from the scale's domain
+  at full length. Since the untruncated labels are what the legend's width is
+  computed from, a chart over long category names overflowed whatever held it,
+  with no host workaround. (#70)
+
 - **One bytecode level per release.** 0.1.0 published its jars at Java 17 and
   `vega-compose-multiplatform`'s Android AAR at Java 21, because the pin named a
   Kotlin target *type* and the AGP Kotlin Multiplatform Android target is not one

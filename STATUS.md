@@ -25,7 +25,7 @@ end to end — expressions, signals, 49 of upstream's 51 documented data transfo
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-193 Vega differential fixtures and 282 Vega-Lite fixtures pass, every one of them matching upstream
+193 Vega differential fixtures and 283 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -192,7 +192,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 193 Vega differential fixtures and 282 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 193 Vega differential fixtures and 283 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -5763,6 +5763,30 @@ false diagnostic is indistinguishable from a real one to a host routing by sever
 The same fact is published as `CompiledSpec.readsContainerSize`, because it answers a question a host
 asks on every rotation and every split-view drag: is a resize worth a recompile at all? False for the
 overwhelming majority of charts, which declare their own width and height.
+
+### `labelExpr` on the guide that had it and the guide that did not
+
+`labelExpr` is not a Vega property on either guide. Upstream destructures it out of the component and
+writes `encode.labels.update.text` from it — `assembleAxis` does, and `assembleLegend` does the same
+thing fifty lines away. This compiler had the axis half and not the legend half, so a
+`legend.labelExpr` was copied through with every other legend property and the **Vega** parser
+reported `PARSE_UNKNOWN_PROPERTY at $.legends[0].labelExpr`: the right complaint, two stages after
+the mistake, which is a confusing place to read it.
+
+The labels were then drawn from the scale's domain unchanged, and that is the part a host cannot work
+around. `labelExpr` is how a document shortens labels that would otherwise not fit; the untruncated
+labels are what the legend's **width** is computed from, so a colour legend over sixty-character
+categories was laid out at full width and the chart it belonged to overflowed its container.
+
+Applied last, after the encode parts are assembled, which is where upstream applies it and not an
+accident of ordering: where a block already states the labels' text — a custom number format type
+writes one — `datum.label` in the expression means *that* text rather than the scale's, so the two
+compose instead of one replacing the other. It is the axis's own `withLabelText`; the rule is the same
+on both guides, which is why it was worth having one function for it.
+
+`legend-label-expr.vl.json` arms both gates and both of them failed before the fix — the specification
+comparison on the stray property, and the scene comparison on labels drawn at full length. 283
+Vega-Lite fixtures now.
 
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
