@@ -246,6 +246,17 @@ public struct DrawTextRun: Equatable, Sendable {
   public let italic: Bool
   public let angleDegrees: Double
 
+  /// Extra space between the characters, in scene units.
+  ///
+  /// Carried because the **measurement** already applies it — `CoreTextTextEngine` sets
+  /// `kCTKernAttributeName` from the same style — and the drawing did not, so a specification with a
+  /// `letterSpacing` was laid out in a box reserved for spaced glyphs and then painted with unspaced
+  /// ones. That is the defect `CoreTextDrawing`'s own header warns about, in a field nobody had
+  /// noticed was missing: measured with one thing, drawn with another.
+  ///
+  /// Defaulted, so a caller that constructs a run without one is unaffected.
+  public let letterSpacing: Double
+
   public init(
     text: String,
     origin: Point,
@@ -255,7 +266,8 @@ public struct DrawTextRun: Equatable, Sendable {
     fontSize: Double,
     fontWeight: Int,
     italic: Bool,
-    angleDegrees: Double
+    angleDegrees: Double,
+    letterSpacing: Double = 0
   ) {
     self.text = text
     self.origin = origin
@@ -266,5 +278,6 @@ public struct DrawTextRun: Equatable, Sendable {
     self.fontWeight = fontWeight
     self.italic = italic
     self.angleDegrees = angleDegrees
+    self.letterSpacing = letterSpacing
   }
 }

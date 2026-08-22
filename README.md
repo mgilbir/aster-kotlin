@@ -764,6 +764,13 @@ regenerate deliberately:
 
 Review the resulting diff as a rendering change, not as noise.
 
+`test-fixtures/scene-walk/*.calls.txt` are a third kind, and they are read by **two** test suites.
+`SceneWalkGoldenTest` writes them from the Compose walk, and `SceneWalkParityTests` in
+`swift/AsterVegaRender` asserts the Swift walk produces the same bytes — which is how "the two
+renderers emit the same calls in the same order", a claim both files make about themselves, is checked
+rather than believed. When those two disagree, one of the walks changed; read the diff before
+regenerating.
+
 ### Formatting
 
 ```bash

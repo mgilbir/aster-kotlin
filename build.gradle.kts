@@ -353,6 +353,13 @@ subprojects {
       .dir(rootProject.layout.projectDirectory.dir("test-fixtures/reference"))
       .withPropertyName("differentialReferences")
       .withPathSensitivity(PathSensitivity.RELATIVE)
+    // The canonical draw-call goldens, which `SceneWalkGoldenTest` reads and the Swift package's
+    // `SceneWalkParityTests` reads too — one file compared by two walks, so a stale task here is a
+    // parity check that did not run.
+    inputs
+      .dir(rootProject.layout.projectDirectory.dir("test-fixtures/scene-walk"))
+      .withPropertyName("sceneWalkGoldens")
+      .withPathSensitivity(PathSensitivity.RELATIVE)
     // The Vega-Lite fixtures and their two references, for the same reason.
     inputs
       .dir(rootProject.layout.projectDirectory.dir("test-fixtures/vega-lite"))
@@ -377,7 +384,8 @@ subprojects {
  */
 tasks.register("updateGoldens") {
   group = "verification"
-  description = "Regenerates scene-snapshot and SVG goldens. Review the diff as a rendering change."
+  description =
+    "Regenerates scene-snapshot, SVG and draw-call goldens. Review the diff as a rendering change."
   doFirst {
     throw GradleException(
       "Run as: ./gradlew test -PupdateGoldens=true --rerun-tasks (see PROJECT_BRIEF.md 18.3)"

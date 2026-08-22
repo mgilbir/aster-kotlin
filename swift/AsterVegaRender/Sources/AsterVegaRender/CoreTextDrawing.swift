@@ -70,13 +70,19 @@ public enum CoreTextDrawing {
 
     // The CoreText attribute names, not UIKit's `.font`/`.foregroundColor` — this file deliberately
     // imports neither UIKit nor AppKit so that it is the same code on iOS and on macOS.
-    let attributed = NSAttributedString(
-      string: run.text,
-      attributes: [
-        NSAttributedString.Key(kCTFontAttributeName as String): font(for: run, textScale: textScale),
-        NSAttributedString.Key(kCTForegroundColorAttributeName as String): colour,
-      ]
-    )
+    var attributes: [NSAttributedString.Key: Any] = [
+      NSAttributedString.Key(kCTFontAttributeName as String): font(for: run, textScale: textScale),
+      NSAttributedString.Key(kCTForegroundColorAttributeName as String): colour,
+    ]
+    // The **same attribute the measurement used**, which is the whole point of setting it here:
+    // `CoreTextTextEngine` applies `kCTKernAttributeName` from the style, so a run measured with
+    // spacing has to be drawn with it or the glyphs sit inside a box that was reserved for something
+    // wider. Scaled like the font, since the spacing is in scene units as the size is.
+    if run.letterSpacing != 0 {
+      attributes[NSAttributedString.Key(kCTKernAttributeName as String)] =
+        run.letterSpacing * textScale
+    }
+    let attributed = NSAttributedString(string: run.text, attributes: attributes)
     let line = CTLineCreateWithAttributedString(attributed)
 
     context.saveGState()

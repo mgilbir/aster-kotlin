@@ -6154,6 +6154,44 @@ run" this repository keeps finding. It now counts draws through `onPlaced`, forc
 state change, and puts two marks on one URL so the per-draw half is testable without any redraw at
 all.
 
+### The two walks, compared against each other at last
+
+Left as a stated gap at the end of the hidden-label work: nothing compared the two `SceneWalk`
+implementations' call sequences. Each says in its own header that it emits "the same calls in the same
+order" as the other, and each renderer's tests assert about that renderer — so a divergence passed both,
+which is exactly how the Apple renderer came to paint 43 text runs where Compose painted 19.
+
+`test-fixtures/scene-walk/*.calls.txt`, nine fixtures, ~410 lines. `SceneWalkGoldenTest` writes each
+from the Compose walk and `SceneWalkParityTests` asserts the Swift walk reproduces it, naming the first
+differing line rather than printing two thousand characters of diff.
+
+**Why a third recorder.** `RecordingTarget` exists on each side and their formats had drifted the way
+two copies of anything do — `->` against ` -> `, `@` against ` a`, a path summarised by a tally here and
+by its first and last command there. Aligning them would churn every assertion written against either,
+so `CanonicalCalls` is a third one per side whose only job is to be byte-identical. It writes every
+field always, with no shorthand for a default: a recorder that omits what it thinks is uninteresting
+cannot prove agreement about it. And a path goes down command by command, control points included,
+because a summary is precisely what hides a curve drawn through the wrong controls.
+
+Two things had to be got right or the comparison would have been about something else. Numbers are
+rounded **by hand** — three decimals, ties away from zero — because Java's `%.3f` rounds a tie up and
+C's rounds it to even, which would have surfaced as a parity failure once in a thousand coordinates
+with nothing to read. And the scene has to be identical **by construction**, so every compile input is
+spelled out on both sides: the text engine's ratios, the fixed clock, seed 42, `EnglishUS`, and UTC.
+The zone is the one that would have slipped — a `time` scale is local, the JVM tests pin
+`Europe/Amsterdam` through Gradle and `swift test` pins nothing, so a golden written without it would
+have been a golden about this machine.
+
+**It found something on its first run.** The Swift `DrawTextRun` had no `letterSpacing`, and
+`CoreTextTextEngine` applies `kCTKernAttributeName` from the style when it *measures* — so a
+specification with letter spacing was laid out in a box reserved for spaced glyphs and painted with
+unspaced ones. That is the defect `CoreTextDrawing`'s own header warns about, in a field nobody had
+noticed was absent. The run carries it now and the drawing applies the same attribute the measurement
+used.
+
+Verified against the defect it exists for: with both of the hidden-label guards removed, the parity
+test fails with `label-overlap: 104 calls here against 80 from the Compose walk`.
+
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
 PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.

@@ -103,6 +103,16 @@ section here does not get released.
 
 ### Added
 
+- **The two renderers' draw-call sequences are compared against each other.** Both
+  `SceneWalk` implementations claim to emit "the same calls in the same order" and
+  nothing checked it — which is how the Apple renderer came to paint labels the
+  axis had hidden while Compose did not, with both renderers' own tests green.
+  `test-fixtures/scene-walk/*.calls.txt` is written from the Compose walk by
+  `SceneWalkGoldenTest` and asserted against the Swift walk by
+  `SceneWalkParityTests`. It found a second divergence immediately: the Swift
+  `DrawTextRun` carried no `letterSpacing`, so a spaced label was **measured**
+  with spacing and **drawn** without it. Fixed. (#71)
+
 - **A host is told which image URL could not be resolved**, once per URL:
   `VegaChart(onUnresolvedImage =)` and `VegaChartView(onUnresolvedImage:)`, both
   additive. Making it usable required fixing something else first — only

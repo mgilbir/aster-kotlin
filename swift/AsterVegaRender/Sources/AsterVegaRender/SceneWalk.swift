@@ -223,7 +223,11 @@ public struct SceneWalk {
             fontSize: style.fontSize,
             fontWeight: Int(style.fontWeight),
             italic: style.fontStyle == FontStyle.italic,
-            angleDegrees: text.angleDegrees
+            angleDegrees: text.angleDegrees,
+            // Carried through, because the engine **measured** with it: `CoreTextTextEngine` applies
+            // the same style's `letterSpacing`, and until this the drawing did not — so a spaced
+            // label sat in a box reserved for spaced glyphs and was painted unspaced.
+            letterSpacing: style.letterSpacing
           ),
           fill: fill,
           stroke: stroke

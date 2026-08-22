@@ -89,6 +89,33 @@ times, and each time the fix belonged in `oracle-js/src/normalize.js` as much as
 
 If a difference is visible in the SVG but the comparison passes, suspect the normalizer.
 
+### The two walks are compared against each other
+
+There are two traversals of a scene — `vega-compose-multiplatform`'s `SceneWalk` and the Swift
+package's — and each says in its own header that it emits "the same calls in the same order" as the
+other. Nothing checked that, and it cost a defect that shipped: the Swift walk had no zero-opacity
+guard, so a label an axis had deliberately hidden was painted black, and on one committed fixture it
+emitted 104 draw calls where the Compose walk emitted 80. Both renderers' own tests passed throughout,
+because each asserts about itself.
+
+`test-fixtures/scene-walk/*.calls.txt` is the comparison. `SceneWalkGoldenTest` writes each file from
+the Compose walk; `SceneWalkParityTests` reads the same file and asserts the Swift walk reproduces it,
+naming the first line that differs.
+
+```bash
+# the Kotlin half, and how to regenerate after a deliberate change
+./gradlew :vega-compose-multiplatform:jvmTest -PupdateGoldens=true --rerun-tasks
+# the Swift half
+./scripts/swift-test.sh
+```
+
+Two things to know before touching it. The **format is a contract between two languages**:
+`CanonicalCalls` exists once per side and its only job is to be byte-identical, which is why it writes
+every field always and rounds by hand rather than through `%f` — Java rounds a tie up and C rounds it
+to even. And the **scene has to be identical by construction** or the comparison is about two
+compilers rather than two walks, so every compile input is spelled out on both sides, `timeZone`
+included: a `time` scale is local, the JVM tests pin `Europe/Amsterdam` and `swift test` pins nothing.
+
 ## Look at the output
 
 Numbers agreeing is not the same as a chart looking right.

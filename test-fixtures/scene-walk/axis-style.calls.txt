@@ -1,0 +1,45 @@
+group clip=-
+  group clip=-
+    group clip=-
+      line (69.500,140.500)-(69.500,145.500) stroke=#00339980 w=3.000 cap=butt join=miter miter=4.000 dash=[2.000,2.000] dashOffset=0.000
+      line (112.500,140.500)-(112.500,145.500) stroke=#00339980 w=3.000 cap=butt join=miter miter=4.000 dash=[2.000,2.000] dashOffset=0.000
+      line (155.500,140.500)-(155.500,145.500) stroke=#00339980 w=3.000 cap=butt join=miter miter=4.000 dash=[2.000,2.000] dashOffset=0.000
+      line (197.500,140.500)-(197.500,145.500) stroke=#00339980 w=3.000 cap=butt join=miter miter=4.000 dash=[2.000,2.000] dashOffset=0.000
+      line (240.500,140.500)-(240.500,145.500) stroke=#00339980 w=3.000 cap=butt join=miter miter=4.000 dash=[2.000,2.000] dashOffset=0.000
+      text "a" origin=(66.563,155.500) anchor=(69.563,147.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=1 angle=0.000 spacing=0.000 fill=#cc3333b3 stroke=-
+      text "b" origin=(109.282,155.500) anchor=(112.282,147.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=1 angle=0.000 spacing=0.000 fill=#cc3333b3 stroke=-
+      text "c" origin=(152.000,155.500) anchor=(155.000,147.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=1 angle=0.000 spacing=0.000 fill=#cc3333b3 stroke=-
+      text "d" origin=(194.718,155.500) anchor=(197.718,147.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=1 angle=0.000 spacing=0.000 fill=#cc3333b3 stroke=-
+      text "e" origin=(237.437,155.500) anchor=(240.437,147.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=1 angle=0.000 spacing=0.000 fill=#cc3333b3 stroke=-
+      line (45.500,140.500)-(265.500,140.500) stroke=#99009999 w=4.000 cap=butt join=miter miter=4.000 dash=[6.000,3.000] dashOffset=0.000
+      text "Category" origin=(129.100,170.300) anchor=(155.500,161.500) ascent=8.800 font="sans-serif" size=11.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#333333ff stroke=-
+    end
+    group clip=-
+      line (45.500,140.500)-(265.500,140.500) stroke=#00aa004d w=2.000 cap=butt join=miter miter=4.000 dash=[4.000,2.000] dashOffset=0.000
+      line (45.500,114.500)-(265.500,114.500) stroke=#00aa004d w=2.000 cap=butt join=miter miter=4.000 dash=[4.000,2.000] dashOffset=0.000
+      line (45.500,88.500)-(265.500,88.500) stroke=#00aa004d w=2.000 cap=butt join=miter miter=4.000 dash=[4.000,2.000] dashOffset=0.000
+      line (45.500,62.500)-(265.500,62.500) stroke=#00aa004d w=2.000 cap=butt join=miter miter=4.000 dash=[4.000,2.000] dashOffset=0.000
+      line (45.500,36.500)-(265.500,36.500) stroke=#00aa004d w=2.000 cap=butt join=miter miter=4.000 dash=[4.000,2.000] dashOffset=0.000
+      line (45.500,10.500)-(265.500,10.500) stroke=#00aa004d w=2.000 cap=butt join=miter miter=4.000 dash=[4.000,2.000] dashOffset=0.000
+      line (45.500,140.500)-(40.500,140.500) stroke=#888888ff w=9.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+      line (45.500,114.500)-(40.500,114.500) stroke=#888888ff w=9.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+      line (45.500,88.500)-(40.500,88.500) stroke=#888888ff w=9.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+      line (45.500,62.500)-(40.500,62.500) stroke=#888888ff w=9.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+      line (45.500,36.500)-(40.500,36.500) stroke=#888888ff w=9.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+      line (45.500,10.500)-(40.500,10.500) stroke=#888888ff w=9.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+      text "0" origin=(32.500,143.500) anchor=(38.500,140.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=1 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      text "20" origin=(26.500,117.500) anchor=(38.500,114.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=1 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      text "40" origin=(26.500,91.500) anchor=(38.500,88.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=1 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      text "60" origin=(26.500,65.500) anchor=(38.500,62.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=1 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      text "80" origin=(26.500,39.500) anchor=(38.500,36.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=1 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      text "100" origin=(20.500,13.500) anchor=(38.500,10.500) ascent=8.000 font="sans-serif" size=10.000 weight=400 italic=1 angle=0.000 spacing=0.000 fill=#000000ff stroke=-
+      line (45.500,140.500)-(45.500,10.500) stroke=#888888ff w=1.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+      text "Value" origin=(0.000,73.300) anchor=(16.500,75.500) ascent=8.800 font="sans-serif" size=11.000 weight=700 italic=0 angle=-90.000 spacing=0.000 fill=#000000ff stroke=-
+    end
+    rect (51.408,103.600,36.311,36.400) corners=[0.000,0.000,0.000,0.000] fill=#9ecae9ff stroke=-
+    rect (94.126,68.500,36.311,71.500) corners=[0.000,0.000,0.000,0.000] fill=#9ecae9ff stroke=-
+    rect (136.845,84.100,36.311,55.900) corners=[0.000,0.000,0.000,0.000] fill=#9ecae9ff stroke=-
+    rect (179.563,21.700,36.311,118.300) corners=[0.000,0.000,0.000,0.000] fill=#9ecae9ff stroke=-
+    rect (222.282,124.400,36.311,15.600) corners=[0.000,0.000,0.000,0.000] fill=#9ecae9ff stroke=-
+  end
+end
