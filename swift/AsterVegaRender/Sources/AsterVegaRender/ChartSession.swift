@@ -246,6 +246,23 @@ public final class ChartSession {
 
   public private(set) var vegaLiteDiagnostics: [VegaDiagnostic] = []
 
+  /// `usermeta` — metadata the document carries for **this app**, not for the engine.
+  ///
+  /// Nothing in the engine reads it, which is the whole point: upstream's schema calls it "optional
+  /// metadata that will be passed to Vega", and it is how whoever wrote the chart hands a host
+  /// something the grammar has no channel for — a table of the values behind marks that carry no
+  /// accessible text of their own, a version to branch on, an identifier to log against. Vega-Lite
+  /// carries it onto the Vega it emits, so a document in either grammar arrives with it intact.
+  ///
+  /// Nil where the document carried none, and where nothing has compiled yet; **empty** where it wrote
+  /// `{}`. Those are different statements, and reading them as one loses the difference between a
+  /// document with no metadata and one whose metadata was filtered to nothing.
+  ///
+  /// Published here rather than left behind `controller.lastCompiled` for the reason every other seam
+  /// on this class exists: a capability Kotlin has and Swift does not is a gap in this boundary rather
+  /// than a fact about the platform.
+  public private(set) var usermeta: [String: any AsterVega.VegaValue]?
+
   /// The controller owns the compiled dataflow and the interaction state.
   ///
   /// Held for the session's lifetime, because a tap is only meaningful against the dataflow the scene
@@ -284,6 +301,7 @@ public final class ChartSession {
       failure = nil
       grammar = nil
       vegaLiteDiagnostics = []
+      usermeta = nil
       return
     }
 
@@ -325,6 +343,9 @@ public final class ChartSession {
       }
 
       if let compiled { self.diagnostics = compiled.diagnostics }
+      // Republished with every compile, like the diagnostics: it belongs to the document now loaded,
+      // and carrying the previous one's metadata forward would be worse than carrying none.
+      self.usermeta = compiled?.spec?.usermeta
       // **Whether there is a chart is decided here**, from the compilation, and not from the snapshot.
       // `ChartSnapshot.scene` is not optional — the controller always holds one, the empty scene before
       // anything has compiled and the *previous* chart after a compile that failed, which is deliberate

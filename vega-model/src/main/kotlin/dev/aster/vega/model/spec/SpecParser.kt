@@ -1030,9 +1030,9 @@ public class SpecParser {
             (root.fields["config"] as? VegaValue.Obj)?.fields?.get("events"),
             "$.config.events",
           ),
+        usermeta = parseUsermeta(root.fields["usermeta"]),
       )
 
-    reportUnsupportedTopLevel(root)
     reportNothingToDraw(root, spec)
     return ParsedSpec(spec, diagnostics.diagnostics)
   }
@@ -1179,23 +1179,26 @@ public class SpecParser {
   // ---- top level ------------------------------------------------------------
 
   /**
-   * Reports specification sections the runtime does not implement.
+   * `usermeta` — metadata for the **host**, kept rather than reported.
    *
-   * Silence here would be the worst outcome: a chart with a title or a layout would render without
-   * it and look merely wrong rather than unsupported.
+   * This used to be the sole entry in a `reportUnsupportedTopLevel` table: one `usermeta is
+   * ignored` warning per compile, whatever the block held, and nowhere for its content to go. Which
+   * made the diagnostic the whole of the feature — a document carrying supplementary data for the
+   * host to read lost it unconditionally and was told so. See [VegaSpec.usermeta].
+   *
+   * Upstream's type is an object. A `usermeta` that is anything else is reported rather than
+   * coerced, because a host reading it back by key would find nothing and have no way to know why.
    */
-  private fun reportUnsupportedTopLevel(root: VegaValue.Obj) {
-    val unsupported = mapOf("usermeta" to "usermeta is ignored")
-    for ((key, reason) in unsupported) {
-      val value = root.fields[key] ?: continue
-      val empty = value is VegaValue.Arr && value.values.isEmpty()
-      if (empty) continue
-      diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "$reason; '$key' was ignored",
-        jsonPath = "$.$key",
-      )
-    }
+  private fun parseUsermeta(value: VegaValue?): Map<String, VegaValue>? {
+    if (value == null) return null
+    if (value is VegaValue.Obj) return value.fields
+    diagnostics.warn(
+      DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+      "'usermeta' must be an object; it is carried through to the host unread, and a " +
+        "${value::class.simpleName} cannot be read back by key, so it was dropped",
+      jsonPath = "$.usermeta",
+    )
+    return null
   }
 
   // ---- signals --------------------------------------------------------------

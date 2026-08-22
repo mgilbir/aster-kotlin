@@ -36,6 +36,19 @@ section here does not get released.
   Vega-Lite specification handed to the Vega parser — previously silent —
   legible: it reads `mark, encoding`. (#57)
 
+### Added
+
+- **`usermeta` reaches the host**, as `VegaSpec.usermeta` and so as
+  `CompiledSpec.spec?.usermeta`, on Kotlin and Swift alike. It was previously
+  discarded with one `usermeta is ignored` warning per compile, whatever it
+  carried — so the diagnostic was the whole of the feature, and a document
+  carrying supplementary data for the host to consume lost it unconditionally.
+  Absent is null and `{}` is an empty map; a non-object `usermeta` is reported
+  and dropped. Vega-Lite already carried it onto the Vega it emits, so a
+  document in either grammar arrives with it intact. `VegaSpec.init` and
+  `doCopy` gain a parameter, which is a new Obj-C signature — recorded in
+  `foreign-api.txt`. (#64)
+
 ## 0.1.0
 
 First release.

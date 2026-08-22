@@ -604,6 +604,45 @@ final class ChartSessionTests: XCTestCase {
     XCTAssertNil(session.scene)
     XCTAssertNotNil(session.failure, "a failure a host can put in front of a reader")
   }
+
+  /// `usermeta` reaches the host, from either grammar.
+  ///
+  /// It used to reach nobody: the Vega parser dropped it with a warning, so the only property whose
+  /// purpose is to survive compilation did not. And a Swift host had no path to it even once the
+  /// parser kept it, because `ChartSession` publishes what a host reads and did not publish this —
+  /// the same shape of gap as a capability that exists for Kotlin alone.
+  ///
+  /// Both grammars are asserted because a Vega-Lite document loses it in two places otherwise: the
+  /// Vega-Lite compiler has to carry it onto the Vega it emits, and the Vega parser has to keep it.
+  func testUsermetaReachesTheHostFromEitherGrammar() async {
+    let session = ChartSession()
+
+    session.load(
+      specification: specification.replacingOccurrences(
+        of: "\"width\": 200", with: "\"usermeta\": {\"source\": \"diary\"}, \"width\": 200"))
+    await session.settle()
+    XCTAssertEqual(
+      VegaValueKt.asString(session.usermeta?["source"] ?? VegaValueNull.shared), "diary")
+
+    session.load(
+      specification: """
+        {"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+         "usermeta": {"source": "diary"},
+         "data": {"values": [{"c": "a", "v": 30}]},
+         "mark": "bar",
+         "encoding": {"x": {"field": "c", "type": "nominal"},
+                      "y": {"field": "v", "type": "quantitative"}}}
+        """)
+    await session.settle()
+    XCTAssertEqual(session.grammar, .vegaLite)
+    XCTAssertEqual(
+      VegaValueKt.asString(session.usermeta?["source"] ?? VegaValueNull.shared), "diary")
+
+    // A document that carries none says none, rather than keeping the last one's.
+    session.load(specification: specification)
+    await session.settle()
+    XCTAssertNil(session.usermeta)
+  }
 }
 
 /// The arithmetic a host might have to repeat, and therefore should not have to.

@@ -4529,13 +4529,13 @@ VegaSpec.background
 VegaSpec.data
 VegaSpec.description()
 VegaSpec.description_
-VegaSpec.doCopy(width:height:padding:autosize:background:frameConfig:events:signals:data:scales:axes:legends:title:layout:marks:projections:encode:description:styleAboveDefaults:)
+VegaSpec.doCopy(width:height:padding:autosize:background:frameConfig:events:signals:data:scales:axes:legends:title:layout:marks:projections:encode:description:styleAboveDefaults:usermeta:)
 VegaSpec.encode
 VegaSpec.events
 VegaSpec.frameConfig
 VegaSpec.hash()
 VegaSpec.height
-VegaSpec.init(width:height:padding:autosize:background:frameConfig:events:signals:data:scales:axes:legends:title:layout:marks:projections:encode:description:styleAboveDefaults:)
+VegaSpec.init(width:height:padding:autosize:background:frameConfig:events:signals:data:scales:axes:legends:title:layout:marks:projections:encode:description:styleAboveDefaults:usermeta:)
 VegaSpec.isEqual(_:)
 VegaSpec.layout
 VegaSpec.legends
@@ -4546,6 +4546,7 @@ VegaSpec.scales
 VegaSpec.signals
 VegaSpec.styleAboveDefaults
 VegaSpec.title
+VegaSpec.usermeta
 VegaSpec.width
 VegaSpecException
 VegaSpecException.diagnostic

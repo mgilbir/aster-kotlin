@@ -496,4 +496,46 @@ class UnhandledPropertiesTest {
       )
     }
   }
+
+  /**
+   * `usermeta` reaches the host instead of being reported at it.
+   *
+   * It used to be the sole entry in a table of unsupported top-level sections: one `usermeta is
+   * ignored` warning per compile, whatever the block held, and no field on `VegaSpec` to hold it.
+   * So a document carrying supplementary data for the host — the case upstream's schema describes,
+   * "optional metadata that will be passed to Vega" — lost it unconditionally, and all a host
+   * learned was that something had gone.
+   *
+   * The three states are asserted together because they are three different statements: absent is
+   * null, `{}` is an empty map, and content is content. A host reading absent and empty as one
+   * cannot tell a document that carries no metadata from one whose metadata was filtered to
+   * nothing.
+   */
+  @Test
+  fun `usermeta is carried to the host, and a non-object one is reported`() {
+    val absent = SpecParser().parseJson(spec(""""width": 100"""))
+    assertEquals(null, absent.spec!!.usermeta)
+    assertEquals(emptyList<String>(), ignored(spec(""""width": 100""")))
+
+    val empty = SpecParser().parseJson(spec(""""usermeta": {}"""))
+    assertEquals(emptyMap<String, VegaValue>(), empty.spec!!.usermeta)
+    assertEquals(emptyList<String>(), ignored(spec(""""usermeta": {}""")))
+
+    val carried =
+      SpecParser()
+        .parseJson(spec(""""usermeta": {"table": [{"c": "a", "v": 1}], "source": "diary"}"""))
+    assertEquals(emptyList<String>(), ignored(spec(""""usermeta": {"source": "diary"}""")))
+    val meta = carried.spec!!.usermeta!!
+    assertEquals(setOf("table", "source"), meta.keys)
+    assertEquals(VegaValue.Str("diary"), meta["source"])
+    // Nested content arrives whole, which is the point of carrying the value rather than a summary.
+    assertEquals(1, (meta["table"] as VegaValue.Arr).values.size)
+
+    // Upstream's type is an object. Anything else cannot be read back by key, so it is reported
+    // rather than coerced into something a host would look in and find nothing.
+    val wrong = diagnostics(spec(""""usermeta": [1, 2]""")).single()
+    assertEquals(DiagnosticCodes.PARSE_UNKNOWN_PROPERTY, wrong.code)
+    assertTrue("must be an object" in wrong.message, wrong.message)
+    assertEquals(null, SpecParser().parseJson(spec(""""usermeta": [1, 2]""")).spec!!.usermeta)
+  }
 }

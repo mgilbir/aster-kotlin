@@ -484,6 +484,32 @@ not from the chart view's own geometry: a chart sized to its container changes i
 view's aspect ratio follows the scene, and a width read back from that view can oscillate. That loop is
 why it is not wired up automatically.
 
+## Metadata a document carries for you
+
+`usermeta` is the one top-level property whose whole purpose is to survive compilation — upstream's
+schema calls it "optional metadata that will be passed to Vega" — and nothing in the engine reads it.
+It is how whoever wrote the chart hands the app something the grammar has no channel for: a table of
+the values behind marks that carry no accessible text of their own, a version to branch on, an
+identifier to log against.
+
+```kotlin
+val compiled = controller.setSpec(specificationFromServer)
+val source = compiled.spec?.usermeta?.get("source")?.asString()
+```
+
+```swift
+let source = session.usermeta?["source"]
+```
+
+Null when the document has none, and an **empty map** when it wrote `{}` — those are two different
+statements and reading them as one loses the difference between a document that carries no metadata
+and one whose metadata was filtered to nothing. A `usermeta` that is not an object is reported and
+dropped, since a host reading it back by key would otherwise find nothing and have no way to know
+why.
+
+Vega-Lite carries it through to the Vega it emits, so a document written in either grammar arrives
+with it intact.
+
 ## Time zone example
 
 A chart of days needs to know which zone the days are in, and on a handset that is not always the

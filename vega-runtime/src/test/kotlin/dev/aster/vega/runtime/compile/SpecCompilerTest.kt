@@ -2,11 +2,13 @@ package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticSeverity
+import dev.aster.vega.model.VegaValue
 import dev.aster.vega.scene.PathNode
 import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.RuleNode
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.flatten
+import dev.aster.vegalite.VegaLiteInput
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -605,5 +607,39 @@ class SpecCompilerTest {
       compile(minimalBar).diagnostics.any { it.code == DiagnosticCodes.PARSE_NOTHING_TO_DRAW },
       compile(minimalBar).diagnostics.toString(),
     )
+  }
+
+  /**
+   * A host reads `usermeta` off the compiled chart, in either grammar.
+   *
+   * Asserted through `compileJson` and through `VegaLiteInput.toVega` before it, because the round
+   * trip is the case that matters: metadata is written by whoever wrote the chart, and a chart
+   * written in Vega-Lite used to lose it twice over — the Vega-Lite compiler carried it onto the
+   * emitted Vega (upstream's rule, and already tested there) and the Vega parser then threw it away
+   * with a warning.
+   *
+   * `CompiledSpec.spec` is the parsed specification, so this needs no second field on the compiled
+   * result to duplicate and keep in step.
+   */
+  @Test
+  fun `usermeta reaches a host off the compiled chart, from either grammar`() {
+    val vega = compile(minimalBar.replaceFirst("{", """{"usermeta": {"source": "diary"},"""))
+    assertEquals(VegaValue.Str("diary"), vega.spec!!.usermeta!!["source"])
+    assertTrue(
+      vega.diagnostics.none { it.severity >= DiagnosticSeverity.WARNING },
+      vega.diagnostics.toString(),
+    )
+
+    val converted =
+      VegaLiteInput.toVega(
+        """
+        {"usermeta": {"source": "diary"}, "data": {"values": [{"a": 1}]},
+         "mark": "bar", "encoding": {"x": {"field": "a", "type": "quantitative"}}}
+        """
+          .trimIndent()
+      )
+    assertTrue(converted.wasVegaLite)
+    val fromVegaLite = compile(converted.vegaJson!!)
+    assertEquals(VegaValue.Str("diary"), fromVegaLite.spec!!.usermeta!!["source"])
   }
 }

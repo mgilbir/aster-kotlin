@@ -5702,6 +5702,32 @@ and no marks, so three assertions of the form "this fragment produces no diagnos
 resting on a document that was not a chart. It has a mark now, which is what those assertions were
 always claiming to be about.
 
+### `usermeta` reaches the host it was written for
+
+`usermeta` is the one top-level property whose whole purpose is to survive compilation. Upstream's
+schema says so — "optional metadata that will be passed to Vega" — and the Vega-Lite compiler on this
+side already carried it onto the Vega it emits, last property, matching upstream.
+
+The Vega parser then threw it away. It was the sole entry in a `reportUnsupportedTopLevel` table:
+`usermeta is ignored`, one warning per compile whatever the block held, and no field on `VegaSpec` for
+its content to live in. So the diagnostic *was* the feature. A document carrying supplementary data
+for the host to consume — the case the property exists for — lost it unconditionally, and the only
+thing a host learned was that something had gone.
+
+It is now `VegaSpec.usermeta`, read from a compiled chart as `CompiledSpec.spec?.usermeta` on both
+hosts. `CompiledSpec.spec` is already the parsed specification, so this needs no second field on the
+compiled result to duplicate and keep in step.
+
+Three states, not two. Absent is null and `{}` is an empty map, because a host reading those as one
+cannot tell a document that carries no metadata from one whose metadata was filtered to nothing. And
+upstream's type is an object, so a `usermeta` that is anything else is reported rather than coerced
+into something a host would look in and find empty.
+
+The boundary moved: `VegaSpec.init` and `doCopy` gained a parameter, which is source-compatible in
+Kotlin and a new signature in Obj-C. `foreign-api.txt` records it, which is what that snapshot is for.
+Nothing constructs a `VegaSpec` from Swift — hosts read one — so the change is additive in practice
+and shown rather than assumed.
+
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
 PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.
