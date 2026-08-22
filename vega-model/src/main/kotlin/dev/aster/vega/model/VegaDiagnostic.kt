@@ -68,6 +68,17 @@ public object DiagnosticCodes {
   /** A message a specification asked for itself, through `warn()`, `info()` or `debug()`. */
   public const val EXPRESSION_LOG: String = "VEGA_EXPRESSION_LOG"
 
+  /**
+   * A specification read `containerSize()` and no host size was supplied.
+   *
+   * Informational: `[null, null]` is what a browser answers outside a container and so what
+   * upstream answers, and the chart is exactly the one upstream draws. What the code cannot say for
+   * itself is that a specification which branches on its container took the "no container" arm,
+   * which is the one thing a host looking at an unexpected layout needs told.
+   */
+  public const val EXPRESSION_CONTAINER_SIZE_UNANSWERED: String =
+    "VEGA_EXPRESSION_CONTAINER_SIZE_UNANSWERED"
+
   public const val SCALE_UNSUPPORTED_TYPE: String = "VEGA_SCALE_UNSUPPORTED_TYPE"
   public const val SCALE_INVALID_DOMAIN: String = "VEGA_SCALE_INVALID_DOMAIN"
 

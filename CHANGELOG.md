@@ -38,6 +38,16 @@ section here does not get released.
 
 ### Added
 
+- **A specification that reads `containerSize()` with no host size supplied now
+  says so**, per dimension, as `EXPRESSION_CONTAINER_SIZE_UNANSWERED` at INFO.
+  The answer is unchanged — `[null, null]` is what a browser gives outside a
+  container and what upstream gives headless — but a document branching on a
+  breakpoint used to take its "no container" arm with nothing in the diagnostics
+  channel to explain the layout. `CompiledSpec.readsContainerSize` publishes the
+  same fact, so a host can decide whether a resize is worth a recompile at all;
+  it is false for any chart that declares its own width and height.
+  `Expression.functionDependencies` is the new seam behind both. (#63)
+
 - **`usermeta` reaches the host**, as `VegaSpec.usermeta` and so as
   `CompiledSpec.spec?.usermeta`, on Kotlin and Swift alike. It was previously
   discarded with one `usermeta is ignored` warning per compile, whatever it

@@ -39,6 +39,9 @@ public class ParsedExpression(
   override val writtenDatasets: Set<String>
     get() = deferred.written
 
+  override val functionDependencies: Set<String>
+    get() = deferred.functions
+
   override fun evaluate(scope: ExpressionScope): VegaValue = evaluator.evaluate(ast, scope)
 
   /**
@@ -89,6 +92,7 @@ public class ParsedExpression(
     val scales: Set<String>,
     val unnamedScale: Boolean,
     val written: Set<String>,
+    val functions: Set<String>,
   )
 
   /**
@@ -104,10 +108,14 @@ public class ParsedExpression(
     val written = mutableSetOf<String>()
     var unnamedDataset = false
     var unnamedScale = false
+    // Collected in this walk rather than in one of its own: it already visits every `Call` node and
+    // reads the callee's name, so the extra fact is free where a second traversal would not be.
+    val functions = mutableSetOf<String>()
     ast.walk { node ->
       if (node !is Node.Call) return@walk
       val callee = node.callee
       if (callee !is Node.Identifier) return@walk
+      functions.add(callee.name)
       val into =
         when (callee.name) {
           in DATA_FUNCTIONS -> datasets
@@ -133,7 +141,7 @@ public class ParsedExpression(
         else -> unnamedScale = true
       }
     }
-    return Deferred(datasets, unnamedDataset, scales, unnamedScale, written)
+    return Deferred(datasets, unnamedDataset, scales, unnamedScale, written, functions)
   }
 
   private companion object {

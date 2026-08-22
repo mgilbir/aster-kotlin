@@ -5728,6 +5728,42 @@ Kotlin and a new signature in Obj-C. `foreign-api.txt` records it, which is what
 Nothing constructs a `VegaSpec` from Swift — hosts read one — so the change is additive in practice
 and shown rather than assumed.
 
+### A question asked and not answered
+
+`containerSize()` is `[null, null]` with no host size. That is upstream's answer, not an invention —
+verified in a `renderer: 'none'` view, which is the configuration every differential fixture is
+rendered in — and the `container-size` fixture depends on it. So the answer had to stay.
+
+The silence around it did not. A specification that sizes itself from its container, or branches on a
+breakpoint to change a layout, quietly takes its "no container" arm until a host says how much room
+there is, and there was nothing anywhere to explain the layout that came out.
+`EXPRESSION_CONTAINER_SIZE_UNANSWERED`, at INFO — the chart is exactly the one upstream draws, and
+the missing fact is only that a question was asked and nobody answered it. Per dimension, because a
+host that knows only its width supplies only its width and `containerSize()[1]` is then still null.
+
+**How the compile knows.** `width: "container"` does not reach the engine as a property; Vega-Lite
+turns it into a signal whose `update` calls `containerSize()`, and a specification may call it from an
+encode channel or a transform parameter just as well. So the fact has to come from the expressions,
+and it comes from a new one: `Expression.functionDependencies`, the names actually called. Every other
+dependency set on that interface answers "what has to exist before this runs"; this one answers "was
+this capability asked for". It is collected in the walk `collectDeferred` already makes over every
+`Call` node, so it costs nothing where a second traversal would.
+
+`SpecCompiler` observes it with a decorator *inside* the expression cache, so each distinct expression
+is examined once per compile rather than once per datum. A callback on the function table was the
+other option and was rejected: the table is shared for the default locale with no host size
+precisely so a chart pays nothing for a feature it does not use, and an observer would build 119
+closures per compile to learn one boolean.
+
+The probe rejects on the text first — the identifier has to appear literally for a call to exist,
+there being no `eval` in a Vega expression — and only then confirms against the tree. That second step
+is the one that matters: `datum.containerSize` and a label with the word in it are **not** calls, and a
+false diagnostic is indistinguishable from a real one to a host routing by severity.
+
+The same fact is published as `CompiledSpec.readsContainerSize`, because it answers a question a host
+asks on every rotation and every split-view drag: is a resize worth a recompile at all? False for the
+overwhelming majority of charts, which declare their own width and height.
+
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
 PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.

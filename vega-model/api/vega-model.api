@@ -40,6 +40,7 @@ public final class dev/aster/vega/model/DelimitedText {
 public final class dev/aster/vega/model/DiagnosticCodes {
 	public static final field EXPORT_IMAGE_UNRESOLVED Ljava/lang/String;
 	public static final field EXPORT_UNSUPPORTED_OPERATION Ljava/lang/String;
+	public static final field EXPRESSION_CONTAINER_SIZE_UNANSWERED Ljava/lang/String;
 	public static final field EXPRESSION_LOG Ljava/lang/String;
 	public static final field EXPRESSION_PARSE_ERROR Ljava/lang/String;
 	public static final field EXPRESSION_UNSUPPORTED_FUNCTION Ljava/lang/String;

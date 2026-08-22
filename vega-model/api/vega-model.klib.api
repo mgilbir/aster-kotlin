@@ -2662,6 +2662,8 @@ final object dev.aster.vega.model/DiagnosticCodes { // dev.aster.vega.model/Diag
         final fun <get-EXPORT_IMAGE_UNRESOLVED>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.EXPORT_IMAGE_UNRESOLVED.<get-EXPORT_IMAGE_UNRESOLVED>|<get-EXPORT_IMAGE_UNRESOLVED>(){}[0]
     final const val EXPORT_UNSUPPORTED_OPERATION // dev.aster.vega.model/DiagnosticCodes.EXPORT_UNSUPPORTED_OPERATION|{}EXPORT_UNSUPPORTED_OPERATION[0]
         final fun <get-EXPORT_UNSUPPORTED_OPERATION>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.EXPORT_UNSUPPORTED_OPERATION.<get-EXPORT_UNSUPPORTED_OPERATION>|<get-EXPORT_UNSUPPORTED_OPERATION>(){}[0]
+    final const val EXPRESSION_CONTAINER_SIZE_UNANSWERED // dev.aster.vega.model/DiagnosticCodes.EXPRESSION_CONTAINER_SIZE_UNANSWERED|{}EXPRESSION_CONTAINER_SIZE_UNANSWERED[0]
+        final fun <get-EXPRESSION_CONTAINER_SIZE_UNANSWERED>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.EXPRESSION_CONTAINER_SIZE_UNANSWERED.<get-EXPRESSION_CONTAINER_SIZE_UNANSWERED>|<get-EXPRESSION_CONTAINER_SIZE_UNANSWERED>(){}[0]
     final const val EXPRESSION_LOG // dev.aster.vega.model/DiagnosticCodes.EXPRESSION_LOG|{}EXPRESSION_LOG[0]
         final fun <get-EXPRESSION_LOG>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.EXPRESSION_LOG.<get-EXPRESSION_LOG>|<get-EXPRESSION_LOG>(){}[0]
     final const val EXPRESSION_PARSE_ERROR // dev.aster.vega.model/DiagnosticCodes.EXPRESSION_PARSE_ERROR|{}EXPRESSION_PARSE_ERROR[0]

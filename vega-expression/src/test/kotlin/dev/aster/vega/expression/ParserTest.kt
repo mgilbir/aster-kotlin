@@ -164,6 +164,29 @@ class ParserTest {
     assertEquals(setOf("threshold"), compiled("datum.v > threshold").signalDependencies)
   }
 
+  /**
+   * The functions an expression **calls**, by the name at the call site.
+   *
+   * Every other dependency set answers "what has to exist before this runs". This one answers "was
+   * this capability asked for", which is how a compile can report that a specification read
+   * `containerSize()` and nobody answered it. So the cases that matter are the near misses: a field
+   * of that name, a signal of that name, and the word inside a string are none of them calls, and
+   * reading any of them as one produces a diagnostic a host cannot tell from a real gap.
+   */
+  @Test
+  fun `function dependencies are the names actually called`() {
+    assertEquals(setOf("containerSize"), compiled("containerSize()[0]").functionDependencies)
+    assertEquals(
+      setOf("isFinite", "containerSize"),
+      compiled("isFinite(containerSize()[0]) ? containerSize()[0] : 200").functionDependencies,
+    )
+    assertEquals(emptySet<String>(), compiled("datum.containerSize").functionDependencies)
+    assertEquals(emptySet<String>(), compiled("containerSize + 1").functionDependencies)
+    assertEquals(emptySet<String>(), compiled("'containerSize()'").functionDependencies)
+    // A member call names the property, not the object.
+    assertEquals(setOf("abs"), compiled("abs(datum.v)").functionDependencies)
+  }
+
   @Test
   fun `a signal used as a dynamic field is still a dependency`() {
     assertEquals(setOf("chosenField"), compiled("datum[chosenField]").signalDependencies)

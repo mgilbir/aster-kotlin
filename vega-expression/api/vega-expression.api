@@ -33,6 +33,7 @@ public abstract interface class dev/aster/vega/expression/Expression {
 	public abstract fun evaluate (Ldev/aster/vega/expression/ExpressionScope;)Ldev/aster/vega/model/VegaValue;
 	public abstract fun getDataDependencies ()Ljava/util/Set;
 	public abstract fun getFieldDependencies ()Ljava/util/Set;
+	public abstract fun getFunctionDependencies ()Ljava/util/Set;
 	public abstract fun getReadsUnnamedDataset ()Z
 	public abstract fun getReadsUnnamedScale ()Z
 	public abstract fun getScaleDependencies ()Ljava/util/Set;
@@ -363,6 +364,7 @@ public final class dev/aster/vega/expression/ParsedExpression : dev/aster/vega/e
 	public final fun getAst ()Ldev/aster/vega/expression/Node;
 	public fun getDataDependencies ()Ljava/util/Set;
 	public fun getFieldDependencies ()Ljava/util/Set;
+	public fun getFunctionDependencies ()Ljava/util/Set;
 	public fun getReadsUnnamedDataset ()Z
 	public fun getReadsUnnamedScale ()Z
 	public fun getScaleDependencies ()Ljava/util/Set;

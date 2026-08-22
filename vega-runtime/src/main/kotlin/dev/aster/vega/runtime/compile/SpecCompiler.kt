@@ -5,6 +5,7 @@ import dev.aster.vega.expression.CachingExpressionCompiler
 import dev.aster.vega.expression.Clock
 import dev.aster.vega.expression.Evaluator
 import dev.aster.vega.expression.ExpressionCompiler
+import dev.aster.vega.expression.ExpressionResult
 import dev.aster.vega.expression.Functions
 import dev.aster.vega.expression.RandomStream
 import dev.aster.vega.expression.VegaExpressionCompiler
@@ -71,6 +72,24 @@ public data class CompiledSpec(
    * specification with no `hover` blocks, which is most of them.
    */
   val hoverVariants: Map<dev.aster.vega.scene.SceneNodeId, SceneNode> = emptyMap(),
+  /**
+   * Whether any expression in this specification **called** `containerSize()`.
+   *
+   * The one compile input a host has to keep answering: a locale and a time zone are settled once,
+   * where the room a chart has changes with every rotation and every split-view drag. So a host
+   * that follows its layout needs to know whether the document cares — and that cannot be read off
+   * the text, since `width: "container"` reaches the engine as a signal whose `update` calls this
+   * function, and a specification may call it from an encode channel or a transform parameter just
+   * as well.
+   *
+   * False for the overwhelming majority of charts, which declare a width and a height. A host with
+   * a false here can ignore a resize entirely rather than recompiling to find out that nothing
+   * moved.
+   *
+   * Exact rather than approximate: a `datum.containerSize` field, or a label with the word in it,
+   * is not a call. See `SpecCompiler.ContainerSizeProbe`.
+   */
+  val readsContainerSize: Boolean = false,
 ) {
   public val isUsable: Boolean
     get() = scene != null
@@ -381,19 +400,25 @@ public class SpecCompiler(
     // `timeFormat(datum.t, '%b %Y')` is how most charts label a derived column.
     // The container size goes the same way: `width: "container"` compiles to a signal that reads
     // `containerSize()`, so the host's answer arrives through the function table like the locale's.
-    val expressions =
-      CachingExpressionCompiler(
+    // A zero or absent dimension is *no* answer for that dimension, which is how a host that knows
+    // only its width says only its width. Hoisted, because the diagnostic below has to name the
+    // dimension that went unanswered and cannot recompute it from `containerSize` alone.
+    val answeredWidth = containerSize?.width?.takeIf { it > 0.0 }
+    val answeredHeight = containerSize?.height?.takeIf { it > 0.0 }
+    val containerSizeProbe =
+      ContainerSizeProbe(
         VegaExpressionCompiler(
           Evaluator(
             Functions.functionsFor(
               locale,
-              containerWidth = containerSize?.width?.takeIf { it > 0.0 },
-              containerHeight = containerSize?.height?.takeIf { it > 0.0 },
+              containerWidth = answeredWidth,
+              containerHeight = answeredHeight,
               timeZone = timeZone,
             )
           )
         )
       )
+    val expressions = CachingExpressionCompiler(containerSizeProbe)
 
     // Datasets, scales and signals are resolved in **one dependency order**, not in three phases.
     //
@@ -620,6 +645,14 @@ public class SpecCompiler(
     val content = frame(spec, scope.nodes, plot, root, ids, diagnostics, expressions)
 
     val scene = layout(spec, scope.bounds, content, plot, ids, diagnostics, fit)
+    // Reported after everything has been compiled, because an expression reading the container size
+    // can be anywhere: a signal's `update`, an encode channel, a transform parameter.
+    reportUnansweredContainerSize(
+      containerSizeProbe.read,
+      answeredWidth,
+      answeredHeight,
+      diagnostics,
+    )
     return Pass(
       CompiledSpec(
         scene,
@@ -628,10 +661,84 @@ public class SpecCompiler(
         diagnostics.diagnostics,
         spec,
         scopeCompiler.hoverVariants.toMap(),
+        readsContainerSize = containerSizeProbe.read,
       ),
       scope.bounds,
       plot,
     )
+  }
+
+  /**
+   * Says so when a specification asked its container how big it is and nobody answered.
+   *
+   * `containerSize()` is `[null, null]` with no host size, which is what a browser answers outside
+   * a container and therefore what upstream answers — verified in a `renderer: 'none'` view, the
+   * configuration every differential fixture is rendered in. So the *answer* is not the problem and
+   * must not change: the fixtures depend on it, `container-size` among them.
+   *
+   * The silence was. A specification that sizes itself from its container, or branches on a
+   * breakpoint, takes its "no container" arm until a host says how much room there is, and there
+   * was nothing anywhere to explain the layout that came out. This is INFO for exactly that reason
+   * — the chart is the one upstream draws, and the fact a reader of diagnostics needs is that a
+   * question was asked and not answered.
+   *
+   * Per dimension, because a host that knows only its width supplies only its width and then
+   * `containerSize()[1]` is still null. A zero counts as no answer, matching what is handed to the
+   * function table.
+   */
+  private fun reportUnansweredContainerSize(
+    read: Boolean,
+    width: Double?,
+    height: Double?,
+    diagnostics: DiagnosticCollector,
+  ) {
+    if (!read) return
+    val unanswered =
+      listOfNotNull("width".takeIf { width == null }, "height".takeIf { height == null })
+    if (unanswered.isEmpty()) return
+    diagnostics.info(
+      DiagnosticCodes.EXPRESSION_CONTAINER_SIZE_UNANSWERED,
+      "This specification reads containerSize() and no host ${unanswered.joinToString(" or ")} " +
+        "was supplied, so that answers null — which is what a browser answers outside a container " +
+        "and what upstream answers headless. A specification that sizes itself from its container, " +
+        "or branches on a breakpoint, therefore takes its 'no container' arm. Set containerSize on " +
+        "the compiler, on VegaChartController, or on ChartSession to answer it.",
+    )
+  }
+
+  /**
+   * Notices whether any expression in one compile **calls** `containerSize()`.
+   *
+   * A decorator rather than a callback on the function table, and that is a deliberate trade. The
+   * table is built once and shared for the default locale with no host size — `Functions.functions`
+   * — precisely so that a chart pays nothing for a feature it does not use, and handing it an
+   * observer would build 119 closures per compile to learn one boolean.
+   *
+   * Wrapped *inside* [CachingExpressionCompiler], so each distinct expression is examined once per
+   * compile rather than once per evaluation — an encode expression runs once per datum.
+   *
+   * The text is rejected first. The identifier has to appear literally for a call to exist, there
+   * being no `eval` in a Vega expression, so a miss is proof and costs one substring scan of a
+   * short string. Only a hit walks the tree, and then the answer is exact: `datum.containerSize`
+   * and a label that happens to contain the word are **not** calls. That precision is the point — a
+   * false diagnostic is indistinguishable from a real one to a host routing by severity.
+   */
+  private class ContainerSizeProbe(private val delegate: ExpressionCompiler) : ExpressionCompiler {
+    var read: Boolean = false
+      private set
+
+    override fun compile(source: String): ExpressionResult {
+      val result = delegate.compile(source)
+      if (!read && source.contains(CONTAINER_SIZE)) {
+        val expression = (result as? ExpressionResult.Compiled)?.expression
+        if (expression != null && CONTAINER_SIZE in expression.functionDependencies) read = true
+      }
+      return result
+    }
+
+    private companion object {
+      const val CONTAINER_SIZE = "containerSize"
+    }
   }
 
   /**
