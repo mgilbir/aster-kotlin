@@ -408,6 +408,45 @@ final class ChartSessionTests: XCTestCase {
     XCTAssertTrue(localised.contains { $0.contains("mei 2026") }, "in Dutch: \(localised)")
   }
 
+  /// A Vega-Lite document that will not compile is reported as one, not reinterpreted as Vega.
+  ///
+  /// The session used to fall back to the text as written when Vega-Lite compilation produced
+  /// nothing, on the theory that the runtime would report on it. It does not: the unconverted text
+  /// goes to a parser that only understands Vega, where `mark` and `encoding` are unknown properties
+  /// and `marks` is absent — so a reader got a complaint about the wrong grammar, or an empty chart.
+  ///
+  /// The construct here is one the compiler refuses by name: a `layer` containing an `hconcat`.
+  /// `VegaLiteTests` already asserts that `toVega` answers nil and says why; this is about what the
+  /// session does with that.
+  func testAVegaLiteDocumentThatWillNotCompileIsReportedAsOne() async {
+    let session = ChartSession()
+    session.load(
+      specification: """
+        {"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+         "data": {"values": [{"a": 1}]},
+         "layer": [{"hconcat": [{"mark": "bar",
+           "encoding": {"x": {"field": "a", "type": "quantitative"}}}]}]}
+        """)
+    await session.settle()
+
+    XCTAssertEqual(session.grammar, .vegaLite, "it was read as Vega-Lite, and stays read that way")
+    XCTAssertNil(session.scene, "no chart, rather than a chart of the wrong grammar's leftovers")
+    XCTAssertNotNil(session.failure, "a host has to be able to put something in front of a reader")
+    XCTAssertFalse(session.vegaLiteDiagnostics.isEmpty)
+    // The **conversion**'s own report, and in the channel a host that shows one channel is showing.
+    XCTAssertEqual(
+      session.diagnostics.map { $0.message }, session.vegaLiteDiagnostics.map { $0.message },
+      "the diagnostics are the conversion's, not a second opinion from the Vega parser")
+    XCTAssertFalse(session.loading)
+
+    // The other half: text that is not Vega-Lite at all still reaches the Vega parser untouched.
+    session.load(specification: specification)
+    await session.settle()
+    XCTAssertEqual(session.grammar, .vega)
+    XCTAssertNotNil(session.scene)
+    XCTAssertNil(session.failure)
+  }
+
   /// `settle()` waits for work queued **during** a compile, not only for the compile.
   ///
   /// Only the compile was ever held. Everything `serialised` deferred — a container-size recompile, a

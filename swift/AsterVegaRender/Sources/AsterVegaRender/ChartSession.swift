@@ -402,9 +402,34 @@ public final class ChartSession {
         )
       self.grammar = converted.wasVegaLite ? .vegaLite : .vega
       self.vegaLiteDiagnostics = converted.wasVegaLite ? converted.diagnostics : []
-      // Falling back to the text as written where Vega-Lite compilation produced nothing: the runtime
-      // will then report on it, which is a better failure than this layer inventing one.
-      let vega = converted.vegaJson ?? specification
+      // **Stop here** where Vega-Lite compilation produced nothing.
+      //
+      // This used to fall back to `specification` — the text as written — on the theory that the
+      // runtime would report on it and that beat inventing a failure. It does not: a document that
+      // Vega-Lite could not compile is then handed to a parser that only understands Vega, where its
+      // `mark` and `encoding` are unknown properties and its `marks` are absent, so what a reader
+      // gets is either a confusing complaint about the wrong grammar or an empty chart. The
+      // conversion error is the one true thing anybody knows at this point, and it is already in
+      // `converted.diagnostics`.
+      //
+      // A nil `vegaJson` means exactly this and nothing else: text that is not JSON, or JSON that is
+      // not Vega-Lite, comes back **unchanged** with `wasVegaLite` false, and goes on to the runtime
+      // as it always did.
+      guard let vega = converted.vegaJson else {
+        let fatal =
+          converted.diagnostics.first {
+            $0.severity == DiagnosticSeverity.fatal || $0.severity == DiagnosticSeverity.error
+          }
+        // Published as the chart's diagnostics too, not only as `vegaLiteDiagnostics`: a host that
+        // shows one channel is showing the one that says nothing about this.
+        self.diagnostics = converted.diagnostics
+        self.failure =
+          fatal?.message ?? "the Vega-Lite specification compiled to nothing"
+        // The chart on screen is left alone, as it is for any compile that produces no scene — a
+        // reader keeps what they were looking at, and `failure` says why it did not change.
+        self.loading = false
+        return
+      }
       // The engine's own off-thread compile, on its default dispatcher. This is the single-argument
       // overload, which exists because a Kotlin default argument does not cross the Obj-C boundary:
       // the two-argument form demands a `CoroutineDispatcher` that no exported symbol can produce, so

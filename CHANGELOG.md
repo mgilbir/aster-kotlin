@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A Vega-Lite document that will not compile is reported, not reinterpreted as
+  Vega.** `ChartSession` fell back to the unconverted text, which a parser that
+  only understands Vega then complained about in the wrong grammar's terms —
+  measured on a refused construct, three diagnostics about `data`, a missing
+  size and nothing to draw, a 0×0 scene published as the chart, and `failure`
+  nil. The conversion's own diagnostics are now the chart's, `failure` says why,
+  and the chart on screen is left alone. Text that is not Vega-Lite still reaches
+  the Vega parser untouched. (#61)
+
 - **A resize only recompiles a chart that asked for one, and no longer on the
   calling thread.** `VegaChartController.containerSize` recompiled
   unconditionally, so a host reporting its layout size on every resize paid a

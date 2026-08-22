@@ -5893,6 +5893,35 @@ it and not a queued touch.
 Setting `containerSize` from Swift is therefore no longer synchronous, and says so. It never reliably
 was.
 
+### A Vega-Lite document read as Vega after it had already failed
+
+`let vega = converted.vegaJson ?? specification`. Where Vega-Lite compilation produced nothing, the
+session handed the text **as written** to a controller that only understands Vega, on the stated
+theory that the runtime would then report on it and that this beat inventing a failure.
+
+Measured, on a `layer` containing an `hconcat` — a construct the compiler refuses by name, with a
+paragraph explaining why upstream rejects it. What a host actually got, with the fallback in place:
+
+- `'data' must be an array`
+- `This document declares nothing that draws: no 'marks', no 'axes', no 'legends' and no 'title' …
+  Its top-level keys are $schema, data, layer.`
+- `Specification declares no width or height; the surface is measured from its contents`
+
+— three complaints about the wrong grammar, a 0×0 empty scene published as the chart, and
+`failure` **nil**. So the session reported success for a document it had already decided it could not
+compile. The one true thing anybody knew at that point was sitting unread in
+`converted.diagnostics`.
+
+It stops there now: the conversion's own diagnostics become the chart's, `failure` carries the first
+of them a reader can act on, and the chart on screen is left alone, as it is for any compile that
+produces no scene. A nil `vegaJson` means exactly this and nothing else — text that is not JSON, or
+JSON that is not Vega-Lite, comes back unchanged with `wasVegaLite` false and goes on to the runtime
+as it always did, which is the half the test also pins.
+
+Worth noting how the old failure became legible: the second of those three diagnostics is
+`PARSE_NOTHING_TO_DRAW`, which did not exist until this stack. Before it, the fallback's answer to a
+broken Vega-Lite document was one complaint about `data` and an empty chart.
+
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
 PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.
