@@ -24,9 +24,27 @@ kotlin {
   // wrong one eventually. `assembleAsterVegaDebugXCFramework` builds it; `scripts/ios-demo.sh` runs
   // that before xcodebuild.
   //
-  // macOS stays out of it deliberately: the Swift package's tests point straight at
-  // `bin/macosArm64/debugFramework`, and adding a platform to an XCFramework does not change that
-  // path but does make the assembly task slower for every iOS build.
+  // **macOS is in the release XCFramework and out of the debug one**, and the asymmetry is the
+  // point.
+  //
+  // It used to be out of both, with the reason given here as speed: the Swift package's own tests
+  // point
+  // straight at `bin/macosArm64/debugFramework`, so nothing local needed a macOS slice and every
+  // iOS
+  // debug assembly would have paid for one. That reasoning holds for *development* and was wrong
+  // for
+  // what ships. The released `Package.swift` declares `platforms: [.macOS(.v13), .iOS(.v16)]` and
+  // its
+  // `AsterVegaRender` target imports `AsterVega`, so a consumer running `swift build` on a Mac —
+  // which
+  // is what a plain command-line build, an Xcode preview and a package-scheme hygiene gate all do —
+  // got `no such module 'AsterVega'` from 0.1.0. The iOS slices were fine; the platform the
+  // manifest
+  // also promised had nothing behind it.
+  //
+  // So the debug XCFramework stays iOS-only, and `scripts/ios-demo.sh` keeps its fast path, while
+  // the
+  // release one carries all three slices. `release.yml` asserts the slice list before it tags.
   val xcframework = XCFramework("AsterVega")
 
   listOf(iosArm64(), iosSimulatorArm64(), macosArm64()).forEach { target ->
@@ -47,7 +65,14 @@ kotlin {
       // which meant a specification pasted into the Android demo drew a chart and the same text
       // pasted into the iOS one could not be read at all. That is not a host restriction.
       export(project(":vega-lite"))
-      if (target.name != "macosArm64") xcframework.add(this)
+      // Debug: the two iOS slices, which is what the demo links. Release: those plus macOS, because
+      // that is the artefact a consumer's manifest resolves and its platforms include macOS.
+      if (
+        target.name != "macosArm64" ||
+          buildType == org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType.RELEASE
+      ) {
+        xcframework.add(this)
+      }
     }
   }
 
