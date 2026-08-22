@@ -103,6 +103,15 @@ section here does not get released.
 
 ### Added
 
+- **A host can register named font families with the Compose renderer**, through
+  `namedFontFamily` or `rememberVegaTextEngine(fontFamilies)`. The default
+  resolver matched the generic CSS keywords and nothing else, so a themed
+  specification naming a real face was drawn in the platform's default one — and
+  said nothing about it. The Apple and Android engines resolve a device family by
+  name; common Compose code cannot, so only a host holding the `FontFamily` can.
+  `ComposeTextEngine.unresolvedFontFamilies` names what went unresolved, a text
+  engine having no diagnostics channel of its own. (#66)
+
 - **`VegaChart(sizing = SceneSizing.Fill)`**, so `fit` has something to do. The
   composable appended `Modifier.size(scene.width.dp, scene.height.dp)`
   unconditionally, so a caller that bounded neither dimension got the scene's own

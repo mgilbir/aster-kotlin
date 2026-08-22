@@ -223,8 +223,14 @@ Keyboard input is the host's own modifier on both Compose renderers — `Modifie
 on iOS, wired with SwiftUI's `.onKeyPress`. The Android View translates keys itself, since a `View` owns
 its own focus and key handling.
 
-A host that ships its own face passes a resolver — `rememberVegaTextEngine { FontFamily(googleSansFlex) }`
-— and both the measurement and the drawing use it. The Android View takes the same seam as
+A host that ships its own face registers it **by name** —
+`rememberVegaTextEngine(mapOf("Google Sans Flex" to FontFamily(googleSansFlex)))` — or passes a resolver
+of its own, and both the measurement and the drawing use it. The default resolver knows the generic CSS
+keywords and nothing else, which is a real limit rather than an omission: common Compose code cannot
+reach an installed family, so only a host that already holds the `FontFamily` can map a name to one.
+A family nothing resolves is drawn in the platform's default face and named in
+`ComposeTextEngine.unresolvedFontFamilies`, since a text engine has no diagnostics channel to report it
+through. The Android View takes the same seam as
 `VegaChartView.fontResolver`, and on iOS a registered family resolves by name; `CoreTextTextEngine` and
 `ChartSession` take a `textScale` for the reader's text-size setting, which
 `DynamicTypeSize.chartTextScale` maps for a SwiftUI host.

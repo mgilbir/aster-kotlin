@@ -6052,6 +6052,36 @@ to pass anywhere, and it does something wherever there is room to do it in.
 the modifier chain: the scene's size in a 600×300 slot by default, the slot with `Fill`, and a caller's
 own `width` beating both. The last of those is the order, and it is now a test rather than a comment.
 
+### A face the chart asked for, drawn as whatever the platform had
+
+`genericFontFamily` matched eight strings — the CSS generics and their `ui-*` spellings — and answered
+null for everything else, which its own doc says means the platform's default face. So a themed
+specification naming a real installed family, or a family the host bundles, was drawn in the default
+one, and nothing said so.
+
+The asymmetry is what makes this the one renderer that needed work. `CoreTextFonts` resolves a family
+by font descriptor and `AndroidTextEngine` through `Typeface.create`, so a name that exists on the
+device is found on both of those. Common Compose code reaches neither: a `FontFamily` comes from a
+`Font` resource or a loaded typeface, so **only a host that already holds one** can map a name to it.
+That is why the answer is a registry rather than a lookup.
+
+`namedFontFamily(mapOf("Google Sans Flex" to FontFamily(…)))` is that registry, with
+`rememberVegaTextEngine(fontFamilies)` as the ergonomic form. Matched without regard to case, because a
+specification's `"Helvetica Neue"` and a host's `"helvetica neue"` are the same face and a chart should
+not turn on which was typed; and a comma-separated stack is read left to right as CSS reads it, so a
+registered name beats a generic written after it. It falls through to `genericFontFamily`, so
+registering nothing changes nothing.
+
+And the silence is closed the way the image resolver's is. A text engine has no diagnostics channel —
+it is handed to a compiler, not built by one — so `ComposeTextEngine.unresolvedFontFamilies` collects
+the names its resolver declined, while **measuring**, which is before anything is drawn. A well-formed
+stack never lands there: `"Helvetica Neue, Arial, sans-serif"` resolves on its last entry. What lands
+there is a name with nothing generic behind it, which is exactly the case that used to be invisible.
+
+The wrapper that records is what `DrawScopeTarget` is given, not the caller's own function, so the
+drawing resolves through the same path the measurement did. A wrapper only one side used would be a new
+way to have the defect this class exists to prevent.
+
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
 PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.

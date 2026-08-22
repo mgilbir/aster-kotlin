@@ -22,10 +22,13 @@ public final class dev/aster/vega/compose/mp/ComposeTextEngine : dev/aster/vega/
 	public fun ascentOf (Ldev/aster/vega/scene/TextStyle;)D
 	public fun defaultLineHeightOf (Ldev/aster/vega/scene/TextStyle;)D
 	public fun descentOf (Ldev/aster/vega/scene/TextStyle;)D
+	public final fun getUnresolvedFontFamilies ()Ljava/util/Set;
 }
 
 public final class dev/aster/vega/compose/mp/ComposeTextEngineKt {
 	public static final fun genericFontFamily (Ljava/lang/String;)Landroidx/compose/ui/text/font/FontFamily;
+	public static final fun namedFontFamily (Ljava/util/Map;)Lkotlin/jvm/functions/Function1;
+	public static final fun rememberVegaTextEngine (Ljava/util/Map;Landroidx/compose/runtime/Composer;I)Ldev/aster/vega/compose/mp/ComposeTextEngine;
 	public static final fun rememberVegaTextEngine (Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;II)Ldev/aster/vega/compose/mp/ComposeTextEngine;
 }
 

@@ -166,4 +166,67 @@ class ComposeTextEngineTest {
 
     assertTrue(spaced > plain + 8.0, "plain $plain spaced $spaced")
   }
+
+  /**
+   * A host's own face is found **by name**.
+   *
+   * The default resolver knows the generic CSS keywords and nothing else, so a themed specification
+   * naming a real family — the one the app bundles, the one its design system uses — was drawn in
+   * the platform's default face. The Apple and Android engines resolve an installed family through
+   * their platforms (`CoreTextFonts` by descriptor, `AndroidTextEngine` through `Typeface.create`);
+   * common Compose code reaches neither, so a name can only be resolved by a host that already
+   * holds the `FontFamily`. This is that registry.
+   */
+  @Test
+  fun `a registered family resolves by name, whatever the case, before a generic fallback`() {
+    val resolve = namedFontFamily(mapOf("Google Sans Flex" to FontFamily.Cursive))
+
+    assertEquals(FontFamily.Cursive, resolve("Google Sans Flex"))
+    // A specification's `"Helvetica Neue"` and a host's `"helvetica neue"` are the same face, and a
+    // chart should not turn on which was typed.
+    assertEquals(FontFamily.Cursive, resolve("google sans flex"))
+    assertEquals(FontFamily.Cursive, resolve("\"Google Sans Flex\""))
+    // Left to right, as CSS reads a stack: the registered name beats the generic written after it.
+    assertEquals(FontFamily.Cursive, resolve("Google Sans Flex, sans-serif"))
+    // And a generic beats a name nobody registered, which is what makes a well-formed stack work.
+    assertEquals(FontFamily.SansSerif, resolve("Unknown Face, sans-serif"))
+    // Registering nothing changes nothing.
+    assertEquals(genericFontFamily("serif"), namedFontFamily(emptyMap())("serif"))
+    assertEquals(null, namedFontFamily(emptyMap())("Unknown Face"))
+  }
+
+  /**
+   * A family the resolver declined is **said**, rather than silently becoming the default face.
+   *
+   * There is no diagnostics channel through a text engine, so this is the same shape as
+   * `DrawScopeTarget.unresolvedImages`: the facts are collected while measuring — which is before
+   * anything is drawn — and a host reads them when it wants to.
+   */
+  @Test
+  fun `a family the resolver cannot answer is recorded`() {
+    val engine = engine()
+    assertEquals(emptySet(), engine.unresolvedFontFamilies)
+
+    // A generic resolves, so it is not reported.
+    engine.advanceOf("Total", TextStyle(fontFamily = "sans-serif", fontSize = 11.0))
+    assertEquals(emptySet(), engine.unresolvedFontFamilies)
+
+    // A well-formed stack resolves on its last entry, so neither is this.
+    engine.advanceOf(
+      "Total",
+      TextStyle(fontFamily = "Helvetica Neue, Arial, serif", fontSize = 11.0),
+    )
+    assertEquals(emptySet(), engine.unresolvedFontFamilies)
+
+    // A name with nothing generic behind it is drawn in the default face, and now says so.
+    engine.advanceOf("Total", TextStyle(fontFamily = "Google Sans Flex", fontSize = 11.0))
+    engine.advanceOf("Total", TextStyle(fontFamily = "Google Sans Flex", fontSize = 12.0))
+    assertEquals(setOf("Google Sans Flex"), engine.unresolvedFontFamilies)
+
+    // Registering it makes it resolve, and nothing is reported.
+    val registered =
+      engine(resolver = namedFontFamily(mapOf("Google Sans Flex" to FontFamily.Serif)))
+    registered.advanceOf("Total", TextStyle(fontFamily = "Google Sans Flex", fontSize = 11.0))
+    assertEquals(emptySet(), registered.unresolvedFontFamilies)
+  }
 }
