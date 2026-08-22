@@ -5997,6 +5997,37 @@ What is not verifiable from `swift test`: that a gesture is or is not installed 
 `activatable(_:)` and `traits(for:)` are internal so the promise itself is asserted, and the gesture
 sets are asserted as sets; the attachment is a reading of `GestureMask` and `allowsHitTesting`.
 
+### An image resolver both draw targets had and neither view could reach
+
+`DrawScopeTarget` and `CoreGraphicsTarget` have each taken a `resolveImage` from the start, with the
+same argument for why it is the host's decision that `DataLoader` makes about data: a URL is not an
+image, and a chart is often data a reader pasted, so following the address is a policy the host owns.
+Neither public view had a parameter for it, so both were always built with it defaulted to nothing. A
+chart with a remote image mark drew every other mark and a hole where the image would be, on both
+platforms, and an unresolved image is recorded and skipped rather than aborting the draw — so the hole
+was all a host saw, with no supported way to supply a fetcher.
+
+Both views take one now, `VegaChart(resolveImage =)` and `VegaChartView(resolveImage:)`, and both
+tests draw through the view's own path rather than through a target built in the test, which is what
+could have passed and proved nothing. The Swift one reads a pixel: white where there is no resolver,
+the resolver's own blue where there is.
+
+**And the Compose cache had to move, or exposing the resolver would have been a performance bug.** A
+`DrawScopeTarget` is constructed inside the `Canvas` draw lambda, so its `cachedRasters` and
+`cachedUrls` had a lifetime of one frame. That was already costing something — a heatmap's raster was
+PNG-encoded and decoded on every draw — and with a resolver reachable it would have called a host's
+fetcher once per image per frame. `ImageCache` is the caller's to own, `rememberVegaImageCache`
+remembers one against the composition, and `VegaChart` does that for its caller. Bounded by **count**
+rather than by bytes, because an `ImageBitmap`'s footprint is a platform's business and this module has
+no way to ask; least recently used goes first, the same three-line policy `CachingExpressionCompiler`
+and `TextLayoutCache` use, `LinkedHashMap`'s access-order mode being JVM-only. The Apple side needed
+nothing: `CoreGraphicsTarget`'s cache is already static.
+
+A gap left stated rather than closed: neither view exposes the list of URLs the resolver could not
+answer. The targets collect it — `unresolvedImages` and `unresolved` — and a view discards the target
+it built. Reporting it from a composable means a callback fired during the draw phase, which is not
+something to add without a reason to.
+
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
 PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.

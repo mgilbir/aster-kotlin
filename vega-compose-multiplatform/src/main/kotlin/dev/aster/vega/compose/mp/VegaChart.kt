@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -63,6 +64,18 @@ import kotlin.math.roundToInt
  *   chart is the page or a thumbnail on it, and what its own users have said. Only marks count
  *   toward it and the guides are exposed either way, so a chart of many small points does not
  *   collapse on the strength of its axis labels.
+ * @param resolveImage turns an `image` mark's URL into something drawable. Null draws no URL
+ *   images, which is the default and is deliberate: a URL is not an image, and fetching one is a
+ *   decision about following an address the *specification* chose — the same argument `DataLoader`
+ *   makes for data. `data:` URLs and engine-produced rasters need no resolver and are drawn without
+ *   one. An image this cannot answer leaves a hole in the chart rather than aborting the draw; the
+ *   lower-level `DrawScopeTarget` collects those URLs, and this composable has nowhere to hand
+ *   them.
+ * @param imageCache where decoded images are kept **across frames**. A draw target is built once
+ *   per frame, so a cache inside one lives for a single draw: a heatmap's raster was PNG-decoded on
+ *   every frame, and a resolver would be called on every frame. The default is remembered against
+ *   the composition, which is what a caller wants; pass one to share it between charts, or to clear
+ *   it when the image behind a URL has changed.
  * @param onActivate what to do when a **reader** activates a mark through the accessibility tree.
  *   Null leaves the chart inert, which is right for a chart that is only being looked at.
  * @param onTap a tap, in **scene** coordinates, with the mark under it or null where it hit
@@ -93,6 +106,8 @@ public fun VegaChart(
   selectedNodeIds: Set<SceneNodeId> = emptySet(),
   captions: VegaCaptions = VegaCaptions.English,
   accessibilityMaxExposedMarks: Int = AccessibilityTree.MAX_EXPOSED_MARKS,
+  resolveImage: ((String) -> ImageBitmap?)? = null,
+  imageCache: ImageCache = rememberVegaImageCache(),
   onActivate: ((SceneNodeId) -> Unit)? = null,
   onTap: ((PointD, SceneNodeId?) -> Unit)? = null,
   onLongPress: ((PointD, SceneNodeId?) -> Unit)? = null,
@@ -162,6 +177,8 @@ public fun VegaChart(
               scope = this,
               textMeasurer = textEngine.measurer,
               fontFamilyResolver = textEngine.fontFamilyResolver,
+              resolveImage = resolveImage,
+              imageCache = imageCache,
             ),
           )
         }
@@ -572,3 +589,20 @@ private fun fitPlacement(
     top = placed.top.toDouble(),
   )
 }
+
+/**
+ * An [ImageCache] that outlives a frame.
+ *
+ * Remembered against nothing, so it survives every recomposition and every redraw of the composable
+ * that owns it — which is the point. A draw target is built once per frame, so a cache inside one
+ * caches nothing across frames: an engine-produced raster was PNG-decoded on every draw, and a
+ * host-supplied resolver would be called on every draw.
+ *
+ * [VegaChart] calls this for its caller. Hoist it where two charts should share one, or where the
+ * image behind a URL can change and the cache has to be cleared.
+ */
+@Composable
+public fun rememberVegaImageCache(maxEntries: Int = 64): ImageCache =
+  remember(maxEntries) {
+    ImageCache(maxEntries)
+  }

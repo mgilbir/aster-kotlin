@@ -279,4 +279,76 @@ final class ImageTests: XCTestCase {
       height: 40
     )
   }
+
+  /// A host's resolver reaches the drawing **through `VegaChartView`**.
+  ///
+  /// `CoreGraphicsTarget` has taken `resolveImage:` from the start and the view had no parameter for
+  /// it, so it was always built without one. A chart with a remote image therefore drew every other
+  /// mark and a hole where the image would be, with no way through the supported entry point to supply
+  /// a fetcher — the same gap the Compose composable had.
+  ///
+  /// Drawn through the view's own `draw(into:size:)`, which is the code path a `Canvas` runs, rather
+  /// than through a target built here: a target built here is what could pass and prove nothing.
+  @available(macOS 14.0, iOS 17.0, *)
+  @MainActor
+  func testAHostsResolverReachesTheDrawingThroughTheView() throws {
+    let drawn = try scene(
+      """
+      {"$schema": "https://vega.github.io/schema/vega/v6.json",
+       "width": 40, "height": 40, "padding": 0, "background": "white",
+       "marks": [{"type": "image", "encode": {"enter": {
+         "x": {"value": 0}, "y": {"value": 0},
+         "width": {"value": 40}, "height": {"value": 40},
+         "url": {"value": "https://example.com/tile.png"}}}}]}
+      """
+    )
+
+    // A one-pixel image the resolver answers with, so a drawn pixel is unmistakably its.
+    let space = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+    let source = try XCTUnwrap(
+      CGContext(
+        data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+        space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+      )
+    )
+    // Blue, so it cannot be confused with the white background this chart declares.
+    source.setFillColor(red: 0, green: 0, blue: 1, alpha: 1)
+    source.fill(CGRect(x: 0, y: 0, width: 1, height: 1))
+    let tile = try XCTUnwrap(source.makeImage())
+
+    // The context owns its own buffer, read back through `context.data`: handing `CGContext` a
+    // pointer into a Swift array would let that pointer escape the closure that produced it.
+    func drawnPixel(resolver: ((String) -> CGImage?)?) throws -> (UInt8, UInt8, UInt8) {
+      let context = try XCTUnwrap(
+        CGContext(
+          data: nil, width: 40, height: 40, bitsPerComponent: 8, bytesPerRow: 160,
+          space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )
+      )
+      context.setFillColor(gray: 1, alpha: 1)
+      context.fill(CGRect(x: 0, y: 0, width: 40, height: 40))
+      let view = VegaChartView(scene: drawn, resolveImage: resolver)
+      view.draw(into: context, size: CGSize(width: 40, height: 40))
+      let pixels = try XCTUnwrap(context.data).assumingMemoryBound(to: UInt8.self)
+      let middle = (20 * 160) + (20 * 4)
+      return (pixels[middle], pixels[middle + 1], pixels[middle + 2])
+    }
+
+    // Without a resolver: the white background, and a hole where the image would be. This is the
+    // state a host was stuck in — every other mark drawn, and nothing to do about the image.
+    let unresolved = try drawnPixel(resolver: nil)
+    XCTAssertEqual(
+      [unresolved.0, unresolved.1, unresolved.2], [255, 255, 255],
+      "no resolver, so the background shows through: \(unresolved)")
+
+    var asked: [String] = []
+    let resolved = try drawnPixel(resolver: { url in
+      asked.append(url)
+      return url == "https://example.com/tile.png" ? tile : nil
+    })
+    XCTAssertEqual(asked, ["https://example.com/tile.png"], "asked for exactly the URL in the chart")
+    XCTAssertEqual(
+      [resolved.0, resolved.1, resolved.2], [0, 0, 255],
+      "the resolver's blue pixel was drawn: \(resolved)")
+  }
 }

@@ -157,4 +157,90 @@ class ImageTest {
       composed.close()
     }
   }
+
+  /**
+   * A host's resolver reaches the drawing **through `VegaChart`**.
+   *
+   * `DrawScopeTarget` has taken a resolver from the start and the composable had no parameter for
+   * it, so it was always built with the resolver defaulted to null. A chart with a remote image
+   * therefore drew every other mark and a hole where the image would be, with no way through the
+   * supported entry point to supply a fetcher — the same gap the SwiftUI view had.
+   *
+   * The resolver here decodes the same tiny PNG the data-URL test uses, so the pixels asserted are
+   * the pixels that test already pins: what is new is the path they arrived by.
+   */
+  @Test
+  fun `a host's resolver reaches the drawing through the composable`() {
+    val bytes = kotlin.io.encoding.Base64.decode(tinyPNG.substringAfter(","))
+    var asked = 0
+    val drawn =
+      scene(
+        """
+        {"${'$'}schema": "https://vega.github.io/schema/vega/v6.json",
+         "width": 40, "height": 40, "padding": 0, "background": "white",
+         "marks": [{"type": "image", "encode": {"enter": {
+           "x": {"value": 0}, "y": {"value": 0},
+           "width": {"value": 40}, "height": {"value": 40},
+           "smooth": {"value": false},
+           "url": {"value": "https://example.com/tile.png"}}}}]}
+        """
+      )
+    val composed = ImageComposeScene(40, 40, density = Density(1f))
+    try {
+      composed.setContent {
+        VegaChart(
+          drawn,
+          fit = SceneFit.None,
+          resolveImage = { url ->
+            asked += 1
+            if (url == "https://example.com/tile.png") decodeImageBytes(bytes) else null
+          },
+        )
+      }
+      val map =
+        Image.makeFromEncoded(composed.render().encodeToData()!!.bytes)
+          .toComposeImageBitmap()
+          .toPixelMap()
+      val image = Raster(map, 40, 40)
+      assertTrue(image.isNear(10, 10, 255, 0, 0), "top left is red: ${image.describe(10, 10)}")
+      assertTrue(image.isNear(30, 10, 0, 0, 255), "top right is blue: ${image.describe(30, 10)}")
+      assertEquals(1, asked, "asked once, not once per frame")
+
+      // A second frame, which is where the cache earns its place: the target is rebuilt per draw,
+      // so
+      // without a cache that outlives one the host's fetcher is called again for the same URL.
+      composed.render()
+      assertEquals(1, asked, "still once after a redraw: the cache outlives the frame")
+    } finally {
+      composed.close()
+    }
+  }
+
+  /**
+   * The cache is bounded, and by count.
+   *
+   * An unbounded map keyed by URL is a leak with a chart generator in front of it. Bounded by count
+   * rather than by bytes because an `ImageBitmap`'s footprint is a platform's business and this
+   * module has no way to ask.
+   */
+  @Test
+  fun `the image cache is bounded and least recently used goes first`() {
+    val bytes = kotlin.io.encoding.Base64.decode(tinyPNG.substringAfter(","))
+    val decoded = requireNotNull(decodeImageBytes(bytes))
+    val cache = ImageCache(maxEntries = 2)
+
+    cache.putUrl("a", decoded)
+    cache.putUrl("b", decoded)
+    assertEquals(2, cache.size)
+    // Touching "a" makes "b" the oldest.
+    assertTrue(cache.url("a") != null)
+    cache.putUrl("c", decoded)
+    assertEquals(2, cache.size)
+    assertTrue(cache.url("a") != null, "the one that was used again survived")
+    assertEquals(null, cache.url("b"), "the least recently used went first")
+    assertTrue(cache.url("c") != null)
+
+    cache.clear()
+    assertEquals(0, cache.size)
+  }
 }

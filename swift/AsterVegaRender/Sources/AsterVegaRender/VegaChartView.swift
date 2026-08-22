@@ -81,6 +81,8 @@ public struct VegaChartView: View {
   private let accessibilityMaxExposedMarks: Int32
   /// Which gestures are installed; see the initialiser.
   private let gestures: ChartGestures
+  /// Turns an `image` mark's URL into something drawable; see the initialiser.
+  private let resolveImage: ((String) -> CGImage?)?
 
   /// Creates a chart view.
   ///
@@ -109,6 +111,13 @@ public struct VegaChartView: View {
   ///     it can move while a finger is on the drawing. A tap claims nothing and tooltips still work
   ///     through it, a tap being a hover as well on a screen with no pointer. Ignored where `session`
   ///     is nil, which installs nothing whatever this says.
+  ///   - resolveImage: turns an `image` mark's URL into something drawable. Nil draws no URL images,
+  ///     which is the default and is deliberate: a URL is not an image, and fetching one is a decision
+  ///     about following an address the *specification* chose — the same argument `VegaDataLoader`
+  ///     makes for data. `data:` URLs and engine-produced rasters need no resolver and are drawn
+  ///     without one. `CoreGraphicsTarget` has taken one from the start; there was no way to reach it
+  ///     through this view, so a chart with a remote image drew every other mark and a hole where the
+  ///     image would be, with no supported way to supply a fetcher.
   public init(
     scene: AsterVega.Scene,
     session: ChartSession? = nil,
@@ -116,6 +125,7 @@ public struct VegaChartView: View {
     textScale: Double? = nil,
     accessibilityMaxExposedMarks: Int32 = AccessibilityTree.shared.MAX_EXPOSED_MARKS,
     gestures: ChartGestures = .all,
+    resolveImage: ((String) -> CGImage?)? = nil,
     onPlaced: ((ChartPlacement) -> Void)? = nil
   ) {
     self.scene = scene
@@ -124,6 +134,7 @@ public struct VegaChartView: View {
     self.textScaleOverride = textScale
     self.accessibilityMaxExposedMarks = accessibilityMaxExposedMarks
     self.gestures = gestures
+    self.resolveImage = resolveImage
     self.onPlaced = onPlaced
   }
 
@@ -510,7 +521,10 @@ public struct VegaChartView: View {
     let scale = textScale
     var target = CoreGraphicsTarget(
       context: context,
-      drawText: { run, fill, ctx in CoreTextDrawing.draw(run, fill, ctx, textScale: scale) }
+      drawText: { run, fill, ctx in CoreTextDrawing.draw(run, fill, ctx, textScale: scale) },
+      // The seam `CoreGraphicsTarget` has always had and this view never passed. Its decode cache is
+      // static, so a resolver is asked once per URL for the process rather than once per frame.
+      resolveImage: resolveImage
     )
     SceneWalk().draw(scene: scene, into: &target)
 

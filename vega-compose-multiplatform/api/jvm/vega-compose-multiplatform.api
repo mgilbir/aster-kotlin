@@ -240,8 +240,8 @@ public final class dev/aster/vega/compose/mp/DrawRect {
 
 public final class dev/aster/vega/compose/mp/DrawScopeTarget : dev/aster/vega/compose/mp/SceneDrawTarget {
 	public static final field $stable I
-	public fun <init> (Landroidx/compose/ui/graphics/drawscope/DrawScope;Landroidx/compose/ui/text/TextMeasurer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
-	public synthetic fun <init> (Landroidx/compose/ui/graphics/drawscope/DrawScope;Landroidx/compose/ui/text/TextMeasurer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Landroidx/compose/ui/graphics/drawscope/DrawScope;Landroidx/compose/ui/text/TextMeasurer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Ldev/aster/vega/compose/mp/ImageCache;)V
+	public synthetic fun <init> (Landroidx/compose/ui/graphics/drawscope/DrawScope;Landroidx/compose/ui/text/TextMeasurer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Ldev/aster/vega/compose/mp/ImageCache;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun beginGroup (Ldev/aster/vega/compose/mp/DrawRect;)V
 	public fun endGroup ()V
 	public final fun getUnresolvedImages ()Ljava/util/List;
@@ -321,6 +321,15 @@ public final class dev/aster/vega/compose/mp/DrawTextRun {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class dev/aster/vega/compose/mp/ImageCache {
+	public static final field $stable I
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun clear ()V
+	public final fun getSize ()I
+}
+
 public final class dev/aster/vega/compose/mp/RecordingTarget : dev/aster/vega/compose/mp/SceneDrawTarget {
 	public static final field $stable I
 	public fun <init> ()V
@@ -360,6 +369,7 @@ public final class dev/aster/vega/compose/mp/SceneWalk {
 }
 
 public final class dev/aster/vega/compose/mp/VegaChartKt {
-	public static final fun VegaChart (Ldev/aster/vega/scene/Scene;Landroidx/compose/ui/Modifier;Ldev/aster/vega/compose/mp/SceneFit;Ldev/aster/vega/compose/mp/ComposeTextEngine;Ljava/util/Set;Ldev/aster/vega/model/locale/VegaCaptions;ILkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Ldev/aster/vega/scene/HitTestOptions;Ldev/aster/vega/scene/VectorD;DLkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;III)V
+	public static final fun VegaChart (Ldev/aster/vega/scene/Scene;Landroidx/compose/ui/Modifier;Ldev/aster/vega/compose/mp/SceneFit;Ldev/aster/vega/compose/mp/ComposeTextEngine;Ljava/util/Set;Ldev/aster/vega/model/locale/VegaCaptions;ILkotlin/jvm/functions/Function1;Ldev/aster/vega/compose/mp/ImageCache;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Ldev/aster/vega/scene/HitTestOptions;Ldev/aster/vega/scene/VectorD;DLkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;III)V
+	public static final fun rememberVegaImageCache (ILandroidx/compose/runtime/Composer;II)Ldev/aster/vega/compose/mp/ImageCache;
 }
 

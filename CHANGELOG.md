@@ -103,6 +103,16 @@ section here does not get released.
 
 ### Added
 
+- **An image resolver on both public view APIs.** `DrawScopeTarget` and
+  `CoreGraphicsTarget` have each taken one from the start and neither
+  `VegaChart` nor `VegaChartView` had a parameter for it, so a chart with a
+  remote image mark drew every other mark and a hole where the image would be,
+  with no supported way to supply a fetcher. Exposing it also required the
+  Compose decode cache to outlive a frame: a target is built per draw, so a
+  heatmap's raster was being re-decoded every frame and a host's fetcher would
+  have been called every frame. `ImageCache` and `rememberVegaImageCache` are
+  the seam; it is bounded and least-recently-used. (#58)
+
 - **A locale can decide the order of a date, not only its names.** `%b` always
   resolved to the reader's month abbreviation, but the *pattern* came from tables
   with no locale in them, so a Dutch axis read `mei 21, 2026`.
