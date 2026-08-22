@@ -47,14 +47,22 @@ public enum CoreTextDrawing {
     guard !run.text.isEmpty else { return }
 
     let colour: CGColor
-    if case .solid(let paint) = fill {
+    switch fill {
+    case .solid(let paint):
       colour = CGColor(
         colorSpace: sRGB,
         components: [
           CGFloat(paint.red), CGFloat(paint.green), CGFloat(paint.blue), CGFloat(paint.alpha),
         ]
       ) ?? CGColor(gray: 0, alpha: 1)
-    } else {
+    case nil:
+      // **Nothing to paint.** Not the same case as the one below, and treating it as if it were is
+      // what painted every label an axis had hidden: an overlapping label is hidden at zero opacity
+      // rather than removed, `SceneWalk.brush` answers nil for that, and black was drawn instead.
+      // The caller now also declines to hand over a run with no paint at all; this is the same
+      // decision at the other end of the call, so neither end can be got wrong on its own.
+      return
+    default:
       // A gradient-filled label is not something a specification can express through this engine's
       // scene, and black is a better answer than an invisible label.
       colour = CGColor(gray: 0, alpha: 1)

@@ -50,6 +50,19 @@ public struct SceneWalk {
     guard node.visible else { return }
     // This item's own opacity, multiplied into this item's own paints below.
     let own = node.opacity
+    // **Nothing paints anything at zero opacity**, so leaving early is the same picture drawn faster.
+    // A group is the exception, as it is in the Compose walk: a transparent group is not an invisible
+    // one, and its children carry their own opacity.
+    //
+    // This line is the whole of the divergence behind a dense temporal axis coming out unreadable on
+    // this renderer. The Compose walk has had it from the start with this same comment; this one had
+    // only the `visible` check. An axis hides an overlapping label by setting its **opacity to zero**
+    // rather than removing it — `AxisBuilder` says so, so that the mark count does not change with
+    // the chart's width — so the node arrived here, `brush` answered nil for it, and
+    // `CoreTextDrawing` read that nil as a paint it could not express and painted black. Measured on
+    // `label-overlap.vg.json`: 43 labels of which 24 are hidden, and this renderer drew all 43 where
+    // Compose drew the 19.
+    if own <= 0, !(node is GroupNode) { return }
 
     switch ForeignRenderersKt.foreignKind(node) {
     case "group":
@@ -155,6 +168,22 @@ public struct SceneWalk {
       let metrics = layout.metrics
       let fill = brush(text.fill, opacity: own, bounds: text.bounds, through: local)
       let stroke = stroke(text.stroke, opacity: own, bounds: text.bounds, through: local)
+      // **Nothing to paint means nothing to draw**, and it has to be decided here.
+      //
+      // An axis hides a label that would overlap its neighbour by setting the label's *opacity to
+      // zero* rather than by removing it — `AxisBuilder` says so outright, so that the mark count
+      // does not change with the chart's width. `brush` then answers nil, as it does for a mark with
+      // no fill at all; and at the other end of the call `CoreTextDrawing` read a nil brush as a
+      // paint it could not express and fell back to black, on the reasoning that black beats an
+      // invisible label. So one nil meant two opposite things and every label the overlap pass had
+      // hidden was drawn at full strength. Measured on a committed document — a temporal axis with a
+      // twenty-day tick interval at 361 units — fourteen labels of which ten had opacity zero: the
+      // Compose renderer drew the four, this one drew all fourteen, each about twice as wide as the
+      // gap between them.
+      //
+      // Both ends are fixed: `CoreTextDrawing` no longer paints a nil brush, and the run is not
+      // handed over at all. Two, because either alone leaves the trap in place for the next caller.
+      if fill == nil && stroke == nil { return }
 
       // Where the *box* sits relative to the anchor. These are `textBounds` in `vega-scene`, which is
       // what the engine used to compute this node's own bounds — so the glyphs land inside the space the

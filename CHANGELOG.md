@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **The Apple renderer no longer paints a label the axis deliberately hid.** An
+  overlapping axis label is hidden at zero opacity rather than removed, and the
+  Swift walk guarded on `visible` alone — so the node reached the text branch,
+  `brush` answered nil, and `CoreTextDrawing` read that as a paint it could not
+  express and drew black. Measured on `label-overlap.vg.json`: 43 labels, 24
+  hidden, 43 drawn where the Compose renderer drew 19. The Compose walk's
+  zero-opacity guard is now mirrored here, so every mark type is covered and the
+  two walks are back in step; the text branch also declines a run with no paint at
+  all, and a nil brush is no longer painted. (#71)
+
 - **A Vega-Lite document that will not compile is reported, not reinterpreted as
   Vega.** `ChartSession` fell back to the unconverted text, which a parser that
   only understands Vega then complained about in the wrong grammar's terms —

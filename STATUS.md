@@ -5922,6 +5922,38 @@ Worth noting how the old failure became legible: the second of those three diagn
 `PARSE_NOTHING_TO_DRAW`, which did not exist until this stack. Before it, the fallback's answer to a
 broken Vega-Lite document was one complaint about `data` and an empty chart.
 
+### A label the axis hid, painted black by the other renderer
+
+An axis hides a label that would overlap its neighbour by setting the label's **opacity to zero**
+rather than by removing it. `AxisBuilder` says so outright, and for a reason: the mark count then does
+not change with the chart's width.
+
+The Swift walk guarded on `visible` and not on opacity, so the node arrived at the text branch,
+`brush` answered nil for it — as it does for a mark with no fill at all — and `CoreTextDrawing` read
+that nil as a paint it could not express and drew `CGColor(gray: 0, alpha: 1)`, on the reasoning that
+black beats an invisible label. One nil meaning two opposite things at the two ends of one call.
+
+Measured on `label-overlap.vg.json`, a committed document: 43 labels, 24 of them hidden. This renderer
+produced 43 text calls. The Compose walk produced 19.
+
+**The Compose walk was right, and the reason is one line.** It has always had
+`if (node.opacity <= 0.0 && node !is GroupNode) return`, with the comment that nothing paints anything
+at zero opacity so leaving early is the same picture drawn faster. The Swift walk had only the
+`visible` check. So the fix is that line, mirrored — which covers every mark type rather than text
+alone, and puts the two walks back in step. That is what they are for: "the same calls in the same
+order" is the claim both files make, and there are two copies of that logic, one per language, so they
+can drift and had.
+
+Two narrower guards went in beside it, because either end of the call could still be got wrong on its
+own. The text branch declines to hand over a run with **no paint at all**, which covers `fillOpacity:
+0` on a node whose own opacity is one. And `CoreTextDrawing` no longer paints a nil brush: nil is
+nothing to paint, and only a brush it genuinely cannot express — a gradient — still falls back to
+black.
+
+Worth stating as a gap rather than leaving implied: nothing compares the two walks' call sequences
+against each other. Their recording targets write different formats, and this defect is what that
+costs.
+
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
 PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.
