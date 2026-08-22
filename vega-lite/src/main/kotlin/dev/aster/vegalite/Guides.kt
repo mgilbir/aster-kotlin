@@ -354,7 +354,7 @@ internal object Guides {
 
     // Labels for a bucketed instant, and a tick step no finer than the bucket.
     if (def.timeUnit != null) {
-      axis.set("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit)))
+      axis.set("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit, view.config.locale)))
       Fields.timeUnitDuration(def.timeUnit)?.let { axis.set("tickMinStep", signalRef(it)) }
     }
     // `guideFormatType`: a specifier is a *time* specifier, and Vega has to be told so wherever the
@@ -815,7 +815,7 @@ internal object Guides {
       // A legend labels a bucketed instant the same way an axis does, and for the same reason: the
       // swatch beside a colour ramp of months should read `Jan`, not the month's number.
       if (def.timeUnit != null) {
-        put("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit)))
+        put("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit, view.config.locale)))
       } else if (def.type == MeasureType.TEMPORAL) {
         // `omitTimeFormatConfig` is true for an axis and **false** for a legend: an axis chooses
         // its own granularity from the span it is showing, where a legend's entries stand alone

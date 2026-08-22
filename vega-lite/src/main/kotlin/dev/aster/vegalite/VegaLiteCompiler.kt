@@ -4,6 +4,7 @@ import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.spec.mergeConfig
 import kotlinx.datetime.TimeZone
 
@@ -71,6 +72,22 @@ public class VegaLiteCompiler(
    * clock from the axis is a brush that starts in the wrong place.
    */
   private val timeZone: TimeZone? = null,
+  /**
+   * The host's language, which decides one thing this compiler **emits**.
+   *
+   * Almost nothing about a locale belongs here: a month name is resolved by the runtime from the
+   * pattern written into the specification, so `%b` has always been enough and a Dutch axis has
+   * always said `mei`. The exception is the *pattern itself* — `Fields.timeUnitSpecifier` writes an
+   * override table into a bucketed axis's format, `%b %d, %Y`, and the order of those fields and
+   * what separates them are properties of a language rather than of a chart. Before this, a host
+   * that supplied a locale to get the day before the month had no lever for it anywhere.
+   *
+   * d3's `en-US` by default, which is what upstream produces, so the emitted specification is
+   * byte-for-byte what it was. It should be the **same** locale the runtime is given: a chart whose
+   * axis pattern comes from one language and whose month names come from another is worse than
+   * either.
+   */
+  private val locale: VegaLocale = VegaLocale.EnglishUS,
 ) {
 
   public fun compileJson(json: String): VegaLiteCompilation {
@@ -90,7 +107,7 @@ public class VegaLiteCompiler(
       )
       return VegaLiteCompilation(null, diagnostics.diagnostics)
     }
-    return Compilation(withHostConfig(spec), diagnostics, timeZone).run()
+    return Compilation(withHostConfig(spec), diagnostics, timeZone, locale).run()
   }
 
   /** The specification with the host's configuration merged **under** its own. */
@@ -115,9 +132,11 @@ private class Compilation(
   private val diagnostics: DiagnosticCollector,
   /** What a selection store's written date is read in; null is the device's own zone. */
   private val timeZone: TimeZone? = null,
+  /** The host's language; see `VegaLiteCompiler.locale`. Reaches the guides through [config]. */
+  private val locale: VegaLocale = VegaLocale.EnglishUS,
 ) {
 
-  private val config = Config(spec.obj("config") ?: VegaValue.EmptyObject)
+  private val config = Config(spec.obj("config") ?: VegaValue.EmptyObject, locale)
 
   /**
    * The selections this chart declares, which the data, the signals and the marks all read.

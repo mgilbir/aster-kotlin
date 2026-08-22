@@ -904,7 +904,10 @@ public object Functions {
         }
       val overrides =
         (args.at(1) as? VegaValue.Obj)?.fields?.mapValues { (_, v) -> JsSemantics.toStringValue(v) }
-      VegaValue.Str(TimeUnits.specifier(units, overrides.orEmpty()))
+      // The locale, which this call had in scope for `monthFormat` and every other date function
+      // and did not pass here — so the one part of a date a host could not move was its **order**.
+      // Under the call's own second argument; see `TimeUnits.specifier`.
+      VegaValue.Str(TimeUnits.specifier(units, overrides.orEmpty(), locale))
     }
 
     map["timeFormat"] = ExpressionFunction { args ->

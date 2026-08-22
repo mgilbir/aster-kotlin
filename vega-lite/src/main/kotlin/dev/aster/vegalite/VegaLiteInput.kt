@@ -4,6 +4,7 @@ import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.locale.VegaLocale
 import kotlinx.datetime.TimeZone
 
 /**
@@ -53,6 +54,17 @@ public object VegaLiteInput {
      * clock from its own axis.
      */
     timeZone: TimeZone? = null,
+    /**
+     * The host's language, for the one thing the Vega-Lite compiler **writes** rather than
+     * resolves.
+     *
+     * Passed here as well as to the runtime, for the same reason [timeZone] is. A month name comes
+     * from the runtime's locale, so `%b` is enough and always was; the *pattern* a bucketed axis is
+     * formatted with is written on this side, and the order of a date's fields is a property of a
+     * language. A host that supplies a locale to one and not the other gets an axis whose field
+     * order and whose month names come from different places.
+     */
+    locale: VegaLocale = VegaLocale.EnglishUS,
   ): VegaLiteConversion {
     val diagnostics = DiagnosticCollector()
     val parsed = VegaJson.parseOrNull(json, diagnostics)
@@ -62,7 +74,7 @@ public object VegaLiteInput {
 
     if (!isVegaLite(parsed)) return VegaLiteConversion(json, false, emptyList())
 
-    val compiled = VegaLiteCompiler(hostConfig, timeZone).compile(parsed)
+    val compiled = VegaLiteCompiler(hostConfig, timeZone, locale).compile(parsed)
     return VegaLiteConversion(compiled.toJson(), true, compiled.diagnostics)
   }
 

@@ -414,6 +414,36 @@ a plural with a number. `VegaCaptions.English` is upstream's own wording and the
 January in every language — d3's parsing is part of the wire format — so `TimeFormat.MONTHS` stays
 English and only what is *written* follows the locale.
 
+### The order of a date, not only its names
+
+`%b` resolves to the reader's month abbreviation, so a Dutch axis has always said `mei`. What it also
+said was `mei 21, 2026`, because the *pattern* — the order of the fields and what separates them —
+came from tables with no locale in them: `%Y-%m-%d` in `TimeUnits`, and `%b %d, %Y` in the two entries
+Vega-Lite writes into a bucketed axis's format. Upstream has no lever for that either; its
+`timeUnitSpecifier` takes no locale. So the two tables below are **empty by default**, and a chart
+that does not ask is byte-for-byte what it was.
+
+```kotlin
+val dutch = VegaLocale(
+    /* … the names above … */
+    // A bucketed axis or legend: `timeUnit`, and `timeUnitSpecifier()` in an expression. Keyed by a
+    // unit or a recognised run of units, coarsest first, exactly as `TimeUnits` keys them. A null
+    // value *removes* an entry, which is how you say "do not combine these two".
+    timeUnitSpecifiers = mapOf("year-month-date" to "%-d %b %Y ", "month-date" to "%-d %b "),
+    // A plain `time` axis, which has no single granularity and labels each tick by the finest field
+    // that is not zero. d3's `scale.tickFormat` cascade, keyed by d3's own eight step names.
+    timeTickFormats = mapOf("hour" to "%H:00", "minute" to "%H:%M"),
+)
+```
+
+Give the **same** locale to `VegaLiteInput.toVega` and to the compiler or controller that draws the
+result. The pattern is written on the Vega-Lite side and the month names are resolved on the runtime
+side, so a locale supplied to one and not the other is an axis whose order and whose names come from
+different places. `ChartSession` does this for you from its own `locale`.
+
+A specification's own second argument to `timeUnitSpecifier(units, specifiers)` still wins: the
+document asked for that by name, and a host's language is a default beneath it.
+
 ## Host data example
 
 A chart can be drawn from data the **app** holds rather than data the payload carried. The

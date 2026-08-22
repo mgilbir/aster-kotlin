@@ -47,6 +47,18 @@ section here does not get released.
 
 ### Added
 
+- **A locale can decide the order of a date, not only its names.** `%b` always
+  resolved to the reader's month abbreviation, but the *pattern* came from tables
+  with no locale in them, so a Dutch axis read `mei 21, 2026`.
+  `VegaLocale.timeUnitSpecifiers` overrides the table a **bucketed** instant is
+  labelled with and `VegaLocale.timeTickFormats` the cascade a **plain** `time`
+  axis uses; both are empty by default, so nothing changes for a chart that does
+  not ask. The Vega-Lite compiler carries a locale for the first time — the
+  pattern is written on that side — so `VegaLiteCompiler`, `VegaLiteInput.toVega`
+  and `Config` take one, and `ChartSession` passes its own. `VegaLocale.init`,
+  `doCopy`, `TimeUnits.specifier` and `toVega` change signature at the Obj-C
+  boundary; recorded in `foreign-api.txt`. (#62)
+
 - **A specification that reads `containerSize()` with no host size supplied now
   says so**, per dimension, as `EXPRESSION_CONTAINER_SIZE_UNANSWERED` at INFO.
   The answer is unchanged — `[null, null]` is what a browser gives outside a

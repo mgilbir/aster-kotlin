@@ -1,6 +1,7 @@
 package dev.aster.vegalite
 
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.locale.VegaLocale
 
 /**
  * Vega-Lite's configuration: the defaults a specification does not state.
@@ -12,7 +13,22 @@ import dev.aster.vega.model.VegaValue
  * User configuration merges *over* these, one level deep per block, which is what `mergeConfig`
  * does: `{"bar": {"fill": "red"}}` replaces the bar's fill and keeps its `binSpacing`.
  */
-internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
+internal class Config(
+  private val user: VegaValue.Obj = VegaValue.EmptyObject,
+  /**
+   * The host's language, carried here because it decides one thing this compiler **emits**.
+   *
+   * Almost nothing about a locale belongs to Vega-Lite: a month name is resolved by the runtime
+   * from the pattern this compiler writes, so `%b` is enough and always was. The exception is the
+   * *pattern* — `Fields.timeUnitSpecifier` writes an override table into the axis format, `%b %d,
+   * %Y`, and the order of those fields is a property of a language rather than of a chart. It is
+   * built from [VegaLocale.timeUnitSpecifiers] for that reason.
+   *
+   * The default is d3's `en-US`, which is what upstream produces, so the emitted specification is
+   * byte-for-byte what it was before locales reached this side.
+   */
+  val locale: VegaLocale = VegaLocale.EnglishUS,
+) {
 
   val raw: VegaValue.Obj
     get() = user
@@ -54,7 +70,8 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
       obj {
         putAll(user)
         block.fields.forEach { (key, value) -> put(key, value) }
-      }
+      },
+      locale,
     )
   }
 

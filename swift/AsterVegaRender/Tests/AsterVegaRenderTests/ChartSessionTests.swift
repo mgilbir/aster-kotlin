@@ -394,6 +394,10 @@ final class ChartSessionTests: XCTestCase {
       date: "%d-%m-%Y",
       time: "%H:%M:%S",
       dateTime: "%a %e %B %Y %X",
+      // The order of a date's fields, which is the part a locale could not reach: the axis format
+      // came from a table with no locale in it, so a Dutch chart read `mei 21, 2026`.
+      timeUnitSpecifiers: ["year-month-date": "%-d %b %Y ", "year-month": "%b %Y "],
+      timeTickFormats: ["hour": "%H:00", "minute": "%H:%M"],
       decimal: ",",
       thousands: ".",
       grouping: [KotlinInt(value: 3)],
@@ -402,6 +406,77 @@ final class ChartSessionTests: XCTestCase {
     )
     let localised = await drawn(with: dutch)
     XCTAssertTrue(localised.contains { $0.contains("mei 2026") }, "in Dutch: \(localised)")
+  }
+
+  /// The **order** of a date's fields, which the locale seam could not reach from here at all.
+  ///
+  /// Two things had to be true for this to work, and neither was. The pattern a bucketed axis is
+  /// formatted with is written by the *Vega-Lite* compiler, and this session never gave that compiler
+  /// its locale — so the pattern was `%b %d, %Y` whatever the host said. And `TimeUnits`'s table took
+  /// no locale, so nothing downstream could move it either.
+  ///
+  /// The middle assertion is the defect itself: Dutch month names in American order, which is what a
+  /// host got for supplying a locale.
+  func testALocaleDecidesTheOrderOfADateOnABucketedAxis() async {
+    let bucketed = """
+      {"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+       "width": 400, "height": 120,
+       "data": {"values": [{"t": "2026-05-20T10:00:00", "v": 1},
+                           {"t": "2026-06-17T10:00:00", "v": 2}]},
+       "mark": "point",
+       "encoding": {"x": {"field": "t", "type": "temporal", "timeUnit": "yearmonthdate"},
+                    "y": {"field": "v", "type": "quantitative"}}}
+      """
+
+    func labels(_ locale: VegaLocale?) async -> [String] {
+      let session = ChartSession(locale: locale)
+      session.load(specification: bucketed)
+      await session.settle()
+      let scene = try! XCTUnwrap(session.scene, session.failure ?? "no scene")
+      var target = RecordingTarget()
+      SceneWalk().draw(scene: scene, into: &target)
+      return target.calls.filter { $0.contains("text ") }
+    }
+
+    let english = await labels(nil)
+    XCTAssertTrue(english.contains { $0.contains("May 21, 2026") }, "en-US: \(english)")
+
+    let namesOnly = await labels(Self.dutch(dayFirst: false))
+    XCTAssertTrue(
+      namesOnly.contains { $0.contains("mei 21, 2026") },
+      "the names move and the order does not, which is what a host used to get: \(namesOnly)")
+
+    let dayFirst = await labels(Self.dutch(dayFirst: true))
+    XCTAssertTrue(dayFirst.contains { $0.contains("21 mei 2026") }, "day first: \(dayFirst)")
+    XCTAssertFalse(
+      dayFirst.contains { $0.contains("mei 21") },
+      "the American order is gone rather than joined: \(dayFirst)")
+  }
+
+  /// Dutch, with or without a say in how a date is ordered.
+  private static func dutch(dayFirst: Bool) -> VegaLocale {
+    VegaLocale(
+      months: [
+        "januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september",
+        "oktober", "november", "december",
+      ],
+      shortMonths: [
+        "jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec",
+      ],
+      days: ["zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"],
+      shortDays: ["zo", "ma", "di", "wo", "do", "vr", "za"],
+      periods: ["a.m.", "p.m."],
+      date: "%d-%m-%Y",
+      time: "%H:%M:%S",
+      dateTime: "%a %e %B %Y %X",
+      timeUnitSpecifiers: dayFirst ? ["year-month-date": "%-d %b %Y "] : [:],
+      timeTickFormats: [:],
+      decimal: ",",
+      thousands: ".",
+      grouping: [KotlinInt(value: 3)],
+      minus: "\u{2212}",
+      captions: VegaCaptionsCompanion.shared.English
+    )
   }
 
   /// A dark chart, themed by the app, from iOS — the other seam that was unreachable from here.

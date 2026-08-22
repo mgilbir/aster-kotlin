@@ -4165,7 +4165,7 @@ TimeUnits.ALL
 TimeUnits.detect(instants:zone:)
 TimeUnits.init()
 TimeUnits.shared
-TimeUnits.specifier(units:overrides:)
+TimeUnits.specifier(units:overrides:locale:)
 TitleDefaults
 TitleDefaults.FONT_FAMILY
 TitleDefaults.FONT_SIZE
@@ -4469,7 +4469,7 @@ VegaLiteCompilation.vega
 VegaLiteCompiler
 VegaLiteCompiler.compile(spec:)
 VegaLiteCompiler.compileJson(json:)
-VegaLiteCompiler.init(hostConfig:timeZone:)
+VegaLiteCompiler.init(hostConfig:timeZone:locale:)
 VegaLiteConversion
 VegaLiteConversion.description()
 VegaLiteConversion.diagnostics
@@ -4510,10 +4510,10 @@ VegaLocale.dateTime
 VegaLocale.days
 VegaLocale.decimal
 VegaLocale.description()
-VegaLocale.doCopy(months:shortMonths:days:shortDays:periods:date:time:dateTime:decimal:thousands:grouping:minus:captions:)
+VegaLocale.doCopy(months:shortMonths:days:shortDays:periods:date:time:dateTime:timeUnitSpecifiers:timeTickFormats:decimal:thousands:grouping:minus:captions:)
 VegaLocale.grouping
 VegaLocale.hash()
-VegaLocale.init(months:shortMonths:days:shortDays:periods:date:time:dateTime:decimal:thousands:grouping:minus:captions:)
+VegaLocale.init(months:shortMonths:days:shortDays:periods:date:time:dateTime:timeUnitSpecifiers:timeTickFormats:decimal:thousands:grouping:minus:captions:)
 VegaLocale.isEqual(_:)
 VegaLocale.minus
 VegaLocale.months
@@ -4522,6 +4522,8 @@ VegaLocale.shortDays
 VegaLocale.shortMonths
 VegaLocale.thousands
 VegaLocale.time
+VegaLocale.timeTickFormats
+VegaLocale.timeUnitSpecifiers
 VegaScale
 VegaScale.bins
 VegaScale.name
@@ -4614,7 +4616,7 @@ curve(points:kind:horizontal:tension:partOfArea:)
 toSvg(options:)
 toSvg(options:).displayLine(line:measure:)
 toSvg(options:).displayLines(measure:)
-toVega(json:hostConfig:timeZone:)
+toVega(json:hostConfig:timeZone:locale:)
 transformedBy(transform:)
 transformedBy(transform:).findNode(id:)
 transformedBy(transform:).flatten()

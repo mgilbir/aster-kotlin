@@ -5788,6 +5788,40 @@ on both guides, which is why it was worth having one function for it.
 comparison on the stray property, and the scene comparison on labels drawn at full length. 283
 Vega-Lite fixtures now.
 
+### The order of a date, which the locale seam could not reach
+
+`%b` has always resolved to the reader's month abbreviation, so a Dutch axis said `mei`. It said
+`mei 21, 2026` all the same, and that is the whole of this: the *pattern* came from tables with no
+locale in them. `TimeUnits.SPECIFIERS` carries `%Y-%m-%d`; `Fields.timeUnitSpecifier` wrote
+`{"year-month": "%b %Y ", "year-month-date": "%b %d, %Y "}` into a bucketed axis's format as a
+literal; and `Functions` had a locale in scope for `monthFormat` and every other date function and
+did not pass it to `TimeUnits.specifier`.
+
+Upstream has no lever for it either — its `timeUnitSpecifier` takes no locale, and `VEGALITE_TIMEFORMAT`
+is a module constant — so this is an addition rather than a port. Both new tables are therefore
+**empty by default** and the emitted specification is byte-for-byte what it was, which is what the 283
+Vega-Lite fixtures compare against.
+
+Two tables, because there are two places a date's shape is decided and they are different tables.
+`VegaLocale.timeUnitSpecifiers` overrides what a **bucketed** instant is labelled with, keyed the way
+`TimeUnits` keys it — a unit or a recognised run of units, coarsest first — with a null value
+*removing* an entry, which is upstream's own way of saying "do not combine these two".
+`VegaLocale.timeTickFormats` overrides the cascade a **plain** `time` axis uses, which has no single
+granularity and labels each tick by the finest field that is not zero; the keys are d3's own names for
+its eight steps, because that cascade is d3's `scale.tickFormat` and `%I %p` is an afternoon in a
+place that writes 14:00.
+
+**Vega-Lite needed the locale for the first time.** The pattern is written on that side, so
+`VegaLiteCompiler`, `VegaLiteInput.toVega` and the internal `Config` all carry one now, and
+`ChartSession` passes its own — a locale given to the runtime and not to the compiler is an axis whose
+field order and whose month names come from different places. That is the same argument `timeZone`
+already made for being passed to both.
+
+Precedence is upstream's and deliberately not clever: defaults, then the host's locale, then a
+document's own second argument to `timeUnitSpecifier(units, specifiers)` — which the document asked
+for by name. Vega-Lite's generated table looks like an exception and is not one: `Fields` builds it
+**from** the locale, so the two agree by construction rather than by out-ranking each other.
+
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
 PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.

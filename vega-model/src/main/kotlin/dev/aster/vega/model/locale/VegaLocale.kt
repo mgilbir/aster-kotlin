@@ -54,6 +54,51 @@ public data class VegaLocale(
   public val time: String = "%-I:%M:%S %p",
   /** `%c` — date and time together, as a pattern. */
   public val dateTime: String = "%x, %X",
+  /**
+   * Overrides for the table `timeUnitSpecifier` reads — the format a **bucketed** instant is
+   * labelled with.
+   *
+   * The one part of a date this seam could not reach. `%b` resolves to this locale's month
+   * abbreviation, so a Dutch chart's axis has always said `mei`; but the *order* of the fields, and
+   * what separates them, came from a table with no locale in it — `%Y-%m-%d` in `TimeUnits`, and
+   * `%b %d, %Y` in the two entries Vega-Lite overrides. Upstream has no lever for that either: its
+   * `timeUnitSpecifier` takes no locale, so this is an addition rather than a port, which is why it
+   * is **empty by default**. Nothing changes for a chart that does not ask.
+   *
+   * Keyed the way `TimeUnits` keys them: a single unit, or a recognised run of units joined by
+   * hyphens, coarsest first — `year`, `month`, `year-month`, `year-month-date`, `hours-minutes`. So
+   * a language that writes the day before the month says `mapOf("year-month-date" to "%-d-%m-%Y ",
+   * "month-date" to "%-d %b ")`. The trailing space is load-bearing: the pieces are concatenated
+   * and the result trimmed.
+   *
+   * A value of **null removes** an entry rather than restoring the default, which is upstream's own
+   * behaviour and the only way to say "do not combine these two": `"hours-minutes" to null` makes
+   * `["hours", "minutes"]` fall back to the two units written separately.
+   *
+   * A specification's own second argument to `timeUnitSpecifier(units, specifiers)` still wins over
+   * this, because the document asked for it by name.
+   *
+   * See [timeTickFormats] for the other half — a `time` axis with no `timeUnit` on it.
+   */
+  public val timeUnitSpecifiers: Map<String, String?> = emptyMap(),
+  /**
+   * Overrides for the cascade a **plain** `time` axis labels its ticks with.
+   *
+   * The other place a date's field order is decided, and a different table from
+   * [timeUnitSpecifiers]: a temporal axis with no `timeUnit` on it has no single granularity, so
+   * each tick is labelled by the finest field that is not zero. That is d3's `scale.tickFormat`,
+   * and the keys here are d3's own names for its eight steps — `millisecond`, `second`, `minute`,
+   * `hour`, `day`, `week`, `month`, `year` — carrying `.%L`, `:%S`, `%I:%M`, `%I %p`, `%a %d`, `%b
+   * %d`, `%B` and `%Y` respectively. (`week` is the step a Sunday takes, which is why it gets the
+   * month back where an ordinary day does not.)
+   *
+   * Empty by default, and the default cascade is d3's exactly, because a differential fixture
+   * compares these labels against upstream's.
+   *
+   * A `%p` on a 24-hour clock is the case a host usually reaches for first: `mapOf("hour" to
+   * "%H:00", "minute" to "%H:%M")`.
+   */
+  public val timeTickFormats: Map<String, String> = emptyMap(),
   /** What separates a whole number from its fraction. */
   public val decimal: String = ".",
   /**

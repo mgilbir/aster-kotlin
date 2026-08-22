@@ -117,6 +117,7 @@ public final class ChartSession {
         + "the device's own zone."
     }
     engineTimeZone = resolved
+    engineLocale = locale ?? VegaLocale.Companion.shared.EnglishUS
     controller = VegaChartController(
       // Kotlin's default arguments do not cross the Obj-C boundary, so each is given explicitly.
       initialScene: Scene.companion.empty(width: 0, height: 0),
@@ -127,7 +128,7 @@ public final class ChartSession {
       // right default for a specification that may be pasted data.
       loader: loader ?? DenyLoader.shared,
       scheduler: nil,
-      locale: locale ?? VegaLocale.Companion.shared.EnglishUS,
+      locale: engineLocale,
       hostConfig: theme,
       containerSize: containerSize,
       // Nil, and then filled through `setData(_:rows:)` — a session is created before the app has its
@@ -143,6 +144,15 @@ public final class ChartSession {
   /// turned into a millisecond while compiling, and a store on a different clock from the axis is a
   /// brush that starts in the wrong place.
   private let engineTimeZone: Kotlinx_datetimeTimeZone?
+
+  /// The locale handed to the engine, or d3's `en-US`.
+  ///
+  /// Kept for the same reason `engineTimeZone` is: the Vega-Lite compiler needs it too. A month name
+  /// is resolved by the runtime from the pattern the compiler writes, so `%b` is enough and always
+  /// was — but the *pattern* is written on the Vega-Lite side, and the order of a date's fields is a
+  /// property of a language. Supplying a locale to one and not the other gives an axis whose field
+  /// order and whose month names come from different places.
+  private let engineLocale: VegaLocale
 
   /// What to show in a tooltip, and where — nil when there is nothing under the pointer.
   ///
@@ -322,7 +332,8 @@ public final class ChartSession {
         VegaLiteInput.shared.toVega(
           json: specification,
           hostConfig: self.hostConfig,
-          timeZone: engineTimeZone
+          timeZone: engineTimeZone,
+          locale: self.engineLocale
         )
       self.grammar = converted.wasVegaLite ? .vegaLite : .vega
       self.vegaLiteDiagnostics = converted.wasVegaLite ? converted.diagnostics : []

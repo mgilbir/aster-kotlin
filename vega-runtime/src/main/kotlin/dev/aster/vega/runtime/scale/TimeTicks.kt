@@ -132,18 +132,25 @@ public object TimeTicks {
     locale: VegaLocale = VegaLocale.EnglishUS,
   ): String {
     val at = localAt(millis, zone)
+    // Each step's pattern, which a host may replace through `VegaLocale.timeTickFormats`. Keyed by
+    // d3's own names for the cascade, because these *are* d3's steps and the default is d3's
+    // exactly — a fixture compares these labels against upstream's. The lever exists because the
+    // field order and the clock are the two things a language decides and this cascade did not ask
+    // it about: `%I %p` is an afternoon in a place that writes 14:00.
+    fun pattern(step: String, d3: String) = locale.timeTickFormats[step] ?: d3
     return when {
-      at.nanosecond != 0 -> TimeFormat.format(at, ".%L", locale)
-      at.second != 0 -> TimeFormat.format(at, ":%S", locale)
-      at.minute != 0 -> TimeFormat.format(at, "%I:%M", locale)
-      at.hour != 0 -> TimeFormat.format(at, "%I %p", locale)
+      at.nanosecond != 0 -> TimeFormat.format(at, pattern("millisecond", ".%L"), locale)
+      at.second != 0 -> TimeFormat.format(at, pattern("second", ":%S"), locale)
+      at.minute != 0 -> TimeFormat.format(at, pattern("minute", "%I:%M"), locale)
+      at.hour != 0 -> TimeFormat.format(at, pattern("hour", "%I %p"), locale)
       at.day != 1 ->
         // A Sunday is a week boundary, so it gets the month back; any other day only needs its
         // name.
-        if (at.date.dayOfWeek.isoDayNumber == 7) TimeFormat.format(at, "%b %d", locale)
-        else TimeFormat.format(at, "%a %d", locale)
-      at.month.number != 1 -> TimeFormat.format(at, "%B", locale)
-      else -> TimeFormat.format(at, "%Y", locale)
+        if (at.date.dayOfWeek.isoDayNumber == 7)
+          TimeFormat.format(at, pattern("week", "%b %d"), locale)
+        else TimeFormat.format(at, pattern("day", "%a %d"), locale)
+      at.month.number != 1 -> TimeFormat.format(at, pattern("month", "%B"), locale)
+      else -> TimeFormat.format(at, pattern("year", "%Y"), locale)
     }
   }
 

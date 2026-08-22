@@ -1,5 +1,6 @@
 package dev.aster.vega.model.time
 
+import dev.aster.vega.model.locale.VegaLocale
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
@@ -141,7 +142,25 @@ public object TimeUnits {
     fun aligned(dates: List<LocalDateTime>): Boolean = test(dates)
   }
 
-  public fun specifier(units: List<String>, overrides: Map<String, String?> = emptyMap()): String {
+  public fun specifier(
+    units: List<String>,
+    overrides: Map<String, String?> = emptyMap(),
+    /**
+     * The host's own table, under [overrides] and over the defaults.
+     *
+     * The lever this table had none of. `%b` has always resolved to the locale's month
+     * abbreviation, so a Dutch axis said `mei`; the *order* of the fields did not move, because
+     * upstream's `timeUnitSpecifier` takes no locale and this is a transcription of it. Null keeps
+     * that exactly, which is what the differential fixtures compare against.
+     *
+     * Under a specification's own [overrides] on purpose: a document writing
+     * `timeUnitSpecifier(units, {...})` asked for that by name, and a host's language preference is
+     * a default beneath it rather than an override of it. Vega-Lite's generated table is the one
+     * exception, and it is not an exception in this function — `Fields.timeUnitSpecifier` builds it
+     * *from* the locale, so the two agree by construction rather than by precedence.
+     */
+    locale: VegaLocale? = null,
+  ): String {
     // Nullable on purpose. Upstream builds the table with `extend({}, defaults, specifiers)` and
     // then
     // tests `s[key] != null`, so an override set to **null** does not fall back to the default — it
@@ -150,7 +169,7 @@ public object TimeUnits {
     // null})` is `%H %Mmin` upstream where taking the built-in combination gives `%H:%M`. The
     // signature used to be `Map<String, String>`, which cannot express it at all; upstream's own
     // test vectors are what caught it.
-    val table: Map<String, String?> = SPECIFIERS + overrides
+    val table: Map<String, String?> = SPECIFIERS + locale?.timeUnitSpecifiers.orEmpty() + overrides
     val ordered = ALL.filter { it in units }
     val out = StringBuilder()
     var start = 0

@@ -7,6 +7,7 @@ import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.flatten
+import dev.aster.vegalite.VegaLiteInput
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -327,6 +328,140 @@ class LocaleTest {
     assertTrue(
       labels(json, dutch).all { it in dutch.shortMonths },
       "labels were ${labels(json, dutch)}",
+    )
+  }
+
+  /**
+   * A bucketed axis writes the date in the order the **language** writes it, not `TimeUnits`'s.
+   *
+   * This was the one part of a date the locale seam could not reach, and the middle assertion is
+   * the whole of the complaint: `%b` has always resolved to the reader's month abbreviation, so a
+   * Dutch axis said `mei` — and said `mei 21, 2026`, because the *pattern* came from a table with
+   * no locale in it (`%Y-%m-%d` in `TimeUnits.SPECIFIERS`, `%b %d, %Y` in the two entries Vega-Lite
+   * overrides) and `Functions` had a locale in scope for every other date function and did not pass
+   * it on.
+   *
+   * Upstream has no lever for this either — its `timeUnitSpecifier` takes no locale — so the table
+   * is **empty by default** and a chart that does not ask is byte-for-byte what it was. That
+   * default is what the 283 Vega-Lite fixtures compare against.
+   */
+  @Test
+  fun `a locale decides the order of a bucketed axis's date fields`() {
+    val bucketed =
+      """
+      {"data": {"values": [{"t": "2026-05-20T10:00:00", "v": 1},
+                           {"t": "2026-06-17T10:00:00", "v": 2}]},
+       "mark": "point",
+       "encoding": {"x": {"field": "t", "type": "temporal", "timeUnit": "yearmonthdate"},
+                    "y": {"field": "v", "type": "quantitative"}}}
+      """
+        .trimIndent()
+
+    fun drawn(locale: VegaLocale) =
+      labels(requireNotNull(VegaLiteInput.toVega(bucketed, locale = locale).vegaJson), locale)
+
+    assertTrue(
+      drawn(VegaLocale.EnglishUS).contains("May 21, 2026"),
+      drawn(VegaLocale.EnglishUS).toString(),
+    )
+
+    // Dutch names, American order — the defect, stated as a test so it cannot come back quietly.
+    assertTrue(drawn(dutch).contains("mei 21, 2026"), drawn(dutch).toString())
+
+    val dayFirst = dutch.copy(timeUnitSpecifiers = mapOf("year-month-date" to "%-d %b %Y "))
+    assertTrue(drawn(dayFirst).contains("21 mei 2026"), drawn(dayFirst).toString())
+    assertTrue(
+      drawn(dayFirst).none { it.contains("mei 21") },
+      "the American order is gone, not merely joined: ${drawn(dayFirst)}",
+    )
+  }
+
+  /**
+   * `timeUnitSpecifier()` in an expression takes the locale too, and a document's own second
+   * argument still wins.
+   *
+   * The precedence is the part worth pinning. A host's language is a *default* under what the
+   * document asked for by name; Vega-Lite's generated table is the exception and is not one here —
+   * `Fields.timeUnitSpecifier` builds it **from** the locale, so the two agree by construction
+   * rather than by one out-ranking the other.
+   */
+  @Test
+  fun `a locale is under a specification's own timeUnitSpecifier overrides`() {
+    // Through a `formula` transform, so it is the function table the compiler builds that is under
+    // test rather than one assembled here — `Functions` is where the locale was in scope and
+    // unused.
+    fun specifierOf(locale: VegaLocale, expression: String): List<String> {
+      val json =
+        """
+        {
+          "width": 200, "height": 100, "padding": 5,
+          "data": [{
+            "name": "t",
+            "values": [{"x": 1}],
+            "transform": [{"type": "formula", "as": "s", "expr": "$expression"}]
+          }],
+          "scales": [{"name": "x", "type": "band", "domain": {"data": "t", "field": "s"},
+                      "range": "width"}],
+          "axes": [{"orient": "bottom", "scale": "x"}]
+        }
+        """
+          .trimIndent()
+      return labels(json, locale)
+    }
+
+    val dayFirst = dutch.copy(timeUnitSpecifiers = mapOf("year-month-date" to "%-d %b %Y "))
+    assertEquals(
+      listOf("%Y-%m-%d"),
+      specifierOf(dutch, "timeUnitSpecifier(['year','month','date'])"),
+    )
+    assertEquals(
+      listOf("%-d %b %Y"),
+      specifierOf(dayFirst, "timeUnitSpecifier(['year','month','date'])"),
+    )
+    // Written by the document, so it wins.
+    assertEquals(
+      listOf("%d/%m/%y"),
+      specifierOf(
+        dayFirst,
+        "timeUnitSpecifier(['year','month','date'], {'year-month-date': '%d/%m/%y'})",
+      ),
+    )
+  }
+
+  /**
+   * A plain `time` axis takes its clock from the locale as well.
+   *
+   * The other place a date's shape was fixed, and a different table: an axis with no `timeUnit` has
+   * no single granularity, so each tick is labelled by the finest field that is not zero. That
+   * cascade is d3's `scale.tickFormat` and its `%I %p` is an afternoon in a place that writes
+   * 14:00. `VegaLocale.timeTickFormats` is keyed by d3's own names for the eight steps, and is
+   * empty by default because a fixture compares these labels against upstream's.
+   */
+  @Test
+  fun `a locale decides the clock a plain time axis labels its ticks with`() {
+    val hours =
+      """
+      {"width": 300, "height": 120, "padding": 5,
+       "data": [{"name": "t", "values": [{"t": "2026-05-20T04:00:00", "v": 1},
+                                         {"t": "2026-05-20T20:00:00", "v": 2}],
+                 "format": {"parse": {"t": "date"}}}],
+       "scales": [{"name": "x", "type": "time", "domain": {"data": "t", "field": "t"},
+                   "range": "width"}],
+       "axes": [{"orient": "bottom", "scale": "x", "tickCount": 4}],
+       "marks": [{"type": "symbol", "from": {"data": "t"}, "encode": {"enter": {
+         "x": {"scale": "x", "field": "t"}, "y": {"value": 60}}}}]}
+      """
+        .trimIndent()
+
+    // The locale's own half-day markers, on a twelve-hour clock the locale had no say in — which is
+    // the same shape of gap as the month name on an American date order.
+    assertEquals(
+      listOf("06 a.m.", "09 a.m.", "12 p.m.", "03 p.m.", "06 p.m."),
+      labels(hours, dutch),
+    )
+    assertEquals(
+      listOf("06:00", "09:00", "12:00", "15:00", "18:00"),
+      labels(hours, dutch.copy(timeTickFormats = mapOf("hour" to "%H:00"))),
     )
   }
 }

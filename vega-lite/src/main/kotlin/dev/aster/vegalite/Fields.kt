@@ -2,6 +2,7 @@ package dev.aster.vegalite
 
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.canonicalNumberString
+import dev.aster.vega.model.locale.VegaLocale
 
 /**
  * The name a channel definition takes in the compiled Vega, and the title a guide shows for it.
@@ -151,11 +152,39 @@ internal object Fields {
    * override table — a month within one year reads `Jan`, a month spanning several reads `Jan
    * 2009`.
    */
-  fun timeUnitSpecifier(timeUnit: String): String {
+  fun timeUnitSpecifier(timeUnit: String, locale: VegaLocale = VegaLocale.EnglishUS): String {
     val parts = timeUnitParts(timeUnit).joinToString(",") { "\"$it\"" }
-    return "timeUnitSpecifier([$parts], " +
-      "{\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"})"
+    // Upstream's `VEGALITE_TIMEFORMAT`, with whatever the **host's language** says about those two
+    // entries substituted in. Only those two: everything else in the table lives in `TimeUnits`,
+    // which merges the locale under a call's own overrides — so a locale that speaks about
+    // `hours-minutes` is honoured there and does not need repeating here.
+    //
+    // The order of a date's fields is the part a locale could not reach before this. `%b` has
+    // always
+    // resolved to the reader's month abbreviation, so a Dutch axis said `mei`; it said
+    // `mei 21, 2026` all the same.
+    val table =
+      VEGA_LITE_TIME_FORMAT + locale.timeUnitSpecifiers.filterKeys { it in VEGA_LITE_TIME_FORMAT }
+    val written =
+      table.entries.joinToString(",") { (key, value) ->
+        "\"$key\":" + if (value == null) "null" else "\"${escaped(value)}\""
+      }
+    return "timeUnitSpecifier([$parts], {$written})"
   }
+
+  /**
+   * Upstream's `VEGALITE_TIMEFORMAT`: a month within one year reads `Jan`, a month spanning several
+   * reads `Jan 2009`.
+   *
+   * The trailing spaces are load-bearing — `TimeUnits.specifier` concatenates the pieces and trims
+   * the result — and the insertion order is what keeps the emitted expression identical to the one
+   * upstream writes.
+   */
+  private val VEGA_LITE_TIME_FORMAT: Map<String, String?> =
+    linkedMapOf("year-month" to "%b %Y ", "year-month-date" to "%b %d, %Y ")
+
+  /** A pattern going into a JSON string inside a generated expression. */
+  private fun escaped(value: String): String = value.replace("\\", "\\\\").replace("\"", "\\\"")
 
   /**
    * The length of one bucket, as an expression — `durationExpr` upstream.
