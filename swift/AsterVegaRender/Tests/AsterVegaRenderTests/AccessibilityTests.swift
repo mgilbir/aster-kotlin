@@ -157,4 +157,60 @@ final class AccessibilityTests: XCTestCase {
   func testTheCapIsTheEnginesOwn() {
     XCTAssertEqual(AccessibilityTree.shared.MAX_EXPOSED_MARKS, 120)
   }
+
+  /// A mark is announced as a button only where activating it does something.
+  ///
+  /// `traits(for:)`'s own header says both hosts used to say button for everything, "which is a promise
+  /// the chart does not keep" — and the gate that landed was on `activatable` while the gate on
+  /// `session` did not. So a chart drawn with no session announced every mark as a button, VoiceOver
+  /// offered the activation, the reader took it, and `accessibilityAction` opened
+  /// `guard let session else { return }` and did nothing. The Compose renderer gates the **role**
+  /// instead of the action: `role = Role.Button` only where the activation exists.
+  ///
+  /// Three conditions, read by the trait, by `accessibilityRespondsToUserInteraction` and by the action
+  /// through one function, so they cannot disagree again.
+  @MainActor
+  func testAMarkIsAButtonOnlyWhereActivatingItDoesSomething() throws {
+    let scene = try scene(bars)
+    let elements = AccessibilityTree.shared.elements(
+      scene: scene,
+      selectedNodeIds: [],
+      captions: VegaCaptionsCompanion.shared.English,
+      maxExposedMarks: AccessibilityTree.shared.MAX_EXPOSED_MARKS
+    )
+    let mark = try XCTUnwrap(elements.first { $0.activatable && $0.nodeId != nil })
+
+    let lookedAt = VegaChartView(scene: scene)
+    XCTAssertFalse(
+      lookedAt.activatable(mark),
+      "no session, so nothing to dispatch into and nothing to promise")
+    XCTAssertFalse(lookedAt.traits(for: mark).contains(.isButton))
+
+    let touchable = VegaChartView(scene: scene, session: ChartSession())
+    XCTAssertTrue(touchable.activatable(mark))
+    XCTAssertTrue(touchable.traits(for: mark).contains(.isButton))
+
+    // A guide is not a button either way, which is the rule that landed first and must not regress.
+    if let guide = elements.first(where: { !$0.activatable }) {
+      XCTAssertFalse(touchable.activatable(guide))
+      XCTAssertFalse(touchable.traits(for: guide).contains(.isButton))
+    }
+  }
+
+  /// The gesture sets, whose whole purpose is that a host can ask for the ones that claim nothing.
+  func testTheGestureSetsSayWhichClaimATouch() {
+    XCTAssertEqual(ChartGestures.all, [.tap, .longPress, .pan, .zoom, .hover])
+
+    // The set that exists for a chart inside a scroll view: neither of these claims the touch.
+    XCTAssertTrue(ChartGestures.withoutDrag.contains(.tap))
+    XCTAssertTrue(ChartGestures.withoutDrag.contains(.hover))
+    // And none of the three that do.
+    XCTAssertFalse(ChartGestures.withoutDrag.contains(.pan))
+    XCTAssertFalse(ChartGestures.withoutDrag.contains(.zoom))
+    XCTAssertFalse(
+      ChartGestures.withoutDrag.contains(.longPress),
+      "a long press reports no location in SwiftUI, so it needs a zero-distance drag to source one")
+
+    XCTAssertTrue(ChartGestures.none.isEmpty)
+  }
 }

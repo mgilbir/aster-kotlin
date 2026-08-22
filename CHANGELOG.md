@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A SwiftUI chart with no session installs no gestures**, and one with a session
+  says which. Every handler already returned early without a session, but
+  `DragGesture(minimumDistance: 0)` claimed the drag on touch-down anyway — so a
+  chart in a horizontal scroll view inside a scrolling page stopped both from
+  scrolling, where the same host code on Compose scrolled both ways. The button
+  trait and `accessibilityRespondsToUserInteraction` are now gated on the same
+  condition as the action they advertise, so VoiceOver no longer offers an
+  activation that does nothing. And the tap is a `SpatialTapGesture` separate from
+  the pan, so `VegaChartView(gestures: .withoutDrag)` keeps taps, hover and
+  tooltips without claiming a touch. (#72)
+
 - **The Apple renderer no longer paints a label the axis deliberately hid.** An
   overlapping axis label is hidden at zero opacity rather than removed, and the
   Swift walk guarded on `visible` alone — so the node reached the text branch,

@@ -5954,6 +5954,49 @@ Worth stating as a gap rather than leaving implied: nothing compares the two wal
 against each other. Their recording targets write different formats, and this defect is what that
 costs.
 
+### A chart nobody could touch, claiming every touch
+
+`VegaChartView` attached `.gesture(touch)`, two `.simultaneousGesture` calls and `.onContinuousHover`
+**unconditionally**. Every handler opened `guard let session else { return }`, so with no session the
+gestures did nothing — and `DragGesture(minimumDistance: 0)` still claims the drag the moment a finger
+lands. The `session` parameter's own documentation said the opposite: "Nil draws a chart nobody can
+touch".
+
+What that cost: a chart wider than its slot goes in a horizontal scroll view inside a page that
+scrolls vertically, and neither scrolled. The same host code on Compose scrolled both ways, because
+`Modifier.chartPointerInput` returns its receiver untouched when every callback is null. So the fix is
+that shape, in three parts.
+
+**No session, no gestures.** Every mask is `.none`, and hit testing is off on the drawing — which is
+also the workaround an adopter had to apply from outside, so applying it here is what makes the
+parameter's documentation true. The VoiceOver overlay is unaffected: it is a sibling in the `ZStack`
+with its own `allowsHitTesting(false)`, and activation goes through `accessibilityAction`, which does
+not need hit testing.
+
+**The button trait is gated on the same condition as the action it advertises.** `traits(for:)`'s own
+header records this exact failure — "Both hosts used to say button for everything, which is a promise
+the chart does not keep" — and the gate that landed was on `activatable` while the gate on `session`
+did not. VoiceOver announced every mark of a session-less chart as a button, a reader activated one,
+and `accessibilityAction` opened `guard let session else { return }`. There is one `activatable(_:)`
+now, read by the trait, by `accessibilityRespondsToUserInteraction` and by the action, so the three
+cannot disagree again. The Compose renderer gates the *role* rather than the action, and this is that.
+
+**The tap and the pan are separate detectors**, as they are on Compose, where `detectTapGestures` and
+`detectTransformGestures` are separate `pointerInput` blocks installed per callback. `SpatialTapGesture`
+reports its location, which is the only reason a zero-distance drag was standing in for a tap; it
+claims nothing until it has recognised one. The pan is a `DragGesture` with a real minimum distance,
+and the hand-rolled slop that used to tell the two apart inside one gesture is gone.
+
+`ChartGestures` is how a host says which. `.withoutDrag` is the tap and the hover — the two that claim
+nothing — and it exists for the scroll-view case; tooltips still work through it, a tap being a hover
+as well on a screen with no pointer. A long press is **not** in it, and that is the one honest cost
+left: SwiftUI reports no location for a long press, so the place the finger landed has to come from a
+zero-distance drag.
+
+What is not verifiable from `swift test`: that a gesture is or is not installed in a SwiftUI hierarchy.
+`activatable(_:)` and `traits(for:)` are internal so the promise itself is asserted, and the gesture
+sets are asserted as sets; the attachment is a reading of `GestureMask` and `allowsHitTesting`.
+
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
 PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.

@@ -25,6 +25,47 @@ import SwiftUI
 /// the space a scene is in, so a chart drawn straight into it is the right way up. The bitmap tests in
 /// the package *do* flip, because a `CGBitmapContext` on its own has its origin at the bottom left —
 /// that difference belongs to the caller, which is why the renderer does not flip anything itself.
+/// Which gestures a chart view installs.
+///
+/// The Compose renderer takes one callback per gesture and installs nothing for the ones a host leaves
+/// null — `Modifier.chartPointerInput` returns its receiver untouched when they are all null — so a
+/// host there pays for exactly what it asked for. This view takes a session rather than five closures,
+/// and a session can answer every gesture, so the choice has to be stated separately. This is that
+/// statement, and it exists for one case in particular: a chart inside a scroll view.
+public struct ChartGestures: OptionSet, Sendable {
+  public let rawValue: Int
+
+  public init(rawValue: Int) {
+    self.rawValue = rawValue
+  }
+
+  /// A tap, dispatched with the mark under it. Claims no drag; see ``ChartGestures/withoutDrag``.
+  public static let tap = ChartGestures(rawValue: 1 << 0)
+  /// A long press, which most specifications bind a tooltip to. **Claims the touch**: SwiftUI reports
+  /// no location for one, so the place the finger landed has to come from a zero-distance drag.
+  public static let longPress = ChartGestures(rawValue: 1 << 1)
+  /// A drag, as a pan of the viewport. Claims the touch past ``VegaChartView``'s slop.
+  public static let pan = ChartGestures(rawValue: 1 << 2)
+  /// A pinch, as a zoom about the point the fingers were centred on.
+  public static let zoom = ChartGestures(rawValue: 1 << 3)
+  /// A pointer moving without touching — a trackpad or mouse on iPad. Claims nothing.
+  public static let hover = ChartGestures(rawValue: 1 << 4)
+
+  /// Everything, which is what a chart that owns its space wants.
+  public static let all: ChartGestures = [.tap, .longPress, .pan, .zoom, .hover]
+
+  /// Everything that does **not** claim a drag: a tap and a hover.
+  ///
+  /// For a chart in a scroll view, which is the case that made this necessary — a chart wider than its
+  /// slot is usually put in a horizontal scroll view inside a page that scrolls vertically. Tooltips
+  /// still work: a tap hovers as well, because a touch screen has no pointer and the engine treats one
+  /// as both, so `"tooltip": true` answers a tap.
+  public static let withoutDrag: ChartGestures = [.tap, .hover]
+
+  /// Nothing at all, for a chart that is only being looked at. The same as passing no session.
+  public static let none: ChartGestures = []
+}
+
 @available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
 public struct VegaChartView: View {
   private let scene: AsterVega.Scene
@@ -38,6 +79,8 @@ public struct VegaChartView: View {
   private let textScaleOverride: Double?
   /// How many data marks a reader may explore one by one; see the initialiser.
   private let accessibilityMaxExposedMarks: Int32
+  /// Which gestures are installed; see the initialiser.
+  private let gestures: ChartGestures
 
   /// Creates a chart view.
   ///
@@ -60,12 +103,19 @@ public struct VegaChartView: View {
   ///     whether the chart is the page or a thumbnail on it, and what its own users have said. Only
   ///     marks count toward it and the axes and legend are exposed either way, so a chart of many
   ///     small points does not collapse on the strength of its axis labels.
+  ///   - gestures: which gestures to install. ``ChartGestures/all`` by default. Pass
+  ///     ``ChartGestures/withoutDrag`` for a chart inside a scroll view: a long press and a pan both
+  ///     claim the touch, and with them installed neither the chart's scroll view nor the page around
+  ///     it can move while a finger is on the drawing. A tap claims nothing and tooltips still work
+  ///     through it, a tap being a hover as well on a screen with no pointer. Ignored where `session`
+  ///     is nil, which installs nothing whatever this says.
   public init(
     scene: AsterVega.Scene,
     session: ChartSession? = nil,
     captions: VegaCaptions? = nil,
     textScale: Double? = nil,
     accessibilityMaxExposedMarks: Int32 = AccessibilityTree.shared.MAX_EXPOSED_MARKS,
+    gestures: ChartGestures = .all,
     onPlaced: ((ChartPlacement) -> Void)? = nil
   ) {
     self.scene = scene
@@ -73,6 +123,7 @@ public struct VegaChartView: View {
     self.captions = captions
     self.textScaleOverride = textScale
     self.accessibilityMaxExposedMarks = accessibilityMaxExposedMarks
+    self.gestures = gestures
     self.onPlaced = onPlaced
   }
 
@@ -123,21 +174,25 @@ public struct VegaChartView: View {
           .onChange(of: proxy.size) { _, new in report(new) }
       }
     )
-    .gesture(touch)
-    .simultaneousGesture(pinch)
-    .simultaneousGesture(
-      LongPressGesture().onEnded { _ in
-        // A long press has no location in SwiftUI, so the last place a finger went down is the honest
-        // answer — which the drag gesture above has already recorded.
-        guard let session, let point = scenePoint(of: lastDown) else { return }
-        session.longPress(at: point)
-      }
-    )
+    // **A tap, not a zero-distance drag.** `SpatialTapGesture` reports where it happened, which is the
+    // whole reason a `DragGesture(minimumDistance: 0)` was standing in for it — and it does not claim
+    // the drag on touch-down, which is what made an interactive chart inside a scroll view impossible.
+    // A host that wants tooltips can now ask for `.tap` alone and get them: a tap hovers as well,
+    // because a touch screen has no pointer and the engine treats one as both.
+    .gesture(tap, including: mask(for: .tap))
+    // Separate detectors, and a real minimum distance on this one. The tap above tolerates a small
+    // movement and fails past it, so the two do not overlap and the hand-rolled slop is gone.
+    .simultaneousGesture(pan, including: mask(for: .pan))
+    .simultaneousGesture(pinch, including: mask(for: .zoom))
+    .simultaneousGesture(longPress, including: mask(for: .longPress))
     // A pointer that moves without touching: a trackpad or mouse on iPad, and nothing on a phone. Wired
     // rather than dismissed as "iOS has no hover", because a chart whose tooltips work on one platform
     // only is a gap in the host rather than a property of the device.
+    //
+    // Gated in the handler rather than at attachment because a hover cannot claim a drag: it is the one
+    // gesture here whose mere presence costs a host nothing.
     .onContinuousHover { phase in
-      guard let session else { return }
+      guard let session, gestures.contains(.hover) else { return }
       switch phase {
       case .active(let location):
         if let point = scenePoint(of: location) { session.hover(at: point) }
@@ -145,6 +200,27 @@ public struct VegaChartView: View {
         session.hover(at: nil)
       }
     }
+    // **Nil session, nothing to touch**, which is what the `session` parameter has always documented.
+    // The masks above already refuse every gesture, and this is the same statement one level up — it
+    // is also the workaround an adopter had to apply from outside, and applying it here is what makes
+    // the parameter's own documentation true. The VoiceOver overlay is unaffected: it is a sibling in
+    // the `ZStack` with its own `allowsHitTesting(false)`, and activation goes through
+    // `accessibilityAction`, which does not need hit testing.
+    .allowsHitTesting(session != nil)
+  }
+
+  /// Whether a gesture is installed at all.
+  ///
+  /// `.none` is how SwiftUI disables a gesture, and the distinction it draws is the one this issue was
+  /// about: every handler here already opened `guard let session else { return }`, so with no session
+  /// the gestures did nothing — and a `DragGesture(minimumDistance: 0)` still **claims the drag on
+  /// touch-down**. A chart wider than its slot is usually put in a horizontal scroll view inside a page
+  /// that scrolls vertically, and neither scrolled: a swipe over the drawing moved nothing, and the
+  /// page would not scroll while a finger was on the chart. The same host code on Compose scrolled
+  /// both ways, because `Modifier.chartPointerInput` returns its receiver untouched when every callback
+  /// is null.
+  private func mask(for gesture: ChartGestures) -> GestureMask {
+    session != nil && gestures.contains(gesture) ? .all : .none
   }
 
   private func report(_ size: CGSize) {
@@ -161,18 +237,32 @@ public struct VegaChartView: View {
     onPlaced?(ChartPlacement(scale: placement.scale, left: placement.left, top: placement.top))
   }
 
-  /// The whole gesture vocabulary, so a chart answers the same touches on iOS as it does on Android.
+  /// A tap, with the place it happened.
   ///
-  /// `DragGesture(minimumDistance: 0)` rather than `TapGesture`, because a tap gesture reports *that* a
-  /// tap happened and not where — and the whole question is where. A drag that stays put is a tap; one
-  /// that moves is a pan, which is the same distinction the Android view's `GestureDetector` makes.
-  private var touch: some Gesture {
-    DragGesture(minimumDistance: 0)
+  /// `SpatialTapGesture` rather than the `DragGesture(minimumDistance: 0)` this used to be. The drag
+  /// was standing in for a tap because `TapGesture` reports *that* a tap happened and not where, and
+  /// the whole question is where — but a zero-distance drag claims the touch the moment a finger lands,
+  /// so a host that only wanted tooltips had to accept that claim and a chart inside a scroll view
+  /// became impossible. This reports the location and claims nothing until it has recognised a tap.
+  private var tap: some Gesture {
+    SpatialTapGesture(coordinateSpace: .local)
+      .onEnded { value in
+        guard let session, let point = scenePoint(of: value.location) else { return }
+        session.tap(at: point)
+      }
+  }
+
+  /// A pan, with a real minimum distance.
+  ///
+  /// The tap above tolerates a small movement and fails past it, so the two detectors do not overlap
+  /// and the hand-rolled slop that used to tell them apart inside one gesture is gone. The Compose
+  /// renderer has always been split this way — `detectTapGestures` and `detectTransformGestures` are
+  /// separate `pointerInput` blocks, installed per callback — and this is that shape.
+  private var pan: some Gesture {
+    DragGesture(minimumDistance: Self.tapSlop)
       .onChanged { value in
         guard let session else { return }
         lastDown = value.startLocation
-        let travelled = hypot(value.translation.width, value.translation.height)
-        guard travelled > Self.tapSlop else { return }
         // Incremental, because the controller adds each delta to the viewport offset: handing it the
         // gesture's cumulative translation every time would accelerate the pan quadratically.
         let previous = panned
@@ -185,16 +275,29 @@ public struct VegaChartView: View {
           phase: GesturePhase.changed
         )
       }
-      .onEnded { value in
+      .onEnded { _ in
         guard let session else { return }
-        let travelled = hypot(value.translation.width, value.translation.height)
-        if travelled <= Self.tapSlop {
-          if let point = scenePoint(of: value.location) { session.tap(at: point) }
-        } else {
-          session.pan(by: Point(x: 0, y: 0), phase: GesturePhase.ended)
-        }
+        session.pan(by: Point(x: 0, y: 0), phase: GesturePhase.ended)
         panned = .zero
       }
+  }
+
+  /// A long press, and the one gesture here that still costs a drag claim.
+  ///
+  /// `LongPressGesture` reports no location, so the place the finger went down has to come from
+  /// somewhere: a `DragGesture(minimumDistance: 0)` that records it and does nothing else. That claims
+  /// the touch, which is why `.longPress` is not in ``ChartGestures/withoutDrag`` — a chart inside a
+  /// scroll view asks for `.tap` and gets tooltips from it, a tap being a hover as well on a screen
+  /// with no pointer.
+  private var longPress: some Gesture {
+    DragGesture(minimumDistance: 0)
+      .onChanged { value in lastDown = value.startLocation }
+      .simultaneously(
+        with: LongPressGesture().onEnded { _ in
+          guard let session, let point = scenePoint(of: lastDown) else { return }
+          session.longPress(at: point)
+        }
+      )
   }
 
   /// A pinch. The anchor is where the fingers were centred, so a chart zooms about what is being looked
@@ -246,7 +349,12 @@ public struct VegaChartView: View {
             .accessibilityLabel(entry.element.label)
             // What kind of thing it is, in the chart's own language: the engine writes this through
             // its locale, so a Dutch chart says "lijn-markering" rather than "line mark".
-            .accessibilityRespondsToUserInteraction(entry.element.activatable)
+            // The **same** condition as the action below, not merely `activatable`. A trait is a
+            // promise, and this one was being made with no session to keep it: VoiceOver announced
+            // every mark as a button, a reader activated it, and nothing happened. The Compose
+            // renderer gates the *role* rather than the action — `role = Role.Button` only where the
+            // activation exists — and this is that.
+            .accessibilityRespondsToUserInteraction(activatable(entry.element))
             .accessibilityInputLabels(
               entry.element.roleDescription.map { [entry.element.label, $0] } ?? [entry.element.label]
             )
@@ -260,7 +368,7 @@ public struct VegaChartView: View {
               // Scaled, because `tap` takes surface coordinates and the controller divides by
               // `contentScale` to reach the scene. Handing it the element's scene-space centre applied the
               // fit factor twice — the same trap `contentScale` has set twice before on this project.
-              guard let session, entry.element.nodeId != nil else { return }
+              guard let session, activatable(entry.element) else { return }
               session.tap(
                 at: Point(
                   x: (entry.element.bounds.left + entry.element.bounds.width / 2) * scale,
@@ -279,12 +387,26 @@ public struct VegaChartView: View {
   /// A mark is a button because activating it selects it and may open a tooltip; a guide's caption is
   /// text, because there is nothing behind it to activate. Both hosts used to say button for
   /// everything, which is a promise the chart does not keep.
-  private func traits(for element: AccessibleElement) -> AccessibilityTraits {
+  func traits(for element: AccessibleElement) -> AccessibilityTraits {
     var traits = AccessibilityTraits()
-    if element.activatable { _ = traits.insert(.isButton) }
+    if activatable(element) { _ = traits.insert(.isButton) }
     if element.selected { _ = traits.insert(.isSelected) }
     if element.isSummary { _ = traits.insert(.isSummaryElement) }
     return traits
+  }
+
+  /// Whether activating this element actually does something.
+  ///
+  /// Three conditions, and the doc comment above `traits(for:)` already named two of them: the engine
+  /// has to call the element a mark, and the mark has to carry a node id. The third is that there is a
+  /// **session** to dispatch into, which the accessibility action has always required and the trait
+  /// did not — so a chart drawn with no session announced every mark as a button and did nothing when
+  /// one was activated. One function now, read by the trait, by
+  /// `accessibilityRespondsToUserInteraction` and by the action, so the three cannot disagree again.
+  /// Internal rather than private so the package's own tests can assert it: a SwiftUI view hierarchy
+  /// cannot be inspected from `swift test`, and this predicate is the whole of the promise.
+  func activatable(_ element: AccessibleElement) -> Bool {
+    session != nil && element.activatable && element.nodeId != nil
   }
 
   /// The chart's accessible elements, paired with an index so `ForEach` has something stable to key on.

@@ -142,6 +142,18 @@ if let scene = session.scene {
 .task { session.load(specification: specification) }
 ```
 
+Two things a host inside a scroll view needs. **No session means no gestures** — the view installs
+none and turns hit testing off, which is what the `session` parameter has always documented. And where
+there *is* a session, `gestures:` says which to install: a long press and a pan claim the touch, so a
+chart in a horizontal scroll view inside a scrolling page passes `.withoutDrag` and keeps its taps,
+its hover and its tooltips.
+
+```swift
+VegaChartView(scene: scene, session: session, gestures: .withoutDrag)
+```
+
+A tap is a hover as well on a screen with no pointer, so `"tooltip": true` answers one.
+
 ## View example
 
 ```kotlin
