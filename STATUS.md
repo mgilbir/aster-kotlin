@@ -6230,6 +6230,36 @@ an era year is a different field), and any format a platform *composes* rather t
 one is not a limitation to fix later — handing in `getBestDateTimePattern` would replace the document's
 format, which is exactly what this shape exists to prevent.
 
+### A red `main`, from three parameters that were additive by every measure that was checked
+
+The nineteen-PR stack landed green and CI went red on the macOS job, at `scripts/ios-demo.sh --check`.
+
+`VegaChartView.init` gained three closure parameters across three PRs — `gestures` is not one, it is
+`resolveImage`, `onUnresolvedImage` and, earlier, the reordering around them. All defaulted, so every
+existing labelled call kept compiling; and `foreign-api.txt` was unchanged, because a Swift-only
+initialiser's parameter *order* is not part of the exported Obj-C surface. Additive by both measures
+this repository checks.
+
+Swift matches a **trailing** closure by scanning forward from the last argument a caller labelled and
+taking the first parameter that can accept one. `resolveImage` sat before `onPlaced`, so
+`VegaChartView(scene: scene, session: session) { placement in … }` — the idiom in this package's own
+README and in both demo screens — rebound to the image resolver and failed with `cannot convert value
+of type '()' to closure result type 'CGImage?'`. A confusing error a long way from its cause.
+
+`onPlaced` comes before the two now, with a comment saying that anything closure-typed added later goes
+after it. The demo compiles unchanged, which is the proof.
+
+**The gate existed and was not run.** `scripts/ios-demo.sh --check` needs Xcode and no simulator
+runtime, so it runs anywhere `swift test` does, and CI had it as its own step all along. What was wrong
+was the local story: four scripts were treated as "the gates", this was a fifth, and a report of "all
+four green" was true and incomplete. So `swift-test.sh` runs it now — the Swift gate means all of the
+Swift, including the package `swift test` cannot see.
+
+And `CallShapeTests` pins the idiom itself, which is the cheaper guard: it asserts almost nothing at
+runtime and fails to *compile* if the order moves, so the Swift suite catches in three seconds what
+previously needed Xcode and a CI run. A trailing closure is not part of a signature, so no snapshot of
+the surface could have caught this; the order is the thing, and that is where it is now asserted.
+
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
 PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.
