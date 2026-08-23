@@ -4,7 +4,7 @@ Notable changes, newest first. The release workflow reads the section for the
 version it is publishing and uses it as the release notes, so a version without a
 section here does not get released.
 
-## Unreleased
+## 0.2.0
 
 ### Fixed
 

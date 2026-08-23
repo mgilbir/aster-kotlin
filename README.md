@@ -93,21 +93,21 @@ val compiled = controller.setSpec(converted.vegaJson ?: text)
 ## Installation
 
 Every library module publishes to Maven Central under `io.github.mgilbir.astervega`, one version for
-all of them, cut from a tag by `.github/workflows/release.yml` (see "Releasing"). Until the first tag
-is pushed there is nothing on Central yet: `./gradlew publishToMavenLocal` installs the same
-coordinates locally and the snippet below then resolves against `mavenLocal()`.
+all of them, tagged by `.github/workflows/release.yml` (see "Releasing"). To try a change that is not
+released yet, `./gradlew publishToMavenLocal` installs the same coordinates locally and the snippet
+below then resolves against `mavenLocal()`.
 
 ```kotlin
 dependencies {
   // The engine: a specification in, a scene out, plus the controller a host drives.
-  implementation("io.github.mgilbir.astervega:vega-runtime:0.1.0")
+  implementation("io.github.mgilbir.astervega:vega-runtime:0.2.0")
   // Vega-Lite in, Vega out. Only needed if the specifications are Vega-Lite.
-  implementation("io.github.mgilbir.astervega:vega-lite:0.1.0")
+  implementation("io.github.mgilbir.astervega:vega-lite:0.2.0")
 
   // One renderer, whichever suits the host:
-  implementation("io.github.mgilbir.astervega:vega-android-canvas:0.1.0")        // Android View
-  implementation("io.github.mgilbir.astervega:vega-compose:0.1.0")               // Jetpack Compose
-  implementation("io.github.mgilbir.astervega:vega-compose-multiplatform:0.1.0") // Compose MP
+  implementation("io.github.mgilbir.astervega:vega-android-canvas:0.2.0")        // Android View
+  implementation("io.github.mgilbir.astervega:vega-compose:0.2.0")               // Jetpack Compose
+  implementation("io.github.mgilbir.astervega:vega-compose-multiplatform:0.2.0") // Compose MP
 }
 ```
 
@@ -119,7 +119,7 @@ to the release, so a consuming build needs no Kotlin toolchain and never runs Gr
 
 ```swift
 // Package.swift
-.package(url: "https://github.com/mgilbir/aster-kotlin", from: "0.1.0")
+.package(url: "https://github.com/mgilbir/aster-kotlin", from: "0.2.0")
 ```
 
 ```swift
