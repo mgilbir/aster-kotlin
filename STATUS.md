@@ -6290,3 +6290,32 @@ property, check that
 `oracle-js/src/normalize.js` and `Differential.kt` both emit it. And look at the two pictures: three
 of the six were found that way, most recently a renderer drawing the full text of a label it had
 measured as truncated.
+
+### A fixture skipped for a fault it had stopped having
+
+The suite reported two skipped tests on every run of `main`, both `facet-footer`, both saying the
+compiled specification matched upstream but this runtime gridded its cells differently. It did not.
+The fixture passes every comparison, and had been passing for ten days.
+
+`GRID_LAYOUT_PENDING` was written in `2e34393b` (9 August), when the grid was first cut into cells.
+`01cc5ed2` (13 August) added `row-footer` and `column-footer` to `TrellisRole` — which until then
+fell through to `CELL` and were gridded *among* the cells rather than placed beside them — and
+`facet-footer` compiles to exactly one `column-footer` group, so that commit fixed it four days
+later without knowing it had. The entry stayed behind.
+
+Not inferred from the dates: deleting `"column-footer" -> COLUMN_FOOTER` from `TrellisRole.of` and
+running the suite reproduces both failures on demand, and restores 74 others across the corpus that
+the same role holds up. That is why the entry is retired rather than merely doubted.
+
+**The mechanism is the finding, not the fixture.** An assumption is silent by construction: the two
+comparisons declined to run, the run went green, and the count of skips — two — sat comfortably
+under the `skipped > 10` guard in CI that exists for exactly this failure. Nothing in the repository
+could have noticed, and the KDoc above the helper had already drifted to claiming the set was
+"empty, and meant to stay that way" while it held an entry. A comment cannot be a guard.
+
+So the suppression is self-expiring now. `no fixture is suppressed for a fault it no longer has`
+walks both pending sets, runs the geometry comparison itself, and fails on any fixture that
+*passes* — naming it and saying to take it out. Both sets are empty, so it is a no-op today; putting
+`facet-footer` back turns the suite red, which is how it was checked. The rule that follows from
+this: a name in either set owes an entry here saying what has to become true for it to leave, and
+the change that makes that true empties the set in the same commit.
