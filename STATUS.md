@@ -6319,3 +6319,42 @@ walks both pending sets, runs the geometry comparison itself, and fails on any f
 `facet-footer` back turns the suite red, which is how it was checked. The rule that follows from
 this: a name in either set owes an entry here saying what has to become true for it to leave, and
 the change that makes that true empties the set in the same commit.
+
+### The exclusion that caused the walk it was written to prevent
+
+The 0.2.0 release failed twenty-seven minutes into the publish job, on `./gradlew build`:
+
+```
+Execution failed for task ':vega-runtime:spotlessKotlin'.
+> Couldn't follow symbolic link '.../vega-runtime/build/bin/macosArm64/releaseFramework/AsterVega.framework/AsterVega'.
+```
+
+Nothing was tagged and nothing was published; the publish step is later in the job than the build,
+and the release job that tags is gated on it. So the cost was an hour, not a bad release.
+
+Spotless was configured with `target("src/…")` and an exclusion covering every `build` directory,
+which reads as belt and braces and is the reverse. The stack says why: `SubtractingFileCollection`
+→ `DefaultConfigurableFileTree.getFiles`. An exclusion is implemented as a subtraction, a
+subtraction has to **enumerate what it subtracts**, and enumerating it walks `build` — the one
+directory the exclusion exists to keep out of. Remove the exclusion and nothing walks it, because
+the target is anchored at `src` and nothing under `build` could ever have matched. The exclusion was
+load-bearing in one direction only: harm.
+
+Fatal on macOS and nowhere else, which is why it waited for a release to appear. A framework is a
+versioned bundle — `AsterVega.framework/AsterVega -> Versions/Current/AsterVega` — and only the
+macOS slice, added in #56 for 0.2.0, produces one. `build` links the framework and runs Spotless
+concurrently, and a walk arriving mid-link finds a symlink whose target does not exist yet.
+
+**The gate gap is the reusable part.** `check.sh` runs `spotlessCheck` and never `./gradlew build`,
+and it does not link a release framework — so the local gate, and CI, which runs the same script,
+could not have caught this. `build` is run in exactly one place: the release workflow. A command
+that only ever runs when it is most expensive to be wrong is worth knowing about, and it is the same
+shape as the `ios-demo.sh` gap that broke `main` in August: a gate that existed and was not run
+locally.
+
+Two things now hold it. `SpotlessSymlinkTest` fails if an exclusion is named again, saying why —
+the idiom is the thing to pin, as with the Swift trailing closure, because the damage is invisible
+in the artefact. And the failure reproduces on demand: put a dangling symlink under any module's
+`build` directory and run `./gradlew :vega-runtime:spotlessKotlin`. That is how the fix was checked
+rather than assumed, and how the first attempted fix — naming a constant line-ending policy, on the
+theory that `GIT_ATTRIBUTES` was doing the walking — was found to be wrong before it was committed.
