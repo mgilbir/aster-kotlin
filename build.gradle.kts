@@ -193,8 +193,21 @@ allprojects {
 
   extensions.configure<SpotlessExtension> {
     kotlin {
+      // No `targetExclude("**/build/**")`. It looks like belt and braces over a target that is
+      // already anchored at `src/`, and it is the opposite: Spotless implements an exclusion as a
+      // `SubtractingFileCollection`, which has to *enumerate* the files it subtracts, so the
+      // pattern makes Gradle walk `build/` — the one directory the exclusion exists to avoid.
+      //
+      // On macOS that directory holds a linked framework, and a framework is a versioned bundle:
+      // `AsterVega.framework/AsterVega -> Versions/Current/AsterVega`. `./gradlew build` links it
+      // and runs Spotless concurrently, and a walk arriving mid-link finds a symlink whose target
+      // does not exist yet: "Couldn't follow symbolic link", and the build fails. That is what the
+      // 0.2.0 release died of, in the one workflow that runs `build` rather than `check.sh` and on
+      // the one host that compiles Apple targets.
+      //
+      // `src/**/*.kt` is relative to the project directory, so nothing under `build/` can match it
+      // and nothing is lost. `SpotlessSymlinkTest` fails if the exclusion comes back.
       target("src/**/*.kt")
-      targetExclude("**/build/**")
       ktfmt(rootProject.libs.versions.ktfmt.get()).googleStyle()
       trimTrailingWhitespace()
       endWithNewline()
