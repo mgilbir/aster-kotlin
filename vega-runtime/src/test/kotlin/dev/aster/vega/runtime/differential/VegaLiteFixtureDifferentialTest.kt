@@ -170,14 +170,34 @@ class VegaLiteFixtureDifferentialTest {
   }
 
   /**
-   * Skips the *placement* comparisons for a chart whose cells this runtime grids differently.
+   * Every suppressed fixture is still failing, so a fixed one cannot go on being skipped.
    *
-   * Empty, and meant to stay that way: `faceted` was the one entry, and its two causes — a band of
-   * labels placed at the grid's own half-unit edge instead of the whole unit upstream rounds it out
-   * to, and a heading centred over the headers rather than over the cells — are fixed. Kept because
-   * the next composition to arrive will need somewhere honest to sit while it is being finished,
-   * and a set with a reason beside it is better than a fixture quietly deleted.
+   * This is the guard the two sets above were missing. `facet-footer` was fixed four days after it
+   * was listed, by a change that was not looking for it, and went on skipping two comparisons for
+   * the ten days after that — because an assumption is silent, and a green run says nothing about
+   * what it declined to check. Nobody was careless; no mechanism here could have noticed.
+   *
+   * So the suppression is now self-expiring: a name in either set that *passes* the geometry
+   * comparison fails here instead, naming itself and saying to take it out. Both sets are empty as
+   * this is written, which makes this a no-op today and a tripwire the moment one is not.
    */
+  @Test
+  fun `no fixture is suppressed for a fault it no longer has`() {
+    for (name in GRID_LAYOUT_PENDING + PROJECTION_PENDING) {
+      val (reference, compiled) = compile(name)
+      val differences =
+        Differential.compareMarks(
+          reference.marks,
+          Differential.flattenScene(requireNotNull(compiled.scene)),
+        )
+      assertTrue(
+        differences.isNotEmpty(),
+        "$name is listed as pending but its geometry now matches upstream — remove it from the " +
+          "set and let the comparison run",
+      )
+    }
+  }
+
   /**
    * Skips the *placement* comparisons for a chart whose places this runtime projects differently.
    *
@@ -203,8 +223,24 @@ class VegaLiteFixtureDifferentialTest {
   }
 
   private companion object {
-    /** Fixtures whose *placement* is pending on the runtime's grid layout. */
-    val GRID_LAYOUT_PENDING = setOf("facet-footer")
+    /**
+     * Fixtures whose *placement* is pending on the runtime's grid layout. **Empty**, and the way it
+     * emptied is the part worth keeping.
+     *
+     * `facet-footer` sat here from the commit that introduced this set, and was fixed four days
+     * later by a change that never mentioned it: adding `row-footer` and `column-footer` to
+     * `TrellisRole`, which until then fell through to `CELL` and were gridded *among* the cells.
+     * That fixture compiles to exactly one `column-footer` group, so it was the same defect wearing
+     * a Vega-Lite hat — but the entry stayed, and an assumption is silent, so two tests skipped for
+     * a fault that no longer existed and the run stayed green either way.
+     *
+     * Removing the role from `TrellisRole.of` reproduces both failures on demand, which is how the
+     * entry was retired rather than merely doubted. The lesson is about the mechanism, not the bug:
+     * a name in here suppresses a test until somebody takes it out, and nothing else will. So when
+     * a grid-layout fault is fixed, empty this set in the same change — and if a fixture is added
+     * here, it owes STATUS.md an entry saying what has to become true for it to leave.
+     */
+    val GRID_LAYOUT_PENDING = emptySet<String>()
 
     /**
      * Fixtures pending on the runtime's projections. **Empty**, and the history is the useful part.
