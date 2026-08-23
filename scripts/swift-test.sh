@@ -14,6 +14,8 @@
 # anything that could run these tests.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# Captured before the `cd` into the package below, so the demo check at the end can be found again.
+ROOT="$PWD"
 
 if ! command -v swift >/dev/null 2>&1; then
   echo "swift not found — this needs Xcode command-line tools, and only runs on macOS." >&2
@@ -55,3 +57,16 @@ if [ -f "$HEADER" ]; then
 fi
 
 swift test "$@"
+
+# The demo app, type-checked for both iOS slices.
+#
+# A separate SwiftPM package, so `swift test` above says nothing about it — and that gap cost a red
+# `main`. Three closure parameters were added to `VegaChartView.init`, all defaulted and all additive
+# to `foreign-api.txt`, and they moved where Swift's forward scan lands a **trailing** closure: the
+# `VegaChartView(scene:session:) { placement in … }` in both demo screens rebound to the new image
+# resolver. Nothing here noticed, because nothing here used that idiom. `CallShapeTests` pins the
+# idiom now; this pins the whole package, which has other code that can break the same way.
+#
+# `--check` needs Xcode and no simulator runtime, so it runs wherever `swift test` does. It is the same
+# command CI runs as its own step; running it here means "the Swift gate" means all of it.
+"$ROOT/scripts/ios-demo.sh" --check

@@ -137,9 +137,16 @@ public struct VegaChartView: View {
     textScale: Double? = nil,
     accessibilityMaxExposedMarks: Int32 = AccessibilityTree.shared.MAX_EXPOSED_MARKS,
     gestures: ChartGestures = .all,
+    // **`onPlaced` comes before the other two closures on purpose.** Swift matches a trailing closure
+    // by scanning *forward* from the last argument a caller labelled, and it takes the first parameter
+    // that can accept one — so with `resolveImage` ahead of it,
+    // `VegaChartView(scene:session:) { placement in … }` silently rebound to the image resolver and
+    // failed with `cannot convert '()' to 'CGImage?'`. That idiom is the one this view's own
+    // documentation and the demo both use, and it was broken by adding parameters that looked purely
+    // additive. Anything closure-typed added here goes *after* this line.
+    onPlaced: ((ChartPlacement) -> Void)? = nil,
     resolveImage: ((String) -> CGImage?)? = nil,
-    onUnresolvedImage: ((String) -> Void)? = nil,
-    onPlaced: ((ChartPlacement) -> Void)? = nil
+    onUnresolvedImage: ((String) -> Void)? = nil
   ) {
     self.scene = scene
     self.session = session
