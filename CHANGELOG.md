@@ -48,6 +48,124 @@ section here does not get released.
   differently. `VegaLocale.EnglishUS` is byte-for-byte unchanged, which is what leaves the
   283 fixture comparisons still. (#98)
 
+- **A date's suffix marker is no longer dropped with the field after it.** A language that
+  writes a marker after each number — `%Y年%m月%d日` — derived its year-month form as
+  `%Y年%m`, losing the `月`, so a bucketed axis read "2026年08". Dropping a field takes one
+  adjacent separator with it, and which one depends on what the separator is for: text
+  standing *between* two fields goes with the dropped one, and a marker belonging to the
+  field before it stays. The two are told apart by whether the separator carries a letter
+  and is attached with no space in front — which keeps `%b %d, %Y` giving `%b %Y`, keeps
+  `%d-%m-%Y` giving `%d-%m`, and keeps Spanish `%e de %B de %Y` giving `%e de %B`, none of
+  which move. No bundled locale is written with markers, so this only ever affected a
+  host-supplied one.
+
+- **`vega-compose` reaches the seams the view underneath already had.** `VegaChart` took a
+  controller or a scene, a modifier and `onEvent`, and nothing else — so a host on the
+  View-based artifact could not register a font family, raise the accessibility threshold or
+  turn off the built-in tooltip, though `VegaChartView` has all three and the Compose API is
+  a wrapper around that very view. `fontResolver`, `accessibilityMaxExposedMarks` and
+  `tooltipsEnabled` are now parameters on both overloads. `onEvent` stays last, and anything
+  added later goes before it: Kotlin binds a trailing lambda to the final parameter, so
+  `VegaChart(controller) { … }` means `onEvent` only while `onEvent` is last. Pinned by
+  `CallShapeTest`, which `scripts/check.sh` now compiles — it never compiled any
+  `androidTest` source set before, so four of them could have stopped compiling unnoticed.
+  (#99)
+
+- **The Android renderers have an image seam at all.** `AndroidCanvasSceneRenderer` has
+  taken an `AndroidImageResolver` since it could draw an `image` mark, and nothing outside
+  the module could set one — so every image mark on a View or Compose host resolved to
+  nothing and reported `EXPORT_IMAGE_UNRESOLVED`. The fix that gave the Compose
+  Multiplatform renderer a resolver for 0.2.0 reached the Swift view and that module, and
+  not this one. `VegaChartView.imageResolver`, `onUnresolvedImage` and `clearImageCache()`
+  are now public and forwarded through `vega-compose`'s `VegaChart`.
+
+  A URL is asked of the resolver **once**, not once per frame, and a refusal is remembered
+  too — without which a host that fetches would have been fetching on every frame of every
+  pan. `onUnresolvedImage` is told once per URL, matching the Compose Multiplatform chart so
+  the same host code works on either renderer; the per-frame diagnostic is unchanged, since
+  it describes the frame that was drawn. (#99)
+
+- **Every host can be told where its chart was drawn.** `onPlaced` reports the fit scale
+  and the offset from the surface's top-left corner, as a `ScenePlacement`, for a host putting
+  its own overlay on a chart or turning a point of its own into scene coordinates. The Compose Multiplatform
+  and SwiftUI charts have had it since they existed; `VegaChartView` and `vega-compose`
+  could not, because `ChartPlacement` was declared in `vega-compose-multiplatform` and a
+  `View` cannot depend on a Compose module. `VegaChartView.placement()` is public too, for
+  a host that would rather ask than be told.
+
+- **A host can hand the Apple renderer its own font**, through `resolveFont` on
+  `ChartSession`, `VegaChartView` and `CoreTextTextEngine`. Both Kotlin renderers have taken
+  a resolver for this since before 0.2.0; the Apple side resolved a family name through
+  CoreText alone, so an app bundling a face — which most design systems do — could only reach
+  a chart by registering it process-wide with `CTFontManagerRegisterGraphicsFont` and hoping
+  the name matched. That works and is the wrong shape: process-wide state to configure one
+  chart, invisible at the call site, and one specification drawing in different faces on
+  different platforms.
+
+  The resolver is consulted for a **named** family and not for a generic one — `sans-serif`
+  asks for the reader's default, and answering it would reintroduce the difference this
+  removes. It returns a *face* at any size; the chart's own size, weight and slant are
+  applied to it. `VegaChartView` defaults to the session's resolver rather than asking for
+  the closure twice, because the layout was measured with it: painting a face the boxes were
+  not measured for puts every label off its baseline. (#106)
+
+- **The Swift package's own API is snapshotted**, in `swift/AsterVegaRender/swift-api.txt`,
+  from the symbol graph the compiler emits. `foreign-api.txt` covers what Kotlin exports to
+  Obj-C; `VegaChartView.init` and `ChartSession` are Swift source and were in no snapshot at
+  all, leaving them to `CallShapeTests` — which pins the shapes somebody thought to write
+  down, and missed a rebound trailing closure and a missing font seam. Run by
+  `scripts/swift-test.sh`, so `check.sh` covers it.
+
+### Changed
+
+- **The Android view centres a chart, as the other three renderers already did.** A scene is
+  scaled to fit, so a slot of a different aspect ratio leaves a strip along one axis;
+  `VegaChartView` put all of it on the right and the bottom while the Compose Multiplatform
+  and SwiftUI charts split it evenly, so the same chart in the same slot sat in a different
+  place depending on the host. **This moves existing Android charts** — by half the slack, and
+  only where there is any: a view measured at its own preferred size is unmoved, which is most
+  of them, and a chart given `match_parent` on an axis shifts by half of what was empty.
+  Drawing, hit testing and the accessibility frames all read the one `placement()`, so they
+  moved together rather than needing four edits. (#99)
+
+- **The placement type moved to `vega-scene`**, the module every renderer already depends
+  on, as `ScenePlacement`. `dev.aster.vega.compose.mp.ChartPlacement` is a typealias now, so
+  Kotlin source keeps compiling; code already compiled against the old class will not link,
+  since a typealias is resolved at the call site.
+
+  It is **not** called `ChartPlacement` in Kotlin, and that is the Obj-C boundary rather than
+  taste: `vega-scene` is exported to the Apple framework under a flat namespace, so that name
+  would collide with the Swift package's own `ChartPlacement` and every Swift host would fail
+  with "'ChartPlacement' is ambiguous for type lookup". `@HiddenFromObjC` is Kotlin/Native-only
+  and the file compiles for the JVM too. The Swift struct is unchanged. (#99)
+
+- **`VegaChartView` computes its placement once**, where the draw's viewport, a touch's
+  conversion to scene coordinates and the accessibility helper's two mappings each wrote the
+  origin out for themselves. Four copies of one number, any of which could drift from the
+  others — which is how a reader's finger lands beside the mark it looked like it hit, a
+  defect this project has had twice. No behaviour changes: all four agreed, and an
+  instrumented test now aims a tap through the reported placement and asserts it hits the
+  bar it aimed at.
+
+- **A locale gets one date, whichever grammar the document was written in.** Vega derived
+  a bucketed axis's format from the locale's own `%x`; Vega-Lite read only the field
+  *order* off it and rebuilt the entry from its own directives. So the same `VegaLocale`
+  produced `21-05-2026` on a Vega chart and `21 mei 2026` on a Vega-Lite one, Spanish lost
+  its `de`, and `%b %d, %Y` came back without its comma — the derivation
+  `timeUnitSpecifierOverrides` documents, disagreeing with the code that implemented it.
+  Both paths now derive through `VegaLocale.timeUnitSpecifiers`.
+
+  **This changes what a host-supplied locale draws.** A locale whose `%x` is numeric now
+  gets a numeric month where Vega-Lite's own table would have written a name — `21-05-2026`
+  rather than `21 mei 2026`. A host wanting the name states `year-month-date` in
+  `timeUnitSpecifierOverrides`, which is the same lever as before and now wins for *every*
+  key it names: a stated `month-date` used to be honoured on a Vega chart and silently
+  dropped on a Vega-Lite one.
+
+  `VegaLocale.EnglishUS` states its tables rather than deriving them, so it is untouched and
+  all 283 Vega-Lite fixture comparisons are unmoved. `dateFieldOrder` remains, for a host
+  that wants the order without the pattern; it is no longer how a specifier is derived. (#97)
+
 ## 0.2.0
 
 ### Fixed

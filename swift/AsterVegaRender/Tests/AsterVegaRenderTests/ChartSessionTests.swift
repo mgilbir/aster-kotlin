@@ -523,11 +523,24 @@ final class ChartSessionTests: XCTestCase {
       namesOnly.contains { $0.contains("mei 21, 2026") },
       "an upstream-pinned locale keeps the American order: \(namesOnly)")
 
+    // A deriving locale is read **whole**: the order it writes and the directives and separators it
+    // writes them with. `%d-%m-%Y` therefore draws `21-05-2026`.
+    //
+    // This read `21 mei 2026` until #97, on the rule that the order came from the locale and the
+    // directives stayed Vega-Lite's. The Vega path never had that rule, so the same `VegaLocale`
+    // drew two different dates depending on a grammar the host cannot see — both arrive as the same
+    // document from the same endpoint. The cost sits on this line: a numeric `%x` now gets a numeric
+    // month where upstream's table would have written a name.
     let dayFirst = await labels(Self.dutch(dayFirst: true))
-    XCTAssertTrue(dayFirst.contains { $0.contains("21 mei 2026") }, "day first: \(dayFirst)")
+    XCTAssertTrue(dayFirst.contains { $0.contains("21-05-2026") }, "day first: \(dayFirst)")
     XCTAssertFalse(
       dayFirst.contains { $0.contains("mei 21") },
       "the American order is gone rather than joined: \(dayFirst)")
+
+    // And a host that wants its month spelled out says so. The same lever as before, and the whole
+    // of the escape hatch.
+    let spelled = await labels(Self.dutch(dayFirst: true, spelledOut: true))
+    XCTAssertTrue(spelled.contains { $0.contains("21 mei 2026") }, "spelled out: \(spelled)")
   }
 
   /// A host's own **rules** reach a chart's labels, and cannot change what the format asked for.
@@ -619,7 +632,12 @@ final class ChartSessionTests: XCTestCase {
   }
 
   /// Dutch, deriving its date order from its own `%x` or pinned to upstream's table.
-  private static func dutch(dayFirst: Bool) -> VegaLocale {
+  /**
+   - Parameter spelledOut: states `year-month-date` outright, which is how a host asks for a month
+     name from a locale whose own `%x` is numeric. Under `dayFirst` alone the pattern is read whole
+     and the month stays a numeral.
+   */
+  private static func dutch(dayFirst: Bool, spelledOut: Bool = false) -> VegaLocale {
     VegaLocale(
       months: [
         "januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september",
@@ -638,7 +656,8 @@ final class ChartSessionTests: XCTestCase {
       // language writes the day first, and until now nothing read it — so a Dutch chart said
       // `mei 21, 2026`, the right month name in the American order. An empty map pins a locale to
       // upstream's own table instead, and `VegaLocale.EnglishUS` is the only one that does.
-      timeUnitSpecifierOverrides: dayFirst ? nil : [:],
+      timeUnitSpecifierOverrides: spelledOut
+        ? ["year-month-date": "%-d %b %Y "] : (dayFirst ? nil : [:]),
       timeTickFormatOverrides: dayFirst ? nil : [:],
       decimal: ",",
       thousands: ".",

@@ -1083,6 +1083,21 @@ public final class dev/aster/vega/scene/ScenePaint$Solid : dev/aster/vega/scene/
 	public final synthetic fun unbox-impl ()Ldev/aster/vega/scene/SceneColor;
 }
 
+public final class dev/aster/vega/scene/ScenePlacement {
+	public fun <init> (DDD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun copy (DDD)Ldev/aster/vega/scene/ScenePlacement;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/ScenePlacement;DDDILjava/lang/Object;)Ldev/aster/vega/scene/ScenePlacement;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLeft ()D
+	public final fun getScale ()D
+	public final fun getTop ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class dev/aster/vega/scene/SceneSnapshotKt {
 	public static final fun toCanonicalJson (Ldev/aster/vega/scene/Scene;IZZ)Ljava/lang/String;
 	public static synthetic fun toCanonicalJson$default (Ldev/aster/vega/scene/Scene;IZZILjava/lang/Object;)Ljava/lang/String;

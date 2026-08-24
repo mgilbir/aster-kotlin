@@ -1207,6 +1207,25 @@ final class dev.aster.vega.scene/SceneNodeIdAllocator { // dev.aster.vega.scene/
     final fun rewind(kotlin/Long) // dev.aster.vega.scene/SceneNodeIdAllocator.rewind|rewind(kotlin.Long){}[0]
 }
 
+final class dev.aster.vega.scene/ScenePlacement { // dev.aster.vega.scene/ScenePlacement|null[0]
+    constructor <init>(kotlin/Double, kotlin/Double, kotlin/Double) // dev.aster.vega.scene/ScenePlacement.<init>|<init>(kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+
+    final val left // dev.aster.vega.scene/ScenePlacement.left|{}left[0]
+        final fun <get-left>(): kotlin/Double // dev.aster.vega.scene/ScenePlacement.left.<get-left>|<get-left>(){}[0]
+    final val scale // dev.aster.vega.scene/ScenePlacement.scale|{}scale[0]
+        final fun <get-scale>(): kotlin/Double // dev.aster.vega.scene/ScenePlacement.scale.<get-scale>|<get-scale>(){}[0]
+    final val top // dev.aster.vega.scene/ScenePlacement.top|{}top[0]
+        final fun <get-top>(): kotlin/Double // dev.aster.vega.scene/ScenePlacement.top.<get-top>|<get-top>(){}[0]
+
+    final fun component1(): kotlin/Double // dev.aster.vega.scene/ScenePlacement.component1|component1(){}[0]
+    final fun component2(): kotlin/Double // dev.aster.vega.scene/ScenePlacement.component2|component2(){}[0]
+    final fun component3(): kotlin/Double // dev.aster.vega.scene/ScenePlacement.component3|component3(){}[0]
+    final fun copy(kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ...): dev.aster.vega.scene/ScenePlacement // dev.aster.vega.scene/ScenePlacement.copy|copy(kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.scene/ScenePlacement.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.scene/ScenePlacement.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.scene/ScenePlacement.toString|toString(){}[0]
+}
+
 final class dev.aster.vega.scene/SceneSnapshotSerializer { // dev.aster.vega.scene/SceneSnapshotSerializer|null[0]
     constructor <init>(kotlin/Int = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // dev.aster.vega.scene/SceneSnapshotSerializer.<init>|<init>(kotlin.Int;kotlin.Boolean;kotlin.Boolean){}[0]
 

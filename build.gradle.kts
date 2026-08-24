@@ -49,10 +49,14 @@ val publishable =
  * **Those two are not covered by this either, and the reason is worth writing down.** Kotlin's ABI
  * validation reads a module's Maven publications, which for an Android library it does not support
  * — KGP even has a diagnostic named for it, `AbiValidationAndroidPublicationNotSupported` — and
- * pointing it at the main compilation instead leaves a provider with no value. So the nine modules
- * that can be dumped are dumped, and the two Android presentation layers are a stated gap rather
- * than a silent one. Their surface is small (`VegaChartView`, the `VegaChart` composable and their
- * options) and it is the one place a consumer has to read the diff by hand.
+ * pointing it at the main compilation instead leaves a provider with no value.
+ *
+ * They are covered by `scripts/android-api.sh` instead, which snapshots what `javap` reads off the
+ * compiled classes, the way `scripts/foreign-api.sh` snapshots the Obj-C surface and for the same
+ * reason. This used to say their surface was small enough for a consumer to read the diff by hand.
+ * Reading it by hand is what failed: `vega-compose` shipped 0.2.0 exposing a controller, a modifier
+ * and one callback while the view underneath had three more seams, and an adopter found it (#99)
+ * rather than a review. A surface nobody snapshots is a surface nobody diffs.
  *
  * The API is `@ExperimentalAbiValidation` and says so. The tasks are `checkKotlinAbi` and
  * `updateKotlinAbi`; the dumps land under each module's `api/`. The `*LegacyAbi` names are the same

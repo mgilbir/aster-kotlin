@@ -39,19 +39,58 @@ class DemoActivityTest {
    * Skipped rather than failed when the device has no route out: an emulator without networking is
    * a fact about the machine, not a regression in the demo.
    */
+  /**
+   * Whether this device can turn the gallery's name into an address.
+   *
+   * The question a test has to ask *before* loading, because an unresolvable host never reaches a
+   * socket: `HttpDataLoader` refuses it rather than trying, since a name it cannot resolve cannot
+   * be checked against the private-network rule. That refusal is correct and is indistinguishable,
+   * at the call site, from a chart asking for an address policy forbids.
+   */
+  private fun canResolve(host: String): Boolean =
+    try {
+      java.net.InetAddress.getByName(host)
+      true
+    } catch (offline: java.io.IOException) {
+      false
+    }
+
+  /**
+   * Skips, loudly, when the device has no DNS.
+   *
+   * An emulator without networking is a fact about the machine and not a regression in the demo —
+   * but a skip has to say which of those it is, or a green run means nothing. `scripts/check.sh`
+   * prints every gate's outcome for the same reason.
+   */
+  private fun assumeTheDeviceCanResolve(host: String) {
+    Assume.assumeTrue(
+      "this device cannot resolve $host, so the tests that fetch from it are not running",
+      canResolve(host),
+    )
+  }
+
   @Test
   fun aPastedSpecificationLoadsItsDataFromTheGallery() {
     val context = InstrumentationRegistry.getInstrumentation().targetContext
     val cache = File(context.cacheDir, "loader-test").apply { deleteRecursively() }
     val loader = VegaDataLoaders.directoryThenNetwork(cache, cacheDownloads = true)
 
-    val rows =
-      try {
-        loader.load("data/barley.json")
-      } catch (unreachable: IOException) {
-        Assume.assumeNoException("no route to vega.github.io from this device", unreachable)
-        return
-      }
+    // **The device is expected to have a route.** `scripts/emulator.sh` starts the AVD with name
+    // servers precisely so this runs; an emulator that cannot resolve a name is a broken emulator,
+    // not a licence to stop testing the network.
+    //
+    // The skip that used to be here is worth recording, because it was two defects at once. It
+    // caught
+    // `IOException` — and an unresolvable host never reaches a socket, since `HttpDataLoader`
+    // refuses
+    // it rather than trying, correctly, because a name it cannot resolve cannot be checked against
+    // the
+    // private-network rule. That arrives as `LoadDeniedException`, which is not an `IOException`,
+    // so
+    // the skip never fired. And had it fired it would have been the worse outcome: a green run that
+    // had quietly stopped exercising the one thing this test exists for.
+    assumeTheDeviceCanResolve(GALLERY_HOST)
+    val rows = loader.load("data/barley.json")
     assertTrue("fetched nothing", rows.contains("\"variety\""))
 
     // Cached where the next load will find it, so the second read needs no network.
@@ -109,9 +148,16 @@ class DemoActivityTest {
     for (chart in DemoChart.entries.filter { it.specAsset != null }) {
       val asset = requireNotNull(chart.specAsset)
       val json = context.assets.open(asset).bufferedReader().use { it.readText() }
+      val fetches = """"url"""" in json
+      // Only the specifications that fetch are skipped, and only when the device cannot resolve the
+      // gallery — the bundled ones still compile on an emulator with no network, which is most of
+      // them and the part this test is really about. Skipping the whole test offline would have
+      // been
+      // the easy fix and would have stopped checking twenty-odd specifications to excuse two.
+      if (fetches && !canResolve(GALLERY_HOST)) continue
       // A specification that fetches gets a loader that can; the rest are read from the assets.
       val controller =
-        if (""""url"""" in json) {
+        if (fetches) {
           VegaChartController(
             textEngine = AndroidTextEngine(),
             loader = VegaDataLoaders.directoryThenNetwork(context.cacheDir, cacheDownloads = true),
@@ -268,5 +314,10 @@ class DemoActivityTest {
     assertEquals(1, pasted.size)
     assertTrue(pasted.single().isSpec)
     assertEquals(null, pasted.single().specAsset)
+  }
+
+  private companion object {
+    /** The host the gallery's specifications fetch from, named once. */
+    const val GALLERY_HOST = "vega.github.io"
   }
 }

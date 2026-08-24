@@ -21,6 +21,7 @@ import dev.aster.vega.scene.AccessibilityTree
 import dev.aster.vega.scene.HitTestOptions
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.Scene
+import dev.aster.vega.scene.ScenePlacement
 import dev.aster.vega.scene.VectorD
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
@@ -59,7 +60,75 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
    * is the note on [newCompatibleTextEngine].
    */
   private var textEngine = AndroidTextEngine(context.resources.configuration.fontScale)
-  private var renderer = AndroidCanvasSceneRenderer(textEngine)
+
+  /**
+   * Every seam the renderer takes, applied in one place.
+   *
+   * It was constructed at a field initialiser and again in [fontResolver]'s setter, and a seam
+   * added to one and not the other is silently dropped for whichever host set the other first.
+   * There are three of them now.
+   */
+  private fun newRenderer(): AndroidCanvasSceneRenderer =
+    AndroidCanvasSceneRenderer(
+      textEngine = textEngine,
+      imageResolver = imageResolver,
+      onUnresolvedImage = { url -> onUnresolvedImage?.invoke(url) },
+    )
+
+  /**
+   * Turns an image mark's URL into a bitmap, or null where there is nothing to show.
+   *
+   * The renderer has taken one of these since it could draw an `image` mark and **nothing outside
+   * this module could set it**, so every image mark on a View or Compose host resolved to nothing
+   * and reported `EXPORT_IMAGE_UNRESOLVED`. The Compose Multiplatform renderer grew the same seam
+   * for 0.2.0; this is the other half of it, and the gap was reported from outside (#99).
+   *
+   * A URL is asked **once**, not once per frame, and a refusal is remembered too — see
+   * [clearImageCache], which is how a host says an address now holds something different.
+   *
+   * Called from the draw, on the main thread. A resolver that fetches should answer from a cache
+   * and start the fetch elsewhere, then call [clearImageCache] when it lands.
+   */
+  public var imageResolver: AndroidImageResolver = AndroidImageResolver.None
+    set(value) {
+      if (field === value) return
+      field = value
+      renderer = newRenderer()
+      invalidate()
+    }
+
+  /**
+   * Told the first time an image mark's URL cannot be resolved, and not again for that URL.
+   *
+   * The hole in the chart is otherwise all a host gets, since a diagnostic has to be read out of
+   * the controller and correlated by hand. Matches `onUnresolvedImage` on the Compose Multiplatform
+   * chart, so the same host code works on either renderer.
+   *
+   * Set freely: unlike [imageResolver] this does not rebuild the renderer, because the renderer
+   * calls back through this property rather than capturing it.
+   */
+  public var onUnresolvedImage: ((String) -> Unit)? = null
+
+  /**
+   * Built **after** every property it reads, and that placement is load-bearing.
+   *
+   * Kotlin runs property initialisers in declaration order, so a renderer constructed above
+   * [imageResolver] would be handed that field before it had been assigned — a null arriving where
+   * the type says it cannot be. Nothing in the compiler catches it, because the read happens inside
+   * [newRenderer] rather than in the initialiser itself.
+   */
+  private var renderer = newRenderer()
+
+  /**
+   * Forgets every resolved and refused address, so the next draw asks [imageResolver] again.
+   *
+   * For an image that has changed behind its URL, and for a fetch that failed once and may not fail
+   * twice.
+   */
+  public fun clearImageCache() {
+    renderer.clearImageCache()
+    invalidate()
+  }
 
   /**
    * A face this app ships, by the family name a specification asks for; null leaves it to Android.
@@ -81,7 +150,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
       if (field === value) return
       field = value
       textEngine = newCompatibleTextEngine()
-      renderer = AndroidCanvasSceneRenderer(textEngine)
+      renderer = newRenderer()
       invalidate()
     }
 
@@ -124,6 +193,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
       drawnRevision = Long.MIN_VALUE
       accessibilityHelper.invalidateSemanticTree()
       syncContentScale()
+      reportPlacement()
       observeController()
       updatePreferredSize()
       applyChartDescription()
@@ -279,6 +349,9 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
       controller.state.collect {
         // A new scene can change the fit scale, so refresh it before anything hit-tests.
         syncContentScale()
+        // And a host holding an overlay has to be told, for the same reason: the scale it was given
+        // described the previous scene's size.
+        reportPlacement()
         accessibilityHelper.invalidateSemanticTree()
         updatePreferredSize()
         applyChartDescription()
@@ -301,6 +374,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
   override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
     super.onSizeChanged(width, height, oldWidth, oldHeight)
     syncContentScale()
+    reportPlacement()
     controller.dispatch(
       ChartInputEvent.Resized(
         width = width.toDouble(),
@@ -318,6 +392,78 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
    */
   private fun syncContentScale() {
     controller.contentScale = fitScaleFor(controller.snapshot.scene)
+  }
+
+  /**
+   * Where the chart is drawn inside this view: the fit scale, and the offset from the view's
+   * top-left corner.
+   *
+   * **One placement, read by everything that has to agree about it.** The origin was written out
+   * four separate times — the draw's viewport, a touch's conversion to scene coordinates, and the
+   * accessibility helper's two mappings — each spelling it `paddingLeft`/`paddingTop` and each free
+   * to drift from the others. A second copy of this arithmetic is how a reader's finger lands
+   * beside the mark it looked like it hit, which this project has had twice.
+   *
+   * The **fit alone**, with no pan or zoom in it: `InteractionState` carries those and the
+   * controller applies them, so folding them in here would apply each twice.
+   *
+   * **Centred in whatever is left over**, which the Compose Multiplatform and SwiftUI renderers
+   * have always done and this one did not. A scene is scaled to fit, so a slot of a different
+   * aspect ratio leaves a strip along one axis; this view used to put all of it on the right and
+   * the bottom, and the same chart in the same slot therefore sat in a different place depending on
+   * which host drew it. `SceneFit.Contain` on the Compose side calls centring what "makes a chart
+   * in a slot of the wrong aspect ratio look placed rather than stuck to a corner", and that was as
+   * true here.
+   *
+   * A view measured at its own preferred size has nothing left over and does not move, which is
+   * most of them; a chart given `match_parent` on an axis moves by half the slack.
+   */
+  public fun placement(): ScenePlacement {
+    val scene = controller.snapshot.scene
+    val scale = fitScaleFor(scene)
+    val availableWidth = (width - paddingLeft - paddingRight).toDouble()
+    val availableHeight = (height - paddingTop - paddingBottom).toDouble()
+    // Never negative. The fit scale has already made the scene no larger than the box, and a box
+    // with
+    // no room at all leaves the origin at the padding rather than pulling the drawing inwards.
+    val slackX = (availableWidth - scene.width * scale).coerceAtLeast(0.0)
+    val slackY = (availableHeight - scene.height * scale).coerceAtLeast(0.0)
+    return ScenePlacement(
+      scale = scale,
+      left = paddingLeft + slackX / 2.0,
+      top = paddingTop + slackY / 2.0,
+    )
+  }
+
+  /**
+   * Told where the chart was drawn, whenever that changes.
+   *
+   * The same seam the Compose Multiplatform and SwiftUI charts have, and the reason it was missing
+   * here is worth recording: `ScenePlacement` was declared in `vega-compose-multiplatform`, which a
+   * `View` cannot depend on. It lives in `vega-scene` now.
+   *
+   * For a host putting its own overlay on the chart, or turning a point of its own into scene
+   * coordinates. Fired on a size change and after a compile, not per frame, and only when the
+   * numbers actually differ.
+   */
+  public var onPlaced: ((ScenePlacement) -> Unit)? = null
+    set(value) {
+      field = value
+      // A host that sets this after the view is laid out has missed the report that already
+      // happened, and would otherwise wait for a resize that may never come.
+      reportPlacement()
+    }
+
+  /** The placement last handed to [onPlaced], so an unchanged one is not reported again. */
+  private var reportedPlacement: ScenePlacement? = null
+
+  private fun reportPlacement() {
+    val callback = onPlaced ?: return
+    if (width <= 0 || height <= 0) return
+    val current = placement()
+    if (current == reportedPlacement) return
+    reportedPlacement = current
+    callback(current)
   }
 
   /** Uniform scale that fits [scene] inside the padded content box. */
@@ -376,9 +522,12 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
     val scene = snapshot.scene
     if (scene.width <= 0.0 || scene.height <= 0.0) return
 
+    // The origin comes from `placement()`, which is what a host is told and what a touch is
+    // converted through. Writing `paddingLeft` here again is how the three drift apart.
+    val placed = placement()
     viewport.set(
-      paddingLeft.toFloat(),
-      paddingTop.toFloat(),
+      placed.left.toFloat(),
+      placed.top.toFloat(),
       (width - paddingRight).toFloat(),
       (height - paddingBottom).toFloat(),
     )
@@ -662,8 +811,11 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
       else -> HitTestOptions.Touch
     }
 
-  private fun MotionEvent.toPointD(): PointD =
-    PointD((x - paddingLeft).toDouble(), (y - paddingTop).toDouble())
+  private fun MotionEvent.toPointD(): PointD {
+    // The same origin the draw uses. See `placement()`.
+    val placed = placement()
+    return PointD(x - placed.left, y - placed.top)
+  }
 
   private fun MotionEvent.chartDevice(): PointerDevice =
     when (getToolType(0)) {

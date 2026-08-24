@@ -67,6 +67,37 @@ final class CallShapeTests: XCTestCase {
     XCTAssertNotNil(view)
   }
 
+  /// Every seam is reachable at once, with `onPlaced` named.
+  ///
+  /// `resolveFont` was added **after** `onPlaced`, which is where the comment beside that parameter
+  /// says anything closure-typed goes: Swift matches a trailing closure by scanning *forward* from
+  /// the last argument a caller labelled, so a closure declared before `onPlaced` steals it. That
+  /// broke `main` once.
+  ///
+  /// Worth knowing, and found by writing this the other way round first: a caller gets the trailing
+  /// closure **or** the parameters that follow it, never both. Swift requires arguments in
+  /// declaration order, so naming `resolveFont` leaves nothing after it for a trailing closure to
+  /// be. `onPlaced` is therefore named here, and the two tests below cover the trailing form.
+  @MainActor
+  func testEverySeamIsReachableAtOnce() throws {
+    let view = VegaChartView(
+      scene: try scene(),
+      session: nil,
+      onPlaced: { placement in _ = placement.scale },
+      resolveImage: { _ in nil },
+      onUnresolvedImage: { _ in },
+      resolveFont: { _ in nil }
+    )
+    XCTAssertNotNil(view)
+  }
+
+  /// A font resolver alone, which is the shape #106 asked for.
+  @MainActor
+  func testAFontResolverAloneIsAReasonableCall() throws {
+    let view = VegaChartView(scene: try scene(), session: nil, resolveFont: { _ in nil })
+    XCTAssertNotNil(view)
+  }
+
   /// And the same shape with a session, which is how both demo screens call it.
   @MainActor
   func testATrailingClosureIsOnPlacedWithASession() throws {
