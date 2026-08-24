@@ -4,24 +4,51 @@ Notable changes, newest first. The release workflow reads the section for the
 version it is publishing and uses it as the release notes, so a version without a
 section here does not get released.
 
-## Unreleased
+## 0.3.0
 
-### Fixed
+### Changed
 
-- **The README no longer teaches the Vega-Lite fallback that 0.2.0 removed**, and the
-  demo no longer performs it. `converted.vegaJson ?: text` hands a document Vega-Lite
-  could not compile to a parser that only understands Vega, which answers with
-  complaints phrased in the wrong grammar and buries the one diagnostic that says what
-  happened. That is the defect fixed in `ChartSession` for 0.2.0 (#61) — and the
-  repository went on documenting it in `README.md` and doing it in both of the demo's
-  conversion paths, so a Kotlin host following either reintroduced it. The example now
-  branches on a null `vegaJson` and surfaces `converted.diagnostics`; the demo's paste
-  screen reports the refusal through a new `PasteReport.refused` without asking the
-  runtime, and its bundled-asset path stops the same way. A sentence now says what the
-  nullability actually means, since a null `vegaJson` and a `wasVegaLite` of false look
-  identical at the call site and only one of them is safe to pass on. Pinned by
-  `VegaJsonFallbackTest`, which scans the main sources, the Swift sources and the
-  README. (#101)
+Three of these change what an existing host sees. They are first for that reason.
+
+- **A locale gets one date, whichever grammar the document was written in.** Vega derived
+  a bucketed axis's format from the locale's own `%x`; Vega-Lite read only the field
+  *order* off it and rebuilt the entry from its own directives. So the same `VegaLocale`
+  produced `21-05-2026` on a Vega chart and `21 mei 2026` on a Vega-Lite one, Spanish lost
+  its `de`, and `%b %d, %Y` came back without its comma — the derivation
+  `timeUnitSpecifierOverrides` documents, disagreeing with the code that implemented it.
+  Both paths now derive through `VegaLocale.timeUnitSpecifiers`.
+
+  **This changes what a host-supplied locale draws.** A locale whose `%x` is numeric now
+  gets a numeric month where Vega-Lite's own table would have written a name — `21-05-2026`
+  rather than `21 mei 2026`. A host wanting the name states `year-month-date` in
+  `timeUnitSpecifierOverrides`, which is the same lever as before and now wins for *every*
+  key it names: a stated `month-date` used to be honoured on a Vega chart and silently
+  dropped on a Vega-Lite one.
+
+  `VegaLocale.EnglishUS` states its tables rather than deriving them, so it is untouched and
+  all 283 Vega-Lite fixture comparisons are unmoved. `dateFieldOrder` remains, for a host
+  that wants the order without the pattern; it is no longer how a specifier is derived. (#97)
+
+- **The Android view centres a chart, as the other three renderers already did.** A scene is
+  scaled to fit, so a slot of a different aspect ratio leaves a strip along one axis;
+  `VegaChartView` put all of it on the right and the bottom while the Compose Multiplatform
+  and SwiftUI charts split it evenly, so the same chart in the same slot sat in a different
+  place depending on the host. **This moves existing Android charts** — by half the slack, and
+  only where there is any: a view measured at its own preferred size is unmoved, which is most
+  of them, and a chart given `match_parent` on an axis shifts by half of what was empty.
+  Drawing, hit testing and the accessibility frames all read the one `placement()`, so they
+  moved together rather than needing four edits. (#99)
+
+- **The placement type moved to `vega-scene`**, the module every renderer already depends
+  on, as `ScenePlacement`. `dev.aster.vega.compose.mp.ChartPlacement` is a typealias now, so
+  Kotlin source keeps compiling; code already compiled against the old class will not link,
+  since a typealias is resolved at the call site.
+
+  It is **not** called `ChartPlacement` in Kotlin, and that is the Obj-C boundary rather than
+  taste: `vega-scene` is exported to the Apple framework under a flat namespace, so that name
+  would collide with the Swift package's own `ChartPlacement` and every Swift host would fail
+  with "'ChartPlacement' is ambiguous for type lookup". `@HiddenFromObjC` is Kotlin/Native-only
+  and the file compiles for the JVM too. The Swift struct is unchanged. (#99)
 
 ### Added
 
@@ -38,26 +65,6 @@ section here does not get released.
   since 0.2.0, so the same host logic is now expressible on both platforms. `ChartState`
   gains a fourth constructor parameter, defaulted, which changes its Obj-C initialiser
   selector; nothing in this repository constructs one. (#100)
-
-- **A facet header follows the reader's language whether or not the field was bucketed.**
-  `Facet.headerText` threaded the locale for a field carrying a `timeUnit` and wrote
-  upstream's `%b %d, %Y` outright for one that did not, three lines apart — so a grid
-  split by a bucketed field was captioned in the reader's language and a grid split by a
-  plain temporal field was captioned in American English. Both branches now read the same
-  `year-month-date` entry, so a bucketed date and an unbucketed one cannot be captioned
-  differently. `VegaLocale.EnglishUS` is byte-for-byte unchanged, which is what leaves the
-  283 fixture comparisons still. (#98)
-
-- **A date's suffix marker is no longer dropped with the field after it.** A language that
-  writes a marker after each number — `%Y年%m月%d日` — derived its year-month form as
-  `%Y年%m`, losing the `月`, so a bucketed axis read "2026年08". Dropping a field takes one
-  adjacent separator with it, and which one depends on what the separator is for: text
-  standing *between* two fields goes with the dropped one, and a marker belonging to the
-  field before it stays. The two are told apart by whether the separator carries a letter
-  and is attached with no space in front — which keeps `%b %d, %Y` giving `%b %Y`, keeps
-  `%d-%m-%Y` giving `%d-%m`, and keeps Spanish `%e de %B de %Y` giving `%e de %B`, none of
-  which move. No bundled locale is written with markers, so this only ever affected a
-  host-supplied one.
 
 - **`vega-compose` reaches the seams the view underneath already had.** `VegaChart` took a
   controller or a scene, a modifier and `onEvent`, and nothing else — so a host on the
@@ -109,62 +116,53 @@ section here does not get released.
   the closure twice, because the layout was measured with it: painting a face the boxes were
   not measured for puts every label off its baseline. (#106)
 
+### Fixed
+
+- **The README no longer teaches the Vega-Lite fallback that 0.2.0 removed**, and the
+  demo no longer performs it. `converted.vegaJson ?: text` hands a document Vega-Lite
+  could not compile to a parser that only understands Vega, which answers with
+  complaints phrased in the wrong grammar and buries the one diagnostic that says what
+  happened. That is the defect fixed in `ChartSession` for 0.2.0 (#61) — and the
+  repository went on documenting it in `README.md` and doing it in both of the demo's
+  conversion paths, so a Kotlin host following either reintroduced it. The example now
+  branches on a null `vegaJson` and surfaces `converted.diagnostics`; the demo's paste
+  screen reports the refusal through a new `PasteReport.refused` without asking the
+  runtime, and its bundled-asset path stops the same way. A sentence now says what the
+  nullability actually means, since a null `vegaJson` and a `wasVegaLite` of false look
+  identical at the call site and only one of them is safe to pass on. Pinned by
+  `VegaJsonFallbackTest`, which scans the main sources, the Swift sources and the
+  README. (#101)
+
+- **A facet header follows the reader's language whether or not the field was bucketed.**
+  `Facet.headerText` threaded the locale for a field carrying a `timeUnit` and wrote
+  upstream's `%b %d, %Y` outright for one that did not, three lines apart — so a grid
+  split by a bucketed field was captioned in the reader's language and a grid split by a
+  plain temporal field was captioned in American English. Both branches now read the same
+  `year-month-date` entry, so a bucketed date and an unbucketed one cannot be captioned
+  differently. `VegaLocale.EnglishUS` is byte-for-byte unchanged, which is what leaves the
+  283 fixture comparisons still. (#98)
+
+- **A date's suffix marker is no longer dropped with the field after it.** A language that
+  writes a marker after each number — `%Y年%m月%d日` — derived its year-month form as
+  `%Y年%m`, losing the `月`, so a bucketed axis read "2026年08". Dropping a field takes one
+  adjacent separator with it, and which one depends on what the separator is for: text
+  standing *between* two fields goes with the dropped one, and a marker belonging to the
+  field before it stays. The two are told apart by whether the separator carries a letter
+  and is attached with no space in front — which keeps `%b %d, %Y` giving `%b %Y`, keeps
+  `%d-%m-%Y` giving `%d-%m`, and keeps Spanish `%e de %B de %Y` giving `%e de %B`, none of
+  which move. No bundled locale is written with markers, so this only ever affected a
+  host-supplied one.
+
+### Internal
+
+Not a change to the engine, and listed because it is a change to what a review can catch.
+
 - **The Swift package's own API is snapshotted**, in `swift/AsterVegaRender/swift-api.txt`,
   from the symbol graph the compiler emits. `foreign-api.txt` covers what Kotlin exports to
   Obj-C; `VegaChartView.init` and `ChartSession` are Swift source and were in no snapshot at
   all, leaving them to `CallShapeTests` — which pins the shapes somebody thought to write
   down, and missed a rebound trailing closure and a missing font seam. Run by
   `scripts/swift-test.sh`, so `check.sh` covers it.
-
-### Changed
-
-- **The Android view centres a chart, as the other three renderers already did.** A scene is
-  scaled to fit, so a slot of a different aspect ratio leaves a strip along one axis;
-  `VegaChartView` put all of it on the right and the bottom while the Compose Multiplatform
-  and SwiftUI charts split it evenly, so the same chart in the same slot sat in a different
-  place depending on the host. **This moves existing Android charts** — by half the slack, and
-  only where there is any: a view measured at its own preferred size is unmoved, which is most
-  of them, and a chart given `match_parent` on an axis shifts by half of what was empty.
-  Drawing, hit testing and the accessibility frames all read the one `placement()`, so they
-  moved together rather than needing four edits. (#99)
-
-- **The placement type moved to `vega-scene`**, the module every renderer already depends
-  on, as `ScenePlacement`. `dev.aster.vega.compose.mp.ChartPlacement` is a typealias now, so
-  Kotlin source keeps compiling; code already compiled against the old class will not link,
-  since a typealias is resolved at the call site.
-
-  It is **not** called `ChartPlacement` in Kotlin, and that is the Obj-C boundary rather than
-  taste: `vega-scene` is exported to the Apple framework under a flat namespace, so that name
-  would collide with the Swift package's own `ChartPlacement` and every Swift host would fail
-  with "'ChartPlacement' is ambiguous for type lookup". `@HiddenFromObjC` is Kotlin/Native-only
-  and the file compiles for the JVM too. The Swift struct is unchanged. (#99)
-
-- **`VegaChartView` computes its placement once**, where the draw's viewport, a touch's
-  conversion to scene coordinates and the accessibility helper's two mappings each wrote the
-  origin out for themselves. Four copies of one number, any of which could drift from the
-  others — which is how a reader's finger lands beside the mark it looked like it hit, a
-  defect this project has had twice. No behaviour changes: all four agreed, and an
-  instrumented test now aims a tap through the reported placement and asserts it hits the
-  bar it aimed at.
-
-- **A locale gets one date, whichever grammar the document was written in.** Vega derived
-  a bucketed axis's format from the locale's own `%x`; Vega-Lite read only the field
-  *order* off it and rebuilt the entry from its own directives. So the same `VegaLocale`
-  produced `21-05-2026` on a Vega chart and `21 mei 2026` on a Vega-Lite one, Spanish lost
-  its `de`, and `%b %d, %Y` came back without its comma — the derivation
-  `timeUnitSpecifierOverrides` documents, disagreeing with the code that implemented it.
-  Both paths now derive through `VegaLocale.timeUnitSpecifiers`.
-
-  **This changes what a host-supplied locale draws.** A locale whose `%x` is numeric now
-  gets a numeric month where Vega-Lite's own table would have written a name — `21-05-2026`
-  rather than `21 mei 2026`. A host wanting the name states `year-month-date` in
-  `timeUnitSpecifierOverrides`, which is the same lever as before and now wins for *every*
-  key it names: a stated `month-date` used to be honoured on a Vega chart and silently
-  dropped on a Vega-Lite one.
-
-  `VegaLocale.EnglishUS` states its tables rather than deriving them, so it is untouched and
-  all 283 Vega-Lite fixture comparisons are unmoved. `dateFieldOrder` remains, for a host
-  that wants the order without the pattern; it is no longer how a specifier is derived. (#97)
 
 ## 0.2.0
 
