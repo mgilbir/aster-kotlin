@@ -59,6 +59,27 @@ section here does not get released.
   which move. No bundled locale is written with markers, so this only ever affected a
   host-supplied one.
 
+### Changed
+
+- **A locale gets one date, whichever grammar the document was written in.** Vega derived
+  a bucketed axis's format from the locale's own `%x`; Vega-Lite read only the field
+  *order* off it and rebuilt the entry from its own directives. So the same `VegaLocale`
+  produced `21-05-2026` on a Vega chart and `21 mei 2026` on a Vega-Lite one, Spanish lost
+  its `de`, and `%b %d, %Y` came back without its comma — the derivation
+  `timeUnitSpecifierOverrides` documents, disagreeing with the code that implemented it.
+  Both paths now derive through `VegaLocale.timeUnitSpecifiers`.
+
+  **This changes what a host-supplied locale draws.** A locale whose `%x` is numeric now
+  gets a numeric month where Vega-Lite's own table would have written a name — `21-05-2026`
+  rather than `21 mei 2026`. A host wanting the name states `year-month-date` in
+  `timeUnitSpecifierOverrides`, which is the same lever as before and now wins for *every*
+  key it names: a stated `month-date` used to be honoured on a Vega chart and silently
+  dropped on a Vega-Lite one.
+
+  `VegaLocale.EnglishUS` states its tables rather than deriving them, so it is untouched and
+  all 283 Vega-Lite fixture comparisons are unmoved. `dateFieldOrder` remains, for a host
+  that wants the order without the pattern; it is no longer how a specifier is derived. (#97)
+
 ## 0.2.0
 
 ### Fixed

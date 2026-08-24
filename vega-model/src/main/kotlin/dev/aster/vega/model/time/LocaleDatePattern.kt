@@ -85,11 +85,14 @@ internal object LocaleDatePattern {
    * The order [pattern] writes year, month and day of month in, or null where it names none of
    * them.
    *
-   * The *order* rather than the pattern, because that is the half of a language's date convention
-   * that transfers: Vega-Lite's own table writes the month as a **name** — `%b %d, %Y` — and
-   * substituting a name into a locale's numeric pattern gives `21-mei-2026`, where the separators
-   * were chosen for numbers. So `:vega-lite` takes the order from here and keeps its own directives
-   * and its own spacing.
+   * The order on its own, which is a smaller fact than the pattern and occasionally the one wanted.
+   *
+   * It is **not** how a specifier is derived, though it was: `:vega-lite` used to read the order
+   * here and rebuild an entry from its own directives, on the argument that substituting a month
+   * name into a numeric pattern gives `21-mei-2026`. That argument is against *substituting*, and
+   * rebuilding is not the only alternative to it — [withFields] keeps the locale's own directives
+   * and substitutes nothing, which is what both paths now do. Rebuilding kept the order and lost
+   * everything else the language writes. See #97.
    *
    * A field the pattern does not name is absent from the list rather than guessed at.
    */
