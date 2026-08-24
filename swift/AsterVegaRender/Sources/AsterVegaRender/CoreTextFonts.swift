@@ -13,8 +13,32 @@ enum CoreTextFonts {
   /// - Parameters:
   ///   - family: the CSS font family list from the specification. The first name is tried.
   ///   - weight: a CSS weight, 100–900; 600 and over asks for bold.
-  static func font(family: String, size: Double, weight: Int, italic: Bool) -> CTFont {
+  ///   - resolveFont: the host's own answer for a family name, tried **before** CoreText. Return nil
+  ///     for a name the host does not recognise and the descriptor path below runs as it always has.
+  ///     The face may be at any size: it is resized to `size` here and given the weight and slant the
+  ///     specification asked for, so a host can hand back
+  ///     `CTFontCreateWithName("Whatever" as CFString, 0, nil)` without thinking about it.
+  static func font(
+    family: String,
+    size: Double,
+    weight: Int,
+    italic: Bool,
+    resolveFont: ((String) -> CTFont?)? = nil
+  ) -> CTFont {
     let key = Key(family: family, size: size, weight: weight, italic: italic)
+
+    // **Only the CoreText answer is cached, and the host's is not.** The cache is process-wide, and
+    // two charts in one app may hand in different resolvers — caching one host's face under a family
+    // name would draw the other chart with it. A resolver is expected to be a lookup in a dictionary
+    // the host already has, which is what Android's `typefaceResolver` is; a host doing something
+    // expensive there should memoise, as it would for `resolveImage`.
+    if let resolveFont {
+      let first = firstFamily(of: family)
+      if let first, let supplied = resolveFont(first) {
+        return styled(supplied, size: size, weight: weight, italic: italic)
+      }
+    }
+
     if let cached = cache.value(for: key) { return cached }
 
     // A specification names a family as a string and whether that face is installed is the device's
@@ -23,10 +47,7 @@ enum CoreTextFonts {
     let points = CGFloat(size)
     var attributes: [CFString: Any] = [kCTFontSizeAttribute: points]
 
-    let first = family.split(separator: ",").first.map {
-      $0.trimmingCharacters(in: CharacterSet(charactersIn: " '\""))
-    }
-    if let first, !first.isEmpty, !Self.generic.contains(first.lowercased()) {
+    if let first = firstFamily(of: family) {
       attributes[kCTFontFamilyNameAttribute] = first
     }
 
@@ -60,6 +81,37 @@ enum CoreTextFonts {
         : CTFontCreateCopyWithSymbolicTraits(base, points, nil, symbolic, symbolic) ?? base
     cache.store(font, for: key)
     return font
+  }
+
+  /// The first name in a CSS family list, or nil where it names no installed face.
+  ///
+  /// A generic — `sans-serif`, `monospace` — answers nil, because it names nothing to look up: the
+  /// system font is the honest answer for those, and a host resolver is not asked either. That is
+  /// deliberate. A host that mapped `sans-serif` to its own face would be overriding a specification
+  /// that asked for *the reader's* default, and the same specification would then draw differently
+  /// on this host and on the two Kotlin ones, which is the defect this whole seam exists to remove.
+  private static func firstFamily(of family: String) -> String? {
+    let first = family.split(separator: ",").first.map {
+      $0.trimmingCharacters(in: CharacterSet(charactersIn: " '\""))
+    }
+    guard let first, !first.isEmpty, !generic.contains(first.lowercased()) else { return nil }
+    return first
+  }
+
+  /// A face the host handed over, at the size and with the traits the specification asked for.
+  ///
+  /// The host supplies a *face*; the size and the weight belong to the chart. Applying the traits to
+  /// the font rather than asking for them in a descriptor is the same care the path below takes, and
+  /// for the same reason recorded there: a descriptor carrying a bold trait is free to answer with an
+  /// unrelated family.
+  private static func styled(_ base: CTFont, size: Double, weight: Int, italic: Bool) -> CTFont {
+    let points = CGFloat(size)
+    let resized = CTFontCreateCopyWithAttributes(base, points, nil, nil)
+    var symbolic: CTFontSymbolicTraits = []
+    if weight >= 600 { symbolic.insert(.traitBold) }
+    if italic { symbolic.insert(.traitItalic) }
+    guard !symbolic.isEmpty else { return resized }
+    return CTFontCreateCopyWithSymbolicTraits(resized, points, nil, symbolic, symbolic) ?? resized
   }
 
   /// CSS generic families, which name no installed face — the system font is the honest answer.

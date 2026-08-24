@@ -6489,3 +6489,43 @@ the Compose Multiplatform and SwiftUI charts centre a scene in a slot of the wro
 reports each faithfully. Changing it moves every existing Android chart, which is an appearance
 decision rather than a consequence of reporting the placement — and `placement()` is now the single
 line it would change.
+
+### The font seam Apple did not have, and the argument that excused it
+
+Both Kotlin renderers let a host hand the engine a face: `AndroidTextEngine(typefaceResolver:)` since
+the canvas renderer grew one, and `ComposeTextEngine`'s registry. The Apple renderer resolved a family
+name through CoreText alone, so an app bundling a font — which most design systems do — could only
+reach a chart by calling `CTFontManagerRegisterGraphicsFont` and hoping the name matched. Reported
+from outside as #106.
+
+**The interesting part is that this repository had already written the argument down and then argued
+the other way.** `AndroidTextEngine`'s own KDoc says a family name resolving against the *system's*
+families is why a bundled font cannot reach a chart, and the README's host matrix — added days
+earlier — claimed the Apple gap was deliberate because `CTFontManagerRegisterFontsForURL` exists. Both
+are true and the second is not a defence: registering mutates process-wide state to configure one
+chart, it is invisible at the call site, and it left one specification and one host configuration
+drawing in different faces on different platforms. The reporter quoted our own KDoc back, which is
+the cheapest possible review and the one nobody here ran.
+
+`resolveFont` is on `CoreTextTextEngine`, `ChartSession` and `VegaChartView` now. Three decisions in
+it are worth keeping:
+
+- **It is consulted for a named family and not for a generic one.** `sans-serif` asks for the
+  reader's default; a host answering it would override that and reintroduce exactly the
+  platform-to-platform difference this removes.
+- **The host returns a face, and the chart keeps the size.** A resolver may hand back
+  `CTFontCreateWithName(name, 0, nil)`; the requested points, weight and slant are applied here, the
+  same way the descriptor path applies traits to a font rather than asking for them in a descriptor.
+- **`VegaChartView` defaults to the session's resolver.** The layout was measured with it, and a host
+  that configured the session and then drew without passing the closure again would paint faces the
+  boxes were not measured for — every label off its baseline, from a seam that looked wired. A seam
+  that has to be wired twice is a seam that will be wired once.
+
+Only the CoreText answer is cached. The process-wide cache is keyed by family, size, weight and slant,
+and two charts in one app may hand in different resolvers — caching one host's face under a family
+name would draw the other chart with it.
+
+One thing found by writing the call-shape test the wrong way round first: a Swift caller gets the
+trailing-closure idiom **or** the parameters declared after `onPlaced`, never both, because Swift
+requires arguments in declaration order and naming `resolveFont` leaves nothing after it for a
+trailing closure to be. Both shapes are pinned.

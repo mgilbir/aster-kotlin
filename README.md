@@ -945,18 +945,20 @@ wraps already had. This is what each one exposes, and where they differ on purpo
 | Forget resolved URLs | `clearImageCache()` | a different `imageResolver` | `ImageCache.clear()` | `CoreGraphicsTarget.clearImageCache()` |
 | Accessibility threshold | `accessibilityMaxExposedMarks` | same | same | same |
 | Engine-drawn tooltip | `tooltipsEnabled` | `tooltipsEnabled` | host draws its own | host draws its own |
-| Font family a specification names | `fontResolver` | `fontResolver` | `ComposeTextEngine` registry | **the platform** — see below |
+| Font family a specification names | `fontResolver` | `fontResolver` | `ComposeTextEngine` registry | `resolveFont` |
 | Spoken captions | the controller's `VegaLocale.captions` | same | `captions` | `captions` |
 | Interaction | the controller's `events` | `onEvent` | `onTap`, `onPan`, `onZoom`, … | `session` + `gestures` |
 | Where the chart was drawn | `onPlaced`, `placement()` | `onPlaced` | `onPlaced` | `onPlaced` |
 
-Three differences are deliberate, and each has a reason that is not "nobody got round to it".
+Two differences are deliberate, and each has a reason that is not "nobody got round to it".
 
-**Fonts on Apple.** Android resolves a family name against the *system's* families, so a font an app
-bundles cannot reach a chart at all and the engine has to be handed a resolver. Apple has its own
-answer — `UIAppFonts` in the Info.plist, or `CTFontManagerRegisterFontsForURL` — after which the
-family resolves by name like any installed one. The seam is missing there because the platform
-supplies it, not because the capability is.
+This table said three until recently, and the third was **fonts on Apple**: the argument was that a
+host can register a bundled face with `CTFontManagerRegisterFontsForURL` and CoreText then resolves
+it by name, so the platform supplied what the seam would have. That argument was too kind to the
+status quo, and an adopter said so (#106). Registering mutates process-wide state to configure one
+chart, it is invisible at the call site, and it left one specification and one host configuration
+drawing in different faces depending on the platform. `resolveFont` is the seam now, on
+`ChartSession`, `VegaChartView` and `CoreTextTextEngine`.
 
 **Captions and interaction.** The two Compose-Multiplatform-and-Swift surfaces paint a `Scene` and
 own no state, so everything they need is a parameter. The View-based pair is driven by a

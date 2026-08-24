@@ -1,0 +1,122 @@
+import AsterVega
+import CoreText
+import XCTest
+
+@testable import AsterVegaRender
+
+/// A host's own face reaches a chart, and reaches **both** halves of it.
+///
+/// CoreText resolves a family name against the faces the process has registered, so an app bundling a
+/// font could only reach a chart through `CTFontManagerRegisterGraphicsFont` — process-wide state, to
+/// configure one chart, invisible at the call site. Both Kotlin renderers have taken a resolver for
+/// exactly this since before 0.2.0. Reported as #106.
+///
+/// The assertion that matters is not "the resolver was called". It is that the face it returns is the
+/// one the layout was **measured** with *and* the one the glyphs are **drawn** with. A seam wired into
+/// one of those and not the other is worse than no seam: every label sits off the baseline of a box
+/// reserved for a different font, and the chart looks subtly broken rather than obviously unwired.
+final class FontResolverTests: XCTestCase {
+
+  /// A face that is emphatically not the system font, so a width computed with it cannot coincide.
+  private func courier(_ points: CGFloat = 0) -> CTFont {
+    CTFontCreateWithName("Courier" as CFString, points, nil)
+  }
+
+  private func style(_ family: String, size: Double = 11, weight: Int = 400) -> TextStyle {
+    TextStyle(
+      fontFamily: family,
+      fontSize: size,
+      fontWeight: Int32(weight),
+      fontStyle: FontStyle.normal,
+      letterSpacing: 0,
+      lineHeight: nil,
+      locale: "und",
+      direction: TextDirection.ltr
+    )
+  }
+
+  func testAResolvedFaceIsWhatTheEngineMeasuresWith() {
+    let resolving = CoreTextTextEngine(resolveFont: { _ in self.courier() })
+    let plain = CoreTextTextEngine()
+
+    let text = "Miles_per_Gallon"
+    let resolved = resolving.advanceOf(line: text, style: style("Whatever"))
+    let byHand = CTLineGetTypographicBounds(
+      CTLineCreateWithAttributedString(
+        NSAttributedString(
+          string: text,
+          attributes: [
+            NSAttributedString.Key(kCTFontAttributeName as String): courier(11)
+          ])),
+      nil, nil, nil)
+
+    XCTAssertEqual(resolved, byHand, accuracy: 0.001, "the host's face should be what was measured")
+    XCTAssertNotEqual(
+      resolved, plain.advanceOf(line: text, style: style("Whatever")), accuracy: 0.001,
+      "and it should differ from the face CoreText would have picked, or this proves nothing")
+  }
+
+  func testTheSizeAndTraitsBelongToTheChartAndNotToTheHost() {
+    // The host hands over a *face*. It may be at any size — the natural thing to write is
+    // `CTFontCreateWithName(name, 0, nil)` — and the chart's own size and weight are applied here.
+    let engine = CoreTextTextEngine(resolveFont: { _ in self.courier() })
+    let bold = style("Whatever", size: 30, weight: 700)
+
+    let font = CoreTextFonts.font(
+      family: "Whatever", size: 30, weight: 700, italic: false,
+      resolveFont: { _ in self.courier() })
+
+    XCTAssertEqual(CTFontGetSize(font), 30, accuracy: 0.001, "the chart's size, not the host's")
+    XCTAssertTrue(
+      CTFontGetSymbolicTraits(font).contains(.traitBold), "the specification asked for bold")
+    XCTAssertGreaterThan(engine.advanceOf(line: "W", style: bold), 0)
+  }
+
+  func testAGenericFamilyIsNotOfferedToTheHost() {
+    // `sans-serif` names no installed face: it asks for *the reader's* default. A host answering it
+    // would override that, and the same specification would then draw differently here and on the two
+    // Kotlin renderers — which is the difference this seam exists to remove, not to introduce.
+    var asked: [String] = []
+    let font = CoreTextFonts.font(
+      family: "sans-serif", size: 11, weight: 400, italic: false,
+      resolveFont: { name in
+        asked.append(name)
+        return self.courier()
+      })
+
+    XCTAssertEqual([], asked, "a generic family should not reach the host")
+    XCTAssertNotEqual(
+      CTFontCopyFamilyName(font) as String, "Courier", "and should not be the host's face")
+  }
+
+  func testANilAnswerFallsBackToCoreText() {
+    let resolved = CoreTextFonts.font(
+      family: "Helvetica", size: 11, weight: 400, italic: false, resolveFont: { _ in nil })
+    let plain = CoreTextFonts.font(family: "Helvetica", size: 11, weight: 400, italic: false)
+
+    XCTAssertEqual(
+      CTFontCopyFamilyName(resolved) as String, CTFontCopyFamilyName(plain) as String,
+      "a name the host does not recognise should resolve as it always did")
+  }
+
+  @MainActor
+  func testTheSessionHandsItsResolverToWhateverDraws() {
+    // The wiring that keeps measuring and drawing in step. A host configures the session once; the
+    // view reads the resolver back off it rather than asking for the closure a second time, because a
+    // seam that has to be wired twice is a seam that will be wired once.
+    let session = ChartSession(resolveFont: { _ in self.courier() })
+    XCTAssertNotNil(session.resolveFont, "the session should carry it for the drawing to read")
+
+    let font = CoreTextFonts.font(
+      family: "Whatever", size: 11, weight: 400, italic: false, resolveFont: session.resolveFont)
+    XCTAssertEqual(CTFontCopyFamilyName(font) as String, "Courier")
+  }
+
+  @MainActor
+  func testAHostsOwnEngineKeepsItsOwnResolver() {
+    // A host that built its own engine has said what it measures with. Guessing a resolver for the
+    // drawing would be painting faces the boxes were not measured for.
+    let session = ChartSession(textEngine: CoreTextTextEngine(resolveFont: { _ in self.courier() }))
+    XCTAssertNotNil(session.resolveFont, "read back off the engine it was given")
+  }
+}

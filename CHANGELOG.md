@@ -93,6 +93,22 @@ section here does not get released.
   `View` cannot depend on a Compose module. `VegaChartView.placement()` is public too, for
   a host that would rather ask than be told.
 
+- **A host can hand the Apple renderer its own font**, through `resolveFont` on
+  `ChartSession`, `VegaChartView` and `CoreTextTextEngine`. Both Kotlin renderers have taken
+  a resolver for this since before 0.2.0; the Apple side resolved a family name through
+  CoreText alone, so an app bundling a face — which most design systems do — could only reach
+  a chart by registering it process-wide with `CTFontManagerRegisterGraphicsFont` and hoping
+  the name matched. That works and is the wrong shape: process-wide state to configure one
+  chart, invisible at the call site, and one specification drawing in different faces on
+  different platforms.
+
+  The resolver is consulted for a **named** family and not for a generic one — `sans-serif`
+  asks for the reader's default, and answering it would reintroduce the difference this
+  removes. It returns a *face* at any size; the chart's own size, weight and slant are
+  applied to it. `VegaChartView` defaults to the session's resolver rather than asking for
+  the closure twice, because the layout was measured with it: painting a face the boxes were
+  not measured for puts every label off its baseline. (#106)
+
 ### Changed
 
 - **The placement type moved to `vega-scene`**, the module every renderer already depends
