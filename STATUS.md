@@ -6677,3 +6677,42 @@ accessor: `values(ids:)` is `NSSet<id>` at the boundary, so Swift types it as `S
 a `Set<Int64>` satisfies it at compile time and fails **inside Kotlin** at run time with
 `kotlin.Long cannot be cast to SceneNodeId`. The boxed path is not type-safe across the boundary,
 which is an argument for a host reading `selectedNodeIds` and never meeting it.
+
+### What does not cross, enumerated rather than assumed
+
+Three adopter reports in a row were the same defect: a type reaches a foreign host while the part of
+it worth reading stays behind, and nothing fails. `SceneNodeId` inside an optional. `VegaValue.Obj`'s
+fields behind a value class. Each was fixed one at a time, and each fix was followed by "are we sure
+there are no more" answered with a shrug.
+
+It is answerable mechanically, so it is answered mechanically now.
+
+`scripts/foreign-coverage.py` reads the committed ABI dumps — Kotlin's own public surface — and
+`foreign-api.txt` — what reaches Obj-C — and lists every public member with no counterpart. The
+result is checked in as `swift/AsterVegaRender/foreign-coverage.txt` and diffed by
+`scripts/foreign-api.sh`, so a member that stops crossing is a line in a review rather than a bug
+report.
+
+**Seventy-seven members do not cross, and none of them is host-facing:**
+
+| | count | why it does not matter |
+|---|---|---|
+| `getPublishesSignal` on every transform | 41 | a host never builds a transform |
+| the discretizing scales' legend arithmetic | 29 | the engine draws its own legends |
+| `SignalScope`'s evaluator scope | 6 | expression internals |
+| `Expression.getExpr` | 1 | the AST |
+
+All are `public` because Kotlin needs cross-module visibility, not because anyone outside should call
+them. So the answer to "is the shape right" is: yes, and here is the list it was checked against.
+
+Getting the list took three wrong versions, which is worth recording because each was confidently
+wrong. The first credited every enum entry as missing. The second, matching bare names anywhere in
+the file, reported **zero** — and zero was as wrong as 147, in the direction that looks like success.
+The third read `toVega` as absent while `ChartSession` calls it three lines away, because a top-level
+extension function is listed unqualified and `foreign-api.sh` credits the symbols after it to it as
+an owner. A number from a script nobody checked is not evidence.
+
+The gate was verified the way the others were: making `valueOrNull` internal, and adding a public
+member whose type cannot cross. The first is caught by the existing snapshot, the second only by this
+one — `+ForeignNodeId.probe`, public in Kotlin and unreachable from a host, which is exactly the
+shape all three reports had.

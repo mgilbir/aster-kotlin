@@ -39,7 +39,6 @@ fi
 # the authority — they are what Swift actually sees, including the full parameter list of every
 # initialiser, which is the thing that breaks.
 CURRENT="$(mktemp)"
-trap 'rm -f "$CURRENT"' EXIT
 
 # Every exported symbol, qualified by the type that owns it. The header's own `swift_name` attributes are
 # the authority: they are what Swift actually sees, including each initialiser's full parameter list, which
@@ -91,6 +90,32 @@ symbols.update(type_name_line.values())
 for symbol in sorted(symbols):
     print(symbol)
 EXTRACT
+
+# The other half of the same question, and the half that goes unnoticed: what did **not** cross.
+# A type can be exported while the part of it worth reading stays behind — a value class inside an
+# optional, a `Map`'s keys — and nothing fails. Both boundary defects an adopter reported were that
+# shape. `scripts/foreign-coverage.py` lists every public Kotlin member with no foreign counterpart;
+# a new line means one stopped crossing.
+COVERAGE="swift/AsterVegaRender/foreign-coverage.txt"
+COVERAGE_NOW="$(mktemp)"
+trap 'rm -f "$CURRENT" "$COVERAGE_NOW"' EXIT
+python3 scripts/foreign-coverage.py > "$COVERAGE_NOW"
+
+if [ "$MODE" = "--accept" ]; then
+  cp "$COVERAGE_NOW" "$COVERAGE"
+  echo "==> Recorded $(grep -c . "$COVERAGE") members that do not cross, in $COVERAGE"
+fi
+
+if [ "$MODE" != "--accept" ] && ! diff -u "$COVERAGE" "$COVERAGE_NOW" > /dev/null; then
+  echo "What reaches a foreign host has changed:"
+  echo
+  diff -u "$COVERAGE" "$COVERAGE_NOW" | tail -n +3
+  echo
+  echo "A line **added** means a public member stopped crossing — ask whether a host wanted it."
+  echo "A line **removed** means one started, which is usually the point of the change."
+  echo "Record it with: scripts/foreign-api.sh --accept"
+  exit 1
+fi
 
 if [ "$MODE" = "--accept" ]; then
   cp "$CURRENT" "$SNAPSHOT"
