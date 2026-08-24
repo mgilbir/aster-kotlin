@@ -81,7 +81,16 @@ jobs:
         run: ./scripts/vega-lite-oracle.sh --references-only
 
       - name: Check
-        run: ./scripts/check.sh
+        # `--fast` because this workflow runs the two differential oracles as their own steps below,
+        # on Linux only, and `check.sh` would otherwise run them a second time — on both hosts, since
+        # node is installed here. The split is deliberate: the oracles re-run `:vega-runtime:jvmTest`
+        # under `--tests` filters, which *replaces* the test-results directory, and the count assertion
+        # further down has to read the results of this step rather than of a filtered re-run.
+        #
+        # Everything else `check.sh` gained is wanted here: on macOS it now runs the Swift suite, the
+        # exported-API snapshot and the iOS demo's type-check, which used to be three separate steps
+        # in this file and one that was missing from the local gate entirely.
+        run: ./scripts/check.sh --fast
 
       - name: Snapshot what check.sh ran
         # Taken here, before the oracle steps, because a Gradle test task *replaces* its results
@@ -113,16 +122,6 @@ jobs:
         # only compiled for one. A runner has the simulator runtime this project's own machine does not.
         if: runner.os == 'macOS'
         run: ./gradlew iosSimulatorArm64Test
-
-      - name: Swift renderer
-        # macOS only: it links the framework Kotlin/Native exports, and the API-surface guard in it is
-        # what catches a change to what Swift sees.
-        if: runner.os == 'macOS'
-        run: ./scripts/swift-test.sh
-
-      - name: Type-check the iOS demo
-        if: runner.os == 'macOS'
-        run: ./scripts/ios-demo.sh --check
 
       - name: Check every declared target is in the module metadata
         # macOS only, and deliberately: on any other host it is *expected* to fail, because Kotlin

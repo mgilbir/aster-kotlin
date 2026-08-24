@@ -12,8 +12,10 @@ compares the counts in this file against the code and the corpus and fails when 
   rate they land here. So `./scripts/check.sh` locally is what a branch has before it merges.
 - Read `CONTRIBUTING.md` first. The method matters more than the remaining feature list: probe upstream
   before implementing, add a fixture and expect it to fail, report anything unsupported by name.
-- `./scripts/check.sh` is the gate — format, all tests, lint, demo APK. `./scripts/oracle.sh`
-  regenerates the upstream references and runs the differential comparison; both must be green.
+- `./scripts/check.sh` is **the** gate, and now runs the others: the Swift package on a Mac, the
+  instrumented suites when a device is attached, and both differential oracles. It ends with a ledger
+  saying which gates ran and which did not and why — read it, because green with something skipped is
+  still green. `--fast` drops the oracles for the edit loop.
 - The next three tasks are at the bottom of this file. They are re-decided every time, not worked
   through in order — twice now the stated order was wrong and the reason is recorded in the commit
   that changed it.
@@ -6358,3 +6360,41 @@ in the artefact. And the failure reproduces on demand: put a dangling symlink un
 `build` directory and run `./gradlew :vega-runtime:spotlessKotlin`. That is how the fix was checked
 rather than assumed, and how the first attempted fix — naming a constant line-ending policy, on the
 theory that `GIT_ATTRIBUTES` was doing the walking — was found to be wrong before it was committed.
+
+### A gate you have to remember is not a gate
+
+`check.sh` was one of five scripts and the working agreement was to remember the other four. That
+agreement has now failed three times in ways that reached `main` or a release:
+
+- `ios-demo.sh` existed, CI ran it, and nobody ran it locally. A Swift trailing closure rebound to a
+  new parameter and `main` went red.
+- `facet-footer` sat in a pending set for ten days after the bug was fixed, skipping two comparisons.
+  An assumption is silent, and two skips sit under the `skipped > 10` guard.
+- A Swift test asserting the old locale rule survived the change to that rule, because
+  `swift-test.sh` is not `check.sh`. Found by running the Swift gate over a finished seven-PR stack,
+  which is late enough to be luck.
+
+Each time the fix was to remember harder. The honest reading is that the fifth failure was going to
+happen, so `check.sh` runs them now: the Gradle gate always, the Swift package on a Mac, the
+instrumented suites when something is on adb, and both differential oracles unless `--fast`.
+
+**The ledger is the load-bearing part**, more than the running. Every gate ends as RAN, SKIPPED with
+a reason, or FAILED, printed last because it is the thing being trusted, and a gate cannot be added
+to the script without appearing in it — the recording *is* the running, through one `run_gate`. What
+this repository keeps getting wrong is not that a check fails; it is that a check does not happen and
+the run looks identical. So a skip now has a name and an actionable reason beside it, and the final
+line says "green, with 2 gate(s) not run" rather than "green".
+
+A failing gate no longer stops the others, for the reason `--continue` is already passed to Gradle:
+knowing the Swift suite also fails is worth more than stopping at the first thing.
+
+The whole set takes 3m48s on this machine with everything running, which is the answer to the
+obvious objection. `--fast` drops the two oracles for the edit loop and says so in the ledger.
+
+CI passes `--fast` and keeps the oracles as their own steps, because they re-run
+`:vega-runtime:jvmTest` under `--tests` filters and that *replaces* the results directory the
+test-count assertion reads. Its separate Swift and iOS-demo steps are gone, being inside `check.sh`
+now.
+
+Checked the way the others were: reverting the Swift locale assertion makes `check.sh` red, where
+before it was green and only `swift-test.sh` knew.

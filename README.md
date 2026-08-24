@@ -808,7 +808,9 @@ the emulator, profiling and layout inspection.
 
 ```bash
 ./scripts/test-core.sh      # JVM tests only; no SDK or device needed
-./scripts/check.sh          # spotlessCheck + all tests + lint + demo APK
+./scripts/check.sh          # THE gate: everything this host can check, with a ledger
+./scripts/check.sh --fast   # the same, minus the differential oracles, for the edit loop
+./scripts/check.sh --list   # what the gates are and what each one needs
 ./scripts/test-android.sh   # instrumented tests; needs a device or emulator
 ./scripts/install-demo.sh   # build and install the demo app
 ./scripts/capture-demo.sh   # screenshot the device into build/artifacts
