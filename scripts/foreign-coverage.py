@@ -13,7 +13,7 @@ Everything currently listed is engine-internal — `getPublishesSignal` on each 
 discretizing scales' legend arithmetic, the expression evaluator's scope, and one AST accessor —
 public for cross-module use in Kotlin and of no use to a host.
 """
-import re, pathlib, collections
+import collections, pathlib, re, sys
 
 kotlin, enums = collections.defaultdict(set), set()
 for api in pathlib.Path(".").glob("vega-*/api/*.api"):
@@ -72,6 +72,58 @@ for cls, members in kotlin.items():
     if missing:
         holes[cls] = missing
 
+# Every member here carries a **reason**, and a member without one fails the check. The list on
+# its own was a flat file to eyeball, which is how a member that a host wanted could sit in it
+# looking like all the others.
+REASONS = {
+    "getPublishesSignal": "internal: @InternalAsterVegaApi, dataflow plumbing a host never builds",
+    "activeItem": "internal: @InternalAsterVegaApi, the expression evaluator's scope",
+    "encodeItem": "internal: @InternalAsterVegaApi, the expression evaluator's scope",
+    "eventPoint": "internal: @InternalAsterVegaApi, the expression evaluator's scope",
+    "inScope": "internal: @InternalAsterVegaApi, the expression evaluator's scope",
+    "intersect": "internal: @InternalAsterVegaApi, the expression evaluator's scope",
+    "intersectLasso": "internal: @InternalAsterVegaApi, the expression evaluator's scope",
+    "getExpr": "internal: the compiled expression's own AST",
+    "getBins": "reachable: ForeignScale.bins",
+    "extentAt": "reachable: ForeignScale.bucketLow / bucketHigh",
+    "legendFraction": "reachable: ForeignScale.legendFraction",
+    "getBucketRepresentatives": "reachable: ForeignScale.bucketRepresentatives",
+    "getLegendMax": "reachable: ForeignScale.legendMax",
+    "getLegendValues": "reachable: ForeignScale.legendValues",
+    "getLegendExtent": "reachable: ForeignScale.legendExtentLow / legendExtentHigh",
+    "getThresholds": "reachable: ForeignScale.thresholds",
+}
+
+unexplained, internal, reachable = [], [], []
+lines = []
 for cls in sorted(holes):
     for member in holes[cls]:
-        print(f"{cls}.{member}")
+        reason = REASONS.get(member)
+        if reason is None:
+            unexplained.append(f"{cls}.{member}")
+            reason = "!! NO REASON RECORDED"
+        elif reason.startswith("internal"):
+            internal.append(f"{cls}.{member}")
+        else:
+            reachable.append(f"{cls}.{member}")
+        lines.append(f"{cls}.{member:32} {reason}")
+
+# The count that matters is the last one. "77 members do not cross" reads like a backlog and is
+# not: a member reachable through a `Foreign*` accessor is not a hole, it is the answer to one.
+print(f"# {len(lines)} public members have no direct foreign counterpart:")
+print(f"#   {len(internal):3} engine internals, marked @InternalAsterVegaApi")
+print(f"#   {len(reachable):3} reachable through a Foreign* accessor instead")
+print(f"#   {len(unexplained):3} unexplained  <- the number this gate is about")
+print("#")
+for line in lines:
+    print(line)
+
+if unexplained:
+    print(file=sys.stderr)
+    print("These do not reach a foreign host and no reason is recorded:", file=sys.stderr)
+    for name in unexplained:
+        print(f"  {name}", file=sys.stderr)
+    print(file=sys.stderr)
+    print("Either a host wants it — expose it through a Foreign* accessor — or it is engine", file=sys.stderr)
+    print("internals: mark it @InternalAsterVegaApi and add it to REASONS here.", file=sys.stderr)
+    sys.exit(1)

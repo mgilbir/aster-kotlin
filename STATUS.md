@@ -6740,3 +6740,43 @@ prints "yes". Removing each seam from the surface it belongs to and re-running m
 red: **all 25 do.** Two did not before that — `Function1` and `Int` are present on any of those
 signatures, so those columns were green whatever the seam did. A green cell that cannot go red is
 worse than no cell.
+
+### What to do about the seventy-seven
+
+Two answers, one for each half, and a report that leads with the number that matters.
+
+**Fifty are engine internals and now say so.** `@InternalAsterVegaApi` is a `@RequiresOptIn` marker:
+`public` had to mean two things — "call this" and "Kotlin has no cross-module `internal` so I had no
+choice" — and nothing distinguished them, which is why "does everything a host needs reach a host"
+had no answer until it was enumerated. A caller outside the engine now gets a compile error unless it
+opts in. The engine's own call sites opted in at file level, which took three rounds of compiling to
+find them all.
+
+**Twenty-seven were a real gap and are exposed.** The legend arithmetic of a banded scale — where the
+buckets cut, what labels them, where a value sits along the bar — is declared on `BinnedScale` with
+**default bodies**, and an Obj-C protocol cannot carry a default, so Kotlin/Native leaves them out
+entirely. A `QuantizeScale` reached Swift with `domain`, `name` and `invertExtent` and nothing else.
+Nothing inside noticed because the engine draws its own legends. `ForeignScale` answers them, and
+`ForeignScaleTests` builds a three-bucket quantize scale in Swift and reads its cuts, its labels, its
+extent and its unbounded ends.
+
+`legendExtent` is split into two functions rather than returned as a `Pair`, which crosses as an
+opaque `KotlinPair` whose halves are `id`. An unbounded bucket end answers **nil** rather than zero,
+because a threshold at 30 says nothing about how far below it the first bucket reaches and a host
+printing 0 there would be inventing a number.
+
+**The count stayed at 77 and that was the wrong headline.** Those twenty-seven members still have no
+*direct* counterpart — `ForeignScale` is a second route, not the same one — so a list of "members
+that do not cross" is unchanged by fixing them. It reads like a backlog and is not. The file now
+opens with the split:
+
+```
+# 77 public members have no direct foreign counterpart:
+#    50 engine internals, marked @InternalAsterVegaApi
+#    27 reachable through a Foreign* accessor instead
+#     0 unexplained  <- the number this gate is about
+```
+
+Zero is the number. Every member carries a reason, and one without a reason fails the check with
+what to do about it: expose it, or mark it internal and say so. Verified by adding a public member
+with an uncrossable type and watching it come back named.

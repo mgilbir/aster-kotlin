@@ -1,3 +1,5 @@
+@file:OptIn(InternalAsterVegaApi::class)
+
 package dev.aster.vega.runtime.interaction
 
 import dev.aster.vega.expression.ExpressionCompiler
@@ -5,6 +7,7 @@ import dev.aster.vega.expression.ExpressionEvaluationException
 import dev.aster.vega.expression.ExpressionResult
 import dev.aster.vega.expression.ExpressionScope
 import dev.aster.vega.model.DiagnosticCollector
+import dev.aster.vega.model.InternalAsterVegaApi
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.spec.SignalUpdate
 import dev.aster.vega.runtime.compile.ItemEncode

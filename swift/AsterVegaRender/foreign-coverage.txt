@@ -1,77 +1,82 @@
-AggregateTransform.getPublishesSignal
-BandScale.getBins
-BinOrdinalScale.extentAt
-BinOrdinalScale.legendFraction
-CollectTransform.getPublishesSignal
-CountPatternTransform.getPublishesSignal
-CrossTransform.getPublishesSignal
-DensityTransform.getPublishesSignal
-DotBinTransform.getPublishesSignal
-Expression.getExpr
-FilterTransform.getPublishesSignal
-FlattenTransform.getPublishesSignal
-FoldTransform.getPublishesSignal
-FormulaTransform.getPublishesSignal
-GeoPathTransform.getPublishesSignal
-GeoPointTransform.getPublishesSignal
-GeoShapeTransform.getPublishesSignal
-GraticuleTransform.getPublishesSignal
-HeatmapTransform.getPublishesSignal
-IdentifierTransform.getPublishesSignal
-IdentityScale.getBins
-ImputeTransform.getPublishesSignal
-IsocontourTransform.getPublishesSignal
-JoinAggregateTransform.getPublishesSignal
-Kde2dTransform.getPublishesSignal
-KdeTransform.getPublishesSignal
-LabelTransform.getPublishesSignal
-LinkPathTransform.getPublishesSignal
-LoessTransform.getPublishesSignal
-LookupTransform.getPublishesSignal
-NestTransform.getPublishesSignal
-OrdinalScale.getBins
-PackTransform.getPublishesSignal
-PartitionTransform.getPublishesSignal
-PieTransform.getPublishesSignal
-PivotTransform.getPublishesSignal
-PointScale.getBins
-ProjectTransform.getPublishesSignal
-QuantileScale.extentAt
-QuantileScale.getBins
-QuantileScale.getBucketRepresentatives
-QuantileScale.getLegendMax
-QuantileScale.getLegendValues
-QuantileScale.legendFraction
-QuantileTransform.getPublishesSignal
-QuantizeScale.extentAt
-QuantizeScale.getBins
-QuantizeScale.getBucketRepresentatives
-QuantizeScale.getLegendMax
-QuantizeScale.getLegendValues
-QuantizeScale.legendFraction
-RegressionTransform.getPublishesSignal
-ResolveFilterTransform.getPublishesSignal
-SampleTransform.getPublishesSignal
-SequenceTransform.getPublishesSignal
-SequentialColorScale.getBins
-SignalScope.activeItem
-SignalScope.encodeItem
-SignalScope.eventPoint
-SignalScope.inScope
-SignalScope.intersect
-SignalScope.intersectLasso
-StackTransform.getPublishesSignal
-StratifyTransform.getPublishesSignal
-ThresholdScale.extentAt
-ThresholdScale.getBins
-ThresholdScale.getBucketRepresentatives
-ThresholdScale.getLegendMax
-ThresholdScale.getLegendValues
-ThresholdScale.legendFraction
-TimeScale.getBins
-TransformedScale.getBins
-TreeLinksTransform.getPublishesSignal
-TreeTransform.getPublishesSignal
-TreemapTransform.getPublishesSignal
-VoronoiTransform.getPublishesSignal
-WindowTransform.getPublishesSignal
+# 77 public members have no direct foreign counterpart:
+#    50 engine internals, marked @InternalAsterVegaApi
+#    27 reachable through a Foreign* accessor instead
+#     0 unexplained  <- the number this gate is about
+#
+AggregateTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+BandScale.getBins                          reachable: ForeignScale.bins
+BinOrdinalScale.extentAt                         reachable: ForeignScale.bucketLow / bucketHigh
+BinOrdinalScale.legendFraction                   reachable: ForeignScale.legendFraction
+CollectTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+CountPatternTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+CrossTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+DensityTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+DotBinTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+Expression.getExpr                          internal: the compiled expression's own AST
+FilterTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+FlattenTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+FoldTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+FormulaTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+GeoPathTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+GeoPointTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+GeoShapeTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+GraticuleTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+HeatmapTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+IdentifierTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+IdentityScale.getBins                          reachable: ForeignScale.bins
+ImputeTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+IsocontourTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+JoinAggregateTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+Kde2dTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+KdeTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+LabelTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+LinkPathTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+LoessTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+LookupTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+NestTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+OrdinalScale.getBins                          reachable: ForeignScale.bins
+PackTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+PartitionTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+PieTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+PivotTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+PointScale.getBins                          reachable: ForeignScale.bins
+ProjectTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+QuantileScale.extentAt                         reachable: ForeignScale.bucketLow / bucketHigh
+QuantileScale.getBins                          reachable: ForeignScale.bins
+QuantileScale.getBucketRepresentatives         reachable: ForeignScale.bucketRepresentatives
+QuantileScale.getLegendMax                     reachable: ForeignScale.legendMax
+QuantileScale.getLegendValues                  reachable: ForeignScale.legendValues
+QuantileScale.legendFraction                   reachable: ForeignScale.legendFraction
+QuantileTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+QuantizeScale.extentAt                         reachable: ForeignScale.bucketLow / bucketHigh
+QuantizeScale.getBins                          reachable: ForeignScale.bins
+QuantizeScale.getBucketRepresentatives         reachable: ForeignScale.bucketRepresentatives
+QuantizeScale.getLegendMax                     reachable: ForeignScale.legendMax
+QuantizeScale.getLegendValues                  reachable: ForeignScale.legendValues
+QuantizeScale.legendFraction                   reachable: ForeignScale.legendFraction
+RegressionTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+ResolveFilterTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+SampleTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+SequenceTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+SequentialColorScale.getBins                          reachable: ForeignScale.bins
+SignalScope.activeItem                       internal: @InternalAsterVegaApi, the expression evaluator's scope
+SignalScope.encodeItem                       internal: @InternalAsterVegaApi, the expression evaluator's scope
+SignalScope.eventPoint                       internal: @InternalAsterVegaApi, the expression evaluator's scope
+SignalScope.inScope                          internal: @InternalAsterVegaApi, the expression evaluator's scope
+SignalScope.intersect                        internal: @InternalAsterVegaApi, the expression evaluator's scope
+SignalScope.intersectLasso                   internal: @InternalAsterVegaApi, the expression evaluator's scope
+StackTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+StratifyTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+ThresholdScale.extentAt                         reachable: ForeignScale.bucketLow / bucketHigh
+ThresholdScale.getBins                          reachable: ForeignScale.bins
+ThresholdScale.getBucketRepresentatives         reachable: ForeignScale.bucketRepresentatives
+ThresholdScale.getLegendMax                     reachable: ForeignScale.legendMax
+ThresholdScale.getLegendValues                  reachable: ForeignScale.legendValues
+ThresholdScale.legendFraction                   reachable: ForeignScale.legendFraction
+TimeScale.getBins                          reachable: ForeignScale.bins
+TransformedScale.getBins                          reachable: ForeignScale.bins
+TreeLinksTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+TreeTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+TreemapTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+VoronoiTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+WindowTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds

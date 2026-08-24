@@ -1,3 +1,5 @@
+@file:OptIn(InternalAsterVegaApi::class)
+
 package dev.aster.vega.dataflow.transform
 
 import dev.aster.vega.expression.ExpressionCompiler
@@ -6,6 +8,7 @@ import dev.aster.vega.expression.ExpressionResult
 import dev.aster.vega.expression.ExpressionScope
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
+import dev.aster.vega.model.InternalAsterVegaApi
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
@@ -127,6 +130,7 @@ public interface Transform {
    * itself, and [TransformPipeline] reports the ones that would otherwise drop the request
    * silently.
    */
+  @InternalAsterVegaApi
   public val publishesSignal: Boolean
     get() = false
 

@@ -6,6 +6,10 @@
 // - Show declarations: true
 
 // Library unique name: <io.github.mgilbir.astervega:vega-model>
+open annotation class dev.aster.vega.model/InternalAsterVegaApi : kotlin/Annotation { // dev.aster.vega.model/InternalAsterVegaApi|null[0]
+    constructor <init>() // dev.aster.vega.model/InternalAsterVegaApi.<init>|<init>(){}[0]
+}
+
 final enum class dev.aster.vega.model.locale/DateField : kotlin/Enum<dev.aster.vega.model.locale/DateField> { // dev.aster.vega.model.locale/DateField|null[0]
     enum entry DATE // dev.aster.vega.model.locale/DateField.DATE|null[0]
     enum entry MONTH // dev.aster.vega.model.locale/DateField.MONTH|null[0]

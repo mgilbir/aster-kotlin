@@ -1,3 +1,5 @@
+@file:OptIn(InternalAsterVegaApi::class)
+
 package dev.aster.vega.dataflow.transform
 
 import dev.aster.vega.dataflow.geo.AlbersUsa
@@ -13,6 +15,7 @@ import dev.aster.vega.dataflow.geo.Projections
 import dev.aster.vega.dataflow.geo.SphericalMeasure
 import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCodes
+import dev.aster.vega.model.InternalAsterVegaApi
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.field

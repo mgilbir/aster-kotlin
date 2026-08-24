@@ -99,6 +99,9 @@ public final class dev/aster/vega/model/ForeignValue {
 	public final fun string (Ldev/aster/vega/model/VegaValue;)Ljava/lang/String;
 }
 
+public abstract interface annotation class dev/aster/vega/model/InternalAsterVegaApi : java/lang/annotation/Annotation {
+}
+
 public final class dev/aster/vega/model/JsonBridgeKt {
 	public static final fun toVegaValue (Lkotlinx/serialization/json/JsonElement;)Ldev/aster/vega/model/VegaValue;
 }
