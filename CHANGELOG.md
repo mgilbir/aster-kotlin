@@ -111,6 +111,16 @@ section here does not get released.
 
 ### Changed
 
+- **The Android view centres a chart, as the other three renderers already did.** A scene is
+  scaled to fit, so a slot of a different aspect ratio leaves a strip along one axis;
+  `VegaChartView` put all of it on the right and the bottom while the Compose Multiplatform
+  and SwiftUI charts split it evenly, so the same chart in the same slot sat in a different
+  place depending on the host. **This moves existing Android charts** — by half the slack, and
+  only where there is any: a view measured at its own preferred size is unmoved, which is most
+  of them, and a chart given `match_parent` on an axis shifts by half of what was empty.
+  Drawing, hit testing and the accessibility frames all read the one `placement()`, so they
+  moved together rather than needing four edits. (#99)
+
 - **The placement type moved to `vega-scene`**, the module every renderer already depends
   on, as `ScenePlacement`. `dev.aster.vega.compose.mp.ChartPlacement` is a typealias now, so
   Kotlin source keeps compiling; code already compiled against the old class will not link,

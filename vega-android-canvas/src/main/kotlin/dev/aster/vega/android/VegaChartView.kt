@@ -407,19 +407,33 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
    * The **fit alone**, with no pan or zoom in it: `InteractionState` carries those and the
    * controller applies them, so folding them in here would apply each twice.
    *
-   * A note on what this does *not* do. The Compose Multiplatform renderer and the SwiftUI one
-   * centre a chart in a slot of the wrong aspect ratio; this view pins it to the padded top-left
-   * and always has. That difference is real and is left alone deliberately — centring here changes
-   * where every existing Android chart is drawn, which is an appearance decision rather than a
-   * consequence of reporting the placement. What this makes possible is changing it in one place if
-   * that decision is taken.
+   * **Centred in whatever is left over**, which the Compose Multiplatform and SwiftUI renderers
+   * have always done and this one did not. A scene is scaled to fit, so a slot of a different
+   * aspect ratio leaves a strip along one axis; this view used to put all of it on the right and
+   * the bottom, and the same chart in the same slot therefore sat in a different place depending on
+   * which host drew it. `SceneFit.Contain` on the Compose side calls centring what "makes a chart
+   * in a slot of the wrong aspect ratio look placed rather than stuck to a corner", and that was as
+   * true here.
+   *
+   * A view measured at its own preferred size has nothing left over and does not move, which is
+   * most of them; a chart given `match_parent` on an axis moves by half the slack.
    */
-  public fun placement(): ScenePlacement =
-    ScenePlacement(
-      scale = fitScaleFor(controller.snapshot.scene),
-      left = paddingLeft.toDouble(),
-      top = paddingTop.toDouble(),
+  public fun placement(): ScenePlacement {
+    val scene = controller.snapshot.scene
+    val scale = fitScaleFor(scene)
+    val availableWidth = (width - paddingLeft - paddingRight).toDouble()
+    val availableHeight = (height - paddingTop - paddingBottom).toDouble()
+    // Never negative. The fit scale has already made the scene no larger than the box, and a box
+    // with
+    // no room at all leaves the origin at the padding rather than pulling the drawing inwards.
+    val slackX = (availableWidth - scene.width * scale).coerceAtLeast(0.0)
+    val slackY = (availableHeight - scene.height * scale).coerceAtLeast(0.0)
+    return ScenePlacement(
+      scale = scale,
+      left = paddingLeft + slackX / 2.0,
+      top = paddingTop + slackY / 2.0,
     )
+  }
 
   /**
    * Told where the chart was drawn, whenever that changes.

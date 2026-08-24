@@ -6562,3 +6562,27 @@ The skip stays for a machine that genuinely has no route, and `check.sh` now **r
 instrumented test by name and reason** in its output. Gradle prints a count and keeps the build
 green, so a suite that stopped checking something looks exactly like one that checked it. The ledger
 already refuses to let a *gate* pass silently; this extends that to a test inside one.
+
+### The Android view centres now, and four call sites moved with it
+
+`VegaChartView` scaled a scene to fit and pinned it to the padded top-left. The Compose
+Multiplatform and SwiftUI renderers centre it in whatever is left over, and `SceneFit.Contain`'s own
+comment says why — centring is what "makes a chart in a slot of the wrong aspect ratio look placed
+rather than stuck to a corner". The same chart in the same slot therefore sat in a different place
+depending on which host drew it.
+
+It centres too now. The change is four lines in `placement()`, and that is the whole point: the draw's
+viewport, a touch's conversion and the accessibility helper's two mappings had each spelled the origin
+out for themselves until they were unified, and centring with four copies would have meant finding all
+four — or, more likely, finding three. Of 76 instrumented tests, exactly **one** failed: the one
+asserting the old top-left offset. The tap test, which aims through the reported placement, and every
+accessibility test followed the change without being touched.
+
+**It moves existing charts**, and only where there was slack: a view measured at its own preferred
+size has none, which is most of them, and a chart given `match_parent` on an axis shifts by half of
+what was empty. That is why it belongs in a release that already carries breaking changes rather than
+in a patch.
+
+Also corrected here: the README still called the type `ChartPlacement` in the paragraph describing
+this difference, three PRs after it was renamed to `ScenePlacement`. Documentation drift of exactly
+the kind this stack has been fixing, introduced by the stack itself.

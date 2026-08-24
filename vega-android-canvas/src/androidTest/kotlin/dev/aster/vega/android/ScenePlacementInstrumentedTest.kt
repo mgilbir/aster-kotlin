@@ -75,14 +75,55 @@ class ScenePlacementInstrumentedTest {
   }
 
   @Test
-  fun theOffsetIsThePaddingThisViewActuallyDrawsAt() {
-    // This view pins the chart to the padded top-left rather than centring it, which the Compose
-    // Multiplatform and SwiftUI charts do. The report says where the drawing *is*, so it says that.
+  fun theChartIsCentredInWhateverIsLeftOver() {
+    // This used to assert the padding outright, because the view pinned the chart to the padded
+    // top-left where the Compose Multiplatform and SwiftUI charts centre it. It centres now, so the
+    // offset is the padding **plus half the slack** along whichever axis has any.
+    val scene = SampleScenes.barChart()
     val view = laidOut(size = 400, padding = 17)
     val placed = view.placement()
 
-    assertEquals(17.0, placed.left, 0.0)
-    assertEquals(17.0, placed.top, 0.0)
+    val available = 400.0 - 17.0 - 17.0
+    assertEquals(17.0 + (available - scene.width * placed.scale) / 2.0, placed.left, 0.5)
+    assertEquals(17.0 + (available - scene.height * placed.scale) / 2.0, placed.top, 0.5)
+  }
+
+  @Test
+  fun theAxisThatFitsExactlyDoesNotMove() {
+    // The fit scale is the smaller of the two ratios, so one axis fills its box and has no slack.
+    // That axis must sit at the padding: centring something that already fits would move it off by
+    // rounding, and a chart measured at its own preferred size must be unmoved by this change.
+    val scene = SampleScenes.barChart()
+    val view = laidOut(size = 400)
+    val placed = view.placement()
+
+    val fills = if (scene.width * placed.scale > scene.height * placed.scale) "width" else "height"
+    if (fills == "width") {
+      assertEquals(0.0, placed.left, 0.5)
+    } else {
+      assertEquals(0.0, placed.top, 0.5)
+    }
+  }
+
+  @Test
+  fun aTallSlotCentresHorizontallyAndAWideOneVertically() {
+    // The case the change is for: a slot of the wrong aspect ratio. One of these offsets is zero
+    // and
+    // the other is not, and which is which follows the slot rather than the scene.
+    val tall = onMainThread {
+      val view = VegaChartView(context)
+      view.controller = VegaChartController.fromScene(SampleScenes.barChart())
+      view.measure(
+        View.MeasureSpec.makeMeasureSpec(200, View.MeasureSpec.EXACTLY),
+        View.MeasureSpec.makeMeasureSpec(600, View.MeasureSpec.EXACTLY),
+      )
+      view.layout(0, 0, 200, 600)
+      view
+    }
+    val placed = tall.placement()
+
+    assertTrue("a tall slot should leave vertical slack: $placed", placed.top > 0.0)
+    assertEquals("and none horizontally", 0.0, placed.left, 0.5)
   }
 
   @Test

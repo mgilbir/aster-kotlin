@@ -985,12 +985,11 @@ ambiguous for type lookup", which is how this was found rather than reasoned abo
 Obj-C is not available, since `@HiddenFromObjC` is Kotlin/Native-only and the file compiles for the
 JVM too. The Swift struct keeps its name, its `CGFloat`s and its value semantics.
 
-One thing the four still disagree about, and it is a **drawing** difference rather than an API one.
-The Compose Multiplatform and SwiftUI charts *centre* a scene in a slot of the wrong aspect ratio;
-`VegaChartView` pins it to the padded top-left and always has. `ChartPlacement` says where the
-drawing **is**, so it reports that faithfully on each. Making them agree changes where every
-existing Android chart is drawn, which is an appearance decision rather than a consequence of
-reporting the placement — `VegaChartView.placement()` is now the single place it would change.
+All four also *place* a scene the same way now: scaled to fit and **centred** in whatever is left
+over. `VegaChartView` pinned it to the padded top-left until 0.3.0, so the same chart in the same
+slot sat differently depending on which host drew it. Only a slot of a different aspect ratio to the
+scene has slack to centre in, so a view measured at its own preferred size is unmoved. Drawing, hit
+testing and the accessibility frames all read one `placement()`, which is why they moved together.
 
 ### The public API
 
