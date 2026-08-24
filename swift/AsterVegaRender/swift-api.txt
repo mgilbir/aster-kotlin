@@ -39,9 +39,11 @@ ChartSession.containerSize  ::  @MainActor var containerSize: SizeD? { get set }
 ChartSession.controls  ::  @MainActor var controls: [SignalInput] { get set }
 ChartSession.diagnostics  ::  @MainActor var diagnostics: [VegaDiagnostic] { get set }
 ChartSession.failure  ::  @MainActor var failure: String? { get set }
+ChartSession.focusedNodeId  ::  @MainActor var focusedNodeId: Int64? { get }
 ChartSession.grammar  ::  @MainActor var grammar: Grammar? { get set }
 ChartSession.hostConfigFailure  ::  @MainActor var hostConfigFailure: String? { get set }
 ChartSession.hover(at:)  ::  @MainActor func hover(at point: Point?)
+ChartSession.hoveredNodeId  ::  @MainActor var hoveredNodeId: Int64? { get }
 ChartSession.init(textEngine:textScale:loader:clock:locale:hostConfigJson:containerSize:timeZone:resolveFont:)  ::  @MainActor init(textEngine: MeasuredTextEngine? = nil, textScale: Double = 1, loader: VegaDataLoader? = nil, clock: (@Sendable () -> Int64)? = nil, locale: VegaLocale? = nil, hostConfigJson: String? = nil, containerSize: SizeD? = nil, timeZone: Foundation.TimeZone? = nil, resolveFont: ((String) -> CTFont?)? = nil)
 ChartSession.lastTouch  ::  @MainActor var lastTouch: TouchOutcome? { get set }
 ChartSession.load(specification:signals:)  ::  @MainActor func load(specification: String, signals: [String : VegaValue] = [:])
@@ -53,7 +55,7 @@ ChartSession.press(_:modifiers:)  ::  @MainActor func press(_ key: ChartKey, mod
 ChartSession.resetViewport()  ::  @MainActor func resetViewport()
 ChartSession.resolveFont  ::  @MainActor let resolveFont: ((String) -> CTFont?)?
 ChartSession.scene  ::  @MainActor var scene: AsterVega.Scene? { get set }
-ChartSession.selectedNodeIds  ::  @MainActor var selectedNodeIds: Set<AnyHashable> { get }
+ChartSession.selectedNodeIds  ::  @MainActor var selectedNodeIds: Set<Int64> { get }
 ChartSession.set(signal:to:)  ::  @MainActor func set(signal: String, to value: VegaValue)
 ChartSession.setData(_:rows:)  ::  @MainActor func setData(_ name: String, rows: [[String : ChartDatum]])
 ChartSession.settle()  ::  @MainActor func settle() async

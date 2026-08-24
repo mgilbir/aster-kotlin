@@ -707,13 +707,32 @@ public final class ChartSession {
     }
   }
 
-  /// The marks currently selected, for the accessibility tree to mark as such.
+  /// The marks currently selected, as the numbers a host can key on.
   ///
-  /// `Set<AnyHashable>` rather than a set of node ids: `SceneNodeId` is a value class, so it has no Obj-C
-  /// representation and crosses as an opaque box. Opaque is enough here — the set is handed straight back
-  /// to the engine, which knows what is in it.
-  public var selectedNodeIds: Set<AnyHashable> {
-    controller.snapshot.interactionState.selection.nodeIds
+  /// This was a `Set<AnyHashable>`, with a comment explaining that `SceneNodeId` is a value class and
+  /// so crosses as an opaque box — "opaque is enough here, the set is handed straight back to the
+  /// engine". That was true while nothing could unbox one. `ForeignNodeId` can, so the apology is
+  /// gone and a host can read a selection instead of only relaying it (#120).
+  public var selectedNodeIds: Set<Int64> {
+    Set(
+      ForeignNodeId.shared.values(ids: controller.snapshot.interactionState.selection.nodeIds)
+        .map { $0.int64Value })
+  }
+
+  /// The mark under the pointer, or nil when there is none.
+  ///
+  /// Exposed because a test needed it and could only get at it by reaching past this class to the
+  /// controller — which is the argument for it being here: a host wanting to draw its own hover
+  /// affordance had the same problem and no `@testable` to fall back on.
+  public var hoveredNodeId: Int64? {
+    ForeignNodeId.shared.valueOrNull(id: controller.snapshot.interactionState.hoveredNodeId)?
+      .int64Value
+  }
+
+  /// The mark with keyboard or accessibility focus, or nil when there is none.
+  public var focusedNodeId: Int64? {
+    ForeignNodeId.shared.valueOrNull(id: controller.snapshot.interactionState.focusedNodeId)?
+      .int64Value
   }
 
   /// Whether the chart has been panned or zoomed away from where it started.

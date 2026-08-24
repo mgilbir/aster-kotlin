@@ -23,6 +23,69 @@ final class ForeignValueTests: XCTestCase {
         """)
   }
 
+  /// Enumeration over a datum **the engine attached to a mark**, which is the reported case.
+  ///
+  /// The other tests here parse a literal this file wrote, which proves the readers agree with each
+  /// other and not that they can read what a chart actually carries. #120's author was reading
+  /// `NodeMetadata.datum`, so that is what this reads: compile a specification, walk to a mark, and
+  /// enumerate the row behind it without knowing its shape in advance.
+  func testADatumOnAMarkCanBeWalkedWithoutKnowingItsShape() throws {
+    let compiled = SpecCompiler(
+      textEngine: MetricTextEngine(advanceRatio: 0.6, ascentRatio: 0.8, descentRatio: 0.2),
+      loader: DenyLoader(),
+      randomSeed: 42,
+      clock: ClockCompanion.shared.Fixed,
+      locale: VegaLocale.Companion.shared.EnglishUS,
+      hostConfig: nil,
+      containerSize: nil,
+      hostData: nil,
+      timeZone: nil
+    )
+    .compileJson(
+      json: """
+        {"width": 200, "height": 100, "padding": 0,
+         "data": [{"name": "t", "values": [{"c": "a", "v": 20, "ok": true}]}],
+         "scales": [
+           {"name": "x", "type": "band", "domain": {"data": "t", "field": "c"}, "range": "width"},
+           {"name": "y", "domain": [0, 100], "range": "height"}],
+         "marks": [{"type": "rect", "from": {"data": "t"}, "encode": {"update": {
+           "x": {"scale": "x", "field": "c"}, "width": {"scale": "x", "band": 1},
+           "y": {"scale": "y", "field": "v"}, "y2": {"scale": "y", "value": 0}}}}]}
+        """,
+      signalOverrides: [:],
+      itemEncodes: [:]
+    )
+    let scene = try XCTUnwrap(compiled.scene, "\(compiled.diagnostics)")
+
+    var datum: (any AsterVega.VegaValue)?
+    func walk(_ node: any AsterVega.SceneNode) {
+      if datum == nil, node.metadata.datum != nil, !(node is GroupNode) {
+        datum = node.metadata.datum
+      }
+      if let group = node as? GroupNode {
+        for child in group.children { walk(child) }
+      }
+    }
+    walk(scene.root)
+
+    let row = try XCTUnwrap(datum, "no mark in this chart carried a datum")
+    XCTAssertEqual("object", foreign.kind(value: row))
+
+    // The shape read off the row rather than assumed about it.
+    var seen: [String: String] = [:]
+    for key in foreign.keys(value: row) {
+      seen[key] = foreign.kind(value: foreign.get(value: row, key: key))
+    }
+    XCTAssertEqual("string", seen["c"], "the row's own fields, enumerated: \(seen)")
+    XCTAssertEqual("number", seen["v"])
+    XCTAssertEqual("boolean", seen["ok"])
+
+    // And read without coercion, which is the difference from `asString`.
+    XCTAssertEqual("a", foreign.string(value: foreign.get(value: row, key: "c")))
+    XCTAssertEqual(20, foreign.number(value: foreign.get(value: row, key: "v")))
+    XCTAssertNil(foreign.string(value: foreign.get(value: row, key: "v")))
+  }
+
   func testAnObjectsKeysCanBeEnumerated() {
     XCTAssertEqual(
       ["variety", "yield", "ok", "tags", "nested"], foreign.keys(value: datum()))

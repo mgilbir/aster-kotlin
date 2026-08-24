@@ -462,7 +462,10 @@ public struct VegaChartView: View {
     return Array(
       AccessibilityTree.shared.elements(
         scene: scene,
-        selectedNodeIds: session?.selectedNodeIds ?? [],
+        // Back into the engine's own form. The session now hands out numbers, which is what a host
+        // wants; the tree wants the ids it issued.
+        selectedNodeIds: ForeignNodeId.shared.setOf(
+          values: (session?.selectedNodeIds ?? []).map { KotlinLong(value: $0) }),
         // The one sentence the tree writes itself — the dense-chart summary. English here because a
         // view has no locale of its own to consult; a host drawing charts in another language passes its
         // own captions to the compiler, and everything else in the tree is already in that language.

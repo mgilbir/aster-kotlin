@@ -6643,3 +6643,37 @@ useless for a host deciding how to display a field.
 
 Both are asserted from Swift, against a real compiled scene and a real parsed datum, rather than from
 Kotlin where the boundary being tested does not exist. 377 Swift tests, up from 350.
+
+### Two things a review caught that the tests had not
+
+The first draft of `ForeignNodeId` was tested against itself: every assertion built a box with
+`setOf` and read it back with `values`, its own function feeding its own function. That proves the
+plumbing and says nothing about the reported case, which is an id the **engine** produced. Both are
+covered now — a tap on a real chart, and a hover dispatched through a real controller, with the
+number that comes out matched against the `id_` of the node it names. The loop is engine → opaque
+box → number → the same node.
+
+The same criticism applied to `ForeignValue`, whose tests parsed a JSON literal this repository
+wrote rather than a datum a chart carried. It now compiles a specification, walks to a mark, and
+enumerates `NodeMetadata.datum` without knowing its shape — which is what #120's author was doing.
+
+**And a habit worth naming.** Twice while writing those tests the sentence "`ChartSession` does not
+expose that" appeared, and both times the response was to reach past it — to the controller in one
+case, and to `@testable` in the other. If a test needs something, a host needs it: a host drawing its
+own hover affordance has the same problem and no `@testable` to fall back on. So `hoveredNodeId` and
+`focusedNodeId` are on `ChartSession` now, and `selectedNodeIds` hands out `Set<Int64>` rather than
+the `Set<AnyHashable>` whose own comment apologised for being opaque.
+
+That last one is **breaking for a Swift host**, and the API snapshot added two PRs ago is what put it
+in the diff rather than in somebody's build:
+
+```
+-ChartSession.selectedNodeIds  ::  @MainActor var selectedNodeIds: Set<AnyHashable> { get }
++ChartSession.selectedNodeIds  ::  @MainActor var selectedNodeIds: Set<Int64> { get }
+```
+
+One more thing found by the crash that followed it, worth knowing before writing another `Foreign*`
+accessor: `values(ids:)` is `NSSet<id>` at the boundary, so Swift types it as `Set<AnyHashable>` and
+a `Set<Int64>` satisfies it at compile time and fails **inside Kotlin** at run time with
+`kotlin.Long cannot be cast to SceneNodeId`. The boxed path is not type-safe across the boundary,
+which is an argument for a host reading `selectedNodeIds` and never meeting it.

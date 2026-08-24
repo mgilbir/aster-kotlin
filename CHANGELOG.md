@@ -25,6 +25,19 @@ section here does not get released.
   boolean and an object all as text, so a host could not tell a field that held `"3"` from
   one that held `3`. (#120)
 
+### Changed
+
+- **`ChartSession.selectedNodeIds` hands out numbers**, `Set<Int64>` rather than
+  `Set<AnyHashable>`. It carried opaque boxes because nothing could unwrap one, with a comment
+  saying "opaque is enough here — the set is handed straight back to the engine". That stopped
+  being true, so a host can read a selection now instead of only relaying it. **Breaking for a
+  Swift host that stored the old set**; `ForeignNodeId.setOf(values:)` converts back where the
+  engine wants its own form.
+
+- **`ChartSession` exposes `hoveredNodeId` and `focusedNodeId`**, as numbers. Neither was
+  reachable at all: the session published a selection and nothing else about the interaction
+  state, so a host drawing its own hover affordance had to reach past it to the controller. (#120)
+
 ## 0.3.0
 
 ### Changed

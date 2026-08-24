@@ -16,7 +16,113 @@ import XCTest
 ///   or a set element has. `InteractionState.hoveredNodeId`, `focusedNodeId` and
 ///   `ChartSelection.nodeIds` are opaque, which is why `ChartSession.selectedNodeIds` is a
 ///   `Set<AnyHashable>` that can only be passed back untouched.
+@available(macOS 14.0, iOS 17.0, *)
 final class ForeignNodeIdTests: XCTestCase {
+
+  /// Two bars, one of which a tap can land on.
+  private let specification = """
+    {"$schema": "https://vega.github.io/schema/vega/v6.json",
+     "width": 200, "height": 100, "padding": 0,
+     "data": [{"name": "t", "values": [{"c": "a", "v": 20}, {"c": "b", "v": 30}]}],
+     "scales": [
+       {"name": "x", "type": "band", "domain": {"data": "t", "field": "c"}, "range": "width"},
+       {"name": "y", "domain": [0, 100], "range": "height"}],
+     "marks": [{"type": "rect", "from": {"data": "t"}, "encode": {"update": {
+       "x": {"scale": "x", "field": "c"}, "width": {"scale": "x", "band": 1},
+       "y": {"scale": "y", "field": "v"}, "y2": {"scale": "y", "value": 0}}}}]}
+    """
+
+  /// The assertion the rest of this file was missing.
+  ///
+  /// Every other test here builds a box with `setOf` and reads it back with `values` — its own
+  /// function feeding its own function, which proves the plumbing and *not* the reported case. This
+  /// one taps a real chart, takes the ids the **engine** produced, and checks the number that comes
+  /// out matches the `id_` of the node actually under the finger.
+  ///
+  /// That is the loop: engine → opaque box → number → the same node. Without it, `ForeignNodeId`
+  /// would be a set of functions that agree with each other and possibly with nothing else.
+  @MainActor
+  func testAnIdTheEngineProducedUnboxesToTheNodeItNames() async throws {
+    let session = ChartSession()
+    session.load(specification: specification)
+    await session.settle()
+    let scene = try XCTUnwrap(session.scene, session.failure ?? "no scene")
+    session.place(
+      contentScale: 1, viewport: Rect(x: 0, y: 0, width: scene.width, height: scene.height))
+
+    // Inside the left bar: the band is the left half, and the bar occupies the bottom fifth.
+    session.tap(at: Point(x: 50, y: 90))
+    await session.settle()
+
+    // Numbers, straight from the session. This read `Set<AnyHashable>` until #120 — boxes a host
+    // could only hand back — and the first draft of this test passed that set to `values(ids:)`,
+    // which crashed with `kotlin.Long cannot be cast to SceneNodeId` once the property started
+    // returning numbers. Worth recording: `values(ids:)` is `NSSet<id>` at the boundary, so Swift
+    // types it as `Set<AnyHashable>` and a `Set<Int64>` satisfies it at compile time and fails
+    // inside Kotlin at run time. A host reading `selectedNodeIds` never meets that edge now.
+    let numbers = session.selectedNodeIds
+    XCTAssertFalse(numbers.isEmpty, "the tap should have hit a bar")
+
+    // And they name real nodes: every number is the `id_` of some node in the scene this drew.
+    var idsInScene: Set<Int64> = []
+    func walk(_ node: any AsterVega.SceneNode) {
+      idsInScene.insert(node.id_)
+      if let group = node as? GroupNode {
+        for child in group.children { walk(child) }
+      }
+    }
+    walk(scene.root)
+
+    for number in numbers {
+      XCTAssertTrue(
+        idsInScene.contains(number),
+        "\(number) came out of a selection and names no node in the scene")
+    }
+
+    // And the raw form still round-trips, for a host driving the controller rather than a session.
+    let boxed = ForeignNodeId.shared.setOf(values: numbers.map { KotlinLong(value: $0) })
+    XCTAssertEqual(
+      numbers.sorted(),
+      ForeignNodeId.shared.values(ids: boxed).map { $0.int64Value }.sorted())
+  }
+
+  /// The same loop for the **nullable** position, which boxes for a different reason.
+  ///
+  /// Driven through `VegaChartController` rather than `ChartSession`, because the session does not
+  /// expose the interaction state at all — it publishes `selectedNodeIds` and nothing else. A host
+  /// that wants a hover uses the controller, which the framework exports, so that is what this uses.
+  @MainActor
+  func testAHoveredIdUnboxesToTheNodeUnderThePointer() throws {
+    let controller = VegaChartController(
+      initialScene: Scene.Companion.shared.empty(width: 0, height: 0),
+      textEngine: MetricTextEngine(advanceRatio: 0.6, ascentRatio: 0.8, descentRatio: 0.2),
+      clock: { KotlinLong(value: 0) },
+      loader: DenyLoader(),
+      scheduler: nil,
+      locale: VegaLocale.Companion.shared.EnglishUS,
+      hostConfig: nil,
+      containerSize: nil,
+      hostData: nil,
+      timeZone: nil)
+    _ = controller.setSpec(json: specification)
+    let scene = controller.snapshot.scene
+    controller.contentScale = 1
+    controller.dispatch(event: ChartInputEventPointerMoved(point: PointD(x: 50, y: 90)))
+
+    let hovered = controller.snapshot.interactionState.hoveredNodeId
+    XCTAssertNotNil(hovered, "the pointer is over a bar")
+    let number = try XCTUnwrap(ForeignNodeId.shared.valueOrNull(id: hovered)).int64Value
+
+    var idsInScene: Set<Int64> = []
+    func walk(_ node: any AsterVega.SceneNode) {
+      idsInScene.insert(node.id_)
+      if let group = node as? GroupNode {
+        for child in group.children { walk(child) }
+      }
+    }
+    walk(scene.root)
+    XCTAssertTrue(idsInScene.contains(number), "\(number) names no node in the scene")
+  }
 
   private func scene() throws -> AsterVega.Scene {
     let compiled = SpecCompiler(
