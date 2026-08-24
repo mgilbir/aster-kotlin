@@ -157,6 +157,8 @@ Gates, and what each needs:
 
   gradle              always. Format, ABI, bytecode level, every JVM test, native compiles,
                       lint, the demo APK, and the instrumented suites compiled.
+  android-api         always. The surface of the two Android artifacts, which Kotlin's ABI
+                      validation cannot dump.
   swift               macOS. The Swift suite, the exported-API snapshot, and the iOS demo's
                       type-check. Not runnable on any other host.
   instrumented        a device or emulator on adb. scripts/emulator.sh --headless starts one.
@@ -189,7 +191,16 @@ gradle_gate() {
 run_gate "gradle" gradle_gate
 
 # ---------------------------------------------------------------------------------------------
-# 2. The Swift gate: the suite, the exported-API snapshot, and the iOS demo's type-check.
+# 2. The Android artifacts' exported surface.
+#
+# Kotlin's ABI validation covers the nine modules it can and cannot cover an Android library, so
+# these two — the artifacts an Android host actually depends on — were guarded by nothing. See
+# scripts/android-api.sh.
+# ---------------------------------------------------------------------------------------------
+run_gate "android-api" ./scripts/android-api.sh
+
+# ---------------------------------------------------------------------------------------------
+# 3. The Swift gate: the suite, the exported-API snapshot, and the iOS demo's type-check.
 #
 # This is the one whose absence was found the hard way, twice. `swift-test.sh` carries the
 # `ios-demo.sh --check` step for the same reason.
@@ -201,7 +212,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------------------------
-# 3. The instrumented suites, if something is listening.
+# 4. The instrumented suites, if something is listening.
 #
 # They are compiled above whatever happens. Running them needs a device, and a host with one
 # attached should not have to remember a second script to use it.
@@ -221,7 +232,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------------------------
-# 4 and 5. The differential comparisons, which are the point of the project.
+# 5 and 6. The differential comparisons, which are the point of the project.
 #
 # They regenerate upstream's own output with the pinned packages and compare against it, so they
 # need node and they are not quick. `--fast` is for the edit-run loop; landing anything runs them.

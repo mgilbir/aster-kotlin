@@ -6398,3 +6398,53 @@ now.
 
 Checked the way the others were: reverting the Swift locale assertion makes `check.sh` red, where
 before it was green and only `swift-test.sh` knew.
+
+### The surface nobody was diffing
+
+Two of the eleven published modules had no API snapshot of any kind. `vega-android-canvas` and
+`vega-compose` are the artifacts an Android host actually depends on, and Kotlin's ABI validation
+cannot dump them — it reads a module's Maven publications and does not support an Android library's,
+which KGP has a diagnostic named for. The build file recorded that as a stated gap and said their
+surface was "small enough for a consumer to read the diff by hand".
+
+Reading it by hand is what failed. `vega-compose` shipped 0.2.0 exposing a controller, a modifier and
+one callback while the `VegaChartView` it wraps had a font resolver, an accessibility threshold and a
+tooltip switch; an adopter found that (#99), not a review. A surface nobody snapshots is a surface
+nobody diffs.
+
+`scripts/android-api.sh` snapshots it now, the way `scripts/foreign-api.sh` snapshots the Obj-C
+surface and for the same reason. **`javap` rather than a source scan**, because the boundary is the
+bytecode: a default argument is a `$default` bridge, a `@Composable` gains a `Composer` and two
+`int`s, and a parameter inserted in the middle of a list is invisible in source and a different
+method here. 184 lines, checked by `check.sh`.
+
+Two things it cost, both found by testing the gate rather than trusting it:
+
+- The obvious classes directory, `runtime_library_classes_dir`, is written by
+  `bundleLibRuntimeToDirDebug`, which is **not in `assembleDebug`'s task graph** — so it holds
+  whatever a previous command left there. Reading it reported "matches the snapshot" for a tree that
+  had just gained a parameter. It reads `compileDebugKotlin`'s own output now. This is exactly the
+  stale-artefact failure `foreign-api.sh` warns about in its own header.
+- Lambda classes and `access$` bridges are numbered by the order lambdas appear in a file, so keeping
+  them would make an unrelated edit look like a change to the surface. They are filtered; `$default`
+  bridges are kept, because those *are* the surface.
+
+**And a matrix of what each host can reach**, in README.md, because "the same on every host" was a
+claim nobody could check. Three differences in it are deliberate and now say why: fonts are the
+platform's job on Apple and cannot be on Android; captions and interaction come through the
+controller on the View-based pair and through parameters on the two that own no state; and clearing
+the image cache from Compose on Android is done by handing over a different resolver instance, which
+works and had to be told.
+
+One difference is a **genuine gap and is named as one**: `onPlaced` exists on the Compose
+Multiplatform and SwiftUI surfaces and on neither View-based one, though both scale the scene to fit
+and a host overlaying its own UI needs the same three numbers. It is unfixed because `ChartPlacement`
+is declared in `vega-compose-multiplatform` and the View path cannot depend on that module — closing
+it means hoisting the type into a shared one, which is a change to a published surface and wants
+deciding rather than slipping in.
+
+The Swift package's *own* API is the remaining hole, and is smaller than Android's was rather than
+absent: `foreign-api.txt` records what Kotlin exports to Obj-C, while `VegaChartView.init` and
+`ChartSession` are Swift source and appear in no snapshot. `CallShapeTests` pins the call shapes
+somebody thought to write down, which is narrower than a snapshot. `swift symbolgraph-extract` would
+close it.

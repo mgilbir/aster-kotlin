@@ -59,6 +59,12 @@ public fun VegaChart(
    * Turns an image mark's URL into a bitmap. See [VegaChartView.imageResolver]: a URL is asked once
    * rather than once per frame, and a refusal is remembered, so a resolver that fetches should
    * answer from a cache and start the fetch elsewhere.
+   *
+   * **Passing a different instance is how a Compose host clears that cache.** There is no reference
+   * to the view from here, so [VegaChartView.clearImageCache] cannot be called directly; assigning
+   * a resolver that is not identically the previous one rebuilds the renderer, and a new renderer
+   * starts with nothing remembered. That is what to do when the image behind a URL has changed, or
+   * to give a fetch that failed once another go.
    */
   imageResolver: AndroidImageResolver = AndroidImageResolver.None,
   /** Told the first time an image mark's URL cannot be resolved, and not again for that URL. */

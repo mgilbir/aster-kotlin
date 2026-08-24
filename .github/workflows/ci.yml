@@ -2,8 +2,10 @@ name: CI
 
 # `main` only, plus a manual trigger. Not pull requests: a run is about thirty minutes across the two
 # hosts, and at the rate branches land here that is not worth paying on every push to every branch.
-# The gates are the same ones `scripts/check.sh`, `scripts/oracle.sh` and `scripts/vega-lite-oracle.sh`
-# run locally, and running them locally before landing is the working agreement.
+# The gates are the ones `scripts/check.sh` runs locally, and running it before landing is the working
+# agreement. It is one script now: it subsumed `swift-test.sh`, `android-api.sh` and the two oracles,
+# after three separate occasions on which something reached `main` or a release because a gate existed
+# and was not the one people ran.
 #
 # What that trades away, so it is a choice rather than a surprise: nothing checks a branch on a host
 # other than the one it was written on, and a host-specific failure is found on `main` after the merge
