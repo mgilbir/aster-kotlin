@@ -3581,6 +3581,15 @@ ScenePaintRadialGradient.init(cx:cy:radius:focusX:focusY:stops:)
 ScenePaintRadialGradient.isEqual(_:)
 ScenePaintRadialGradient.radius
 ScenePaintRadialGradient.stops
+ScenePlacement
+ScenePlacement.description()
+ScenePlacement.doCopy(scale:left:top:)
+ScenePlacement.hash()
+ScenePlacement.init(scale:left:top:)
+ScenePlacement.isEqual(_:)
+ScenePlacement.left
+ScenePlacement.scale
+ScenePlacement.top
 SceneSnapshotSerializer
 SceneSnapshotSerializer.init(precision:pretty:includeNodeIds:)
 SceneSnapshotSerializer.serialize(scene:)

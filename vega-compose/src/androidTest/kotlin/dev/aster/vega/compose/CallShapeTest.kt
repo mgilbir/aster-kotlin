@@ -74,6 +74,7 @@ private object CallShapes {
       tooltipsEnabled = false,
       imageResolver = AndroidImageResolver { null },
       onUnresolvedImage = {},
+      onPlaced = {},
       onEvent = {},
     )
   }
@@ -88,6 +89,7 @@ private object CallShapes {
       tooltipsEnabled = false,
       imageResolver = AndroidImageResolver { null },
       onUnresolvedImage = {},
+      onPlaced = {},
       onEvent = {},
     )
   }

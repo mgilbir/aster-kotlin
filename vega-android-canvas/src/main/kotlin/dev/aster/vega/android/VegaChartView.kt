@@ -21,6 +21,7 @@ import dev.aster.vega.scene.AccessibilityTree
 import dev.aster.vega.scene.HitTestOptions
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.Scene
+import dev.aster.vega.scene.ScenePlacement
 import dev.aster.vega.scene.VectorD
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
@@ -192,6 +193,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
       drawnRevision = Long.MIN_VALUE
       accessibilityHelper.invalidateSemanticTree()
       syncContentScale()
+      reportPlacement()
       observeController()
       updatePreferredSize()
       applyChartDescription()
@@ -347,6 +349,9 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
       controller.state.collect {
         // A new scene can change the fit scale, so refresh it before anything hit-tests.
         syncContentScale()
+        // And a host holding an overlay has to be told, for the same reason: the scale it was given
+        // described the previous scene's size.
+        reportPlacement()
         accessibilityHelper.invalidateSemanticTree()
         updatePreferredSize()
         applyChartDescription()
@@ -369,6 +374,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
   override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
     super.onSizeChanged(width, height, oldWidth, oldHeight)
     syncContentScale()
+    reportPlacement()
     controller.dispatch(
       ChartInputEvent.Resized(
         width = width.toDouble(),
@@ -386,6 +392,64 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
    */
   private fun syncContentScale() {
     controller.contentScale = fitScaleFor(controller.snapshot.scene)
+  }
+
+  /**
+   * Where the chart is drawn inside this view: the fit scale, and the offset from the view's
+   * top-left corner.
+   *
+   * **One placement, read by everything that has to agree about it.** The origin was written out
+   * four separate times — the draw's viewport, a touch's conversion to scene coordinates, and the
+   * accessibility helper's two mappings — each spelling it `paddingLeft`/`paddingTop` and each free
+   * to drift from the others. A second copy of this arithmetic is how a reader's finger lands
+   * beside the mark it looked like it hit, which this project has had twice.
+   *
+   * The **fit alone**, with no pan or zoom in it: `InteractionState` carries those and the
+   * controller applies them, so folding them in here would apply each twice.
+   *
+   * A note on what this does *not* do. The Compose Multiplatform renderer and the SwiftUI one
+   * centre a chart in a slot of the wrong aspect ratio; this view pins it to the padded top-left
+   * and always has. That difference is real and is left alone deliberately — centring here changes
+   * where every existing Android chart is drawn, which is an appearance decision rather than a
+   * consequence of reporting the placement. What this makes possible is changing it in one place if
+   * that decision is taken.
+   */
+  public fun placement(): ScenePlacement =
+    ScenePlacement(
+      scale = fitScaleFor(controller.snapshot.scene),
+      left = paddingLeft.toDouble(),
+      top = paddingTop.toDouble(),
+    )
+
+  /**
+   * Told where the chart was drawn, whenever that changes.
+   *
+   * The same seam the Compose Multiplatform and SwiftUI charts have, and the reason it was missing
+   * here is worth recording: `ScenePlacement` was declared in `vega-compose-multiplatform`, which a
+   * `View` cannot depend on. It lives in `vega-scene` now.
+   *
+   * For a host putting its own overlay on the chart, or turning a point of its own into scene
+   * coordinates. Fired on a size change and after a compile, not per frame, and only when the
+   * numbers actually differ.
+   */
+  public var onPlaced: ((ScenePlacement) -> Unit)? = null
+    set(value) {
+      field = value
+      // A host that sets this after the view is laid out has missed the report that already
+      // happened, and would otherwise wait for a resize that may never come.
+      reportPlacement()
+    }
+
+  /** The placement last handed to [onPlaced], so an unchanged one is not reported again. */
+  private var reportedPlacement: ScenePlacement? = null
+
+  private fun reportPlacement() {
+    val callback = onPlaced ?: return
+    if (width <= 0 || height <= 0) return
+    val current = placement()
+    if (current == reportedPlacement) return
+    reportedPlacement = current
+    callback(current)
   }
 
   /** Uniform scale that fits [scene] inside the padded content box. */
@@ -444,9 +508,12 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
     val scene = snapshot.scene
     if (scene.width <= 0.0 || scene.height <= 0.0) return
 
+    // The origin comes from `placement()`, which is what a host is told and what a touch is
+    // converted through. Writing `paddingLeft` here again is how the three drift apart.
+    val placed = placement()
     viewport.set(
-      paddingLeft.toFloat(),
-      paddingTop.toFloat(),
+      placed.left.toFloat(),
+      placed.top.toFloat(),
       (width - paddingRight).toFloat(),
       (height - paddingBottom).toFloat(),
     )
@@ -730,8 +797,11 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
       else -> HitTestOptions.Touch
     }
 
-  private fun MotionEvent.toPointD(): PointD =
-    PointD((x - paddingLeft).toDouble(), (y - paddingTop).toDouble())
+  private fun MotionEvent.toPointD(): PointD {
+    // The same origin the draw uses. See `placement()`.
+    val placed = placement()
+    return PointD(x - placed.left, y - placed.top)
+  }
 
   private fun MotionEvent.chartDevice(): PointerDevice =
     when (getToolType(0)) {

@@ -948,7 +948,7 @@ wraps already had. This is what each one exposes, and where they differ on purpo
 | Font family a specification names | `fontResolver` | `fontResolver` | `ComposeTextEngine` registry | **the platform** — see below |
 | Spoken captions | the controller's `VegaLocale.captions` | same | `captions` | `captions` |
 | Interaction | the controller's `events` | `onEvent` | `onTap`, `onPan`, `onZoom`, … | `session` + `gestures` |
-| Where the chart was drawn | — | — | `onPlaced` | `onPlaced` |
+| Where the chart was drawn | `onPlaced`, `placement()` | `onPlaced` | `onPlaced` | `onPlaced` |
 
 Three differences are deliberate, and each has a reason that is not "nobody got round to it".
 
@@ -969,12 +969,26 @@ does it — the setter rebuilds the renderer, and a new renderer starts with an 
 a real mechanism rather than a workaround, but it is one you have to be told about. Said here, and
 in the parameter's own documentation.
 
-**`onPlaced`.** A genuine gap, not a difference. Both View-based surfaces scale the scene to fit —
-`VegaChartView` sets `controller.contentScale` from its own `fitScaleFor` — so a host overlaying its
-own UI needs the same three numbers there and cannot get them. It is unfixed because
-`ChartPlacement` is declared in `vega-compose-multiplatform`, and the View path cannot depend on
-that module: closing this means hoisting the type into a shared one, which is a change to a
-published surface and wants deciding rather than slipping in.
+**Where the chart was drawn** is reported by all four now. It was missing from the two View-based
+surfaces for a structural reason rather than an oversight: the type was declared in
+`vega-compose-multiplatform`, which a `View` cannot depend on. It is `dev.aster.vega.scene.ScenePlacement`
+now, in the module every renderer already depends on, and
+`dev.aster.vega.compose.mp.ChartPlacement` remains as a typealias.
+
+It is called `ScenePlacement` on the Kotlin side and `ChartPlacement` on the Swift side, which looks
+like an inconsistency and is the opposite. Everything in `vega-scene` is exported to the Apple
+framework under a **flat** Obj-C namespace, so a Kotlin `ChartPlacement` and the Swift struct of that
+name are two types with one name in a host's scope — `swift build` fails with "'ChartPlacement' is
+ambiguous for type lookup", which is how this was found rather than reasoned about. Hiding it from
+Obj-C is not available, since `@HiddenFromObjC` is Kotlin/Native-only and the file compiles for the
+JVM too. The Swift struct keeps its name, its `CGFloat`s and its value semantics.
+
+One thing the four still disagree about, and it is a **drawing** difference rather than an API one.
+The Compose Multiplatform and SwiftUI charts *centre* a scene in a slot of the wrong aspect ratio;
+`VegaChartView` pins it to the padded top-left and always has. `ChartPlacement` says where the
+drawing **is**, so it reports that faithfully on each. Making them agree changes where every
+existing Android chart is drawn, which is an appearance decision rather than a consequence of
+reporting the placement — `VegaChartView.placement()` is now the single place it would change.
 
 ### The public API
 

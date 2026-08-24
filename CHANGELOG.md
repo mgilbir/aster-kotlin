@@ -85,7 +85,34 @@ section here does not get released.
   the same host code works on either renderer; the per-frame diagnostic is unchanged, since
   it describes the frame that was drawn. (#99)
 
+- **Every host can be told where its chart was drawn.** `onPlaced` reports the fit scale
+  and the offset from the surface's top-left corner, as a `ScenePlacement`, for a host putting
+  its own overlay on a chart or turning a point of its own into scene coordinates. The Compose Multiplatform
+  and SwiftUI charts have had it since they existed; `VegaChartView` and `vega-compose`
+  could not, because `ChartPlacement` was declared in `vega-compose-multiplatform` and a
+  `View` cannot depend on a Compose module. `VegaChartView.placement()` is public too, for
+  a host that would rather ask than be told.
+
 ### Changed
+
+- **The placement type moved to `vega-scene`**, the module every renderer already depends
+  on, as `ScenePlacement`. `dev.aster.vega.compose.mp.ChartPlacement` is a typealias now, so
+  Kotlin source keeps compiling; code already compiled against the old class will not link,
+  since a typealias is resolved at the call site.
+
+  It is **not** called `ChartPlacement` in Kotlin, and that is the Obj-C boundary rather than
+  taste: `vega-scene` is exported to the Apple framework under a flat namespace, so that name
+  would collide with the Swift package's own `ChartPlacement` and every Swift host would fail
+  with "'ChartPlacement' is ambiguous for type lookup". `@HiddenFromObjC` is Kotlin/Native-only
+  and the file compiles for the JVM too. The Swift struct is unchanged. (#99)
+
+- **`VegaChartView` computes its placement once**, where the draw's viewport, a touch's
+  conversion to scene coordinates and the accessibility helper's two mappings each wrote the
+  origin out for themselves. Four copies of one number, any of which could drift from the
+  others — which is how a reader's finger lands beside the mark it looked like it hit, a
+  defect this project has had twice. No behaviour changes: all four agreed, and an
+  instrumented test now aims a tap through the reported placement and asserts it hits the
+  bar it aimed at.
 
 - **A locale gets one date, whichever grammar the document was written in.** Vega derived
   a bucketed axis's format from the locale's own `%x`; Vega-Lite read only the field

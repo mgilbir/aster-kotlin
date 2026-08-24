@@ -376,8 +376,13 @@ private data class Placement(val scale: Float, val left: Float, val top: Float)
  * numbers move the drawing, the touch target and the accessibility frames. One placement for all
  * three is the whole point; the Swift renderer's `ChartPlacement` exists for the same reason and
  * says so.
+ *
+ * **An alias now.** The type moved to `vega-scene`, the module every renderer already depends on,
+ * because every renderer needs it: declaring it here left the two `View`-based Android surfaces
+ * unable to report a placement at all, since they cannot depend on a Compose module to say where
+ * they drew something. The alias keeps `dev.aster.vega.compose.mp.ChartPlacement` compiling.
  */
-public data class ChartPlacement(val scale: Double, val left: Double, val top: Double)
+public typealias ChartPlacement = dev.aster.vega.scene.ScenePlacement
 
 /**
  * Where a scene sits inside a slot, computed once and used by everything that has to agree about

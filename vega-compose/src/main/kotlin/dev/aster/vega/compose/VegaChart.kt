@@ -15,6 +15,7 @@ import dev.aster.vega.runtime.ChartEvent
 import dev.aster.vega.runtime.VegaChartController
 import dev.aster.vega.scene.AccessibilityTree
 import dev.aster.vega.scene.Scene
+import dev.aster.vega.scene.ScenePlacement
 
 /**
  * Public Compose API for a chart.
@@ -69,6 +70,11 @@ public fun VegaChart(
   imageResolver: AndroidImageResolver = AndroidImageResolver.None,
   /** Told the first time an image mark's URL cannot be resolved, and not again for that URL. */
   onUnresolvedImage: ((String) -> Unit)? = null,
+  /**
+   * Told where the chart was drawn, whenever that changes — for a host putting its own overlay on
+   * it, or turning a point of its own into scene coordinates. See [VegaChartView.onPlaced].
+   */
+  onPlaced: ((ScenePlacement) -> Unit)? = null,
   onEvent: ((ChartEvent) -> Unit)? = null,
 ) {
   AndroidView(
@@ -83,6 +89,7 @@ public fun VegaChart(
         this.tooltipsEnabled = tooltipsEnabled
         this.imageResolver = imageResolver
         this.onUnresolvedImage = onUnresolvedImage
+        this.onPlaced = onPlaced
         this.controller = controller
       }
     },
@@ -94,6 +101,7 @@ public fun VegaChart(
       view.tooltipsEnabled = tooltipsEnabled
       view.imageResolver = imageResolver
       view.onUnresolvedImage = onUnresolvedImage
+      view.onPlaced = onPlaced
       // Assigning the same controller would reset the view's state, so only swap when it changed.
       if (view.controller !== controller) view.controller = controller
       view.invalidateIfStale()
@@ -124,6 +132,7 @@ public fun VegaChart(
   tooltipsEnabled: Boolean = true,
   imageResolver: AndroidImageResolver = AndroidImageResolver.None,
   onUnresolvedImage: ((String) -> Unit)? = null,
+  onPlaced: ((ScenePlacement) -> Unit)? = null,
   onEvent: ((ChartEvent) -> Unit)? = null,
 ) {
   val controller = remember { VegaChartController.fromScene(scene) }
@@ -143,6 +152,7 @@ public fun VegaChart(
     tooltipsEnabled = tooltipsEnabled,
     imageResolver = imageResolver,
     onUnresolvedImage = onUnresolvedImage,
+    onPlaced = onPlaced,
     onEvent = onEvent,
   )
 }

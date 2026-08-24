@@ -55,7 +55,9 @@ vega-android-canvas  public class dev.aster.vega.android.VegaChartView extends a
     public final dev.aster.vega.android.AndroidTextEngine getChartTextEngine();
     public final dev.aster.vega.android.AndroidTextEngine newCompatibleTextEngine();
     public final dev.aster.vega.runtime.VegaChartController getController();
+    public final dev.aster.vega.scene.ScenePlacement placement();
     public final int getAccessibilityMaxExposedMarks();
+    public final kotlin.jvm.functions.Function1<dev.aster.vega.scene.ScenePlacement, kotlin.Unit> getOnPlaced();
     public final kotlin.jvm.functions.Function1<java.lang.String, android.graphics.Typeface> getFontResolver();
     public final kotlin.jvm.functions.Function1<java.lang.String, kotlin.Unit> getOnUnresolvedImage();
     public final void clearImageCache();
@@ -64,6 +66,7 @@ vega-android-canvas  public class dev.aster.vega.android.VegaChartView extends a
     public final void setController(dev.aster.vega.runtime.VegaChartController);
     public final void setFontResolver(kotlin.jvm.functions.Function1<? super java.lang.String, ? extends android.graphics.Typeface>);
     public final void setImageResolver(dev.aster.vega.android.AndroidImageResolver);
+    public final void setOnPlaced(kotlin.jvm.functions.Function1<? super dev.aster.vega.scene.ScenePlacement, kotlin.Unit>);
     public final void setOnUnresolvedImage(kotlin.jvm.functions.Function1<? super java.lang.String, kotlin.Unit>);
     public final void setScene(dev.aster.vega.scene.Scene);
     public final void setTooltipsEnabled(boolean);
@@ -179,6 +182,6 @@ vega-android-canvas  }
 vega-android-canvas  }
 vega-compose  public final class dev.aster.vega.compose.VegaChartKt {
     public static final dev.aster.vega.runtime.VegaChartController rememberVegaChartController(dev.aster.vega.scene.Scene, dev.aster.vega.model.locale.VegaLocale, androidx.compose.runtime.Composer, int, int);
-    public static final void VegaChart(dev.aster.vega.runtime.VegaChartController, androidx.compose.ui.Modifier, kotlin.jvm.functions.Function1<? super java.lang.String, ? extends android.graphics.Typeface>, int, boolean, dev.aster.vega.android.AndroidImageResolver, kotlin.jvm.functions.Function1<? super java.lang.String, kotlin.Unit>, kotlin.jvm.functions.Function1<? super dev.aster.vega.runtime.ChartEvent, kotlin.Unit>, androidx.compose.runtime.Composer, int, int);
-    public static final void VegaChart(dev.aster.vega.scene.Scene, androidx.compose.ui.Modifier, kotlin.jvm.functions.Function1<? super java.lang.String, ? extends android.graphics.Typeface>, int, boolean, dev.aster.vega.android.AndroidImageResolver, kotlin.jvm.functions.Function1<? super java.lang.String, kotlin.Unit>, kotlin.jvm.functions.Function1<? super dev.aster.vega.runtime.ChartEvent, kotlin.Unit>, androidx.compose.runtime.Composer, int, int);
+    public static final void VegaChart(dev.aster.vega.runtime.VegaChartController, androidx.compose.ui.Modifier, kotlin.jvm.functions.Function1<? super java.lang.String, ? extends android.graphics.Typeface>, int, boolean, dev.aster.vega.android.AndroidImageResolver, kotlin.jvm.functions.Function1<? super java.lang.String, kotlin.Unit>, kotlin.jvm.functions.Function1<? super dev.aster.vega.scene.ScenePlacement, kotlin.Unit>, kotlin.jvm.functions.Function1<? super dev.aster.vega.runtime.ChartEvent, kotlin.Unit>, androidx.compose.runtime.Composer, int, int);
+    public static final void VegaChart(dev.aster.vega.scene.Scene, androidx.compose.ui.Modifier, kotlin.jvm.functions.Function1<? super java.lang.String, ? extends android.graphics.Typeface>, int, boolean, dev.aster.vega.android.AndroidImageResolver, kotlin.jvm.functions.Function1<? super java.lang.String, kotlin.Unit>, kotlin.jvm.functions.Function1<? super dev.aster.vega.scene.ScenePlacement, kotlin.Unit>, kotlin.jvm.functions.Function1<? super dev.aster.vega.runtime.ChartEvent, kotlin.Unit>, androidx.compose.runtime.Composer, int, int);
 vega-compose  }

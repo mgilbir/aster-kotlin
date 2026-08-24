@@ -6448,3 +6448,44 @@ absent: `foreign-api.txt` records what Kotlin exports to Obj-C, while `VegaChart
 `ChartSession` are Swift source and appear in no snapshot. `CallShapeTests` pins the call shapes
 somebody thought to write down, which is narrower than a snapshot. `swift symbolgraph-extract` would
 close it.
+
+### One placement, and the name that could not be shared
+
+`onPlaced` existed on the Compose Multiplatform and SwiftUI charts and on neither `View`-based
+surface, so a host on `vega-compose` or `VegaChartView` could not find out where its chart had been
+drawn — which it needs to put an overlay on one, or to turn a point of its own into scene
+coordinates. Both of those surfaces *do* scale the scene to fit, so the numbers existed and were
+unreachable.
+
+The reason was structural: the type was declared in `vega-compose-multiplatform`, and a `View`
+cannot depend on a Compose module. It is `dev.aster.vega.scene.ScenePlacement` now, with
+`dev.aster.vega.compose.mp.ChartPlacement` left as a typealias so Kotlin callers are unaffected.
+
+**It is not called `ChartPlacement`, and that was found rather than reasoned about.** Everything in
+`vega-scene` is exported to the Apple framework under a *flat* Obj-C namespace, so a Kotlin
+`ChartPlacement` and the Swift package's own struct of that name are two types with one name in a
+host's scope. The Swift build failed with "'ChartPlacement' is ambiguous for type lookup" — in this
+repository's own tests, and it would have done the same in every adopter's. `@HiddenFromObjC` is not
+available, being a Kotlin/Native annotation on a file that compiles for the JVM too. So the Kotlin
+type took the other name and the Swift struct kept its `CGFloat`s and its value semantics. Worth
+remembering the next time a type looks like it should be shared across that boundary: the namespace
+is flat, and a collision is a compile error in somebody else's project.
+
+**The second half is a defect that had not happened yet.** The view wrote its origin out four times
+— the draw's viewport, a touch's conversion to scene coordinates, and the accessibility helper's two
+mappings — each spelling it `paddingLeft`/`paddingTop`. All four agreed, so nothing was wrong; any
+one of them could have drifted, and two agreeing while one does not is how a reader's finger lands
+beside the mark it looked like it hit, which this project has had twice. There is one `placement()`
+now, and an instrumented test aims a tap through the *reported* placement and asserts it hits the
+bar it aimed at.
+
+That test needed strengthening before it was worth anything. Asserting that *something* was selected
+passed with an origin wrong by forty pixels, because the tap still landed on a neighbouring bar. It
+asserts the node id now, and fails on the drift as intended — checked by introducing it.
+
+What is still different between the four, and is a **drawing** difference rather than an API one:
+the Compose Multiplatform and SwiftUI charts centre a scene in a slot of the wrong aspect ratio, and
+`VegaChartView` pins it to the padded top-left. `ScenePlacement` says where the drawing *is*, so it
+reports each faithfully. Changing it moves every existing Android chart, which is an appearance
+decision rather than a consequence of reporting the placement — and `placement()` is now the single
+line it would change.
