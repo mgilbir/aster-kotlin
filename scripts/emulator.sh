@@ -14,6 +14,18 @@ AVD="${AVD_NAME:-vega-native-api37}"
 WINDOW=(-no-boot-anim -gpu swiftshader_indirect)
 [[ "${1:-}" == "--headless" ]] && WINDOW+=(-no-window -no-audio)
 
+# **Name servers, stated.** The emulator does not reliably inherit macOS's resolver configuration, and
+# an emulator that cannot resolve a name is not obviously broken — it boots, it draws, and only the
+# handful of tests that fetch from the gallery fail, with a message about the private-network rule
+# that reads like a policy decision rather than a missing route. `DemoActivityTest` lost two tests to
+# that, and the tempting fix was to skip them: a gate that goes green having quietly stopped
+# exercising the network is the failure this repository keeps having, so the emulator gets DNS
+# instead.
+#
+# Google's and Cloudflare's, in that order, because they are reachable from anywhere this is likely to
+# run. `EMULATOR_DNS` overrides for a network that blocks them.
+DNS=(-dns-server "${EMULATOR_DNS:-8.8.8.8,1.1.1.1}")
+
 if ! "$EMULATOR" -list-avds | grep -qx "$AVD"; then
   echo "No AVD named '$AVD'. Create one with scripts/setup-android-sdk.sh's instructions." >&2
   exit 1
@@ -34,7 +46,7 @@ echo "==> Starting $AVD"
 # nohup + disown so the emulator outlives this script's shell; otherwise it dies with the terminal or
 # CI step that started it, which is confusing when the window simply vanishes.
 mkdir -p build
-nohup "$EMULATOR" "@$AVD" "${WINDOW[@]}" > build/emulator.log 2>&1 &
+nohup "$EMULATOR" "@$AVD" "${WINDOW[@]}" "${DNS[@]}" > build/emulator.log 2>&1 &
 disown
 
 "$ADB" wait-for-device

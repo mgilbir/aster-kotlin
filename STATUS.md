@@ -6529,3 +6529,36 @@ One thing found by writing the call-shape test the wrong way round first: a Swif
 trailing-closure idiom **or** the parameters declared after `onPlaced`, never both, because Swift
 requires arguments in declaration order and naming `resolveFont` leaves nothing after it for a
 trailing closure to be. Both shapes are pinned.
+
+### The emulator had no DNS, and the tempting fix was to stop testing the network
+
+Two `:demo` instrumented tests failed on an emulator that could not resolve `vega.github.io`. They
+fetch from the gallery over a real socket, which is the part no JVM test can prove — the JVM suites
+use a fake transport, and a missing `INTERNET` permission or an Android policy the desktop does not
+have would show up there and nowhere earlier.
+
+The first fix was to skip them, and it was wrong twice over.
+
+**It was already there and had never worked.** The test caught `IOException` and called
+`Assume.assumeNoException`, with a comment above saying "skipped rather than failed when the device
+has no route out". But an unresolvable host never reaches a socket: `HttpDataLoader` refuses it,
+correctly, because a name it cannot resolve cannot be checked against the private-network rule. That
+arrives as `LoadDeniedException`, which does not extend `IOException`, so the catch never fired. A
+guard written in the same commit as the comment describing it, and dead the whole time.
+
+**And repairing it would have been the worse outcome.** A green run that has quietly stopped
+exercising the one thing a test exists for is this repository's recurring defect — `facet-footer`
+skipped two comparisons for ten days on exactly that pattern. Making the skip *work* would have
+turned a loud failure into a silent one.
+
+So the emulator gets name servers. `scripts/emulator.sh` passes `-dns-server`, because the emulator
+does not reliably inherit macOS's resolver configuration and an emulator that cannot resolve a name
+is a broken emulator rather than a licence to stop testing. Both tests run and pass now: 11 tests, 0
+failures, **0 skipped**, where before it was 2 failures and then 1 silent skip.
+
+`EMULATOR_DNS` overrides for a network that blocks Google's and Cloudflare's.
+
+The skip stays for a machine that genuinely has no route, and `check.sh` now **reports every skipped
+instrumented test by name and reason** in its output. Gradle prints a count and keeps the build
+green, so a suite that stopped checking something looks exactly like one that checked it. The ledger
+already refuses to let a *gate* pass silently; this extends that to a test inside one.

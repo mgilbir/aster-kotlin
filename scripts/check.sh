@@ -227,6 +227,32 @@ if [ -n "$adb_path" ] && [ -x "$adb_path" ] && "$adb_path" devices | grep -qE '\
       :demo:connectedDebugAndroidTest
   }
   run_gate "instrumented" instrumented_gate
+
+  # **A skipped instrumented test is reported by name.** Gradle prints a count and the build stays
+  # green, so a suite that quietly stopped exercising something looks exactly like one that checked
+  # it — which is how a Vega-Lite fixture skipped two comparisons for ten days. The commonest cause
+  # here is a device with no route out: `scripts/emulator.sh` starts the AVD with name servers so the
+  # tests that fetch actually run, and if one skips anyway that is worth seeing rather than passing.
+  python3 - <<'SKIPS'
+import glob, xml.etree.ElementTree as ET
+
+skipped = []
+for path in glob.glob("*/build/outputs/androidTest-results/**/*.xml", recursive=True):
+    try:
+        suite = ET.parse(path).getroot()
+    except ET.ParseError:
+        continue
+    for case in suite.iter("testcase"):
+        for skip in case.iter("skipped"):
+            why = (skip.get("message") or "no reason given").strip()
+            skipped.append(f"  {case.get('name')}: {why}")
+
+if skipped:
+    print()
+    print(f"NOTE: {len(skipped)} instrumented test(s) skipped, which the build does not fail for:")
+    for line in skipped:
+        print(line)
+SKIPS
 else
   skip_gate "instrumented" "no device on adb; start one with scripts/emulator.sh --headless"
 fi
