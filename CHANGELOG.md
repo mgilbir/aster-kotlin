@@ -4,6 +4,25 @@ Notable changes, newest first. The release workflow reads the section for the
 version it is publishing and uses it as the release notes, so a version without a
 section here does not get released.
 
+## Unreleased
+
+### Fixed
+
+- **The README no longer teaches the Vega-Lite fallback that 0.2.0 removed**, and the
+  demo no longer performs it. `converted.vegaJson ?: text` hands a document Vega-Lite
+  could not compile to a parser that only understands Vega, which answers with
+  complaints phrased in the wrong grammar and buries the one diagnostic that says what
+  happened. That is the defect fixed in `ChartSession` for 0.2.0 (#61) — and the
+  repository went on documenting it in `README.md` and doing it in both of the demo's
+  conversion paths, so a Kotlin host following either reintroduced it. The example now
+  branches on a null `vegaJson` and surfaces `converted.diagnostics`; the demo's paste
+  screen reports the refusal through a new `PasteReport.refused` without asking the
+  runtime, and its bundled-asset path stops the same way. A sentence now says what the
+  nullability actually means, since a null `vegaJson` and a `wasVegaLite` of false look
+  identical at the call site and only one of them is safe to pass on. Pinned by
+  `VegaJsonFallbackTest`, which scans the main sources, the Swift sources and the
+  README. (#101)
+
 ## 0.2.0
 
 ### Fixed

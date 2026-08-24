@@ -80,6 +80,26 @@ public data class PasteReport(val headline: String, val details: List<String>) {
       return PasteReport(headline, (errors + warnings).map { it.readable() })
     }
 
+    /**
+     * The report for text that **is** Vega-Lite and compiled to nothing.
+     *
+     * A fourth outcome, and it needs a path of its own because the other three each have a
+     * `CompiledSpec` behind them and this one deliberately does not. Handing a document Vega-Lite
+     * refused to a parser that only understands Vega produces a second and louder set of
+     * diagnostics, phrased in the wrong grammar — unknown `mark`, unknown `encoding`, no `marks`,
+     * nothing to draw — which buries the one diagnostic that says what actually happened. So the
+     * runtime is never asked, and the conversion's own complaint is what a reader gets.
+     */
+    public fun refused(converted: VegaLiteConversion): PasteReport {
+      val errors = converted.diagnostics.filter { it.severity >= DiagnosticSeverity.ERROR }
+      val warnings = converted.diagnostics.filter { it.severity < DiagnosticSeverity.ERROR }
+      return PasteReport(
+        headline =
+          "Compiled as Vega-Lite, which produced nothing — the previous chart is still shown.",
+        details = (errors + warnings).map { it.readable() },
+      )
+    }
+
     /** "1 thing", "3 properties" — plural forms that read aloud, since TalkBack may. */
     private fun count(n: Int, noun: String): String =
       if (n == 1) "1 $noun"

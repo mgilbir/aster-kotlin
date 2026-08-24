@@ -80,10 +80,28 @@ from text a user supplied actually needs — the user pasted a chart, not a dial
 
 ```kotlin
 val converted = VegaLiteInput.toVega(text)   // routes on `$schema`, then on shape
-val compiled = controller.setSpec(converted.vegaJson ?: text)
+
+// Stop where the conversion produced nothing, rather than passing the text on.
+val vega = converted.vegaJson
+if (vega == null) return showCannotDraw(converted.diagnostics)
+
+val compiled = controller.setSpec(vega)
 // converted.wasVegaLite says which way it went; converted.diagnostics is what the
 // Vega-Lite compiler could not honour, ahead of anything the runtime reports.
 ```
+
+**A null `vegaJson` means one thing and nothing else: the input was Vega-Lite and compiling it
+produced nothing.** Text that is not JSON, and JSON that is not Vega-Lite, comes back *unchanged*
+with `wasVegaLite` false and goes to the runtime as it always did. The two cases are indistinguishable
+at the call site, and only one of them is safe to pass on — which is why the example stops instead of
+falling back to `text`.
+
+Falling back is worth naming, because the type invites it and it is wrong. A document Vega-Lite could
+not compile, handed to a parser that only understands Vega, has `mark` and `encoding` it does not
+recognise and no `marks` at all — so a reader gets either a complaint phrased in the wrong grammar or
+an empty chart, and neither says what actually happened. The conversion's own diagnostics are the one
+true thing anybody knows at that point. `ChartSession` on the Swift side stops for exactly this
+reason, and says why through its `failure`.
 
 `VegaLiteCompiler` is the compiler itself, if a host already knows which grammar it has. The demo's
 "Paste your own" screen takes either, and its "Spec: Vega-Lite" entry is a bundled one.

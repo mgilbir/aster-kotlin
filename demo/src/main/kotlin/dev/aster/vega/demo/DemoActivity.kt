@@ -138,8 +138,14 @@ private fun DemoScreen() {
         // for, because a Vega-Lite specification read as Vega would otherwise fail for a reason
         // that reads like nonsense.
         val converted = VegaLiteInput.toVega(pasted)
-        val compiled = controller.setSpecAsync(converted.vegaJson ?: pasted)
-        report = PasteReport.of(compiled, converted)
+        // **Stop** where Vega-Lite compilation produced nothing, rather than passing the text on.
+        // The text was Vega-Lite — a null `vegaJson` means that and nothing else — and a parser
+        // that only understands Vega answers it with complaints in the wrong grammar, which bury
+        // the conversion's own. `ChartSession` stops here for the same reason.
+        val vega = converted.vegaJson
+        report =
+          if (vega == null) PasteReport.refused(converted)
+          else PasteReport.of(controller.setSpecAsync(vega), converted)
         status = report!!.headline
       }
     } else if (asset != null) {
@@ -154,13 +160,26 @@ private fun DemoScreen() {
       // thread
       // for the same reason the read does. A specification that is already Vega passes straight
       // through.
-      val vega = withContext(Dispatchers.Default) { VegaLiteInput.toVega(json).vegaJson ?: json }
-      val compiled = controller.setSpecAsync(vega)
-      val errors = compiled.diagnostics.count { it.severity >= DiagnosticSeverity.ERROR }
-      status =
-        if (!compiled.isUsable) "$asset did not compile; see diagnostics"
-        else if (errors > 0) "$asset compiled with $errors error(s)"
-        else "$asset compiled: ${compiled.diagnostics.size} diagnostic(s)"
+      val converted = withContext(Dispatchers.Default) { VegaLiteInput.toVega(json) }
+      // The same stop as the paste path above. A bundled asset that fails this way is a bug in the
+      // bundle rather than in something a user typed, so it is the more important one to see said
+      // plainly and not dressed up as a Vega parse failure.
+      val vega = converted.vegaJson
+      if (vega == null) {
+        // Said in full rather than pointing at the list below, which renders only for a pasted
+        // specification — for a bundled one there is nothing on screen for "see diagnostics" to
+        // mean.
+        val why =
+          converted.diagnostics.firstOrNull { it.severity >= DiagnosticSeverity.ERROR }?.message
+        status = "$asset is Vega-Lite and compiled to nothing" + (why?.let { ": $it" } ?: ".")
+      } else {
+        val compiled = controller.setSpecAsync(vega)
+        val errors = compiled.diagnostics.count { it.severity >= DiagnosticSeverity.ERROR }
+        status =
+          if (!compiled.isUsable) "$asset did not compile; see diagnostics"
+          else if (errors > 0) "$asset compiled with $errors error(s)"
+          else "$asset compiled: ${compiled.diagnostics.size} diagnostic(s)"
+      }
     } else {
       // Built off the main thread as well: a sample scene is *processing* — it measures text and
       // lays
