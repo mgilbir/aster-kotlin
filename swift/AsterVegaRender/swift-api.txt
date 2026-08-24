@@ -1,0 +1,212 @@
+Brush  ::  enum Brush
+Brush.alpha  ::  var alpha: Double { get }
+Brush.linear(from:to:stops:alpha:)  ::  case linear(from: Point, to: Point, stops: [GradientStop], alpha: Double)
+Brush.radial(centre:radius:stops:alpha:)  ::  case radial(centre: Point, radius: Double, stops: [GradientStop], alpha: Double)
+Brush.solid(_:)  ::  case solid(Paint)
+ChartGestures  ::  struct ChartGestures
+ChartGestures.all  ::  static let all: ChartGestures
+ChartGestures.hover  ::  static let hover: ChartGestures
+ChartGestures.init(rawValue:)  ::  init(rawValue: Int)
+ChartGestures.longPress  ::  static let longPress: ChartGestures
+ChartGestures.none  ::  static let none: ChartGestures
+ChartGestures.pan  ::  static let pan: ChartGestures
+ChartGestures.rawValue  ::  let rawValue: Int
+ChartGestures.tap  ::  static let tap: ChartGestures
+ChartGestures.withoutDrag  ::  static let withoutDrag: ChartGestures
+ChartGestures.zoom  ::  static let zoom: ChartGestures
+ChartPlacement  ::  struct ChartPlacement
+ChartPlacement.init(scale:left:top:)  ::  init(scale: Double, left: CGFloat, top: CGFloat)
+ChartPlacement.left  ::  let left: CGFloat
+ChartPlacement.scale  ::  let scale: Double
+ChartPlacement.scenePoint(of:)  ::  func scenePoint(of location: CGPoint) -> Point
+ChartPlacement.top  ::  let top: CGFloat
+ChartSession  ::  @MainActor final class ChartSession
+ChartSession.ChartDatum  ::  enum ChartDatum
+ChartSession.ChartDatum.flag(_:)  ::  case flag(Bool)
+ChartSession.ChartDatum.instant(_:)  ::  case instant(Date)
+ChartSession.ChartDatum.missing  ::  case missing
+ChartSession.ChartDatum.number(_:)  ::  case number(Double)
+ChartSession.ChartDatum.text(_:)  ::  case text(String)
+ChartSession.Grammar  ::  enum Grammar
+ChartSession.Grammar.vega  ::  case vega
+ChartSession.Grammar.vegaLite  ::  case vegaLite
+ChartSession.TouchOutcome  ::  enum TouchOutcome
+ChartSession.TouchOutcome.nothing(x:y:)  ::  case nothing(x: Double, y: Double)
+ChartSession.TouchOutcome.selected(count:)  ::  case selected(count: Int)
+ChartSession.TouchOutcome.tooltip(_:)  ::  case tooltip(String)
+ChartSession.canReset  ::  @MainActor var canReset: Bool { get }
+ChartSession.containerSize  ::  @MainActor var containerSize: SizeD? { get set }
+ChartSession.controls  ::  @MainActor var controls: [SignalInput] { get set }
+ChartSession.diagnostics  ::  @MainActor var diagnostics: [VegaDiagnostic] { get set }
+ChartSession.failure  ::  @MainActor var failure: String? { get set }
+ChartSession.grammar  ::  @MainActor var grammar: Grammar? { get set }
+ChartSession.hostConfigFailure  ::  @MainActor var hostConfigFailure: String? { get set }
+ChartSession.hover(at:)  ::  @MainActor func hover(at point: Point?)
+ChartSession.init(textEngine:textScale:loader:clock:locale:hostConfigJson:containerSize:timeZone:resolveFont:)  ::  @MainActor init(textEngine: MeasuredTextEngine? = nil, textScale: Double = 1, loader: VegaDataLoader? = nil, clock: (@Sendable () -> Int64)? = nil, locale: VegaLocale? = nil, hostConfigJson: String? = nil, containerSize: SizeD? = nil, timeZone: Foundation.TimeZone? = nil, resolveFont: ((String) -> CTFont?)? = nil)
+ChartSession.lastTouch  ::  @MainActor var lastTouch: TouchOutcome? { get set }
+ChartSession.load(specification:signals:)  ::  @MainActor func load(specification: String, signals: [String : VegaValue] = [:])
+ChartSession.loading  ::  @MainActor var loading: Bool { get set }
+ChartSession.longPress(at:)  ::  @MainActor func longPress(at point: Point)
+ChartSession.pan(by:phase:)  ::  @MainActor func pan(by delta: Point, phase: GesturePhase)
+ChartSession.place(contentScale:viewport:)  ::  @MainActor func place(contentScale: Double, viewport: Rect)
+ChartSession.press(_:modifiers:)  ::  @MainActor func press(_ key: ChartKey, modifiers: Modifiers = Modifiers.Companion.shared.None)
+ChartSession.resetViewport()  ::  @MainActor func resetViewport()
+ChartSession.resolveFont  ::  @MainActor let resolveFont: ((String) -> CTFont?)?
+ChartSession.scene  ::  @MainActor var scene: AsterVega.Scene? { get set }
+ChartSession.selectedNodeIds  ::  @MainActor var selectedNodeIds: Set<AnyHashable> { get }
+ChartSession.set(signal:to:)  ::  @MainActor func set(signal: String, to value: VegaValue)
+ChartSession.setData(_:rows:)  ::  @MainActor func setData(_ name: String, rows: [[String : ChartDatum]])
+ChartSession.settle()  ::  @MainActor func settle() async
+ChartSession.tap(at:)  ::  @MainActor func tap(at point: Point)
+ChartSession.textScale  ::  @MainActor let textScale: Double
+ChartSession.timeZoneFailure  ::  @MainActor var timeZoneFailure: String? { get set }
+ChartSession.tooltip  ::  @MainActor var tooltip: ChartTooltip? { get set }
+ChartSession.usermeta  ::  @MainActor var usermeta: [String : any AsterVega.VegaValue]? { get set }
+ChartSession.value(of:)  ::  @MainActor func value(of control: SignalInput) -> VegaValue
+ChartSession.vegaLiteDiagnostics  ::  @MainActor var vegaLiteDiagnostics: [VegaDiagnostic] { get set }
+ChartSession.viewport  ::  @MainActor var viewport: ChartViewport { get set }
+ChartSession.zoom(by:at:phase:)  ::  @MainActor func zoom(by scaleFactor: Double, at anchor: Point, phase: GesturePhase)
+ChartTooltip  ::  struct ChartTooltip
+ChartTooltip.Row  ::  struct Row
+ChartTooltip.Row.init(label:value:)  ::  init(label: String, value: String)
+ChartTooltip.Row.label  ::  let label: String
+ChartTooltip.Row.value  ::  let value: String
+ChartTooltip.anchor  ::  let anchor: CGPoint?
+ChartTooltip.init(rows:text:anchor:)  ::  init(rows: [Row], text: String, anchor: CGPoint?)
+ChartTooltip.rows  ::  let rows: [Row]
+ChartTooltip.text  ::  let text: String
+ChartViewport  ::  struct ChartViewport
+ChartViewport.identity  ::  static let identity: ChartViewport
+ChartViewport.init(offsetX:offsetY:scale:)  ::  init(offsetX: Double, offsetY: Double, scale: Double)
+ChartViewport.offsetX  ::  let offsetX: Double
+ChartViewport.offsetY  ::  let offsetY: Double
+ChartViewport.scale  ::  let scale: Double
+CoreGraphicsTarget  ::  struct CoreGraphicsTarget
+CoreGraphicsTarget.beginGroup(clip:)  ::  mutating func beginGroup(clip: Rect?)
+CoreGraphicsTarget.clearImageCache()  ::  static func clearImageCache()
+CoreGraphicsTarget.endGroup()  ::  mutating func endGroup()
+CoreGraphicsTarget.image(url:raster:in:fit:smooth:opacity:)  ::  mutating func image(url: String, raster: DrawRaster?, in rect: Rect, fit: DrawImageFit, smooth: Bool, opacity: Double)
+CoreGraphicsTarget.init(context:drawText:resolveImage:onUnresolvedImage:)  ::  init(context: CGContext, drawText: ((DrawTextRun, Brush?, CGContext) -> Void)? = nil, resolveImage: ((String) -> CGImage?)? = nil, onUnresolvedImage: ((String) -> Void)? = nil)
+CoreGraphicsTarget.line(from:to:stroke:)  ::  mutating func line(from: Point, to: Point, stroke: StrokePaint?)
+CoreGraphicsTarget.path(_:fill:stroke:)  ::  mutating func path(_ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?)
+CoreGraphicsTarget.rect(_:corners:fill:stroke:)  ::  mutating func rect(_ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?)
+CoreGraphicsTarget.text(_:fill:stroke:)  ::  mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?)
+CoreGraphicsTarget.unresolved  ::  var unresolved: [String] { get }
+CoreTextDrawing  ::  enum CoreTextDrawing
+CoreTextDrawing.draw(_:_:_:)  ::  static func draw(_ run: DrawTextRun, _ fill: Brush?, _ context: CGContext)
+CoreTextDrawing.draw(_:_:_:textScale:resolveFont:)  ::  static func draw(_ run: DrawTextRun, _ fill: Brush?, _ context: CGContext, textScale: Double, resolveFont: ((String) -> CTFont?)? = nil)
+CoreTextTextEngine  ::  final class CoreTextTextEngine
+CoreTextTextEngine.advanceOf(line:style:)  ::  override func advanceOf(line: String, style: TextStyle) -> Double
+CoreTextTextEngine.ascentOf(style:)  ::  override func ascentOf(style: TextStyle) -> Double
+CoreTextTextEngine.defaultLineHeightOf(style:)  ::  override func defaultLineHeightOf(style: TextStyle) -> Double
+CoreTextTextEngine.descentOf(style:)  ::  override func descentOf(style: TextStyle) -> Double
+CoreTextTextEngine.init(textScale:resolveFont:)  ::  init(textScale: Double = 1, resolveFont: ((String) -> CTFont?)? = nil)
+CoreTextTextEngine.resolveFont  ::  let resolveFont: ((String) -> CTFont?)?
+CoreTextTextEngine.textScale  ::  let textScale: Double
+Corners  ::  struct Corners
+Corners.bottomLeft  ::  let bottomLeft: Double
+Corners.bottomRight  ::  let bottomRight: Double
+Corners.init(topLeft:topRight:bottomRight:bottomLeft:)  ::  init(topLeft: Double, topRight: Double, bottomRight: Double, bottomLeft: Double)
+Corners.isSquare  ::  var isSquare: Bool { get }
+Corners.square  ::  static let square: Corners
+Corners.topLeft  ::  let topLeft: Double
+Corners.topRight  ::  let topRight: Double
+DrawImageFit  ::  enum DrawImageFit
+DrawImageFit.contain  ::  case contain
+DrawImageFit.fill  ::  case fill
+DrawRaster  ::  struct DrawRaster
+DrawRaster.digest  ::  let digest: Int64
+DrawRaster.height  ::  let height: Int
+DrawRaster.image  ::  let image: RasterImage
+DrawRaster.init(image:)  ::  init(image: RasterImage)
+DrawRaster.width  ::  let width: Int
+DrawTarget  ::  protocol DrawTarget
+DrawTarget.beginGroup(clip:)  ::  mutating func beginGroup(clip: Rect?)
+DrawTarget.endGroup()  ::  mutating func endGroup()
+DrawTarget.image(url:raster:in:fit:smooth:opacity:)  ::  mutating func image(url: String, raster: DrawRaster?, in rect: Rect, fit: DrawImageFit, smooth: Bool, opacity: Double)
+DrawTarget.line(from:to:stroke:)  ::  mutating func line(from: Point, to: Point, stroke: StrokePaint?)
+DrawTarget.path(_:fill:stroke:)  ::  mutating func path(_ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?)
+DrawTarget.rect(_:corners:fill:stroke:)  ::  mutating func rect(_ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?)
+DrawTarget.text(_:fill:stroke:)  ::  mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?)
+DrawTextRun  ::  struct DrawTextRun
+DrawTextRun.anchor  ::  let anchor: Point
+DrawTextRun.angleDegrees  ::  let angleDegrees: Double
+DrawTextRun.ascent  ::  let ascent: Double
+DrawTextRun.fontFamily  ::  let fontFamily: String
+DrawTextRun.fontSize  ::  let fontSize: Double
+DrawTextRun.fontWeight  ::  let fontWeight: Int
+DrawTextRun.init(text:origin:anchor:ascent:fontFamily:fontSize:fontWeight:italic:angleDegrees:letterSpacing:)  ::  init(text: String, origin: Point, anchor: Point, ascent: Double, fontFamily: String, fontSize: Double, fontWeight: Int, italic: Bool, angleDegrees: Double, letterSpacing: Double = 0)
+DrawTextRun.italic  ::  let italic: Bool
+DrawTextRun.letterSpacing  ::  let letterSpacing: Double
+DrawTextRun.origin  ::  let origin: Point
+DrawTextRun.text  ::  let text: String
+GradientStop  ::  struct GradientStop
+GradientStop.init(offset:paint:)  ::  init(offset: Double, paint: Paint)
+GradientStop.offset  ::  let offset: Double
+GradientStop.paint  ::  let paint: Paint
+LineCap  ::  enum LineCap
+LineCap.butt  ::  case butt
+LineCap.round  ::  case round
+LineCap.square  ::  case square
+LineJoin  ::  enum LineJoin
+LineJoin.bevel  ::  case bevel
+LineJoin.miter  ::  case miter
+LineJoin.round  ::  case round
+Paint  ::  struct Paint
+Paint.alpha  ::  let alpha: Double
+Paint.blue  ::  let blue: Double
+Paint.green  ::  let green: Double
+Paint.init(red:green:blue:alpha:)  ::  init(red: Double, green: Double, blue: Double, alpha: Double)
+Paint.of(_:)  ::  static func of(_ colour: SceneColor) -> Paint
+Paint.red  ::  let red: Double
+PathCommand  ::  enum PathCommand
+PathCommand.close  ::  case close
+PathCommand.cubic(control1:control2:to:)  ::  case cubic(control1: Point, control2: Point, to: Point)
+PathCommand.line(to:)  ::  case line(to: Point)
+PathCommand.move(to:)  ::  case move(to: Point)
+Point  ::  struct Point
+Point.init(x:y:)  ::  init(x: Double, y: Double)
+Point.x  ::  let x: Double
+Point.y  ::  let y: Double
+RecordingTarget  ::  struct RecordingTarget
+RecordingTarget.beginGroup(clip:)  ::  mutating func beginGroup(clip: Rect?)
+RecordingTarget.calls  ::  var calls: [String] { get }
+RecordingTarget.endGroup()  ::  mutating func endGroup()
+RecordingTarget.image(url:raster:in:fit:smooth:opacity:)  ::  mutating func image(url: String, raster: DrawRaster?, in rect: Rect, fit: DrawImageFit, smooth: Bool, opacity: Double)
+RecordingTarget.init()  ::  init()
+RecordingTarget.line(from:to:stroke:)  ::  mutating func line(from: Point, to: Point, stroke: StrokePaint?)
+RecordingTarget.path(_:fill:stroke:)  ::  mutating func path(_ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?)
+RecordingTarget.rect(_:corners:fill:stroke:)  ::  mutating func rect(_ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?)
+RecordingTarget.text(_:fill:stroke:)  ::  mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?)
+Rect  ::  struct Rect
+Rect.height  ::  let height: Double
+Rect.init(x:y:width:height:)  ::  init(x: Double, y: Double, width: Double, height: Double)
+Rect.width  ::  let width: Double
+Rect.x  ::  let x: Double
+Rect.y  ::  let y: Double
+SceneExport  ::  enum SceneExport
+SceneExport.bitmap(_:scale:drawText:resolveImage:)  ::  static func bitmap(_ scene: AsterVega.Scene, scale: Double = 2, drawText: ((DrawTextRun, Brush?, CGContext) -> Void)? = CoreTextDrawing.draw, resolveImage: ((String) -> CGImage?)? = nil) -> CGImage?
+SceneExport.defaultSvgOptions  ::  static var defaultSvgOptions: SvgOptions { get }
+SceneExport.pdf(_:drawText:resolveImage:)  ::  static func pdf(_ scene: AsterVega.Scene, drawText: ((DrawTextRun, Brush?, CGContext) -> Void)? = CoreTextDrawing.draw, resolveImage: ((String) -> CGImage?)? = nil) -> Data?
+SceneExport.png(_:scale:drawText:resolveImage:)  ::  static func png(_ scene: AsterVega.Scene, scale: Double = 2, drawText: ((DrawTextRun, Brush?, CGContext) -> Void)? = CoreTextDrawing.draw, resolveImage: ((String) -> CGImage?)? = nil) -> Data?
+SceneExport.svg(_:options:)  ::  static func svg(_ scene: AsterVega.Scene, options: SvgOptions? = nil) -> String
+SceneWalk  ::  struct SceneWalk
+SceneWalk.draw(scene:into:)  ::  func draw<T>(scene: Scene, into target: inout T) where T : DrawTarget
+SceneWalk.init()  ::  init()
+StrokePaint  ::  struct StrokePaint
+StrokePaint.brush  ::  let brush: Brush
+StrokePaint.cap  ::  let cap: LineCap
+StrokePaint.dash  ::  let dash: [Double]
+StrokePaint.dashOffset  ::  let dashOffset: Double
+StrokePaint.init(brush:width:cap:join:miterLimit:dash:dashOffset:)  ::  init(brush: Brush, width: Double, cap: LineCap, join: LineJoin, miterLimit: Double, dash: [Double], dashOffset: Double)
+StrokePaint.join  ::  let join: LineJoin
+StrokePaint.miterLimit  ::  let miterLimit: Double
+StrokePaint.width  ::  let width: Double
+VegaChartView  ::  @MainActor struct VegaChartView
+VegaChartView.body  ::  @MainActor var body: some View { get }
+VegaChartView.init(scene:session:captions:textScale:accessibilityMaxExposedMarks:gestures:onPlaced:resolveImage:onUnresolvedImage:resolveFont:)  ::  @MainActor init(scene: AsterVega.Scene, session: ChartSession? = nil, captions: VegaCaptions? = nil, textScale: Double? = nil, accessibilityMaxExposedMarks: Int32 = AccessibilityTree.shared.MAX_EXPOSED_MARKS, gestures: ChartGestures = .all, onPlaced: ((ChartPlacement) -> Void)? = nil, resolveImage: ((String) -> CGImage?)? = nil, onUnresolvedImage: ((String) -> Void)? = nil, resolveFont: ((String) -> CTFont?)? = nil)
+VegaDataLoader  ::  final class VegaDataLoader
+VegaDataLoader.baseURL  ::  static let baseURL: String
+VegaDataLoader.init(localDirectory:session:timeout:)  ::  init(localDirectory: URL?, session: URLSession = .shared, timeout: Foundation.TimeInterval = 20)
+VegaDataLoader.load(uri:)  ::  func load(uri: String) throws -> String
+VegaDataLoader.sanitize(uri:)  ::  func sanitize(uri: String) throws -> String

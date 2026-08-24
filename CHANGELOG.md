@@ -109,6 +109,13 @@ section here does not get released.
   the closure twice, because the layout was measured with it: painting a face the boxes were
   not measured for puts every label off its baseline. (#106)
 
+- **The Swift package's own API is snapshotted**, in `swift/AsterVegaRender/swift-api.txt`,
+  from the symbol graph the compiler emits. `foreign-api.txt` covers what Kotlin exports to
+  Obj-C; `VegaChartView.init` and `ChartSession` are Swift source and were in no snapshot at
+  all, leaving them to `CallShapeTests` — which pins the shapes somebody thought to write
+  down, and missed a rebound trailing closure and a missing font seam. Run by
+  `scripts/swift-test.sh`, so `check.sh` covers it.
+
 ### Changed
 
 - **The Android view centres a chart, as the other three renderers already did.** A scene is

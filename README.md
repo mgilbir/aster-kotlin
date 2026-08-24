@@ -1016,11 +1016,18 @@ adopter found it rather than a review.
 `./scripts/check.sh` runs all of it — the ABI dumps, the Android snapshot, and the Obj-C snapshot
 under `swift/AsterVegaRender/foreign-api.txt`.
 
-One hole is left and is worth naming rather than discovering. `foreign-api.txt` records what **Kotlin
-exports to Obj-C**; the Swift package's *own* API — `VegaChartView.init`, `ChartSession` — is Swift
-source and appears in no snapshot. It is guarded by `CallShapeTests`, which fails to compile if the
-initialiser's shape moves, and that is narrower than a snapshot: it pins the call shapes somebody
-thought to write down. A symbol-graph dump (`swift symbolgraph-extract`) would close it.
+The Swift package's *own* API is snapshotted too, in `swift/AsterVegaRender/swift-api.txt`, from the
+symbol graph the compiler emits. `foreign-api.txt` records what **Kotlin exports to Obj-C**, which is
+a different surface: `VegaChartView.init` and `ChartSession` are Swift source and appeared in it
+nowhere, so the half of the Apple API a host actually calls was guarded by `CallShapeTests` alone —
+which pins the shapes somebody thought to write down, and is exactly as good as that foresight was.
+It was not good enough twice: a trailing closure rebound to a new parameter and broke `main`, and a
+missing font seam went unnoticed until an adopter reported it.
+
+Only symbols this package **declares** are recorded. A symbol with no source location is inherited or
+synthesised elsewhere, and for `VegaChartView` that is 810 SwiftUI `View` defaults — `offset(_:)` and
+the rest — which are the SDK's API, not this one's, and would make an Xcode upgrade look like a
+change to what a host compiles against.
 
 ### Platforms
 

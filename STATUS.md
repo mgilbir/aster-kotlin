@@ -6586,3 +6586,28 @@ in a patch.
 Also corrected here: the README still called the type `ChartPlacement` in the paragraph describing
 this difference, three PRs after it was renamed to `ScenePlacement`. Documentation drift of exactly
 the kind this stack has been fixing, introduced by the stack itself.
+
+### The other Apple surface, and two ways to read a stale artefact
+
+`foreign-api.txt` records what **Kotlin exports to Obj-C**. `VegaChartView.init` and `ChartSession`
+are Swift source and appear in it nowhere, so the half of the Apple API a host actually calls was
+guarded by `CallShapeTests` alone — which pins the call shapes somebody thought to write down, and is
+therefore exactly as good as that foresight was. It was not good enough twice: a trailing closure
+rebound to a parameter added after it and broke `main` (#93), and a missing font seam sat unnoticed
+until an adopter reported it (#106). Neither is a shape a hand-written test would have thought to
+assert; both are one line of a diff in `swift-api.txt`.
+
+`swift build -emit-symbol-graph` rather than `swift package dump-symbol-graph`: the latter invokes the
+extractor without the package's own `-F`, so it fails with "missing required module 'AsterVega'".
+
+**Only symbols this package declares** are recorded, discriminated by whether the symbol carries a
+source location. Without that filter `VegaChartView` contributes 810 SwiftUI `View` defaults —
+`offset(_:)`, `symbolEffect(_:options:isActive:)` — which are the SDK's API rather than this one's and
+would make an Xcode upgrade read as a change to what a host compiles against. 212 symbols with it.
+
+Two stale-artefact traps on the way, both the same shape as the one in `scripts/android-api.sh` and
+the one `foreign-api.sh` warns about in its own header. A symbol graph is emitted by the *compile*, so
+an incremental build with nothing to do emits nothing: sharing `.build` with `swift test` meant the
+second run found no file where the first had left one, and giving it a private scratch path did not
+help either, because that path is incremental too. It is deleted each run — eight seconds, and it
+cannot be stale. The guard that says "no symbol graph after building" is what caught the second one.
