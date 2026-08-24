@@ -6716,3 +6716,27 @@ The gate was verified the way the others were: making `valueOrNull` internal, an
 member whose type cannot cross. The first is caught by the existing snapshot, the second only by this
 one — `+ForeignNodeId.probe`, public in Kotlin and unreachable from a host, which is exactly the
 shape all three reports had.
+
+### The matrix is derived now, and the markers are checked for teeth
+
+The README's table of what each host exposes was written by hand, which made it a claim. Both seams
+an adopter reported missing were absent from a host *while that table said the shape was deliberate*.
+
+`scripts/host-parity.py` derives it from the surfaces already snapshotted for other reasons —
+`android-api.txt`, the Compose Multiplatform klib dump, and `swift-api.txt` — and `check.sh` runs it.
+Twenty-five markers across seven seams and four hosts, and two absences carrying a recorded reason:
+an engine-drawn tooltip on the two scene-painting surfaces, which own no tooltip, and clearing the
+image cache from `vega-compose`, which holds no handle on the view.
+
+Three extraction bugs on the way, and the pattern is the same one as the coverage script: **a check
+is only as good as what it reads.** Matching the javap class *header* rather than its block reported
+every seam missing from a view that has all of them. The JVM `.api` dump erases a lambda parameter to
+`Function1`, so every seam on the Compose Multiplatform composable looked identical — the klib dump
+keeps `Function1<String, ImageBitmap?>` and is what this reads. And `clearImageCache` is a static on
+`CoreGraphicsTarget` rather than on the view, so filtering the Swift surface to two types hid it.
+
+Then the markers were checked for teeth, which is the step that separates this from a table that
+prints "yes". Removing each seam from the surface it belongs to and re-running must turn the check
+red: **all 25 do.** Two did not before that — `Function1` and `Int` are present on any of those
+signatures, so those columns were green whatever the seam did. A green cell that cannot go red is
+worse than no cell.
