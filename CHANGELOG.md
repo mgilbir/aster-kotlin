@@ -39,6 +39,15 @@ section here does not get released.
   gains a fourth constructor parameter, defaulted, which changes its Obj-C initialiser
   selector; nothing in this repository constructs one. (#100)
 
+- **A facet header follows the reader's language whether or not the field was bucketed.**
+  `Facet.headerText` threaded the locale for a field carrying a `timeUnit` and wrote
+  upstream's `%b %d, %Y` outright for one that did not, three lines apart — so a grid
+  split by a bucketed field was captioned in the reader's language and a grid split by a
+  plain temporal field was captioned in American English. Both branches now read the same
+  `year-month-date` entry, so a bucketed date and an unbucketed one cannot be captioned
+  differently. `VegaLocale.EnglishUS` is byte-for-byte unchanged, which is what leaves the
+  283 fixture comparisons still. (#98)
+
 ## 0.2.0
 
 ### Fixed

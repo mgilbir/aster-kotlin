@@ -164,6 +164,32 @@ internal object Fields {
   }
 
   /**
+   * The specifier a **plain** temporal field is labelled with, quoted ready for an expression.
+   *
+   * The other half of [timeUnitSpecifier]. A field carrying a `timeUnit` gets an expression,
+   * because Vega chooses among the units at render time from the span being shown; a field with no
+   * `timeUnit` has nothing to choose between and gets a literal, which upstream writes as `"%b %d,
+   * %Y"` and cannot do otherwise, having no locale to ask.
+   *
+   * It is the same table's `year-month-date` entry, so the two halves cannot drift: whatever a
+   * bucketed year-month-date is labelled with, an unbucketed date is labelled with too.
+   *
+   * **Trimmed**, and that is not cosmetic. Every entry in the table ends in a space because
+   * `TimeUnits.specifier` concatenates the pieces of a compound specifier and trims the result. A
+   * literal is not concatenated with anything, so it has to do the trimming here — and for
+   * [VegaLocale.EnglishUS] that is exactly what makes this `%b %d, %Y`, upstream's own string, with
+   * every fixture unmoved.
+   */
+  fun fullDateSpecifier(locale: VegaLocale = VegaLocale.EnglishUS): String {
+    // A host may state `null` for an entry, which *removes* it rather than restoring a default.
+    // With
+    // no year-month-date to read, upstream's own is the honest answer rather than nothing at all.
+    val pattern =
+      localeTimeFormat(locale)["year-month-date"] ?: UPSTREAM_TIME_FORMAT["year-month-date"]
+    return "\"" + escaped(pattern.orEmpty().trim()) + "\""
+  }
+
+  /**
    * Upstream's `VEGALITE_TIMEFORMAT`, reordered by the reader's language.
    *
    * The **order** comes from the locale and the directives stay Vega-Lite's own, and that split is

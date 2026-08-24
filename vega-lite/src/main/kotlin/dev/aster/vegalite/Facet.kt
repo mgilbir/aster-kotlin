@@ -41,10 +41,14 @@ private fun headerText(def: ChannelDef, field: String, config: Config? = null): 
   if (def.type == MeasureType.TEMPORAL || timeUnit != null) {
     val utc = timeUnit?.contains("utc") == true || def.scale.string("type") == "utc"
     val prefix = if (utc) "utc" else "time"
+    // One locale for both branches. The bucketed branch has threaded it since the locale seam
+    // landed, and the plain one carried upstream's date hardcoded three lines below it —
+    // defensible as parity, since upstream has no locale to ask, but it meant a grid split by a
+    // bucketed field followed the reader's language and a grid split by a plain date did not.
+    val locale = config?.locale ?: VegaLocale.EnglishUS
     val specifier =
-      if (timeUnit != null)
-        Fields.timeUnitSpecifier(timeUnit, config?.locale ?: VegaLocale.EnglishUS)
-      else "\"%b %d, %Y\""
+      if (timeUnit != null) Fields.timeUnitSpecifier(timeUnit, locale)
+      else Fields.fullDateSpecifier(locale)
     return "${prefix}Format($accessor, $specifier)"
   }
   return "isValid($accessor) ? $accessor : \"\"+$accessor"
