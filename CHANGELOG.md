@@ -4,7 +4,30 @@ Notable changes, newest first. The release workflow reads the section for the
 version it is publishing and uses it as the release notes, so a version without a
 section here does not get released.
 
-## Unreleased
+## 0.4.0
+
+### Changed
+
+Three of these break a Swift host that compiled against 0.3.0. They are first for that reason.
+
+- **Fifty engine-internal members now require opt-in.** `@InternalAsterVegaApi` marks the
+  declarations that are `public` only because Kotlin has no cross-module `internal` — the
+  dataflow's `publishesSignal`, the expression evaluator's scope hooks, one AST accessor.
+  Calling one from outside the engine is now a compile error unless you
+  `@OptIn(InternalAsterVegaApi::class)`, and opting in means accepting that they may change
+  in a patch release. **Source-breaking** for anyone who was calling them; nothing in this
+  repository was.
+
+- **`ChartSession.selectedNodeIds` hands out numbers**, `Set<Int64>` rather than
+  `Set<AnyHashable>`. It carried opaque boxes because nothing could unwrap one, with a comment
+  saying "opaque is enough here — the set is handed straight back to the engine". That stopped
+  being true, so a host can read a selection now instead of only relaying it. **Breaking for a
+  Swift host that stored the old set**; `ForeignNodeId.setOf(values:)` converts back where the
+  engine wants its own form.
+
+- **`ChartSession` exposes `hoveredNodeId` and `focusedNodeId`**, as numbers. Neither was
+  reachable at all: the session published a selection and nothing else about the interaction
+  state, so a host drawing its own hover affordance had to reach past it to the controller. (#120)
 
 ### Added
 
@@ -25,18 +48,32 @@ section here does not get released.
   boolean and an object all as text, so a host could not tell a field that held `"3"` from
   one that held `3`. (#120)
 
-### Changed
+- **A host can draw its own legend for a banded scale**, through `ForeignScale`. The numbers
+  a legend is built from — where the buckets cut, what labels them, where a value sits along
+  the bar — are declared on `BinnedScale` with **default bodies**, and an Obj-C protocol
+  cannot carry a default, so Kotlin/Native left them out: a `QuantizeScale` reached Swift
+  with `domain`, `name` and `invertExtent` and nothing else. Nothing inside the engine
+  noticed, because the engine draws its own legends. `legendExtent` is split into two
+  functions rather than crossing as an opaque `KotlinPair`, and an unbounded bucket end
+  answers **null** rather than zero — a cut point at 30 says nothing about how far below it
+  the first bucket reaches. (#120)
 
-- **`ChartSession.selectedNodeIds` hands out numbers**, `Set<Int64>` rather than
-  `Set<AnyHashable>`. It carried opaque boxes because nothing could unwrap one, with a comment
-  saying "opaque is enough here — the set is handed straight back to the engine". That stopped
-  being true, so a host can read a selection now instead of only relaying it. **Breaking for a
-  Swift host that stored the old set**; `ForeignNodeId.setOf(values:)` converts back where the
-  engine wants its own form.
+### Internal
 
-- **`ChartSession` exposes `hoveredNodeId` and `focusedNodeId`**, as numbers. Neither was
-  reachable at all: the session published a selection and nothing else about the interaction
-  state, so a host drawing its own hover affordance had to reach past it to the controller. (#120)
+Not changes to the engine, and listed because they change what a review can catch.
+
+- **What does *not* reach a foreign host is enumerated and gated.**
+  `scripts/foreign-coverage.py` reads the committed ABI dumps against `foreign-api.txt` and
+  records every public member with no foreign counterpart, each with a reason: 50 marked
+  internal, 27 reachable through a `Foreign*` accessor, **0 unexplained**. A member that
+  stops crossing without a recorded reason fails the build and says what to do about it.
+  Three adopter reports in a row were that one defect — a type crossing while the part worth
+  reading stayed behind, with nothing failing.
+
+- **The host matrix in `README.md` is derived rather than asserted.**
+  `scripts/host-parity.py` checks every seam against every host's recorded surface, and
+  `check.sh` runs it. The table was written by hand, and both seams an adopter reported
+  missing were absent from a host while it called the shape deliberate.
 
 ## 0.3.0
 
