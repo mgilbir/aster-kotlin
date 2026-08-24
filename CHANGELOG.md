@@ -48,6 +48,17 @@ section here does not get released.
   differently. `VegaLocale.EnglishUS` is byte-for-byte unchanged, which is what leaves the
   283 fixture comparisons still. (#98)
 
+- **A date's suffix marker is no longer dropped with the field after it.** A language that
+  writes a marker after each number — `%Y年%m月%d日` — derived its year-month form as
+  `%Y年%m`, losing the `月`, so a bucketed axis read "2026年08". Dropping a field takes one
+  adjacent separator with it, and which one depends on what the separator is for: text
+  standing *between* two fields goes with the dropped one, and a marker belonging to the
+  field before it stays. The two are told apart by whether the separator carries a letter
+  and is attached with no space in front — which keeps `%b %d, %Y` giving `%b %Y`, keeps
+  `%d-%m-%Y` giving `%d-%m`, and keeps Spanish `%e de %B de %Y` giving `%e de %B`, none of
+  which move. No bundled locale is written with markers, so this only ever affected a
+  host-supplied one.
+
 ## 0.2.0
 
 ### Fixed

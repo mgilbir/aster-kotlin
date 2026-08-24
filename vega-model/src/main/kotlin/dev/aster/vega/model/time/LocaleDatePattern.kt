@@ -42,13 +42,44 @@ internal object LocaleDatePattern {
     return buildString {
       for ((index, piece) in kept.withIndex()) {
         append(piece.directive)
-        // The separator after the last field is dropped whatever it was: a pattern ending in a
-        // literal — `%Y年` — keeps it, and one ending in nothing appends nothing.
-        if (index < kept.size - 1) append(piece.separator)
+        if (index < kept.size - 1) {
+          // Between two kept fields, whatever sat there stays: it is doing the separating.
+          append(piece.separator)
+        } else if (piece === pieces.last() || isMarker(piece.separator)) {
+          // After the last kept field, only text that **belongs to that field**. A pattern ending
+          // in a literal keeps it, and so does a marker — see [isMarker].
+          append(piece.separator)
+        }
       }
-      kept.last().let { if (it === pieces.last()) append(it.separator) }
     }
+      // A marker may carry a space after it — `%Y년 %m월 ` — and nothing follows it now.
+      .trimEnd()
   }
+
+  /**
+   * Whether [separator] is a **marker owned by the field before it**, rather than a connector
+   * between two fields.
+   *
+   * This is the distinction the whole of [withFields] turns on, and getting it wrong is silent.
+   * Dropping a field takes one adjacent separator with it, and which one depends on what the
+   * separator is for:
+   *
+   * - `%b %d, %Y` — the `, ` sits *between* two fields and belongs to neither, so dropping the date
+   *   takes the space after it and leaves `%b %Y`. A connector.
+   * - `%Y年%m月%d日` — the `月` is not between anything, it is what makes the number a month. Dropping
+   *   the day has to leave `%Y年%m月`, and taking `月` with it leaves `%Y年%m`, which reads "2026年08"
+   *   and is not a date in any language. A marker.
+   *
+   * Two conditions, and both are needed. **A marker carries a letter**, which is what separates `月`
+   * and `년` from `-`, `/`, `.` and `, `. **A marker is attached**, with no space before it, which
+   * is what separates `月` from Spanish `%e de %B de %Y`: `de` is a word with letters in it, but the
+   * space in front says it stands between the two fields rather than belonging to the one behind,
+   * and `%e de %B de ` would be wrong where `%e de %B` is right.
+   *
+   * `Character.isLetter` is true for CJK ideographs, which is the case this exists for.
+   */
+  private fun isMarker(separator: String): Boolean =
+    separator.isNotEmpty() && !separator.first().isWhitespace() && separator.any { it.isLetter() }
 
   /**
    * The order [pattern] writes year, month and day of month in, or null where it names none of
