@@ -2759,6 +2759,17 @@ final object dev.aster.vega.model/DiagnosticCodes { // dev.aster.vega.model/Diag
         final fun <get-TRANSFORM_NOT_IMPLEMENTED>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED.<get-TRANSFORM_NOT_IMPLEMENTED>|<get-TRANSFORM_NOT_IMPLEMENTED>(){}[0]
 }
 
+final object dev.aster.vega.model/ForeignValue { // dev.aster.vega.model/ForeignValue|null[0]
+    final fun at(dev.aster.vega.model/VegaValue?, kotlin/Int): dev.aster.vega.model/VegaValue? // dev.aster.vega.model/ForeignValue.at|at(dev.aster.vega.model.VegaValue?;kotlin.Int){}[0]
+    final fun boolean(dev.aster.vega.model/VegaValue?): kotlin/Boolean? // dev.aster.vega.model/ForeignValue.boolean|boolean(dev.aster.vega.model.VegaValue?){}[0]
+    final fun count(dev.aster.vega.model/VegaValue?): kotlin/Int // dev.aster.vega.model/ForeignValue.count|count(dev.aster.vega.model.VegaValue?){}[0]
+    final fun get(dev.aster.vega.model/VegaValue?, kotlin/String): dev.aster.vega.model/VegaValue? // dev.aster.vega.model/ForeignValue.get|get(dev.aster.vega.model.VegaValue?;kotlin.String){}[0]
+    final fun keys(dev.aster.vega.model/VegaValue?): kotlin.collections/List<kotlin/String> // dev.aster.vega.model/ForeignValue.keys|keys(dev.aster.vega.model.VegaValue?){}[0]
+    final fun kind(dev.aster.vega.model/VegaValue?): kotlin/String // dev.aster.vega.model/ForeignValue.kind|kind(dev.aster.vega.model.VegaValue?){}[0]
+    final fun number(dev.aster.vega.model/VegaValue?): kotlin/Double? // dev.aster.vega.model/ForeignValue.number|number(dev.aster.vega.model.VegaValue?){}[0]
+    final fun string(dev.aster.vega.model/VegaValue?): kotlin/String? // dev.aster.vega.model/ForeignValue.string|string(dev.aster.vega.model.VegaValue?){}[0]
+}
+
 final object dev.aster.vega.model/TopoJson { // dev.aster.vega.model/TopoJson|null[0]
     final fun feature(dev.aster.vega.model/VegaValue, kotlin/String): kotlin.collections/List<dev.aster.vega.model/VegaValue>? // dev.aster.vega.model/TopoJson.feature|feature(dev.aster.vega.model.VegaValue;kotlin.String){}[0]
     final fun mesh(dev.aster.vega.model/VegaValue, kotlin/String, dev.aster.vega.model/TopoJson.MeshFilter): kotlin.collections/List<dev.aster.vega.model/VegaValue>? // dev.aster.vega.model/TopoJson.mesh|mesh(dev.aster.vega.model.VegaValue;kotlin.String;dev.aster.vega.model.TopoJson.MeshFilter){}[0]

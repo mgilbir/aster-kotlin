@@ -1766,6 +1766,13 @@ final object dev.aster.vega.scene/ColorSpaces { // dev.aster.vega.scene/ColorSpa
     }
 }
 
+final object dev.aster.vega.scene/ForeignNodeId { // dev.aster.vega.scene/ForeignNodeId|null[0]
+    final fun noneValue(): kotlin/Long // dev.aster.vega.scene/ForeignNodeId.noneValue|noneValue(){}[0]
+    final fun setOf(kotlin.collections/List<kotlin/Long>): kotlin.collections/Set<dev.aster.vega.scene/SceneNodeId> // dev.aster.vega.scene/ForeignNodeId.setOf|setOf(kotlin.collections.List<kotlin.Long>){}[0]
+    final fun valueOrNull(dev.aster.vega.scene/SceneNodeId?): kotlin/Long? // dev.aster.vega.scene/ForeignNodeId.valueOrNull|valueOrNull(dev.aster.vega.scene.SceneNodeId?){}[0]
+    final fun values(kotlin.collections/Set<dev.aster.vega.scene/SceneNodeId>): kotlin.collections/List<kotlin/Long> // dev.aster.vega.scene/ForeignNodeId.values|values(kotlin.collections.Set<dev.aster.vega.scene.SceneNodeId>){}[0]
+}
+
 final object dev.aster.vega.scene/ForeignPaint { // dev.aster.vega.scene/ForeignPaint|null[0]
     final fun isGradient(dev.aster.vega.scene/ScenePaint?): kotlin/Boolean // dev.aster.vega.scene/ForeignPaint.isGradient|isGradient(dev.aster.vega.scene.ScenePaint?){}[0]
     final fun linearGradient(dev.aster.vega.scene/ScenePaint?): dev.aster.vega.scene/ScenePaint.LinearGradient? // dev.aster.vega.scene/ForeignPaint.linearGradient|linearGradient(dev.aster.vega.scene.ScenePaint?){}[0]

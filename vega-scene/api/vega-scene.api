@@ -256,6 +256,14 @@ public final class dev/aster/vega/scene/FontStyle : java/lang/Enum {
 	public static fun values ()[Ldev/aster/vega/scene/FontStyle;
 }
 
+public final class dev/aster/vega/scene/ForeignNodeId {
+	public static final field INSTANCE Ldev/aster/vega/scene/ForeignNodeId;
+	public final fun noneValue ()J
+	public final fun setOf (Ljava/util/List;)Ljava/util/Set;
+	public final fun valueOrNull-FOt1xws (Ldev/aster/vega/scene/SceneNodeId;)Ljava/lang/Long;
+	public final fun values (Ljava/util/Set;)Ljava/util/List;
+}
+
 public final class dev/aster/vega/scene/ForeignPaint {
 	public static final field INSTANCE Ldev/aster/vega/scene/ForeignPaint;
 	public final fun isGradient (Ldev/aster/vega/scene/ScenePaint;)Z

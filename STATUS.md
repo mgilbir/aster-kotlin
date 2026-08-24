@@ -6611,3 +6611,35 @@ an incremental build with nothing to do emits nothing: sharing `.build` with `sw
 second run found no file where the first had left one, and giving it a private scratch path did not
 help either, because that path is incremental too. It is deleted each run — eight seconds, and it
 cannot be stale. The guard that says "no symbol graph after building" is what caught the second one.
+
+### A node id that boxes, and a datum with no shape
+
+Two types stopped a Swift host reading a scene, and the fix is the `Foreign*` pattern this
+repository already uses five times: a Kotlin `value class` has no Obj-C representation, so the
+questions a host asks are given plain functions instead.
+
+**The report was right about the symptom and wrong about the cause, and the difference decided the
+fix.** #120 concluded a `SceneNodeId` could not be read at all, having found the *type* absent from
+`foreign-api.txt` — which it is. But Kotlin/Native unwraps a value class at the boundary wherever it
+can, so a **non-null** id crosses as an `int64_t`: `SceneNode.id` has always been readable from
+Swift, under the name **`id_`**, renamed to dodge Obj-C's `id` keyword. That rename is very probably
+why the property looked missing.
+
+What genuinely boxes is the **nullable** and the **collected** — `InteractionState.hoveredNodeId`,
+`focusedNodeId`, `ChartEvent.MarkHovered.nodeId` and `ChartSelection.nodeIds` — because a box is the
+only representation an optional or a set element has. That is exactly why
+`ChartSession.selectedNodeIds` is a `Set<AnyHashable>` that can only be handed straight back.
+
+So `ForeignNodeId` covers those and nothing else. The first draft had a `value(id:)` and an
+`of(value:)`, which the header showed to be `int64_t` to `int64_t` — **identity functions that read
+as a fix**. They were deleted before any of this was believed, which is the argument for reading the
+generated header rather than reasoning about the boundary.
+
+`ForeignValue` is the other half: `keys`, `count`, `at`, `get`, and a `kind` that names the shape so
+a host asks once instead of trying each reader. Its `string`, `number` and `boolean` **do not
+coerce**, which is the point of having them beside `asString` rather than instead of it — `asString`
+renders a number, a boolean, an array and an object all as text, which is right for an expression and
+useless for a host deciding how to display a field.
+
+Both are asserted from Swift, against a real compiled scene and a real parsed datum, rather than from
+Kotlin where the boundary being tested does not exist. 377 Swift tests, up from 350.
