@@ -6,6 +6,10 @@
 // - Show declarations: true
 
 // Library unique name: <io.github.mgilbir.astervega:vega-model>
+open annotation class dev.aster.vega.model/InternalAsterVegaApi : kotlin/Annotation { // dev.aster.vega.model/InternalAsterVegaApi|null[0]
+    constructor <init>() // dev.aster.vega.model/InternalAsterVegaApi.<init>|<init>(){}[0]
+}
+
 final enum class dev.aster.vega.model.locale/DateField : kotlin/Enum<dev.aster.vega.model.locale/DateField> { // dev.aster.vega.model.locale/DateField|null[0]
     enum entry DATE // dev.aster.vega.model.locale/DateField.DATE|null[0]
     enum entry MONTH // dev.aster.vega.model.locale/DateField.MONTH|null[0]
@@ -2757,6 +2761,17 @@ final object dev.aster.vega.model/DiagnosticCodes { // dev.aster.vega.model/Diag
         final fun <get-TRANSFORM_INVALID_PARAMETER>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.TRANSFORM_INVALID_PARAMETER.<get-TRANSFORM_INVALID_PARAMETER>|<get-TRANSFORM_INVALID_PARAMETER>(){}[0]
     final const val TRANSFORM_NOT_IMPLEMENTED // dev.aster.vega.model/DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED|{}TRANSFORM_NOT_IMPLEMENTED[0]
         final fun <get-TRANSFORM_NOT_IMPLEMENTED>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED.<get-TRANSFORM_NOT_IMPLEMENTED>|<get-TRANSFORM_NOT_IMPLEMENTED>(){}[0]
+}
+
+final object dev.aster.vega.model/ForeignValue { // dev.aster.vega.model/ForeignValue|null[0]
+    final fun at(dev.aster.vega.model/VegaValue?, kotlin/Int): dev.aster.vega.model/VegaValue? // dev.aster.vega.model/ForeignValue.at|at(dev.aster.vega.model.VegaValue?;kotlin.Int){}[0]
+    final fun boolean(dev.aster.vega.model/VegaValue?): kotlin/Boolean? // dev.aster.vega.model/ForeignValue.boolean|boolean(dev.aster.vega.model.VegaValue?){}[0]
+    final fun count(dev.aster.vega.model/VegaValue?): kotlin/Int // dev.aster.vega.model/ForeignValue.count|count(dev.aster.vega.model.VegaValue?){}[0]
+    final fun get(dev.aster.vega.model/VegaValue?, kotlin/String): dev.aster.vega.model/VegaValue? // dev.aster.vega.model/ForeignValue.get|get(dev.aster.vega.model.VegaValue?;kotlin.String){}[0]
+    final fun keys(dev.aster.vega.model/VegaValue?): kotlin.collections/List<kotlin/String> // dev.aster.vega.model/ForeignValue.keys|keys(dev.aster.vega.model.VegaValue?){}[0]
+    final fun kind(dev.aster.vega.model/VegaValue?): kotlin/String // dev.aster.vega.model/ForeignValue.kind|kind(dev.aster.vega.model.VegaValue?){}[0]
+    final fun number(dev.aster.vega.model/VegaValue?): kotlin/Double? // dev.aster.vega.model/ForeignValue.number|number(dev.aster.vega.model.VegaValue?){}[0]
+    final fun string(dev.aster.vega.model/VegaValue?): kotlin/String? // dev.aster.vega.model/ForeignValue.string|string(dev.aster.vega.model.VegaValue?){}[0]
 }
 
 final object dev.aster.vega.model/TopoJson { // dev.aster.vega.model/TopoJson|null[0]

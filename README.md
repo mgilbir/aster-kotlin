@@ -938,6 +938,11 @@ Four public surfaces draw the same scene, and a seam reachable from one and not 
 defect rather than a preference — that is how `vega-compose` shipped without the seams the view it
 wraps already had. This is what each one exposes, and where they differ on purpose.
 
+**`scripts/host-parity.py` checks this table against the recorded surfaces**, so it is derived rather
+than believed. It was written by hand once, and both seams an adopter reported missing were absent
+from a host while this table called the shape deliberate. Every marker in it is verified to fail when
+its seam is removed.
+
 | | Android `VegaChartView` | `vega-compose` | Compose Multiplatform | SwiftUI `VegaChartView` |
 |---|---|---|---|---|
 | Image resolver | `imageResolver` | `imageResolver` | `resolveImage` | `resolveImage` |

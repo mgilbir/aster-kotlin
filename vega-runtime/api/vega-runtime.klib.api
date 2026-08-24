@@ -1480,6 +1480,20 @@ final object dev.aster.vega.runtime.scale/ColorSchemes { // dev.aster.vega.runti
     final fun rampOrNull(kotlin/String): kotlin.collections/List<dev.aster.vega.scene/SceneColor>? // dev.aster.vega.runtime.scale/ColorSchemes.rampOrNull|rampOrNull(kotlin.String){}[0]
 }
 
+final object dev.aster.vega.runtime.scale/ForeignScale { // dev.aster.vega.runtime.scale/ForeignScale|null[0]
+    final fun bins(dev.aster.vega.runtime.scale/VegaScale): kotlin.collections/List<kotlin/Double>? // dev.aster.vega.runtime.scale/ForeignScale.bins|bins(dev.aster.vega.runtime.scale.VegaScale){}[0]
+    final fun bucketHigh(dev.aster.vega.runtime.scale/VegaScale, kotlin/Int): kotlin/Double? // dev.aster.vega.runtime.scale/ForeignScale.bucketHigh|bucketHigh(dev.aster.vega.runtime.scale.VegaScale;kotlin.Int){}[0]
+    final fun bucketLow(dev.aster.vega.runtime.scale/VegaScale, kotlin/Int): kotlin/Double? // dev.aster.vega.runtime.scale/ForeignScale.bucketLow|bucketLow(dev.aster.vega.runtime.scale.VegaScale;kotlin.Int){}[0]
+    final fun bucketRepresentatives(dev.aster.vega.runtime.scale/VegaScale): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/ForeignScale.bucketRepresentatives|bucketRepresentatives(dev.aster.vega.runtime.scale.VegaScale){}[0]
+    final fun isBanded(dev.aster.vega.runtime.scale/VegaScale): kotlin/Boolean // dev.aster.vega.runtime.scale/ForeignScale.isBanded|isBanded(dev.aster.vega.runtime.scale.VegaScale){}[0]
+    final fun legendExtentHigh(dev.aster.vega.runtime.scale/VegaScale): kotlin/Double? // dev.aster.vega.runtime.scale/ForeignScale.legendExtentHigh|legendExtentHigh(dev.aster.vega.runtime.scale.VegaScale){}[0]
+    final fun legendExtentLow(dev.aster.vega.runtime.scale/VegaScale): kotlin/Double? // dev.aster.vega.runtime.scale/ForeignScale.legendExtentLow|legendExtentLow(dev.aster.vega.runtime.scale.VegaScale){}[0]
+    final fun legendFraction(dev.aster.vega.runtime.scale/VegaScale, kotlin/Double): kotlin/Double // dev.aster.vega.runtime.scale/ForeignScale.legendFraction|legendFraction(dev.aster.vega.runtime.scale.VegaScale;kotlin.Double){}[0]
+    final fun legendMax(dev.aster.vega.runtime.scale/VegaScale): kotlin/Double // dev.aster.vega.runtime.scale/ForeignScale.legendMax|legendMax(dev.aster.vega.runtime.scale.VegaScale){}[0]
+    final fun legendValues(dev.aster.vega.runtime.scale/VegaScale): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/ForeignScale.legendValues|legendValues(dev.aster.vega.runtime.scale.VegaScale){}[0]
+    final fun thresholds(dev.aster.vega.runtime.scale/VegaScale): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/ForeignScale.thresholds|thresholds(dev.aster.vega.runtime.scale.VegaScale){}[0]
+}
+
 final object dev.aster.vega.runtime.scale/Ticks { // dev.aster.vega.runtime.scale/Ticks|null[0]
     final fun logTicks(kotlin/Double, kotlin/Double, kotlin/Double, kotlin/Int = ...): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/Ticks.logTicks|logTicks(kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Int){}[0]
     final fun nice(kotlin.collections/List<kotlin/Double>, kotlin/Int = ...): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/Ticks.nice|nice(kotlin.collections.List<kotlin.Double>;kotlin.Int){}[0]

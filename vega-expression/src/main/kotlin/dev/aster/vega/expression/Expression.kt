@@ -1,6 +1,7 @@
 package dev.aster.vega.expression
 
 import dev.aster.vega.model.DiagnosticCodes
+import dev.aster.vega.model.InternalAsterVegaApi
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asString
@@ -220,7 +221,7 @@ public interface ExpressionScope {
    * nothing; the value the function returns is decided by the caller either way, which is why this
    * returns nothing.
    */
-  public fun encodeItem(item: VegaValue, set: String) {}
+  @InternalAsterVegaApi public fun encodeItem(item: VegaValue, set: String) {}
 
   /**
    * `item()` — the scene item the event being handled landed on.
@@ -230,7 +231,7 @@ public interface ExpressionScope {
    * none is, which is upstream's `item || {}` and is why `encode(item(), 'select')` is a no-op
    * outside a handler rather than an error.
    */
-  public fun activeItem(): VegaValue = VegaValue.EmptyObject
+  @InternalAsterVegaApi public fun activeItem(): VegaValue = VegaValue.EmptyObject
 
   /**
    * `xy()` — the event's position in the **root frame's** own coordinates, as a two-element array.
@@ -240,7 +241,7 @@ public interface ExpressionScope {
    * placed in. `x()` and `y()` are its two components. [VegaValue.Null] when no event is being
    * handled.
    */
-  public fun eventPoint(): VegaValue = VegaValue.Null
+  @InternalAsterVegaApi public fun eventPoint(): VegaValue = VegaValue.Null
 
   /**
    * `inScope(item)` — whether the item is inside the group this expression belongs to.
@@ -249,7 +250,7 @@ public interface ExpressionScope {
    * — including for every expression in a top-level signal, where `inScope(anything)` is false
    * there too.
    */
-  public fun inScope(item: VegaValue): Boolean = false
+  @InternalAsterVegaApi public fun inScope(item: VegaValue): Boolean = false
 
   /**
    * `intersect([[x0, y0], [x1, y1]][, opt])` — the scene items a box covers.
@@ -259,9 +260,11 @@ public interface ExpressionScope {
    * marks answers `[]` there as well. A scope that *has* a scene — an event handler's — overrides
    * this.
    */
+  @InternalAsterVegaApi
   public fun intersect(box: VegaValue, options: VegaValue): VegaValue = VegaValue.Arr(emptyList())
 
   /** `intersectLasso(mark, points, unit)` — the same question asked with a freehand outline. */
+  @InternalAsterVegaApi
   public fun intersectLasso(mark: String, points: VegaValue, unit: VegaValue): VegaValue =
     VegaValue.Arr(emptyList())
 

@@ -87,6 +87,21 @@ public final class dev/aster/vega/model/DiagnosticSeverity : java/lang/Enum {
 	public static fun values ()[Ldev/aster/vega/model/DiagnosticSeverity;
 }
 
+public final class dev/aster/vega/model/ForeignValue {
+	public static final field INSTANCE Ldev/aster/vega/model/ForeignValue;
+	public final fun at (Ldev/aster/vega/model/VegaValue;I)Ldev/aster/vega/model/VegaValue;
+	public final fun boolean (Ldev/aster/vega/model/VegaValue;)Ljava/lang/Boolean;
+	public final fun count (Ldev/aster/vega/model/VegaValue;)I
+	public final fun get (Ldev/aster/vega/model/VegaValue;Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
+	public final fun keys (Ldev/aster/vega/model/VegaValue;)Ljava/util/List;
+	public final fun kind (Ldev/aster/vega/model/VegaValue;)Ljava/lang/String;
+	public final fun number (Ldev/aster/vega/model/VegaValue;)Ljava/lang/Double;
+	public final fun string (Ldev/aster/vega/model/VegaValue;)Ljava/lang/String;
+}
+
+public abstract interface annotation class dev/aster/vega/model/InternalAsterVegaApi : java/lang/annotation/Annotation {
+}
+
 public final class dev/aster/vega/model/JsonBridgeKt {
 	public static final fun toVegaValue (Lkotlinx/serialization/json/JsonElement;)Ldev/aster/vega/model/VegaValue;
 }

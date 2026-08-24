@@ -6611,3 +6611,172 @@ an incremental build with nothing to do emits nothing: sharing `.build` with `sw
 second run found no file where the first had left one, and giving it a private scratch path did not
 help either, because that path is incremental too. It is deleted each run — eight seconds, and it
 cannot be stale. The guard that says "no symbol graph after building" is what caught the second one.
+
+### A node id that boxes, and a datum with no shape
+
+Two types stopped a Swift host reading a scene, and the fix is the `Foreign*` pattern this
+repository already uses five times: a Kotlin `value class` has no Obj-C representation, so the
+questions a host asks are given plain functions instead.
+
+**The report was right about the symptom and wrong about the cause, and the difference decided the
+fix.** #120 concluded a `SceneNodeId` could not be read at all, having found the *type* absent from
+`foreign-api.txt` — which it is. But Kotlin/Native unwraps a value class at the boundary wherever it
+can, so a **non-null** id crosses as an `int64_t`: `SceneNode.id` has always been readable from
+Swift, under the name **`id_`**, renamed to dodge Obj-C's `id` keyword. That rename is very probably
+why the property looked missing.
+
+What genuinely boxes is the **nullable** and the **collected** — `InteractionState.hoveredNodeId`,
+`focusedNodeId`, `ChartEvent.MarkHovered.nodeId` and `ChartSelection.nodeIds` — because a box is the
+only representation an optional or a set element has. That is exactly why
+`ChartSession.selectedNodeIds` is a `Set<AnyHashable>` that can only be handed straight back.
+
+So `ForeignNodeId` covers those and nothing else. The first draft had a `value(id:)` and an
+`of(value:)`, which the header showed to be `int64_t` to `int64_t` — **identity functions that read
+as a fix**. They were deleted before any of this was believed, which is the argument for reading the
+generated header rather than reasoning about the boundary.
+
+`ForeignValue` is the other half: `keys`, `count`, `at`, `get`, and a `kind` that names the shape so
+a host asks once instead of trying each reader. Its `string`, `number` and `boolean` **do not
+coerce**, which is the point of having them beside `asString` rather than instead of it — `asString`
+renders a number, a boolean, an array and an object all as text, which is right for an expression and
+useless for a host deciding how to display a field.
+
+Both are asserted from Swift, against a real compiled scene and a real parsed datum, rather than from
+Kotlin where the boundary being tested does not exist. 377 Swift tests, up from 350.
+
+### Two things a review caught that the tests had not
+
+The first draft of `ForeignNodeId` was tested against itself: every assertion built a box with
+`setOf` and read it back with `values`, its own function feeding its own function. That proves the
+plumbing and says nothing about the reported case, which is an id the **engine** produced. Both are
+covered now — a tap on a real chart, and a hover dispatched through a real controller, with the
+number that comes out matched against the `id_` of the node it names. The loop is engine → opaque
+box → number → the same node.
+
+The same criticism applied to `ForeignValue`, whose tests parsed a JSON literal this repository
+wrote rather than a datum a chart carried. It now compiles a specification, walks to a mark, and
+enumerates `NodeMetadata.datum` without knowing its shape — which is what #120's author was doing.
+
+**And a habit worth naming.** Twice while writing those tests the sentence "`ChartSession` does not
+expose that" appeared, and both times the response was to reach past it — to the controller in one
+case, and to `@testable` in the other. If a test needs something, a host needs it: a host drawing its
+own hover affordance has the same problem and no `@testable` to fall back on. So `hoveredNodeId` and
+`focusedNodeId` are on `ChartSession` now, and `selectedNodeIds` hands out `Set<Int64>` rather than
+the `Set<AnyHashable>` whose own comment apologised for being opaque.
+
+That last one is **breaking for a Swift host**, and the API snapshot added two PRs ago is what put it
+in the diff rather than in somebody's build:
+
+```
+-ChartSession.selectedNodeIds  ::  @MainActor var selectedNodeIds: Set<AnyHashable> { get }
++ChartSession.selectedNodeIds  ::  @MainActor var selectedNodeIds: Set<Int64> { get }
+```
+
+One more thing found by the crash that followed it, worth knowing before writing another `Foreign*`
+accessor: `values(ids:)` is `NSSet<id>` at the boundary, so Swift types it as `Set<AnyHashable>` and
+a `Set<Int64>` satisfies it at compile time and fails **inside Kotlin** at run time with
+`kotlin.Long cannot be cast to SceneNodeId`. The boxed path is not type-safe across the boundary,
+which is an argument for a host reading `selectedNodeIds` and never meeting it.
+
+### What does not cross, enumerated rather than assumed
+
+Three adopter reports in a row were the same defect: a type reaches a foreign host while the part of
+it worth reading stays behind, and nothing fails. `SceneNodeId` inside an optional. `VegaValue.Obj`'s
+fields behind a value class. Each was fixed one at a time, and each fix was followed by "are we sure
+there are no more" answered with a shrug.
+
+It is answerable mechanically, so it is answered mechanically now.
+
+`scripts/foreign-coverage.py` reads the committed ABI dumps — Kotlin's own public surface — and
+`foreign-api.txt` — what reaches Obj-C — and lists every public member with no counterpart. The
+result is checked in as `swift/AsterVegaRender/foreign-coverage.txt` and diffed by
+`scripts/foreign-api.sh`, so a member that stops crossing is a line in a review rather than a bug
+report.
+
+**Seventy-seven members do not cross, and none of them is host-facing:**
+
+| | count | why it does not matter |
+|---|---|---|
+| `getPublishesSignal` on every transform | 41 | a host never builds a transform |
+| the discretizing scales' legend arithmetic | 29 | the engine draws its own legends |
+| `SignalScope`'s evaluator scope | 6 | expression internals |
+| `Expression.getExpr` | 1 | the AST |
+
+All are `public` because Kotlin needs cross-module visibility, not because anyone outside should call
+them. So the answer to "is the shape right" is: yes, and here is the list it was checked against.
+
+Getting the list took three wrong versions, which is worth recording because each was confidently
+wrong. The first credited every enum entry as missing. The second, matching bare names anywhere in
+the file, reported **zero** — and zero was as wrong as 147, in the direction that looks like success.
+The third read `toVega` as absent while `ChartSession` calls it three lines away, because a top-level
+extension function is listed unqualified and `foreign-api.sh` credits the symbols after it to it as
+an owner. A number from a script nobody checked is not evidence.
+
+The gate was verified the way the others were: making `valueOrNull` internal, and adding a public
+member whose type cannot cross. The first is caught by the existing snapshot, the second only by this
+one — `+ForeignNodeId.probe`, public in Kotlin and unreachable from a host, which is exactly the
+shape all three reports had.
+
+### The matrix is derived now, and the markers are checked for teeth
+
+The README's table of what each host exposes was written by hand, which made it a claim. Both seams
+an adopter reported missing were absent from a host *while that table said the shape was deliberate*.
+
+`scripts/host-parity.py` derives it from the surfaces already snapshotted for other reasons —
+`android-api.txt`, the Compose Multiplatform klib dump, and `swift-api.txt` — and `check.sh` runs it.
+Twenty-five markers across seven seams and four hosts, and two absences carrying a recorded reason:
+an engine-drawn tooltip on the two scene-painting surfaces, which own no tooltip, and clearing the
+image cache from `vega-compose`, which holds no handle on the view.
+
+Three extraction bugs on the way, and the pattern is the same one as the coverage script: **a check
+is only as good as what it reads.** Matching the javap class *header* rather than its block reported
+every seam missing from a view that has all of them. The JVM `.api` dump erases a lambda parameter to
+`Function1`, so every seam on the Compose Multiplatform composable looked identical — the klib dump
+keeps `Function1<String, ImageBitmap?>` and is what this reads. And `clearImageCache` is a static on
+`CoreGraphicsTarget` rather than on the view, so filtering the Swift surface to two types hid it.
+
+Then the markers were checked for teeth, which is the step that separates this from a table that
+prints "yes". Removing each seam from the surface it belongs to and re-running must turn the check
+red: **all 25 do.** Two did not before that — `Function1` and `Int` are present on any of those
+signatures, so those columns were green whatever the seam did. A green cell that cannot go red is
+worse than no cell.
+
+### What to do about the seventy-seven
+
+Two answers, one for each half, and a report that leads with the number that matters.
+
+**Fifty are engine internals and now say so.** `@InternalAsterVegaApi` is a `@RequiresOptIn` marker:
+`public` had to mean two things — "call this" and "Kotlin has no cross-module `internal` so I had no
+choice" — and nothing distinguished them, which is why "does everything a host needs reach a host"
+had no answer until it was enumerated. A caller outside the engine now gets a compile error unless it
+opts in. The engine's own call sites opted in at file level, which took three rounds of compiling to
+find them all.
+
+**Twenty-seven were a real gap and are exposed.** The legend arithmetic of a banded scale — where the
+buckets cut, what labels them, where a value sits along the bar — is declared on `BinnedScale` with
+**default bodies**, and an Obj-C protocol cannot carry a default, so Kotlin/Native leaves them out
+entirely. A `QuantizeScale` reached Swift with `domain`, `name` and `invertExtent` and nothing else.
+Nothing inside noticed because the engine draws its own legends. `ForeignScale` answers them, and
+`ForeignScaleTests` builds a three-bucket quantize scale in Swift and reads its cuts, its labels, its
+extent and its unbounded ends.
+
+`legendExtent` is split into two functions rather than returned as a `Pair`, which crosses as an
+opaque `KotlinPair` whose halves are `id`. An unbounded bucket end answers **nil** rather than zero,
+because a threshold at 30 says nothing about how far below it the first bucket reaches and a host
+printing 0 there would be inventing a number.
+
+**The count stayed at 77 and that was the wrong headline.** Those twenty-seven members still have no
+*direct* counterpart — `ForeignScale` is a second route, not the same one — so a list of "members
+that do not cross" is unchanged by fixing them. It reads like a backlog and is not. The file now
+opens with the split:
+
+```
+# 77 public members have no direct foreign counterpart:
+#    50 engine internals, marked @InternalAsterVegaApi
+#    27 reachable through a Foreign* accessor instead
+#     0 unexplained  <- the number this gate is about
+```
+
+Zero is the number. Every member carries a reason, and one without a reason fails the check with
+what to do about it: expose it, or mark it internal and say so. Verified by adding a public member
+with an uncrossable type and watching it come back named.

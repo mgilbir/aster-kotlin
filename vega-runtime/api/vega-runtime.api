@@ -1005,6 +1005,21 @@ public final class dev/aster/vega/runtime/scale/ColorSchemes {
 	public final fun rampOrNull (Ljava/lang/String;)Ljava/util/List;
 }
 
+public final class dev/aster/vega/runtime/scale/ForeignScale {
+	public static final field INSTANCE Ldev/aster/vega/runtime/scale/ForeignScale;
+	public final fun bins (Ldev/aster/vega/runtime/scale/VegaScale;)Ljava/util/List;
+	public final fun bucketHigh (Ldev/aster/vega/runtime/scale/VegaScale;I)Ljava/lang/Double;
+	public final fun bucketLow (Ldev/aster/vega/runtime/scale/VegaScale;I)Ljava/lang/Double;
+	public final fun bucketRepresentatives (Ldev/aster/vega/runtime/scale/VegaScale;)Ljava/util/List;
+	public final fun isBanded (Ldev/aster/vega/runtime/scale/VegaScale;)Z
+	public final fun legendExtentHigh (Ldev/aster/vega/runtime/scale/VegaScale;)Ljava/lang/Double;
+	public final fun legendExtentLow (Ldev/aster/vega/runtime/scale/VegaScale;)Ljava/lang/Double;
+	public final fun legendFraction (Ldev/aster/vega/runtime/scale/VegaScale;D)D
+	public final fun legendMax (Ldev/aster/vega/runtime/scale/VegaScale;)D
+	public final fun legendValues (Ldev/aster/vega/runtime/scale/VegaScale;)Ljava/util/List;
+	public final fun thresholds (Ldev/aster/vega/runtime/scale/VegaScale;)Ljava/util/List;
+}
+
 public final class dev/aster/vega/runtime/scale/IdentityScale : dev/aster/vega/runtime/scale/VegaScale {
 	public fun <init> (Ljava/lang/String;)V
 	public fun getBins ()Ljava/util/List;

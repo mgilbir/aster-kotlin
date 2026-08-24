@@ -4,6 +4,40 @@ Notable changes, newest first. The release workflow reads the section for the
 version it is publishing and uses it as the release notes, so a version without a
 section here does not get released.
 
+## Unreleased
+
+### Added
+
+- **A Swift host can read a node id that arrived boxed, and a datum whose shape it does
+  not know.** `ForeignNodeId` and `ForeignValue` join the five `Foreign*` accessors that
+  already exist for the same reason: a Kotlin `value class` has no Obj-C representation, so
+  the questions a host asks are given plain functions instead.
+
+  `ForeignNodeId` covers the positions where a `SceneNodeId` **boxes** — a nullable one
+  (`InteractionState.hoveredNodeId`, `focusedNodeId`) and a collected one
+  (`ChartSelection.nodeIds`) — with `valueOrNull`, `values`, `setOf` and `noneValue`. A
+  *non-null* id was already readable and is deliberately not wrapped: Kotlin/Native unwraps
+  it to an `Int64`, so `SceneNode.id` crosses today under the name **`id_`**, renamed to
+  avoid Obj-C's `id` keyword.
+
+  `ForeignValue` gives `keys`, `count`, `at`, `get` and a `kind` naming the shape, plus
+  `string`, `number` and `boolean` that **do not coerce** — `asString` renders a number, a
+  boolean and an object all as text, so a host could not tell a field that held `"3"` from
+  one that held `3`. (#120)
+
+### Changed
+
+- **`ChartSession.selectedNodeIds` hands out numbers**, `Set<Int64>` rather than
+  `Set<AnyHashable>`. It carried opaque boxes because nothing could unwrap one, with a comment
+  saying "opaque is enough here — the set is handed straight back to the engine". That stopped
+  being true, so a host can read a selection now instead of only relaying it. **Breaking for a
+  Swift host that stored the old set**; `ForeignNodeId.setOf(values:)` converts back where the
+  engine wants its own form.
+
+- **`ChartSession` exposes `hoveredNodeId` and `focusedNodeId`**, as numbers. Neither was
+  reachable at all: the session published a selection and nothing else about the interaction
+  state, so a host drawing its own hover affordance had to reach past it to the controller. (#120)
+
 ## 0.3.0
 
 ### Changed

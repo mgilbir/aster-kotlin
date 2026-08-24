@@ -1,3 +1,5 @@
+@file:OptIn(InternalAsterVegaApi::class)
+
 package dev.aster.vega.dataflow.transform
 
 import dev.aster.vega.dataflow.force.AxisForce
@@ -11,6 +13,7 @@ import dev.aster.vega.dataflow.force.ManyBodyForce
 import dev.aster.vega.dataflow.force.Simulation
 import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCodes
+import dev.aster.vega.model.InternalAsterVegaApi
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString

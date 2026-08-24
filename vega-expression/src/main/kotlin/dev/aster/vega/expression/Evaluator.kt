@@ -1,7 +1,10 @@
+@file:OptIn(InternalAsterVegaApi::class)
+
 package dev.aster.vega.expression
 
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticSeverity
+import dev.aster.vega.model.InternalAsterVegaApi
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asString
