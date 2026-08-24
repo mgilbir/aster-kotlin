@@ -23,6 +23,22 @@ section here does not get released.
   `VegaJsonFallbackTest`, which scans the main sources, the Swift sources and the
   README. (#101)
 
+### Added
+
+- **A Kotlin host can tell a failed compile from one that has not happened**, through
+  `ChartState.failure`. A compile that produces no scene deliberately keeps the previous
+  snapshot — a reader holds on to what they were looking at — which left nothing on the
+  state saying a failure had occurred, so a host wanting its own "this chart cannot be
+  drawn" copy had to infer it from the diagnostics. That inference is wrong in both
+  directions: `PARSE_NOTHING_TO_DRAW` is INFO by deliberate choice, and a document can
+  report errors and still draw a chart the reader can see. It is now stated: the first
+  ERROR or FATAL diagnostic's message where a compile drew nothing, a plain sentence
+  where nothing said anything more useful, and null again after the next compile that
+  draws or any `setScene`. The Swift `ChartSession.failure` has carried exactly this
+  since 0.2.0, so the same host logic is now expressible on both platforms. `ChartState`
+  gains a fourth constructor parameter, defaulted, which changes its Obj-C initialiser
+  selector; nothing in this repository constructs one. (#100)
+
 ## 0.2.0
 
 ### Fixed

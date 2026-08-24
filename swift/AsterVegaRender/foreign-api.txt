@@ -579,9 +579,10 @@ ChartState.Companion.shared
 ChartState.companion
 ChartState.description()
 ChartState.diagnostics
-ChartState.doCopy(snapshot:isLoading:diagnostics:)
+ChartState.doCopy(snapshot:isLoading:diagnostics:failure:)
+ChartState.failure
 ChartState.hash()
-ChartState.init(snapshot:isLoading:diagnostics:)
+ChartState.init(snapshot:isLoading:diagnostics:failure:)
 ChartState.isEqual(_:)
 ChartState.isLoading
 ChartState.snapshot
