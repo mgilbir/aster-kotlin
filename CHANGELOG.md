@@ -71,6 +71,20 @@ section here does not get released.
   `androidTest` source set before, so four of them could have stopped compiling unnoticed.
   (#99)
 
+- **The Android renderers have an image seam at all.** `AndroidCanvasSceneRenderer` has
+  taken an `AndroidImageResolver` since it could draw an `image` mark, and nothing outside
+  the module could set one — so every image mark on a View or Compose host resolved to
+  nothing and reported `EXPORT_IMAGE_UNRESOLVED`. The fix that gave the Compose
+  Multiplatform renderer a resolver for 0.2.0 reached the Swift view and that module, and
+  not this one. `VegaChartView.imageResolver`, `onUnresolvedImage` and `clearImageCache()`
+  are now public and forwarded through `vega-compose`'s `VegaChart`.
+
+  A URL is asked of the resolver **once**, not once per frame, and a refusal is remembered
+  too — without which a host that fetches would have been fetching on every frame of every
+  pan. `onUnresolvedImage` is told once per URL, matching the Compose Multiplatform chart so
+  the same host code works on either renderer; the per-frame diagnostic is unchanged, since
+  it describes the frame that was drawn. (#99)
+
 ### Changed
 
 - **A locale gets one date, whichever grammar the document was written in.** Vega derived

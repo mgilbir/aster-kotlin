@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import dev.aster.vega.android.AndroidImageResolver
 import dev.aster.vega.android.VegaChartView
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.runtime.ChartEvent
@@ -54,6 +55,14 @@ public fun VegaChart(
   accessibilityMaxExposedMarks: Int = AccessibilityTree.MAX_EXPOSED_MARKS,
   /** Whether the view draws the tooltip itself, or leaves it to a host that renders its own. */
   tooltipsEnabled: Boolean = true,
+  /**
+   * Turns an image mark's URL into a bitmap. See [VegaChartView.imageResolver]: a URL is asked once
+   * rather than once per frame, and a refusal is remembered, so a resolver that fetches should
+   * answer from a cache and start the fetch elsewhere.
+   */
+  imageResolver: AndroidImageResolver = AndroidImageResolver.None,
+  /** Told the first time an image mark's URL cannot be resolved, and not again for that URL. */
+  onUnresolvedImage: ((String) -> Unit)? = null,
   onEvent: ((ChartEvent) -> Unit)? = null,
 ) {
   AndroidView(
@@ -66,6 +75,8 @@ public fun VegaChart(
         this.fontResolver = fontResolver
         this.accessibilityMaxExposedMarks = accessibilityMaxExposedMarks
         this.tooltipsEnabled = tooltipsEnabled
+        this.imageResolver = imageResolver
+        this.onUnresolvedImage = onUnresolvedImage
         this.controller = controller
       }
     },
@@ -75,6 +86,8 @@ public fun VegaChart(
       view.fontResolver = fontResolver
       view.accessibilityMaxExposedMarks = accessibilityMaxExposedMarks
       view.tooltipsEnabled = tooltipsEnabled
+      view.imageResolver = imageResolver
+      view.onUnresolvedImage = onUnresolvedImage
       // Assigning the same controller would reset the view's state, so only swap when it changed.
       if (view.controller !== controller) view.controller = controller
       view.invalidateIfStale()
@@ -103,6 +116,8 @@ public fun VegaChart(
   fontResolver: ((String) -> android.graphics.Typeface?)? = null,
   accessibilityMaxExposedMarks: Int = AccessibilityTree.MAX_EXPOSED_MARKS,
   tooltipsEnabled: Boolean = true,
+  imageResolver: AndroidImageResolver = AndroidImageResolver.None,
+  onUnresolvedImage: ((String) -> Unit)? = null,
   onEvent: ((ChartEvent) -> Unit)? = null,
 ) {
   val controller = remember { VegaChartController.fromScene(scene) }
@@ -120,6 +135,8 @@ public fun VegaChart(
     fontResolver = fontResolver,
     accessibilityMaxExposedMarks = accessibilityMaxExposedMarks,
     tooltipsEnabled = tooltipsEnabled,
+    imageResolver = imageResolver,
+    onUnresolvedImage = onUnresolvedImage,
     onEvent = onEvent,
   )
 }

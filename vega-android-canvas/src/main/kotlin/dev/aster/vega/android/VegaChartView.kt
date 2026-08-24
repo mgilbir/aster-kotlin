@@ -59,7 +59,75 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
    * is the note on [newCompatibleTextEngine].
    */
   private var textEngine = AndroidTextEngine(context.resources.configuration.fontScale)
-  private var renderer = AndroidCanvasSceneRenderer(textEngine)
+
+  /**
+   * Every seam the renderer takes, applied in one place.
+   *
+   * It was constructed at a field initialiser and again in [fontResolver]'s setter, and a seam
+   * added to one and not the other is silently dropped for whichever host set the other first.
+   * There are three of them now.
+   */
+  private fun newRenderer(): AndroidCanvasSceneRenderer =
+    AndroidCanvasSceneRenderer(
+      textEngine = textEngine,
+      imageResolver = imageResolver,
+      onUnresolvedImage = { url -> onUnresolvedImage?.invoke(url) },
+    )
+
+  /**
+   * Turns an image mark's URL into a bitmap, or null where there is nothing to show.
+   *
+   * The renderer has taken one of these since it could draw an `image` mark and **nothing outside
+   * this module could set it**, so every image mark on a View or Compose host resolved to nothing
+   * and reported `EXPORT_IMAGE_UNRESOLVED`. The Compose Multiplatform renderer grew the same seam
+   * for 0.2.0; this is the other half of it, and the gap was reported from outside (#99).
+   *
+   * A URL is asked **once**, not once per frame, and a refusal is remembered too — see
+   * [clearImageCache], which is how a host says an address now holds something different.
+   *
+   * Called from the draw, on the main thread. A resolver that fetches should answer from a cache
+   * and start the fetch elsewhere, then call [clearImageCache] when it lands.
+   */
+  public var imageResolver: AndroidImageResolver = AndroidImageResolver.None
+    set(value) {
+      if (field === value) return
+      field = value
+      renderer = newRenderer()
+      invalidate()
+    }
+
+  /**
+   * Told the first time an image mark's URL cannot be resolved, and not again for that URL.
+   *
+   * The hole in the chart is otherwise all a host gets, since a diagnostic has to be read out of
+   * the controller and correlated by hand. Matches `onUnresolvedImage` on the Compose Multiplatform
+   * chart, so the same host code works on either renderer.
+   *
+   * Set freely: unlike [imageResolver] this does not rebuild the renderer, because the renderer
+   * calls back through this property rather than capturing it.
+   */
+  public var onUnresolvedImage: ((String) -> Unit)? = null
+
+  /**
+   * Built **after** every property it reads, and that placement is load-bearing.
+   *
+   * Kotlin runs property initialisers in declaration order, so a renderer constructed above
+   * [imageResolver] would be handed that field before it had been assigned — a null arriving where
+   * the type says it cannot be. Nothing in the compiler catches it, because the read happens inside
+   * [newRenderer] rather than in the initialiser itself.
+   */
+  private var renderer = newRenderer()
+
+  /**
+   * Forgets every resolved and refused address, so the next draw asks [imageResolver] again.
+   *
+   * For an image that has changed behind its URL, and for a fetch that failed once and may not fail
+   * twice.
+   */
+  public fun clearImageCache() {
+    renderer.clearImageCache()
+    invalidate()
+  }
 
   /**
    * A face this app ships, by the family name a specification asks for; null leaves it to Android.
@@ -81,7 +149,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
       if (field === value) return
       field = value
       textEngine = newCompatibleTextEngine()
-      renderer = AndroidCanvasSceneRenderer(textEngine)
+      renderer = newRenderer()
       invalidate()
     }
 

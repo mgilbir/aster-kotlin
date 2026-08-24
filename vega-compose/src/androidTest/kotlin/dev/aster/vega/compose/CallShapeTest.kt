@@ -2,6 +2,7 @@ package dev.aster.vega.compose
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import dev.aster.vega.android.AndroidImageResolver
 import dev.aster.vega.runtime.ChartEvent
 import dev.aster.vega.runtime.VegaChartController
 import dev.aster.vega.scene.Scene
@@ -71,6 +72,8 @@ private object CallShapes {
       fontResolver = { null },
       accessibilityMaxExposedMarks = 40,
       tooltipsEnabled = false,
+      imageResolver = AndroidImageResolver { null },
+      onUnresolvedImage = {},
       onEvent = {},
     )
   }
@@ -83,6 +86,8 @@ private object CallShapes {
       fontResolver = { null },
       accessibilityMaxExposedMarks = 40,
       tooltipsEnabled = false,
+      imageResolver = AndroidImageResolver { null },
+      onUnresolvedImage = {},
       onEvent = {},
     )
   }
