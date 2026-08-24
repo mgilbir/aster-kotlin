@@ -1106,10 +1106,12 @@ final class dev.aster.vega.runtime/ChartSnapshot { // dev.aster.vega.runtime/Cha
 }
 
 final class dev.aster.vega.runtime/ChartState { // dev.aster.vega.runtime/ChartState|null[0]
-    constructor <init>(dev.aster.vega.runtime/ChartSnapshot, kotlin/Boolean = ..., kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic> = ...) // dev.aster.vega.runtime/ChartState.<init>|<init>(dev.aster.vega.runtime.ChartSnapshot;kotlin.Boolean;kotlin.collections.List<dev.aster.vega.model.VegaDiagnostic>){}[0]
+    constructor <init>(dev.aster.vega.runtime/ChartSnapshot, kotlin/Boolean = ..., kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic> = ..., kotlin/String? = ...) // dev.aster.vega.runtime/ChartState.<init>|<init>(dev.aster.vega.runtime.ChartSnapshot;kotlin.Boolean;kotlin.collections.List<dev.aster.vega.model.VegaDiagnostic>;kotlin.String?){}[0]
 
     final val diagnostics // dev.aster.vega.runtime/ChartState.diagnostics|{}diagnostics[0]
         final fun <get-diagnostics>(): kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic> // dev.aster.vega.runtime/ChartState.diagnostics.<get-diagnostics>|<get-diagnostics>(){}[0]
+    final val failure // dev.aster.vega.runtime/ChartState.failure|{}failure[0]
+        final fun <get-failure>(): kotlin/String? // dev.aster.vega.runtime/ChartState.failure.<get-failure>|<get-failure>(){}[0]
     final val isLoading // dev.aster.vega.runtime/ChartState.isLoading|{}isLoading[0]
         final fun <get-isLoading>(): kotlin/Boolean // dev.aster.vega.runtime/ChartState.isLoading.<get-isLoading>|<get-isLoading>(){}[0]
     final val snapshot // dev.aster.vega.runtime/ChartState.snapshot|{}snapshot[0]
@@ -1118,7 +1120,8 @@ final class dev.aster.vega.runtime/ChartState { // dev.aster.vega.runtime/ChartS
     final fun component1(): dev.aster.vega.runtime/ChartSnapshot // dev.aster.vega.runtime/ChartState.component1|component1(){}[0]
     final fun component2(): kotlin/Boolean // dev.aster.vega.runtime/ChartState.component2|component2(){}[0]
     final fun component3(): kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic> // dev.aster.vega.runtime/ChartState.component3|component3(){}[0]
-    final fun copy(dev.aster.vega.runtime/ChartSnapshot = ..., kotlin/Boolean = ..., kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic> = ...): dev.aster.vega.runtime/ChartState // dev.aster.vega.runtime/ChartState.copy|copy(dev.aster.vega.runtime.ChartSnapshot;kotlin.Boolean;kotlin.collections.List<dev.aster.vega.model.VegaDiagnostic>){}[0]
+    final fun component4(): kotlin/String? // dev.aster.vega.runtime/ChartState.component4|component4(){}[0]
+    final fun copy(dev.aster.vega.runtime/ChartSnapshot = ..., kotlin/Boolean = ..., kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic> = ..., kotlin/String? = ...): dev.aster.vega.runtime/ChartState // dev.aster.vega.runtime/ChartState.copy|copy(dev.aster.vega.runtime.ChartSnapshot;kotlin.Boolean;kotlin.collections.List<dev.aster.vega.model.VegaDiagnostic>;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.runtime/ChartState.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.aster.vega.runtime/ChartState.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.aster.vega.runtime/ChartState.toString|toString(){}[0]

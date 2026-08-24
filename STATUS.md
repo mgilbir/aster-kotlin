@@ -12,8 +12,10 @@ compares the counts in this file against the code and the corpus and fails when 
   rate they land here. So `./scripts/check.sh` locally is what a branch has before it merges.
 - Read `CONTRIBUTING.md` first. The method matters more than the remaining feature list: probe upstream
   before implementing, add a fixture and expect it to fail, report anything unsupported by name.
-- `./scripts/check.sh` is the gate — format, all tests, lint, demo APK. `./scripts/oracle.sh`
-  regenerates the upstream references and runs the differential comparison; both must be green.
+- `./scripts/check.sh` is **the** gate, and now runs the others: the Swift package on a Mac, the
+  instrumented suites when a device is attached, and both differential oracles. It ends with a ledger
+  saying which gates ran and which did not and why — read it, because green with something skipped is
+  still green. `--fast` drops the oracles for the edit loop.
 - The next three tasks are at the bottom of this file. They are re-decided every time, not worked
   through in order — twice now the stated order was wrong and the reason is recorded in the commit
   that changed it.
@@ -6358,3 +6360,254 @@ in the artefact. And the failure reproduces on demand: put a dangling symlink un
 `build` directory and run `./gradlew :vega-runtime:spotlessKotlin`. That is how the fix was checked
 rather than assumed, and how the first attempted fix — naming a constant line-ending policy, on the
 theory that `GIT_ATTRIBUTES` was doing the walking — was found to be wrong before it was committed.
+
+### A gate you have to remember is not a gate
+
+`check.sh` was one of five scripts and the working agreement was to remember the other four. That
+agreement has now failed three times in ways that reached `main` or a release:
+
+- `ios-demo.sh` existed, CI ran it, and nobody ran it locally. A Swift trailing closure rebound to a
+  new parameter and `main` went red.
+- `facet-footer` sat in a pending set for ten days after the bug was fixed, skipping two comparisons.
+  An assumption is silent, and two skips sit under the `skipped > 10` guard.
+- A Swift test asserting the old locale rule survived the change to that rule, because
+  `swift-test.sh` is not `check.sh`. Found by running the Swift gate over a finished seven-PR stack,
+  which is late enough to be luck.
+
+Each time the fix was to remember harder. The honest reading is that the fifth failure was going to
+happen, so `check.sh` runs them now: the Gradle gate always, the Swift package on a Mac, the
+instrumented suites when something is on adb, and both differential oracles unless `--fast`.
+
+**The ledger is the load-bearing part**, more than the running. Every gate ends as RAN, SKIPPED with
+a reason, or FAILED, printed last because it is the thing being trusted, and a gate cannot be added
+to the script without appearing in it — the recording *is* the running, through one `run_gate`. What
+this repository keeps getting wrong is not that a check fails; it is that a check does not happen and
+the run looks identical. So a skip now has a name and an actionable reason beside it, and the final
+line says "green, with 2 gate(s) not run" rather than "green".
+
+A failing gate no longer stops the others, for the reason `--continue` is already passed to Gradle:
+knowing the Swift suite also fails is worth more than stopping at the first thing.
+
+The whole set takes 3m48s on this machine with everything running, which is the answer to the
+obvious objection. `--fast` drops the two oracles for the edit loop and says so in the ledger.
+
+CI passes `--fast` and keeps the oracles as their own steps, because they re-run
+`:vega-runtime:jvmTest` under `--tests` filters and that *replaces* the results directory the
+test-count assertion reads. Its separate Swift and iOS-demo steps are gone, being inside `check.sh`
+now.
+
+Checked the way the others were: reverting the Swift locale assertion makes `check.sh` red, where
+before it was green and only `swift-test.sh` knew.
+
+### The surface nobody was diffing
+
+Two of the eleven published modules had no API snapshot of any kind. `vega-android-canvas` and
+`vega-compose` are the artifacts an Android host actually depends on, and Kotlin's ABI validation
+cannot dump them — it reads a module's Maven publications and does not support an Android library's,
+which KGP has a diagnostic named for. The build file recorded that as a stated gap and said their
+surface was "small enough for a consumer to read the diff by hand".
+
+Reading it by hand is what failed. `vega-compose` shipped 0.2.0 exposing a controller, a modifier and
+one callback while the `VegaChartView` it wraps had a font resolver, an accessibility threshold and a
+tooltip switch; an adopter found that (#99), not a review. A surface nobody snapshots is a surface
+nobody diffs.
+
+`scripts/android-api.sh` snapshots it now, the way `scripts/foreign-api.sh` snapshots the Obj-C
+surface and for the same reason. **`javap` rather than a source scan**, because the boundary is the
+bytecode: a default argument is a `$default` bridge, a `@Composable` gains a `Composer` and two
+`int`s, and a parameter inserted in the middle of a list is invisible in source and a different
+method here. 184 lines, checked by `check.sh`.
+
+Two things it cost, both found by testing the gate rather than trusting it:
+
+- The obvious classes directory, `runtime_library_classes_dir`, is written by
+  `bundleLibRuntimeToDirDebug`, which is **not in `assembleDebug`'s task graph** — so it holds
+  whatever a previous command left there. Reading it reported "matches the snapshot" for a tree that
+  had just gained a parameter. It reads `compileDebugKotlin`'s own output now. This is exactly the
+  stale-artefact failure `foreign-api.sh` warns about in its own header.
+- Lambda classes and `access$` bridges are numbered by the order lambdas appear in a file, so keeping
+  them would make an unrelated edit look like a change to the surface. They are filtered; `$default`
+  bridges are kept, because those *are* the surface.
+
+**And a matrix of what each host can reach**, in README.md, because "the same on every host" was a
+claim nobody could check. Three differences in it are deliberate and now say why: fonts are the
+platform's job on Apple and cannot be on Android; captions and interaction come through the
+controller on the View-based pair and through parameters on the two that own no state; and clearing
+the image cache from Compose on Android is done by handing over a different resolver instance, which
+works and had to be told.
+
+One difference is a **genuine gap and is named as one**: `onPlaced` exists on the Compose
+Multiplatform and SwiftUI surfaces and on neither View-based one, though both scale the scene to fit
+and a host overlaying its own UI needs the same three numbers. It is unfixed because `ChartPlacement`
+is declared in `vega-compose-multiplatform` and the View path cannot depend on that module — closing
+it means hoisting the type into a shared one, which is a change to a published surface and wants
+deciding rather than slipping in.
+
+The Swift package's *own* API is the remaining hole, and is smaller than Android's was rather than
+absent: `foreign-api.txt` records what Kotlin exports to Obj-C, while `VegaChartView.init` and
+`ChartSession` are Swift source and appear in no snapshot. `CallShapeTests` pins the call shapes
+somebody thought to write down, which is narrower than a snapshot. `swift symbolgraph-extract` would
+close it.
+
+### One placement, and the name that could not be shared
+
+`onPlaced` existed on the Compose Multiplatform and SwiftUI charts and on neither `View`-based
+surface, so a host on `vega-compose` or `VegaChartView` could not find out where its chart had been
+drawn — which it needs to put an overlay on one, or to turn a point of its own into scene
+coordinates. Both of those surfaces *do* scale the scene to fit, so the numbers existed and were
+unreachable.
+
+The reason was structural: the type was declared in `vega-compose-multiplatform`, and a `View`
+cannot depend on a Compose module. It is `dev.aster.vega.scene.ScenePlacement` now, with
+`dev.aster.vega.compose.mp.ChartPlacement` left as a typealias so Kotlin callers are unaffected.
+
+**It is not called `ChartPlacement`, and that was found rather than reasoned about.** Everything in
+`vega-scene` is exported to the Apple framework under a *flat* Obj-C namespace, so a Kotlin
+`ChartPlacement` and the Swift package's own struct of that name are two types with one name in a
+host's scope. The Swift build failed with "'ChartPlacement' is ambiguous for type lookup" — in this
+repository's own tests, and it would have done the same in every adopter's. `@HiddenFromObjC` is not
+available, being a Kotlin/Native annotation on a file that compiles for the JVM too. So the Kotlin
+type took the other name and the Swift struct kept its `CGFloat`s and its value semantics. Worth
+remembering the next time a type looks like it should be shared across that boundary: the namespace
+is flat, and a collision is a compile error in somebody else's project.
+
+**The second half is a defect that had not happened yet.** The view wrote its origin out four times
+— the draw's viewport, a touch's conversion to scene coordinates, and the accessibility helper's two
+mappings — each spelling it `paddingLeft`/`paddingTop`. All four agreed, so nothing was wrong; any
+one of them could have drifted, and two agreeing while one does not is how a reader's finger lands
+beside the mark it looked like it hit, which this project has had twice. There is one `placement()`
+now, and an instrumented test aims a tap through the *reported* placement and asserts it hits the
+bar it aimed at.
+
+That test needed strengthening before it was worth anything. Asserting that *something* was selected
+passed with an origin wrong by forty pixels, because the tap still landed on a neighbouring bar. It
+asserts the node id now, and fails on the drift as intended — checked by introducing it.
+
+What is still different between the four, and is a **drawing** difference rather than an API one:
+the Compose Multiplatform and SwiftUI charts centre a scene in a slot of the wrong aspect ratio, and
+`VegaChartView` pins it to the padded top-left. `ScenePlacement` says where the drawing *is*, so it
+reports each faithfully. Changing it moves every existing Android chart, which is an appearance
+decision rather than a consequence of reporting the placement — and `placement()` is now the single
+line it would change.
+
+### The font seam Apple did not have, and the argument that excused it
+
+Both Kotlin renderers let a host hand the engine a face: `AndroidTextEngine(typefaceResolver:)` since
+the canvas renderer grew one, and `ComposeTextEngine`'s registry. The Apple renderer resolved a family
+name through CoreText alone, so an app bundling a font — which most design systems do — could only
+reach a chart by calling `CTFontManagerRegisterGraphicsFont` and hoping the name matched. Reported
+from outside as #106.
+
+**The interesting part is that this repository had already written the argument down and then argued
+the other way.** `AndroidTextEngine`'s own KDoc says a family name resolving against the *system's*
+families is why a bundled font cannot reach a chart, and the README's host matrix — added days
+earlier — claimed the Apple gap was deliberate because `CTFontManagerRegisterFontsForURL` exists. Both
+are true and the second is not a defence: registering mutates process-wide state to configure one
+chart, it is invisible at the call site, and it left one specification and one host configuration
+drawing in different faces on different platforms. The reporter quoted our own KDoc back, which is
+the cheapest possible review and the one nobody here ran.
+
+`resolveFont` is on `CoreTextTextEngine`, `ChartSession` and `VegaChartView` now. Three decisions in
+it are worth keeping:
+
+- **It is consulted for a named family and not for a generic one.** `sans-serif` asks for the
+  reader's default; a host answering it would override that and reintroduce exactly the
+  platform-to-platform difference this removes.
+- **The host returns a face, and the chart keeps the size.** A resolver may hand back
+  `CTFontCreateWithName(name, 0, nil)`; the requested points, weight and slant are applied here, the
+  same way the descriptor path applies traits to a font rather than asking for them in a descriptor.
+- **`VegaChartView` defaults to the session's resolver.** The layout was measured with it, and a host
+  that configured the session and then drew without passing the closure again would paint faces the
+  boxes were not measured for — every label off its baseline, from a seam that looked wired. A seam
+  that has to be wired twice is a seam that will be wired once.
+
+Only the CoreText answer is cached. The process-wide cache is keyed by family, size, weight and slant,
+and two charts in one app may hand in different resolvers — caching one host's face under a family
+name would draw the other chart with it.
+
+One thing found by writing the call-shape test the wrong way round first: a Swift caller gets the
+trailing-closure idiom **or** the parameters declared after `onPlaced`, never both, because Swift
+requires arguments in declaration order and naming `resolveFont` leaves nothing after it for a
+trailing closure to be. Both shapes are pinned.
+
+### The emulator had no DNS, and the tempting fix was to stop testing the network
+
+Two `:demo` instrumented tests failed on an emulator that could not resolve `vega.github.io`. They
+fetch from the gallery over a real socket, which is the part no JVM test can prove — the JVM suites
+use a fake transport, and a missing `INTERNET` permission or an Android policy the desktop does not
+have would show up there and nowhere earlier.
+
+The first fix was to skip them, and it was wrong twice over.
+
+**It was already there and had never worked.** The test caught `IOException` and called
+`Assume.assumeNoException`, with a comment above saying "skipped rather than failed when the device
+has no route out". But an unresolvable host never reaches a socket: `HttpDataLoader` refuses it,
+correctly, because a name it cannot resolve cannot be checked against the private-network rule. That
+arrives as `LoadDeniedException`, which does not extend `IOException`, so the catch never fired. A
+guard written in the same commit as the comment describing it, and dead the whole time.
+
+**And repairing it would have been the worse outcome.** A green run that has quietly stopped
+exercising the one thing a test exists for is this repository's recurring defect — `facet-footer`
+skipped two comparisons for ten days on exactly that pattern. Making the skip *work* would have
+turned a loud failure into a silent one.
+
+So the emulator gets name servers. `scripts/emulator.sh` passes `-dns-server`, because the emulator
+does not reliably inherit macOS's resolver configuration and an emulator that cannot resolve a name
+is a broken emulator rather than a licence to stop testing. Both tests run and pass now: 11 tests, 0
+failures, **0 skipped**, where before it was 2 failures and then 1 silent skip.
+
+`EMULATOR_DNS` overrides for a network that blocks Google's and Cloudflare's.
+
+The skip stays for a machine that genuinely has no route, and `check.sh` now **reports every skipped
+instrumented test by name and reason** in its output. Gradle prints a count and keeps the build
+green, so a suite that stopped checking something looks exactly like one that checked it. The ledger
+already refuses to let a *gate* pass silently; this extends that to a test inside one.
+
+### The Android view centres now, and four call sites moved with it
+
+`VegaChartView` scaled a scene to fit and pinned it to the padded top-left. The Compose
+Multiplatform and SwiftUI renderers centre it in whatever is left over, and `SceneFit.Contain`'s own
+comment says why — centring is what "makes a chart in a slot of the wrong aspect ratio look placed
+rather than stuck to a corner". The same chart in the same slot therefore sat in a different place
+depending on which host drew it.
+
+It centres too now. The change is four lines in `placement()`, and that is the whole point: the draw's
+viewport, a touch's conversion and the accessibility helper's two mappings had each spelled the origin
+out for themselves until they were unified, and centring with four copies would have meant finding all
+four — or, more likely, finding three. Of 76 instrumented tests, exactly **one** failed: the one
+asserting the old top-left offset. The tap test, which aims through the reported placement, and every
+accessibility test followed the change without being touched.
+
+**It moves existing charts**, and only where there was slack: a view measured at its own preferred
+size has none, which is most of them, and a chart given `match_parent` on an axis shifts by half of
+what was empty. That is why it belongs in a release that already carries breaking changes rather than
+in a patch.
+
+Also corrected here: the README still called the type `ChartPlacement` in the paragraph describing
+this difference, three PRs after it was renamed to `ScenePlacement`. Documentation drift of exactly
+the kind this stack has been fixing, introduced by the stack itself.
+
+### The other Apple surface, and two ways to read a stale artefact
+
+`foreign-api.txt` records what **Kotlin exports to Obj-C**. `VegaChartView.init` and `ChartSession`
+are Swift source and appear in it nowhere, so the half of the Apple API a host actually calls was
+guarded by `CallShapeTests` alone — which pins the call shapes somebody thought to write down, and is
+therefore exactly as good as that foresight was. It was not good enough twice: a trailing closure
+rebound to a parameter added after it and broke `main` (#93), and a missing font seam sat unnoticed
+until an adopter reported it (#106). Neither is a shape a hand-written test would have thought to
+assert; both are one line of a diff in `swift-api.txt`.
+
+`swift build -emit-symbol-graph` rather than `swift package dump-symbol-graph`: the latter invokes the
+extractor without the package's own `-F`, so it fails with "missing required module 'AsterVega'".
+
+**Only symbols this package declares** are recorded, discriminated by whether the symbol carries a
+source location. Without that filter `VegaChartView` contributes 810 SwiftUI `View` defaults —
+`offset(_:)`, `symbolEffect(_:options:isActive:)` — which are the SDK's API rather than this one's and
+would make an Xcode upgrade read as a change to what a host compiles against. 212 symbols with it.
+
+Two stale-artefact traps on the way, both the same shape as the one in `scripts/android-api.sh` and
+the one `foreign-api.sh` warns about in its own header. A symbol graph is emitted by the *compile*, so
+an incremental build with nothing to do emits nothing: sharing `.build` with `swift test` meant the
+second run found no file where the first had left one, and giving it a private scratch path did not
+help either, because that path is incremental too. It is deleted each run — eight seconds, and it
+cannot be stale. The guard that says "no symbol graph after building" is what caught the second one.

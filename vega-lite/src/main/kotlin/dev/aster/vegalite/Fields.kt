@@ -2,7 +2,6 @@ package dev.aster.vegalite
 
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.canonicalNumberString
-import dev.aster.vega.model.locale.DateField
 import dev.aster.vega.model.locale.VegaLocale
 
 /**
@@ -164,51 +163,77 @@ internal object Fields {
   }
 
   /**
-   * Upstream's `VEGALITE_TIMEFORMAT`, reordered by the reader's language.
+   * The specifier a **plain** temporal field is labelled with, quoted ready for an expression.
    *
-   * The **order** comes from the locale and the directives stay Vega-Lite's own, and that split is
-   * the point. This table is the one that spells the month as a *name*, which is what it exists for
-   * — `Jan 2009` rather than `2009-01`. Substituting a name into a locale's numeric `%x` gives
-   * `21-mei-2026`, because those separators were chosen for numbers; so the fields are placed in
-   * the language's order with a single space between them, and the comma before the year goes with
-   * the English form that has one.
+   * The other half of [timeUnitSpecifier]. A field carrying a `timeUnit` gets an expression,
+   * because Vega chooses among the units at render time from the span being shown; a field with no
+   * `timeUnit` has nothing to choose between and gets a literal, which upstream writes as `"%b %d,
+   * %Y"` and cannot do otherwise, having no locale to ask.
    *
-   * `TimeUnits.SPECIFIERS` takes the other route — the locale's whole pattern, numerals and all —
-   * because its entries *are* numeric. Two tables, two derivations, one order.
+   * It is the same table's `year-month-date` entry, so the two halves cannot drift: whatever a
+   * bucketed year-month-date is labelled with, an unbucketed date is labelled with too.
    *
-   * A locale that states `timeUnitSpecifierOverrides` has said what it wants outright, so those win
-   * for the keys they name; and `VegaLocale.EnglishUS` states an empty map, which is how upstream's
-   * own `%b %d, %Y ` survives unchanged for every fixture.
+   * **Trimmed**, and that is not cosmetic. Every entry in the table ends in a space because
+   * `TimeUnits.specifier` concatenates the pieces of a compound specifier and trims the result. A
+   * literal is not concatenated with anything, so it has to do the trimming here — and for
+   * [VegaLocale.EnglishUS] that is exactly what makes this `%b %d, %Y`, upstream's own string, with
+   * every fixture unmoved.
+   */
+  fun fullDateSpecifier(locale: VegaLocale = VegaLocale.EnglishUS): String {
+    // A host may state `null` for an entry, which *removes* it rather than restoring a default.
+    // With
+    // no year-month-date to read, upstream's own is the honest answer rather than nothing at all.
+    val pattern =
+      localeTimeFormat(locale)["year-month-date"] ?: UPSTREAM_TIME_FORMAT["year-month-date"]
+    return "\"" + escaped(pattern.orEmpty().trim()) + "\""
+  }
+
+  /**
+   * The table `timeUnitSpecifier` is given as its second argument: **one date per locale**, shared
+   * with the Vega path rather than derived a second way here.
    *
-   * The trailing spaces are load-bearing — `TimeUnits.specifier` concatenates the pieces and trims
-   * the result — and the insertion order is what keeps the emitted expression identical to
-   * upstream's for that locale.
+   * This used to read only the field *order* off the locale and rebuild the entries from
+   * Vega-Lite's own directives with a single space between them, on the argument that `%x` is
+   * numeric and substituting a month name into numeric separators gives `21-mei-2026`. The argument
+   * is sound against substituting; it is not an argument for discarding the pattern. Keeping the
+   * locale's own directives substitutes nothing, and rebuilding threw away everything a language
+   * writes that is not a field: a Dutch host got `%d %b %Y` here and `%d-%m-%Y` from the same
+   * locale on a Vega chart, Spanish lost its `de`, and `%b %d, %Y` came back without its comma —
+   * which is the derivation `VegaLocale.timeUnitSpecifierOverrides` documents, disagreeing with the
+   * code that implemented it. Reported as #97.
+   *
+   * So the derivation is `VegaLocale.timeUnitSpecifiers`, the same one a Vega chart reads, and the
+   * two grammars cannot answer differently about the same locale again.
+   *
+   * What stays Vega-Lite's own is the **fallback**, and only that. Where a locale says nothing —
+   * `VegaLocale.EnglishUS` states an empty map, and a `%x` naming no date field derives nothing —
+   * this answers with upstream's `VEGALITE_TIMEFORMAT`, the table that spells a month as a *name*,
+   * where a Vega chart would fall through to `TimeUnits.SPECIFIERS` and get numerals. That
+   * difference is upstream's and is the whole reason this table exists.
+   *
+   * Two consequences worth stating rather than discovering:
+   * - **`EnglishUS` is untouched.** It states a map, so nothing is derived for it, and upstream's
+   *   `%b %d, %Y ` survives comma and all — which is what keeps the 283 fixture comparisons
+   *   meaningful.
+   * - **A `%x` naming fewer than three fields now derives** rather than falling back. It gets a
+   *   `year-month-date` with no day in it, which is not good, and is exactly what a Vega chart has
+   *   always done with the same locale. Agreeing is the point here; improving it is a question for
+   *   both paths at once.
+   *
+   * A stated table still wins outright, and now for **every** key it names. It used to be filtered
+   * to the keys the fallback happened to hold, so a host stating `month-date` had it honoured on a
+   * Vega chart and dropped here.
+   *
+   * The trailing spaces are load-bearing — `TimeUnits.specifier` concatenates the pieces of a
+   * compound specifier and trims the result — and the insertion order is what keeps the emitted
+   * expression identical to upstream's for a locale that states nothing.
    */
   private fun localeTimeFormat(locale: VegaLocale): Map<String, String?> {
-    val order = locale.dateFieldOrder
     val stated = locale.timeUnitSpecifierOverrides
-    val derived =
-      // **A locale that states a table has said what it wants**, so nothing here is derived beside
-      // it: two answers about the same date would be worse than one that is merely American.
-      // `VegaLocale.EnglishUS` states an empty one for exactly this reason — it is the locale
-      // upstream's tests assume, so it has to answer what upstream answers, comma and all — and
-      // that
-      // is what keeps the 283 fixture comparisons meaningful.
-      if (
-        stated == null && order.containsAll(listOf(DateField.YEAR, DateField.MONTH, DateField.DATE))
-      ) {
-        val directive =
-          mapOf(DateField.YEAR to "%Y", DateField.MONTH to "%b", DateField.DATE to "%d")
-        linkedMapOf<String, String?>(
-          "year-month" to
-            order.filter { it != DateField.DATE }.joinToString(" ") { directive.getValue(it) } +
-              " ",
-          "year-month-date" to order.joinToString(" ") { directive.getValue(it) } + " ",
-        )
-      } else {
-        UPSTREAM_TIME_FORMAT
-      }
-    return derived + stated.orEmpty().filterKeys { it in derived }
+    // Stated against upstream's table rather than against a derivation, because a host stating one
+    // entry of a Vega-Lite table means the other entries to stay what Vega-Lite would have said.
+    if (stated != null) return UPSTREAM_TIME_FORMAT + stated
+    return locale.timeUnitSpecifiers.ifEmpty { UPSTREAM_TIME_FORMAT }
   }
 
   /**

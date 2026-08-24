@@ -344,6 +344,9 @@ class LocaleTest {
    * Upstream has no lever for this either — its `timeUnitSpecifier` takes no locale — so the table
    * is **empty by default** and a chart that does not ask is byte-for-byte what it was. That
    * default is what the 283 Vega-Lite fixtures compare against.
+   *
+   * Both grammars now derive that pattern the same way, from the locale's own `%x`; see #97 and
+   * `OneDatePerLocaleTest`. The middle assertion below is where the difference used to show.
    */
   @Test
   fun `a locale decides the order of a bucketed axis's date fields`() {
@@ -369,12 +372,21 @@ class LocaleTest {
       drawn(VegaLocale.EnglishUS).toString(),
     )
 
-    // And Dutch reads the day first **without being told to**, because its own `date` — d3's `%x`,
-    // `%d-%m-%Y` — says so and nothing was reading it. The month keeps its name: the order comes
-    // from
-    // the locale and the directives stay Vega-Lite's, so this is `21 mei 2026` and not
-    // `21-05-2026`.
-    assertTrue(drawn(dutch).contains("21 mei 2026"), drawn(dutch).toString())
+    // And Dutch reads its own `date` — d3's `%x`, `%d-%m-%Y` — whole: the order it writes **and**
+    // the directives and separators it writes them with. So `21-05-2026`.
+    //
+    // This assertion used to read `21 mei 2026`, on the rule that the order came from the locale
+    // and the directives stayed Vega-Lite's. That rule is what #97 reported, because the Vega path
+    // never had it: the same `VegaLocale` produced `21-05-2026` on a Vega chart and `21 mei 2026`
+    // here, and a host cannot see which grammar ran — both arrive as the same document from the
+    // same endpoint. Rebuilding an entry from an order and a set of directives keeps the order and
+    // discards everything else a language writes, which is how the comma went missing from
+    // `%b %d, %Y` and how Spanish lost its `de`.
+    //
+    // The cost is on this line and is worth naming: a locale whose `%x` is numeric now gets a
+    // numeric month where upstream's table would have written a name. A host that wants the name
+    // says so, which is the assertion below.
+    assertTrue(drawn(dutch).contains("21-05-2026"), drawn(dutch).toString())
     assertTrue(
       drawn(dutch).none { it.contains("mei 21") },
       "the American order is gone, not merely joined: ${drawn(dutch)}",
@@ -383,6 +395,11 @@ class LocaleTest {
     // A locale that states a table has said what it wants, and it wins.
     val stated = dutch.copy(timeUnitSpecifierOverrides = mapOf("year-month-date" to "%-d/%-m/%Y "))
     assertTrue(drawn(stated).contains("21/5/2026"), drawn(stated).toString())
+
+    // Including a host that wants its month spelled out, which is what deriving from a numeric `%x`
+    // no longer does on its own. The escape hatch is the same one, and this is the whole of it.
+    val named = dutch.copy(timeUnitSpecifierOverrides = mapOf("year-month-date" to "%-d %b %Y "))
+    assertTrue(drawn(named).contains("21 mei 2026"), drawn(named).toString())
   }
 
   /**

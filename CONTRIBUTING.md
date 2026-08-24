@@ -170,4 +170,14 @@ colour ramps need d3's interpolator tables and a scheme extent.
   most valuable thing in the file.
 - Update `STATUS.md` and `SUPPORTED_FEATURES.md` in the same commit as the change they describe,
   including the next-three list. A status file that lags is worse than none.
-- `./scripts/check.sh` must be green before committing: format, all tests, lint, demo APK.
+- `./scripts/check.sh` must be green before committing. It is **the** gate: format, the ABI
+  dumps, every JVM test, the native compiles, lint, the demo APK, the instrumented suites compiled
+  and — where the host allows — the Swift package, the instrumented suites *run*, and the two
+  differential comparisons against upstream.
+
+  It prints a ledger of every gate as RAN, SKIPPED with a reason, or FAILED. **Read it.** A run can
+  be green having skipped something, and the reason is always actionable — start an emulator, install
+  node, use a Mac. `--fast` drops the oracles for the edit loop; landing anything runs them.
+
+  It was five scripts and an agreement to remember the other four. That agreement failed three times
+  in ways that reached `main` or a release, so it is one script now.

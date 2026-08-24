@@ -80,10 +80,28 @@ from text a user supplied actually needs — the user pasted a chart, not a dial
 
 ```kotlin
 val converted = VegaLiteInput.toVega(text)   // routes on `$schema`, then on shape
-val compiled = controller.setSpec(converted.vegaJson ?: text)
+
+// Stop where the conversion produced nothing, rather than passing the text on.
+val vega = converted.vegaJson
+if (vega == null) return showCannotDraw(converted.diagnostics)
+
+val compiled = controller.setSpec(vega)
 // converted.wasVegaLite says which way it went; converted.diagnostics is what the
 // Vega-Lite compiler could not honour, ahead of anything the runtime reports.
 ```
+
+**A null `vegaJson` means one thing and nothing else: the input was Vega-Lite and compiling it
+produced nothing.** Text that is not JSON, and JSON that is not Vega-Lite, comes back *unchanged*
+with `wasVegaLite` false and goes to the runtime as it always did. The two cases are indistinguishable
+at the call site, and only one of them is safe to pass on — which is why the example stops instead of
+falling back to `text`.
+
+Falling back is worth naming, because the type invites it and it is wrong. A document Vega-Lite could
+not compile, handed to a parser that only understands Vega, has `mark` and `encoding` it does not
+recognise and no `marks` at all — so a reader gets either a complaint phrased in the wrong grammar or
+an empty chart, and neither says what actually happened. The conversion's own diagnostics are the one
+true thing anybody knows at that point. `ChartSession` on the Swift side stops for exactly this
+reason, and says why through its `failure`.
 
 `VegaLiteCompiler` is the compiler itself, if a host already knows which grammar it has. The demo's
 "Paste your own" screen takes either, and its "Spec: Vega-Lite" entry is a bundled one.
@@ -790,7 +808,9 @@ the emulator, profiling and layout inspection.
 
 ```bash
 ./scripts/test-core.sh      # JVM tests only; no SDK or device needed
-./scripts/check.sh          # spotlessCheck + all tests + lint + demo APK
+./scripts/check.sh          # THE gate: everything this host can check, with a ledger
+./scripts/check.sh --fast   # the same, minus the differential oracles, for the edit loop
+./scripts/check.sh --list   # what the gates are and what each one needs
 ./scripts/test-android.sh   # instrumented tests; needs a device or emulator
 ./scripts/install-demo.sh   # build and install the demo app
 ./scripts/capture-demo.sh   # screenshot the device into build/artifacts
@@ -912,19 +932,102 @@ assembled four modules out of seven, with the dropped ones reporting success. An
 can compile while the root module lists every declared one: `ktecma262` 0.1.2 was published from Linux
 with no native variants at all, and a version on Central cannot be replaced.
 
+### The same chart on every host
+
+Four public surfaces draw the same scene, and a seam reachable from one and not the others is a
+defect rather than a preference — that is how `vega-compose` shipped without the seams the view it
+wraps already had. This is what each one exposes, and where they differ on purpose.
+
+| | Android `VegaChartView` | `vega-compose` | Compose Multiplatform | SwiftUI `VegaChartView` |
+|---|---|---|---|---|
+| Image resolver | `imageResolver` | `imageResolver` | `resolveImage` | `resolveImage` |
+| Unresolved image, once per URL | `onUnresolvedImage` | `onUnresolvedImage` | `onUnresolvedImage` | `onUnresolvedImage` |
+| Forget resolved URLs | `clearImageCache()` | a different `imageResolver` | `ImageCache.clear()` | `CoreGraphicsTarget.clearImageCache()` |
+| Accessibility threshold | `accessibilityMaxExposedMarks` | same | same | same |
+| Engine-drawn tooltip | `tooltipsEnabled` | `tooltipsEnabled` | host draws its own | host draws its own |
+| Font family a specification names | `fontResolver` | `fontResolver` | `ComposeTextEngine` registry | `resolveFont` |
+| Spoken captions | the controller's `VegaLocale.captions` | same | `captions` | `captions` |
+| Interaction | the controller's `events` | `onEvent` | `onTap`, `onPan`, `onZoom`, … | `session` + `gestures` |
+| Where the chart was drawn | `onPlaced`, `placement()` | `onPlaced` | `onPlaced` | `onPlaced` |
+
+Two differences are deliberate, and each has a reason that is not "nobody got round to it".
+
+This table said three until recently, and the third was **fonts on Apple**: the argument was that a
+host can register a bundled face with `CTFontManagerRegisterFontsForURL` and CoreText then resolves
+it by name, so the platform supplied what the seam would have. That argument was too kind to the
+status quo, and an adopter said so (#106). Registering mutates process-wide state to configure one
+chart, it is invisible at the call site, and it left one specification and one host configuration
+drawing in different faces depending on the platform. `resolveFont` is the seam now, on
+`ChartSession`, `VegaChartView` and `CoreTextTextEngine`.
+
+**Captions and interaction.** The two Compose-Multiplatform-and-Swift surfaces paint a `Scene` and
+own no state, so everything they need is a parameter. The View-based pair is driven by a
+`VegaChartController`, which already holds the locale the captions come from and already publishes
+an event stream. Passing them again would be two sources for one fact.
+
+**Clearing the cache from Compose on Android.** A `VegaChart` host holds no reference to the view
+inside it, so `clearImageCache()` is out of reach. Handing a *different* `imageResolver` instance
+does it — the setter rebuilds the renderer, and a new renderer starts with an empty cache — which is
+a real mechanism rather than a workaround, but it is one you have to be told about. Said here, and
+in the parameter's own documentation.
+
+**Where the chart was drawn** is reported by all four now. It was missing from the two View-based
+surfaces for a structural reason rather than an oversight: the type was declared in
+`vega-compose-multiplatform`, which a `View` cannot depend on. It is `dev.aster.vega.scene.ScenePlacement`
+now, in the module every renderer already depends on, and
+`dev.aster.vega.compose.mp.ChartPlacement` remains as a typealias.
+
+It is called `ScenePlacement` on the Kotlin side and `ChartPlacement` on the Swift side, which looks
+like an inconsistency and is the opposite. Everything in `vega-scene` is exported to the Apple
+framework under a **flat** Obj-C namespace, so a Kotlin `ChartPlacement` and the Swift struct of that
+name are two types with one name in a host's scope — `swift build` fails with "'ChartPlacement' is
+ambiguous for type lookup", which is how this was found rather than reasoned about. Hiding it from
+Obj-C is not available, since `@HiddenFromObjC` is Kotlin/Native-only and the file compiles for the
+JVM too. The Swift struct keeps its name, its `CGFloat`s and its value semantics.
+
+All four also *place* a scene the same way now: scaled to fit and **centred** in whatever is left
+over. `VegaChartView` pinned it to the padded top-left until 0.3.0, so the same chart in the same
+slot sat differently depending on which host drew it. Only a slot of a different aspect ratio to the
+scene has slack to centre in, so a view measured at its own preferred size is unmoved. Drawing, hit
+testing and the accessibility frames all read one `placement()`, which is why they moved together.
+
 ### The public API
 
-Every published module carries a committed ABI dump under `api/` — `.api` for the JVM surface and
-`.klib.api` for the native one an iOS consumer links against. `./scripts/check.sh` compares them, so a
-change to what other people compile against shows up in this repository's diff rather than in their
-build. `./gradlew updateKotlinAbi` rewrites the dumps; review that diff as an API change.
+Nine of the eleven published modules carry a committed ABI dump under `api/` — `.api` for the JVM
+surface and `.klib.api` for the native one an iOS consumer links against. `./gradlew updateKotlinAbi`
+rewrites them; review that diff as an API change.
 
-`vega-compose` and `vega-android-canvas` are the two modules **not** covered, and the reason is a
-tooling gap rather than a decision: since AGP 9 their Kotlin support comes from the Android plugin's own
+`vega-compose` and `vega-android-canvas` cannot be dumped that way, and the reason is a tooling gap
+rather than a decision: since AGP 9 their Kotlin support comes from the Android plugin's own
 `KotlinBaseApiPlugin`, so `binary-compatibility-validator` creates no tasks for them, and Kotlin's own
 ABI validation reads a module's Maven publications, which for an Android library it does not support.
-Their surface is small — `VegaChartView`, the `VegaChart` composable and their options — and it is the
-one place a consumer has to read the diff by hand.
+
+They are snapshotted by `scripts/android-api.sh` instead, into `android-api.txt`, from what `javap`
+reads off the compiled classes. `javap` rather than a source scan because the boundary is the
+bytecode: a default argument is a `$default` bridge, a `@Composable` gains a `Composer` and two
+`int`s, and **a parameter inserted in the middle of a list is invisible in source and a different
+method here** — which is the shape of the thing that actually went wrong.
+
+This section used to say their surface was small enough to read by hand. Reading it by hand is what
+failed: `vega-compose` shipped 0.2.0 exposing a controller, a modifier and one callback while the
+view underneath it had a font resolver, an accessibility threshold and a tooltip switch, and an
+adopter found it rather than a review.
+
+`./scripts/check.sh` runs all of it — the ABI dumps, the Android snapshot, and the Obj-C snapshot
+under `swift/AsterVegaRender/foreign-api.txt`.
+
+The Swift package's *own* API is snapshotted too, in `swift/AsterVegaRender/swift-api.txt`, from the
+symbol graph the compiler emits. `foreign-api.txt` records what **Kotlin exports to Obj-C**, which is
+a different surface: `VegaChartView.init` and `ChartSession` are Swift source and appeared in it
+nowhere, so the half of the Apple API a host actually calls was guarded by `CallShapeTests` alone —
+which pins the shapes somebody thought to write down, and is exactly as good as that foresight was.
+It was not good enough twice: a trailing closure rebound to a new parameter and broke `main`, and a
+missing font seam went unnoticed until an adopter reported it.
+
+Only symbols this package **declares** are recorded. A symbol with no source location is inherited or
+synthesised elsewhere, and for `VegaChartView` that is 810 SwiftUI `View` defaults — `offset(_:)` and
+the rest — which are the SDK's API, not this one's, and would make an Xcode upgrade look like a
+change to what a host compiles against.
 
 ### Platforms
 

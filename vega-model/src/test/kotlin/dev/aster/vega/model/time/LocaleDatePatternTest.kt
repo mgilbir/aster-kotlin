@@ -58,6 +58,59 @@ class LocaleDatePatternTest {
   }
 
   @Test
+  fun `a suffix marker belongs to its field and is not dropped with the next one`() {
+    // `zh-CN` writes the date with a marker after every number: the character is what makes the
+    // number a month rather than text sitting between two fields. Dropping the day therefore has to
+    // leave the month's marker behind. Taking it produced `%Y\u5e74%m`, which reads "2026\u5e7408"
+    // and is
+    // not a date in any language — and nothing caught it, because no bundled locale is written this
+    // way and English cannot express the difference.
+    val chinese = specifiers("%Y\u5e74%m\u6708%d\u65e5")
+    assertEquals("%Y\u5e74%m\u6708%d\u65e5 ", chinese["year-month-date"])
+    assertEquals("%Y\u5e74%m\u6708 ", chinese["year-month"])
+    assertEquals("%m\u6708%d\u65e5 ", chinese["month-date"])
+
+    // Korean puts a space after each marker. The marker stays; the space it carried has nothing
+    // left to separate, so it goes.
+    val korean = specifiers("%Y\ub144 %m\uc6d4 %d\uc77c")
+    assertEquals("%Y\ub144 %m\uc6d4 %d\uc77c ", korean["year-month-date"])
+    assertEquals("%Y\ub144 %m\uc6d4 ", korean["year-month"])
+    assertEquals("%m\uc6d4 %d\uc77c ", korean["month-date"])
+  }
+
+  @Test
+  fun `a connector is not a marker, whatever it is made of`() {
+    // The two ways the marker rule could over-reach, and both are why it takes *two* conditions.
+    //
+    // Punctuation attached to a field is still a connector — it has no letter in it — so a trailing
+    // field takes the separator before it and `%d-%m-%Y` without its year is `%d-%m`, not `%d-%m-`.
+    assertEquals("%d-%m ", specifiers("%d-%m-%Y")["month-date"])
+    assertEquals("%d/%m ", specifiers("%d/%m/%Y")["month-date"])
+
+    // And a word *is* a letter but stands between the fields when a space precedes it, which is
+    // Spanish: `%e de %B de %Y` without its year is `%e de %B`, not `%e de %B de `.
+    assertEquals("%e de %B ", specifiers("%e de %B de %Y")["month-date"])
+  }
+
+  @Test
+  fun `keeping every field reproduces the pattern`() {
+    // The property that makes the rest of this trustworthy: whatever the separators are for, a
+    // derivation that drops nothing must give the pattern back unchanged.
+    for (pattern in
+      listOf(
+        "%b %d, %Y",
+        "%d-%m-%Y",
+        "%d/%m/%Y",
+        "%Y-%m-%d",
+        "%e de %B de %Y",
+        "%Y\u5e74%m\u6708%d\u65e5",
+        "%Y\ub144 %m\uc6d4 %d\uc77c",
+      )) {
+      assertEquals(pattern + " ", specifiers(pattern)["year-month-date"], pattern)
+    }
+  }
+
+  @Test
   fun `prose between the fields survives`() {
     // `es-ES` writes `%e de %B de %Y`. A table of directives could not have produced this; the
     // pattern-with-fields-dropped rule gets it for nothing, which is why the rule is that.

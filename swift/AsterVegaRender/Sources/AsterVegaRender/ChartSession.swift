@@ -1,4 +1,5 @@
 import AsterVega
+import CoreText
 import Foundation
 import Observation
 
@@ -94,15 +95,26 @@ public final class ChartSession {
     locale: VegaLocale? = nil,
     hostConfigJson: String? = nil,
     containerSize: SizeD? = nil,
-    timeZone: Foundation.TimeZone? = nil
+    timeZone: Foundation.TimeZone? = nil,
+    /// The host's own answer for a font family; see `CoreTextTextEngine.resolveFont`. Appended at
+    /// the end because Swift requires arguments in declaration order, so inserting one mid-list
+    /// breaks every caller that passes a later argument.
+    resolveFont: ((String) -> CTFont?)? = nil
   ) {
     let ticker = clock ?? { Int64(Date().timeIntervalSince1970 * 1000) }
-    let engine = textEngine ?? CoreTextTextEngine(textScale: textScale)
+    let engine =
+      textEngine ?? CoreTextTextEngine(textScale: textScale, resolveFont: resolveFont)
     // Read back off the engine where it is one of ours, so a host that built its own
     // `CoreTextTextEngine(textScale:)` and passed it gets its glyphs *drawn* at that size too. A host
     // with an engine of its own keeps whatever it measured with, and the drawing is told 1 — its
     // metrics are its business.
     self.textScale = (engine as? CoreTextTextEngine)?.textScale ?? 1
+    // Read back off the engine for the same reason, and it matters more here: this is what the
+    // *drawing* is given, so a host that built its own `CoreTextTextEngine(resolveFont:)` and passed
+    // it gets its faces painted as well as measured. A host with an engine of its own answers nil and
+    // keeps whatever that engine resolves with — its metrics are its business, and guessing a
+    // resolver for it would be measuring with one face and painting with another.
+    self.resolveFont = (engine as? CoreTextTextEngine)?.resolveFont
     let theme = hostConfigJson.flatMap { Self.parsedConfig($0) }
     if hostConfigJson != nil, theme == nil {
       hostConfigFailure =
@@ -252,6 +264,13 @@ public final class ChartSession {
   public private(set) var scene: AsterVega.Scene?
   public private(set) var diagnostics: [VegaDiagnostic] = []
   public private(set) var controls: [SignalInput] = []
+  /// The font resolver the layout was measured with, so a drawing can use the same one.
+  ///
+  /// `VegaChartView` reads this rather than asking a host to pass the closure twice: measuring with
+  /// one face and painting with another leaves every label off its baseline, and a seam that has to
+  /// be wired in two places is a seam that will be wired in one.
+  public let resolveFont: ((String) -> CTFont?)?
+
   public private(set) var failure: String?
   /// True while a compile is in flight, which for a remote dataset is long enough to say so.
   public private(set) var loading = false

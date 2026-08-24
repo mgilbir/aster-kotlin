@@ -32,6 +32,11 @@ fi
 # says nothing about the rest of the surface a host outside it depends on. The snapshot covers all of it.
 ./scripts/foreign-api.sh
 
+# And the other Apple surface, which that one does not cover: `foreign-api.txt` is what Kotlin exports
+# to Obj-C, while `VegaChartView.init` and `ChartSession` are Swift source and appear in it nowhere.
+# `CallShapeTests` pins the shapes somebody thought to write down; this pins the rest.
+./scripts/swift-api.sh
+
 cd swift/AsterVegaRender
 
 # Discard SwiftPM's build when the framework has changed underneath it.

@@ -316,6 +316,10 @@ class VegaChartControllerTest {
     assertEquals(before, controller.snapshot.scene, "the chart on screen should not be blanked")
     assertTrue(controller.diagnostics.value.any { it.severity >= DiagnosticSeverity.ERROR })
     assertFalse(controller.state.value.isLoading)
+    // "Says why" is a claim about the *state*, not only about the diagnostics list: the snapshot is
+    // unchanged above, so this is the one thing on it that distinguishes a failed compile from a
+    // compile that has not happened. `ChartFailureTest` covers the rest of its life.
+    assertNotNull(controller.state.value.failure)
   }
 
   @Test

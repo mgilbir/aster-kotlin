@@ -188,11 +188,15 @@ public data class VegaLocale(
   /**
    * The order this language writes year, month and day of month in, read off [date].
    *
-   * The *order* rather than the pattern, and that distinction is load-bearing. Vega-Lite writes its
-   * own specifier table with the month as a **name** — `%b %d, %Y` — and substituting a name into a
-   * locale's numeric pattern gives `21-mei-2026`, because those separators were chosen for numbers.
-   * So a caller that has its own directives takes the order from here and keeps its own spacing;
-   * [timeUnitSpecifiers], whose entries *are* numeric, takes the whole pattern instead.
+   * The order alone, for a caller that wants to know how a language arranges a date without wanting
+   * the language's own directives with it — laying out a set of controls, say, or choosing among
+   * ready-made patterns.
+   *
+   * **Not how a specifier is derived.** It was, on the Vega-Lite side, and the two paths disagreed
+   * about the same locale as a result: rebuilding an entry from an order and a set of directives
+   * keeps the order and discards everything else a language writes, so a comma, a numeral and the
+   * Spanish `de` were all lost. Both paths now derive through [timeUnitSpecifiers], which keeps the
+   * pattern. See #97.
    *
    * Empty where [date] names none of the three, which is not a pattern an order can be read from.
    */

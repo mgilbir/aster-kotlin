@@ -154,20 +154,25 @@ internal class VegaAccessibilityHelper(private val view: VegaChartView) :
   private fun toScene(x: Float, y: Float): PointD {
     val scale = viewToSceneScale()
     val interaction = view.controller.snapshot.interactionState
+    // The view's own placement, not `paddingLeft` written out a third time: the draw, a touch and
+    // these frames have to agree about where the chart is, and three copies of the origin is how
+    // they stop agreeing.
+    val placed = view.placement()
     return PointD(
-      ((x - view.paddingLeft - interaction.viewportOffset.dx) / scale),
-      ((y - view.paddingTop - interaction.viewportOffset.dy) / scale),
+      ((x - placed.left - interaction.viewportOffset.dx) / scale),
+      ((y - placed.top - interaction.viewportOffset.dy) / scale),
     )
   }
 
   private fun toViewRect(bounds: RectD): Rect {
     val scale = viewToSceneScale()
     val interaction = view.controller.snapshot.interactionState
+    val placed = view.placement()
     fun mapX(value: Double) =
-      (value * scale + interaction.viewportOffset.dx + view.paddingLeft).roundToInt()
+      (value * scale + interaction.viewportOffset.dx + placed.left).roundToInt()
 
     fun mapY(value: Double) =
-      (value * scale + interaction.viewportOffset.dy + view.paddingTop).roundToInt()
+      (value * scale + interaction.viewportOffset.dy + placed.top).roundToInt()
 
     val rect = Rect(mapX(bounds.left), mapY(bounds.top), mapX(bounds.right), mapY(bounds.bottom))
     // Accessibility bounds must be non-empty to be reachable.

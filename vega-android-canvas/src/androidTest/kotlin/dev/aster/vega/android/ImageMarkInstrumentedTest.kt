@@ -90,6 +90,96 @@ class ImageMarkInstrumentedTest {
     assertTrue(diagnostics.toString(), diagnostics.all { it.contains("Could not resolve image") })
   }
 
+  /**
+   * A URL is asked of the resolver **once**, however many frames are drawn.
+   *
+   * `render` runs per frame, and this seam is newly reachable by a host (#99) — so without a cache
+   * a resolver that fetches would be fetching on every frame of every pan, for every image on the
+   * chart.
+   */
+  @Test
+  fun aUrlIsResolvedOncePerRendererRatherThanOncePerFrame() {
+    val asked = mutableListOf<String>()
+    val counting = AndroidImageResolver { url ->
+      asked.add(url)
+      if (url == "red") swatch(Color.RED) else swatch(Color.GREEN)
+    }
+    val compiled = SpecCompiler(AndroidTextEngine()).compileJson(spec)
+    val bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+    val renderer = AndroidCanvasSceneRenderer(imageResolver = counting)
+    repeat(5) { renderer.render(compiled.scene!!, Canvas(bitmap), RectF(0f, 0f, 100f, 100f), 1f) }
+
+    assertEquals(listOf("red", "green"), asked)
+  }
+
+  /**
+   * A **refusal** is remembered too, which is the half that is easy to leave out.
+   *
+   * Caching only the successes sends an address that has already said no back to the resolver on
+   * every frame — the expensive case rather than the cheap one — and makes a once-per-URL report
+   * impossible to build.
+   */
+  @Test
+  fun aRefusalIsRememberedAndReportedOnlyOnce() {
+    val asked = mutableListOf<String>()
+    val unresolved = mutableListOf<String>()
+    val refusing = AndroidImageResolver { url ->
+      asked.add(url)
+      null
+    }
+    val compiled = SpecCompiler(AndroidTextEngine()).compileJson(spec)
+    val bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+    val renderer =
+      AndroidCanvasSceneRenderer(
+        imageResolver = refusing,
+        onUnresolvedImage = { unresolved.add(it) },
+      )
+    repeat(5) { renderer.render(compiled.scene!!, Canvas(bitmap), RectF(0f, 0f, 100f, 100f), 1f) }
+
+    assertEquals(listOf("red", "green"), asked)
+    assertEquals(listOf("red", "green"), unresolved)
+  }
+
+  /**
+   * The diagnostic still fires every frame, and that is deliberate rather than an oversight.
+   *
+   * `lastDiagnostics` describes **the frame just drawn**, so a mark missing from it has to be
+   * reported whether or not the reason was already known. The callback answers the other question —
+   * "tell me when something goes wrong" — which is why the two counts differ.
+   */
+  @Test
+  fun theDiagnosticDescribesTheFrameEvenWhenTheReportIsOnce() {
+    val compiled = SpecCompiler(AndroidTextEngine()).compileJson(spec)
+    val bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+    val renderer = AndroidCanvasSceneRenderer(imageResolver = AndroidImageResolver.None)
+    repeat(3) { renderer.render(compiled.scene!!, Canvas(bitmap), RectF(0f, 0f, 100f, 100f), 1f) }
+
+    assertEquals(2, renderer.lastDiagnostics.size)
+  }
+
+  /** Clearing the cache is how a host says the image behind an address has changed. */
+  @Test
+  fun clearingTheCacheAsksAgain() {
+    val asked = mutableListOf<String>()
+    var colour = Color.RED
+    val changing = AndroidImageResolver { url ->
+      asked.add(url)
+      swatch(colour)
+    }
+    val compiled = SpecCompiler(AndroidTextEngine()).compileJson(spec)
+    val bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+    val renderer = AndroidCanvasSceneRenderer(imageResolver = changing)
+    renderer.render(compiled.scene!!, Canvas(bitmap), RectF(0f, 0f, 100f, 100f), 1f)
+    assertEquals(Color.RED, bitmap.getPixel(20, 20))
+
+    colour = Color.BLUE
+    renderer.clearImageCache()
+    renderer.render(compiled.scene!!, Canvas(bitmap), RectF(0f, 0f, 100f, 100f), 1f)
+
+    assertEquals(4, asked.size)
+    assertEquals(Color.BLUE, bitmap.getPixel(20, 20))
+  }
+
   /** `aspect` letterboxes rather than stretching, which is the default and the safer one. */
   @Test
   fun aspectFitsTheImageInsideTheBoxInsteadOfStretchingIt() {

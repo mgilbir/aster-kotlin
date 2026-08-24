@@ -41,8 +41,25 @@ public final class CoreTextTextEngine: MeasuredTextEngine {
   public let textScale: Double
 
   /// - Parameter textScale: the reader's text-size factor. 1, the default, is the size as written.
-  public init(textScale: Double = 1) {
+  /// The host's own answer for a font family, tried before CoreText.
+  ///
+  /// CoreText resolves a family name against the faces the *process* has registered, so an app that
+  /// bundles a font — which most design systems do — could only reach a chart by calling
+  /// `CTFontManagerRegisterGraphicsFont` and hoping the name matched. That works and is the wrong
+  /// shape: it mutates process-wide state to configure one chart, it is invisible at the call site,
+  /// and it left one specification and one host configuration drawing in different faces on Apple
+  /// and on the two Kotlin renderers, both of which have taken a resolver for exactly this.
+  /// Reported from outside as #106.
+  ///
+  /// **It must be the same resolver the drawing uses.** A label sits where the layout put it, so
+  /// measuring with one face and painting with another is how a chart gets labels overhanging their
+  /// own boxes — the defect `CoreTextFonts` was extracted to fix. `ChartSession` and `VegaChartView`
+  /// take this and hand it to both sides; a host wiring them separately has to do the same.
+  public let resolveFont: ((String) -> CTFont?)?
+
+  public init(textScale: Double = 1, resolveFont: ((String) -> CTFont?)? = nil) {
     self.textScale = textScale > 0 ? textScale : 1
+    self.resolveFont = resolveFont
     super.init()
   }
 
@@ -97,7 +114,8 @@ public final class CoreTextTextEngine: MeasuredTextEngine {
       family: style.fontFamily,
       size: style.fontSize * textScale,
       weight: Int(style.fontWeight),
-      italic: style.fontStyle == FontStyle.italic
+      italic: style.fontStyle == FontStyle.italic,
+      resolveFont: resolveFont
     )
   }
 }

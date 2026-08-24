@@ -61,6 +61,26 @@ public data class ChartState(
   val snapshot: ChartSnapshot,
   val isLoading: Boolean = false,
   val diagnostics: List<VegaDiagnostic> = emptyList(),
+  /**
+   * Why the last compile drew nothing, or null when the chart on screen is the one asked for.
+   *
+   * A compile that produces no scene deliberately **keeps** the previous [snapshot] — a reader
+   * holds on to what they were looking at rather than watching it blank — which leaves the state
+   * saying nothing about what just happened. Without this, a host wanting its own "this chart
+   * cannot be drawn" copy has to infer the failure from [diagnostics], and that inference is wrong
+   * in both directions: `PARSE_NOTHING_TO_DRAW` is INFO by deliberate choice, and a document can
+   * report several warnings and still draw perfectly.
+   *
+   * So it is stated instead. Set to the first ERROR or FATAL diagnostic's message where a compile
+   * produced no scene, and to a plain sentence where nothing said anything more useful; cleared by
+   * the next compile that does produce one, and by [VegaChartController.setScene]. `ChartSession`
+   * on the Swift side carries the same value under the same rules, so a host expressing this logic
+   * expresses it identically on both platforms.
+   *
+   * Not a substitute for [diagnostics]: this says the chart is absent, and those say what the
+   * specification asked for that could not be done. A chart can draw with errors in it.
+   */
+  val failure: String? = null,
 ) {
   public companion object {
     public fun empty(): ChartState =
@@ -396,6 +416,9 @@ public class VegaChartController(
             revision = revision,
           ),
         isLoading = false,
+        // A hand-authored scene is a chart on screen by definition, so a failure recorded by an
+        // earlier compile no longer describes anything.
+        failure = null,
       )
   }
 
@@ -552,7 +575,18 @@ public class VegaChartController(
     _inputs.value = SignalInput.of(compiled.spec?.signals.orEmpty(), compiled.signals.values)
     val scene = compiled.scene
     if (scene == null) {
-      _state.value = _state.value.copy(isLoading = false, diagnostics = diagnostics)
+      // The snapshot is kept — see `ChartState.failure` — so this is the only thing that says a
+      // compile just failed. The first ERROR or FATAL is what a reader is shown, and the fallback
+      // covers a compile that produced neither a scene nor a complaint, which is a bug elsewhere
+      // but must not read as success here.
+      _state.value =
+        _state.value.copy(
+          isLoading = false,
+          diagnostics = diagnostics,
+          failure =
+            diagnostics.firstOrNull { it.severity >= DiagnosticSeverity.ERROR }?.message
+              ?: "the specification compiled to no scene",
+        )
       return compiled
     }
     val revision = nextRevision++
@@ -568,6 +602,10 @@ public class VegaChartController(
           ),
         isLoading = false,
         diagnostics = diagnostics,
+        // Explicitly, rather than by the constructor default: a scene was produced, so whatever the
+        // last failure was is over, and saying so here is what keeps a stale message off the
+        // screen.
+        failure = null,
       )
     return compiled
   }

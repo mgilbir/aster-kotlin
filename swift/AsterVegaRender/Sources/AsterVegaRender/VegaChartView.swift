@@ -77,6 +77,7 @@ public struct VegaChartView: View {
   private let captions: VegaCaptions?
   /// What every font size is multiplied by when drawing; see ``ChartSession/textScale``.
   private let textScaleOverride: Double?
+  private let resolveFontOverride: ((String) -> CTFont?)?
   /// How many data marks a reader may explore one by one; see the initialiser.
   private let accessibilityMaxExposedMarks: Int32
   /// Which gestures are installed; see the initialiser.
@@ -146,7 +147,8 @@ public struct VegaChartView: View {
     // additive. Anything closure-typed added here goes *after* this line.
     onPlaced: ((ChartPlacement) -> Void)? = nil,
     resolveImage: ((String) -> CGImage?)? = nil,
-    onUnresolvedImage: ((String) -> Void)? = nil
+    onUnresolvedImage: ((String) -> Void)? = nil,
+    resolveFont: ((String) -> CTFont?)? = nil
   ) {
     self.scene = scene
     self.session = session
@@ -157,10 +159,20 @@ public struct VegaChartView: View {
     self.resolveImage = resolveImage
     self.onUnresolvedImage = onUnresolvedImage
     self.onPlaced = onPlaced
+    self.resolveFontOverride = resolveFont
   }
 
   /// The factor the glyphs are drawn at: the session's, or one a caller stated.
   private var textScale: Double { textScaleOverride ?? session?.textScale ?? 1 }
+
+  /// The face resolver the glyphs are drawn with: the session's, or one a caller stated.
+  ///
+  /// Defaulting to the session's is the important half. The layout was measured with *its* resolver,
+  /// and a host that configured the session and then drew without passing the closure again would be
+  /// painting faces the boxes were not measured for — every label off its baseline, from a seam that
+  /// looked wired. So the default is the one that cannot be wrong, and stating it here overrides both
+  /// measuring and drawing only when a caller means to.
+  private var resolveFont: ((String) -> CTFont?)? { resolveFontOverride ?? session?.resolveFont }
 
   /// The canvas's size, remembered so a gesture can undo the same placement the drawing used.
   @State private var canvasSize: CGSize = .zero
@@ -540,9 +552,14 @@ public struct VegaChartView: View {
     // is the renderer's deliberate answer to "shaping text is the platform's job".
     // The scale the *layout* was measured with, so the glyphs fill the boxes the engine reserved.
     let scale = textScale
+    // Captured beside the scale, and for the same reason: both describe how the layout was measured,
+    // and the drawing has to be told both or it paints something the boxes were not reserved for.
+    let faces = resolveFont
     var target = CoreGraphicsTarget(
       context: context,
-      drawText: { run, fill, ctx in CoreTextDrawing.draw(run, fill, ctx, textScale: scale) },
+      drawText: { run, fill, ctx in
+        CoreTextDrawing.draw(run, fill, ctx, textScale: scale, resolveFont: faces)
+      },
       // The seam `CoreGraphicsTarget` has always had and this view never passed. Its decode cache is
       // static, so a resolver is asked once per URL for the process rather than once per frame.
       resolveImage: resolveImage,

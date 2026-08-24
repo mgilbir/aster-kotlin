@@ -51,6 +51,17 @@ import dev.aster.vega.scene.Transform2D
 public class AndroidCanvasSceneRenderer(
   private val textEngine: AndroidTextEngine = AndroidTextEngine(),
   private val imageResolver: AndroidImageResolver = AndroidImageResolver.None,
+  /**
+   * Told the first time a URL cannot be resolved, and not again for that URL.
+   *
+   * An unresolved image leaves a hole in the chart and the draw carries on, which is right — a
+   * chart is better with one mark missing than not drawn at all — and a diagnostic is the only
+   * trace. A host that wants to react to the hole rather than read a list gets this.
+   *
+   * **Called from the draw.** Treat it as a report and not as a place to set state that a layout
+   * pass would read: launch, log, enqueue.
+   */
+  private val onUnresolvedImage: ((String) -> Unit)? = null,
 ) {
 
   private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -402,6 +413,51 @@ public class AndroidCanvasSceneRenderer(
 
   private val rasterCache = HashMap<Long, Bitmap>()
 
+  /**
+   * A URL asked of the resolver **once**, not once per frame.
+   *
+   * `render` runs per frame and an `image` mark resolves its URL every time it is drawn, so a
+   * resolver reachable by a host — which is new; until now nothing outside this module could set
+   * one — would have been called on every frame of every pan, for every image on the chart. A host
+   * fetching over the network would have been doing it sixty times a second.
+   *
+   * **A refusal is remembered too**, which is the half that is easy to miss: caching only successes
+   * sends an address that has already said no back to the resolver on every frame, which is the
+   * expensive case rather than the cheap one. It is also what makes [onUnresolvedImage] once per
+   * URL rather than once per frame, and a report that fired per frame could not be built on.
+   *
+   * A null value means "asked, and there is nothing there". [clearImageCache] gives a transient
+   * failure a second chance, and is how a host says the image behind a URL has changed.
+   */
+  private val urlCache = HashMap<String, Bitmap?>()
+
+  private fun resolveUrl(url: String): Bitmap? {
+    // A raster the engine produced carries its pixels and an empty address; it is handled above,
+    // and
+    // reaching here with an empty URL means there was nothing to ask for. Not the host's business,
+    // and not something to report as an unresolved image either.
+    if (url.isEmpty()) return null
+    if (urlCache.containsKey(url)) return urlCache[url]
+    val bitmap = imageResolver.resolve(url)
+    // The same small bound the raster cache keeps, for the same reason. Clearing may let a URL be
+    // reported a second time, which is the honest cost of not growing without limit.
+    if (urlCache.size > URL_CACHE_LIMIT) urlCache.clear()
+    urlCache[url] = bitmap
+    if (bitmap == null) onUnresolvedImage?.invoke(url)
+    return bitmap
+  }
+
+  /**
+   * Forgets every resolved and refused URL, so the next draw asks the resolver again.
+   *
+   * For a host whose image behind an address has changed, and for one giving a transient failure
+   * another go. Engine-produced rasters are not affected: they are keyed by the digest of their own
+   * pixels and cannot go stale.
+   */
+  public fun clearImageCache() {
+    urlCache.clear()
+  }
+
   private fun drawImage(
     node: ImageNode,
     canvas: Canvas,
@@ -415,7 +471,7 @@ public class AndroidCanvasSceneRenderer(
     // for its (empty) URL is how every one of those was silently dropped — the SVG renderer encodes
     // them
     // as data URLs and drew them all along, so the two renderers disagreed about a whole mark type.
-    val bitmap = node.raster?.let { rasterBitmap(it) } ?: imageResolver.resolve(node.url)
+    val bitmap = node.raster?.let { rasterBitmap(it) } ?: resolveUrl(node.url)
     if (bitmap == null) {
       // Never silently omit a mark (PROJECT_BRIEF.md 13.3).
       diagnostics.error(
@@ -666,6 +722,13 @@ public class AndroidCanvasSceneRenderer(
      * case.
      */
     private const val RASTER_CACHE_LIMIT: Int = 16
+
+    /**
+     * How many resolved addresses to keep, successes and refusals together. Larger than the raster
+     * bound because an entry may be a remembered `null`, which costs nothing to hold and saves a
+     * fetch per frame.
+     */
+    private const val URL_CACHE_LIMIT: Int = 64
   }
 }
 

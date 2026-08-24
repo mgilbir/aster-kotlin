@@ -1,0 +1,187 @@
+vega-android-canvas  final class dev.aster.vega.android.AndroidTextEngine$Companion {
+    public dev.aster.vega.android.AndroidTextEngine$Companion(kotlin.jvm.internal.DefaultConstructorMarker);
+vega-android-canvas  final class dev.aster.vega.android.AndroidTextEngine$LineMetrics {
+    public dev.aster.vega.android.AndroidTextEngine$LineMetrics(double, double, double);
+    public final double getAscent();
+    public final double getDescent();
+    public final double getLineHeight();
+vega-android-canvas  final class dev.aster.vega.android.AndroidTextEngine$TypefaceKey {
+    public boolean equals(java.lang.Object);
+    public dev.aster.vega.android.AndroidTextEngine$TypefaceKey(java.lang.String, int, boolean);
+    public final boolean component3();
+    public final boolean getItalic();
+    public final dev.aster.vega.android.AndroidTextEngine$TypefaceKey copy(java.lang.String, int, boolean);
+    public final int component2();
+    public final int getWeight();
+    public final java.lang.String component1();
+    public final java.lang.String getFamily();
+    public int hashCode();
+    public java.lang.String toString();
+    public static dev.aster.vega.android.AndroidTextEngine$TypefaceKey copy$default(dev.aster.vega.android.AndroidTextEngine$TypefaceKey, java.lang.String, int, boolean, int, java.lang.Object);
+vega-android-canvas  final class dev.aster.vega.android.VegaAccessibilityHelper$VirtualNode {
+    public boolean equals(java.lang.Object);
+    public dev.aster.vega.android.VegaAccessibilityHelper$VirtualNode(int, java.lang.String, dev.aster.vega.scene.RectD, dev.aster.vega.scene.SceneNode, boolean, boolean, java.lang.String);
+    public final boolean component5();
+    public final boolean component6();
+    public final boolean getActivatable();
+    public final boolean getSelected();
+    public final dev.aster.vega.android.VegaAccessibilityHelper$VirtualNode copy(int, java.lang.String, dev.aster.vega.scene.RectD, dev.aster.vega.scene.SceneNode, boolean, boolean, java.lang.String);
+    public final dev.aster.vega.scene.RectD component3();
+    public final dev.aster.vega.scene.RectD getBounds();
+    public final dev.aster.vega.scene.SceneNode component4();
+    public final dev.aster.vega.scene.SceneNode getNode();
+    public final int component1();
+    public final int getId();
+    public final java.lang.String component2();
+    public final java.lang.String component7();
+    public final java.lang.String getLabel();
+    public final java.lang.String getRoleDescription();
+    public int hashCode();
+    public java.lang.String toString();
+    public static dev.aster.vega.android.VegaAccessibilityHelper$VirtualNode copy$default(dev.aster.vega.android.VegaAccessibilityHelper$VirtualNode, int, java.lang.String, dev.aster.vega.scene.RectD, dev.aster.vega.scene.SceneNode, boolean, boolean, java.lang.String, int, java.lang.Object);
+vega-android-canvas  public class dev.aster.vega.android.VegaChartView extends android.view.View {
+    public boolean dispatchKeyEvent(android.view.KeyEvent);
+    public boolean onGenericMotionEvent(android.view.MotionEvent);
+    public boolean onHoverEvent(android.view.MotionEvent);
+    public boolean onKeyDown(int, android.view.KeyEvent);
+    public boolean onTouchEvent(android.view.MotionEvent);
+    public dev.aster.vega.android.VegaChartView(android.content.Context);
+    public dev.aster.vega.android.VegaChartView(android.content.Context, android.util.AttributeSet);
+    public dev.aster.vega.android.VegaChartView(android.content.Context, android.util.AttributeSet, int);
+    public dev.aster.vega.android.VegaChartView(android.content.Context, android.util.AttributeSet, int, int, kotlin.jvm.internal.DefaultConstructorMarker);
+    public final androidx.customview.widget.ExploreByTouchHelper accessibilityHelperForTesting$vega_android_canvas();
+    public final boolean getTooltipsEnabled();
+    public final dev.aster.vega.android.AndroidImageResolver getImageResolver();
+    public final dev.aster.vega.android.AndroidTextEngine getChartTextEngine();
+    public final dev.aster.vega.android.AndroidTextEngine newCompatibleTextEngine();
+    public final dev.aster.vega.runtime.VegaChartController getController();
+    public final dev.aster.vega.scene.ScenePlacement placement();
+    public final int getAccessibilityMaxExposedMarks();
+    public final kotlin.jvm.functions.Function1<dev.aster.vega.scene.ScenePlacement, kotlin.Unit> getOnPlaced();
+    public final kotlin.jvm.functions.Function1<java.lang.String, android.graphics.Typeface> getFontResolver();
+    public final kotlin.jvm.functions.Function1<java.lang.String, kotlin.Unit> getOnUnresolvedImage();
+    public final void clearImageCache();
+    public final void invalidateIfStale();
+    public final void setAccessibilityMaxExposedMarks(int);
+    public final void setController(dev.aster.vega.runtime.VegaChartController);
+    public final void setFontResolver(kotlin.jvm.functions.Function1<? super java.lang.String, ? extends android.graphics.Typeface>);
+    public final void setImageResolver(dev.aster.vega.android.AndroidImageResolver);
+    public final void setOnPlaced(kotlin.jvm.functions.Function1<? super dev.aster.vega.scene.ScenePlacement, kotlin.Unit>);
+    public final void setOnUnresolvedImage(kotlin.jvm.functions.Function1<? super java.lang.String, kotlin.Unit>);
+    public final void setScene(dev.aster.vega.scene.Scene);
+    public final void setTooltipsEnabled(boolean);
+    public static final dev.aster.vega.android.VegaChartView$Companion Companion;
+    public static final double WHEEL_ZOOM_STEP;
+vega-android-canvas  public final class dev.aster.vega.android.AndroidCanvasSceneRenderer {
+    public dev.aster.vega.android.AndroidCanvasSceneRenderer();
+    public dev.aster.vega.android.AndroidCanvasSceneRenderer(dev.aster.vega.android.AndroidTextEngine, dev.aster.vega.android.AndroidImageResolver, kotlin.jvm.functions.Function1, int, kotlin.jvm.internal.DefaultConstructorMarker);
+    public dev.aster.vega.android.AndroidCanvasSceneRenderer(dev.aster.vega.android.AndroidTextEngine, dev.aster.vega.android.AndroidImageResolver, kotlin.jvm.functions.Function1<? super java.lang.String, kotlin.Unit>);
+    public final java.util.List<dev.aster.vega.model.VegaDiagnostic> getLastDiagnostics();
+    public final void clearImageCache();
+    public final void render(dev.aster.vega.scene.Scene, android.graphics.Canvas, android.graphics.RectF, float);
+    public static final dev.aster.vega.android.AndroidCanvasSceneRenderer$Companion Companion;
+    public static final int GRADIENT_STOP_LIMIT;
+vega-android-canvas  public final class dev.aster.vega.android.AndroidCanvasSceneRenderer$Companion {
+    public dev.aster.vega.android.AndroidCanvasSceneRenderer$Companion(kotlin.jvm.internal.DefaultConstructorMarker);
+vega-android-canvas  public final class dev.aster.vega.android.AndroidCanvasSceneRendererKt {
+    public static final android.graphics.Matrix toMatrix(dev.aster.vega.scene.Transform2D, android.graphics.Matrix);
+    public static final android.graphics.Path toAndroidPath(dev.aster.vega.scene.PathData, android.graphics.Path);
+vega-android-canvas  public final class dev.aster.vega.android.AndroidImageResolver$Companion {
+    public final dev.aster.vega.android.AndroidImageResolver getNone();
+vega-android-canvas  public final class dev.aster.vega.android.AndroidTextEngine extends dev.aster.vega.scene.MeasuredTextEngine {
+    public dev.aster.vega.android.AndroidTextEngine();
+    public dev.aster.vega.android.AndroidTextEngine(float, kotlin.jvm.functions.Function1, int, kotlin.jvm.internal.DefaultConstructorMarker);
+    public dev.aster.vega.android.AndroidTextEngine(float, kotlin.jvm.functions.Function1<? super java.lang.String, ? extends android.graphics.Typeface>);
+    public double advanceOf(java.lang.String, dev.aster.vega.scene.TextStyle);
+    public double ascentOf(dev.aster.vega.scene.TextStyle);
+    public double defaultLineHeightOf(dev.aster.vega.scene.TextStyle);
+    public double descentOf(dev.aster.vega.scene.TextStyle);
+    public final android.graphics.Paint$Align androidAlign$vega_android_canvas(dev.aster.vega.scene.TextAlign);
+    public final android.text.TextPaint paintFor$vega_android_canvas(dev.aster.vega.scene.TextStyle);
+    public static final int MAX_CACHED_STYLES;
+vega-android-canvas  public final class dev.aster.vega.android.BitmapExport {
+    public boolean equals(java.lang.Object);
+    public dev.aster.vega.android.BitmapExport(android.graphics.Bitmap, java.util.List<dev.aster.vega.model.VegaDiagnostic>);
+    public final android.graphics.Bitmap component1();
+    public final android.graphics.Bitmap getBitmap();
+    public final dev.aster.vega.android.BitmapExport copy(android.graphics.Bitmap, java.util.List<dev.aster.vega.model.VegaDiagnostic>);
+    public final java.util.List<dev.aster.vega.model.VegaDiagnostic> component2();
+    public final java.util.List<dev.aster.vega.model.VegaDiagnostic> getWarnings();
+    public int hashCode();
+    public java.lang.String toString();
+    public static dev.aster.vega.android.BitmapExport copy$default(dev.aster.vega.android.BitmapExport, android.graphics.Bitmap, java.util.List, int, java.lang.Object);
+vega-android-canvas  public final class dev.aster.vega.android.BitmapExportOptions {
+    public boolean equals(java.lang.Object);
+    public dev.aster.vega.android.BitmapExportOptions();
+    public dev.aster.vega.android.BitmapExportOptions(java.lang.Double, java.lang.Double, float, dev.aster.vega.scene.SceneColor, android.graphics.Bitmap$Config);
+    public dev.aster.vega.android.BitmapExportOptions(java.lang.Double, java.lang.Double, float, dev.aster.vega.scene.SceneColor, android.graphics.Bitmap$Config, int, kotlin.jvm.internal.DefaultConstructorMarker);
+    public final android.graphics.Bitmap$Config component5();
+    public final android.graphics.Bitmap$Config getConfig();
+    public final dev.aster.vega.android.BitmapExportOptions copy(java.lang.Double, java.lang.Double, float, dev.aster.vega.scene.SceneColor, android.graphics.Bitmap$Config);
+    public final dev.aster.vega.scene.SceneColor component4();
+    public final dev.aster.vega.scene.SceneColor getBackground();
+    public final float component3();
+    public final float getPixelScale();
+    public final java.lang.Double component1();
+    public final java.lang.Double component2();
+    public final java.lang.Double getHeight();
+    public final java.lang.Double getWidth();
+    public int hashCode();
+    public java.lang.String toString();
+    public static dev.aster.vega.android.BitmapExportOptions copy$default(dev.aster.vega.android.BitmapExportOptions, java.lang.Double, java.lang.Double, float, dev.aster.vega.scene.SceneColor, android.graphics.Bitmap$Config, int, java.lang.Object);
+vega-android-canvas  public final class dev.aster.vega.android.ByteExport {
+    public boolean equals(java.lang.Object);
+    public dev.aster.vega.android.ByteExport(byte[], java.util.List<dev.aster.vega.model.VegaDiagnostic>);
+    public final byte[] component1();
+    public final byte[] getBytes();
+    public final dev.aster.vega.android.ByteExport copy(byte[], java.util.List<dev.aster.vega.model.VegaDiagnostic>);
+    public final java.util.List<dev.aster.vega.model.VegaDiagnostic> component2();
+    public final java.util.List<dev.aster.vega.model.VegaDiagnostic> getWarnings();
+    public int hashCode();
+    public java.lang.String toString();
+    public static dev.aster.vega.android.ByteExport copy$default(dev.aster.vega.android.ByteExport, byte[], java.util.List, int, java.lang.Object);
+vega-android-canvas  public final class dev.aster.vega.android.SceneExporter {
+    public dev.aster.vega.android.SceneExporter();
+    public dev.aster.vega.android.SceneExporter(dev.aster.vega.android.AndroidCanvasSceneRenderer);
+    public dev.aster.vega.android.SceneExporter(dev.aster.vega.android.AndroidCanvasSceneRenderer, int, kotlin.jvm.internal.DefaultConstructorMarker);
+    public final dev.aster.vega.android.BitmapExport toBitmap(dev.aster.vega.scene.Scene, dev.aster.vega.android.BitmapExportOptions);
+    public final dev.aster.vega.android.ByteExport toPdf(dev.aster.vega.scene.Scene, double, double);
+    public final dev.aster.vega.android.ByteExport toPng(dev.aster.vega.scene.Scene, dev.aster.vega.android.BitmapExportOptions, int);
+    public static dev.aster.vega.android.BitmapExport toBitmap$default(dev.aster.vega.android.SceneExporter, dev.aster.vega.scene.Scene, dev.aster.vega.android.BitmapExportOptions, int, java.lang.Object);
+    public static dev.aster.vega.android.ByteExport toPdf$default(dev.aster.vega.android.SceneExporter, dev.aster.vega.scene.Scene, double, double, int, java.lang.Object);
+    public static dev.aster.vega.android.ByteExport toPng$default(dev.aster.vega.android.SceneExporter, dev.aster.vega.scene.Scene, dev.aster.vega.android.BitmapExportOptions, int, int, java.lang.Object);
+vega-android-canvas  public final class dev.aster.vega.android.VegaAccessibilityHelper extends androidx.customview.widget.ExploreByTouchHelper {
+    public dev.aster.vega.android.VegaAccessibilityHelper(dev.aster.vega.android.VegaChartView);
+    public final void invalidateSemanticTree();
+    public static final dev.aster.vega.android.VegaAccessibilityHelper$Companion Companion;
+    public static final int MAX_EXPOSED_MARKS;
+vega-android-canvas  public final class dev.aster.vega.android.VegaAccessibilityHelper$Companion {
+    public dev.aster.vega.android.VegaAccessibilityHelper$Companion(kotlin.jvm.internal.DefaultConstructorMarker);
+vega-android-canvas  public final class dev.aster.vega.android.VegaChartView$Companion {
+    public dev.aster.vega.android.VegaChartView$Companion(kotlin.jvm.internal.DefaultConstructorMarker);
+vega-android-canvas  public interface dev.aster.vega.android.AndroidImageResolver {
+    public abstract android.graphics.Bitmap resolve(java.lang.String);
+    public static final dev.aster.vega.android.AndroidImageResolver$Companion Companion;
+vega-android-canvas  }
+vega-android-canvas  }
+vega-android-canvas  }
+vega-android-canvas  }
+vega-android-canvas  }
+vega-android-canvas  }
+vega-android-canvas  }
+vega-android-canvas  }
+vega-android-canvas  }
+vega-android-canvas  }
+vega-android-canvas  }
+vega-android-canvas  }
+vega-android-canvas  }
+vega-android-canvas  }
+vega-android-canvas  }
+vega-android-canvas  }
+vega-android-canvas  }
+vega-android-canvas  }
+vega-compose  public final class dev.aster.vega.compose.VegaChartKt {
+    public static final dev.aster.vega.runtime.VegaChartController rememberVegaChartController(dev.aster.vega.scene.Scene, dev.aster.vega.model.locale.VegaLocale, androidx.compose.runtime.Composer, int, int);
+    public static final void VegaChart(dev.aster.vega.runtime.VegaChartController, androidx.compose.ui.Modifier, kotlin.jvm.functions.Function1<? super java.lang.String, ? extends android.graphics.Typeface>, int, boolean, dev.aster.vega.android.AndroidImageResolver, kotlin.jvm.functions.Function1<? super java.lang.String, kotlin.Unit>, kotlin.jvm.functions.Function1<? super dev.aster.vega.scene.ScenePlacement, kotlin.Unit>, kotlin.jvm.functions.Function1<? super dev.aster.vega.runtime.ChartEvent, kotlin.Unit>, androidx.compose.runtime.Composer, int, int);
+    public static final void VegaChart(dev.aster.vega.scene.Scene, androidx.compose.ui.Modifier, kotlin.jvm.functions.Function1<? super java.lang.String, ? extends android.graphics.Typeface>, int, boolean, dev.aster.vega.android.AndroidImageResolver, kotlin.jvm.functions.Function1<? super java.lang.String, kotlin.Unit>, kotlin.jvm.functions.Function1<? super dev.aster.vega.scene.ScenePlacement, kotlin.Unit>, kotlin.jvm.functions.Function1<? super dev.aster.vega.runtime.ChartEvent, kotlin.Unit>, androidx.compose.runtime.Composer, int, int);
+vega-compose  }
