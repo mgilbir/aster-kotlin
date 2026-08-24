@@ -59,6 +59,18 @@ section here does not get released.
   which move. No bundled locale is written with markers, so this only ever affected a
   host-supplied one.
 
+- **`vega-compose` reaches the seams the view underneath already had.** `VegaChart` took a
+  controller or a scene, a modifier and `onEvent`, and nothing else — so a host on the
+  View-based artifact could not register a font family, raise the accessibility threshold or
+  turn off the built-in tooltip, though `VegaChartView` has all three and the Compose API is
+  a wrapper around that very view. `fontResolver`, `accessibilityMaxExposedMarks` and
+  `tooltipsEnabled` are now parameters on both overloads. `onEvent` stays last, and anything
+  added later goes before it: Kotlin binds a trailing lambda to the final parameter, so
+  `VegaChart(controller) { … }` means `onEvent` only while `onEvent` is last. Pinned by
+  `CallShapeTest`, which `scripts/check.sh` now compiles — it never compiled any
+  `androidTest` source set before, so four of them could have stopped compiling unnoticed.
+  (#99)
+
 ### Changed
 
 - **A locale gets one date, whichever grammar the document was written in.** Vega derived

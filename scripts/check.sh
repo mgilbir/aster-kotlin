@@ -53,6 +53,21 @@ else
   echo "      Only a macOS run covers them; linuxX64 below is the portability check available here."
 fi
 
+# The instrumented suites are **compiled** here, though they are run on a device. They were compiled
+# by nothing: `test` covers the JVM source sets and `:demo:assembleDebug` covers the demo's `main`,
+# so four `androidTest` source sets could stop compiling and every gate stayed green until somebody
+# attached a device. That also made a whole class of guard useless — a call-shape assertion is a
+# file that must *compile*, and one living in a source set nobody compiles asserts nothing.
+# `CallShapeTest` in `:vega-compose` is the first of them.
+#
+# `:benchmark` is release-only, hence the different variant.
+instrumented_tasks=(
+  :vega-compose:compileDebugAndroidTestKotlin
+  :vega-android-canvas:compileDebugAndroidTestKotlin
+  :demo:compileDebugAndroidTestKotlin
+  :benchmark:compileReleaseAndroidTestKotlin
+)
+
 # `--continue` because the inventory is the point: without it the first failing module aborts the
 # build, and a run that stopped after vega-dataflow looks much like one that passed the other eight.
 # A failing task still fails the build.
@@ -62,6 +77,7 @@ fi
   checkBytecodeLevel \
   test \
   compileKotlinLinuxX64 \
+  "${instrumented_tasks[@]}" \
   "${host_tasks[@]}" \
   lint \
   :demo:assembleDebug

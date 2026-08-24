@@ -12,6 +12,7 @@ import dev.aster.vega.android.VegaChartView
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.runtime.ChartEvent
 import dev.aster.vega.runtime.VegaChartController
+import dev.aster.vega.scene.AccessibilityTree
 import dev.aster.vega.scene.Scene
 
 /**
@@ -25,17 +26,55 @@ import dev.aster.vega.scene.Scene
  *
  * Recomposition does not reparse or recompile anything: the [controller] owns the scene, and the
  * view is only told to re-check its revision.
+ *
+ * Every seam the view has is a parameter here. Hosting the view is what makes the two APIs agree,
+ * and a seam reachable from one and not the other undoes that: a host on this artifact could not
+ * register a font or raise the accessibility threshold at all, though the view underneath had both.
+ *
+ * **[onEvent] stays last, and anything added later goes before it.** Kotlin binds a trailing lambda
+ * to the final parameter, so `VegaChart(controller) { event -> … }` — the idiom — means [onEvent]
+ * only while [onEvent] is last. A parameter appended after it silently captures that lambda if it
+ * is function-typed and rejects it if it is not, and either way every host writing the idiom is
+ * broken by a change that looks additive. The Swift package learned this from the other side, where
+ * a trailing closure binds to the *first* eligible parameter rather than the last; the rule there
+ * is the mirror image and is written beside `onPlaced` for the same reason.
  */
 @Composable
 public fun VegaChart(
   controller: VegaChartController,
   modifier: Modifier = Modifier,
+  /**
+   * Resolves a font family named by a specification to a typeface, or null to leave it to the
+   * platform. See [VegaChartView.fontResolver] — the same seam, and the same caveat: text metrics
+   * are decided when a specification is compiled, so a controller compiling with a different engine
+   * measures with different faces.
+   */
+  fontResolver: ((String) -> android.graphics.Typeface?)? = null,
+  /** How many marks are exposed individually to a screen reader; see [VegaChartView]. */
+  accessibilityMaxExposedMarks: Int = AccessibilityTree.MAX_EXPOSED_MARKS,
+  /** Whether the view draws the tooltip itself, or leaves it to a host that renders its own. */
+  tooltipsEnabled: Boolean = true,
   onEvent: ((ChartEvent) -> Unit)? = null,
 ) {
   AndroidView(
     modifier = modifier,
-    factory = { context -> VegaChartView(context).apply { this.controller = controller } },
+    factory = { context ->
+      VegaChartView(context).apply {
+        // Before the controller, because assigning it compiles, and `fontResolver` is documented as
+        // wanting to be set before the first compile — the view rebuilds its text engine when it
+        // changes, and a chart already measured was measured with whatever this was then.
+        this.fontResolver = fontResolver
+        this.accessibilityMaxExposedMarks = accessibilityMaxExposedMarks
+        this.tooltipsEnabled = tooltipsEnabled
+        this.controller = controller
+      }
+    },
     update = { view ->
+      // Assigned unconditionally: every one of these setters returns early when the value has not
+      // changed, so recomposition costs a comparison and does not churn the view.
+      view.fontResolver = fontResolver
+      view.accessibilityMaxExposedMarks = accessibilityMaxExposedMarks
+      view.tooltipsEnabled = tooltipsEnabled
       // Assigning the same controller would reset the view's state, so only swap when it changed.
       if (view.controller !== controller) view.controller = controller
       view.invalidateIfStale()
@@ -61,6 +100,9 @@ public fun VegaChart(
 public fun VegaChart(
   scene: Scene,
   modifier: Modifier = Modifier,
+  fontResolver: ((String) -> android.graphics.Typeface?)? = null,
+  accessibilityMaxExposedMarks: Int = AccessibilityTree.MAX_EXPOSED_MARKS,
+  tooltipsEnabled: Boolean = true,
   onEvent: ((ChartEvent) -> Unit)? = null,
 ) {
   val controller = remember { VegaChartController.fromScene(scene) }
@@ -68,7 +110,18 @@ public fun VegaChart(
     if (controller.snapshot.scene !== scene) controller.setScene(scene)
     onDispose {}
   }
-  VegaChart(controller = controller, modifier = modifier, onEvent = onEvent)
+  // The same list, forwarded rather than a subset: the two overloads differ in where the scene
+  // comes
+  // from and in nothing else, and a seam on one and not the other is the defect this change is
+  // about.
+  VegaChart(
+    controller = controller,
+    modifier = modifier,
+    fontResolver = fontResolver,
+    accessibilityMaxExposedMarks = accessibilityMaxExposedMarks,
+    tooltipsEnabled = tooltipsEnabled,
+    onEvent = onEvent,
+  )
 }
 
 /**
