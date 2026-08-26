@@ -139,4 +139,30 @@ final class FontResolverTests: XCTestCase {
     let session = ChartSession(textEngine: CoreTextTextEngine(resolveFont: { _ in self.courier() }))
     XCTAssertNotNil(session.resolveFont, "read back off the engine it was given")
   }
+
+  func testAFamilyNothingCouldAnswerIsRecorded() {
+    // CoreText answers an unknown family with the system font: legible, wrong, and silent. Two of
+    // the three renderers fell back that way and only the Compose one said so, which is part of why
+    // they disagreed about reading a stack for as long as they did (#123).
+    let engine = CoreTextTextEngine()
+    _ = engine.advanceOf(line: "M", style: style("Definitely Not Installed"))
+
+    XCTAssertEqual(["Definitely Not Installed"], engine.unresolvedFontFamilies)
+  }
+
+  func testAStackThatEndsInAGenericIsNotAMiss() {
+    // A well-formed stack asks for the reader's default as its last resort and gets it. Recording
+    // that as unresolved would make the set noise, and a set nobody can act on gets ignored.
+    let engine = CoreTextTextEngine()
+    _ = engine.advanceOf(line: "M", style: style("sans-serif"))
+
+    XCTAssertEqual([], engine.unresolvedFontFamilies)
+  }
+
+  func testAFamilyTheHostAnsweredIsNotAMiss() {
+    let engine = CoreTextTextEngine(resolveFont: { _ in self.courier() })
+    _ = engine.advanceOf(line: "M", style: style("Chart Sans"))
+
+    XCTAssertEqual([], engine.unresolvedFontFamilies, "the host answered, so nothing was missed")
+  }
 }

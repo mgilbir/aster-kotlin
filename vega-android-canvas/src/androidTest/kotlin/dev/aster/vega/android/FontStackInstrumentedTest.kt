@@ -84,4 +84,38 @@ class FontStackInstrumentedTest {
 
     assertEquals("a stack naming monospace should measure as monospace", mono, stack, 0.01)
   }
+
+  @Test
+  fun aFamilyNothingCouldAnswerIsRecorded() {
+    // Android answers an unknown name with the default face: legible, wrong, and silent. Only the
+    // Compose Multiplatform engine said so, which is part of why the three renderers disagreed
+    // about
+    // reading a stack for as long as they did (#123).
+    val engine = AndroidTextEngine(typefaceResolver = { null })
+    engine.advanceOf("M", style("Definitely Not Installed"))
+
+    assertEquals(setOf("Definitely Not Installed"), engine.unresolvedFontFamilies)
+  }
+
+  @Test
+  fun aStackThatEndsInAGenericIsNotAMiss() {
+    // A well-formed stack asks for a generic as its last resort and gets it. Recording that would
+    // make the set noise, and a set nobody can act on gets ignored.
+    val engine = AndroidTextEngine(typefaceResolver = { null })
+    engine.advanceOf("M", style("Noto Sans, sans-serif"))
+
+    assertEquals(emptySet<String>(), engine.unresolvedFontFamilies)
+  }
+
+  @Test
+  fun aFamilyTheHostAnsweredIsNotAMiss() {
+    // What the host returns is its business; that it returned something is the fact. The Apple
+    // engine got this wrong first — it compared the resulting face's name against the requested
+    // one,
+    // which records a host answering `Chart Sans` with a different face as a miss.
+    val engine = AndroidTextEngine(typefaceResolver = { Typeface.MONOSPACE })
+    engine.advanceOf("M", style("Chart Sans"))
+
+    assertEquals(emptySet<String>(), engine.unresolvedFontFamilies)
+  }
 }

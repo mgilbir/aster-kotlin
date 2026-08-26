@@ -109,7 +109,52 @@ public final class CoreTextTextEngine: MeasuredTextEngine {
     return height > 0 ? Double(height) : style.fontSize + 2.0
   }
 
+  /**
+   The font families this engine drew in something else.
+
+   CoreText answers an unknown family with the system font: legible, not what the specification
+   asked for, and silent. The Compose Multiplatform engine has collected these since it had a
+   resolver; this one and the Android view did not, so two of the three renderers fell back without
+   saying so — a fair part of why they disagreed about how to read a CSS stack for as long as they
+   did (#123).
+
+   Filled while **measuring**, so it is complete once a chart has been laid out with this engine. A
+   well-formed stack is not in here: one ending in a generic resolves on it.
+   */
+  public private(set) var unresolvedFontFamilies: Set<String> = []
+
   private func font(for style: TextStyle) -> CTFont {
+    // **The resolver is wrapped so the engine knows whether it answered**, which is what
+    // `ComposeTextEngine` does and for the reason found by testing this: comparing the resulting
+    // font's family against the requested name records a *hit* as a miss, because a host answering
+    // `Chart Sans` with Courier is exactly the case the seam exists for. What the host returns is
+    // its business; that it returned something is the fact.
+    var hostAnswered = false
+    let watched: ((String) -> CTFont?)? =
+      resolveFont.map { resolver in
+        { name in
+          let supplied = resolver(name)
+          if supplied != nil { hostAnswered = true }
+          return supplied
+        }
+      }
+    let resolved = resolvedFont(for: style, resolveFont: watched)
+    if hostAnswered { return resolved }
+
+    // Nothing answered, so this is CoreText's own doing. A stack of generics is not a miss: it asked
+    // for the reader's default and got it.
+    let wanted = FontStack.shared.families(stack: style.fontFamily)
+      .filter { !FontStack.shared.isGeneric(name: $0) }
+    if !wanted.isEmpty {
+      let got = (CTFontCopyFamilyName(resolved) as String).lowercased()
+      if !wanted.contains(where: { $0.lowercased() == got }) {
+        unresolvedFontFamilies.insert(style.fontFamily)
+      }
+    }
+    return resolved
+  }
+
+  private func resolvedFont(for style: TextStyle, resolveFont: ((String) -> CTFont?)?) -> CTFont {
     CoreTextFonts.font(
       family: style.fontFamily,
       size: style.fontSize * textScale,

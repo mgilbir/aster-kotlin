@@ -26,6 +26,15 @@ section here does not get released.
   already answering them and the reasoning had it backwards. A host that registers
   `sans-serif` has said what its sans is. (#123)
 
+- **Every renderer says which font it could not find.** `unresolvedFontFamilies` is on the
+  Android and Apple text engines now, as it has been on the Compose Multiplatform one:
+  both platforms answer an unknown family with a default face, which is legible, is not
+  what the specification asked for, and was **silent**. Two of the three renderers falling
+  back without saying so is a fair part of why they disagreed about reading a CSS stack for
+  as long as they did. A stack that ends in a generic is not a miss — it asked for the
+  reader's default and got it — and neither is a family the host answered, whatever face it
+  answered with. (#123)
+
 - **`ChartGestures.none` claims no touches, as it always said it did.** It documented
   itself as "the same as passing no session", and hit testing was gated on whether a
   session was present rather than on the gesture set — so a chart with a session and

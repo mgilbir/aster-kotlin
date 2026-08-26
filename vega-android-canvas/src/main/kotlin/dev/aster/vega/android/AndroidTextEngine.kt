@@ -173,6 +173,26 @@ public class AndroidTextEngine(
     }
   }
 
+  /**
+   * The font families this engine drew in something else.
+   *
+   * A name it cannot resolve does not fail: Android answers with the default face, which is legible
+   * and is not what the specification asked for, and nothing said so. The Compose Multiplatform
+   * engine has collected these since it had a resolver; this one and the Apple renderer did not, so
+   * two of the three renderers fell back **silently** — which is a fair part of why they disagreed
+   * about how to read a CSS stack for as long as they did (#123).
+   *
+   * There is no diagnostics channel through a text engine, so the facts are collected and a host
+   * reads them when it wants to, exactly as `unresolvedImages` works.
+   *
+   * A well-formed stack is not in here: `"Helvetica Neue, Arial, sans-serif"` ends in a generic and
+   * resolves on it. What lands here is a stack with nothing behind it.
+   */
+  public val unresolvedFontFamilies: Set<String>
+    get() = unresolved.toSet()
+
+  private val unresolved = LinkedHashSet<String>()
+
   private fun createTypeface(family: String, weight: Int, italic: Boolean): Typeface {
     // **Each name in the stack, in order.** `family` is what the specification wrote — a CSS list,
     // often `"Noto Sans, Chart Sans"` — and this used to hand the whole string to the resolver, so
@@ -211,7 +231,15 @@ public class AndroidTextEngine(
         "monospace",
         "courier",
         "courier new" -> Typeface.MONOSPACE
-        else -> Typeface.create(FontStack.families(family).firstOrNull() ?: family, Typeface.NORMAL)
+        else -> {
+          val first = FontStack.families(family).firstOrNull() ?: family
+          val created = Typeface.create(first, Typeface.NORMAL)
+          // `Typeface.create` never fails: an unknown name answers the default face. Comparing
+          // against it is the only way to tell "this device has that font" from "it does not", and
+          // without the comparison a chart draws in the wrong face and says nothing.
+          if (created == Typeface.DEFAULT && family.isNotBlank()) unresolved.add(family)
+          created
+        }
       }
     return styled(base, weight, italic)
   }

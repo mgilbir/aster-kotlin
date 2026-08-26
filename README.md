@@ -952,6 +952,7 @@ its seam is removed.
 | Engine-drawn tooltip | `tooltipsEnabled` | `tooltipsEnabled` | host draws its own | host draws its own |
 | Font family a specification names | `fontResolver` | `fontResolver` | `ComposeTextEngine` registry | `resolveFont` |
 | Which name that resolver is offered | every entry in the CSS stack, in order — `FontStack` | same | same | same |
+| A family nothing could answer | `unresolvedFontFamilies` | via the view | `unresolvedFontFamilies` | `unresolvedFontFamilies` |
 | Spoken captions | the controller's `VegaLocale.captions` | same | `captions` | `captions` |
 | Interaction | the controller's `events` | `onEvent` | `onTap`, `onPan`, `onZoom`, … | `session` + `gestures` |
 | Where the chart was drawn | `onPlaced`, `placement()` | `onPlaced` | `onPlaced` | `onPlaced` |
