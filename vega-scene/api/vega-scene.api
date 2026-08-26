@@ -248,6 +248,13 @@ public final class dev/aster/vega/scene/Fill$Companion {
 	public final fun of (Ldev/aster/vega/scene/SceneColor;)Ldev/aster/vega/scene/Fill;
 }
 
+public final class dev/aster/vega/scene/FontStack {
+	public static final field INSTANCE Ldev/aster/vega/scene/FontStack;
+	public final fun families (Ljava/lang/String;)Ljava/util/List;
+	public final fun getGenerics ()Ljava/util/Set;
+	public final fun isGeneric (Ljava/lang/String;)Z
+}
+
 public final class dev/aster/vega/scene/FontStyle : java/lang/Enum {
 	public static final field ITALIC Ldev/aster/vega/scene/FontStyle;
 	public static final field NORMAL Ldev/aster/vega/scene/FontStyle;

@@ -72,21 +72,41 @@ final class FontResolverTests: XCTestCase {
     XCTAssertGreaterThan(engine.advanceOf(line: "W", style: bold), 0)
   }
 
-  func testAGenericFamilyIsNotOfferedToTheHost() {
-    // `sans-serif` names no installed face: it asks for *the reader's* default. A host answering it
-    // would override that, and the same specification would then draw differently here and on the two
-    // Kotlin renderers — which is the difference this seam exists to remove, not to introduce.
+  func testEveryNameInTheStackIsOffered() {
+    // This asserted the opposite until #123: a generic was **not** offered to the host, on the
+    // grounds that answering one would draw differently here than on the Kotlin renderers. That was
+    // wrong on the facts — the Compose Multiplatform registry is consulted before its generic
+    // mapping, so a host registering `sans-serif` was answered there and not here, which is the
+    // divergence the reasoning claimed to prevent.
+    //
+    // Every name is offered now, in order, generics included: a host that registers one has said
+    // what its sans is.
     var asked: [String] = []
     let font = CoreTextFonts.font(
-      family: "sans-serif", size: 11, weight: 400, italic: false,
+      family: "Noto Sans, sans-serif, Chart Sans", size: 11, weight: 400, italic: false,
+      resolveFont: { name in
+        asked.append(name)
+        return name == "Chart Sans" ? self.courier() : nil
+      })
+
+    XCTAssertEqual(
+      ["Noto Sans", "sans-serif", "Chart Sans"], asked,
+      "the whole stack, in order, until something answers")
+    XCTAssertEqual(
+      CTFontCopyFamilyName(font) as String, "Courier",
+      "the face the host answered with, from the third entry")
+  }
+
+  func testTheStackStopsAtTheFirstAnswer() {
+    // A host is not asked for names after one it has answered.
+    var asked: [String] = []
+    _ = CoreTextFonts.font(
+      family: "Chart Sans, Noto Sans", size: 11, weight: 400, italic: false,
       resolveFont: { name in
         asked.append(name)
         return self.courier()
       })
-
-    XCTAssertEqual([], asked, "a generic family should not reach the host")
-    XCTAssertNotEqual(
-      CTFontCopyFamilyName(font) as String, "Courier", "and should not be the host's face")
+    XCTAssertEqual(["Chart Sans"], asked)
   }
 
   func testANilAnswerFallsBackToCoreText() {

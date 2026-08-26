@@ -1766,6 +1766,14 @@ final object dev.aster.vega.scene/ColorSpaces { // dev.aster.vega.scene/ColorSpa
     }
 }
 
+final object dev.aster.vega.scene/FontStack { // dev.aster.vega.scene/FontStack|null[0]
+    final val generics // dev.aster.vega.scene/FontStack.generics|{}generics[0]
+        final fun <get-generics>(): kotlin.collections/Set<kotlin/String> // dev.aster.vega.scene/FontStack.generics.<get-generics>|<get-generics>(){}[0]
+
+    final fun families(kotlin/String): kotlin.collections/List<kotlin/String> // dev.aster.vega.scene/FontStack.families|families(kotlin.String){}[0]
+    final fun isGeneric(kotlin/String): kotlin/Boolean // dev.aster.vega.scene/FontStack.isGeneric|isGeneric(kotlin.String){}[0]
+}
+
 final object dev.aster.vega.scene/ForeignNodeId { // dev.aster.vega.scene/ForeignNodeId|null[0]
     final fun noneValue(): kotlin/Long // dev.aster.vega.scene/ForeignNodeId.noneValue|noneValue(){}[0]
     final fun setOf(kotlin.collections/List<kotlin/Long>): kotlin.collections/Set<dev.aster.vega.scene/SceneNodeId> // dev.aster.vega.scene/ForeignNodeId.setOf|setOf(kotlin.collections.List<kotlin.Long>){}[0]

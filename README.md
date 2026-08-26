@@ -951,9 +951,18 @@ its seam is removed.
 | Accessibility threshold | `accessibilityMaxExposedMarks` | same | same | same |
 | Engine-drawn tooltip | `tooltipsEnabled` | `tooltipsEnabled` | host draws its own | host draws its own |
 | Font family a specification names | `fontResolver` | `fontResolver` | `ComposeTextEngine` registry | `resolveFont` |
+| Which name that resolver is offered | every entry in the CSS stack, in order — `FontStack` | same | same | same |
 | Spoken captions | the controller's `VegaLocale.captions` | same | `captions` | `captions` |
 | Interaction | the controller's `events` | `onEvent` | `onTap`, `onPan`, `onZoom`, … | `session` + `gestures` |
 | Where the chart was drawn | `onPlaced`, `placement()` | `onPlaced` | `onPlaced` | `onPlaced` |
+
+A seam existing on every host is not the same as every host doing the same thing with it, and the
+font row is where that bit. The three engines each read a specification's CSS stack differently —
+whole, first-entry-only, and not at all — so one registration drew in three faces from one
+specification. `FontStack` in `vega-scene` is that rule once, and the Swift renderer reaches it
+through the exported framework rather than restating it. `scripts/host-parity.py` checks that a seam
+is *present*; it cannot check that two engines agree about what to do with it, which is why this took
+an adopter to find.
 
 Two differences are deliberate, and each has a reason that is not "nobody got round to it".
 

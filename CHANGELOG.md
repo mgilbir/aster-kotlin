@@ -4,6 +4,28 @@ Notable changes, newest first. The release workflow reads the section for the
 version it is publishing and uses it as the release notes, so a version without a
 section here does not get released.
 
+## Unreleased
+
+### Fixed
+
+- **One specification names one font on every host.** A specification writes a CSS stack —
+  `"Noto Sans, Chart Sans"` — and `TextStyle.fontFamily` carries it whole, so each text
+  engine had to split it. Each did something different: the Compose Multiplatform engine
+  read the whole stack and let any entry match, the Apple renderer offered its resolver the
+  **first** entry only and nothing at all when that was a generic, and the Android view
+  offered the **unsplit string**. A host that registered one face under one name got that
+  face on one renderer and the platform default on the others, from the same chart.
+
+  `FontStack` in `vega-scene` is the rule once — split on commas, trim spaces and quotes,
+  offer each entry in order until one answers — and all four renderers read it, the Swift
+  one through the exported framework rather than restating it.
+
+  **A generic is now offered to the resolver too.** The Apple renderer skipped one, on the
+  stated grounds that answering it would draw differently there than on the Kotlin
+  renderers; the Compose registry is consulted before its generic mapping, so it was
+  already answering them and the reasoning had it backwards. A host that registers
+  `sans-serif` has said what its sans is. (#123)
+
 ## 0.4.0
 
 ### Changed

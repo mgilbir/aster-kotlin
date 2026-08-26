@@ -12,6 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.sp
+import dev.aster.vega.scene.FontStack
 import dev.aster.vega.scene.FontStyle as SceneFontStyle
 import dev.aster.vega.scene.MeasuredTextEngine
 import dev.aster.vega.scene.TextStyle
@@ -254,17 +255,19 @@ public fun namedFontFamily(families: Map<String, FontFamily>): (String) -> FontF
   // and this closure outlives all of them.
   val byLowerName = families.entries.associate { (name, family) -> name.lowercase() to family }
   return { family ->
-    family
-      .split(',')
+    // `FontStack` rather than a split here: this engine's reading of a CSS stack was the right one
+    // and was also the only one, so the Apple and Android renderers disagreed with it and with each
+    // other (#123). One rule, in the module all three depend on.
+    FontStack.families(family)
       .asSequence()
-      .map { it.trim().trim('"', '\'').lowercase() }
+      .map { it.lowercase() }
       .firstNotNullOfOrNull { byLowerName[it] } ?: genericFontFamily(family)
   }
 }
 
 public fun genericFontFamily(family: String): FontFamily? {
-  for (name in family.split(',')) {
-    val trimmed = name.trim().trim('"', '\'').lowercase()
+  for (name in FontStack.families(family)) {
+    val trimmed = name.lowercase()
     when (trimmed) {
       "sans-serif",
       "system-ui",

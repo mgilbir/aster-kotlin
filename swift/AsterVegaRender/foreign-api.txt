@@ -1285,6 +1285,12 @@ FoldTransform.apply(input:params:context:)
 FoldTransform.init()
 FoldTransform.shared
 FoldTransform.type
+FontStack
+FontStack.families(stack:)
+FontStack.generics
+FontStack.init()
+FontStack.isGeneric(name:)
+FontStack.shared
 FontStyle
 FontStyle.entries
 FontStyle.init(name:ordinal:)
