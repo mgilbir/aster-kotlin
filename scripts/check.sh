@@ -161,6 +161,10 @@ Gates, and what each needs:
                       validation cannot dump.
   host-parity         always. Every seam checked against every host's recorded surface, so the
                       README's matrix is derived rather than asserted.
+  host-conformance    always. Every conformance golden is read by every engine, so a seam wired
+                      to one host cannot pass as agreement.
+  changelog           always. A branch that moves an API snapshot has to say so in CHANGELOG.md,
+                      or mark the commit [api-snapshot-only].
   swift               macOS. The Swift suite, the exported-API snapshot, and the iOS demo's
                       type-check. Not runnable on any other host.
   instrumented        a device or emulator on adb. scripts/emulator.sh --headless starts one.
@@ -211,7 +215,31 @@ run_gate "android-api" ./scripts/android-api.sh
 run_gate "host-parity" python3 ./scripts/host-parity.py
 
 # ---------------------------------------------------------------------------------------------
-# 4. The Swift gate: the suite, the exported-API snapshot, and the iOS demo's type-check.
+# 4. Every conformance golden, read by every engine.
+#
+# host-parity checks a seam *exists* on each surface and cannot check that two engines agree about
+# what to do with it — a signature does not say how a CSS font stack is read, and three engines read
+# one three different ways (#123) behind a green matrix. `test-fixtures/host-conformance` is where
+# that agreement is written down, and it only works if every golden is read on every side: a golden
+# wired to one host leaves the disagreement exactly as invisible as before, with a file on disk
+# suggesting otherwise. Nothing else can notice, because a missing test has no signature.
+#
+# The readers themselves run inside the gradle, swift and instrumented gates. This checks the
+# pairing.
+# ---------------------------------------------------------------------------------------------
+run_gate "host-conformance" python3 ./scripts/host-conformance.py
+
+# ---------------------------------------------------------------------------------------------
+# 5. A branch that changes the public surface says so in the changelog.
+#
+# `changelog-section.sh` checks a section *exists* for the version being released and cannot check
+# that it is complete. 0.4.0's was not: two of five commits had entries, so a source-breaking change
+# would have shipped unmentioned, and rewriting a pull request description is what caught it.
+# ---------------------------------------------------------------------------------------------
+run_gate "changelog" python3 ./scripts/changelog-gate.py
+
+# ---------------------------------------------------------------------------------------------
+# 6. The Swift gate: the suite, the exported-API snapshot, and the iOS demo's type-check.
 #
 # This is the one whose absence was found the hard way, twice. `swift-test.sh` carries the
 # `ios-demo.sh --check` step for the same reason.
@@ -223,7 +251,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------------------------
-# 5. The instrumented suites, if something is listening.
+# 7. The instrumented suites, if something is listening.
 #
 # They are compiled above whatever happens. Running them needs a device, and a host with one
 # attached should not have to remember a second script to use it.
@@ -269,7 +297,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------------------------
-# 6 and 7. The differential comparisons, which are the point of the project.
+# 8 and 9. The differential comparisons, which are the point of the project.
 #
 # They regenerate upstream's own output with the pinned packages and compare against it, so they
 # need node and they are not quick. `--fast` is for the edit-run loop; landing anything runs them.

@@ -1,0 +1,16 @@
+# What each engine asks its font resolver, in order, for a specification's CSS stack.
+#
+# The resolver declines everything, so the transcript is the whole walk rather than the prefix
+# before an answer. `|` separates the names; a case with no names asks nothing.
+#
+# This is #123: the Apple renderer used to ask for the first entry only and nothing at all when it
+# was generic, and the Android view used to ask once with the unsplit string. It is also the
+# contract divergence found while writing this file — the Compose Multiplatform engine asked once
+# with the whole stack, so a host's `{ name -> myFonts[name] }` worked on two engines of three.
+Chart Sans -> Chart Sans
+Noto Sans, Chart Sans -> Noto Sans | Chart Sans
+sans-serif, Chart Sans -> sans-serif | Chart Sans
+'Chart Sans', "Noto Sans" , sans-serif -> Chart Sans | Noto Sans | sans-serif
+Helvetica Neue -> Helvetica Neue
+A,,B, -> A | B
+sans-serif -> sans-serif

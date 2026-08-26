@@ -98,6 +98,7 @@ vega-android-canvas  public final class dev.aster.vega.android.AndroidTextEngine
     public double descentOf(dev.aster.vega.scene.TextStyle);
     public final android.graphics.Paint$Align androidAlign$vega_android_canvas(dev.aster.vega.scene.TextAlign);
     public final android.text.TextPaint paintFor$vega_android_canvas(dev.aster.vega.scene.TextStyle);
+    public final java.util.Set<java.lang.String> getUnresolvedFontFamilies();
     public static final int MAX_CACHED_STYLES;
 vega-android-canvas  public final class dev.aster.vega.android.BitmapExport {
     public boolean equals(java.lang.Object);

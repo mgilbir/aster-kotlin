@@ -116,6 +116,26 @@ to even. And the **scene has to be identical by construction** or the comparison
 compilers rather than two walks, so every compile input is spelled out on both sides, `timeZone`
 included: a `time` scale is local, the JVM tests pin `Europe/Amsterdam` and `swift test` pins nothing.
 
+### The same idea, one level up: host conformance
+
+The scene walk compares two renderers' output. `test-fixtures/host-conformance` compares what three
+engines do with the same input, for the seams a host plugs into — a font resolver, an image resolver,
+the placement a host is told about. Same arrangement, same reason: one golden between them rather than
+each against the others, a reader written once per side.
+
+```bash
+./gradlew :vega-compose-multiplatform:jvmTest --tests '*ConformanceTest*'   # Compose Multiplatform
+./gradlew :vega-android-canvas:connectedDebugAndroidTest                    # Android, needs a device
+./scripts/swift-test.sh                                                     # Apple
+python3 scripts/host-conformance.py                                         # every golden read by every engine
+```
+
+These goldens are **written by hand, not generated** — the opposite of the scene walk, deliberately.
+There is no `-PupdateGoldens` for them, because the whole value is that a line only moves when someone
+decides an engine should behave differently and writes down what it should do. Adding a seam means
+adding a golden *and* a reader on all three engines; the last gate above is what makes the second half
+non-optional.
+
 ## Look at the output
 
 Numbers agreeing is not the same as a chart looking right.
@@ -181,3 +201,10 @@ colour ramps need d3's interpolator tables and a scheme extent.
 
   It was five scripts and an agreement to remember the other four. That agreement failed three times
   in ways that reached `main` or a release, so it is one script now.
+
+- **A change to the public surface belongs in `CHANGELOG.md`, in the same branch.** The release
+  workflow assembles the release page from that section verbatim, so an entry nobody writes is a
+  change nobody is told about — which is how 0.4.0 nearly shipped a source-breaking one. The
+  `changelog` gate fails a branch that moves an API snapshot and says nothing. Where a snapshot was
+  re-recorded and the surface did not really change, put `[api-snapshot-only]` in a commit message
+  and say there why.

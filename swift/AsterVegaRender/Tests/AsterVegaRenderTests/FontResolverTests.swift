@@ -72,21 +72,41 @@ final class FontResolverTests: XCTestCase {
     XCTAssertGreaterThan(engine.advanceOf(line: "W", style: bold), 0)
   }
 
-  func testAGenericFamilyIsNotOfferedToTheHost() {
-    // `sans-serif` names no installed face: it asks for *the reader's* default. A host answering it
-    // would override that, and the same specification would then draw differently here and on the two
-    // Kotlin renderers — which is the difference this seam exists to remove, not to introduce.
+  func testEveryNameInTheStackIsOffered() {
+    // This asserted the opposite until #123: a generic was **not** offered to the host, on the
+    // grounds that answering one would draw differently here than on the Kotlin renderers. That was
+    // wrong on the facts — the Compose Multiplatform registry is consulted before its generic
+    // mapping, so a host registering `sans-serif` was answered there and not here, which is the
+    // divergence the reasoning claimed to prevent.
+    //
+    // Every name is offered now, in order, generics included: a host that registers one has said
+    // what its sans is.
     var asked: [String] = []
     let font = CoreTextFonts.font(
-      family: "sans-serif", size: 11, weight: 400, italic: false,
+      family: "Noto Sans, sans-serif, Chart Sans", size: 11, weight: 400, italic: false,
+      resolveFont: { name in
+        asked.append(name)
+        return name == "Chart Sans" ? self.courier() : nil
+      })
+
+    XCTAssertEqual(
+      ["Noto Sans", "sans-serif", "Chart Sans"], asked,
+      "the whole stack, in order, until something answers")
+    XCTAssertEqual(
+      CTFontCopyFamilyName(font) as String, "Courier",
+      "the face the host answered with, from the third entry")
+  }
+
+  func testTheStackStopsAtTheFirstAnswer() {
+    // A host is not asked for names after one it has answered.
+    var asked: [String] = []
+    _ = CoreTextFonts.font(
+      family: "Chart Sans, Noto Sans", size: 11, weight: 400, italic: false,
       resolveFont: { name in
         asked.append(name)
         return self.courier()
       })
-
-    XCTAssertEqual([], asked, "a generic family should not reach the host")
-    XCTAssertNotEqual(
-      CTFontCopyFamilyName(font) as String, "Courier", "and should not be the host's face")
+    XCTAssertEqual(["Chart Sans"], asked)
   }
 
   func testANilAnswerFallsBackToCoreText() {
@@ -118,5 +138,31 @@ final class FontResolverTests: XCTestCase {
     // drawing would be painting faces the boxes were not measured for.
     let session = ChartSession(textEngine: CoreTextTextEngine(resolveFont: { _ in self.courier() }))
     XCTAssertNotNil(session.resolveFont, "read back off the engine it was given")
+  }
+
+  func testAFamilyNothingCouldAnswerIsRecorded() {
+    // CoreText answers an unknown family with the system font: legible, wrong, and silent. Two of
+    // the three renderers fell back that way and only the Compose one said so, which is part of why
+    // they disagreed about reading a stack for as long as they did (#123).
+    let engine = CoreTextTextEngine()
+    _ = engine.advanceOf(line: "M", style: style("Definitely Not Installed"))
+
+    XCTAssertEqual(["Definitely Not Installed"], engine.unresolvedFontFamilies)
+  }
+
+  func testAStackThatEndsInAGenericIsNotAMiss() {
+    // A well-formed stack asks for the reader's default as its last resort and gets it. Recording
+    // that as unresolved would make the set noise, and a set nobody can act on gets ignored.
+    let engine = CoreTextTextEngine()
+    _ = engine.advanceOf(line: "M", style: style("sans-serif"))
+
+    XCTAssertEqual([], engine.unresolvedFontFamilies)
+  }
+
+  func testAFamilyTheHostAnsweredIsNotAMiss() {
+    let engine = CoreTextTextEngine(resolveFont: { _ in self.courier() })
+    _ = engine.advanceOf(line: "M", style: style("Chart Sans"))
+
+    XCTAssertEqual([], engine.unresolvedFontFamilies, "the host answered, so nothing was missed")
   }
 }

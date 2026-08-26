@@ -105,6 +105,7 @@ CoreTextTextEngine.descentOf(style:)  ::  override func descentOf(style: TextSty
 CoreTextTextEngine.init(textScale:resolveFont:)  ::  init(textScale: Double = 1, resolveFont: ((String) -> CTFont?)? = nil)
 CoreTextTextEngine.resolveFont  ::  let resolveFont: ((String) -> CTFont?)?
 CoreTextTextEngine.textScale  ::  let textScale: Double
+CoreTextTextEngine.unresolvedFontFamilies  ::  var unresolvedFontFamilies: Set<String> { get }
 Corners  ::  struct Corners
 Corners.bottomLeft  ::  let bottomLeft: Double
 Corners.bottomRight  ::  let bottomRight: Double

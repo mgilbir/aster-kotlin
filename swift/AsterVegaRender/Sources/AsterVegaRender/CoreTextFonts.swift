@@ -1,4 +1,5 @@
 #if canImport(CoreText)
+import AsterVega
 import CoreText
 import Foundation
 
@@ -32,10 +33,17 @@ enum CoreTextFonts {
     // name would draw the other chart with it. A resolver is expected to be a lookup in a dictionary
     // the host already has, which is what Android's `typefaceResolver` is; a host doing something
     // expensive there should memoise, as it would for `resolveImage`.
+    // **Every name in the stack, in order.** This used to offer the resolver the first entry only,
+    // and nothing at all when that entry was a generic — so a host that had registered `Chart Sans`
+    // was never asked for it if the specification wrote `"Noto Sans, Chart Sans"`, and never asked at
+    // all for `"sans-serif, Chart Sans"`. The Compose Multiplatform engine had always read the whole
+    // stack, so one specification drew in different faces on different hosts (#123). `FontStack` is
+    // that rule, shared, and it comes from the engine rather than being restated here.
     if let resolveFont {
-      let first = firstFamily(of: family)
-      if let first, let supplied = resolveFont(first) {
-        return styled(supplied, size: size, weight: weight, italic: italic)
+      for name in FontStack.shared.families(stack: family) {
+        if let supplied = resolveFont(name) {
+          return styled(supplied, size: size, weight: weight, italic: italic)
+        }
       }
     }
 
@@ -83,19 +91,21 @@ enum CoreTextFonts {
     return font
   }
 
-  /// The first name in a CSS family list, or nil where it names no installed face.
+  /// The first name CoreText should be asked for, or nil where the stack names no installed face.
   ///
-  /// A generic — `sans-serif`, `monospace` — answers nil, because it names nothing to look up: the
-  /// system font is the honest answer for those, and a host resolver is not asked either. That is
-  /// deliberate. A host that mapped `sans-serif` to its own face would be overriding a specification
-  /// that asked for *the reader's* default, and the same specification would then draw differently
-  /// on this host and on the two Kotlin ones, which is the defect this whole seam exists to remove.
+  /// A generic — `sans-serif`, `monospace` — answers nil here, because it names nothing for a
+  /// *descriptor* to look up and the system font is the honest answer.
+  ///
+  /// It used to gate the **host resolver** too, on the grounds that answering a generic would draw
+  /// differently here than on the Kotlin renderers. That was wrong on the facts: the Compose
+  /// Multiplatform registry is consulted before its generic mapping, so a host registering
+  /// `sans-serif` was answered there and not here. A host that registers a generic has said what its
+  /// sans is, and every renderer now takes it — see `FontStack`.
   private static func firstFamily(of family: String) -> String? {
-    let first = family.split(separator: ",").first.map {
-      $0.trimmingCharacters(in: CharacterSet(charactersIn: " '\""))
+    for name in FontStack.shared.families(stack: family) where !generic.contains(name.lowercased()) {
+      return name
     }
-    guard let first, !first.isEmpty, !generic.contains(first.lowercased()) else { return nil }
-    return first
+    return nil
   }
 
   /// A face the host handed over, at the size and with the traits the specification asked for.

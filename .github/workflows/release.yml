@@ -85,7 +85,13 @@ jobs:
       - name: Check
         # A release is never published from a red build. This is the gate the repository uses, which
         # compiles every target and runs the JVM and native suites.
-        run: ./scripts/check.sh
+        #
+        # `--fast` because the two oracles are their own steps below. `check.sh` grew the ability to
+        # run them itself, and this file was not updated with `ci.yml` when it did — so every release
+        # since has regenerated upstream's scenes twice and compared them twice, for about four
+        # minutes of nothing. Keeping them separate is deliberate rather than incidental: they are
+        # named steps in the log, and a differential failure should say which grammar it was.
+        run: ./scripts/check.sh --fast
 
       - name: Differential tests against upstream Vega
         # Regenerates upstream's own scenes with the pinned Vega and compares. The point of the

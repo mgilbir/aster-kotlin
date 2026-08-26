@@ -1,0 +1,16 @@
+# Where a scene is drawn inside a slot: the fit scale, and the offset from the slot's top-left.
+#
+# `<sceneW>x<sceneH> in <slotW>x<slotH>` and then `scale | left | top`, to six places.
+#
+# Every case is chosen to come out exact in binary floating point. `CanonicalCalls` records why that
+# matters between two languages — Java rounds a tie up and C rounds it to even — and the cheapest
+# answer is a golden with no ties in it rather than a rounding routine written twice.
+#
+# The three renderers each compute this, and disagreed until #99 in 0.3.0: the Android view
+# pinned a scene to the padded top-left where the other two centred it, so the same chart in the
+# same slot sat in a different place depending on the host. Nothing compared them.
+200x100 in 400x400 -> 2.000000 | 0.000000 | 100.000000
+100x100 in 400x200 -> 2.000000 | 100.000000 | 0.000000
+200x100 in 200x100 -> 1.000000 | 0.000000 | 0.000000
+400x200 in 200x100 -> 0.500000 | 0.000000 | 0.000000
+100x200 in 400x400 -> 2.000000 | 100.000000 | 0.000000

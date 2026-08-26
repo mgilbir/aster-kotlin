@@ -4,6 +4,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.os.Build
 import android.text.TextPaint
+import dev.aster.vega.scene.FontStack
 import dev.aster.vega.scene.FontStyle
 import dev.aster.vega.scene.MeasuredTextEngine
 import dev.aster.vega.scene.TextAlign
@@ -172,17 +173,55 @@ public class AndroidTextEngine(
     }
   }
 
+  /**
+   * The font families this engine drew in something else.
+   *
+   * A name it cannot resolve does not fail: Android answers with the default face, which is legible
+   * and is not what the specification asked for, and nothing said so. The Compose Multiplatform
+   * engine has collected these since it had a resolver; this one and the Apple renderer did not, so
+   * two of the three renderers fell back **silently** — which is a fair part of why they disagreed
+   * about how to read a CSS stack for as long as they did (#123).
+   *
+   * There is no diagnostics channel through a text engine, so the facts are collected and a host
+   * reads them when it wants to, exactly as `unresolvedImages` works.
+   *
+   * A well-formed stack is not in here: `"Helvetica Neue, Arial, sans-serif"` ends in a generic and
+   * resolves on it. What lands here is a stack with nothing behind it.
+   */
+  public val unresolvedFontFamilies: Set<String>
+    get() = unresolved.toSet()
+
+  private val unresolved = LinkedHashSet<String>()
+
   private fun createTypeface(family: String, weight: Int, italic: Boolean): Typeface {
+    // **Each name in the stack, in order.** `family` is what the specification wrote — a CSS list,
+    // often `"Noto Sans, Chart Sans"` — and this used to hand the whole string to the resolver, so
+    // a
+    // host that had registered `Chart Sans` was asked for a name nothing matches and never
+    // answered.
+    // The Compose Multiplatform engine had always split it, so one specification drew in two faces
+    // across two Kotlin hosts (#123). `FontStack` is that rule, once.
+    //
     // The host's face first, and then weight and slant applied to *it* rather than to a system
     // family: an app's bold is its own face, and asking the platform for "some bold font" is how a
     // label comes out in a face nothing in the chart mentions.
-    typefaceResolver(family)?.let { supplied ->
-      return styled(supplied, weight, italic)
+    for (name in FontStack.families(family)) {
+      typefaceResolver(name)?.let { supplied ->
+        return styled(supplied, weight, italic)
+      }
     }
     // Vega's generic families map onto Android's built-in families; anything else is passed through
     // to the platform, which falls back rather than failing.
+    // Nothing answered, so the platform's own generics. Read off the **stack** rather than the
+    // whole
+    // string: `"Noto Sans, sans-serif"` asks for a sans as its last resort and used to match none
+    // of
+    // these, falling through to `Typeface.create` with the entire list as a family name.
     val base =
-      when (family.lowercase()) {
+      when (
+        FontStack.families(family).firstOrNull { it.lowercase() in GENERIC_ALIASES }?.lowercase()
+          ?: family.lowercase()
+      ) {
         "sans-serif",
         "helvetica",
         "arial" -> Typeface.SANS_SERIF
@@ -192,10 +231,38 @@ public class AndroidTextEngine(
         "monospace",
         "courier",
         "courier new" -> Typeface.MONOSPACE
-        else -> Typeface.create(family, Typeface.NORMAL)
+        else -> {
+          val first = FontStack.families(family).firstOrNull() ?: family
+          val created = Typeface.create(first, Typeface.NORMAL)
+          // `Typeface.create` never fails: an unknown name answers the default face. Comparing
+          // against it is the only way to tell "this device has that font" from "it does not", and
+          // without the comparison a chart draws in the wrong face and says nothing.
+          if (created == Typeface.DEFAULT && family.isNotBlank()) unresolved.add(family)
+          created
+        }
       }
     return styled(base, weight, italic)
   }
+
+  /**
+   * The names the `when` above maps onto a built-in family.
+   *
+   * Wider than CSS's generics on purpose: a specification naming `Helvetica` or `Courier` on a
+   * device that has neither is asking for a sans or a mono, and Android answers with the family
+   * rather than with nothing.
+   */
+  private val GENERIC_ALIASES =
+    setOf(
+      "sans-serif",
+      "helvetica",
+      "arial",
+      "serif",
+      "times",
+      "times new roman",
+      "monospace",
+      "courier",
+      "courier new",
+    )
 
   /** A face at a weight and slant, through the widest API the device has. */
   private fun styled(base: Typeface, weight: Int, italic: Boolean): Typeface =

@@ -4,6 +4,90 @@ Notable changes, newest first. The release workflow reads the section for the
 version it is publishing and uses it as the release notes, so a version without a
 section here does not get released.
 
+## Unreleased
+
+### Changed
+
+- **A font resolver is asked for one name, on every host.** `ComposeTextEngine` called a host's
+  `fontFamilyResolver` once with the whole CSS stack — `"Noto Sans, Chart Sans"` — and let
+  `namedFontFamily` split it, while the Android and Apple engines called theirs once per entry.
+  The same host closure therefore had to be written differently per renderer, which is the #123
+  defect one level up: not which names an engine reads, but what it asks a host. The engine now
+  walks the stack and offers each entry in turn, and falls back to a generic itself.
+
+  For a host passing `namedFontFamily(myFonts)` nothing changes. A host with its own closure that
+  matched on the *unsplit* string has to match on a name instead — which is what it already had to
+  do to work on the other two renderers.
+
+  `namedFontFamily` correspondingly does one thing now: look a single name up in the map, quotes
+  and spaces trimmed. Splitting the stack and falling back to `genericFontFamily` were the
+  engine's job and are done there, so calling it directly with a stack or a generic returns `null`
+  where it used to answer.
+
+### Fixed
+
+- **One specification names one font on every host.** A specification writes a CSS stack —
+  `"Noto Sans, Chart Sans"` — and `TextStyle.fontFamily` carries it whole, so each text
+  engine had to split it. Each did something different: the Compose Multiplatform engine
+  read the whole stack and let any entry match, the Apple renderer offered its resolver the
+  **first** entry only and nothing at all when that was a generic, and the Android view
+  offered the **unsplit string**. A host that registered one face under one name got that
+  face on one renderer and the platform default on the others, from the same chart.
+
+  `FontStack` in `vega-scene` is the rule once — split on commas, trim spaces and quotes,
+  offer each entry in order until one answers — and all four renderers read it, the Swift
+  one through the exported framework rather than restating it.
+
+  **A generic is now offered to the resolver too.** The Apple renderer skipped one, on the
+  stated grounds that answering it would draw differently there than on the Kotlin
+  renderers; the Compose registry is consulted before its generic mapping, so it was
+  already answering them and the reasoning had it backwards. A host that registers
+  `sans-serif` has said what its sans is. (#123)
+
+- **Every renderer says which font it could not find.** `unresolvedFontFamilies` is on the
+  Android and Apple text engines now, as it has been on the Compose Multiplatform one:
+  both platforms answer an unknown family with a default face, which is legible, is not
+  what the specification asked for, and was **silent**. Two of the three renderers falling
+  back without saying so is a fair part of why they disagreed about reading a CSS stack for
+  as long as they did. A stack that ends in a generic is not a miss — it asked for the
+  reader's default and got it — and neither is a family the host answered, whatever face it
+  answered with. (#123)
+
+- **`ChartGestures.none` claims no touches, as it always said it did.** It documented
+  itself as "the same as passing no session", and hit testing was gated on whether a
+  session was present rather than on the gesture set — so a chart with a session and
+  `.none` still took touches from the scroll view around it, which is the exact symptom
+  0.2.0 fixed for the no-session case. A host following that sentence had to read the
+  source to find out why its page stopped scrolling.
+
+  One respect is deliberately *not* the same, and the documentation now says so: a reader
+  using VoiceOver can still explore the chart and activate a mark, because activation goes
+  through an accessibility action rather than a gesture and a session is what makes it
+  work. Pass no session for a chart that is inert to everything. (#124)
+
+### Internal
+
+- **One contract, checked on every host.** `scripts/host-parity.py` checks a seam *exists* on
+  each surface; it cannot check that two engines agree about what to do with it, and that is
+  where every host defect in this release came from — three engines read a CSS stack three
+  different ways behind a matrix that said all four had `fontResolver`. A signature does not
+  say how a stack is read.
+
+  `test-fixtures/host-conformance` writes the agreement down instead: one golden per seam, read
+  by every engine that implements it, in the shape `test-fixtures/scene-walk` already uses. Three
+  seams so far — how a font stack is walked, when an image resolver is asked for a url, and where
+  a scene is placed in a slot. `scripts/host-conformance.py` (a `check.sh` gate) checks that each
+  golden is read on every side, because a golden wired to one host leaves the disagreement as
+  invisible as before while looking like coverage.
+
+  Designing it found a fourth divergence before a line of it ran: the Compose Multiplatform engine
+  called `fontFamilyResolver` once with the whole stack where the other two called it per entry, so
+  the same host closure had to be written differently per renderer. It now matches.
+
+  The conformance goldens are declared as test-task inputs, alongside the differential and
+  scene-walk fixtures. Found the hard way: a deliberately broken `placement.txt` was saved and
+  `jvmTest` reported *up to date*.
+
 ## 0.4.0
 
 ### Changed

@@ -1285,6 +1285,12 @@ FoldTransform.apply(input:params:context:)
 FoldTransform.init()
 FoldTransform.shared
 FoldTransform.type
+FontStack
+FontStack.families(stack:)
+FontStack.generics
+FontStack.init()
+FontStack.isGeneric(name:)
+FontStack.shared
 FontStyle
 FontStyle.entries
 FontStyle.init(name:ordinal:)
@@ -2344,6 +2350,8 @@ Kotlinx_serialization_jsonJsonElement.Companion
 Kotlinx_serialization_jsonJsonElement.Companion.init()
 Kotlinx_serialization_jsonJsonElement.Companion.serializer()
 Kotlinx_serialization_jsonJsonElement.Companion.shared
+Kotlinx_serialization_jsonJsonElement.companion
+Kotlinx_serialization_jsonJsonElement.toVegaValue()
 Ktecma262MatchResult
 Ktecma262MatchResult.description()
 Ktecma262MatchResult.get(group:)
@@ -3026,6 +3034,7 @@ PathBuilder.circle(cx:cy:radius:)
 PathBuilder.close()
 PathBuilder.companion
 PathBuilder.cubicTo(x1:y1:x2:y2:x:y:)
+PathBuilder.curve(points:kind:horizontal:tension:partOfArea:)
 PathBuilder.init()
 PathBuilder.lineTo(x:y:)
 PathBuilder.moveTo(x:y:)
@@ -3086,6 +3095,7 @@ PathData.hash()
 PathData.init(commands:)
 PathData.isEmpty
 PathData.isEqual(_:)
+PathData.transformedBy(transform:)
 PathKt
 PathKt.distanceToSegment(p:a:b:)
 PathNode
@@ -3502,6 +3512,8 @@ Scene.companion
 Scene.contentBounds
 Scene.description()
 Scene.doCopy(width:height:background:root:revision:)
+Scene.findNode(id:)
+Scene.flatten()
 Scene.hash()
 Scene.height
 Scene.init(width:height:background:root:revision:)
@@ -3510,6 +3522,8 @@ Scene.nodeCount
 Scene.replacing(replacements:)
 Scene.revision
 Scene.root
+Scene.toCanonicalJson(precision:pretty:includeNodeIds:)
+Scene.toSvg(options:)
 Scene.viewport
 Scene.width
 SceneBlendMode
@@ -4107,6 +4121,8 @@ TextRun
 TextRun.align
 TextRun.baseline
 TextRun.description()
+TextRun.displayLine(line:measure:)
+TextRun.displayLines(measure:)
 TextRun.doCopy(text:style:align:baseline:limit:ellipsis:lineBreak:lines:)
 TextRun.ellipsis
 TextRun.hash()
@@ -4569,6 +4585,7 @@ VegaLiteInput
 VegaLiteInput.init()
 VegaLiteInput.isVegaLite(spec:)
 VegaLiteInput.shared
+VegaLiteInput.toVega(json:hostConfig:timeZone:locale:)
 VegaLocale
 VegaLocale.Companion
 VegaLocale.Companion.EnglishUS
@@ -4685,14 +4702,3 @@ WindowTransform.apply(input:params:context:)
 WindowTransform.init()
 WindowTransform.shared
 WindowTransform.type
-companion
-companion.toVegaValue()
-curve(points:kind:horizontal:tension:partOfArea:)
-toSvg(options:)
-toSvg(options:).displayLine(line:measure:)
-toSvg(options:).displayLines(measure:)
-toVega(json:hostConfig:timeZone:locale:)
-transformedBy(transform:)
-transformedBy(transform:).findNode(id:)
-transformedBy(transform:).flatten()
-transformedBy(transform:).toCanonicalJson(precision:pretty:includeNodeIds:)

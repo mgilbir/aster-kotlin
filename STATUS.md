@@ -6780,3 +6780,27 @@ opens with the split:
 Zero is the number. Every member carries a reason, and one without a reason fails the check with
 what to do about it: expose it, or mark it internal and say so. Verified by adding a public member
 with an uncrossable type and watching it come back named.
+
+### An entry nobody writes is a change nobody is told about
+
+`changelog-section.sh` checks that a section **exists** for the version being released. It cannot
+check that the section is complete, and 0.4.0's was not: entries had been written for two of the five
+commits in a stack, so `@InternalAsterVegaApi` — a source-breaking change — and the whole of
+`ForeignScale` would have shipped unmentioned. The release page is assembled from that section
+verbatim.
+
+It was caught by rewriting a pull request description, which is luck rather than process.
+
+The surface is already snapshotted for other reasons, so "did the API change" is answerable without
+judgement: `scripts/changelog-gate.py` compares the branch against its merge-base with `origin/main`,
+uncommitted work included, and fails when an API snapshot moved and `CHANGELOG.md` did not.
+
+**The escape hatch is the interesting part.** A snapshot can move without the surface changing — the
+extension re-attribution two commits ago moved eleven lines and changed nothing a host can call — so
+a gate without a way out would train people to add a meaningless entry, which is worse than no gate.
+`[api-snapshot-only]` in a commit message is that way out, and it leaves the reason in the history
+where a reviewer reads it.
+
+Five paths, all checked in a throwaway worktree rather than reasoned about: a snapshot moved with no
+entry fails; with an entry passes; with the marker passes; a source-only change is not flagged; and on
+`main` with nothing changed there is nothing to compare.
