@@ -62,7 +62,17 @@ public struct ChartGestures: OptionSet, Sendable {
   /// as both, so `"tooltip": true` answers a tap.
   public static let withoutDrag: ChartGestures = [.tap, .hover]
 
-  /// Nothing at all, for a chart that is only being looked at. The same as passing no session.
+  /// No gestures at all, for a chart that is only being looked at.
+  ///
+  /// The chart claims no touches, so a scroll view around it scrolls — which is what "the same as
+  /// passing no session" used to promise and, until #124, did not deliver: three behaviours keyed off
+  /// whether a session was present rather than off this set, so a caller following that sentence got
+  /// a chart that still blocked its parent.
+  ///
+  /// **Not** the same as passing no session in one respect, and deliberately. A reader using
+  /// VoiceOver can still explore the chart and activate a mark, because activation goes through an
+  /// accessibility action rather than through a gesture, and a session is what makes it work. Pass no
+  /// session for a chart that is inert to everything.
   public static let none: ChartGestures = []
 }
 
@@ -250,7 +260,7 @@ public struct VegaChartView: View {
     // the parameter's own documentation true. The VoiceOver overlay is unaffected: it is a sibling in
     // the `ZStack` with its own `allowsHitTesting(false)`, and activation goes through
     // `accessibilityAction`, which does not need hit testing.
-    .allowsHitTesting(session != nil)
+    .allowsHitTesting(claimsTouches)
   }
 
   /// Whether a gesture is installed at all.
@@ -265,6 +275,26 @@ public struct VegaChartView: View {
   /// is null.
   private func mask(for gesture: ChartGestures) -> GestureMask {
     session != nil && gestures.contains(gesture) ? .all : .none
+  }
+
+  /// Whether this chart takes a touch away from whatever is behind it.
+  ///
+  /// Both halves, and the second was missing. A chart with no session installs no working gesture,
+  /// and a chart with a session and `.none` installs none either — but only the first turned hit
+  /// testing off, so the second went on claiming touches and blocking a surrounding scroll view.
+  /// `ChartGestures.none` documented itself as "the same as passing no session" and was not (#124).
+  ///
+  /// VoiceOver is unaffected either way. The overlay is a sibling in the `ZStack` with its own
+  /// `allowsHitTesting(false)`, and activation goes through `accessibilityAction`, which needs no hit
+  /// testing — so a chart that claims no touches can still be explored and activated by a reader.
+  /// That is why `activatable` is *not* gated on this: a mark a reader can activate is a capability,
+  /// and `.none` is a statement about fingers rather than about assistive technology.
+  ///
+  /// Internal rather than private for the reason `activatable` is: a SwiftUI view hierarchy cannot be
+  /// inspected from `swift test`, so a predicate that is the whole of a promise has to be readable by
+  /// the test that asserts it. Otherwise this fix would be the kind that is verified by looking at it.
+  var claimsTouches: Bool {
+    session != nil && !gestures.isEmpty
   }
 
   private func report(_ size: CGSize) {

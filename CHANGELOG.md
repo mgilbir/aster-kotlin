@@ -26,6 +26,18 @@ section here does not get released.
   already answering them and the reasoning had it backwards. A host that registers
   `sans-serif` has said what its sans is. (#123)
 
+- **`ChartGestures.none` claims no touches, as it always said it did.** It documented
+  itself as "the same as passing no session", and hit testing was gated on whether a
+  session was present rather than on the gesture set — so a chart with a session and
+  `.none` still took touches from the scroll view around it, which is the exact symptom
+  0.2.0 fixed for the no-session case. A host following that sentence had to read the
+  source to find out why its page stopped scrolling.
+
+  One respect is deliberately *not* the same, and the documentation now says so: a reader
+  using VoiceOver can still explore the chart and activate a mark, because activation goes
+  through an accessibility action rather than a gesture and a session is what makes it
+  work. Pass no session for a chart that is inert to everything. (#124)
+
 ## 0.4.0
 
 ### Changed
