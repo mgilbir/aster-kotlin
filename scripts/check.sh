@@ -161,6 +161,8 @@ Gates, and what each needs:
                       validation cannot dump.
   host-parity         always. Every seam checked against every host's recorded surface, so the
                       README's matrix is derived rather than asserted.
+  changelog           always. A branch that moves an API snapshot has to say so in CHANGELOG.md,
+                      or mark the commit [api-snapshot-only].
   swift               macOS. The Swift suite, the exported-API snapshot, and the iOS demo's
                       type-check. Not runnable on any other host.
   instrumented        a device or emulator on adb. scripts/emulator.sh --headless starts one.
@@ -211,7 +213,16 @@ run_gate "android-api" ./scripts/android-api.sh
 run_gate "host-parity" python3 ./scripts/host-parity.py
 
 # ---------------------------------------------------------------------------------------------
-# 4. The Swift gate: the suite, the exported-API snapshot, and the iOS demo's type-check.
+# 4. A branch that changes the public surface says so in the changelog.
+#
+# `changelog-section.sh` checks a section *exists* for the version being released and cannot check
+# that it is complete. 0.4.0's was not: two of five commits had entries, so a source-breaking change
+# would have shipped unmentioned, and rewriting a pull request description is what caught it.
+# ---------------------------------------------------------------------------------------------
+run_gate "changelog" python3 ./scripts/changelog-gate.py
+
+# ---------------------------------------------------------------------------------------------
+# 5. The Swift gate: the suite, the exported-API snapshot, and the iOS demo's type-check.
 #
 # This is the one whose absence was found the hard way, twice. `swift-test.sh` carries the
 # `ios-demo.sh --check` step for the same reason.
@@ -223,7 +234,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------------------------
-# 5. The instrumented suites, if something is listening.
+# 6. The instrumented suites, if something is listening.
 #
 # They are compiled above whatever happens. Running them needs a device, and a host with one
 # attached should not have to remember a second script to use it.
@@ -269,7 +280,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------------------------
-# 6 and 7. The differential comparisons, which are the point of the project.
+# 7 and 8. The differential comparisons, which are the point of the project.
 #
 # They regenerate upstream's own output with the pinned packages and compare against it, so they
 # need node and they are not quick. `--fast` is for the edit-run loop; landing anything runs them.

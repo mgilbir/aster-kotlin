@@ -181,3 +181,10 @@ colour ramps need d3's interpolator tables and a scheme extent.
 
   It was five scripts and an agreement to remember the other four. That agreement failed three times
   in ways that reached `main` or a release, so it is one script now.
+
+- **A change to the public surface belongs in `CHANGELOG.md`, in the same branch.** The release
+  workflow assembles the release page from that section verbatim, so an entry nobody writes is a
+  change nobody is told about — which is how 0.4.0 nearly shipped a source-breaking one. The
+  `changelog` gate fails a branch that moves an API snapshot and says nothing. Where a snapshot was
+  re-recorded and the surface did not really change, put `[api-snapshot-only]` in a commit message
+  and say there why.
