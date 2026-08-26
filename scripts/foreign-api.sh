@@ -49,23 +49,47 @@ import re
 import sys
 
 NAME = re.compile(r'swift_name\("([^"]+)"\)')
-TYPE = re.compile(r"^@(?:interface|protocol)\s+(\w+)")
+# A category — `@interface AsterVegaScene (Extensions)` — is how Kotlin/Native emits a top-level
+# extension function. It carries no `swift_name` of its own; its members belong to the type it
+# extends.
+TYPE = re.compile(r"^@(?:interface|protocol)\s+(\w+)(\s*\(\s*(\w+)\s*\))?")
 END = re.compile(r"^@end")
+# An attribute-only line: what a type's `swift_name` sits on, above its `@interface`.
+BARE_ATTRIBUTE = re.compile(r"^\s*__attribute__")
 
 lines = pathlib.Path(sys.argv[1]).read_text(errors="ignore").splitlines()
 
-# A type's own `swift_name` sits on the attribute line *above* its `@interface`, so a naive scan credits it
-# to the type before it as if it were a member. The declarations are found first, and the attribute lines
-# they consume are then skipped.
+# A type's own `swift_name` sits on the attribute line *above* its `@interface`, so a naive scan
+# credits it to the type before it as if it were a member.
+#
+# The scan must also stop at anything that is not a bare attribute. It did not, and a category
+# declared a few lines below a method picked that **method's** name up as its own: the snapshot
+# recorded `transformedBy(transform:).flatten()`, meaning `flatten()` was credited to a function.
+# Harmless to the diff and not to a reader — it cost an audit a wrong conclusion, reading `toVega`
+# as absent while `ChartSession` calls it three lines away.
 type_name_line = {}
 for index, line in enumerate(lines):
-    if not TYPE.match(line):
-        continue
+    declaration = TYPE.match(line)
+    if not declaration or declaration.group(3):
+        continue  # a category takes its owner from the type it extends, below
     for back in range(index - 1, max(index - 6, -1), -1):
-        named = NAME.search(lines[back])
+        above = lines[back]
+        if not above.strip():
+            continue
+        if not BARE_ATTRIBUTE.match(above):
+            break  # a declaration, not this type's name
+        named = NAME.search(above)
         if named:
             type_name_line[back] = named.group(1)
             break
+
+# Obj-C class name to the name Swift sees, so a category can be credited to the right type.
+swift_name_of = {}
+for index, line in enumerate(lines):
+    declaration = TYPE.match(line)
+    if declaration and not declaration.group(3):
+        above = [name for at, name in type_name_line.items() if index - 6 < at < index]
+        swift_name_of[declaration.group(1)] = above[-1] if above else declaration.group(1)
 
 owner = None
 symbols = set()
@@ -74,8 +98,8 @@ for index, line in enumerate(lines):
         continue  # consumed as the name of the type declared just below
     declaration = TYPE.match(line)
     if declaration:
-        above = [name for at, name in type_name_line.items() if index - 6 < at < index]
-        owner = above[-1] if above else declaration.group(1)
+        objc = declaration.group(1)
+        owner = swift_name_of.get(objc, objc)
         continue
     if END.match(line):
         owner = None

@@ -34,16 +34,18 @@ objc, present, bare = collections.defaultdict(set), set(), set()
 for line in pathlib.Path("swift/AsterVegaRender/foreign-api.txt").read_text().splitlines():
     line = line.strip()
     if not line: continue
-    # A **top-level extension function** is listed unqualified — `toVega(json:...)`,
-    # `toSvg(options:)` — and `foreign-api.sh` credits any symbol after it to it as an owner, so
-    # `transformedBy(transform:).flatten()` really means `flatten()` crossed as a free function.
-    # Both are names a host can call, and neither is `Class.member`. Missing this read `toVega` as
-    # absent while `ChartSession` calls it three lines away.
-    if "(" in line.split(".")[0]:
-        for segment in line.split("."):
-            name = segment.split("(")[0].rstrip("_").strip()
-            if name:
-                bare.add(name.lower())
+    # A **top-level extension function** is credited to the type it extends, because Kotlin/Native
+    # emits it as an Obj-C category on that type: `Scene.flatten()`. Kotlin's own ABI dump names it
+    # after the *file class* instead — `SceneKt.flatten` — so the two disagree about the owner and
+    # nothing matches.
+    #
+    # This used to be papered over by matching bare names anywhere in the file, because the snapshot
+    # recorded these mangled (`transformedBy(transform:).flatten()`). Fixing that extractor removed
+    # the paper and the gate immediately reported six unexplained members, which is the gate working.
+    for segment in line.split("."):
+        name = segment.split("(")[0].rstrip("_").strip()
+        if name:
+            bare.add(name.lower())
     head = line.split(".")[0]
     present.add(head)
     if "." in line:
@@ -67,7 +69,9 @@ for cls, members in kotlin.items():
         and not m.startswith(("component", "copy$", "access$", "<", "$"))
         and not m.isupper()                       # enum entries / constants
         and not (candidates(m) & objc[cls])
-        and not (candidates(m) & bare)
+        # `SceneKt.flatten` is `Scene.flatten()` across the boundary.
+        and not (candidates(m) & objc.get(cls.removesuffix("Kt"), set()))
+        and not (cls.endswith("Kt") and candidates(m) & bare)
     )
     if missing:
         holes[cls] = missing
