@@ -6,6 +6,24 @@ section here does not get released.
 
 ## Unreleased
 
+### Changed
+
+- **A font resolver is asked for one name, on every host.** `ComposeTextEngine` called a host's
+  `fontFamilyResolver` once with the whole CSS stack — `"Noto Sans, Chart Sans"` — and let
+  `namedFontFamily` split it, while the Android and Apple engines called theirs once per entry.
+  The same host closure therefore had to be written differently per renderer, which is the #123
+  defect one level up: not which names an engine reads, but what it asks a host. The engine now
+  walks the stack and offers each entry in turn, and falls back to a generic itself.
+
+  For a host passing `namedFontFamily(myFonts)` nothing changes. A host with its own closure that
+  matched on the *unsplit* string has to match on a name instead — which is what it already had to
+  do to work on the other two renderers.
+
+  `namedFontFamily` correspondingly does one thing now: look a single name up in the map, quotes
+  and spaces trimmed. Splitting the stack and falling back to `genericFontFamily` were the
+  engine's job and are done there, so calling it directly with a stack or a generic returns `null`
+  where it used to answer.
+
 ### Fixed
 
 - **One specification names one font on every host.** A specification writes a CSS stack —
@@ -46,6 +64,29 @@ section here does not get released.
   using VoiceOver can still explore the chart and activate a mark, because activation goes
   through an accessibility action rather than a gesture and a session is what makes it
   work. Pass no session for a chart that is inert to everything. (#124)
+
+### Internal
+
+- **One contract, checked on every host.** `scripts/host-parity.py` checks a seam *exists* on
+  each surface; it cannot check that two engines agree about what to do with it, and that is
+  where every host defect in this release came from — three engines read a CSS stack three
+  different ways behind a matrix that said all four had `fontResolver`. A signature does not
+  say how a stack is read.
+
+  `test-fixtures/host-conformance` writes the agreement down instead: one golden per seam, read
+  by every engine that implements it, in the shape `test-fixtures/scene-walk` already uses. Three
+  seams so far — how a font stack is walked, when an image resolver is asked for a url, and where
+  a scene is placed in a slot. `scripts/host-conformance.py` (a `check.sh` gate) checks that each
+  golden is read on every side, because a golden wired to one host leaves the disagreement as
+  invisible as before while looking like coverage.
+
+  Designing it found a fourth divergence before a line of it ran: the Compose Multiplatform engine
+  called `fontFamilyResolver` once with the whole stack where the other two called it per entry, so
+  the same host closure had to be written differently per renderer. It now matches.
+
+  The conformance goldens are declared as test-task inputs, alongside the differential and
+  scene-walk fixtures. Found the hard way: a deliberately broken `placement.txt` was saved and
+  `jvmTest` reported *up to date*.
 
 ## 0.4.0
 

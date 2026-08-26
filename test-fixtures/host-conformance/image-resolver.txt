@@ -1,0 +1,17 @@
+# What each renderer asks its image resolver, across repeated draws of the same scene.
+#
+# The case is a comma-separated list of URLs an `image` mark names, then how many times the scene is
+# drawn. The observation is the sequence of URLs the resolver was asked, in order, for the whole run.
+#
+# The contract is **once per URL, however many frames** — and a refusal is remembered too, which is
+# the half that is easy to leave out: caching only the successes sends an address that has already
+# said no back to the resolver on every frame, which is the expensive case rather than the cheap one.
+# Three renderers implement it three times over — a cache in the Android renderer, an `ImageCache` in
+# the Compose Multiplatform target, a static one on `CoreGraphicsTarget` — and three implementations
+# of one contract is the shape that drifts.
+#
+# Every URL here is refused by the resolver, so the transcript is what was *asked* rather than what
+# was answered. A hit and a miss are cached alike; that is the point.
+a.png x1 -> a.png
+a.png x3 -> a.png
+a.png,b.png x3 -> a.png | b.png

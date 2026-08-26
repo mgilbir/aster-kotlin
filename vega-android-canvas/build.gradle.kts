@@ -21,6 +21,18 @@ android {
     warningsAsErrors = true
     abortOnError = true
   }
+
+  sourceSets {
+    // The conformance goldens travel with the test app. An instrumented test runs on a device and
+    // cannot read the repository, so pointing the `androidTest` assets at the shared directory is
+    // what lets this host read the same file the other two read — see
+    // `test-fixtures/host-conformance/README.md`.
+    getByName("androidTest") {
+      // The goldens only. Pointing at `test-fixtures` itself drags the whole differential corpus
+      // — hundreds of megabytes of upstream reference scenes — into the test APK.
+      assets.srcDir(rootProject.layout.projectDirectory.dir("test-fixtures/host-conformance"))
+    }
+  }
 }
 
 kotlin {

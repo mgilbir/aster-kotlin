@@ -178,7 +178,11 @@ class ComposeTextEngineTest {
    * holds the `FontFamily`. This is that registry.
    */
   @Test
-  fun `a registered family resolves by name, whatever the case, before a generic fallback`() {
+  fun `a registered family resolves by name, whatever the case`() {
+    // **One name, not a stack.** The engine walks the stack and asks this for each entry in
+    // turn, the way `AndroidTextEngine` and `CoreTextTextEngine` ask theirs, so a host can write
+    // one resolver for all three. This helper used to split the stack and fall back to a generic
+    // itself; both are the engine's job, and the test below asserts the engine does them.
     val resolve = namedFontFamily(mapOf("Google Sans Flex" to FontFamily.Cursive))
 
     assertEquals(FontFamily.Cursive, resolve("Google Sans Flex"))
@@ -186,13 +190,22 @@ class ComposeTextEngineTest {
     // chart should not turn on which was typed.
     assertEquals(FontFamily.Cursive, resolve("google sans flex"))
     assertEquals(FontFamily.Cursive, resolve("\"Google Sans Flex\""))
+    // A name nobody registered is nobody's, and the engine decides what to do about that.
+    assertEquals(null, resolve("Unknown Face"))
+    assertEquals(null, namedFontFamily(emptyMap())("serif"))
+  }
+
+  @Test
+  fun `the engine walks the stack and falls back, so a resolver answers one name`() {
+    // The three behaviours that moved out of `namedFontFamily`, asserted where they now live.
+    val engine = engine(resolver = namedFontFamily(mapOf("Google Sans Flex" to FontFamily.Cursive)))
+
     // Left to right, as CSS reads a stack: the registered name beats the generic written after it.
-    assertEquals(FontFamily.Cursive, resolve("Google Sans Flex, sans-serif"))
+    assertEquals(FontFamily.Cursive, engine.fontFamilyResolver("Google Sans Flex, sans-serif"))
     // And a generic beats a name nobody registered, which is what makes a well-formed stack work.
-    assertEquals(FontFamily.SansSerif, resolve("Unknown Face, sans-serif"))
+    assertEquals(FontFamily.SansSerif, engine.fontFamilyResolver("Unknown Face, sans-serif"))
     // Registering nothing changes nothing.
-    assertEquals(genericFontFamily("serif"), namedFontFamily(emptyMap())("serif"))
-    assertEquals(null, namedFontFamily(emptyMap())("Unknown Face"))
+    assertEquals(genericFontFamily("serif"), engine.fontFamilyResolver("serif"))
   }
 
   /**

@@ -97,9 +97,19 @@ public class ComposeTextEngine(
    * side used would be a new way to have it.
    */
   internal val fontFamilyResolver: (String) -> FontFamily? = { family ->
-    fontFamilyResolver(family).also {
-      if (it == null && family.isNotBlank()) unresolved.add(family)
-    }
+    // **Each name in the stack, in order** — the engine walks it and the resolver answers one name.
+    // This used to hand the resolver the *whole* stack and let `namedFontFamily` split it, which
+    // made the resolver contract differ from the other two engines: a host writing
+    // `{ name -> myFonts[name] }` worked on Android and Apple and was handed
+    // `"Noto Sans, Chart Sans"` here. #123 fixed which names each engine *reads*; this is the same
+    // defect one level up, in what a host's function is asked, and it was found by writing the
+    // conformance suite that now holds all three to it.
+    FontStack.families(family).firstNotNullOfOrNull { fontFamilyResolver(it) }
+      ?: genericFontFamily(family).also {
+        // The whole stack, not the entry that failed: a host reads this to find out which
+        // *specification* drew in the wrong face, and one name out of a list is not that.
+        if (it == null && family.isNotBlank()) unresolved.add(family)
+      }
   }
 
   /** Ascent, descent and line height for one style, which cost a measurement each to find out. */
@@ -254,15 +264,11 @@ public fun namedFontFamily(families: Map<String, FontFamily>): (String) -> FontF
   // style,
   // and this closure outlives all of them.
   val byLowerName = families.entries.associate { (name, family) -> name.lowercase() to family }
-  return { family ->
-    // `FontStack` rather than a split here: this engine's reading of a CSS stack was the right one
-    // and was also the only one, so the Apple and Android renderers disagreed with it and with each
-    // other (#123). One rule, in the module all three depend on.
-    FontStack.families(family)
-      .asSequence()
-      .map { it.lowercase() }
-      .firstNotNullOfOrNull { byLowerName[it] } ?: genericFontFamily(family)
-  }
+  // One **name**, not a stack. The engine walks the stack and asks this for each entry in turn, the
+  // same way `AndroidTextEngine` and `CoreTextTextEngine` ask theirs, so a host can write the same
+  // resolver for all three. It used to split the stack here and fall back to `genericFontFamily`,
+  // both of which are the engine's job.
+  return { name -> byLowerName[name.trim().trim('"', '\'').lowercase()] }
 }
 
 public fun genericFontFamily(family: String): FontFamily? {

@@ -840,6 +840,15 @@ renderers emit the same calls in the same order", a claim both files make about 
 rather than believed. When those two disagree, one of the walks changed; read the diff before
 regenerating.
 
+`test-fixtures/host-conformance/*.txt` are a fourth kind, and they generalise that idea to the seams a
+host plugs into. The scene walk compares two renderers' *output*; these compare what three engines do
+with the same *input* — how a CSS font stack is walked, when an `imageResolver` is asked for a url,
+where a scene lands in a slot. `scripts/host-parity.py` checks each seam exists on each surface and
+cannot check that any two agree about it, which is precisely where #123 was: four hosts
+carried `fontResolver` while three read a stack three different ways. Each golden is read by a test on
+every engine, and `scripts/host-conformance.py` checks that pairing so a seam wired to one host cannot
+pass as agreement. See `test-fixtures/host-conformance/README.md`.
+
 ### Formatting
 
 ```bash

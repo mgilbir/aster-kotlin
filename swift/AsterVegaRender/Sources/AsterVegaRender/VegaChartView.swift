@@ -538,7 +538,11 @@ public struct VegaChartView: View {
   /// carries no pan or zoom: `VegaChartController` subtracts its own `viewportOffset` and divides by its
   /// own `viewportScale`, so removing either here would remove it twice and a tap would drift further
   /// from the finger the further the chart had been panned.
-  private func placement(in size: CGSize) -> (scale: Double, left: CGFloat, top: CGFloat)? {
+  ///
+  /// Internal rather than private for the reason `claimsTouches` and `activatable` are: a SwiftUI
+  /// view hierarchy cannot be inspected from `swift test`, and this arithmetic is checked against
+  /// the other two renderers' through `test-fixtures/host-conformance/placement.txt`.
+  func placement(in size: CGSize) -> (scale: Double, left: CGFloat, top: CGFloat)? {
     guard scene.width > 0, scene.height > 0, size.width > 0, size.height > 0 else { return nil }
     let scale = min(size.width / CGFloat(scene.width), size.height / CGFloat(scene.height))
     return (

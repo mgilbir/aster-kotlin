@@ -377,6 +377,14 @@ subprojects {
       .dir(rootProject.layout.projectDirectory.dir("test-fixtures/scene-walk"))
       .withPropertyName("sceneWalkGoldens")
       .withPathSensitivity(PathSensitivity.RELATIVE)
+    // The cross-host conformance goldens, read by this module's readers and by the Android and
+    // SwiftUI ones. Same reason again, and it is the reason found the hard way: a broken
+    // `placement.txt` was committed and `jvmTest` reported up to date, so the suite whose whole
+    // purpose is to catch a host disagreeing said nothing.
+    inputs
+      .dir(rootProject.layout.projectDirectory.dir("test-fixtures/host-conformance"))
+      .withPropertyName("hostConformanceGoldens")
+      .withPathSensitivity(PathSensitivity.RELATIVE)
     // The Vega-Lite fixtures and their two references, for the same reason.
     inputs
       .dir(rootProject.layout.projectDirectory.dir("test-fixtures/vega-lite"))
