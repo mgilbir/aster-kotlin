@@ -551,12 +551,12 @@ public final class dev/aster/vega/runtime/compile/AxisDefaults {
 	public static final field LABEL_FONT_SIZE D
 	public static final field LABEL_LIMIT D
 	public static final field LABEL_PADDING D
+	public static final field MAX_EXTENT D
+	public static final field MIN_EXTENT D
 	public static final field TICK_SIZE D
 	public static final field TICK_WIDTH D
 	public static final field TITLE_FONT_SIZE D
 	public static final field TITLE_FONT_WEIGHT I
-	public static final field TITLE_MAX_EXTENT D
-	public static final field TITLE_MIN_EXTENT D
 	public static final field TITLE_PADDING D
 	public final fun crispRound (D)D
 	public final fun getDomainColor ()Ldev/aster/vega/scene/SceneColor;
@@ -589,6 +589,11 @@ public final class dev/aster/vega/runtime/compile/CompiledSpec {
 	public fun hashCode ()I
 	public final fun isUsable ()Z
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/runtime/compile/FontWeights {
+	public static final field INSTANCE Ldev/aster/vega/runtime/compile/FontWeights;
+	public final fun of (Ljava/lang/String;)I
 }
 
 public final class dev/aster/vega/runtime/compile/ItemEncode {
@@ -664,6 +669,8 @@ public final class dev/aster/vega/runtime/compile/MarkEncoder {
 }
 
 public final class dev/aster/vega/runtime/compile/NumberResolver {
+	public static final field Companion Ldev/aster/vega/runtime/compile/NumberResolver$Companion;
+	public static final field MAX_TICK_COUNT I
 	public fun <init> (Ldev/aster/vega/expression/ExpressionCompiler;Ldev/aster/vega/runtime/compile/SignalScope;Ldev/aster/vega/model/DiagnosticCollector;Lkotlin/jvm/functions/Function1;)V
 	public synthetic fun <init> (Ldev/aster/vega/expression/ExpressionCompiler;Ldev/aster/vega/runtime/compile/SignalScope;Ldev/aster/vega/model/DiagnosticCollector;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun resolve (Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;)Ljava/lang/Double;
@@ -671,7 +678,11 @@ public final class dev/aster/vega/runtime/compile/NumberResolver {
 	public final fun resolveLines (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 	public final fun resolveList (Ljava/lang/String;Ljava/lang/String;)Ljava/util/List;
 	public final fun resolveText (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public final fun resolveTickCount (Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;)Ljava/lang/Integer;
 	public final fun resolveValue (Ljava/lang/String;Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
+}
+
+public final class dev/aster/vega/runtime/compile/NumberResolver$Companion {
 }
 
 public final class dev/aster/vega/runtime/compile/PlotSize {
@@ -705,8 +716,8 @@ public final class dev/aster/vega/runtime/compile/SignalResolver {
 public final class dev/aster/vega/runtime/compile/SignalResolver$Resolution {
 	public final fun resolve (Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;Ljava/util/Set;Ljava/util/Map;)V
 	public static synthetic fun resolve$default (Ldev/aster/vega/runtime/compile/SignalResolver$Resolution;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;Ljava/util/Set;Ljava/util/Map;ILjava/lang/Object;)V
-	public final fun scope (Ljava/util/Map;Ljava/util/Map;)Ldev/aster/vega/runtime/compile/SignalScope;
-	public static synthetic fun scope$default (Ldev/aster/vega/runtime/compile/SignalResolver$Resolution;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Ldev/aster/vega/runtime/compile/SignalScope;
+	public final fun scope (Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;)Ldev/aster/vega/runtime/compile/SignalScope;
+	public static synthetic fun scope$default (Ldev/aster/vega/runtime/compile/SignalResolver$Resolution;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Ldev/aster/vega/runtime/compile/SignalScope;
 }
 
 public final class dev/aster/vega/runtime/compile/SignalScope : dev/aster/vega/expression/ExpressionScope {

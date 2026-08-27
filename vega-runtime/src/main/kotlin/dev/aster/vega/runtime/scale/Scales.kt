@@ -71,12 +71,6 @@ public sealed interface PositionScale : VegaScale {
 }
 
 /**
- * Continuous linear scale.
- *
- * @param domain at least two values; more than two makes it piecewise.
- * @param clamp when true, out-of-domain inputs clamp to the range ends instead of extrapolating.
- */
-/**
  * `identity`: the value itself, coerced to a number.
  *
  * The one scale that maps nothing. It exists so a specification can name a scale where a channel
@@ -100,6 +94,12 @@ public class IdentityScale(override val name: String) : VegaScale {
   }
 }
 
+/**
+ * Continuous linear scale.
+ *
+ * @param domain at least two values; more than two makes it piecewise.
+ * @param clamp when true, out-of-domain inputs clamp to the range ends instead of extrapolating.
+ */
 public class LinearScale(
   override val name: String,
   public val domain: List<Double>,
@@ -762,24 +762,6 @@ public class OrdinalScale(
 }
 
 /**
- * The four scales that map a continuous input onto a **discrete** output.
- *
- * They differ only in where the cut points come from, and that difference is the whole choice a
- * specification is making:
- * - `quantize` cuts the domain into equal **intervals**, so a skewed column puts most of its rows
- *   into one bucket;
- * - `quantile` cuts it into equal **counts**, so every bucket holds the same number of rows however
- *   skewed the column is, and the buckets are of unequal width;
- * - `threshold` takes the cut points literally from the domain, which is how a specification says
- *   "these are the boundaries that matter" rather than deriving them;
- * - `bin-ordinal` treats the domain as bin *edges* and looks the bin up in an ordinal range, which
- *   is what pairs a `bin` transform with a colour scheme.
- *
- * All four resolve with a **right bisection**: a value equal to a cut point falls into the bucket
- * *above* it. That is d3's rule and it matters at every boundary — the interval is `[low, high)`,
- * so a value of exactly 25 on a 0-100 quantize with four buckets is in the second, not the first.
- */
-/**
  * The shape the four discrete-output scales share, so a legend can draw any of them once.
  *
  * A banded legend is one swatch per range value, labelled by the cut point at its *lower* edge —
@@ -936,6 +918,13 @@ public class QuantizeScale(
       (0 until n).map { i -> ((i + 1) * x1 - (i - n) * x0) / (n + 1) }
     }
 
+  /**
+   * Widened by one band at each end, because the outermost buckets have no stated edge.
+   *
+   * A threshold scale's domain stops at its last cut point, so measuring against it would give the
+   * first and last bands no width at all. Upstream pads by one average band; with a single cut
+   * point and no average to take, it pads by a tenth.
+   */
   override val legendExtent: Pair<Double, Double>
     get() = (domain.firstOrNull() ?: 0.0) to (domain.lastOrNull() ?: 1.0)
 
@@ -1031,13 +1020,6 @@ public class ThresholdScale(
     get() = thresholds
 
   /**
-   * Widened by one band at each end, because the outermost buckets have no stated edge.
-   *
-   * A threshold scale's domain stops at its last cut point, so measuring against it would give the
-   * first and last bands no width at all. Upstream pads by one average band; with a single cut
-   * point and no average to take, it pads by a tenth.
-   */
-  /**
    * Unbounded at both ends, and deliberately so: a cut point at 10 says the first bucket holds
    * everything below 10 and nothing about how far below. Upstream answers `undefined` there.
    */
@@ -1130,13 +1112,6 @@ public class BinOrdinalScale(
   }
 }
 
-/**
- * Formats a number with a fixed number of decimals, trimming a trailing `.0`.
- *
- * A deliberately small subset of d3-format: enough for default tick labels. An explicit `format`
- * string in a specification is not supported and must be reported as a diagnostic by the caller
- * rather than silently ignored.
- */
 /**
  * A continuous scale whose range is a colour ramp.
  *
@@ -1258,16 +1233,6 @@ public class SequentialColorScale(
 }
 
 /**
- * Formats an axis tick label the way Vega's default does: fixed decimals, thousands separators and
- * a typographic minus.
- *
- * Neither of the last two is optional. Verified against upstream: a linear axis over `[0, 1000000]`
- * labels `100,000`, not `100000`, and so does a log axis; and a negative tick is signed with U+2212
- * rather than a hyphen, because the label goes through d3-format. A *discrete* axis does not — its
- * labels are the domain's own strings — which is why the substitution lives here and not in
- * [formatNumber].
- */
-/**
  * The decimals a label keeps when the tick step says nothing.
  *
  * Six, and it is d3's rather than a choice: upstream formats a label with `,f` and fills the
@@ -1278,6 +1243,16 @@ public class SequentialColorScale(
  */
 private const val DEGENERATE_PRECISION = 6
 
+/**
+ * Formats an axis tick label the way Vega's default does: fixed decimals, thousands separators and
+ * a typographic minus.
+ *
+ * Neither of the last two is optional. Verified against upstream: a linear axis over `[0, 1000000]`
+ * labels `100,000`, not `100000`, and so does a log axis; and a negative tick is signed with U+2212
+ * rather than a hyphen, because the label goes through d3-format. A *discrete* axis does not — its
+ * labels are the domain's own strings — which is why the substitution lives here and not in
+ * [formatNumber].
+ */
 public fun formatTickLabel(
   value: Double,
   decimals: Int,
@@ -1325,6 +1300,13 @@ private fun grouped(digits: String, locale: VegaLocale): String {
   return pieces.reversed().joinToString(locale.thousands)
 }
 
+/**
+ * Formats a number with a fixed number of decimals, trimming a trailing `.0`.
+ *
+ * A deliberately small subset of d3-format: enough for default tick labels. An explicit `format`
+ * string in a specification is not supported and must be reported as a diagnostic by the caller
+ * rather than silently ignored.
+ */
 public fun formatNumber(value: Double, decimals: Int): String {
   if (value.isNaN()) return "NaN"
   // d3-format spells these the way JavaScript does rather than with the mathematical symbol.

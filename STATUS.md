@@ -7089,3 +7089,86 @@ regression check, and a property it does not write is a property it cannot check
 and smoothing, an item's `href` and its `zindex`. It also recorded `effectiveCornerRadius`, which is
 a different clamp of the same input from the `Corners.of` every renderer draws with — a number
 nothing draws.
+
+### "Nothing throws" had no mechanism, and six ways a document could prove it
+
+The audit's first design tension: the README stakes the whole diagnostic model on one sentence —
+"nothing throws; a compile returns diagnostics" — and no public boundary had a catch-all or a depth
+cap. The contract held only if every one of sixty thousand compiler lines was individually careful,
+and seven of them were not.
+
+Each of the seven is fixed where it was, across this branch and the three before it. What is new
+here is the **boundary**: `SpecCompiler.compileJson` and `compile` are guarded, so the *next* one is
+a `VEGA_COMPILE_FAILED` diagnostic carrying the exception rather than a crash in the host.
+Cancellation is rethrown, because swallowing it would leave a cancelled coroutine running, and so is
+`OutOfMemoryError`, after which nothing the process does is trustworthy. The three fixed here:
+
+- **A gradient legend's `values` are whatever the specification wrote.** `"values": ["2020-01-01"]`
+  on a continuous colour scale cast straight to `VegaValue.Num` and threw a `ClassCastException` out
+  of a public entry point.
+- **A `tickCount` of a billion** was an out-of-memory error on the way to building the list, or a
+  billion-iteration walk-down before that. Upstream hangs on the same document, so the clamp is
+  named in a diagnostic rather than hidden.
+- **A mark tree nested a few thousand groups deep** was a `StackOverflowError` — an `Error`, caught
+  by nothing typed, unrecoverable on Kotlin/Native. The deepest nesting in the whole fixture corpus
+  is three.
+
+**And one that could throw without being a document's fault.** A comparator that answers zero for a
+pair it cannot order is not a total order — a row whose sort key is unreadable compares equal to two
+rows that compare unequal to each other — and the JVM's TimSort detects exactly that and throws
+`Comparison method violates its general contract!` once there are 32 or more items. A field some
+rows lack is all it takes. JavaScript's sort does not check, so upstream simply produces some order;
+both sort paths here now fall back to declaration order, which is the order stability would have
+given anyway.
+
+### The flagship interaction was inert, and a static compile could not see it
+
+`buildTime` read `spec.domain` and consulted `domainRaw` only to suppress `nice`, so the ladder every
+other continuous scale climbs — raw domain, `zero`, the three `domain*` overrides, padding, nice —
+was computed and thrown away. `domainRaw` is how an interactive zoom publishes the exact interval it
+wants; the committed `overview-plus-detail.vg.json` fixture is that shape, and brushing the overview
+recompiled the detail panel with the full domain and rendered it unzoomed. The oracle passes it
+because the brush signal is null at compile time, which is the shape of blind spot worth naming: the
+differential harness compares the *initial* scene, and an interaction's first frame is the only one
+it ever sees.
+
+The same rewrite fixed the `nice` step, which re-derived from the original domain and discarded both
+the bounds and the padding computed immediately above it. Vega-Lite defaults every temporal scale to
+`nice: true`, so a VL `scale.domainMax` on a time axis silently showed the whole span — and the
+comment beside the code said the opposite was intended.
+
+### A diagnostic code is a contract, and thirty conditions were sharing one
+
+Codes are documented as part of the public surface: a host matches on them. Three were flatly wrong.
+A **load failure** reported `VEGA_PARSE_UNKNOWN_PROPERTY`, which says the document is at fault, when
+it is the only condition in the whole file that describes something *outside* the specification and
+the only one a retry is meaningful for. An image with no size reported `VEGA_EXPORT_IMAGE_UNRESOLVED`
+— a code about export, from a compile. "The scale was not built" reported
+`VEGA_SCALE_UNSUPPORTED_TYPE`, which says this engine has no such scale type, so a host reading that
+code to decide whether a type was supported was told the wrong thing by the *mark* that referenced
+it.
+
+Eight new codes, and the runtime's conditions redistributed across them. Nothing was renamed or
+removed.
+
+### Two floods, three parsers and thirty comments in the wrong place
+
+**The flood.** A missing scale is a property of the specification and it was reported once per
+*row*: a 10,000-row mark produced 10,000 identical ERROR diagnostics and buried everything else,
+including whatever a reader was looking for. `reportOnce` was in the same file, unused by any of the
+three per-datum reports.
+
+**The parsers.** `MarkEncoder`, `TitleBuilder` and `GuideStyle` each had their own CSS font-weight
+parser and they had drifted: `bolder` was 700, 800 and 700, and two of the three read a numeric
+string while the third answered 400 for it. A title and an axis label written with the same weight
+came out at different weights. One parser now, and `bolder`/`lighter` are **relative** to the
+inherited weight — the initial 400 in a chart — so CSS Fonts 4's table gives 700 and 100. All three
+had said 300 for `lighter`, which is a value the table does not contain.
+
+**The comments.** Thirty KDoc blocks sat above a *different* declaration from the one they document:
+the function each belonged to had moved and the comment had not. `AxisBuilder`'s explanation of
+`validTicks` — three of whose four steps are surprises worth writing down — documented `offsetOf`.
+`SpecCompiler`'s class comment described a compiler that could not draw legends or titles, which two
+thousand lines in `LegendBuilder` and `TitleBuilder` had been contradicting for several releases.
+Each was moved to the declaration it describes, or deleted where it was an older wording of the
+block below it.

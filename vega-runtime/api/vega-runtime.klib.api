@@ -538,7 +538,13 @@ final class dev.aster.vega.runtime.compile/NumberResolver { // dev.aster.vega.ru
     final fun resolveLines(kotlin/String, kotlin/String): kotlin/String? // dev.aster.vega.runtime.compile/NumberResolver.resolveLines|resolveLines(kotlin.String;kotlin.String){}[0]
     final fun resolveList(kotlin/String, kotlin/String): kotlin.collections/List<dev.aster.vega.model/VegaValue>? // dev.aster.vega.runtime.compile/NumberResolver.resolveList|resolveList(kotlin.String;kotlin.String){}[0]
     final fun resolveText(kotlin/String, kotlin/String): kotlin/String? // dev.aster.vega.runtime.compile/NumberResolver.resolveText|resolveText(kotlin.String;kotlin.String){}[0]
+    final fun resolveTickCount(dev.aster.vega.model.spec/NumberValue?, kotlin/String): kotlin/Int? // dev.aster.vega.runtime.compile/NumberResolver.resolveTickCount|resolveTickCount(dev.aster.vega.model.spec.NumberValue?;kotlin.String){}[0]
     final fun resolveValue(kotlin/String, kotlin/String): dev.aster.vega.model/VegaValue? // dev.aster.vega.runtime.compile/NumberResolver.resolveValue|resolveValue(kotlin.String;kotlin.String){}[0]
+
+    final object Companion { // dev.aster.vega.runtime.compile/NumberResolver.Companion|null[0]
+        final const val MAX_TICK_COUNT // dev.aster.vega.runtime.compile/NumberResolver.Companion.MAX_TICK_COUNT|{}MAX_TICK_COUNT[0]
+            final fun <get-MAX_TICK_COUNT>(): kotlin/Int // dev.aster.vega.runtime.compile/NumberResolver.Companion.MAX_TICK_COUNT.<get-MAX_TICK_COUNT>|<get-MAX_TICK_COUNT>(){}[0]
+    }
 }
 
 final class dev.aster.vega.runtime.compile/PlotSize { // dev.aster.vega.runtime.compile/PlotSize|null[0]
@@ -571,7 +577,7 @@ final class dev.aster.vega.runtime.compile/SignalResolver { // dev.aster.vega.ru
 
     final inner class Resolution { // dev.aster.vega.runtime.compile/SignalResolver.Resolution|null[0]
         final fun resolve(kotlin/String, kotlin.collections/Map<kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>>, kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.scale/VegaScale> = ..., kotlin.collections/Set<kotlin/String> = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.dataflow.transform/ProjectionDefinition> = ...) // dev.aster.vega.runtime.compile/SignalResolver.Resolution.resolve|resolve(kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.collections.List<dev.aster.vega.model.VegaValue>>;kotlin.collections.Map<kotlin.String,dev.aster.vega.runtime.scale.VegaScale>;kotlin.collections.Set<kotlin.String>;kotlin.collections.Map<kotlin.String,dev.aster.vega.dataflow.transform.ProjectionDefinition>){}[0]
-        final fun scope(kotlin.collections/Map<kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>>, kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.scale/VegaScale> = ...): dev.aster.vega.runtime.compile/SignalScope // dev.aster.vega.runtime.compile/SignalResolver.Resolution.scope|scope(kotlin.collections.Map<kotlin.String,kotlin.collections.List<dev.aster.vega.model.VegaValue>>;kotlin.collections.Map<kotlin.String,dev.aster.vega.runtime.scale.VegaScale>){}[0]
+        final fun scope(kotlin.collections/Map<kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>>, kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.scale/VegaScale> = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.dataflow.transform/ProjectionDefinition> = ...): dev.aster.vega.runtime.compile/SignalScope // dev.aster.vega.runtime.compile/SignalResolver.Resolution.scope|scope(kotlin.collections.Map<kotlin.String,kotlin.collections.List<dev.aster.vega.model.VegaValue>>;kotlin.collections.Map<kotlin.String,dev.aster.vega.runtime.scale.VegaScale>;kotlin.collections.Map<kotlin.String,dev.aster.vega.dataflow.transform.ProjectionDefinition>){}[0]
     }
 }
 
@@ -1331,6 +1337,10 @@ final object dev.aster.vega.runtime.compile/AxisDefaults { // dev.aster.vega.run
         final fun <get-LABEL_LIMIT>(): kotlin/Double // dev.aster.vega.runtime.compile/AxisDefaults.LABEL_LIMIT.<get-LABEL_LIMIT>|<get-LABEL_LIMIT>(){}[0]
     final const val LABEL_PADDING // dev.aster.vega.runtime.compile/AxisDefaults.LABEL_PADDING|{}LABEL_PADDING[0]
         final fun <get-LABEL_PADDING>(): kotlin/Double // dev.aster.vega.runtime.compile/AxisDefaults.LABEL_PADDING.<get-LABEL_PADDING>|<get-LABEL_PADDING>(){}[0]
+    final const val MAX_EXTENT // dev.aster.vega.runtime.compile/AxisDefaults.MAX_EXTENT|{}MAX_EXTENT[0]
+        final fun <get-MAX_EXTENT>(): kotlin/Double // dev.aster.vega.runtime.compile/AxisDefaults.MAX_EXTENT.<get-MAX_EXTENT>|<get-MAX_EXTENT>(){}[0]
+    final const val MIN_EXTENT // dev.aster.vega.runtime.compile/AxisDefaults.MIN_EXTENT|{}MIN_EXTENT[0]
+        final fun <get-MIN_EXTENT>(): kotlin/Double // dev.aster.vega.runtime.compile/AxisDefaults.MIN_EXTENT.<get-MIN_EXTENT>|<get-MIN_EXTENT>(){}[0]
     final const val TICK_SIZE // dev.aster.vega.runtime.compile/AxisDefaults.TICK_SIZE|{}TICK_SIZE[0]
         final fun <get-TICK_SIZE>(): kotlin/Double // dev.aster.vega.runtime.compile/AxisDefaults.TICK_SIZE.<get-TICK_SIZE>|<get-TICK_SIZE>(){}[0]
     final const val TICK_WIDTH // dev.aster.vega.runtime.compile/AxisDefaults.TICK_WIDTH|{}TICK_WIDTH[0]
@@ -1339,10 +1349,6 @@ final object dev.aster.vega.runtime.compile/AxisDefaults { // dev.aster.vega.run
         final fun <get-TITLE_FONT_SIZE>(): kotlin/Double // dev.aster.vega.runtime.compile/AxisDefaults.TITLE_FONT_SIZE.<get-TITLE_FONT_SIZE>|<get-TITLE_FONT_SIZE>(){}[0]
     final const val TITLE_FONT_WEIGHT // dev.aster.vega.runtime.compile/AxisDefaults.TITLE_FONT_WEIGHT|{}TITLE_FONT_WEIGHT[0]
         final fun <get-TITLE_FONT_WEIGHT>(): kotlin/Int // dev.aster.vega.runtime.compile/AxisDefaults.TITLE_FONT_WEIGHT.<get-TITLE_FONT_WEIGHT>|<get-TITLE_FONT_WEIGHT>(){}[0]
-    final const val TITLE_MAX_EXTENT // dev.aster.vega.runtime.compile/AxisDefaults.TITLE_MAX_EXTENT|{}TITLE_MAX_EXTENT[0]
-        final fun <get-TITLE_MAX_EXTENT>(): kotlin/Double // dev.aster.vega.runtime.compile/AxisDefaults.TITLE_MAX_EXTENT.<get-TITLE_MAX_EXTENT>|<get-TITLE_MAX_EXTENT>(){}[0]
-    final const val TITLE_MIN_EXTENT // dev.aster.vega.runtime.compile/AxisDefaults.TITLE_MIN_EXTENT|{}TITLE_MIN_EXTENT[0]
-        final fun <get-TITLE_MIN_EXTENT>(): kotlin/Double // dev.aster.vega.runtime.compile/AxisDefaults.TITLE_MIN_EXTENT.<get-TITLE_MIN_EXTENT>|<get-TITLE_MIN_EXTENT>(){}[0]
     final const val TITLE_PADDING // dev.aster.vega.runtime.compile/AxisDefaults.TITLE_PADDING|{}TITLE_PADDING[0]
         final fun <get-TITLE_PADDING>(): kotlin/Double // dev.aster.vega.runtime.compile/AxisDefaults.TITLE_PADDING.<get-TITLE_PADDING>|<get-TITLE_PADDING>(){}[0]
 
@@ -1358,6 +1364,10 @@ final object dev.aster.vega.runtime.compile/AxisDefaults { // dev.aster.vega.run
         final fun <get-titleColor>(): dev.aster.vega.scene/SceneColor // dev.aster.vega.runtime.compile/AxisDefaults.titleColor.<get-titleColor>|<get-titleColor>(){}[0]
 
     final fun crispRound(kotlin/Double): kotlin/Double // dev.aster.vega.runtime.compile/AxisDefaults.crispRound|crispRound(kotlin.Double){}[0]
+}
+
+final object dev.aster.vega.runtime.compile/FontWeights { // dev.aster.vega.runtime.compile/FontWeights|null[0]
+    final fun of(kotlin/String): kotlin/Int // dev.aster.vega.runtime.compile/FontWeights.of|of(kotlin.String){}[0]
 }
 
 final object dev.aster.vega.runtime.compile/LegendDefaults { // dev.aster.vega.runtime.compile/LegendDefaults|null[0]

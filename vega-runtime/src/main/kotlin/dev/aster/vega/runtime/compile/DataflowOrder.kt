@@ -138,7 +138,7 @@ internal class DataflowOrder(
       for ((name, count) in names.groupingBy { it }.eachCount()) {
         if (count > 1) {
           diagnostics.warn(
-            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            DiagnosticCodes.DUPLICATE_DEFINITION,
             "Duplicate $kind '$name'; the later definition wins",
             operator = name,
           )
@@ -206,12 +206,6 @@ internal class DataflowOrder(
     private val dataSpecs = data.associateBy { it.name }
 
     /**
-     * For each projection, the datasets its `fit` reads.
-     *
-     * Only `fit` matters: every other projection property is a number or a signal, and a signal is
-     * already an operator that the ordering knows how to wait for.
-     */
-    /**
      * What each projection's `fit` waits for, as operators.
      *
      * Lazy because it is `readsOf` in disguise and that needs every other table built first. Going
@@ -261,20 +255,6 @@ internal class DataflowOrder(
     private val scaleSpecs = scales.associateBy { it.name }
     private val signalSpecs = signals.associateBy { it.name }
 
-    /**
-     * Signals a transform **writes**, mapped to the dataset whose pipeline writes them.
-     *
-     * `{"type": "extent", "field": "v", "signal": "span"}` publishes `span`; `{"type": "bin",
-     * "signal": "bins"}` publishes the bin settings it chose. Upstream treats these as ordinary
-     * signals — `parseTransform` does `scope.addSignal(spec.signal, scope.proxy(t))`, so the signal
-     * is an operator standing in for the transform — which puts everything reading one behind the
-     * dataset that produces it.
-     *
-     * They are not declared anywhere, so without this a signal reading `bins` looked like a signal
-     * reading nothing and was resolved first, against a name that had no value yet. `bin`'s own
-     * `signal` is a plain string beside the other parameters, which is exactly how the transform
-     * pipeline tells a *written* signal from a `{"signal": "..."}` reference it should read.
-     */
     /**
      * Datasets a *signal* replaces with `setdata`, mapped to the signal that does it.
      *

@@ -185,7 +185,7 @@ public class EventDispatcher(
       // but nothing in the corpus uses it and guessing at the ordering would be worse than saying
       // so.
       diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        DiagnosticCodes.INTERACTION_UNSUPPORTED,
         "A 'between' selector wrapping another 'between' is not dispatched; signal " +
           "'${binding.signalName}' will not update from it",
         operator = binding.signalName,
@@ -210,7 +210,7 @@ public class EventDispatcher(
       // happened. Reported rather than dropped, because a signal driven by a timer is one that
       // never changes here and the reason is not visible from the drawing.
       diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        DiagnosticCodes.INTERACTION_UNSUPPORTED,
         "A timer stream needs a clock to fire it; signal '${binding.signalName}' will keep its " +
           "initial value",
         operator = binding.signalName,
@@ -222,7 +222,7 @@ public class EventDispatcher(
       // later. Nothing here schedules, and silently treating it as a throttle would fire on the
       // leading edge instead of the trailing one — the opposite behaviour.
       diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        DiagnosticCodes.INTERACTION_UNSUPPORTED,
         "A debounce needs a scheduler to fire after the quiet period; signal " +
           "'${binding.signalName}' will fire on every matching event instead",
         operator = binding.signalName,
@@ -291,7 +291,7 @@ public class EventDispatcher(
       }
     if (!blocked) return true
     diagnostics.warn(
-      DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+      DiagnosticCodes.INTERACTION_UNSUPPORTED,
       "Blocked $key $type event listener; 'config.events' does not permit it, so signal " +
         "'${binding.signalName}' will not update from it",
       operator = binding.signalName,

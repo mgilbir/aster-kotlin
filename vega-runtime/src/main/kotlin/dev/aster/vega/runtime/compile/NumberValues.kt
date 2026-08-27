@@ -4,6 +4,7 @@ import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.expression.ExpressionEvaluationException
 import dev.aster.vega.expression.ExpressionResult
 import dev.aster.vega.expression.JsSemantics
+import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.spec.ChannelValue
@@ -79,12 +80,34 @@ public class NumberResolver(
     resolve(value, owner)?.let { if (it.isFinite()) it.toInt() else 0 }
 
   /**
-   * Evaluates an expression to a list of values, for the places a signal supplies a whole array.
+   * A `tickCount`, clamped to something this compiler will actually build.
    *
-   * A scale domain is the common one: the `extent` transform publishes a two-element array and a
-   * specification points a scale straight at it. A signal that is not an array is treated as a
-   * one-element list rather than rejected, which is what upstream's own array coercion does.
+   * A tick count is an ordinary number in a specification and nothing bounded it, so `"tickCount":
+   * 1e9` asked for a billion-element list — an out-of-memory error on the way to building it, or,
+   * through `countWithMinStep`'s walk-down, a loop of a billion iterations first. Upstream hangs on
+   * the same specification, so this is a documented clamp rather than a divergence to hide: the
+   * limit is named, the diagnostic says what was asked for and what was used, and `ScaleResolver`'s
+   * `MAX_BINS` is the same idea one file over.
+   *
+   * Ten thousand is far past any axis a person reads and far below any allocation that matters.
    */
+  public fun resolveTickCount(value: NumberValue?, owner: String): Int? {
+    val requested = resolveInt(value, owner) ?: return null
+    if (requested <= MAX_TICK_COUNT) return requested
+    diagnostics.warn(
+      DiagnosticCodes.COMPILE_LIMIT_EXCEEDED,
+      "A tick count of $requested was asked for on '$owner' and $MAX_TICK_COUNT is the most this " +
+        "engine will build; the guide was drawn with $MAX_TICK_COUNT",
+      operator = owner,
+    )
+    return MAX_TICK_COUNT
+  }
+
+  public companion object {
+    /** See [resolveTickCount]. */
+    public const val MAX_TICK_COUNT: Int = 10_000
+  }
+
   /**
    * Evaluates an expression to text, for the properties whose value is words rather than a size.
    */
@@ -133,6 +156,13 @@ public class NumberResolver(
         }
     }
 
+  /**
+   * Evaluates an expression to a list of values, for the places a signal supplies a whole array.
+   *
+   * A scale domain is the common one: the `extent` transform publishes a two-element array and a
+   * specification points a scale straight at it. A signal that is not an array is treated as a
+   * one-element list rather than rejected, which is what upstream's own array coercion does.
+   */
   public fun resolveList(expression: String, owner: String): List<VegaValue>? =
     when (val compiled = expressions.compile(expression)) {
       is ExpressionResult.Failed -> {

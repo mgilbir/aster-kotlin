@@ -271,13 +271,6 @@ public class ScaleResolver(
   }
 
   /**
-   * The colour list a scale's range describes.
-   *
-   * A named categorical scheme resolves to its palette. A ramp scheme is reported instead:
-   * reproducing one needs d3's interpolator table and Vega's default scheme extent, and
-   * approximating either would be wrong in a way that still looks like a chart.
-   */
-  /**
    * Vega's **named ranges**: `"range": "category"` and its siblings.
    *
    * These are not scheme names and not literal arrays — they are keys into `config.range`, which
@@ -362,13 +355,6 @@ public class ScaleResolver(
   }
 
   /**
-   * The stops a scheme supplies, whichever of the three ways it was named.
-   *
-   * Upstream lowercases a scheme name before looking it up (`vega-encode/src/scale.js`), so a
-   * palette picker offering "Viridis" finds `viridis`. Stops written out inline are not looked up
-   * at all — they are already the table every named scheme resolves to.
-   */
-  /**
    * The stops of a scheme that is a **ramp**, or null for one that is a palette.
    *
    * The distinction is upstream's own and it decides everything downstream: `isFunction(scheme)`
@@ -413,6 +399,13 @@ public class ScaleResolver(
       is SchemeRef.Colors -> null
     }
 
+  /**
+   * The stops a scheme supplies, whichever of the three ways it was named.
+   *
+   * Upstream lowercases a scheme name before looking it up (`vega-encode/src/scale.js`), so a
+   * palette picker offering "Viridis" finds `viridis`. Stops written out inline are not looked up
+   * at all — they are already the table every named scheme resolves to.
+   */
   private fun schemeColors(spec: ScaleSpec, range: RangeSpec.Scheme): List<SceneColor>? {
     if (range.scheme is SchemeRef.Colors) {
       val values = (range.scheme as SchemeRef.Colors).values
@@ -452,6 +445,13 @@ public class ScaleResolver(
     }
   }
 
+  /**
+   * The colour list a scale's range describes.
+   *
+   * A named categorical scheme resolves to its palette. A ramp scheme is reported instead:
+   * reproducing one needs d3's interpolator table and Vega's default scheme extent, and
+   * approximating either would be wrong in a way that still looks like a chart.
+   */
   private fun colorRange(spec: ScaleSpec): List<SceneColor>? =
     when (val range = effectiveRange(spec)) {
       is RangeSpec.Literal -> {
@@ -554,36 +554,11 @@ public class ScaleResolver(
   }
 
   /**
-   * A continuous scale's domain, in upstream's order: the values, then `zero`, then the explicit
-   * limits. `nice` is the caller's, because each scale type rounds differently.
-   *
-   * Two things here are visible only in upstream's `configureDomain`, and a reasonable reading gets
-   * both wrong:
-   * - `zero` keys off the **scale type**, not off whether the domain was written out. A linear
-   *   scale handed `[10, 20]` still starts at 0, which is not what "explicit domain" suggests. It
-   *   applies to linear, pow and sqrt and to nothing else — not log, and not symlog, whose domain
-   *   reaches both signs happily.
-   * - `domainMin` and `domainMax` **replace** an end rather than clamping it, and they run *after*
-   *   `zero`, so `domainMin: 30` beats the zero that would otherwise have pulled the domain down.
-   *   Upstream does not correct a minimum placed above the maximum either; it leaves the domain
-   *   running backwards.
-   *
-   * @param zeroDefault whether this scale type includes zero when the specification is silent.
-   * @param fallback the domain to use when nothing resolved; a log-family scale cannot take `[0,
-   *   1]`.
-   */
-  /**
    * `domainRaw`: a domain to use exactly as given, whatever the rest of the scale says.
    *
    * Almost always a signal — `{"signal": "brush"}` — and almost always null until a reader touches
    * the chart, which is why an unresolvable one has to mean "no override" rather than "empty
    * domain".
-   */
-  /**
-   * True when `domainRaw` supplied the domain, in which case `nice` must not touch it.
-   *
-   * Checked at each `nice` site rather than once, because upstream's `configureDomain` returns
-   * before it reaches any of them and there is no single place here that all six pass through.
    */
   private fun rawDomain(spec: ScaleSpec): List<Double>? {
     val raw = spec.domainRaw ?: return null
@@ -610,6 +585,25 @@ public class ScaleResolver(
    */
   private fun rawApplies(spec: ScaleSpec): Boolean = (rawDomain(spec)?.size ?: 0) >= 2
 
+  /**
+   * A continuous scale's domain, in upstream's order: the values, then `zero`, then the explicit
+   * limits. `nice` is the caller's, because each scale type rounds differently.
+   *
+   * Two things here are visible only in upstream's `configureDomain`, and a reasonable reading gets
+   * both wrong:
+   * - `zero` keys off the **scale type**, not off whether the domain was written out. A linear
+   *   scale handed `[10, 20]` still starts at 0, which is not what "explicit domain" suggests. It
+   *   applies to linear, pow and sqrt and to nothing else — not log, and not symlog, whose domain
+   *   reaches both signs happily.
+   * - `domainMin` and `domainMax` **replace** an end rather than clamping it, and they run *after*
+   *   `zero`, so `domainMin: 30` beats the zero that would otherwise have pulled the domain down.
+   *   Upstream does not correct a minimum placed above the maximum either; it leaves the domain
+   *   running backwards.
+   *
+   * @param zeroDefault whether this scale type includes zero when the specification is silent.
+   * @param fallback the domain to use when nothing resolved; a log-family scale cannot take `[0,
+   *   1]`.
+   */
   private fun continuousDomain(
     spec: ScaleSpec,
     zeroDefault: Boolean,
@@ -683,22 +677,24 @@ public class ScaleResolver(
    */
   private fun buildTime(spec: ScaleSpec, zone: TimeZone): TimeScale? {
     val range = numericRange(spec) ?: return null
-    val explicit = literalNumbers(spec.domain)
+    // The **same ladder** every other continuous scale climbs, because upstream's
+    // `configureDomain` runs one block whatever the type: `domainRaw` first and returning if it
+    // applies, then `zero` and the three `domain*` overrides, then the padding, then `nice`.
+    //
+    // This used to read `spec.domain` and consult `rawApplies` only to suppress `nice`, so a
+    // `domainRaw` was computed and thrown away — and `domainRaw` is how an interactive zoom
+    // publishes the exact interval it wants. The committed `overview-plus-detail.vg.json` fixture
+    // is exactly that shape: brush the overview, and the detail panel recompiled with the full
+    // domain and rendered unzoomed. A static compile passes the oracle because the brush signal is
+    // null at compile time, so the flagship interaction was inert with nothing to read.
+    //
+    // `zeroDefault = false`, because upstream's `includeZero` is
+    // `!scale.bins && (linear || pow || sqrt)` — a time scale never zeroes unless a specification
+    // asks it to, and an explicit `zero: true` still applies.
     val domain =
-      if (explicit != null && explicit.size >= 2) explicit
-      else {
-        val extent = numericExtent(spec.domain, spec.name) ?: return null
-        listOf(extent.start, extent.endInclusive)
-      }
-    // A **bound** replaces an end of the domain here as it does on any other continuous scale:
-    // upstream's `configureDomain` runs the same block whatever the type, and a time scale that
-    // ignored them drew the whole of the data where a chart had asked for one year of it.
-    val bounded =
-      domain.toMutableList().also {
-        numbers.resolve(spec.domainMin, spec.name)?.let { low -> it[0] = low }
-        numbers.resolve(spec.domainMax, spec.name)?.let { high -> it[it.size - 1] = high }
-      }
-    val padded = padded(bounded, range, spec)
+      continuousDomain(spec, zeroDefault = false, fallback = emptyList())?.takeIf { it.size >= 2 }
+        ?: return null
+    val padded = padded(domain, range, spec)
     val niced =
       if (spec.nice && !rawApplies(spec)) {
         // `nice: "month"` rounds out to a **calendar boundary**, where `nice: true` rounds out to
@@ -711,16 +707,21 @@ public class ScaleResolver(
           TimeInterval.forUnit(spec.niceInterval)?.let { (interval, implied) ->
             TimeStepper(interval, implied * (spec.niceStep ?: 1), zone)
           }
+        // Over `padded`, not over the original `domain`. Rounding out from the *unbounded* domain
+        // discarded both the `domainMin`/`domainMax` above and the padding — and Vega-Lite
+        // defaults every temporal scale to `nice: true`, so a VL chart's `scale.domainMax` on a
+        // time axis silently showed the whole span. The comment beside this said the opposite was
+        // intended.
         val (lo, hi) =
           if (stepper != null) {
-            val start = stepper.floor(domain.first())
-            val flooredEnd = stepper.floor(domain.last())
-            val end = if (flooredEnd < domain.last()) stepper.offset(flooredEnd, 1) else flooredEnd
+            val start = stepper.floor(padded.first())
+            val flooredEnd = stepper.floor(padded.last())
+            val end = if (flooredEnd < padded.last()) stepper.offset(flooredEnd, 1) else flooredEnd
             start to end
           } else {
             TimeTicks.nice(
-              domain.first(),
-              domain.last(),
+              padded.first(),
+              padded.last(),
               spec.niceCount ?: LinearScale.DEFAULT_TICK_COUNT,
               zone,
             )

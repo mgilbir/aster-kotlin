@@ -82,10 +82,85 @@ public object DiagnosticCodes {
   public const val SCALE_UNSUPPORTED_TYPE: String = "VEGA_SCALE_UNSUPPORTED_TYPE"
   public const val SCALE_INVALID_DOMAIN: String = "VEGA_SCALE_INVALID_DOMAIN"
 
+  /**
+   * A guide or an expression names a scale the compiler did not build.
+   *
+   * Distinct from [SCALE_UNSUPPORTED_TYPE], which it used to be reported as: that one says "this
+   * engine has no such scale type" and this one says "the scale is one this engine has, and
+   * something about *this* specification stopped it being built". A host matching on the first to
+   * decide whether the type is supported was told the wrong thing.
+   */
+  public const val SCALE_NOT_BUILT: String = "VEGA_SCALE_NOT_BUILT"
+
+  /**
+   * A dataset could not be fetched: the loader refused the URL, or the fetch itself failed.
+   *
+   * The only code in this file that describes something outside the specification, which is why a
+   * host wants to tell it apart — a retry is meaningful here and meaningless for everything else.
+   * It used to report [PARSE_UNKNOWN_PROPERTY], which says the opposite: that the *document* was at
+   * fault.
+   */
+  public const val DATA_LOAD_FAILED: String = "VEGA_DATA_LOAD_FAILED"
+
+  /**
+   * A dataset was reached and could not be read as the specification asked.
+   *
+   * A `dsv` with no delimiter, a TopoJSON file that does not hold the named object, a response that
+   * is not an array of rows, a `format.parse` this engine cannot apply, a `source` naming a dataset
+   * nobody defined.
+   */
+  public const val DATA_UNREADABLE: String = "VEGA_DATA_UNREADABLE"
+
+  /**
+   * Two definitions in one scope share a name, and the later one wins.
+   *
+   * Upstream's behaviour, reported because the loser is invisible otherwise.
+   */
+  public const val DUPLICATE_DEFINITION: String = "VEGA_DUPLICATE_DEFINITION"
+
+  /**
+   * A channel's value is one the encoder cannot use, and a documented default was drawn instead.
+   *
+   * An unknown `strokeCap`, an unparseable colour, an `image` with no size — the last of which used
+   * to report [EXPORT_IMAGE_UNRESOLVED], a code about *export* that a compile has no business
+   * emitting.
+   */
+  public const val ENCODE_INVALID_VALUE: String = "VEGA_ENCODE_INVALID_VALUE"
+
+  /**
+   * A specification asked the compiler for more than it will materialize.
+   *
+   * A tick count in the billions, a facet cross product of a million cells, a mark tree nested
+   * thousands deep. Every one of these is a specification a *browser* also fails on, and the
+   * difference is that this says which limit was reached and by how much rather than exhausting the
+   * heap or the stack. The caps are stated in the code that applies them.
+   */
+  public const val COMPILE_LIMIT_EXCEEDED: String = "VEGA_COMPILE_LIMIT_EXCEEDED"
+
+  /**
+   * The compiler failed in a way it does not have a diagnostic for.
+   *
+   * The last-resort boundary that makes "nothing throws" true by construction rather than by every
+   * one of sixty thousand lines being individually careful. A specification is data, often pasted
+   * data; reaching this is a defect in *this* engine, and the message carries the exception so it
+   * can be reported as one.
+   */
+  public const val COMPILE_FAILED: String = "VEGA_COMPILE_FAILED"
+
   public const val TRANSFORM_NOT_IMPLEMENTED: String = "VEGA_TRANSFORM_NOT_IMPLEMENTED"
   public const val TRANSFORM_INVALID_PARAMETER: String = "VEGA_TRANSFORM_INVALID_PARAMETER"
 
   public const val SIGNAL_CYCLE: String = "VEGA_SIGNAL_CYCLE"
+
+  /**
+   * An event stream or handler this engine cannot dispatch, so a signal will not update from it.
+   *
+   * A `window:` source, a `between` wrapping another `between`, a timer or a debounce with no
+   * scheduler, a stream `config.events` blocks. Every one of them is a control that looks wired and
+   * is not, which is the case a diagnostic is most worth having for — and all of them used to
+   * report [PARSE_UNKNOWN_PROPERTY], which says the document named a property nobody read.
+   */
+  public const val INTERACTION_UNSUPPORTED: String = "VEGA_INTERACTION_UNSUPPORTED"
 
   public const val RENDER_UNSUPPORTED_BLEND_MODE: String = "VEGA_RENDER_UNSUPPORTED_BLEND_MODE"
   public const val RENDER_UNSUPPORTED_NODE: String = "VEGA_RENDER_UNSUPPORTED_NODE"

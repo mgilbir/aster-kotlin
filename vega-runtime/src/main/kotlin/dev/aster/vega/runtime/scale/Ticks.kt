@@ -29,12 +29,6 @@ public object Ticks {
   private val E2 = sqrt(2.0)
 
   /**
-   * The step size d3 would use between [start] and [stop] for about [count] ticks.
-   *
-   * A positive result is a multiplier; a negative result `-k` means the step is `1/k`.
-   * `Double.NEGATIVE_INFINITY` means the range is degenerate.
-   */
-  /**
    * d3's `tickSpec`: the first and last tick **indices** and the increment between them.
    *
    * Transcribed from d3-array 3.2.4, which rewrote this — the older algorithm computed the
@@ -84,10 +78,10 @@ public object Ticks {
   private class TickSpec(val i1: Double, val i2: Double, val inc: Double)
 
   /**
-   * The increment between ticks: a step, or **`-k` meaning a step of `1/k`**.
+   * The step size d3 would use between [start] and [stop] for about [count] ticks.
    *
-   * The negative form is d3's way of keeping a fractional step exact — a tenth is `-10`, not `0.1`
-   * — so `0.1 + 0.2` never enters an axis.
+   * A positive result is a multiplier; a negative result `-k` means the step is `1/k`.
+   * `Double.NEGATIVE_INFINITY` means the range is degenerate.
    */
   public fun tickIncrement(start: Double, stop: Double, count: Int): Double =
     tickIncrement(start, stop, count.toDouble())

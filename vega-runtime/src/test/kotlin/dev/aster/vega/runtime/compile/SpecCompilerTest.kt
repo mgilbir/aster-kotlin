@@ -184,8 +184,12 @@ class SpecCompilerTest {
       diagnostics.any { it.code == DiagnosticCodes.SCALE_UNSUPPORTED_TYPE },
       "$diagnostics",
     )
-    // The mark that referenced it must complain as well, rather than positioning at the origin.
-    assertTrue(diagnostics.count { it.code == DiagnosticCodes.SCALE_UNSUPPORTED_TYPE } > 1)
+    // The mark that referenced it must complain as well, rather than positioning at the origin —
+    // and under `SCALE_NOT_BUILT`, which is the distinction: the *scale* has a type upstream does
+    // not have, and the *mark* refers to a scale that consequently was not built. Both used to
+    // report `SCALE_UNSUPPORTED_TYPE`, so a host reading that code to decide whether the type was
+    // supported was told the wrong thing by the mark.
+    assertTrue(diagnostics.any { it.code == DiagnosticCodes.SCALE_NOT_BUILT }, "$diagnostics")
   }
 
   @Test
@@ -324,7 +328,9 @@ class SpecCompilerTest {
         """"url": "data/table.json"""",
       )
     val compiled = compile(remote)
-    assertTrue(compiled.diagnostics.any { it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY })
+    // `DATA_LOAD_FAILED` and not `PARSE_UNKNOWN_PROPERTY`: the document is fine and the *fetch* is
+    // what did not happen, which is the one condition in this file a host might retry.
+    assertTrue(compiled.diagnostics.any { it.code == DiagnosticCodes.DATA_LOAD_FAILED })
     assertTrue(compiled.scene!!.flatten().none { it.node is RectNode })
   }
 
@@ -333,7 +339,7 @@ class SpecCompilerTest {
     val broken = minimalBar.replace("""{"data": "t"}""", """{"data": "nope"}""")
     assertTrue(
       compile(broken).diagnostics.any {
-        it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY && it.message.contains("nope")
+        it.code == DiagnosticCodes.DATA_UNREADABLE && it.message.contains("nope")
       }
     )
   }

@@ -177,10 +177,15 @@ public class MarkEncoder(
         data.mapIndexedNotNull { index, datum -> path(at(index), datum, index, "shape") }
       MarkType.TRAIL -> listOfNotNull(trail(spec, ordered(spec, data)))
       MarkType.IMAGE -> data.mapIndexedNotNull { index, datum -> image(at(index), datum, index) }
-      else -> {
+      // A **group** is not unimplemented: it is built by `encodeGroup`, which the scope compiler
+      // calls because a group needs a whole nested scope and this entry point has none. Reporting
+      // "the group mark encoder is not implemented" from a public function said the opposite of
+      // what the two thousand lines beside it do.
+      MarkType.GROUP -> {
         diagnostics.error(
-          DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-          "The '${spec.type.name.lowercase()}' mark encoder is not implemented; " +
+          DiagnosticCodes.ENCODE_INVALID_VALUE,
+          "A group mark carries its own scope — data, signals, scales and children — so it is " +
+            "built by the scope compiler and not by this entry point; " +
             "${data.size} data row${if (data.size == 1) "" else "s"} produced no marks",
           operator = spec.name ?: spec.type.name.lowercase(),
         )
@@ -525,7 +530,7 @@ public class MarkEncoder(
         "path:$source",
         dev.aster.vega.model.VegaDiagnostic(
           severity = dev.aster.vega.model.DiagnosticSeverity.WARNING,
-          code = DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          code = DiagnosticCodes.ENCODE_INVALID_VALUE,
           message =
             "Could not read all of the path '$source'; the outline stops where the reading did",
           operator = spec.name,
@@ -688,7 +693,7 @@ public class MarkEncoder(
         "shape:$source",
         dev.aster.vega.model.VegaDiagnostic(
           severity = dev.aster.vega.model.DiagnosticSeverity.WARNING,
-          code = DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          code = DiagnosticCodes.ENCODE_INVALID_VALUE,
           message =
             "Symbol shape '$source' is neither one of the twelve names nor a path this engine " +
               "could read; a circle was drawn instead",
@@ -778,12 +783,12 @@ public class MarkEncoder(
             ?: markConfig.number("fontSize")
             ?: MarkDefaults.TEXT_FONT_SIZE,
         fontWeight = fontWeight(channels, datum),
-        fontStyle =
-          if (string(channels["fontStyle"], datum)?.equals("italic", ignoreCase = true) == true) {
-            FontStyle.ITALIC
-          } else {
-            FontStyle.NORMAL
-          },
+        // `italic` and `normal` are the two this engine's text styles have. `oblique` is CSS's
+        // third and drew **upright** with nothing said about it, in a file where `strokeCap` and
+        // `strokeJoin` report an unknown value two hundred lines down. Italic is the nearest thing
+        // a text engine here can ask for, and saying so is the difference between a substitution
+        // and a silence.
+        fontStyle = fontStyle(channels, datum, spec),
         // Upstream's default is `fontSize + 2` rather than a ratio, which `TextLayout` applies when
         // this is null. Only the *gap between lines* changes; a single-line label is unaffected, so
         // the channel is invisible until the text has a break in it.
@@ -865,7 +870,7 @@ public class MarkEncoder(
         "blend:$name",
         dev.aster.vega.model.VegaDiagnostic(
           severity = dev.aster.vega.model.DiagnosticSeverity.WARNING,
-          code = DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          code = DiagnosticCodes.ENCODE_INVALID_VALUE,
           message = "Blend mode '$name' is not one this engine has; the item composites normally",
         ),
       )
@@ -1115,7 +1120,7 @@ public class MarkEncoder(
       "interpolate:$method",
       dev.aster.vega.model.VegaDiagnostic(
         severity = dev.aster.vega.model.DiagnosticSeverity.WARNING,
-        code = DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        code = DiagnosticCodes.ENCODE_INVALID_VALUE,
         message =
           "'$method' is not one of Vega's interpolation methods; the points were joined with " +
             "straight lines instead",
@@ -1237,7 +1242,7 @@ public class MarkEncoder(
       "square" -> StrokeCap.SQUARE
       else -> {
         diagnostics.warn(
-          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          DiagnosticCodes.ENCODE_INVALID_VALUE,
           "Unknown strokeCap '$name'; drawing a butt cap",
           operator = spec.name,
         )
@@ -1253,7 +1258,7 @@ public class MarkEncoder(
       "bevel" -> StrokeJoin.BEVEL
       else -> {
         diagnostics.warn(
-          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          DiagnosticCodes.ENCODE_INVALID_VALUE,
           "Unknown strokeJoin '$name'; drawing a miter join",
           operator = spec.name,
         )
@@ -1334,7 +1339,7 @@ public class MarkEncoder(
     val height = vertical?.extent ?: number(channels["height"], datum)
     if (width == null || height == null) {
       diagnostics.warn(
-        DiagnosticCodes.EXPORT_IMAGE_UNRESOLVED,
+        DiagnosticCodes.ENCODE_INVALID_VALUE,
         "Image '${url ?: "(pixels)"}' has no explicit " +
           "${if (width == null) "width" else "height"}; upstream takes " +
           "it from the image's own pixels, which only the renderer has, so the mark was placed " +
@@ -1364,19 +1369,6 @@ public class MarkEncoder(
     )
   }
 
-  /**
-   * Reads a channel's input, which is not always a column of the row being drawn.
-   *
-   * Vega's four object forms of `field` each reach somewhere else, and each is resolved here
-   * because this is the only place that knows all of them:
-   * - **group** — a property of the enclosing group. Inside a group scope `width` and `height` are
-   *   that group's own size, which is exactly what `{"group": "height"}` asks for and why a mark
-   *   can be made to span its cell.
-   * - **parent** — a column of the facet datum, which the `parent` signal already carries.
-   * - **signal** — the column *name* comes from a signal, so the signal is read first and the
-   *   result used as a path.
-   * - **datum** — the name is itself held in a column, one level of indirection further.
-   */
   /**
    * Which scale a channel means, when the specification lets a signal decide.
    *
@@ -1474,16 +1466,51 @@ public class MarkEncoder(
       accessibility = describe(spec, datum, channels),
     )
 
+  /**
+   * `fontStyle`, and what happens to the one CSS value this engine's [FontStyle] has no room for.
+   *
+   * `italic` and `normal` are the two a text engine here can ask a platform for. `oblique` is a
+   * *slanted upright* face, which no platform text API in this project can request, so it is drawn
+   * as italic and reported — the same treatment `strokeCap` and `strokeJoin` give an unknown value
+   * further down this file, and the opposite of what this used to do, which was draw it upright and
+   * say nothing.
+   */
+  private fun fontStyle(
+    channels: Map<String, ChannelValue>,
+    datum: VegaValue,
+    spec: MarkSpec,
+  ): FontStyle {
+    val name = string(channels["fontStyle"], datum) ?: return FontStyle.NORMAL
+    return when {
+      name.equals("italic", ignoreCase = true) -> FontStyle.ITALIC
+      name.equals("normal", ignoreCase = true) || name.isEmpty() -> FontStyle.NORMAL
+      name.equals("oblique", ignoreCase = true) -> {
+        diagnostics.warn(
+          DiagnosticCodes.ENCODE_INVALID_VALUE,
+          "fontStyle 'oblique' is a slanted upright face, which no text engine here can ask a " +
+            "platform for; italic was drawn instead",
+          operator = spec.name ?: "text",
+        )
+        FontStyle.ITALIC
+      }
+      else -> {
+        diagnostics.warn(
+          DiagnosticCodes.ENCODE_INVALID_VALUE,
+          "Unknown fontStyle '$name'; drawing an upright face",
+          operator = spec.name ?: "text",
+        )
+        FontStyle.NORMAL
+      }
+    }
+  }
+
   private fun fontWeight(channels: EncodeEntry, datum: VegaValue): Int {
     val channel = channels["fontWeight"] ?: return 400
     val numeric = number(channel, datum)
     if (numeric != null) return numeric.toInt().coerceIn(1, 1000)
-    return when (string(channel, datum)?.lowercase()) {
-      "bold",
-      "bolder" -> 700
-      "lighter" -> 300
-      else -> 400
-    }
+    // [FontWeights] is the one rule; this used to be the third of three that disagreed with each
+    // other, and the one that answered 400 for the numeric string `"700"`.
+    return string(channel, datum)?.let { FontWeights.of(it) } ?: 400
   }
 
   private fun textAlign(name: String?): TextAlign =
@@ -1627,12 +1654,6 @@ public class MarkEncoder(
   }
 
   /**
-   * The position of a mark that has no extent of its own — a symbol, a text, a line's vertex.
-   *
-   * Upstream runs the same spatial adjustment over these, but with no width to halve it reduces to
-   * this: a centre channel is the position, and it wins over a start channel written beside it.
-   */
-  /**
    * A path mark's rows, in the order its `sort` asks for.
    *
    * A `sort` on a mark orders the *items* it draws, and for a line or an area there is only one
@@ -1647,20 +1668,26 @@ public class MarkEncoder(
     val sort = spec.sort ?: return data
     if (data.size < 2) return data
     val channels = spec.encode.effective
-    return data.sortedWith { a, b ->
-      var result = 0
-      for ((index, field) in sort.fields.withIndex()) {
-        val left = rowPosition(channels, a, field) ?: continue
-        val right = rowPosition(channels, b, field) ?: continue
-        val comparison = left.compareTo(right)
-        if (comparison != 0) {
-          val descending = sort.orders.getOrNull(index)?.startsWith("desc") == true
-          result = if (descending) -comparison else comparison
-          break
+    // Indices, so an unorderable pair can fall back to **declaration order** rather than to zero.
+    // A comparator that answers zero for a pair it cannot order is not a total order — a row whose
+    // key is unreadable compares equal to two rows that compare unequal to each other — and the
+    // JVM's TimSort detects that and throws `IllegalArgumentException: Comparison method violates
+    // its general contract!` once there are 32 or more items. A field some rows lack is all it
+    // takes, and a line chart over a thousand points is the ordinary case.
+    val order =
+      data.indices.sortedWith { a, b ->
+        for ((index, field) in sort.fields.withIndex()) {
+          val left = rowPosition(channels, data[a], field) ?: continue
+          val right = rowPosition(channels, data[b], field) ?: continue
+          val comparison = left.compareTo(right)
+          if (comparison != 0) {
+            val descending = sort.orders.getOrNull(index)?.startsWith("desc") == true
+            return@sortedWith if (descending) -comparison else comparison
+          }
         }
+        a.compareTo(b)
       }
-      result
-    }
+    return order.map { data[it] }
   }
 
   /** Where a row lands on one axis, as the sort sees it. */
@@ -1671,6 +1698,12 @@ public class MarkEncoder(
       else -> null
     }
 
+  /**
+   * The position of a mark that has no extent of its own — a symbol, a text, a line's vertex.
+   *
+   * Upstream runs the same spatial adjustment over these, but with no width to halve it reduces to
+   * this: a centre channel is the position, and it wins over a start channel written beside it.
+   */
   private fun centred(
     channels: EncodeEntry,
     datum: VegaValue,
@@ -1754,10 +1787,19 @@ public class MarkEncoder(
   private fun scaledPosition(channel: ChannelValue.Scaled, datum: VegaValue): Double? {
     val scale = scales[scaleNameOf(channel, datum)]
     if (scale == null) {
-      diagnostics.error(
-        DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-        "Encoding refers to scale '${scaleNameOf(channel, datum)}', which was not built",
-        operator = scaleNameOf(channel, datum),
+      // Once, not once per row. A missing scale is a property of the *specification*, so a 10,000
+      // row mark produced 10,000 identical ERROR diagnostics and buried everything else —
+      // including whatever a reader was actually looking for. `reportOnce` was in this file,
+      // unused by any of the three per-datum reports.
+      reportOnce(
+        "scale-missing:${scaleNameOf(channel, datum)}",
+        dev.aster.vega.model.VegaDiagnostic(
+          severity = dev.aster.vega.model.DiagnosticSeverity.ERROR,
+          code = DiagnosticCodes.SCALE_NOT_BUILT,
+          message =
+            "Encoding refers to scale '${scaleNameOf(channel, datum)}', which was not built",
+          operator = scaleNameOf(channel, datum),
+        ),
       )
       return null
     }
@@ -1768,10 +1810,11 @@ public class MarkEncoder(
       // it belongs to, and it maps a name to a pixel offset without being a position scale in any
       // sense this engine models. Refusing it outright was stricter than upstream and cost every
       // such label its offset.
-      val input =
-        channel.field?.let { datum.fieldOf(it) }
-          ?: channel.value
-          ?: return unpositionable(channel, datum)
+      // `scaledInput`, not a second reading of the same three sources. The two had already
+      // drifted: this one skipped `signal`, so `{"scale": "ord", "signal": "…"}` on a non-position
+      // scale silently lost its value where the position path eighty lines down read it. One of
+      // two readers of the same rule is how a rule stops being one.
+      val input = scaledInput(channel, datum) ?: return unpositionable(channel, datum)
       val mapped = scale.scale(input).asDouble()
       return if (mapped.isNaN()) unpositionable(channel, datum) else mapped
     }
@@ -1853,11 +1896,18 @@ public class MarkEncoder(
 
   /** Reports a scale whose output cannot place a mark, and leaves the channel unset. */
   private fun unpositionable(channel: ChannelValue.Scaled, datum: VegaValue): Double? {
-    diagnostics.error(
-      DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-      "Scale '${scaleNameOf(channel, datum)}' produced no number for this datum, so it cannot " +
-        "position a mark",
-      operator = scaleNameOf(channel, datum),
+    // Once per scale, not once per datum: a scale that cannot place one row usually cannot place
+    // any of them, and ten thousand copies of the same sentence is not a better report.
+    reportOnce(
+      "unpositionable:${scaleNameOf(channel, datum)}",
+      dev.aster.vega.model.VegaDiagnostic(
+        severity = dev.aster.vega.model.DiagnosticSeverity.ERROR,
+        code = DiagnosticCodes.ENCODE_INVALID_VALUE,
+        message =
+          "Scale '${scaleNameOf(channel, datum)}' produced no number for this datum, so it " +
+            "cannot position a mark",
+        operator = scaleNameOf(channel, datum),
+      ),
     )
     return null
   }
@@ -1954,10 +2004,16 @@ public class MarkEncoder(
         is ChannelValue.Scaled -> {
           val scale = scales[scaleNameOf(channel, datum)]
           if (scale == null) {
-            diagnostics.error(
-              DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-              "Colour channel '$channelName' refers to scale '${channel.scale}', which was not built",
-              operator = scaleNameOf(channel, datum),
+            reportOnce(
+              "colour-scale-missing:$channelName:${scaleNameOf(channel, datum)}",
+              dev.aster.vega.model.VegaDiagnostic(
+                severity = dev.aster.vega.model.DiagnosticSeverity.ERROR,
+                code = DiagnosticCodes.SCALE_NOT_BUILT,
+                message =
+                  "Colour channel '$channelName' refers to scale '${channel.scale}', which was " +
+                    "not built",
+                operator = scaleNameOf(channel, datum),
+              ),
             )
             return null
           }
@@ -1984,10 +2040,14 @@ public class MarkEncoder(
     val text = resolved.asString()
     val colour = SceneColor.parse(text)
     if (colour == null) {
-      diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "Could not parse colour '$text' for channel '$channelName'",
-        operator = spec.name,
+      reportOnce(
+        "colour:$channelName:$text",
+        dev.aster.vega.model.VegaDiagnostic(
+          severity = dev.aster.vega.model.DiagnosticSeverity.WARNING,
+          code = DiagnosticCodes.ENCODE_INVALID_VALUE,
+          message = "Could not parse colour '$text' for channel '$channelName'",
+          operator = spec.name,
+        ),
       )
     }
     return colour

@@ -29,6 +29,10 @@ section here does not get released.
   second resolves against the first when both are inlined into one page. No behaviour changed; the
   documentation did.
 
+- **`AxisDefaults.TITLE_MIN_EXTENT`/`TITLE_MAX_EXTENT` are `MIN_EXTENT`/`MAX_EXTENT`.** They clamp
+  the **axis** extent — the reach of its ticks and labels — which is what upstream calls `minExtent`
+  and `maxExtent`; the old names read as a property of the title and are not one.
+
 - **`groupTuples` and `groupKey` answer a `GroupKey` rather than a list of raw values.** What makes
   two rows one group is upstream's own string coercion — its `fastmap` is object-backed, so the
   number `1001` and the string `"1001"` are one property and therefore one group — and keying on
@@ -63,11 +67,103 @@ section here does not get released.
   were. It is a boolean in upstream's own `Definition`, and a chart asking for its biggest slice
   first got its slices in data order with no diagnostic.
 
+- **Eight diagnostic codes**, so a host can tell apart conditions that used to share one:
+  `VEGA_DATA_LOAD_FAILED` (the only one that describes something outside the specification, and the
+  only one a retry is meaningful for), `VEGA_DATA_UNREADABLE`, `VEGA_SCALE_NOT_BUILT`,
+  `VEGA_ENCODE_INVALID_VALUE`, `VEGA_DUPLICATE_DEFINITION`, `VEGA_INTERACTION_UNSUPPORTED`,
+  `VEGA_COMPILE_LIMIT_EXCEEDED` and `VEGA_COMPILE_FAILED`. Nothing was renamed or removed; the
+  conditions that used to report `VEGA_PARSE_UNKNOWN_PROPERTY`, `VEGA_SCALE_UNSUPPORTED_TYPE` or
+  `VEGA_EXPORT_IMAGE_UNRESOLVED` from the *runtime* now report one of these instead.
+
 - **`PathData.containsNonZero`**, the containment test that agrees with what a fill paints, and
   **`isSafeHref`**, upstream's `href` allowlist as a predicate a host can apply to the link a
   `MarkClicked` carries before following it.
 
 ### Fixed
+
+- **Nothing throws, by construction.** The README stakes the whole diagnostic model on it —
+  "nothing throws; a compile returns diagnostics" — and no public boundary had a catch-all or a
+  depth cap, so a *specification* could take the host down seven different ways. Each of those is
+  fixed where it was; `SpecCompiler.compileJson` and `compile` are now guarded as well, so the next
+  one is a `VEGA_COMPILE_FAILED` diagnostic carrying the exception rather than a crash. Cancellation
+  and `OutOfMemoryError` are deliberately not caught.
+
+- **A time scale honours `domainRaw`, and nices from its bounded domain.** The time branch read
+  `spec.domain` and consulted the raw domain only to suppress `nice`, so the whole ladder every
+  other continuous scale climbs — raw domain, `zero`, the three `domain*` overrides, padding, nice —
+  was computed and thrown away. `domainRaw` is how an interactive zoom publishes the exact interval
+  it wants: the committed `overview-plus-detail.vg.json` fixture is that shape, and brushing the
+  overview recompiled the detail panel with the full domain and rendered it unzoomed. A static
+  compile passes the oracle because the brush signal is null at compile time, so the flagship
+  interaction was inert with nothing to read. And the `nice` step re-derived from the *original*
+  domain, discarding `domainMin`/`domainMax` and the padding computed immediately above it —
+  Vega-Lite defaults every temporal scale to `nice: true`, so a VL `scale.domainMax` on a time axis
+  silently showed the whole span.
+
+- **A gradient legend's `values` need not be numbers.** `"values": ["2020-01-01"]` on a continuous
+  colour scale — the natural way to write date stops — cast straight to `VegaValue.Num` and threw a
+  `ClassCastException` out of the public `compileJson`. Unreadable entries are reported and left
+  out.
+
+- **A `tickCount` of a billion is clamped and said so.** Nothing bounded it, so it was an
+  out-of-memory error on the way to building the list, or a billion-iteration walk-down before
+  that. Upstream hangs on the same specification, so the limit is named in the diagnostic rather
+  than hidden.
+
+- **A mark tree nested past 64 groups is a diagnostic.** A group is the only construct that nests
+  and it nests by recursion, so a machine-generated document a few thousand deep was a
+  `StackOverflowError` — an `Error`, caught by nothing typed, unrecoverable on Kotlin/Native. The
+  deepest nesting in the whole fixture corpus is three.
+
+- **A projection is readable from a mark's `encode` block.** `SignalScope.withDatum` carried every
+  field except the projections, so `{"size": {"signal": "4 * geoScale('p')"}}` reported
+  "projection 'p' is not defined" once per compile and left the channel unset. Every geo fixture
+  passed, because none of them calls a geo function inside `encode`.
+
+- **A sort over a field some rows lack no longer throws.** A comparator that answers zero for a pair
+  it cannot order is not a total order, and the JVM's TimSort detects that and throws
+  `IllegalArgumentException: Comparison method violates its general contract!` once there are 32 or
+  more items. Both sort paths fall back to declaration order, which is the order stability would
+  have given anyway.
+
+- **A missing scale is reported once, not once per row.** A 10,000-row mark produced 10,000
+  identical ERROR diagnostics and buried everything else; `reportOnce` was in the same file, unused
+  by any of the three per-datum reports. Unparseable colours and unpositionable scales are reported
+  once too.
+
+- **Diagnostic codes say what happened.** Codes are a documented public contract, and several were
+  semantically wrong: a *load failure* reported `VEGA_PARSE_UNKNOWN_PROPERTY`, which says the
+  document is at fault; an image with no size reported `VEGA_EXPORT_IMAGE_UNRESOLVED`, a code about
+  export that a compile has no business emitting; "the scale was not built" reported
+  `VEGA_SCALE_UNSUPPORTED_TYPE`, which says this engine has no such scale type. Around thirty
+  unrelated runtime conditions shared one parse code. See the Added section for the eight new ones.
+
+- **`autosize.contains: "padding"` with padding wider than the size says so.** The plotting area
+  comes out negative — upstream's does too, probed — and nothing said why the chart was empty.
+
+- **One font-weight parser, not three.** `MarkEncoder`, `TitleBuilder` and `GuideStyle` each had
+  their own and they had drifted: `bolder` was 700, 800 and 700, and two of the three read a numeric
+  string while the third answered 400 for it, so a title and an axis label written with the same
+  weight came out at different weights. `bolder` and `lighter` are **relative** to the inherited
+  weight, which in a chart is the initial 400, so CSS Fonts 4's table gives 700 and 100; `lighter`
+  was 300 everywhere, a value the table does not contain.
+
+- **A non-position scaled channel reads its `signal`.** One of the two readers of the same rule had
+  drifted and skipped it, so `{"scale": "ord", "signal": "…"}` on a non-position scale silently lost
+  its value while the position path eighty lines away read it.
+
+- **`fontStyle: "oblique"` says what it drew.** It is a slanted upright face, which no text engine
+  here can ask a platform for; it was drawn upright and silently, in a file where `strokeCap` and
+  `strokeJoin` report an unknown value two hundred lines down.
+
+- **`facet.aggregate.cross` is capped.** The product of the dimensions' distinct values was
+  unbounded: two columns of a thousand values each is a million fully compiled cells.
+
+- **Thirty orphaned documentation blocks were reattached to the code they describe.** Each was a
+  KDoc block sitting above a *different* declaration than the one it documents — the function it
+  belonged to had moved and the comment had not — so `AxisBuilder`'s explanation of `validTicks`
+  documented `offsetOf`, and `SpecCompiler`'s class comment described a compiler that could not
+  draw legends or titles, which two thousand lines had been contradicting for several releases.
 
 - **A group's opacity paints its panel and is not inherited, in the SVG export too.** `opacity` was
   emitted on the `<g>` container, which composites the whole subtree — so a half-opaque group drew

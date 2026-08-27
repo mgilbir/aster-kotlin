@@ -11,6 +11,7 @@ import dev.aster.vega.expression.RandomStream
 import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
+import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
@@ -96,21 +97,6 @@ public data class CompiledSpec(
 }
 
 /**
- * Compiles a parsed Vega specification into a scene.
- *
- * The datasets, scales and signals are resolved in one dependency order rather than in three fixed
- * phases — see [DataflowOrder], which is this compiler's stand-in for upstream's dataflow ranking.
- * Mark encoding, axes and layout follow, in that order. It executes the subset the runtime supports
- * and reports the rest, which is what lets the differential harness compare against upstream on a
- * real specification instead of on hand-authored scenes.
- *
- * Nesting lives in [ScopeCompiler]: a group mark carries a whole scope of its own, and this class
- * only sets up the outermost one. Legends and titles are not implemented; the parser reports them.
- *
- * @param textEngine measures axis labels. Pass the Android engine to get the scene the device will
- *   draw, or the default deterministic engine for JVM comparisons.
- */
-/**
  * One item's re-encoding through a named block of its own mark, as a handler's `encode` left it.
  *
  * [fresh] is whether it was applied by the event being handled *now*. It decides whether the block
@@ -120,6 +106,27 @@ public data class CompiledSpec(
  */
 public data class ItemEncode(val set: String, val fresh: Boolean)
 
+/**
+ * Compiles a parsed Vega specification into a scene.
+ *
+ * The datasets, scales and signals are resolved in one dependency order rather than in three fixed
+ * phases — see [DataflowOrder], which is this compiler's stand-in for upstream's dataflow ranking.
+ * Mark encoding, axes, legends, titles and layout follow, in that order. It executes the subset the
+ * runtime supports and reports the rest, which is what lets the differential harness compare
+ * against upstream on a real specification instead of on hand-authored scenes.
+ *
+ * Nesting lives in [ScopeCompiler]: a group mark carries a whole scope of its own, and this class
+ * only sets up the outermost one.
+ *
+ * **Nothing throws.** [compileJson] and [compile] are guarded, so a specification that reaches a
+ * defect in this engine comes back as a `VEGA_COMPILE_FAILED` diagnostic carrying the exception
+ * rather than as a crash in the host. The sentence this paragraph replaces said that legends and
+ * titles were not implemented, which two thousand lines in `LegendBuilder` and `TitleBuilder` had
+ * been contradicting for several releases.
+ *
+ * @param textEngine measures axis labels. Pass the Android engine to get the scene the device will
+ *   draw, or the default deterministic engine for JVM comparisons.
+ */
 public class SpecCompiler(
   private val textEngine: TextEngine = MetricTextEngine(),
   /**
@@ -231,7 +238,31 @@ public class SpecCompiler(
   private val timeZone: TimeZone? = null,
 ) {
 
+  /**
+   * The **boundary**, and the reason "nothing throws" is true by construction rather than by sixty
+   * thousand lines each being individually careful.
+   *
+   * The README stakes the whole diagnostic model on it — "nothing throws; a compile returns
+   * diagnostics" — and the audit found seven independent ways a *specification* could crash the
+   * host: a date part JavaScript rolls over and `kotlinx-datetime` refuses, a one-argument
+   * `datetime` saturating an `Int`, a legend value cast to a number it is not, an expression nested
+   * past the stack, a sort comparator that is not a total order, and a mark tree deep enough to
+   * overflow. Each of those is fixed where it was; this is what makes the *next* one a bug report
+   * rather than a crash.
+   *
+   * The exception is carried into the diagnostic, so a swallowed defect is a defect somebody can
+   * paste into an issue rather than one nobody hears about. An `Error` is caught too — a
+   * `StackOverflowError` is exactly the shape this exists for — and the two that must never be
+   * caught are rethrown: cancellation, which is control flow, and `OutOfMemoryError`, after which
+   * nothing this process does is trustworthy.
+   */
   public fun compileJson(
+    json: String,
+    signalOverrides: Map<String, VegaValue> = emptyMap(),
+    itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
+  ): CompiledSpec = guarded { compileJsonUnguarded(json, signalOverrides, itemEncodes) }
+
+  private fun compileJsonUnguarded(
     json: String,
     signalOverrides: Map<String, VegaValue> = emptyMap(),
     itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
@@ -269,6 +300,42 @@ public class SpecCompiler(
    *   measurement showed costs well under a frame (STATUS.md, Performance observations).
    */
   public fun compile(
+    spec: VegaSpec,
+    signalOverrides: Map<String, VegaValue> = emptyMap(),
+    itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
+  ): CompiledSpec = guarded { compileUnguarded(spec, signalOverrides, itemEncodes) }
+
+  /** See [compileJson] for what this catches and why. */
+  private inline fun guarded(compile: () -> CompiledSpec): CompiledSpec =
+    try {
+      compile()
+    } catch (cancellation: kotlin.coroutines.cancellation.CancellationException) {
+      // Control flow, not a failure: swallowing it would leave a cancelled coroutine running.
+      throw cancellation
+    } catch (exhausted: OutOfMemoryError) {
+      // Nothing this process does after one of these is trustworthy, including the diagnostic.
+      throw exhausted
+    } catch (failure: Throwable) {
+      CompiledSpec(
+        scene = null,
+        scales = emptyMap(),
+        signals = EMPTY_SIGNALS,
+        diagnostics =
+          listOf(
+            VegaDiagnostic(
+              severity = DiagnosticSeverity.FATAL,
+              code = DiagnosticCodes.COMPILE_FAILED,
+              message =
+                "The compiler failed on this specification with " +
+                  "${failure::class.simpleName}: ${failure.message}. That is a defect in this " +
+                  "engine rather than in the document — please report it.",
+              cause = failure,
+            )
+          ),
+      )
+    }
+
+  private fun compileUnguarded(
     spec: VegaSpec,
     signalOverrides: Map<String, VegaValue> = emptyMap(),
     itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
@@ -358,6 +425,19 @@ public class SpecCompiler(
     val viewHeight =
       if (containsPadding) declaredHeight - spec.padding.top - spec.padding.bottom
       else declaredHeight
+    // A padding wider than the size it is measured inside leaves a **negative** plotting area.
+    // Upstream does the same — probed: `width: 50, padding: 40, contains: "padding"` publishes a
+    // `width` signal of −30 — so this is not clamped, because clamping would draw a chart upstream
+    // does not. What it was not doing is saying so, and a chart whose plotting area came out
+    // negative is one nobody can read for a reason that is nowhere in the picture.
+    if (viewWidth < 0.0 || viewHeight < 0.0) {
+      diagnostics.warn(
+        DiagnosticCodes.COMPILE_LIMIT_EXCEEDED,
+        "autosize.contains is 'padding' and the padding is wider than the declared size, so the " +
+          "plotting area is $viewWidth by $viewHeight. Upstream publishes the same negative " +
+          "size, and nothing will be visible.",
+      )
+    }
 
     // A `fit` chart's plotting area is what is left of the declared size once the drawing's
     // overhang
@@ -584,7 +664,15 @@ public class SpecCompiler(
     }
 
     val datasets = resolved.datasets
-    val signals = session.scope(datasets, scales)
+    // The projections travel with the scope, so an expression *anywhere* below can reach them.
+    // They were being threaded into the resolution and then dropped on the way out, which is why a
+    // `geoScale()` in a mark's encode block reported "not defined".
+    val signals =
+      session.scope(
+        datasets,
+        scales,
+        projectionsSoFar(spec, expressions, signalValues, resolved, scales),
+      )
     // The plotting area, now that a declared `width` or `height` signal has had its say. Everything
     // downstream measures against this: an axis's extent, the surface.
     val plot = plotSize(signalValues, width, height)
@@ -633,7 +721,7 @@ public class SpecCompiler(
     hostData?.keys.orEmpty().forEach { name ->
       if (name !in data.claimedHostData) {
         diagnostics.warn(
-          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          DiagnosticCodes.DATA_UNREADABLE,
           "The host supplied a table named '$name', which no dataset in this specification is " +
             "called. Vega-Lite writes the name from `data: {\"name\": …}` through to the compiled " +
             "specification, so it is the name to use.",
@@ -880,7 +968,7 @@ public class SpecCompiler(
     val background = spec.background?.let { SceneColor.parse(it) }
     if (spec.background != null && background == null) {
       diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        DiagnosticCodes.ENCODE_INVALID_VALUE,
         "Could not parse background colour '${spec.background}'",
       )
     }
@@ -964,22 +1052,6 @@ public class SpecCompiler(
   }
 
   /**
-   * The plotting area as the `width` and `height` signals currently have it.
-   *
-   * Read from the live values rather than settled once, because a scale with a `"width"` range is
-   * built at whatever point the order reaches it — after the `width` signal, which is the edge
-   * [DataflowOrder] adds for exactly this.
-   */
-  /**
-   * The projections buildable from the signals that have settled so far.
-   *
-   * Rebuilt at each step of the dataflow order rather than once, because a projection is *made of*
-   * signals — `rotate: [{signal: "lon"}, 0]` — and the answer therefore changes as the order is
-   * walked. Into a collector nobody reads: this runs many times over and the same projection would
-   * report the same unimplemented property once per call, where the scope built after the loop
-   * reports it exactly once.
-   */
-  /**
    * The datasets that read a projection whose `fit` draws on a dataset **other than themselves**.
    *
    * That is the condition for needing a second pass: a projection fitted only to the table that
@@ -1024,6 +1096,15 @@ public class SpecCompiler(
     return readers
   }
 
+  /**
+   * The projections buildable from the signals that have settled so far.
+   *
+   * Rebuilt at each step of the dataflow order rather than once, because a projection is *made of*
+   * signals — `rotate: [{signal: "lon"}, 0]` — and the answer therefore changes as the order is
+   * walked. Into a collector nobody reads: this runs many times over and the same projection would
+   * report the same unimplemented property once per call, where the scope built after the loop
+   * reports it exactly once.
+   */
   private fun projectionsSoFar(
     spec: VegaSpec,
     expressions: ExpressionCompiler,
@@ -1046,6 +1127,13 @@ public class SpecCompiler(
       .resolve(spec.projections)
   }
 
+  /**
+   * The plotting area as the `width` and `height` signals currently have it.
+   *
+   * Read from the live values rather than settled once, because a scale with a `"width"` range is
+   * built at whatever point the order reaches it — after the `width` signal, which is the edge
+   * [DataflowOrder] adds for exactly this.
+   */
   private fun plotSize(
     signals: Map<String, VegaValue>,
     declaredWidth: Double,

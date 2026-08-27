@@ -813,7 +813,7 @@ public class VegaChartController(
       if (++round > MAX_CASCADE_ROUNDS) {
         return listOf(
           VegaDiagnostic(
-            code = DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            code = DiagnosticCodes.SIGNAL_CYCLE,
             severity = DiagnosticSeverity.WARNING,
             message =
               "Signals '${frontier.sorted().joinToString("', '")}' are still changing after " +

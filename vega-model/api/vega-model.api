@@ -38,6 +38,12 @@ public final class dev/aster/vega/model/DelimitedText {
 }
 
 public final class dev/aster/vega/model/DiagnosticCodes {
+	public static final field COMPILE_FAILED Ljava/lang/String;
+	public static final field COMPILE_LIMIT_EXCEEDED Ljava/lang/String;
+	public static final field DATA_LOAD_FAILED Ljava/lang/String;
+	public static final field DATA_UNREADABLE Ljava/lang/String;
+	public static final field DUPLICATE_DEFINITION Ljava/lang/String;
+	public static final field ENCODE_INVALID_VALUE Ljava/lang/String;
 	public static final field EXPORT_IMAGE_UNRESOLVED Ljava/lang/String;
 	public static final field EXPORT_UNSUPPORTED_OPERATION Ljava/lang/String;
 	public static final field EXPRESSION_CONTAINER_SIZE_UNANSWERED Ljava/lang/String;
@@ -45,6 +51,7 @@ public final class dev/aster/vega/model/DiagnosticCodes {
 	public static final field EXPRESSION_PARSE_ERROR Ljava/lang/String;
 	public static final field EXPRESSION_UNSUPPORTED_FUNCTION Ljava/lang/String;
 	public static final field INSTANCE Ldev/aster/vega/model/DiagnosticCodes;
+	public static final field INTERACTION_UNSUPPORTED Ljava/lang/String;
 	public static final field PARSE_INVALID_JSON Ljava/lang/String;
 	public static final field PARSE_MISSING_PROPERTY Ljava/lang/String;
 	public static final field PARSE_NOTHING_TO_DRAW Ljava/lang/String;
@@ -53,6 +60,7 @@ public final class dev/aster/vega/model/DiagnosticCodes {
 	public static final field RENDER_UNSUPPORTED_BLEND_MODE Ljava/lang/String;
 	public static final field RENDER_UNSUPPORTED_NODE Ljava/lang/String;
 	public static final field SCALE_INVALID_DOMAIN Ljava/lang/String;
+	public static final field SCALE_NOT_BUILT Ljava/lang/String;
 	public static final field SCALE_UNSUPPORTED_TYPE Ljava/lang/String;
 	public static final field SIGNAL_CYCLE Ljava/lang/String;
 	public static final field TRANSFORM_INVALID_PARAMETER Ljava/lang/String;

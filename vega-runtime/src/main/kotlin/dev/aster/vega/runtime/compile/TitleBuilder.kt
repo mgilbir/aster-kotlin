@@ -358,16 +358,8 @@ internal class TitleBuilder(
   private fun titleWeight(spec: TitleSpec): Int =
     weightOf(spec.fontWeight) ?: TitleDefaults.FONT_WEIGHT
 
-  /** A CSS font weight, named or numeric. */
-  private fun weightOf(named: String?): Int? = named?.let {
-    when (it.lowercase()) {
-      "normal" -> 400
-      "bold" -> 700
-      "lighter" -> 300
-      "bolder" -> 800
-      else -> it.toIntOrNull()
-    }
-  }
+  /** A CSS font weight, named or numeric; see [FontWeights], which is the one rule. */
+  private fun weightOf(named: String?): Int? = named?.let { FontWeights.of(it) }
 
   /** `"italic"` slants the face; anything else, including nothing, leaves it upright. */
   private fun styleOf(name: String?): FontStyle =

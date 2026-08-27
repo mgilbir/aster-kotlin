@@ -327,18 +327,4 @@ internal object GuideCaption {
       format(low, CAPTION_TICK_COUNT),
       format(high, CAPTION_TICK_COUNT),
     )
-
-  /** As many decimals as the cut points need to stay distinct; see the banded legend. */
-  private fun decimalsFor(values: List<Double>): Int {
-    for (decimals in 0..6) {
-      if (values.all { kotlin.math.abs(it - roundTo(it, decimals)) < 1e-9 }) return decimals
-    }
-    return 6
-  }
-
-  private fun roundTo(value: Double, decimals: Int): Double {
-    var factor = 1.0
-    repeat(decimals) { factor *= 10 }
-    return kotlin.math.round(value * factor) / factor
-  }
 }
