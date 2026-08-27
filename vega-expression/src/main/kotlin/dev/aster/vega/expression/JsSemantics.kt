@@ -3,8 +3,11 @@ package dev.aster.vega.expression
 import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.isNullish
+import dev.aster.vega.model.locale.VegaLocale
+import dev.aster.vega.model.time.TimeFormat
 import io.github.mgilbir.ecma262.number.toEcmaDouble
 import kotlin.math.truncate
+import kotlinx.datetime.TimeZone
 
 /**
  * JavaScript's coercion and comparison rules, as Vega's expression language inherits them.
@@ -29,7 +32,11 @@ public object JsSemantics {
       is VegaValue.Undefined -> false
       is VegaValue.Bool -> value.value
       is VegaValue.Num -> value.value != 0.0 && !value.value.isNaN()
-      is VegaValue.Timestamp -> value.epochMillis != 0.0 && !value.epochMillis.isNaN()
+      // A `Date` is an **object**, and every object is truthy — including the epoch and including
+      // an Invalid Date. Treating it as its number made `datetime(0)` falsey, so
+      // `if(datum.when, ...)` took the wrong branch for exactly one instant in history and for
+      // every date that failed to parse.
+      is VegaValue.Timestamp -> true
       is VegaValue.Str -> value.value.isNotEmpty()
       is VegaValue.Arr -> true
       is VegaValue.Obj -> true
@@ -89,7 +96,7 @@ public object JsSemantics {
       is VegaValue.Undefined -> "undefined"
       is VegaValue.Bool -> value.value.toString()
       is VegaValue.Num -> numberToString(value.value)
-      is VegaValue.Timestamp -> numberToString(value.epochMillis)
+      is VegaValue.Timestamp -> dateToString(value.epochMillis)
       is VegaValue.Str -> value.value
       // `String([1,2])` is "1,2", and `String([null])` is "" — null elements stringify to empty.
       // `Array.prototype.join` writes an empty string for an **undefined** element too, which is
@@ -130,8 +137,18 @@ public object JsSemantics {
       VegaValue.Num(toNumber(left) + toNumber(right))
     }
 
+  /**
+   * Whether `ToPrimitive` with the default hint gives a **string**, which is what decides `+`.
+   *
+   * A `Date` is the one built-in whose `@@toPrimitive` prefers a string under the default hint, so
+   * `datetime(0) + 1` concatenates where every other object-that-is-a-number would add. Reading a
+   * timestamp as a number here made a label built by concatenation print epoch milliseconds.
+   */
   private fun concatenates(value: VegaValue): Boolean =
-    value is VegaValue.Str || value is VegaValue.Arr || value is VegaValue.Obj
+    value is VegaValue.Str ||
+      value is VegaValue.Arr ||
+      value is VegaValue.Obj ||
+      value is VegaValue.Timestamp
 
   /** JavaScript's `%`, a remainder that takes the sign of the dividend: `-7 % 3` is `-1`. */
   public fun remainder(left: Double, right: Double): Double {
@@ -147,14 +164,12 @@ public object JsSemantics {
     if (left is VegaValue.Num && right is VegaValue.Num) {
       return !left.value.isNaN() && !right.value.isNaN() && left.value == right.value
     }
-    if (left::class != right::class) {
-      // Timestamps compare as numbers, since that is what they are underneath.
-      val leftNumber = (left as? VegaValue.Timestamp)?.epochMillis
-      val rightNumber = (right as? VegaValue.Timestamp)?.epochMillis
-      if (leftNumber != null && right is VegaValue.Num) return leftNumber == right.value
-      if (rightNumber != null && left is VegaValue.Num) return rightNumber == left.value
-      return false
-    }
+    // Two different types are never strictly equal, and a `Date` against a number is two
+    // different types: `datetime(0) === 0` is **false** upstream. There used to be a bridge here
+    // that compared them as numbers, and it carried a second defect with it — the comparison went
+    // through a boxed `Double`, whose `equals` says `NaN` equals itself and `-0.0` does not equal
+    // `0.0`, both inverted from JavaScript.
+    if (left::class != right::class) return false
     return when (left) {
       // Two singletons, and each is strictly equal only to itself: `undefined === null` is false,
       // which is the half of the pair `==` does not agree with.
@@ -197,6 +212,27 @@ public object JsSemantics {
     val rightComposite = right is VegaValue.Arr || right is VegaValue.Obj
     if (leftComposite && rightComposite) return strictEquals(left, right)
 
+    // An object against a primitive is `ToPrimitive`'d first, and for an array or a `Date` that
+    // gives a **string** — so `[1,2] == '1,2'` is true, and `datetime(0) == 0` is false because
+    // `Number("Thu Jan 01 1970 …")` is NaN. Comparing them numerically instead had the first
+    // answer false and the second true, both backwards.
+    val leftText = if (leftComposite || left is VegaValue.Timestamp) toStringValue(left) else null
+    val rightText =
+      if (rightComposite || right is VegaValue.Timestamp) toStringValue(right) else null
+    if (leftText != null || rightText != null) {
+      val a = leftText ?: (left as? VegaValue.Str)?.value
+      val b = rightText ?: (right as? VegaValue.Str)?.value
+      // Both sides primitivized to text: compare the text. One side a string: compare the text.
+      if (a != null && b != null) return a == b
+      // The other side is a number or a boolean, so the text is coerced to a number and the
+      // comparison is over the numbers.
+      val text = leftText ?: rightText!!
+      val other = if (leftText != null) right else left
+      val textNumber = stringToNumber(text)
+      val otherNumber = toNumber(other)
+      return !textNumber.isNaN() && !otherNumber.isNaN() && textNumber == otherNumber
+    }
+
     if (left is VegaValue.Str && right is VegaValue.Str) return left.value == right.value
 
     // Anything else compares numerically, which is what JavaScript's abstract equality reduces to.
@@ -224,19 +260,46 @@ public object JsSemantics {
 
   // ---- bitwise --------------------------------------------------------------
 
-  /** `ToInt32`: JavaScript's bitwise operators truncate to a signed 32-bit integer first. */
-  public fun toInt32(value: VegaValue): Int {
-    val number = toNumber(value)
-    if (!number.isFinite()) return 0
-    return truncate(number).toLong().toInt()
-  }
+  /**
+   * `ToInt32`: JavaScript's bitwise operators truncate to a signed 32-bit integer first.
+   *
+   * The truncation **wraps** modulo 2^32; it does not saturate. `toLong()` saturates at ±2^63, so
+   * every value above that came out as -1 and `1e20 | 0` answered -1 where JavaScript answers
+   * 1661992960. Going through the mathematical modulo first is what the specification says and is
+   *             exact for every double, because a double above 2^53 is already a whole number.
+   */
+  public fun toInt32(value: VegaValue): Int = toUint32(value).toInt()
 
-  /** `ToUint32`, needed for the unsigned right shift. */
+  /** `ToUint32`, needed for the unsigned right shift. The same modulo, left unsigned. */
   public fun toUint32(value: VegaValue): Long {
     val number = toNumber(value)
     if (!number.isFinite()) return 0L
-    return truncate(number).toLong() and 0xFFFFFFFFL
+    return truncate(number).mod(TWO_TO_THE_32).toLong()
   }
 
-  private val NUMERIC = Regex("^[+-]?(\\d+\\.?\\d*|\\.\\d+)([eE][+-]?\\d+)?$")
+  private const val TWO_TO_THE_32: Double = 4294967296.0
+
+  /**
+   * `Date.prototype.toString`, which is what `String(date)` and `date + ''` produce.
+   *
+   * ECMA-262 21.4.4.41 spells the whole of it: `www mmm dd yyyy hh:mm:ss GMT±hhmm`, in English
+   * regardless of locale, read in the **host's own time zone** rather than in a chart's configured
+   * one — a browser prints a browser's zone whatever `config.timezone` says, and this prints the
+   * device's for the same reason. An Invalid Date is the literal `"Invalid Date"`.
+   *
+   * One divergence is left, and the specification itself is why: after the offset, an
+   * implementation *may* append a parenthesised zone name, and V8 appends `" (Central European
+   * Standard Time)"`. Producing that name needs CLDR data that is not available on every target
+   * this engine compiles for, and the specification marks it implementation-defined, so it is
+   * omitted. Everything before it agrees.
+   */
+  private fun dateToString(millis: Double): String {
+    if (millis.isNaN()) return "Invalid Date"
+    return TimeFormat.format(
+      millis,
+      "%a %b %d %Y %H:%M:%S GMT%Z",
+      TimeZone.currentSystemDefault(),
+      VegaLocale.EnglishUS,
+    )
+  }
 }

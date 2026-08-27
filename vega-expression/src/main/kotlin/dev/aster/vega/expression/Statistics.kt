@@ -86,7 +86,12 @@ public object Statistics {
           w = sqrt(w) - 5.0
           ERFINV_FAR
         }
-        else -> return Double.POSITIVE_INFINITY
+        // `w` is infinite, which is `x` at exactly ±1. Upstream sets `p = Infinity` and falls
+        // through to the multiply below, so the **sign of x** survives. Returning the infinity
+        // here instead lost it: `quantileNormal(0)` came back as +Infinity where upstream answers
+        // −Infinity, so a QQ plot's lowest rank was drawn at the top of the chart, and
+        // `quantileLogNormal(0)` — `exp` of that — was +Infinity where upstream answers 0.
+        else -> return Double.POSITIVE_INFINITY * x
       }
     // Horner's method, in the order upstream evaluates it: the first coefficient is the highest
     // power and each step multiplies by w before adding the next.

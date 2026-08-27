@@ -1,5 +1,8 @@
 package dev.aster.vega.expression
 
+import dev.aster.vega.model.DiagnosticCodes
+import dev.aster.vega.model.DiagnosticSeverity
+import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
@@ -108,6 +111,24 @@ public object Functions {
 
   /** A runaway step cannot spin forever; no axis has this many boundaries. */
   private const val MAX_SEQUENCE: Int = 100_000
+
+  /**
+   * The calendar `new Date(year, ...)` can build in, and the time value it can hold.
+   *
+   * ECMA-262 clips a date to ±8.64e15 milliseconds, which is ±271,821 years around the epoch;
+   * outside it the answer is an *Invalid Date*, meaning NaN. The year bounds are that range in
+   * years, rounded outwards, and they exist so a year that cannot be a `LocalDate` never becomes
+   * one.
+   */
+  private const val MAX_TIME_VALUE: Double = 8.64e15
+
+  private const val MIN_YEAR: Double = -271_821.0
+
+  private const val MAX_YEAR: Double = 275_760.0
+
+  /** `TimeClip`: a time value outside ECMA-262's range is an Invalid Date. */
+  private fun clipTimeValue(millis: Double): Double =
+    if (!millis.isFinite() || abs(millis) > MAX_TIME_VALUE) Double.NaN else millis
 
   /** The stepper a unit name asks for, or null when it names none. */
   private fun stepperFor(unit: String, zone: TimeZone): TimeStepper? =
@@ -320,14 +341,41 @@ public object Functions {
         when {
           numbers.any { it.isInfinite() } -> Double.POSITIVE_INFINITY
           numbers.any { it.isNaN() } -> Double.NaN
-          else -> sqrt(numbers.sumOf { it * it })
+          // Scaled by the largest magnitude before squaring, which is what `Math.hypot` is for:
+          // the naive sum overflows to Infinity for `hypot(1e200, 1e200)`, whose answer is a
+          // perfectly ordinary 1.41e200, and underflows to zero at the other end.
+          else -> {
+            val largest = numbers.maxOfOrNull { abs(it) } ?: 0.0
+            if (largest == 0.0) 0.0
+            else
+              largest *
+                sqrt(
+                  numbers.sumOf {
+                    val q = it / largest
+                    q * q
+                  }
+                )
+          }
         }
       )
     }
 
     // JavaScript's Math.round rounds halves toward +Infinity: round(-2.5) === -2, not -3.
+    //
+    // `floor(x + 0.5)` is the idiom and it is wrong twice. It loses a **negative zero** —
+    // `Math.round(-0.4)` is `-0`, which `1/x` tells apart from `0` and which a formatter can print
+    // with a minus sign — and it rounds *up* at the half-ulp below a half, because `x + 0.5` is
+    // itself rounded before the floor: `Math.round(0.49999999999999994)` is 0 and this answered 1.
     map.unary("round") { value ->
-      if (value.isNaN() || value.isInfinite()) value else floor(value + 0.5)
+      when {
+        value.isNaN() || value.isInfinite() -> value
+        // Below the tie, and above -0.5, the answer is a zero with the sign of the input.
+        value < 0.5 && value >= -0.5 -> if (value < 0 || 1.0 / value < 0) -0.0 else 0.0
+        else -> {
+          val down = floor(value)
+          if (value - down >= 0.5) down + 1.0 else down
+        }
+      }
     }
 
     // Vega's min and max are JavaScript's Math.min/Math.max: a variadic spread, not an array
@@ -337,13 +385,15 @@ public object Functions {
     map["min"] = ExpressionFunction { args -> extreme(args, takeSmaller = true) }
     map["max"] = ExpressionFunction { args -> extreme(args, takeSmaller = false) }
 
+    // `Math.max(min, Math.min(max, value))`, composed in that order and **not** corrected for
+    // swapped bounds: `clamp(5, 10, 0)` is 10 upstream, because the inner `min` picks 0 and the
+    // outer `max` then picks 10. Sorting the bounds first answered 5, which is defensible and is
+    // not what a specification written against upstream gets.
     map["clamp"] = ExpressionFunction { args ->
       val value = args.number(0)
       val low = args.number(1)
       val high = args.number(2)
-      VegaValue.Num(
-        if (value.isNaN()) Double.NaN else value.coerceIn(minOf(low, high), maxOf(low, high))
-      )
+      VegaValue.Num(maxOf(low, minOf(high, value)))
     }
 
     // ---- type predicates ----------------------------------------------------
@@ -355,6 +405,10 @@ public object Functions {
     // spells a date as a `Timestamp` for exactly that reason, and the two predicates below are the
     // only place the difference shows.
     map.predicate("isNumber") { it is VegaValue.Num }
+    // Upstream tests `value instanceof Date`, so a *number* of milliseconds is not a date to it
+    // either — which is answerable here only because an instant is its own type in this value
+    // model. Every Vega-Lite chart over a temporal field filters with
+    // `isDate(f) || (isValid(f) && isFinite(+f))`, so without this the whole scale collapses.
     map.predicate("isDate") { it is VegaValue.Timestamp }
     // A date is an **object** as well as a date, because `typeof new Date()` is `"object"`. Both
     // predicates answer true for one upstream, which is the other half of `isNumber` answering
@@ -366,11 +420,6 @@ public object Functions {
     // null** is defined, and answering false for it — which is what one value for both did — makes
     // `isDefined` a slower `isValid`.
     map.predicate("isDefined") { it !is VegaValue.Undefined }
-    // Upstream tests `value instanceof Date`, so a *number* of milliseconds is not a date to it
-    // either — which is answerable here only because an instant is its own type in this value
-    // model. Every Vega-Lite chart over a temporal field filters with
-    // `isDate(f) || (isValid(f) && isFinite(+f))`, so without this the whole scale collapses.
-    map.predicate("isDate") { it is VegaValue.Timestamp }
     // `isValid` is narrower than truthiness: it rejects null and NaN but accepts 0 and "".
     map.predicate("isValid") {
       // `_ != null && _ === _`: the loose comparison, so both kinds of nothing are invalid.
@@ -400,8 +449,11 @@ public object Functions {
     map["parseFloat"] = ExpressionFunction { args ->
       VegaValue.Num(parseLeadingNumber(JsSemantics.toStringValue(args.at(0)), allowDecimal = true))
     }
+    // The radix is **0 when it is not given**, not 10, and 0 means "work it out": a string starting
+    // `0x` or `0X` is read as hexadecimal with the prefix stripped, which is why `parseInt('0xFF')`
+    // is 255. Defaulting to 10 answered 0, because parsing stops at the `x`.
     map["parseInt"] = ExpressionFunction { args ->
-      val radix = if (args.size > 1) args.number(1).toInt() else 10
+      val radix = if (args.size > 1) args.number(1).let { if (it.isNaN()) 0 else it.toInt() } else 0
       VegaValue.Num(parseInteger(JsSemantics.toStringValue(args.at(0)), radix))
     }
 
@@ -432,7 +484,7 @@ public object Functions {
      * chart went blank — which is what a bound text field made visible.
      */
     map["regexp"] = ExpressionFunction { args ->
-      VegaValue.Pattern(args.string(0), if (args.size > 1) args.string(1) else "")
+      compilePattern(args.string(0), if (args.size > 1) args.string(1) else "")
     }
     /*
      * `test(pattern, string)` — whether the pattern matches anywhere in the string.
@@ -499,8 +551,80 @@ public object Functions {
       val align = if (args.size > 3) args.string(3) else "right"
       VegaValue.Str(padText(text, length, character, align))
     }
+    // `wrap('format')`, and the wrapper is `value === null ? 'null' : locale.format(spec)(value)`
+    // — a **strict** test, so a null argument comes back as the literal string `"null"` before any
+    // formatting happens and an undefined one goes through and formats as NaN. Coercing the null
+    // to 0 instead printed a number the data does not contain, which is the shape of mistake this
+    // engine exists to avoid. The same wrapper covers `timeFormat`, `utcFormat`, `timeParse` and
+    // `utcParse`; the two parsers already had it.
     map["format"] = ExpressionFunction { args ->
+      if (args.at(0) is VegaValue.Null) return@ExpressionFunction VegaValue.Str("null")
       VegaValue.Str(NumberFormat.format(args.number(0), args.string(1), locale))
+    }
+
+    // ---- the four in upstream's codegen table and not in its function context ----
+    //
+    // `vega-expression` has **two** tables: `functionContext`, which is what the reference test
+    // reads, and the codegen whitelist, which passes a handful of names straight through to the
+    // JavaScript runtime. These four live only in the second, so `knownUnsupported` could be empty
+    // and a test could check that it was while all four were missing.
+
+    // `Number.isNaN`, not the global `isNaN`: there is **no coercion**, so `isNaN('x')` is false
+    // where the global would say true, and a `datetime()` — an object upstream — is not a number
+    // either. The same distinction `isFinite` is already documented for, two lines down from here.
+    map.predicate("isNaN") { it is VegaValue.Num && it.value.isNaN() }
+
+    // `btoa` and `atob` are the browser's, and they work in **code units**, not characters: every
+    // unit has to fit in a byte, and one that does not is an `InvalidCharacterError` upstream. A
+    // diagnostic here, for the same reason every other refusal in this file is one.
+    map["btoa"] = ExpressionFunction { args ->
+      val text = args.string(0)
+      val bytes = IntArray(text.length)
+      for (index in text.indices) {
+        val unit = text[index].code
+        if (unit > 0xFF) {
+          throw ExpressionEvaluationException(
+            VegaDiagnostic(
+              severity = DiagnosticSeverity.ERROR,
+              code = DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION,
+              message =
+                "btoa() encodes one byte per character and was given U+" +
+                  unit.toString(16).uppercase().padStart(4, '0') +
+                  ", which does not fit in one; encode the text first",
+            )
+          )
+        }
+        bytes[index] = unit
+      }
+      VegaValue.Str(base64Encode(bytes))
+    }
+    map["atob"] = ExpressionFunction { args ->
+      val decoded =
+        base64Decode(args.string(0))
+          ?: throw ExpressionEvaluationException(
+            VegaDiagnostic(
+              severity = DiagnosticSeverity.ERROR,
+              code = DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION,
+              message = "atob() was given text that is not base64",
+            )
+          )
+      VegaValue.Str(decoded.map { it.toChar() }.joinToString(""))
+    }
+
+    // Percent-encoding over the **UTF-8** bytes, with upstream's unreserved set — which keeps
+    // `!~*'()` as well as the usual `-_.` and is why this is not a general-purpose escaper.
+    map["encodeURIComponent"] = ExpressionFunction { args ->
+      val out = StringBuilder()
+      for (byte in args.string(0).encodeToByteArray()) {
+        val value = byte.toInt() and 0xFF
+        val char = value.toChar()
+        if (char in 'A'..'Z' || char in 'a'..'z' || char in '0'..'9' || char in URI_UNRESERVED) {
+          out.append(char)
+        } else {
+          out.append('%').append(value.toString(16).uppercase().padStart(2, '0'))
+        }
+      }
+      VegaValue.Str(out.toString())
     }
 
     // ---- strings and arrays -------------------------------------------------
@@ -568,7 +692,7 @@ public object Functions {
     map["sort"] = ExpressionFunction { args ->
       val array = args.at(0) as? VegaValue.Arr ?: return@ExpressionFunction VegaValue.Null
       // Upstream sorts in natural ascending order; a comparator argument is not supported.
-      VegaValue.Arr(array.values.sortedWith(NATURAL_ORDER))
+      VegaValue.Arr(array.values.sortedWith(ASCENDING))
     }
 
     /**
@@ -605,15 +729,10 @@ public object Functions {
     // with the UTC function lands an hour off for half the year.
     offsetFunction(map, "utcOffset") { TimeZone.UTC }
 
-    /** The same, stepped in **universal** time: `utcOffset('hours', t, 1)` adds a UTC hour. */
-    map["utcOffset"] = ExpressionFunction { args ->
-      val stepper =
-        stepperFor(args.string(0), TimeZone.UTC) ?: return@ExpressionFunction VegaValue.Null
-      val at = JsSemantics.toNumber(args.at(1))
-      if (!at.isFinite()) return@ExpressionFunction VegaValue.Null
-      val by = args.numberOr(2, 1.0).takeIf { it.isFinite() } ?: 1.0
-      VegaValue.Num(stepper.offset(at, floor(by).toInt()))
-    }
+    // `utcOffset` used to be registered a second time here, and the second registration won. The
+    // two differed in their **return type** — this one answered a `Num` where `offsetFunction`
+    // answers a `Timestamp` — so `isDate(utcOffset(...))` was false where `isDate(timeOffset(...))`
+    // was true, for two functions upstream defines as twins. Upstream's `utcOffset` returns a Date.
 
     /**
      * `timeSequence(unit, start, stop[, step])` — every boundary in a span, `stop` exclusive.
@@ -734,21 +853,41 @@ public object Functions {
     }
 
     // ---- ranges -------------------------------------------------------------
+    // `span(array)` is `(+array[array.length-1]) - (+array[0]) || 0` upstream, and the `|| 0` is
+    // the whole of it: an empty array, a null, or anything that is not an array answers **0**, not
+    // NaN. `span(domain('x'))` over a scale with no data is the common way to reach it, and a NaN
+    // there poisons every layout signal computed from it.
     map["span"] = ExpressionFunction { args ->
-      val array =
-        args.at(0) as? VegaValue.Arr ?: return@ExpressionFunction VegaValue.Num(Double.NaN)
-      if (array.values.isEmpty()) return@ExpressionFunction VegaValue.Num(Double.NaN)
-      VegaValue.Num(
+      val array = args.at(0) as? VegaValue.Arr ?: return@ExpressionFunction VegaValue.Num(0.0)
+      if (array.values.isEmpty()) return@ExpressionFunction VegaValue.Num(0.0)
+      val width =
         JsSemantics.toNumber(array.values.last()) - JsSemantics.toNumber(array.values.first())
-      )
+      VegaValue.Num(if (width.isNaN()) 0.0 else width)
     }
+    /**
+     * `inrange(value, range[, left, right])` — and the two flags are **inclusivity**, not
+     * exclusivity, which is the sort of thing only the source settles.
+     *
+     * `left = left === undefined || left`, so an omitted flag means *inclusive* and `false` means
+     * the end is open: `inrange(1, [1, 2], false)` is false. Both flags were being ignored here and
+     * every comparison was inclusive, so a brush that deliberately excluded its upper end selected
+     * the row sitting exactly on it.
+     */
     map["inrange"] = ExpressionFunction { args ->
       val value = args.number(0)
       val range = args.at(1) as? VegaValue.Arr ?: return@ExpressionFunction VegaValue.Bool(false)
       if (range.values.size < 2) return@ExpressionFunction VegaValue.Bool(false)
       val a = JsSemantics.toNumber(range.values.first())
       val b = JsSemantics.toNumber(range.values.last())
-      VegaValue.Bool(value >= minOf(a, b) && value <= maxOf(a, b))
+      val lo = minOf(a, b)
+      val hi = maxOf(a, b)
+      fun inclusive(index: Int): Boolean =
+        index >= args.size ||
+          args.at(index) is VegaValue.Undefined ||
+          JsSemantics.truthy(args.at(index))
+      val left = if (inclusive(2)) lo <= value else lo < value
+      val right = if (inclusive(3)) value <= hi else value < hi
+      VegaValue.Bool(left && right)
     }
     /**
      * `merge(a, b, ...)` — one object with every key, later arguments winning.
@@ -811,8 +950,13 @@ public object Functions {
       if (range.values.size < 2) return@ExpressionFunction args.at(0)
       val min = args.number(1)
       val max = args.number(2)
-      var lo = JsSemantics.toNumber(range.values.first())
-      var hi = JsSemantics.toNumber(range.values.last())
+      // Upstream reads the ends as `min` and `max` of the two, so a **descending** range is
+      // normalized before anything is clamped. Taking them in written order left one untouched and
+      // returned it unchanged, which is what a reversed y-domain feeding pan or zoom hands in.
+      val ends =
+        JsSemantics.toNumber(range.values.first()) to JsSemantics.toNumber(range.values.last())
+      var lo = minOf(ends.first, ends.second)
+      var hi = maxOf(ends.first, ends.second)
       val span = hi - lo
       if (span > max - min) {
         lo = min
@@ -842,7 +986,26 @@ public object Functions {
     // `datetime(...)` is `new Date(...)` while `utc(...)` is `Date.UTC(...)`, which returns
     // milliseconds — so `isDate(datetime(2020,0,1))` is true and `isDate(utc(2020,0,1))` is false.
     // Both are numbers for arithmetic either way; only the type test can tell them apart.
+    /**
+     * `datetime(...)` is `new Date(...)`, and the **one-argument** form is not the constructor.
+     *
+     * `new Date(v)` with a single argument is a *time value*: a number is epoch milliseconds and a
+     * string is parsed. Only two or more arguments are year, month, day and the rest. Reading the
+     * first argument as a year regardless made `datetime(datum.epochMillis)` — a documented
+     * upstream idiom — the year 1.6 trillion, and `toInt()` saturated on the way there so
+     * `LocalDate` threw an `IllegalArgumentException` out of a public compile.
+     */
     map["datetime"] = ExpressionFunction { args ->
+      if (args.size == 1) {
+        val single = args.at(0)
+        val instant =
+          if (single is VegaValue.Str) {
+            (DateValues.parse(single, localZone()) as? VegaValue.Num)?.value ?: Double.NaN
+          } else {
+            JsSemantics.toNumber(single)
+          }
+        return@ExpressionFunction VegaValue.Timestamp(clipTimeValue(instant))
+      }
       VegaValue.Timestamp(construct(args, localZone()))
     }
     map["utc"] = ExpressionFunction { args -> VegaValue.Num(construct(args, TimeZone.UTC)) }
@@ -1168,10 +1331,10 @@ public object Functions {
       (args.at(0) as? VegaValue.Str) ?: VegaValue.Null
     }
 
-    // ---- control flow -------------------------------------------------------
-    map["if"] = ExpressionFunction { args ->
-      if (JsSemantics.truthy(args.at(0))) args.at(1) else args.at(2)
-    }
+    // No `if` here. It has to **short-circuit**, so the evaluator intercepts the call before any
+    // argument is evaluated; an entry in this table would take three already-evaluated arguments
+    // and could never be reached. One was registered anyway and read as though it were the
+    // implementation.
 
     return map
   }
@@ -1440,6 +1603,11 @@ public object Functions {
         return@ExpressionFunction VegaValue.Arr(emptyList())
       }
       val by = JsSemantics.toNumber(args.at(3)).takeIf { it.isFinite() && it != 0.0 } ?: 1.0
+      // d3's `interval.range` refuses a step that is not a positive whole number and answers an
+      // empty array. A negative one walked *downwards* here, away from `stop`, and every iteration
+      // stayed below it — a hundred thousand timestamps emitted before the guard stopped it, for
+      // a call upstream answers `[]` to.
+      if (floor(by) < 1) return@ExpressionFunction VegaValue.Arr(emptyList())
       val out = mutableListOf<VegaValue>()
       val floored = stepper.floor(start)
       var at = if (floored < start) stepper.floor(stepper.offset(floored, 1)) else floored
@@ -1527,7 +1695,11 @@ public object Functions {
    */
   private fun construct(args: List<VegaValue>, zone: TimeZone): Double {
     val year = args.number(0)
-    if (year.isNaN()) return Double.NaN
+    // A year outside the calendar is an *Invalid Date* upstream, which is NaN. Without this,
+    // `toInt()` saturated at `Int.MAX_VALUE` and `LocalDate` threw — an uncaught
+    // `IllegalArgumentException` out of a public compile, since every catch site here is typed
+    // `ExpressionEvaluationException`. `utc(1600000000000)` is the one-line way to reach it.
+    if (year.isNaN() || year < MIN_YEAR || year > MAX_YEAR) return Double.NaN
     val start = LocalDate(year.toInt(), 1, 1).atStartOfDayIn(zone)
     val months = args.numberOr(1, 0.0)
     val days = args.numberOr(2, 1.0) - 1.0
@@ -1585,7 +1757,34 @@ public object Functions {
   private fun List<VegaValue>.pattern(index: Int): VegaValue.Pattern =
     when (val value = at(index)) {
       is VegaValue.Pattern -> value
-      else -> VegaValue.Pattern(JsSemantics.toStringValue(value))
+      else -> compilePattern(JsSemantics.toStringValue(value), "")
+    }
+
+  /**
+   * A pattern, or a diagnostic saying what the syntax error was.
+   *
+   * `VegaValue.Pattern` compiles its regular expression in its **initializer**, and a pattern that
+   * does not parse raises the engine's own syntax error there — which is not an
+   * `ExpressionEvaluationException` and so escapes every catch site between here and the host. The
+   * KDoc on that field explains that an ECMA-262 engine was adopted precisely so an ordinary
+   * browser pattern would stop throwing on the JVM, and then `regexp('(')` threw anyway. A
+   * specification is data, often pasted data, and `regexp(query, 'i')` over a text field a reader
+   * types into reaches a half-typed pattern on nearly every keystroke.
+   */
+  private fun compilePattern(source: String, flags: String): VegaValue.Pattern =
+    try {
+      VegaValue.Pattern(source, flags)
+    } catch (failure: Throwable) {
+      throw ExpressionEvaluationException(
+        VegaDiagnostic(
+          severity = DiagnosticSeverity.ERROR,
+          code = DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION,
+          message =
+            "/$source/$flags is not a regular expression this engine can read" +
+              (failure.message?.let { ": $it" } ?: ""),
+          cause = failure,
+        )
+      )
     }
 
   /** `Math.min`/`Math.max`: variadic, and NaN if any argument does not coerce to a number. */
@@ -1611,6 +1810,16 @@ public object Functions {
   private fun parseLeadingNumber(text: String, allowDecimal: Boolean): Double {
     // `parseFloat` skips *StrWhiteSpace*, the same set `trim` uses.
     val trimmed = text.ecmaTrim()
+    // `Infinity` is a *StrDecimalLiteral*, so `parseFloat('Infinity')` is Infinity rather than NaN
+    // — with an optional sign, and only as a leading token, so `Infinityx` is still Infinity and
+    // `xInfinity` is NaN. `parseInt` has no such rule: its digits are digits.
+    if (allowDecimal) {
+      val signed = trimmed.startsWith("+") || trimmed.startsWith("-")
+      val body = if (signed) trimmed.substring(1) else trimmed
+      if (body.startsWith("Infinity")) {
+        return if (trimmed.startsWith("-")) Double.NEGATIVE_INFINITY else Double.POSITIVE_INFINITY
+      }
+    }
     val pattern = if (allowDecimal) LEADING_FLOAT else LEADING_INT
     val match = pattern.find(trimmed) ?: return Double.NaN
     return match.value.toDoubleOrNull() ?: Double.NaN
@@ -1631,14 +1840,31 @@ public object Functions {
       else -> -1
     }
 
+  /**
+   * `parseInt(string, radix)`, whose radix rule is the part worth writing down.
+   *
+   * A radix of 0 — which is what an omitted one is — means the prefix decides: `0x`/`0X` is 16 and
+   * anything else is 10. A radix of 16 also strips the prefix; every other radix does not. Outside
+   * 2..36 the answer is NaN.
+   */
   private fun parseInteger(text: String, radix: Int): Double {
     val trimmed = text.ecmaTrim()
-    if (radix == 10) return parseLeadingNumber(trimmed, allowDecimal = false)
-    val effective = radix.takeIf { it in 2..36 } ?: return Double.NaN
-    val body = if (effective == 16) trimmed.removePrefix("0x").removePrefix("0X") else trimmed
+    val signLength = if (trimmed.startsWith("+") || trimmed.startsWith("-")) 1 else 0
+    val negative = trimmed.startsWith("-")
+    val unsigned = trimmed.substring(signLength)
+    val hexPrefixed = unsigned.startsWith("0x") || unsigned.startsWith("0X")
+    val effective =
+      when {
+        radix == 0 -> if (hexPrefixed) 16 else 10
+        radix in 2..36 -> radix
+        else -> return Double.NaN
+      }
+    if (effective == 10) return parseLeadingNumber(trimmed, allowDecimal = false)
+    val body = if (effective == 16 && hexPrefixed) unsigned.substring(2) else unsigned
     val digits = body.takeWhile { digitValue(it) in 0 until effective }
     if (digits.isEmpty()) return Double.NaN
-    return digits.toLongOrNull(effective)?.toDouble() ?: Double.NaN
+    val magnitude = digits.toLongOrNull(effective)?.toDouble() ?: return Double.NaN
+    return if (negative) -magnitude else magnitude
   }
 
   private fun truncateText(text: String, limit: Int, position: String, ellipsis: String): String {
@@ -1671,17 +1897,97 @@ public object Functions {
     }
   }
 
+  /** `encodeURIComponent`'s unreserved punctuation, beyond the letters and digits. */
+  private const val URI_UNRESERVED: String = "-_.!~*'()"
+
+  private const val BASE64_ALPHABET: String =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+  /** `btoa`: three bytes to four characters, the last group padded with `=`. */
+  private fun base64Encode(bytes: IntArray): String {
+    val out = StringBuilder((bytes.size + 2) / 3 * 4)
+    var index = 0
+    while (index < bytes.size) {
+      val remaining = bytes.size - index
+      val a = bytes[index]
+      val b = if (remaining > 1) bytes[index + 1] else 0
+      val c = if (remaining > 2) bytes[index + 2] else 0
+      val group = (a shl 16) or (b shl 8) or c
+      out.append(BASE64_ALPHABET[(group shr 18) and 0x3F])
+      out.append(BASE64_ALPHABET[(group shr 12) and 0x3F])
+      out.append(if (remaining > 1) BASE64_ALPHABET[(group shr 6) and 0x3F] else '=')
+      out.append(if (remaining > 2) BASE64_ALPHABET[group and 0x3F] else '=')
+      index += 3
+    }
+    return out.toString()
+  }
+
+  /**
+   * `atob`: the inverse, and **null** rather than an exception when the text is not base64.
+   *
+   * The browser's own leniency, reproduced: ASCII whitespace is skipped anywhere, and padding is
+   * optional as long as the remaining length is not one character past a group.
+   */
+  private fun base64Decode(text: String): IntArray? {
+    val clean = text.filterNot {
+      it == ' ' || it == '\t' || it == '\n' || it == '\r' || it == '\u000C'
+    }
+    val body = clean.trimEnd('=')
+    if (clean.length - body.length > 2) return null
+    if (body.length % 4 == 1) return null
+    if (body.any { BASE64_ALPHABET.indexOf(it) < 0 }) return null
+    val out = ArrayList<Int>(body.length / 4 * 3)
+    var index = 0
+    while (index < body.length) {
+      val remaining = body.length - index
+      var group = 0
+      for (offset in 0 until 4) {
+        val digit = if (offset < remaining) BASE64_ALPHABET.indexOf(body[index + offset]) else 0
+        group = (group shl 6) or digit
+      }
+      out.add((group shr 16) and 0xFF)
+      if (remaining > 2) out.add((group shr 8) and 0xFF)
+      if (remaining > 3) out.add(group and 0xFF)
+      index += 4
+    }
+    return out.toIntArray()
+  }
+
   private val LEADING_FLOAT = Regex("^[+-]?(\\d+\\.?\\d*|\\.\\d+)([eE][+-]?\\d+)?")
   private val LEADING_INT = Regex("^[+-]?\\d+")
 
-  /** Numbers before strings, each ascending — the ordering upstream's `sort` produces. */
-  private val NATURAL_ORDER =
-    Comparator<VegaValue> { a, b ->
-      val numeric = a is VegaValue.Num && b is VegaValue.Num
-      if (numeric) {
-        JsSemantics.toNumber(a).compareTo(JsSemantics.toNumber(b))
-      } else {
-        JsSemantics.toStringValue(a).compareTo(JsSemantics.toStringValue(b))
+  /**
+   * `vega-util`'s `ascending`, transcribed, which is what `sort()` sorts with.
+   *
+   * ```js
+   * (u < v || u == null) && v != null ? -1
+   *   : (u > v || v == null) && u != null ? 1
+   *   : (v = v instanceof Date ? +v : v, u = u instanceof Date ? +u : u) !== u && v === v ? -1
+   *   : v !== v && u === u ? 1 : 0
+   * ```
+   *
+   * Three things fall out of it that a hand-written "numbers, then strings" rule got wrong. The `<`
+   * is **JavaScript's relational comparison**, so two strings compare lexicographically and
+   * everything else compares numerically — `sort([10, 9, '10', '9'])` is `9,9,10,10`, and a
+   * `datetime()` sorts by its instant rather than by the digits of its epoch, which is where an
+   * array of dates spanning a digit-count boundary came out shuffled. Absent values sort **first**,
+   * and NaN sorts after them and before everything else. And a pair the comparison cannot order — a
+   * string against a number — compares equal, which leaves them in the order they arrived, because
+   * `sortedWith` is stable and `Array.prototype.sort` is too.
+   */
+  private val ASCENDING =
+    Comparator<VegaValue> { u, v ->
+      val uAbsent = u.isNullish
+      val vAbsent = v.isNullish
+      val ordering = JsSemantics.compare(u, v)
+      val uNaN = u.asNumberOrNull()?.isNaN() == true
+      val vNaN = v.asNumberOrNull()?.isNaN() == true
+      when {
+        ((ordering != null && ordering < 0) || uAbsent) && !vAbsent -> -1
+        ((ordering != null && ordering > 0) || vAbsent) && !uAbsent -> 1
+        uNaN && !vNaN -> -1
+        vNaN && !uNaN -> 1
+        else -> 0
       }
     }
 }

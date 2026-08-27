@@ -6,7 +6,6 @@ import dev.aster.vega.model.locale.DateNameContext
 import dev.aster.vega.model.locale.VegaLocale
 import kotlin.time.Instant
 import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
@@ -279,8 +278,10 @@ public object TimeFormat {
   /** `%V`: the ISO week, where a week belongs to the year holding its Thursday. */
   private fun isoWeek(at: LocalDateTime): Int {
     val thursday = at.date.plus(4 - at.date.dayOfWeek.isoDayNumber, DateTimeUnit.DAY)
-    val firstOfYear = LocalDate(thursday.year, 1, 1)
-    return ((thursday.dayOfYear - 1) / 7) + 1 + if (firstOfYear.dayOfWeek.isoDayNumber > 4) 0 else 0
+    // The week is the Thursday's day of the year divided by seven, and nothing else: this used to
+    // add `if (firstOfYear.dayOfWeek > 4) 0 else 0`, which is zero either way and read as though a
+    // correction were being applied.
+    return ((thursday.dayOfYear - 1) / 7) + 1
   }
 
   /** `%G`: the year that ISO week belongs to, which is not always the calendar year. */
@@ -308,6 +309,4 @@ public object TimeFormat {
     val day = at.date.dayOfYear
     return if (day < firstSunday) 0 else (day - firstSunday) / 7 + 1
   }
-
-  private fun pad(value: Int, width: Int): String = value.toString().padStart(width, '0')
 }

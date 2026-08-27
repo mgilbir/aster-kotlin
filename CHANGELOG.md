@@ -26,6 +26,12 @@ section here does not get released.
 
 ### Added
 
+- **Four expression functions upstream has and this engine did not:** `isNaN`, `atob`, `btoa` and
+  `encodeURIComponent`. They live in `vega-expression`'s **codegen whitelist** rather than in its
+  `functionContext`, and the test asserting that `knownUnsupported` is empty read only the second
+  table — so the guarantee was auditing the wrong list and all four were missing behind it. The
+  test now reads both. `isNaN` is `Number.isNaN`, so it does not coerce: `isNaN('x')` is false.
+
 - **`VegaValue.Undefined`, because JavaScript has two absent values and this model had one.**
   Reading a property that is not there now yields it, and nothing else produces one. `isNullish`
   is the `_ == null` screen that covers both, which is the idiom upstream writes every one of its
@@ -36,6 +42,90 @@ section here does not get released.
   missing field. A host that does not care can test both.
 
 ### Fixed
+
+- **A signal is a dependency even when a datum field shares its name.** `collectSignals` removed a
+  member-access property name **by name** from the whole expression, so `"year == datum.year"`
+  reported no dependency on the signal `year` at all. `DataflowOrder` then resolved the expression
+  before the signal existed and never re-evaluated it after: a slider bound to `year` moved
+  nothing, with no diagnostic, because from the compiler's point of view the expression did not
+  mention it. The removal was undoing something that never happened — the AST walk does not descend
+  into a non-computed property — so it is gone.
+
+- **`datetime(x)` with one argument is a time value, not a year.** Upstream's codegen is
+  `datetime: 'new Date'`, so `datetime(datum.epochMillis)` — a documented idiom — is that instant.
+  Reading the first argument as a year regardless made it the year 1.6 trillion, `toInt()`
+  saturated on the way, and `LocalDate` threw an `IllegalArgumentException` out of a public
+  compile, which every catch site in the engine is too narrowly typed to see. A one-argument
+  `datetime` is now a time value (a string is parsed, as `new Date` parses one), the calendar
+  constructor starts at two arguments, and a year outside the calendar is an Invalid Date rather
+  than an exception. `utc(x)` keeps reading a year, because `Date.UTC` does.
+
+- **Three ways a specification could crash the host are diagnostics.** `data()` with no arguments
+  raised `NoSuchElementException`; `regexp('(')` raised the regular-expression engine's own syntax
+  error from a field initializer — the exact failure class its KDoc says that engine was adopted to
+  end — and a deeply nested expression raised `StackOverflowError`, which is an `Error`, is caught
+  by nothing typed, and is unrecoverable on Kotlin/Native. All three now produce the ordinary
+  diagnostic, and the parser counts its depth (256 levels; the deepest expression in the whole
+  fixture corpus nests eight).
+
+- **`quantileNormal(0)` is −Infinity.** `erfInverse` returned from its last branch instead of
+  falling through to upstream's `p * x`, so the sign of the input was lost: the lowest rank of a QQ
+  plot was drawn at the *top* of the chart, and `quantileLogNormal(0)` was +Infinity where upstream
+  answers 0.
+
+- **`span` of nothing is 0.** Upstream's is `(+a[a.length-1]) - (+a[0]) || 0`, and the `|| 0` is
+  the whole of it. `span(domain('x'))` over a scale with no data answered NaN, which poisons every
+  layout signal computed from it.
+
+- **`utcOffset` answers a date.** It was registered twice and the second registration won,
+  answering a number — so `isDate(utcOffset(…))` was false while `isDate(timeOffset(…))`, its
+  documented twin, was true.
+
+- **A `Date` behaves like an object, because it is one.** `datetime(0)` is truthy (it was falsey,
+  so `if(datum.when, …)` took the wrong branch for exactly one instant in history and for every
+  date that failed to parse), `'' + datetime(t)` is the date string rather than the epoch
+  milliseconds a tooltip was showing, and a date is never `==` or `===` a number. Relational
+  comparison stays numeric, because `<` asks `ToPrimitive` for the number hint.
+
+  `String(date)` is ECMA-262 21.4.4.41's form — `Thu Jan 01 1970 01:00:00 GMT+0100`, in English,
+  in the host's own zone as a browser prints it. One thing is missing and the specification is why:
+  an implementation *may* append a parenthesised zone name and V8 does, and producing it needs CLDR
+  data that is not available on every target this engine compiles for.
+
+- **Eleven more places the expression engine disagreed with JavaScript**, each probed against the
+  pinned upstream rather than reasoned about:
+  - `sort()` is vega-util's `ascending`, so two strings compare lexicographically and everything
+    else compares numerically. Comparing everything-but-two-numbers as text sorted an array of
+    dates spanning a digit-count boundary backwards.
+  - `clampRange` normalizes a descending range before clamping it, which is what a reversed
+    y-domain feeding pan or zoom hands in.
+  - `inrange`'s third and fourth arguments are **inclusivity** flags, and were being ignored — so a
+    brush that deliberately excluded its upper end selected the row sitting exactly on it.
+  - `timeSequence` with a step that is not a positive whole number is `[]`. A negative one walked
+    *downwards*, away from `stop`, and emitted a hundred thousand timestamps before the guard
+    stopped it.
+  - `ToInt32`/`ToUint32` wrap modulo 2^32 rather than saturating at ±2^63, so `1e20 | 0` is
+    1661992960 and not −1.
+  - A property key is a **string**: `[10,20,30][1.5]` and `[10,20,30]['01']` are undefined, where
+    coercing the key to a number read element 1 for both.
+  - An array or a date against a primitive primitivizes to a **string**, so `[1,2] == '1,2'` is
+    true where comparing numerically said false.
+  - `clamp(5, 10, 0)` is 10: upstream composes `max(min, min(max, value))` and does not correct
+    swapped bounds.
+  - `hypot` scales by the largest magnitude before squaring, so `hypot(1e200, 1e200)` is
+    1.41e200 rather than Infinity.
+  - `round` keeps a negative zero and no longer rounds the tie's lower neighbour up:
+    `round(0.49999999999999994)` is 0.
+  - `parseInt('0xFF')` is 255 (an omitted radix is 0, not 10, and 0 means the prefix decides) and
+    `parseFloat('Infinity')` is Infinity.
+  - `format(null, spec)` is the string `"null"`, as its `timeParse` sibling already was.
+
+- **Three JavaScript string escapes were silently producing the wrong text.** The lexer's fallback
+  is the identity, so `'\x41'` came out as `"x41"`, `'\u{1F600}'` as `"u{1F600}"`, and a line
+  continuation put a newline into the string. And a **no-break space** is JavaScript whitespace and
+  is not Kotlin's, so an expression copied out of a rendered web page failed with
+  `Unexpected character ' '` — two characters that look identical in a diagnostic. U+FEFF, which is
+  what a UTF-8 byte-order mark decodes to, is whitespace now for the same reason.
 
 - **A field a row does not have is `undefined`, not `null`, and the difference is the chart.**
   `Number(null)` is 0 and `Number(undefined)` is NaN, so a filter `datum.x < 10` over rows that

@@ -6891,3 +6891,70 @@ which is what a further read would have answered anyway, and which is the "nothi
 `ForeignValue.kind` and `ForeignSignals.kind` grew a ninth answer, `"undefined"`. A host that does
 not care which kind of nothing it is holding can test both; one that wants to tell a missing field
 from a null one now can.
+
+### The expression engine, against upstream rather than against a reading of it
+
+Twenty findings, all in `vega-expression`, and the shape they share is the one the audit named: a
+rule implemented from what it plausibly means, where it had to be transcribed from the thing it has
+to agree with. Every expectation in `ExpressionFidelityTest` was read off the pinned Vega through
+`oracle-js/src/eval-probe.js`, and several of them are answers no amount of reading the Kotlin would
+have suggested.
+
+**A dependency that was never recorded was never missed.** `collectSignals` removed a member-access
+property name **by name** from the whole expression, so `"year == datum.year"` reported no
+dependency on the signal `year` at all — `DataflowOrder` resolved it before the signal existed and
+never re-evaluated it, so a slider bound to `year` moved nothing and there was no diagnostic to
+read. The removal was undoing something that never happened: the AST walk does not descend into a
+non-computed property, so the name was never added.
+
+**Three ways a pasted string took the host down.** `data()` raised `NoSuchElementException`,
+`regexp('(')` raised the regular-expression engine's own syntax error from a field initializer —
+the exact failure class that engine's KDoc says it was adopted to end — and a deeply nested
+expression raised `StackOverflowError`, which is an `Error`, is caught by nothing typed, and is
+**unrecoverable on Kotlin/Native**. `regexp(query, 'i')` over a text field a reader types into
+reaches a half-typed pattern on nearly every keystroke. All three are diagnostics, and the parser
+counts its depth now: 256, against a corpus whose deepest expression nests eight.
+
+**`datetime(x)` was the year 1.6 trillion.** Upstream's codegen is `datetime: 'new Date'`, so a
+single argument is a *time value* and not a year — `datetime(datum.epochMillis)` is a documented
+idiom. Reading it as a year saturated `toInt()` and threw an `IllegalArgumentException` out of a
+public compile, past every catch site, all of which are typed `ExpressionEvaluationException`.
+`utc(x)` keeps reading a year, because `Date.UTC` does; the two are not twins and it took a probe
+to see it.
+
+**A `Date` is an object.** It was behaving as its number, so `datetime(0)` was falsey — one instant
+in history, and every date that failed to parse, taking the wrong branch of an `if` — `'' + date`
+printed epoch milliseconds into a tooltip, and `date == 0` was true where upstream says false.
+Relational comparison is the exception and stays numeric, because `<` asks `ToPrimitive` for the
+number hint while `+` and `==` ask for the default one, which a `Date` answers with a string.
+`String(date)` is now ECMA-262's own form. What is left out is left out by the specification's
+leave: an implementation *may* append a parenthesised zone name after the offset, V8 does, and
+producing it needs CLDR data no Kotlin/Native target has.
+
+**`functionContext` was the wrong list.** `Functions.knownUnsupported` is empty and a test asserts
+that it is, which was meant to be the guarantee that nothing is missing. `vega-expression` keeps a
+**second** table — a codegen whitelist of names passed straight through to the JavaScript runtime —
+and four of those, `isNaN`, `atob`, `btoa` and `encodeURIComponent`, were unimplemented behind it.
+The test reads both now.
+
+**And the rest, one line each, all probed:** `erfInverse` lost the sign of its input, so
+`quantileNormal(0)` was +Infinity and a QQ plot's lowest rank was drawn at the top of the chart;
+`span` of nothing is 0 and was NaN, which poisons every layout signal built from it; `utcOffset` was
+registered twice and the survivor answered a number where its twin answers a date; `sort` compared
+everything-but-two-numbers as text, which sorts dates by the digits of their epoch; `clampRange`
+left a descending range untouched; `inrange`'s two flags are **inclusivity** and were ignored
+outright; a negative `timeSequence` step walked away from `stop` and emitted a hundred thousand
+timestamps; `ToInt32` saturated instead of wrapping; a property key is a string, so `arr[1.5]` is
+undefined and not `arr[1]`; `[1,2] == '1,2'` is true; `clamp` does not correct swapped bounds;
+`hypot` overflowed; `round` lost a negative zero and rounded the tie's neighbour up; `parseInt`
+never worked out its own radix; `parseFloat('Infinity')` was NaN; `format(null, …)` printed a zero
+the data does not contain. Three string escapes — `\xNN`, `\u{…}` and a line continuation — were
+silently producing the wrong text, and a **no-break space** is JavaScript whitespace and is not
+Kotlin's, so an expression copied out of a rendered web page failed with `Unexpected character ' '`
+on a character indistinguishable from a space in the diagnostic.
+
+Two things in the audit's expression cluster are deliberately **not** here.
+`CachingExpressionCompiler`'s unsynchronized LRU (M40) goes with `TextLayoutCache` (L22) to the
+branch that gives the controller one confined compile executor: `vega-expression` has no lock
+available, and a copy-on-write map pays an O(n) copy on every cache *hit*, which is the hot path.
+Patching it here is the piecemeal alternative the audit's own T5 argues against.

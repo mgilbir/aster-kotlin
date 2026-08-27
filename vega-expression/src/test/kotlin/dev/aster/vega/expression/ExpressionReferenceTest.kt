@@ -224,6 +224,39 @@ class ExpressionReferenceTest {
     assertEquals(emptyList<String>(), unaccounted)
   }
 
+  /**
+   * `functionContext` is not the whole surface: the **codegen whitelist** is the other half.
+   *
+   * `vega-expression` keeps a second table of names it passes straight through to the JavaScript
+   * runtime, and the test above could not see it. Four names lived only there — `isNaN`, `atob`,
+   * `btoa` and `encodeURIComponent` — so all four were unimplemented while `knownUnsupported` was
+   * empty and a test asserted that it was. A guarantee that audits the wrong table is not one.
+   *
+   * The list is upstream's own, read out of the pinned build:
+   * ```
+   * node --input-type=module -e "import {functions} from 'vega-expression';
+   *   console.log(Object.keys(functions({})).sort().join(' '))"
+   * ```
+   */
+  @Test
+  fun `every name in upstream's codegen table is implemented or explained`() {
+    val codegen =
+      ("abs acos asin atan atan2 atob btoa ceil clamp cos date datetime day encodeURIComponent " +
+          "exp floor hours hypot if isFinite isNaN length log lower max milliseconds min minutes " +
+          "month now parseFloat parseInt pow random regexp round seconds sin split sqrt substring " +
+          "tan test time timezoneoffset trim upper utc utcdate utcday utchours utcmilliseconds " +
+          "utcminutes utcmonth utcseconds utcyear year")
+        .split(" ")
+
+    // `if` short-circuits and `now`/`random` need the scope's clock and generator, so all three are
+    // intercepted by `Evaluator` before the table is consulted; see the note above on `scopeBound`.
+    val intercepted = setOf("if", "now", "random")
+    val unaccounted = codegen.filterNot {
+      it in Functions.functions || it in Functions.knownUnsupported || it in intercepted
+    }
+    assertEquals(emptyList<String>(), unaccounted)
+  }
+
   private object EmptyScope : ExpressionScope {
     override val datum: VegaValue = VegaValue.EmptyObject
 

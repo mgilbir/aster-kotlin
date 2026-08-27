@@ -87,31 +87,52 @@ public class Evaluator(
    * `TypeError`, so upstream takes the whole chart down and this answers `undefined`. That is the
    * "nothing throws" contract, and the answer is the one a further read would have given anyway.
    */
-  private fun property(target: VegaValue, key: VegaValue): VegaValue =
-    when (target) {
-      is VegaValue.Obj -> target.fields[key.asString()] ?: VegaValue.Undefined
+  private fun property(target: VegaValue, key: VegaValue): VegaValue {
+    // Every property key in JavaScript is a **string**, and it is the string that decides
+    // everything: `[10,20,30][1.5]` is undefined because `"1.5"` is not an array index, and
+    // `[10,20,30]['01']` is undefined because `"01"` is not the canonical spelling of one.
+    // Coercing the key to a number instead read element 1 for both. The string is
+    // `JsSemantics.toStringValue` and not the model's `asString`, because this is JavaScript's
+    // `ToPropertyKey` and not this engine's canonical text.
+    val name = JsSemantics.toStringValue(key)
+    return when (target) {
+      is VegaValue.Obj -> target.fields[name] ?: VegaValue.Undefined
       is VegaValue.Arr -> {
-        val name = key.asString()
         if (name == "length") {
           VegaValue.Num(target.values.size.toDouble())
         } else {
-          val index = JsSemantics.toNumber(key)
-          if (index.isNaN() || index < 0 || index >= target.values.size) VegaValue.Undefined
-          else target.values[index.toInt()]
+          val index = arrayIndexOrNull(name)
+          if (index == null || index >= target.values.size) VegaValue.Undefined
+          else target.values[index]
         }
       }
       is VegaValue.Str -> {
-        val name = key.asString()
         if (name == "length") {
           VegaValue.Num(target.value.length.toDouble())
         } else {
-          val index = JsSemantics.toNumber(key)
-          if (index.isNaN() || index < 0 || index >= target.value.length) VegaValue.Undefined
-          else VegaValue.Str(target.value[index.toInt()].toString())
+          val index = arrayIndexOrNull(name)
+          if (index == null || index >= target.value.length) VegaValue.Undefined
+          else VegaValue.Str(target.value[index].toString())
         }
       }
       else -> VegaValue.Undefined
     }
+  }
+
+  /**
+   * The array index [name] spells, or null when it spells anything else.
+   *
+   * An *array index* is a string that is the canonical decimal spelling of a whole number below
+   * 2^32 − 1: digits only, no sign, no leading zero, no point. Anything else is an ordinary
+   * property name, and an array has none.
+   */
+  private fun arrayIndexOrNull(name: String): Int? {
+    if (name.isEmpty() || name.length > 10) return null
+    if (name.length > 1 && name[0] == '0') return null
+    for (char in name) if (char !in '0'..'9') return null
+    val value = name.toLongOrNull() ?: return null
+    return if (value < Int.MAX_VALUE) value.toInt() else null
+  }
 
   private fun call(node: Node.Call, scope: ExpressionScope): VegaValue {
     val name =
@@ -211,6 +232,19 @@ public class Evaluator(
     }
 
     if (name == "data") {
+      // `first()` on no arguments is a `NoSuchElementException`, which is not an
+      // `ExpressionEvaluationException` and so escapes every catch site between here and the host.
+      // `data()` with nothing in it is a plausible typo and used to take the chart down.
+      if (node.arguments.isEmpty()) {
+        throw ExpressionEvaluationException(
+          VegaDiagnostic(
+            severity = DiagnosticSeverity.ERROR,
+            code = DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION,
+            message = "data() takes the name of a dataset",
+            operator = name,
+          )
+        )
+      }
       val dataset = scope.dataset(evaluate(node.arguments.first(), scope).asString())
       return VegaValue.Arr(dataset)
     }

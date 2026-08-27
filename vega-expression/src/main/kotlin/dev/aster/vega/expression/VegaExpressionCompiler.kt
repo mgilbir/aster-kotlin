@@ -61,14 +61,19 @@ public class ParsedExpression(
     // A bare identifier is a signal reference unless it is `datum`, a constant, or a function name.
     val called = mutableSetOf<Node>()
     ast.walk { node -> if (node is Node.Call) called.add(node.callee) }
+    // `walk` does not descend into a non-computed member's property — `datum.year` visits the
+    // member and its target and never the name after the dot — so a property name is never added
+    // here and there is nothing to take back out.
+    //
+    // There used to be a second clause that removed one anyway, and it removed it *by name* from
+    // the whole set: `"year == datum.year"` reported no dependency on the signal `year` at all. A
+    // dependency that is never recorded is never missed, so `DataflowOrder` resolved the
+    // expression before the signal existed and never re-evaluated it after — a slider bound to
+    // `year` moved nothing, and there was no diagnostic to read, because from the compiler's point
+    // of view the expression did not mention it.
     ast.walk { node ->
       if (node is Node.Identifier && node !in called) {
         if (node.name != "datum" && node.name !in Functions.constants) names.add(node.name)
-      }
-      // The target of a non-computed member access is the thing being read, not a property name.
-      if (node is Node.Member && !node.computed) {
-        val property = node.property
-        if (property is Node.Identifier) names.remove(property.name)
       }
     }
     return names

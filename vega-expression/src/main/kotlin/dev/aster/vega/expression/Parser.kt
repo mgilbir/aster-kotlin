@@ -18,6 +18,35 @@ public class Parser(private val source: String) {
   private val tokens = Lexer(source).tokenize()
   private var position = 0
 
+  /**
+   * How deep the recursion is, and how deep it may go.
+   *
+   * A recursive-descent parser recurses once per level of nesting, so `"((((…"` a few thousand deep
+   * is a `StackOverflowError` — which is an `Error` rather than an exception, is not caught by
+   * anything typed, and is **unrecoverable on Kotlin/Native**. An expression is data, so the depth
+   * is counted and refused with the same syntax error every other malformed expression gets.
+   *
+   * 256 is far past anything a person or a compiler writes: the deepest expression in the whole
+   * fixture corpus nests eight levels, and Vega-Lite's generated predicates reach about twenty.
+   */
+  private var depth = 0
+
+  private inline fun <T> nested(block: () -> T): T {
+    if (++depth > MAX_DEPTH) {
+      depth = 0
+      throw ExpressionSyntaxException(
+        "Nested more than $MAX_DEPTH levels deep",
+        peek().start,
+        source,
+      )
+    }
+    try {
+      return block()
+    } finally {
+      depth--
+    }
+  }
+
   public fun parse(): Node {
     val node = parseExpression()
     val token = peek()
@@ -29,7 +58,7 @@ public class Parser(private val source: String) {
 
   // ---- precedence climbing --------------------------------------------------
 
-  private fun parseExpression(): Node = parseConditional()
+  private fun parseExpression(): Node = nested { parseConditional() }
 
   /** `test ? consequent : alternate`, right-associative. */
   private fun parseConditional(): Node {
@@ -66,7 +95,8 @@ public class Parser(private val source: String) {
     val token = peek()
     if (token.type == TokenType.OPERATOR && token.text in UNARY_OPERATORS) {
       advance()
-      return Node.Unary(token.text, parseUnary())
+      // Counted too: `!!!!…` recurses here without ever passing through `parseExpression`.
+      return nested { Node.Unary(token.text, parseUnary()) }
     }
     return parsePostfix()
   }
@@ -276,3 +306,6 @@ public class Parser(private val source: String) {
       )
   }
 }
+
+/** See `Parser.depth`. */
+private const val MAX_DEPTH: Int = 256
