@@ -26,6 +26,47 @@ section here does not get released.
 
 ### Fixed
 
+- **A bracket followed by a dot reads the field behind it.** `"field": "coordinates[0].lat"` —
+  the ordinary shape of a GeoJSON-derived row — resolved to nothing at all, so the mark was not
+  drawn and nothing said why. `parseFieldPath` added an empty segment for the `.` after the
+  closing bracket, and a lookup through an empty segment misses by construction.
+
+  The whole function is now a transcription of vega-util's `splitAccessPath`, which is what every
+  upstream field accessor is built from, rather than a re-derivation of what the notation looks
+  like it means. The re-derivation was wrong in three more ways the original explains: `a..b` and
+  `.a` were two segments and one where upstream reads one and one, a quoted bracket ended at the
+  next `]` rather than at its own closing quote (so `a["b]c"]` was cut in half), and a quote was
+  honoured anywhere in a bracket rather than only where upstream honours one. One divergence is
+  kept deliberately: upstream *throws* on an unterminated bracket or quote, and a field path is
+  data — often pasted data — so the remainder becomes a literal segment and the lookup misses.
+
+- **Numbers in emitted JSON are written the way `JSON.stringify` writes them.** `VegaJson.write`
+  fell back to the platform's `Double.toString` for any value that was not a small integer, under
+  a comment claiming JavaScript's rules. The platform's rules are not JavaScript's — it switches
+  to exponential notation at 10^7 rather than 10^21, and writes `1.5E-6` where JavaScript writes
+  `0.0000015` — and, being the platform's, it answers differently on each Kotlin/Native target, so
+  the same value was not even the same text on two of the five hosts that emit it. It goes through
+  `Decimals.jsString` now, which is the same specification the rest of the engine prints with.
+
+- **A signal and a dataset say what they cannot honour.** Every other block in `SpecParser` names
+  the properties it consumes and reports the remainder; these two read the handful they knew and
+  dropped the rest in silence, against the class's own "nothing is silently dropped". Four
+  properties were disappearing: a dataset's `on` triggers and `async`, and a signal's `react` and
+  `push`. `push` is the expensive one — this repository's own Vega-Lite compiler emits
+  `"push": "outer"` for a faceted selection, and a group's signals are resolved into a copy of the
+  enclosing scope, so the name was shadowed inside the group and the outer signal never changed.
+  Each now says that, by name, with its JSON path.
+
+- **`%s` floors the epoch instead of truncating it.** d3-time-format writes
+  `Math.floor(+d / 1000)`; a division that truncates toward zero is a second late for every
+  instant in the half-second before an epoch second, which before 1970 is the whole axis. `%Q` and
+  `%s` also write their number through `Decimals.jsString` now rather than through a `Long`, for
+  the same reason the JSON writer does.
+
+- **A `SpecParser` may be used twice.** It is public, its name is a verb, and it accumulated: a
+  second specification came back carrying the first one's diagnostics and read the first one's
+  `config` for any block it did not set itself. Each `parse` and `parseJson` starts from nothing.
+
 - **One specification names one font on every host.** A specification writes a CSS stack —
   `"Noto Sans, Chart Sans"` — and `TextStyle.fontFamily` carries it whole, so each text
   engine had to split it. Each did something different: the Compose Multiplatform engine

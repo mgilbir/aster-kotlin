@@ -6804,3 +6804,46 @@ where a reviewer reads it.
 Five paths, all checked in a throwaway worktree rather than reasoned about: a snapshot moved with no
 entry fails; with an entry passes; with the marker passes; a source-only change is not flagged; and on
 `main` with nothing changed there is nothing to compare.
+
+### A whole-repository audit, and the first of the four places its findings cluster
+
+`docs/audits/codebase-audit-2026-08-27.md` is an adversarial read of everything in this repository —
+nine areas, each read in full, every Critical re-traced against the source before it was written
+down. It found 11 Critical, 33 High, 61 Medium and 66 Low, and its own summary is that they cluster
+in four places: promises without mechanisms, JavaScript semantics that leaked Kotlin, one semantic
+implemented once per host, and gates that skip instead of failing. The findings carry stable ids, so
+a fix can cite one instead of restating it, and the work is going through them in a stack of pull
+requests rather than in one.
+
+This is the first, and it is the value model's own reading and printing.
+
+**A bracket followed by a dot read nothing.** `parseFieldPath` was written from what the notation
+looks like it means rather than from vega-util's `splitAccessPath`, which is what every upstream
+field accessor is built from — and the difference is not decoration. A `.` after a closing bracket
+appended an *empty* segment, and a lookup through an empty segment misses by construction, so
+`"field": "coordinates[0].lat"` over GeoJSON-shaped rows drew nothing and said nothing. Three more
+divergences came out of the same reading: `a..b` and `.a` split one segment too many, a quoted
+bracket ended at the next `]` rather than at its own quote (so `a["b]c"]` was cut in half), and a
+quote counted as one anywhere inside a bracket rather than only where upstream counts it. The
+function is a transcription now. One divergence is kept and written down: upstream *throws* on an
+unterminated bracket, and a field path is pasted data.
+
+**Two blocks of the parser were still silent.** `SpecParser` names what each block consumes and
+reports the remainder — the inversion that made the axis's fifty-nine dropped properties visible —
+and `signals` and `data` were the two that had never been wired into it. Four properties were
+disappearing: a dataset's `on` triggers and `async`, and a signal's `react` and `push`. `push` is
+the one that matters, because this repository's own Vega-Lite compiler emits `"push": "outer"` for
+a faceted selection and a group's signals are resolved into a *copy* of the enclosing scope — so
+the name is shadowed inside the group and the outer signal never changes. One half of this project
+was writing something the other half was dropping, and neither said so.
+
+**Two number printers and one clock.** `VegaJson.write` fell back to the platform's `Double.toString`
+under a comment claiming `JSON.stringify`'s rules, which switches to exponential notation fourteen
+orders of magnitude early and is the *platform's* — so the same value was not the same text on two
+of the five targets that emit it. `%s` divided by a thousand and truncated toward zero where
+d3-time-format floors, which is a second late for every instant before 1970. Both go through
+`Decimals.jsString` now, which is the specification the rest of the engine already prints with.
+
+**And a parser that could not be used twice.** `SpecParser` is public and its name is a verb, and it
+accumulated: a second specification came back carrying the first one's diagnostics, and read the
+first one's `config` for any block it did not set itself.

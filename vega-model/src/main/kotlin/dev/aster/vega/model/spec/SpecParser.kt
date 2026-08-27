@@ -835,6 +835,49 @@ private val LAYOUT_CONSUMED =
 /** Data properties this engine reads. */
 private val DATA_CONSUMED = setOf("name", "values", "source", "transform", "format", "url")
 
+/** The two a dataset may say that this engine cannot act on, each said back by name. */
+private val DATA_UNSUPPORTED =
+  mapOf(
+    "on" to
+      "A dataset's 'on' triggers insert, remove or modify rows in place, which needs the " +
+        "incremental dataflow this engine does not have — every change recompiles the whole " +
+        "specification instead",
+    "async" to
+      "'async' defers a load past the first render, and a load here happens while the " +
+        "specification is compiling, so the dataset is always ready before anything is drawn",
+  )
+
+/** Signal properties this engine reads. */
+private val SIGNAL_CONSUMED =
+  setOf(
+    "name",
+    "value",
+    "init",
+    "update",
+    "on",
+    "bind",
+    // Upstream's parser reads it no more than this one does: it is there for a reader.
+    "description",
+  )
+
+/**
+ * The two a signal may say that this engine cannot act on.
+ *
+ * Both were dropped without a word until an audit went looking, and `push` is the expensive one:
+ * this repo's own Vega-Lite compiler emits `"push": "outer"` for a faceted selection, so the
+ * silence was between two halves of one project.
+ */
+private val SIGNAL_UNSUPPORTED =
+  mapOf(
+    "push" to
+      "'push' says this definition writes an enclosing scope's signal rather than declaring " +
+        "one of its own; a group's signals are resolved into a copy of the enclosing scope " +
+        "here, so the name is shadowed inside the group and the outer signal never changes",
+    "react" to
+      "'react' says whether a signal re-evaluates when what it reads changes; every signal is " +
+        "re-evaluated on every compile here, so 'react: false' does not hold it still",
+  )
+
 /**
  * Encode channels this engine's mark encoders read, across every mark type.
  *
@@ -951,10 +994,15 @@ public data class ParsedSpec(val spec: VegaSpec?, val diagnostics: List<VegaDiag
  *
  * Only the subset the runtime can execute is modelled. Coverage is tracked in
  * SUPPORTED_FEATURES.md.
+ *
+ * An instance may be reused: each [parse] and [parseJson] starts from nothing. It used to
+ * accumulate instead — a second specification came back carrying the first one's diagnostics, and
+ * read the first one's `config` for any block it did not set itself — which is the kind of state a
+ * caller has no way to see and no reason to expect from a class whose name is a verb.
  */
 public class SpecParser {
 
-  private val diagnostics = DiagnosticCollector()
+  private var diagnostics = DiagnosticCollector()
 
   /** The specification's `config` block, which every guide reads behind its own properties. */
   private var config: GuideConfig = GuideConfig.Empty
@@ -971,12 +1019,25 @@ public class SpecParser {
   private var scaleTypes: Map<String, ScaleType> = emptyMap()
 
   public fun parseJson(json: String): ParsedSpec {
+    reset()
     val root =
       VegaJson.parseOrNull(json, diagnostics) ?: return ParsedSpec(null, diagnostics.diagnostics)
-    return parse(root)
+    return parseRoot(root)
   }
 
   public fun parse(root: VegaValue): ParsedSpec {
+    reset()
+    return parseRoot(root)
+  }
+
+  /** Everything one specification leaves behind, dropped before the next one is read. */
+  private fun reset() {
+    diagnostics = DiagnosticCollector()
+    config = GuideConfig.Empty
+    scaleTypes = emptyMap()
+  }
+
+  private fun parseRoot(root: VegaValue): ParsedSpec {
     if (root !is VegaValue.Obj) {
       diagnostics.fatal(
         DiagnosticCodes.PARSE_INVALID_JSON,
@@ -1220,6 +1281,7 @@ public class SpecParser {
         ->
         parseSignalHandler(entry, "$path.on[$index]", name, subscope)
       }
+    obj.reportUnhandled("Signal", path, SIGNAL_CONSUMED, SIGNAL_UNSUPPORTED)
     return SignalSpec(
       name = name,
       value = obj.fields["value"],
@@ -1684,6 +1746,8 @@ public class SpecParser {
         jsonPath = "$path.format.type",
       )
     }
+
+    obj.reportUnhandled("Data", path, DATA_CONSUMED, DATA_UNSUPPORTED)
 
     return DataSpec(
       name = name,

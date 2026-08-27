@@ -101,16 +101,19 @@ private fun writeJson(value: VegaValue, out: StringBuilder, depth: Int) {
 }
 
 /**
- * JavaScript's `JSON.stringify` number rules: an integral value loses its `.0`, and a non-finite
- * one becomes `null` — which is what JSON permits and what upstream writes.
+ * JavaScript's `JSON.stringify` number rules: a non-finite value becomes `null` — which is what
+ * JSON permits and what upstream writes — and every other one is written as `String(x)`.
+ *
+ * `String(x)` is [Decimals.jsString], not the platform's `toString`. The rules it applies are not
+ * the ones a platform picks: an integral value loses its point up to 10^21 and goes exponential
+ * above it, a small one stays in full down to 10^-7 and goes exponential below, and the digits in
+ * between are the *fewest* that read back as the same double. Kotlin's `toString` switches to
+ * exponential at 10^7, writes `1.5E-6` where JavaScript writes `0.0000015`, and — being the
+ * platform's — answers differently on each Kotlin/Native target, so this JSON was not even the same
+ * text on two of the five hosts that emit it.
  */
 private fun jsonNumber(value: Double): String =
-  when {
-    !value.isFinite() -> "null"
-    value == 0.0 -> "0"
-    value % 1.0 == 0.0 && kotlin.math.abs(value) < 1e21 -> value.toLong().toString()
-    else -> value.toString()
-  }
+  if (!value.isFinite()) "null" else Decimals.jsString(value)
 
 private fun writeJsonString(text: String, out: StringBuilder) {
   out.append('"')

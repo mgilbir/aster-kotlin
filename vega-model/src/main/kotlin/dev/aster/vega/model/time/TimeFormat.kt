@@ -1,5 +1,6 @@
 package dev.aster.vega.model.time
 
+import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.locale.DateName
 import dev.aster.vega.model.locale.DateNameContext
 import dev.aster.vega.model.locale.VegaLocale
@@ -201,8 +202,11 @@ public object TimeFormat {
         'S' -> number(at.second, 2)
         'L' -> number(at.nanosecond / 1_000_000, 3)
         'f' -> number(at.nanosecond / 1_000, 6)
-        'Q' -> out.append(digits(millis.toLong().toString()))
-        's' -> out.append(digits((millis / 1000.0).toLong().toString()))
+        'Q' -> out.append(digits(Decimals.jsString(millis)))
+        // `Math.floor(+d / 1000)`, and the floor is the whole of it: a division that truncates
+        // toward zero is a second late for every instant before 1970. d3 writes `-2` for
+        // `-1500`; truncation writes `-1`, which is the same second twice and a missing one.
+        's' -> out.append(digits(Decimals.jsString(kotlin.math.floor(millis / 1000.0))))
         'Z' -> out.append(digits(offset(millis, zone)))
         // The locale's own compositions. d3's en-US spells these three out as the defaults on
         // `VegaLocale`, and a locale that writes its dates the other way round says so there rather
