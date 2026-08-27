@@ -96,14 +96,25 @@ public class SceneExporter(
     return BitmapExport(bitmap, renderer.lastDiagnostics)
   }
 
+  /**
+   * The bitmap as PNG bytes.
+   *
+   * There is no `quality`, and there never meaningfully was: PNG is lossless, and Android documents
+   * the argument as ignored for it. A public parameter that does nothing is worse than no parameter
+   * — a caller passing 80 to make a smaller file gets exactly the same bytes and no way to find out
+   * why. A smaller file means fewer pixels, which is `BitmapExportOptions.pixelScale`.
+   */
   public fun toPng(
     scene: Scene,
     options: BitmapExportOptions = BitmapExportOptions(),
-    quality: Int = 100,
   ): ByteExport {
     val export = toBitmap(scene, options)
-    val stream = ByteArrayOutputStream()
-    val compressed = export.bitmap.compress(Bitmap.CompressFormat.PNG, quality, stream)
+    // Sized from the bitmap rather than left at the default 32 bytes: a full-page export is
+    // megabytes, and a `ByteArrayOutputStream` that starts at 32 doubles its buffer twenty times
+    // getting there, copying everything each time. `byteCount` is the decoded size, which is a
+    // generous upper bound for a compressed PNG and therefore exactly one allocation.
+    val stream = ByteArrayOutputStream(export.bitmap.byteCount.coerceAtLeast(1024))
+    val compressed = export.bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
     check(compressed) { "Bitmap.compress reported failure for PNG output" }
     return ByteExport(stream.toByteArray(), export.warnings)
   }

@@ -492,9 +492,15 @@ class SpecCompilerTest {
         .filterIsInstance<PathNode>()
         .single()
     val moves = path.path.commands.count { it is dev.aster.vega.scene.PathCommand.MoveTo }
-    // Three subpaths, not two: the run before the gap, the point that was not defined — which is
-    // still one of the series' points, drawn as nothing — and the run after it.
-    assertEquals(3, moves, "the runs either side of the gap, and the point that made it")
+    // **Two** subpaths: the run before the gap and the run after it, and *nothing* at the point
+    // that was not defined. This asserted three — the undefined point was made a subpath of its own
+    // — which is not what `d3.line().defined()` does and not what upstream draws: its SVG for
+    // `line-defined-gaps` is `M0,100L50,70 M150,50L200,80`, with no third `M`. A degenerate subpath
+    // is invisible under a butt cap and a round *dot* under a round one, at a coordinate the chart
+    // is saying it has no value for. The differential harness could not see the difference until
+    // the `defined` channel reached `normalize.js` and both sides began recording which command
+    // produced each vertex.
+    assertEquals(2, moves, "the runs either side of the gap, and nothing where the gap is")
   }
 
   // ---- scale reverse ----------------------------------------------------------

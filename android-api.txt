@@ -149,10 +149,10 @@ vega-android-canvas  public final class dev.aster.vega.android.SceneExporter {
     public dev.aster.vega.android.SceneExporter(dev.aster.vega.android.AndroidCanvasSceneRenderer, int, kotlin.jvm.internal.DefaultConstructorMarker);
     public final dev.aster.vega.android.BitmapExport toBitmap(dev.aster.vega.scene.Scene, dev.aster.vega.android.BitmapExportOptions);
     public final dev.aster.vega.android.ByteExport toPdf(dev.aster.vega.scene.Scene, double, double);
-    public final dev.aster.vega.android.ByteExport toPng(dev.aster.vega.scene.Scene, dev.aster.vega.android.BitmapExportOptions, int);
+    public final dev.aster.vega.android.ByteExport toPng(dev.aster.vega.scene.Scene, dev.aster.vega.android.BitmapExportOptions);
     public static dev.aster.vega.android.BitmapExport toBitmap$default(dev.aster.vega.android.SceneExporter, dev.aster.vega.scene.Scene, dev.aster.vega.android.BitmapExportOptions, int, java.lang.Object);
     public static dev.aster.vega.android.ByteExport toPdf$default(dev.aster.vega.android.SceneExporter, dev.aster.vega.scene.Scene, double, double, int, java.lang.Object);
-    public static dev.aster.vega.android.ByteExport toPng$default(dev.aster.vega.android.SceneExporter, dev.aster.vega.scene.Scene, dev.aster.vega.android.BitmapExportOptions, int, int, java.lang.Object);
+    public static dev.aster.vega.android.ByteExport toPng$default(dev.aster.vega.android.SceneExporter, dev.aster.vega.scene.Scene, dev.aster.vega.android.BitmapExportOptions, int, java.lang.Object);
     public static final dev.aster.vega.android.SceneExporter$Companion Companion;
     public static final long MAX_EXPORT_PIXELS;
 vega-android-canvas  public final class dev.aster.vega.android.SceneExporter$Companion {

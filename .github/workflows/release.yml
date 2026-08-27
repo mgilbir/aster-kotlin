@@ -33,21 +33,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: "21"
 
       - name: Set up node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "20"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
 
       - name: Check this version has not been released
         # The version in the build file is the one thing that names a release, so the guard is that
@@ -77,10 +77,28 @@ jobs:
           echo "CHANGELOG.md has a section for $version."
 
       - name: Record upstream's test vectors
-        # `check.sh` says it will skip the replays without these, but the replay guards also assert
-        # the harness has not *shrunk* — `replayed >= 60` — so on a fresh clone they fail rather than
-        # skip. The vectors are gitignored by design, being derived, so CI records them first.
+        # **This step is the protection, not a convenience.** Each replay guards its own vector file
+        # with an assumption, so a missing file *skips* the whole test — the `replayed >= N` floor
+        # below it never runs, because a skipped test runs nothing. (The floor catches a set that is
+        # partly there, which is a different failure.) The comment here used to claim the opposite,
+        # which mattered: it read as though forgetting this step would fail loudly, and forgetting it
+        # would in fact have published green with eleven replays silently skipped.
+        #
+        # The vectors are gitignored by design, being derived from the pinned upstream packages.
         run: ./scripts/record-upstream-vectors.sh
+
+      - name: Render upstream's Vega-Lite scenes
+        # **This arms a gate that runs inside `check.sh`.** `VegaLiteFixtureDifferentialTest` is
+        # 1126 cases and the one that catches a specification matching upstream property for property
+        # while still drawing the wrong chart; it answers a missing reference with an *assumption*,
+        # and the references are gitignored, being derived. `ci.yml` has rendered them since the
+        # commit that added them; this file was never updated, so **every release since has published
+        # with that gate skipped in full** — while the publish job's own comment below said verify
+        # "has already run that comparison in full".
+        #
+        # Before `check.sh`, not after: the gate runs in its Gradle step, so references written
+        # afterwards arm it for a run that has already finished.
+        run: ./scripts/vega-lite-oracle.sh --references-only
 
       - name: Check
         # A release is never published from a red build. This is the gate the repository uses, which
@@ -105,12 +123,22 @@ jobs:
     name: Build and publish (macOS)
     needs: verify
     runs-on: macos-latest
+    outputs:
+      # **Whether the Gradle modules actually reached Maven Central.**
+      #
+      # The publish step skips with `exit 0` when the credentials are not configured, which is
+      # deliberate — a fork can build and attach the XCFramework without them. What was not
+      # deliberate is what happened next: the release job tagged, pushed and wrote a page telling
+      # readers to add `io.github.mgilbir.astervega:vega-runtime:$version` to their build, for
+      # coordinates that did not exist. And a tag cannot be moved, so that version could never be
+      # released properly afterwards.
+      published: ${{ steps.central.outputs.published }}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: "21"
@@ -119,12 +147,12 @@ jobs:
         # The recorder below is a Node script that reads the pinned packages and clones upstream's own
         # test files. Pinned here as in the verify job rather than taken from whatever the runner image
         # ships, because what it records is the reference the JVM replays against.
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "20"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
 
       - name: Record upstream's test vectors
         # **The gate needs its inputs on this host too.** `build` below runs every test, and the
@@ -149,6 +177,7 @@ jobs:
         run: ./gradlew verifyPublishedVariants
 
       - name: Publish to Maven Central
+        id: central
         env:
           CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
           CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
@@ -156,9 +185,16 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
+          # Recorded either way, and read by the release job: a page that names Maven Central
+          # coordinates has to be a page whose coordinates exist.
+          echo "published=false" >> "$GITHUB_OUTPUT"
           if [ -z "${CENTRAL_TOKEN_USERNAME:-}" ] || [ -z "${MAVEN_GPG_PRIVATE_KEY:-}" ]; then
-            echo "::notice::Maven Central credentials or signing key not configured;"
-            echo "::notice::skipping publish. See the Releasing section of README.md."
+            echo "::warning::Maven Central credentials or signing key not configured, so the Gradle"
+            echo "::warning::modules will NOT be published. The tag and the release page will still"
+            echo "::warning::be created, with the XCFramework attached and no Maven coordinates on"
+            echo "::warning::them. A tag cannot be moved, so this version cannot be published to"
+            echo "::warning::Central later under the same number. See the Releasing section of"
+            echo "::warning::README.md."
             exit 0
           fi
           version=$(sed -n 's/^version = "\(.*\)"$/\1/p' build.gradle.kts)
@@ -206,6 +242,8 @@ jobs:
           .github/scripts/check-deployment.py status.json "$modules"
           rm -f status.json
 
+          # Only now, past every check: the bundle validated and holds every module.
+          echo "published=true" >> "$GITHUB_OUTPUT"
           echo "Release it at https://central.sonatype.com/publishing/deployments"
 
       - name: Build the XCFramework for Swift
@@ -260,7 +298,7 @@ jobs:
           ls -la artifacts/
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: aster-kotlin-artifacts
           path: artifacts/
@@ -277,12 +315,12 @@ jobs:
     steps:
       # The **dispatched commit**, not whatever `main` points at by now. The artefacts were built from
       # this tree, so this is the tree the tag has to name.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.sha }}
 
       - name: Download artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: aster-kotlin-artifacts
           path: artifacts
@@ -342,6 +380,7 @@ jobs:
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
+          PUBLISHED: ${{ needs.publish.outputs.published }}
         run: |
           set -euo pipefail
 
@@ -352,13 +391,25 @@ jobs:
             echo ""
             echo "## Using it"
             echo ""
-            echo "Gradle — every module is on Maven Central under \`io.github.mgilbir.astervega\`:"
-            echo ""
-            echo '```kotlin'
-            echo "implementation(\"io.github.mgilbir.astervega:vega-runtime:$version\")"
-            echo "implementation(\"io.github.mgilbir.astervega:vega-lite:$version\")"
-            echo '```'
-            echo ""
+            # **Only when they exist.** The publish job skips when its credentials are not
+            # configured, and this page used to name Maven Central coordinates regardless — telling
+            # a reader to add a dependency that resolves to nothing. Since a tag cannot be moved,
+            # the version was also unreleasable afterwards.
+            if [ "$PUBLISHED" = "true" ]; then
+              echo "Gradle — every module is on Maven Central under \`io.github.mgilbir.astervega\`:"
+              echo ""
+              echo '```kotlin'
+              echo "implementation(\"io.github.mgilbir.astervega:vega-runtime:$version\")"
+              echo "implementation(\"io.github.mgilbir.astervega:vega-lite:$version\")"
+              echo '```'
+              echo ""
+            else
+              echo "> **The Gradle modules were not published for this version.** The publish job's"
+              echo "> Maven Central credentials were not configured, so nothing was uploaded and"
+              echo "> \`io.github.mgilbir.astervega:*:$version\` does not resolve. The XCFramework"
+              echo "> below was built from this tag and is complete."
+              echo ""
+            fi
             echo "Swift Package Manager — the XCFramework is attached below, and \`Package.swift\` at"
             echo "tag \`v$version\` names it with its checksum:"
             echo ""
@@ -367,9 +418,26 @@ jobs:
             echo '```'
           } >> notes.md
 
+          # **`--latest` is a claim about ordering, not about recency.** It was passed
+          # unconditionally, so publishing a patch for an older line — 0.2.4 after 0.3.0 — would
+          # have moved the badge backwards and changed what `gh release view` and the repository
+          # sidebar point at. `sort -V` over the existing tags decides it.
+          #
+          # Fetched, because this job checked out one commit: `actions/checkout` brings no tags at
+          # depth 1, so the local tag list would otherwise hold only the one pushed a step ago and
+          # every release would call itself the latest by default.
+          git fetch --tags --quiet origin
+          newest=$(git tag --list 'v*' | sed 's/^v//' | sort -V | tail -1)
+          if [ "$newest" = "$version" ]; then
+            latest=(--latest)
+          else
+            latest=(--latest=false)
+            echo "::notice::v$newest is newer than v$version, so this release is not marked latest."
+          fi
+
           gh release create "v$version" \
             --title "Aster Vega $version" \
             --notes-file notes.md \
-            --latest \
+            "${latest[@]}" \
             artifacts/*
           echo "https://github.com/${GITHUB_REPOSITORY}/releases/tag/v$version"

@@ -171,8 +171,35 @@ Gates, and what each needs:
   oracle              node. Regenerates upstream Vega's own scenes and compares. Slow; --fast
                       skips it.
   vega-lite-oracle    node. The same for Vega-Lite. Slow; --fast skips it.
+  vega-lite-references
+                      node. Renders upstream's Vega-Lite scenes **before** the Gradle gate, which
+                      is what arms VegaLiteFixtureDifferentialTest's 1126 cases inside it. Without
+                      it that gate skips and this summary still says every gate ran.
 GATES
   exit 0
+fi
+
+# ---------------------------------------------------------------------------------------------
+# 0. Upstream's Vega-Lite scenes, which **arm** a gate that runs inside step 1.
+#
+# `VegaLiteFixtureDifferentialTest` — 1126 cases, and the gate that catches a specification which
+# matches upstream property for property and still draws the wrong chart — answers a missing
+# reference with an assumption. The references are gitignored by design, being sixteen megabytes of
+# derived output nobody reads a diff of. So on a fresh clone the whole gate skipped, silently, and
+# the summary at the bottom of this script said "Green, and every gate ran".
+#
+# It used to be rendered at step 9, *after* the tests that need it, which armed the gate for the
+# **next** run and never for the one printing the summary. So a single run could not arm it at all,
+# and a release could not either — `release.yml`'s verify job never rendered them.
+#
+# Skipped with `--fast`, which is the edit-run loop, and skipped without node. Both are reported.
+# ---------------------------------------------------------------------------------------------
+if [ "$fast" = true ]; then
+  skip_gate "vega-lite-references" "--fast was given; the Vega-Lite scene comparison is unarmed"
+elif ! command -v node >/dev/null 2>&1; then
+  skip_gate "vega-lite-references" "node is not installed; the Vega-Lite scene comparison is unarmed"
+else
+  run_gate "vega-lite-references" ./scripts/vega-lite-oracle.sh --references-only
 fi
 
 # ---------------------------------------------------------------------------------------------

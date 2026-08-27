@@ -897,14 +897,18 @@ public class MarkEncoder(
 
     val horizontal = string(channels["orient"], data.first())?.lowercase() == "horizontal"
     val tension = number(channels["tension"], data.first())
-    // A line of **one point** closes its own subpath, which is upstream's own `Z`. One point left
-    // over from a *break* does not: what closes is a line d3 was handed a single point for, and a
-    // series broken into fragments was handed all of them. The break lives in the item's vertices,
-    // which is where it is visible; closing each fragment drew `Z`s upstream has not got and
-    // reported the whole line as a closed polygon.
-    val broken = segments.sumOf { it.size } > 1
+    // A subpath of **one point** closes itself, which is upstream's own `Z`, and the rule is per
+    // subpath rather than per series: `curveLinear.lineEnd` closes when it has seen exactly one
+    // point since the last `lineStart`, and `defined` starts a new one at every break. So a series
+    // whose last run is a single point ends `…M300,0Z` — which is upstream's own SVG for
+    // `shifted-buckets`, and what this used to suppress for the whole series as soon as any break
+    // existed. It was suppressing it for the right reason at the time: an undefined point was being
+    // made a subpath of its own, so *every* break produced a spurious one-point run. `segments` no
+    // longer emits those, so what is left is a genuine run of one defined point.
     val path = PathData.build {
-      segments.forEach { trace(it, interpolate, horizontal, tension, partOfArea = broken) }
+      segments.forEach {
+        trace(it, interpolate, horizontal, tension, partOfArea = it.size != 1)
+      }
     }
     return PathNode(
       id = ids.allocate(),
@@ -1007,6 +1011,14 @@ public class MarkEncoder(
    * but the mark it belongs to is still a mark: a series filtered down to a single row, or one
    * bracketed by two breaks, is present in the scene and carries its colour into the legend.
    * Dropping the run dropped the whole item with it whenever no run had two points.
+   *
+   * The point that **breaks** the series is not one of them. It used to be added as a subpath of
+   * its own, on the reasoning that it is still one of the series' points; upstream disagrees, and
+   * upstream's answer is the whole of `d3.line().defined()` — a point that is not defined is not
+   * drawn, so it contributes no `moveTo` and no vertex. `line-defined-gaps` renders as
+   * `M0,100L50,70 M150,50L200,80` upstream and had a `M100,90` in the middle here: a degenerate
+   * subpath, invisible with a butt cap and a **round dot** with a round one, at a coordinate the
+   * chart is saying it has no value for.
    */
   private fun <T> segments(
     data: List<VegaValue>,
@@ -1017,11 +1029,7 @@ public class MarkEncoder(
     var current = mutableListOf<T>()
     for (datum in data) {
       if (broken(channels, datum)) {
-        // The point that broke the series is a subpath of its own. Nothing is drawn to it or from
-        // it — a single point has no length — but it is still one of the series' points, and a
-        // break is exactly the absence of a line *between* two of them.
         if (current.isNotEmpty()) result.add(current)
-        result.add(listOf(resolve(datum)))
         current = mutableListOf()
       } else {
         current.add(resolve(datum))

@@ -155,7 +155,7 @@
     },
     {
       "closed": 0,
-      "points": "40 30 110 70 200 110",
+      "points": "M 40 30 L 110 70 L 200 110",
       "role": "mark",
       "stroke": "#9d755d",
       "strokeWidth": 2,

@@ -27,7 +27,7 @@ end to end — expressions, signals, 49 of upstream's 51 documented data transfo
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-193 Vega differential fixtures and 283 Vega-Lite fixtures pass, every one of them matching upstream
+194 Vega differential fixtures and 283 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -194,7 +194,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 193 Vega differential fixtures and 283 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 194 Vega differential fixtures and 283 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -226,7 +226,7 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests, and every renderer now exposes the tree: the Android View, the Swift one and Compose Multiplatform. Not verified on physical hardware or with a real user |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 193 Vega differential fixtures |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 194 Vega differential fixtures |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -7565,3 +7565,102 @@ audit has found a comparison that passed because it compared nothing.
 It matches inside string literals now, with comments stripped first — a deliberately small scanner
 rather than a parser, because Kotlin and Swift agree on `//`, on `/* */` and on `"`, and a file that
 genuinely reads a golden names it in a string, since that is how a path is written.
+
+### The gates that reported on themselves
+
+The last cluster of the audit is the one that matters most, because everything above it is only as
+true as the checks that established it. Four of those checks were not running, and each said it was.
+
+**The Vega-Lite scene comparison was unarmed, everywhere.** `VegaLiteFixtureDifferentialTest` is
+1126 cases and the gate that catches a specification matching upstream property for property while
+still drawing the wrong chart. It answers a missing reference with an *assumption*, and the
+references are gitignored by design — sixteen megabytes of derived output nobody reads a diff of. So:
+
+- `scripts/check.sh` rendered them at **step 9**, after the Gradle step that runs the test. A single
+  run armed the gate for the *next* run and never for the one printing "Green, and every gate ran".
+- `release.yml`'s verify job never rendered them at all, so every release since the gate was added
+  published with it skipped in full — while the publish job's own comment said verify "has already
+  run that comparison in full".
+
+They are rendered first now, reported as a gate of their own so a `--fast` run says the comparison
+is unarmed, and the test fails rather than skips when the set is only *partly* there — the same
+shape as the `replayed >= N` floors in the upstream replays.
+
+**The differential model could not see a gap in a line.** This is the deeper one. Both sides —
+`normalize.js` and `Differential.kt` — flattened a `moveTo` and a `lineTo` into a bare coordinate
+pair, so a line broken into subpaths and a line drawn straight through the break produced the
+**identical** record. And `normalize.js` never read the `defined` channel at all, so upstream's own
+two subpaths were recorded as one outline. Two independent implementations of the same erasure read
+as agreement, which is precisely what a differential harness exists to prevent.
+
+Each vertex carries the command that produced it now; the recorder honours `defined` through d3's
+own generator; and an area is recorded front-and-back **per segment**, which is what `d3.area()`
+emits. Nothing in the corpus had an interior `moveTo`, so `line-defined-gaps` was written for it —
+and it immediately found a real defect in the engine, which is the point: the point that *breaks* a
+series was being drawn as a subpath of its own, where `d3.line().defined()` drops it. Invisible
+under a butt cap, a round dot under a round one, at a coordinate the chart is saying it has no value
+for. Two Vega-Lite fixtures had been agreeing about the same erasure and now compare properly.
+
+**`test-core.sh` was missing a third of the suite.** It named six modules by hand and predated two of
+them, so `vega-lite` and `vega-loader` — about eight hundred tests, the whole Vega-Lite compiler
+among them — were absent from what README.md sells as the JVM suite. Deriving the list from
+`settings.gradle.kts` and running it found three stale assertions on the first run.
+
+**And the gradle gate never compiled the common metadata**, which is what a consumer of the
+multiplatform artefact resolves against. Two commits on this audit's own stack shipped a
+`commonMain` catch of `OutOfMemoryError` — not in `kotlin-stdlib-common` — that builds for every
+target and fails the metadata compilation, while the gate said green. Both fixed, and the task is in
+the gate.
+
+### Documents that had stopped being true, and a check for the next one
+
+**A release page could name coordinates that did not exist.** The publish step skips with `exit 0`
+when its credentials are absent, which is deliberate for a fork; the release job then tagged, pushed
+and wrote a page telling readers to add `io.github.mgilbir.astervega:vega-runtime:$version` to their
+build. A tag cannot be moved, so that version was also unreleasable afterwards. The job reports
+whether it published now and the notes say so, and `--latest` is computed from the tag list rather
+than passed unconditionally — a patch for an older line was moving the badge backwards.
+
+**One `[api-snapshot-only]` marker exempted a whole branch.** It was a substring search over every
+message on the branch, so a commit that re-recorded a snapshot for a genuinely cosmetic reason waved
+through a real API break in a later one. The marker is a claim about *one* change; each snapshot is
+traced to the commits that touched it now, and every one of them has to carry it.
+
+**Two ADRs were contradicted by shipped modules and still read as accepted.** 0005 said Vega-Lite
+compilation was out of scope; `vega-lite` ships. 0003 said the public Composable does not draw on a
+`DrawScope`; `vega-compose-multiplatform` does. `docs/adr/README.md`'s own rule is to amend a record
+rather than silently changing behaviour that contradicts it, and nothing checked whether that had
+been done — so `DocumentedNumbersTest` now insists that a record marked superseded or amended says
+so in **both** its Status line and the index beside it. It cannot tell whether a record is *true*;
+it can stop the index and the file disagreeing, which is how a reader scanning one gets misled.
+
+Both records were amended rather than rewritten, and 0005's "revisit if" clause turned out to be
+exactly right about the order — the runtime passed its fixtures first, and the differential harness
+against upstream compilation was the first thing built. What it got wrong is the cost estimate that
+was the argument for never starting.
+
+**And HANDOFF.md violated its own opening line.** "Delete it when it stops being true" sat above a
+branch name that has not existed for a long time and "177 differential fixtures pass" in bold as
+"the only number here that means what it says" — against a corpus of 194 and 283. A document whose
+stated rule is that it must be true or gone, out by seventeen on the one number it vouches for, is
+worse than no document: nothing tells a reader which of its other three thousand lines aged the same
+way. It is framed as what it is now — a record of how things came to be, which is why several of its
+notes are still the only place a decision is explained — and points at `STATUS.md` for the present.
+
+### Smaller things in the oracle, and one meaningless parameter
+
+- **`record-number-strings.mjs` recorded one family in six.** Six expressions were passed to a
+  `push()` that takes one, so five were evaluated and discarded — including the powers of two and
+  the large integers, which is exactly where `String(x)` changes notation and where a port is most
+  likely to be wrong. The same mistake appeared one line above, where the negative of each value was
+  pushed *inside* the argument list of the positive.
+- **`eval-probe.js` and `transform-probe.js` did not pin determinism.** `now()` answered the wall
+  clock and `random()` an unseeded generator, so a probe of anything built on either answered
+  differently every run — and a probe exists to be quoted in a comment or turned into a fixture.
+- **`acorn` was a range**, in the oracle whose whole argument is that a version range makes the
+  reference unreproducible. The lockfile was saving it.
+- **`toPng(quality)` did nothing.** PNG is lossless and Android documents the argument as ignored, so
+  a caller passing 80 for a smaller file got the same bytes and no way to find out why. Removed, and
+  the byte stream is sized from the bitmap rather than growing from 32 bytes by repeated doubling.
+- **Every GitHub Action is pinned by SHA**, not by a mutable tag, on a workflow whose release job
+  holds `contents: write`.

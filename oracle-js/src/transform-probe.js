@@ -4,6 +4,11 @@
 // Each run gets a deep copy of the input: Vega's transforms mutate the tuples they are given, so
 // sharing one array between runs silently contaminates every result after the first.
 import * as vega from 'vega';
+import { pinDeterminism } from './determinism.js';
+
+// Pinned for the reason `eval-probe.js` is: `sample`, `dotbin` and the force layouts all draw from
+// the module-level generator, so an unpinned probe of one answers differently every run.
+pinDeterminism();
 
 const BASE = [
   { c: 'a', g: 'x', v: 1 },

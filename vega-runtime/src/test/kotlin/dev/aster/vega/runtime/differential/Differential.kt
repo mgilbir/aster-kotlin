@@ -453,24 +453,38 @@ public object Differential {
       return Mark(kind, node.metadata.role, numbers + paintNumbers(node), paintStrings(node))
     }
 
+    // **Each vertex carries the command that produced it**, which is the whole of subpath
+    // structure. `MoveTo` and `LineTo` were both flattened to a bare pair, so a line broken into
+    // separate subpaths and a line drawn straight through the break produced the *identical* point
+    // list — and a break is exactly what `defined: false` means. A regression joining across a gap
+    // passed every assertion on both sides of this comparison, which is the shape of blind spot
+    // worth naming: the model erased the thing the channel exists to express.
+    //
+    // The letters match `oracle-js/src/normalize.js`, which records the same three from d3's own
+    // path context, so the two strings are comparable character for character.
     val vertices =
       node.path.commands.flatMap { command ->
         when (command) {
-          is dev.aster.vega.scene.PathCommand.MoveTo -> listOf(world.apply(command.x, command.y))
-          is dev.aster.vega.scene.PathCommand.LineTo -> listOf(world.apply(command.x, command.y))
+          is dev.aster.vega.scene.PathCommand.MoveTo ->
+            listOf("M" to world.apply(command.x, command.y))
+          is dev.aster.vega.scene.PathCommand.LineTo ->
+            listOf("L" to world.apply(command.x, command.y))
           // A cubic's control points are part of the outline: two curves through the same anchors
           // are different shapes, and comparing anchors alone would not see it.
           is dev.aster.vega.scene.PathCommand.CubicTo ->
             listOf(
-              world.apply(command.x1, command.y1),
-              world.apply(command.x2, command.y2),
-              world.apply(command.x, command.y),
+              "C" to world.apply(command.x1, command.y1),
+              "C" to world.apply(command.x2, command.y2),
+              "C" to world.apply(command.x, command.y),
             )
           else -> emptyList()
         }
       }
     val strings = LinkedHashMap<String, String>()
-    strings["points"] = vertices.joinToString(" ") { "${fmt(it.x)} ${fmt(it.y)}" }
+    strings["points"] =
+      vertices.joinToString(" ") { (command, point) ->
+        "$command ${fmt(point.x)} ${fmt(point.y)}"
+      }
     node.metadata.interpolate?.let { strings["interpolate"] = it }
     val numbers = LinkedHashMap<String, Double>()
     node.metadata.tension?.let { numbers["tension"] = it }

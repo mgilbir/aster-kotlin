@@ -22,6 +22,41 @@ import org.junit.jupiter.api.Test
  */
 class DocumentedNumbersTest {
 
+  /**
+   * Every ADR's **Status** line says the same thing in the file and in the index beside it.
+   *
+   * `docs/adr/README.md` says to amend a record rather than silently changing behaviour that
+   * contradicts it, and nothing checked whether that had been done: 0003 and 0005 each read as
+   * plainly accepted while a shipped module contradicted them, for several releases. Nothing here
+   * can tell whether a record is *true* — that is a reading, not a test — but it can insist that a
+   * record which has been superseded or amended says so **in both places**, so a reader scanning
+   * the index cannot be told one thing and the file another.
+   */
+  @Test
+  fun `an amended or superseded ADR says so in its file and in the index`() {
+    val directory = File(repositoryRoot, "docs/adr")
+    val index = File(directory, "README.md").readText()
+    val records =
+      directory.listFiles().orEmpty().filter { it.name.matches(Regex("""\d{4}-.*\.md""")) }
+    assertTrue(records.size >= 8, "expected the ADR directory to hold the records; found $records")
+
+    for (record in records.sortedBy { it.name }) {
+      val status =
+        Regex("""(?m)^Status: (.*)$""").find(record.readText())?.groupValues?.get(1).orEmpty()
+      assertTrue(status.isNotBlank(), "${record.name} has no Status line")
+      val row =
+        index.lines().firstOrNull { it.contains("(${record.name})") }
+          ?: throw AssertionError("${record.name} is not in docs/adr/README.md's table")
+      for (word in listOf("superseded", "amended")) {
+        if (!status.lowercase().contains(word)) continue
+        assertTrue(
+          row.lowercase().contains(word),
+          "${record.name} is $word in its Status line and the index says nothing: $row",
+        )
+      }
+    }
+  }
+
   @Test
   fun `the documented transform count is the registry's size`() {
     assertCount(

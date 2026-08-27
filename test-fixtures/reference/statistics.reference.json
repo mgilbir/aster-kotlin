@@ -180,7 +180,7 @@
     },
     {
       "closed": 0,
-      "points": "0 109.637755 130 2.586735",
+      "points": "M 0 109.637755 L 130 2.586735",
       "role": "mark",
       "stroke": "#e45756",
       "strokeWidth": 2,

@@ -1,16 +1,27 @@
 # Handoff
 
-Working brief for whoever picks this up next. Delete it when it stops being true.
+**A working log, not a brief. STATUS.md is the current state of this repository.**
 
-## Where things stand
+This file opened with "Delete it when it stops being true", and then said things that were not:
+it named a branch, `milestone-0-bootstrap`, that has not existed for a long time, and put "177
+differential fixtures pass" in bold as "the only number here that means what it says" — the corpus
+is 194 Vega fixtures and 283 Vega-Lite ones. A document whose stated rule is that it must be true
+or gone, asserting a fixture count that is out by seventeen, is worse than no document: a reader
+has no way to tell which of its other three thousand lines have aged the same way.
 
-Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
+So what it is has been corrected rather than what it says, which is the honest reading of its own
+rule. Everything below is a **record of how something came to be the way it is** — what was tried,
+what was rejected and why — kept because several of those notes are the only place a decision is
+explained, and because `STATUS.md` and `UpstreamTransformVectorsTest` both point into it. None of
+it is a description of the present.
 
-- `./scripts/check.sh` — format, all tests, lint, demo APK
-- `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
+For where things stand, read:
 
-**177 differential fixtures pass, all matching upstream exactly.** That is the only number here
-that means what it says.
+- `STATUS.md` — what works, what does not, and the numbers, which are asserted by
+  `DocumentedNumbersTest` against what is on disk rather than written by hand.
+- `SUPPORTED_FEATURES.md` — the feature matrix, with the test that establishes each row.
+- `docs/adr/` — the decisions, each amended where it was later reversed.
+- `scripts/check.sh --gates` — what is actually checked before anything lands.
 
 ## Read this before trusting the other number
 

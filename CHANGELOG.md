@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Changed
 
+- **`SceneExporter.toPng` no longer takes a `quality`.** PNG is lossless and Android documents the
+  argument as ignored for it, so a caller passing 80 to get a smaller file got the same bytes and no
+  way to find out why. A smaller file is `BitmapExportOptions.pixelScale`.
+
+- **`scripts/test-core.sh` runs every core module.** It named six by hand and predated two of them,
+  so `vega-lite` and `vega-loader` — about eight hundred tests, the whole Vega-Lite compiler among
+  them — were absent from what the README sells as the JVM suite. A broken Vega-Lite compiler passed
+  it cleanly. The list is derived from `settings.gradle.kts` now, so the next module added is in it.
+
 - **`ChartSession.set(signal:to:)` is queued like every other mutation.** It was the one entry point
   that was not, and it is the one a reader can reach *while* a chart is loading — a slider on a
   specification still compiling remotely. `setSignal` walks the signal updater and the event
@@ -166,6 +175,57 @@ section here does not get released.
   second keyed on the path's identity.
 
 ### Fixed
+
+- **The differential comparison can see a `defined` gap.** Both sides flattened a `moveTo` and a
+  `lineTo` into a bare point, and `normalize.js` never read the `defined` channel at all — so a line
+  broken into subpaths and a line drawn straight through the break produced the *identical* record.
+  A regression joining across a gap passed every assertion on both sides, and a gap is the entire
+  point of the channel. Each vertex now carries the command that produced it, the recorder honours
+  `defined` through d3's own generator, and an area records front-and-back per segment the way
+  `d3.area()` emits it. The new `line-defined-gaps` fixture is the only one in the corpus with an
+  interior `moveTo`.
+
+- **An undefined point is not drawn.** With the comparison able to see it: the engine made the point
+  that *broke* a series a subpath of its own, where `d3.line().defined()` drops it. Invisible under
+  a butt cap, a round dot under a round one, at a coordinate the chart is saying it has no value
+  for. And a subpath of exactly one point closes itself, which is a rule per subpath rather than per
+  series — this was being suppressed for the whole series as soon as any break existed.
+
+- **`scripts/check.sh` arms the Vega-Lite scene gate before running it.** The references were
+  rendered at the last step, *after* the Gradle gate that needs them, so a single run armed the gate
+  for the next one and never for the one printing "Green, and every gate ran" — 1126 cases skipping
+  in silence. They are rendered first now, and reported as a gate of their own when `--fast` or a
+  missing node skips them. `VegaLiteFixtureDifferentialTest` also fails on a *partly* rendered set
+  rather than skipping most of itself.
+
+- **The release workflow arms it too.** Its verify job never rendered the references at all, so
+  every release since the gate was added published with it skipped in full — while the publish job's
+  own comment said verify "has already run that comparison in full".
+
+- **A release page cannot claim Maven Central coordinates that do not exist.** When the publish
+  step's credentials are absent it skips, and the release job still tagged, pushed and wrote a page
+  telling readers to add a dependency that resolves to nothing — and a tag cannot be moved, so the
+  version was unreleasable afterwards. The job now reports whether it published and the notes say
+  so. `--latest` is also computed rather than passed unconditionally, so a patch for an older line
+  cannot move the badge backwards.
+
+- **One `[api-snapshot-only]` marker no longer exempts a whole branch.** It was a substring search
+  over every message on the branch, so a commit that re-recorded a snapshot for a cosmetic reason
+  waved through a real API break in another commit. Each snapshot is now traced to the commits that
+  touched it, and every one of those has to carry the marker.
+
+- **`scripts/host-conformance.py` no longer counts a comment as a reader.**
+
+- **The oracle's number corpus records what it meant to.** `record-number-strings.mjs` passed six
+  expressions to one `push()`, which takes one — so five of six families were evaluated and thrown
+  away, including the powers of two and the large integers, which is exactly where `String(x)`
+  switches notation.
+
+- **`eval-probe.js` and `transform-probe.js` pin determinism.** Without it `now()` answered the wall
+  clock and `random()` an unseeded generator, so a probe of either was irreproducible — and a probe
+  exists to be quoted in a comment or turned into a fixture.
+
+- **`acorn` is pinned exactly**, in the oracle whose own rule forbids ranges.
 
 - **A drag pans the Apple chart by the distance the finger moved.** The view divided the delta by the
   fit scale before dispatching, and `InteractionState.viewportOffset` holds a pan in surface pixels —
