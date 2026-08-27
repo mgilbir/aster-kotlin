@@ -23,6 +23,7 @@ import dev.aster.vega.scene.TextAlign
 import dev.aster.vega.scene.TextBaseline
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.Transform2D
+import dev.aster.vega.scene.paintOrder
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -164,7 +165,9 @@ public class SceneWalk {
       target.rect(panel, corners(node), brush(node.fill, node.opacity, paintRect!!, local), null)
     }
 
-    for (child in node.children) walk(child, local, target)
+    // `paintOrder`, not `children`; see the note in `AndroidCanvasSceneRenderer`. The Swift walk
+    // reorders identically, which is what keeps the scene-walk goldens byte-identical.
+    for (child in paintOrder(node.children)) walk(child, local, target)
 
     if (panel != null && node.strokeForeground) {
       target.rect(panel, corners(node), null, stroke(node.stroke, node.opacity, paintRect!!, local))

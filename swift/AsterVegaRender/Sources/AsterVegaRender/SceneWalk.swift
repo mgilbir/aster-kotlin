@@ -97,7 +97,12 @@ public struct SceneWalk {
         )
       }
       // Drawn whatever the group's own opacity is — a transparent group is not an invisible one.
-      for child in group.children {
+      //
+      // `paintOrder`, not `children`: an item's `zindex` reorders what is painted, and only the
+      // SVG renderer was applying it, so a `zindex` raised a mark in the export and nowhere else.
+      // The Compose walk reorders identically, which is what keeps the scene-walk goldens
+      // byte-identical.
+      for child in SceneKt.paintOrder(children: group.children) {
         walk(node: child, transform: local, into: &target)
       }
       if let panelBox = panel, group.strokeForeground {

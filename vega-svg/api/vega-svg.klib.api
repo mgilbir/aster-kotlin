@@ -88,3 +88,4 @@ final class dev.aster.vega.svg/SvgRenderer { // dev.aster.vega.svg/SvgRenderer|n
 
 final fun (dev.aster.vega.scene/Scene).dev.aster.vega.svg/toSvg(dev.aster.vega.svg/SvgOptions = ...): kotlin/String // dev.aster.vega.svg/toSvg|toSvg@dev.aster.vega.scene.Scene(dev.aster.vega.svg.SvgOptions){}[0]
 final fun dev.aster.vega.svg/escapeXml(kotlin/String): kotlin/String // dev.aster.vega.svg/escapeXml|escapeXml(kotlin.String){}[0]
+final fun dev.aster.vega.svg/isSafeHref(kotlin/String): kotlin/Boolean // dev.aster.vega.svg/isSafeHref|isSafeHref(kotlin.String){}[0]

@@ -39,7 +39,13 @@ public data class SvgOptions(
   val precision: Int = DEFAULT_DECIMAL_PRECISION,
   val pretty: Boolean = true,
   /**
-   * Prefix for every generated `id`; keeps ids stable and collision-free across embedded charts.
+   * Prefix for every generated `id`.
+   *
+   * Ids are sequential from document order, so two documents rendered with the **same** prefix
+   * generate the same ids — `vc0`, `vg0` — and an `xlink:href="#vc0"` in the second one resolves
+   * against the first when both are inlined into one page. Two charts on one page therefore need
+   * two prefixes; a standalone file needs nothing. There is no way for a renderer to detect this
+   * for itself, which is why it is written here rather than warned about.
    */
   val idPrefix: String = "v",
   val imagePolicy: SvgImagePolicy = SvgImagePolicy.REFERENCE,
@@ -140,7 +146,27 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     // upstream emits `<a xlink:href="…">` around the element and nothing else. Done here rather
     // than in
     // each of the seven renderers below, because it is the same wrapper whatever the shape is.
-    val href = node.metadata.href
+    val href =
+      node.metadata.href?.let { candidate ->
+        if (isSafeHref(candidate)) {
+          candidate
+        } else {
+          // Upstream refuses it outright — `handleHref` goes through
+          // `loader.sanitize(href, {context: 'href'})`, which throws "Sanitize failure, invalid
+          // URI"
+          // and emits no anchor at all. The mark is still drawn; only the link is dropped.
+          warnings.add(
+            SvgExportWarning(
+              code = "SVG_HREF_REFUSED",
+              message =
+                "The link '$candidate' is not a scheme this export will write; the mark was drawn " +
+                  "without it. Upstream refuses the same set.",
+              nodeType = node::class.simpleName ?: "node",
+            )
+          )
+          null
+        }
+      }
     if (href != null) {
       newline(out, depth)
       out.append("<a xlink:href=\"").append(escapeXml(href)).append("\">")
@@ -194,7 +220,13 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     newline(out, depth)
     out.append("<g")
     appendTransform(out, node.transform)
-    appendOpacity(out, node.opacity)
+    // **Not** `appendOpacity` here. `opacity` on a `<g>` composites the whole subtree, so a
+    // half-opaque group drew its opaque children at half and an `opacity: 0` group made its
+    // children vanish — which is neither what the canvas renderers do (they apply a group's own
+    // opacity to its own paint and nothing else, and say so) nor what upstream emits. Upstream
+    // puts it on the group's background `<path>`: probed by rendering a half-opaque group with an
+    // opaque child through `view.toSVG()`, which comes back
+    // `<path class="background" … opacity="0.5"/>` with the child's own `<path>` untouched.
     clipId?.let { out.append(" clip-path=\"url(#").append(it).append(")\"") }
     appendStyle(out, node, node.blendMode)
     appendAccessibility(out, node)
@@ -212,7 +244,14 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     // device and absent from every SVG export.
     val background = node.paintRect?.takeIf { node.fill != null || node.stroke != null }
     if (background != null) {
-      renderGroupPaint(node, background, out, defs, depth + 1, stroked = !node.strokeForeground)
+      renderGroupPaint(
+        node,
+        background,
+        out,
+        defs,
+        depth + 1,
+        stroked = !node.strokeForeground,
+      )
     }
 
     // Painted in `zindex` order, which is a render-time question rather than a scene one: upstream
@@ -287,6 +326,12 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
       node.metadata.markName == first.metadata.markName &&
       node.metadata.markKind == first.metadata.markKind
 
+  /**
+   * A group's own rectangle, and **the only thing a group's `opacity` applies to**.
+   *
+   * See the note in `renderGroup`: the opacity belongs on this element rather than on the `<g>`
+   * that holds the children, which is where upstream puts it and what the canvas renderers do.
+   */
   private fun renderGroupPaint(
     node: GroupNode,
     clipRect: RectD,
@@ -310,6 +355,7 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     }
     appendFill(out, if (filled) node.fill else null, defs, node.bounds)
     appendStroke(out, if (stroked) node.stroke else null, defs, node.bounds)
+    appendOpacity(out, node.opacity)
     out.append("/>")
   }
 
@@ -382,8 +428,11 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     val run = node.layout.run
     val style = run.style
     newline(out, depth)
+    // The **first line's baseline**, not the anchor; see the note on the baseline below. The
+    // rotation transform further down still pivots about the anchor, which is where it belongs.
+    val firstBaseline = node.y + firstBaselineOffset(node.layout)
     out.append("<text x=\"").append(num(node.x)).append('"')
-    out.append(" y=\"").append(num(node.y)).append('"')
+    out.append(" y=\"").append(num(firstBaseline)).append('"')
     out.append(" font-family=\"").append(escapeXml(style.fontFamily)).append('"')
     out.append(" font-size=\"").append(num(style.fontSize)).append('"')
     if (style.fontWeight != 400) out.append(" font-weight=\"").append(style.fontWeight).append('"')
@@ -394,7 +443,13 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
       out.append(" letter-spacing=\"").append(num(style.letterSpacing)).append('"')
     }
     out.append(" text-anchor=\"").append(textAnchor(run.align)).append('"')
-    out.append(" dominant-baseline=\"").append(dominantBaseline(run.baseline)).append('"')
+    // No `dominant-baseline`. It is a *per-line* instruction, so a three-line label with
+    // `baseline: middle` had each of its lines centred on its own `y` and the block came out
+    // (n − 1)·lineHeight/2 lower than every canvas renderer draws it — those apply one offset from
+    // the anchor to the **first** baseline and stack from there, which is what `TextMetrics.height`
+    // being the whole block's height means. An export that does not match the screen is the one
+    // thing this renderer exists to avoid. The offset is folded into `y` instead, and the element
+    // is left on SVG's own default baseline, which is what upstream emits too.
     appendFill(out, node.fill, defs, node.bounds)
     appendStroke(out, node.stroke, defs, node.bounds)
     val transform =
@@ -421,7 +476,7 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
       lines.forEach { line ->
         newline(out, depth + 1)
         out.append("<tspan x=\"").append(num(node.x)).append('"')
-        out.append(" y=\"").append(num(node.y + line.baselineY)).append("\">")
+        out.append(" y=\"").append(num(firstBaseline + line.baselineY)).append("\">")
         out.append(escapeXml(line.text))
         out.append("</tspan>")
       }
@@ -565,9 +620,11 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
       is ScenePaint.Solid -> if (paint.color.isTransparent) "none" else paint.color.toCssHex()
       is ScenePaint.LinearGradient -> {
         val stops = paint.stops.joinToString("") { stopElement(it.offset, it.color) }
-        val key =
-          "lg:${num(paint.x1)},${num(paint.y1)},${num(paint.x2)},${num(paint.y2)}:$stops:" +
-            "${num(bounds.width)}x${num(bounds.height)}"
+        // The key is the **emitted element**, and nothing else. It used to carry the node's
+        // bounds, which the `<linearGradient>` below does not mention: two marks of different
+        // sizes sharing one gradient therefore got two identical definitions in `<defs>`, one per
+        // size. `bounds` is still a parameter because a radial gradient's geometry needs it.
+        val key = "lg:${num(paint.x1)},${num(paint.y1)},${num(paint.x2)},${num(paint.y2)}:$stops"
         val id =
           defs.idFor(key, "${options.idPrefix}g") { id ->
             "<linearGradient id=\"$id\" x1=\"${num(paint.x1)}\" y1=\"${num(paint.y1)}\" " +
@@ -621,15 +678,25 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
       TextAlign.RIGHT -> "end"
     }
 
-  private fun dominantBaseline(baseline: TextBaseline): String =
-    when (baseline) {
-      TextBaseline.ALPHABETIC -> "alphabetic"
+  /**
+   * Anchor to first baseline, the same rule `AndroidCanvasSceneRenderer.baselineOffset` applies.
+   *
+   * One rule stated twice is a rule that drifts, and this one had: the export used SVG's own
+   * per-line `dominant-baseline` and the canvas renderers used the block's metrics, so a multi-line
+   * label came out in two different places. Written here rather than shared into `vega-scene` only
+   * because `TextMetrics` already carries everything it needs.
+   */
+  private fun firstBaselineOffset(layout: dev.aster.vega.scene.TextLayout): Double {
+    val metrics = layout.metrics
+    return when (layout.run.baseline) {
+      TextBaseline.ALPHABETIC -> 0.0
       TextBaseline.TOP,
-      TextBaseline.LINE_TOP -> "text-before-edge"
-      TextBaseline.MIDDLE -> "central"
+      TextBaseline.LINE_TOP -> metrics.ascent
+      TextBaseline.MIDDLE -> metrics.ascent - metrics.height / 2.0
       TextBaseline.BOTTOM,
-      TextBaseline.LINE_BOTTOM -> "text-after-edge"
+      TextBaseline.LINE_BOTTOM -> metrics.ascent - metrics.height
     }
+  }
 
   private fun strokeCap(cap: StrokeCap): String =
     when (cap) {
@@ -640,16 +707,88 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
 }
 
 /** Escapes the five XML entities. Text content and attribute values share one escaper. */
+/**
+ * Whether a spec-supplied `href` may be written into an export, transcribed from upstream's own
+ * allowlist.
+ *
+ * ```js
+ * const whitespace_re = /[\u0000-\u0020\u00A0\u1680\u180E\u2000-\u2029\u205f\u3000]/g;
+ * const allowed_re =
+ *   /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp|file|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i;
+ * ```
+ *
+ * A link is a **specification-controlled string**, and this project's own threat model treats a
+ * specification as untrusted. The export was XML-escaping it and writing it through, so a
+ * `javascript:` URL survived into a file that is clickable the moment a browser opens it — the one
+ * thing an export of untrusted input must not do. Upstream sanitizes the same string through its
+ * loader and refuses this set; that answers the audit's open question about whether it does.
+ *
+ * Three alternatives, and the third is the one worth reading twice: a **listed scheme**; a first
+ * character that is not a letter, which is every relative link (`/path`, `#anchor`, `?q=1`); or a
+ * run of scheme characters that is *not* followed by a colon, which is what lets `images/a.png`
+ * through and keeps `javascript:` out. The whitespace class is stripped first, because
+ * `java\nscript:` is the same URL to a browser and a different string to a matcher.
+ */
+public fun isSafeHref(href: String): Boolean {
+  val stripped = href.filterNot { it.code <= 0x20 || it in HREF_WHITESPACE }
+  if (stripped.isEmpty()) return false
+  for (scheme in HREF_SCHEMES) {
+    if (
+      stripped.length > scheme.length && stripped.regionMatches(0, scheme, 0, scheme.length, true)
+    ) {
+      return true
+    }
+  }
+  val first = stripped[0]
+  if (!first.isLetter()) return true
+  // `[a-z+.\-]+(?:[^a-z+.\-:]|$)`
+  var index = 0
+  while (index < stripped.length && isSchemeChar(stripped[index])) index++
+  if (index == 0) return false
+  return index == stripped.length || stripped[index] != ':'
+}
+
+private fun isSchemeChar(ch: Char): Boolean =
+  (ch in 'a'..'z') || (ch in 'A'..'Z') || ch == '+' || ch == '.' || ch == '-'
+
+private val HREF_WHITESPACE =
+  charArrayOf('\u00A0', '\u1680', '\u180E', '\u205F', '\u3000').concatToString() +
+    (0x2000..0x2029).map { it.toChar() }.joinToString("")
+
+private val HREF_SCHEMES =
+  listOf(
+    "http:",
+    "https:",
+    "ftp:",
+    "ftps:",
+    "mailto:",
+    "tel:",
+    "callto:",
+    "cid:",
+    "xmpp:",
+    "file:",
+    "data:",
+  )
+
 public fun escapeXml(value: String): String {
-  if (value.none { it == '&' || it == '<' || it == '>' || it == '"' || it == '\'' }) return value
+  if (value.none { it == '&' || it == '<' || it == '>' || it == '"' || it == '\'' || it < ' ' }) {
+    return value
+  }
   val out = StringBuilder(value.length + 16)
   for (ch in value) {
-    when (ch) {
-      '&' -> out.append("&amp;")
-      '<' -> out.append("&lt;")
-      '>' -> out.append("&gt;")
-      '"' -> out.append("&quot;")
-      '\'' -> out.append("&apos;")
+    when {
+      ch == '&' -> out.append("&amp;")
+      ch == '<' -> out.append("&lt;")
+      ch == '>' -> out.append("&gt;")
+      ch == '"' -> out.append("&quot;")
+      ch == '\'' -> out.append("&apos;")
+      // XML 1.0 has **no way to write** a C0 control character other than tab, newline and
+      // carriage return — not even as a numeric reference — so a document containing one is not
+      // well formed and a viewer refuses the whole file. Escaping the five entities and passing
+      // everything else through meant one stray byte in a data-derived label took the export down,
+      // which is not a thing a reader can diagnose. The snapshot serializer already drops them;
+      // this is the same rule at the other end.
+      ch < ' ' && ch != '\t' && ch != '\n' && ch != '\r' -> Unit
       else -> out.append(ch)
     }
   }

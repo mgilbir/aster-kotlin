@@ -24,6 +24,11 @@ section here does not get released.
   engine's job and are done there, so calling it directly with a stack or a generic returns `null`
   where it used to answer.
 
+- **`SvgOptions.idPrefix` says what it is for.** Ids are sequential from document order, so two
+  documents rendered with the same prefix generate the same ids and an `xlink:href="#vc0"` in the
+  second resolves against the first when both are inlined into one page. No behaviour changed; the
+  documentation did.
+
 - **`groupTuples` and `groupKey` answer a `GroupKey` rather than a list of raw values.** What makes
   two rows one group is upstream's own string coercion — its `fastmap` is object-backed, so the
   number `1001` and the string `"1001"` are one property and therefore one group — and keying on
@@ -58,7 +63,74 @@ section here does not get released.
   were. It is a boolean in upstream's own `Definition`, and a chart asking for its biggest slice
   first got its slices in data order with no diagnostic.
 
+- **`PathData.containsNonZero`**, the containment test that agrees with what a fill paints, and
+  **`isSafeHref`**, upstream's `href` allowlist as a predicate a host can apply to the link a
+  `MarkClicked` carries before following it.
+
 ### Fixed
+
+- **A group's opacity paints its panel and is not inherited, in the SVG export too.** `opacity` was
+  emitted on the `<g>` container, which composites the whole subtree — so a half-opaque group drew
+  its opaque children at half, and an `opacity: 0` group made its children **vanish**. Every canvas
+  renderer here does the opposite and documents it, and so does upstream: probed by rendering a
+  half-opaque group with an opaque child through `view.toSVG()`, which comes back
+  `<path class="background" … opacity="0.5"/>` with the child untouched. The renderer's own test
+  said all this and could not see it, because "exactly one element carries an opacity" was
+  satisfied by the container just as well as by the panel.
+
+- **`zindex` decides paint order everywhere, not only in the export.** `paintOrder` reorders a
+  mark's items by their `zindex`, its own comment says every renderer has to apply it, and only
+  `SvgRenderer` did. So a raised mark was on top in an exported file and underneath on every screen
+  — and the hit index, which numbers its entries in walk order, sent the tap to the mark drawn
+  *below* it. The scene walk, the hit index, the Android canvas renderer, the Compose Multiplatform
+  walk and the Swift walk all reorder now.
+
+- **Four ways a mark could be visible and untappable.**
+  - A fully transparent **group**'s children were pruned from the hit index while every renderer
+    drew them.
+  - The broad phase was gated on `boundsTolerance` alone, so `strokeTolerance` was unreachable past
+    it: `Mouse` has a `boundsTolerance` of 0, and on an axis-aligned rule — whose bounds *are* its
+    stroke width — its 2 px tolerance was effectively zero.
+  - A fill was picked with the **even-odd** rule while every renderer painted it with **nonzero
+    winding**, so a tap on the visibly solid centre of a self-intersecting outline missed.
+  - A `path` with `fillOpacity: 0` lost its interior. `isPointInPath` never looks at alpha, so a
+    transparent fill is the idiom for an invisible tap target; `hitsRect` already said so and cited
+    upstream, and the branch beside it was testing `isVisible`.
+
+- **A multi-line label is exported where it is drawn.** The export set a `dominant-baseline` on the
+  `<text>` element, which is a **per-line** instruction, so a three-line label with
+  `baseline: middle` had each line centred on its own `y` and the block came out
+  (n − 1)·lineHeight/2 lower than every canvas renderer draws it. The one offset from the anchor to
+  the first baseline is folded into `y` now, which is the rule the canvas renderers apply and the
+  shape upstream emits.
+
+- **A `javascript:` link does not survive into an export.** An `href` is a specification-controlled
+  string and this project's threat model treats a specification as untrusted, so escaping it and
+  writing it through produced a file that is clickable the moment a browser opens it. Upstream
+  sanitizes the same string — `loader.sanitize(href, {context: 'href'})`, whose allowlist is now
+  transcribed in `isSafeHref` — and refuses this set; a refused link is reported as an
+  `SVG_HREF_REFUSED` warning and the mark is still drawn.
+
+- **A control character no longer makes an export unreadable.** XML 1.0 has no way to write a C0
+  control character, not even as a numeric reference, so one stray byte in a data-derived label
+  made the whole file malformed and a viewer refused all of it.
+
+- **A group with a fill and no size paints nothing**, which is what upstream paints — `M0,0h0v0h0Z`,
+  probed. Falling back to the clip rectangle filled the whole clipped region instead.
+
+- **A quoted font family keeps its comma.** `"Foo, Bar", serif` names two families and was being
+  split into three, none of which a host could answer.
+
+- **One gradient definition, however many marks share it.** The `<defs>` key carried the node's
+  bounds, which the emitted `<linearGradient>` does not mention, so two marks of different sizes
+  with the same gradient produced two identical definitions.
+
+- **The canonical snapshot can see eight more things.** ADR-0008 calls it the level-2 regression
+  check, and a property it does not write is a property it cannot check: `dashOffset`, `miterLimit`,
+  the four **per-corner** radii, `blendMode`, a symbol's custom path, an image's `align`, `baseline`
+  and `smooth`, an item's `href` and its `zindex` were all invisible to it. It also recorded
+  `effectiveCornerRadius`, which is a different clamp from the `Corners.of` every renderer draws
+  with — a number nothing draws.
 
 - **`window` annotates duplicate rows separately.** Results were keyed by the row itself, and
   `VegaValue.Obj` is a value class over a map that compares structurally — so two rows that happen

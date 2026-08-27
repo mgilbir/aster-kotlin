@@ -37,6 +37,7 @@ import dev.aster.vega.scene.StrokeJoin
 import dev.aster.vega.scene.SymbolNode
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.Transform2D
+import dev.aster.vega.scene.paintOrder
 
 /**
  * Draws an immutable [Scene] onto an Android [Canvas].
@@ -178,7 +179,11 @@ public class AndroidCanvasSceneRenderer(
       )
     }
 
-    for (child in node.children) drawNode(child, canvas, diagnostics)
+    // `paintOrder`, not `children`: an item's `zindex` reorders what is painted, and only the SVG
+    // renderer was applying it. A `zindex` therefore raised a mark in the export and not on the
+    // screen, and the hit index — which numbers entries in walk order — sent the tap to the mark
+    // underneath.
+    for (child in paintOrder(node.children)) drawNode(child, canvas, diagnostics)
 
     // `strokeForeground` puts the group's outline over its children rather than under them, which
     // is

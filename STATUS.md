@@ -7029,3 +7029,63 @@ into each other's expansion. It is a class now, owned by the triangulation using
 `Dataflow.kt` is marked `@InternalAsterVegaApi`: its `ChangeSet`/`TupleId` contract has no consumer
 outside its own tests, and `TupleId` was promising an SDK reader that identity is "preserved across
 incremental updates", which nothing implements.
+
+### One scene, five readings of it, and the two that were not readings at all
+
+The audit's third design tension is "one semantic, N implementations", and this is the half of it
+that lives in shared code: what a scene *means* before any host touches it.
+
+**`zindex` was a private arrangement between the scene and the SVG renderer.** `paintOrder` reorders
+a mark's items by their `zindex`, and its own comment says every renderer has to apply it. One did.
+So a raised mark was on top in an exported file and underneath on every screen — and the hit index,
+which numbers its entries in the order it walks them, sent the tap to the mark drawn *below* the one
+the reader could see. The scene walk, the hit index, the Android renderer, the Compose walk and the
+Swift walk all reorder now, which is also what keeps the two scene-walk goldens byte-identical.
+
+**A group's opacity composited its children in the export.** `opacity` on a `<g>` applies to the
+whole subtree; every canvas renderer here applies a group's opacity to its own panel and says so in
+a comment, and so does upstream — probed, and it emits `<path class="background" … opacity="0.5"/>`
+with the child element bare. The renderer's own test asserted "exactly one element carries an
+opacity", which the container satisfied as well as the panel would have. The test now says *which*.
+
+**Four ways a mark could be visible and untappable.** A fully transparent group's children were
+pruned from the hit index while every renderer drew them. The broad phase was gated on
+`boundsTolerance` alone, so `strokeTolerance` could not be reached past it — `Mouse` has a
+`boundsTolerance` of 0, and on an axis-aligned rule, whose bounds *are* its stroke width, its 2 px
+tolerance was zero. A fill was picked with the **even-odd** rule while every renderer painted it with
+**nonzero winding**, so a tap on the visibly solid centre of a self-intersecting outline missed. And
+a `path` with `fillOpacity: 0` lost its interior, in the same file where `hitsRect` explains — citing
+upstream — that a transparent fill is precisely the idiom for an invisible tap target.
+
+**An export that does not match the screen.** A `dominant-baseline` is a per-line instruction, so a
+three-line label with `baseline: middle` had each line centred on its own `y` and the block came out
+(n − 1)·lineHeight/2 below where every canvas renderer puts it. The offset from the anchor to the
+first baseline is folded into `y` now, which is both the canvas rule and the shape upstream emits.
+
+There is a **larger** version of that question this branch deliberately does not answer. Upstream's
+own offset is `Math.round(0.30 * fontSize)` for `middle` — a function of the font size and nothing
+else, with the remaining lines stacked below — where this engine offsets by `ascent − height/2` over
+the **block's** height. For one line the two agree exactly; for three they differ by a whole line.
+The differential harness cannot settle it: `oracle-js/src/normalize.js` says in its own header that
+text is compared by content and anchor rather than by glyph bounds, because font metrics legitimately
+differ between a browser and Android (ADR-0006) — so `text-array-lines.vg.json`, which has multi-line
+labels at `middle` and `bottom`, passes either way. Changing it would move `textBounds`, which feeds
+`autosize: fit` and every guide's extent, with no oracle to check the result against. It is written
+down here instead, which is what this project does with a difference it cannot yet verify.
+
+**A link, a control character and a rectangle nobody asked for.** An `href` is a
+specification-controlled string, and the export was XML-escaping it and writing it through — so a
+`javascript:` URL survived into a file that is clickable the moment a browser opens it. Upstream
+sanitizes the same string through `loader.sanitize(href, {context: 'href'})`, which answers the
+audit's open question about whether it does; its allowlist is transcribed as `isSafeHref`, a refused
+link becomes a warning, and the mark is still drawn. A C0 control character cannot be written in XML
+at all, not even as a numeric reference, so one stray byte in a data-derived label made the whole
+document malformed and a viewer refused all of it. And a group with a fill and no size was painting
+its whole **clip** rectangle, where upstream paints `M0,0h0v0h0Z` — nothing.
+
+**The snapshot could not see eight of the things it is for.** ADR-0008 calls it the level-2
+regression check, and a property it does not write is a property it cannot check: `dashOffset`,
+`miterLimit`, the four per-corner radii, `blendMode`, a symbol's custom path, an image's placement
+and smoothing, an item's `href` and its `zindex`. It also recorded `effectiveCornerRadius`, which is
+a different clamp of the same input from the `Corners.of` every renderer draws with — a number
+nothing draws.

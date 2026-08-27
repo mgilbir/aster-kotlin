@@ -46,6 +46,13 @@ public class SceneSnapshotSerializer(
       if (!node.transform.isIdentity) field("transform", transform(node.transform))
       if (node.opacity != 1.0) field("opacity", num(node.opacity))
       if (!node.visible) field("visible", "false")
+      // `blendMode` is a drawing instruction with fifteen values and the snapshot could not see any
+      // of them, so a mark that stopped compositing looked identical here. ADR-0008 calls this the
+      // level-2 regression check; a property it does not write is a property it cannot check.
+      val blend = blendModeOf(node)
+      if (blend != SceneBlendMode.NORMAL) {
+        field("blendMode", str(blend.name.lowercase().replace('_', '-')))
+      }
 
       when (node) {
         is GroupNode -> {
@@ -65,7 +72,18 @@ public class SceneSnapshotSerializer(
           field("y", num(node.y))
           field("width", num(node.width))
           field("height", num(node.height))
-          if (node.cornerRadius != 0.0) field("cornerRadius", num(node.effectiveCornerRadius))
+          // `corners`, not `effectiveCornerRadius`. The two are different clamps of the same
+          // input — `effectiveCornerRadius` takes the absolute width and height and every renderer
+          // draws through `Corners.of`, which does not — so the snapshot was recording a number
+          // nothing draws, and the four **per-corner** overrides were invisible to it entirely.
+          val corners = node.corners
+          if (!corners.isSquare) {
+            field(
+              "corners",
+              "[${num(corners.topLeft)}, ${num(corners.topRight)}, " +
+                "${num(corners.bottomRight)}, ${num(corners.bottomLeft)}]",
+            )
+          }
           node.fill?.let { field("fill", fill(it)) }
           node.stroke?.let { field("stroke", stroke(it)) }
         }
@@ -86,6 +104,10 @@ public class SceneSnapshotSerializer(
           field("y", num(node.y))
           field("size", num(node.size))
           field("shape", str(node.shape.name.lowercase().replace('_', '-')))
+          // The **outline**, when the shape is a specification's own SVG path. `shape` alone reads
+          // `custom` for every one of them, so a wrong path string was a snapshot that did not
+          // move.
+          node.customPath?.let { field("customPath", str(pathToString(it))) }
           if (node.angleDegrees != 0.0) field("angle", num(node.angleDegrees))
           node.fill?.let { field("fill", fill(it)) }
           node.stroke?.let { field("stroke", stroke(it)) }
@@ -111,6 +133,11 @@ public class SceneSnapshotSerializer(
           field("width", num(node.width))
           field("height", num(node.height))
           field("fit", str(node.fit.name.lowercase()))
+          // `align` and `baseline` decide where the image lands, and `smooth` decides what it looks
+          // like when scaled. None of the three was written, so all three were unwatched.
+          field("align", str(node.align.name.lowercase()))
+          field("baseline", str(node.baseline.name.lowercase()))
+          if (!node.smooth) field("smooth", "false")
         }
       }
 
@@ -118,6 +145,24 @@ public class SceneSnapshotSerializer(
     }
     return out.toString()
   }
+
+  /**
+   * A node's blend mode, which lives on each concrete type rather than on the interface.
+   *
+   * Written out rather than reached through a shared property because adding one to `SceneNode`
+   * would make every implementor restate it; here the exhaustive `when` is the reminder that a new
+   * node type has to answer.
+   */
+  private fun blendModeOf(node: SceneNode): SceneBlendMode =
+    when (node) {
+      is GroupNode -> node.blendMode
+      is RectNode -> node.blendMode
+      is RuleNode -> node.blendMode
+      is PathNode -> node.blendMode
+      is SymbolNode -> node.blendMode
+      is TextNode -> node.blendMode
+      is ImageNode -> node.blendMode
+    }
 
   // ---- value writers -------------------------------------------------------
 
@@ -147,6 +192,15 @@ public class SceneSnapshotSerializer(
       append(", \"dash\": [")
       append(stroke.dashArray.joinToString(", ") { num(it) })
       append("]")
+      // Where the dash pattern starts. A gridline that begins on a gap rather than a dash is a
+      // different picture and was the same snapshot.
+      if (stroke.dashOffset != 0.0) append(", \"dashOffset\": ${num(stroke.dashOffset)}")
+    }
+    // How far a miter joint may run past its vertex, which is what decides whether a sharp corner
+    // is pointed or cut off — and which this engine deliberately sets to upstream's value rather
+    // than the platform's, per `Stroke.miterLimit`.
+    if (stroke.miterLimit != Stroke.DEFAULT_MITER_LIMIT) {
+      append(", \"miterLimit\": ${num(stroke.miterLimit)}")
     }
     if (stroke.opacity != 1.0) append(", \"opacity\": ${num(stroke.opacity)}")
     append("}")
@@ -174,6 +228,10 @@ public class SceneSnapshotSerializer(
       metadata.datumIndex?.let { field("datumIndex", it.toString()) }
       if (metadata.interactive) field("interactive", "true")
       metadata.tooltip?.let { field("tooltip", str(tooltipToString(it))) }
+      // A link and a paint-order override are both things a specification asks for and neither was
+      // written, so a mark that lost its `href` or its `zindex` left the snapshot unchanged.
+      metadata.href?.let { field("href", str(it)) }
+      if (metadata.zindex != 0) field("zindex", metadata.zindex.toString())
       metadata.accessibility?.let { descriptor ->
         field(
           "accessibility",

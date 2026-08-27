@@ -3094,6 +3094,7 @@ PathData.bounds
 PathData.commands
 PathData.companion
 PathData.containsEvenOdd(point:tolerance:)
+PathData.containsNonZero(point:tolerance:)
 PathData.description()
 PathData.distanceToOutline(point:tolerance:)
 PathData.flatten(tolerance:)
@@ -3992,6 +3993,7 @@ SvgRenderer.init(options:)
 SvgRenderer.render(scene:)
 SvgRendererKt
 SvgRendererKt.escapeXml(value:)
+SvgRendererKt.isSafeHref(href:)
 SymbolNode
 SymbolNode.angleDegrees
 SymbolNode.blendMode

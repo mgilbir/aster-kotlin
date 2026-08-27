@@ -190,7 +190,11 @@ private fun SceneNode.walkInternal(
   visit(this, parentTransform)
   if (this is GroupNode) {
     val childTransform = parentTransform.concat(transform)
-    for (child in children) child.walkInternal(childTransform, visit)
+    // `paintOrder`, not `children`. This walk is what `flatten` documents as "paint order", and it
+    // was declaration order — so an item raised by a `zindex` came back before the items it is
+    // painted over. `SvgRenderer` was the only walk in the repository applying the reordering, and
+    // `paintOrder`'s own comment says every renderer has to.
+    for (child in paintOrder(children)) child.walkInternal(childTransform, visit)
   }
 }
 

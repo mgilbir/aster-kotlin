@@ -65,13 +65,26 @@ public class SceneHitIndex(
   public val usesSpatialIndex: Boolean
     get() = grid != null
 
+  /**
+   * How far outside a node's own bounds the broad phase still has to look.
+   *
+   * The **larger** of the two tolerances, and it has to be: the narrow phase reaches
+   * [HitTestOptions.strokeTolerance] past a thin outline, and a broad phase gated on
+   * [HitTestOptions.boundsTolerance] alone threw those points away before it could. `Mouse` has a
+   * `boundsTolerance` of 0, so its 2 px stroke tolerance was reachable only where a node's bounds
+   * happened to be fatter than its geometry — on an axis-aligned rule, whose bounds are its stroke
+   * width, it was effectively zero. Widening the broad phase costs candidates and decides nothing:
+   * `hitsPrecisely` still answers.
+   */
+  private val searchTolerance: Double = maxOf(options.boundsTolerance, options.strokeTolerance)
+
   /** Topmost node containing [point] in scene coordinates, or `null`. */
   public fun hitTest(point: PointD): HitResult? {
-    val candidates = grid?.candidates(point, options.boundsTolerance) ?: entries
+    val candidates = grid?.candidates(point, searchTolerance) ?: entries
     var best: Entry? = null
     for (entry in candidates) {
       if (best != null && entry.paintOrder < best.paintOrder) continue
-      if (!entry.worldBounds.expand(options.boundsTolerance).contains(point)) continue
+      if (!entry.worldBounds.expand(searchTolerance).contains(point)) continue
       val inverse = entry.worldTransform.invert() ?: continue
       val local = inverse.apply(point)
       if (hitsPrecisely(entry.node, local, options)) best = entry
@@ -111,7 +124,12 @@ public class SceneHitIndex(
       ancestors: List<GroupNode>,
       window: RectD?,
     ) {
-      if (!node.visible || node.opacity <= 0.0) return
+      // A fully transparent **group** still contributes its children. Every canvas renderer draws
+      // them — a group's opacity applies to its own panel and is not inherited, which is written
+      // down in each of them — so pruning the whole subtree here made marks that are visible on
+      // screen impossible to tap. Anything else at zero opacity paints nothing and is correctly
+      // skipped.
+      if (!node.visible || (node.opacity <= 0.0 && node !is GroupNode)) return
       val world = parentTransform.concat(node.transform)
       val worldBounds = world.mapBounds(node.bounds)
       val visible = window?.let { intersectRects(worldBounds, it) } ?: worldBounds
@@ -128,7 +146,12 @@ public class SceneHitIndex(
             val mapped = world.mapBounds(clip)
             window?.let { intersectRects(mapped, it) } ?: mapped
           } ?: window
-        for (child in node.children) visit(child, world, nextAncestors, nextWindow)
+        // `paintOrder`, not `children`: an item's `zindex` reorders what is painted, and this
+        // index numbers its entries in the order it walks them. Walking the raw children made the
+        // hit test disagree with the picture — a tap landed on the mark drawn *underneath* the one
+        // a `zindex` had raised. `paintOrder`'s own comment says every renderer has to use it; the
+        // hit index is the reader's other half of the same question.
+        for (child in paintOrder(node.children)) visit(child, world, nextAncestors, nextWindow)
       }
     }
     visit(scene.root, Transform2D.Identity, emptyList(), null)
@@ -209,11 +232,18 @@ public fun hitsPrecisely(node: SceneNode, point: PointD, options: HitTestOptions
         node.outline.distanceToOutline(point) <=
           (node.stroke?.halfWidth ?: 0.0) + options.strokeTolerance
       } else {
-        node.outline.containsEvenOdd(point)
+        // Nonzero winding, because that is the rule the fill was **painted** with. The even-odd
+        // rule calls the centre of a self-intersecting outline — a pentagram, a figure-of-eight —
+        // outside, so a tap on the visibly solid middle of one missed.
+        node.outline.containsNonZero(point)
       }
+    // `node.fill != null` rather than `fill.isVisible`, which is the rule `hitsRect` already
+    // states and cites upstream for: `isPointInPath` never looks at alpha, so `fillOpacity: 0` is
+    // the idiom for an invisible tap target and a `path` mark using it lost its interior while the
+    // `rect` beside it kept one.
     is PathNode ->
-      if (node.fill != null && node.fill.isVisible) {
-        node.path.containsEvenOdd(point) ||
+      if (node.fill != null) {
+        node.path.containsNonZero(point) ||
           node.path.distanceToOutline(point) <= (node.stroke?.halfWidth ?: 0.0)
       } else {
         node.path.distanceToOutline(point) <=
@@ -244,7 +274,7 @@ private fun hitsRect(node: RectNode, point: PointD, options: HitTestOptions): Bo
   // target and specifications in the wild use it. A stroke is different — a zero-width one has no
   // outline to be near — so that one keeps `isVisible`.
   if (node.fill != null) {
-    if (rounded?.containsEvenOdd(point) ?: node.rect.contains(point)) return true
+    if (rounded?.containsNonZero(point) ?: node.rect.contains(point)) return true
   }
   val stroke = node.stroke
   if (stroke == null || !stroke.isVisible) return false
@@ -319,7 +349,7 @@ private fun hitsGroup(node: GroupNode, point: PointD, options: HitTestOptions): 
   // The background: a fill, or a stroke that is *not* drawn in the foreground.
   val background = node.fill != null || (!node.strokeForeground && stroke != null)
   if (!background) return false
-  return rounded?.containsEvenOdd(point) ?: rect.contains(point)
+  return rounded?.containsNonZero(point) ?: rect.contains(point)
 }
 
 /**

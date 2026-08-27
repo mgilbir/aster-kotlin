@@ -66,6 +66,7 @@ public final class dev/aster/vega/svg/SvgRenderer {
 
 public final class dev/aster/vega/svg/SvgRendererKt {
 	public static final fun escapeXml (Ljava/lang/String;)Ljava/lang/String;
+	public static final fun isSafeHref (Ljava/lang/String;)Z
 	public static final fun toSvg (Ldev/aster/vega/scene/Scene;Ldev/aster/vega/svg/SvgOptions;)Ljava/lang/String;
 	public static synthetic fun toSvg$default (Ldev/aster/vega/scene/Scene;Ldev/aster/vega/svg/SvgOptions;ILjava/lang/Object;)Ljava/lang/String;
 }

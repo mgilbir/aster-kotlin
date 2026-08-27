@@ -87,6 +87,15 @@ class SvgRendererTest {
     assertTrue(svg.contains("opacity=\"0.5\""), svg)
     // The child does not: exactly one element in the output mentions an opacity.
     assertEquals(1, svg.split("opacity=\"").size - 1, "only the group's own panel is faded:\n$svg")
+    // And it is the **panel** that carries it, not the `<g>` — which is the half this test could
+    // not see before, because "exactly one element" was satisfied by the container just as well.
+    // `opacity` on a `<g>` composites the whole subtree, so the child was being drawn at half
+    // whatever the canvas renderers did. Upstream emits `<path class="background" … opacity>`.
+    val faded_element = svg.lines().first { "opacity=\"0.5\"" in it }.trim()
+    assertTrue(
+      faded_element.startsWith("<rect") || faded_element.startsWith("<path"),
+      "the opacity belongs on the panel, not on the container: $faded_element",
+    )
 
     // At zero the panel disappears and the children stay, which is upstream's behaviour and was not
     // this renderer's: it used to return early and drop the subtree.
@@ -515,6 +524,127 @@ class SvgRendererTest {
       "svg/stacked-bar-chart.svg",
       SampleScenes.stackedBarChart(textEngine).toSvg(),
     )
+  }
+
+  /**
+   * A `javascript:` link does not survive into an export.
+   *
+   * An `href` is a **specification-controlled string**, and this project's threat model treats a
+   * specification as untrusted — so escaping it and writing it through produced a file that is
+   * clickable the moment a browser opens it. Upstream refuses the same set: `handleHref` goes
+   * through `loader.sanitize(href, {context: 'href'})`, whose allowlist is transcribed in
+   * `isSafeHref`, and a rejected URI throws there rather than becoming an anchor.
+   */
+  @Test
+  fun `a link this export will not write is refused and reported`() {
+    fun render(href: String): SvgDocument =
+      SvgRenderer()
+        .render(
+          sceneOf(
+            RectNode(
+              id = ids.allocate(),
+              x = 0.0,
+              y = 0.0,
+              width = 10.0,
+              height = 10.0,
+              fill = Fill.of(SceneColor.Black),
+              metadata = NodeMetadata(href = href),
+            )
+          )
+        )
+
+    val refused = render("javascript:alert(1)")
+    assertFalse(refused.svg.contains("<a "), refused.svg)
+    assertEquals(listOf("SVG_HREF_REFUSED"), refused.warnings.map { it.code })
+
+    // A browser ignores control characters inside a scheme, so a matcher has to as well.
+    assertFalse(render("java\nscript:alert(1)").svg.contains("<a "))
+
+    // Everything ordinary still links.
+    for (allowed in
+      listOf(
+        "https://example.com/a",
+        "/relative",
+        "#anchor",
+        "images/a.png",
+        "mailto:a@b.c",
+        "data:image/png;base64,AAA",
+      )) {
+      val ok = render(allowed)
+      assertTrue(ok.svg.contains("<a "), "$allowed should link:\n${ok.svg}")
+      assertTrue(ok.warnings.isEmpty(), allowed)
+    }
+  }
+
+  /**
+   * A C0 control character in data-derived text does not make the document unreadable.
+   *
+   * XML 1.0 has no way to write one — not even as a numeric reference — so a viewer refuses the
+   * whole file rather than the one label. Escaping the five entities and passing everything else
+   * through meant one stray byte took the export down.
+   */
+  @Test
+  fun `a control character in a label does not break the document`() {
+    val svg =
+      sceneOf(
+          TextNode(
+            id = ids.allocate(),
+            x = 5.0,
+            y = 5.0,
+            layout = textEngine.layout(TextRun("a\u0007b")),
+            fill = Fill.of(SceneColor.Black),
+          )
+        )
+        .toSvg()
+    assertFalse(svg.contains('\u0007'), svg)
+    DocumentBuilderFactory.newInstance()
+      .apply { isNamespaceAware = true }
+      .newDocumentBuilder()
+      .parse(InputSource(svg.reader()))
+  }
+
+  /**
+   * One gradient definition, however many marks share it.
+   *
+   * The `<defs>` key carried the node's bounds and the emitted `<linearGradient>` does not mention
+   * them, so two marks of different sizes with the same gradient produced two identical
+   * definitions.
+   */
+  @Test
+  fun `two marks of different sizes share one gradient definition`() {
+    val gradient =
+      ScenePaint.LinearGradient(
+        x1 = 0.0,
+        y1 = 0.0,
+        x2 = 1.0,
+        y2 = 0.0,
+        stops =
+          listOf(
+            GradientStop(0.0, SceneColor.Black),
+            GradientStop(1.0, SceneColor.White),
+          ),
+      )
+    val svg =
+      sceneOf(
+          RectNode(
+            id = ids.allocate(),
+            x = 0.0,
+            y = 0.0,
+            width = 10.0,
+            height = 10.0,
+            fill = Fill(gradient),
+          ),
+          RectNode(
+            id = ids.allocate(),
+            x = 20.0,
+            y = 0.0,
+            width = 40.0,
+            height = 30.0,
+            fill = Fill(gradient),
+          ),
+        )
+        .toSvg()
+    assertEquals(1, svg.split("<linearGradient").size - 1, svg)
   }
 
   private fun allSampleScenes(): List<Scene> =
