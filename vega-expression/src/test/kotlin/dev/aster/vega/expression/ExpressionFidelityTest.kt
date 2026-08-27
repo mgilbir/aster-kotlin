@@ -162,6 +162,25 @@ class ExpressionFidelityTest {
     assertEquals("1577836800000", text("'' + utc(2020)"))
   }
 
+  /**
+   * C7's other half: `datetime` and `utc` are `new Date(...)`, so every field rolls over and a
+   * two-digit year is nineteen-hundreds.
+   *
+   * Both had been open-coded here from "the first of January, then add", which gives the rollover
+   * for free and the year rule not at all — so `datetime(99, 1, 1)` was February of the year 99
+   * rather than of 1999, which is what every Vega renderer answers. It shares one implementation
+   * with the Vega-Lite compiler now: `JsDate.make`.
+   */
+  @Test
+  fun `a date constructor rolls over and reads a two-digit year as nineteen hundreds`() {
+    assertEquals(text("'' + time(utc(1999, 1, 1))"), text("'' + time(utc(99, 1, 1))"))
+    assertEquals(text("'' + time(utc(1900, 0, 1))"), text("'' + time(utc(0, 0, 1))"))
+    assertEquals(text("'' + time(utc(2013, 0, 1))"), text("'' + time(utc(2012, 12, 1))"))
+    assertEquals(text("'' + time(utc(2012, 2, 1))"), text("'' + time(utc(2012, 1, 30))"))
+    assertEquals(text("'' + time(utc(2012, 0, 2))"), text("'' + time(utc(2012, 0, 1, 24))"))
+    assertEquals(text("'' + time(utc(2011, 11, 31))"), text("'' + time(utc(2012, 0, 0))"))
+  }
+
   /** A year outside the calendar is an Invalid Date upstream, and used to throw here. */
   @Test
   fun `a year outside the calendar is NaN rather than an exception`() {

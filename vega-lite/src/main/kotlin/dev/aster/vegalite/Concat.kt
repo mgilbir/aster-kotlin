@@ -79,7 +79,21 @@ private constructor(
       }
       val children = mutableListOf<Child>()
       entries.forEachIndexed { index, entry ->
-        val declared = entry as? VegaValue.Obj ?: return@forEachIndexed
+        // A concatenation's members are **views**. Anything else — a number, a string, a null left
+        // behind by a trailing comma — was skipped in silence, so the chart came out one plot short
+        // with nothing said about which one or why. Upstream refuses the whole document; reporting
+        // and going on keeps the rest of the chart, which is this engine's rule everywhere else.
+        val declared =
+          entry as? VegaValue.Obj
+            ?: run {
+              diagnostics.error(
+                VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
+                "Entry $index of `$kind` is not a view: a concatenation's members are objects, " +
+                  "and this one is not. It is left out of the chart.",
+                jsonPath = "$.$kind[$index]",
+              )
+              return@forEachIndexed
+            }
         // A **repetition** inside a concatenation is a concatenation of its copies, exactly as one
         // at the top of a chart is: normalising it here rather than refusing it lets the ordinary
         // nesting take it, a concatenation's plot being allowed to be a concatenation.

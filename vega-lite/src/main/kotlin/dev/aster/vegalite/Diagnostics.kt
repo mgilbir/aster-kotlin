@@ -31,4 +31,23 @@ public object VegaLiteDiagnostics {
    * rules had not moved.
    */
   public const val SCHEMA_VERSION: String = "VEGA_LITE_SCHEMA_VERSION"
+
+  /**
+   * The document is larger than the compiler will walk — see `Limits`.
+   *
+   * Nesting or transform count, and in both cases upstream refuses the same document too. What is
+   * new is that this one comes back as a diagnostic rather than as a `StackOverflowError` out of a
+   * public entry point.
+   */
+  public const val LIMIT_EXCEEDED: String = "VEGA_LITE_LIMIT_EXCEEDED"
+
+  /**
+   * The compiler failed on this document. A defect here, not in the document.
+   *
+   * The backstop behind everything else: `compileJson` and `compile` are guarded, so a
+   * specification that reaches a defect comes back carrying the exception rather than as a crash in
+   * the host. This module takes **pasted text** — `VegaLiteInput.toVega` is a `String` — and before
+   * this had no `try` in it anywhere.
+   */
+  public const val COMPILE_FAILED: String = "VEGA_LITE_COMPILE_FAILED"
 }

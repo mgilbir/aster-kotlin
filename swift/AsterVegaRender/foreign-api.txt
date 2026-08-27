@@ -1737,6 +1737,12 @@ JoinAggregateTransform.apply(input:params:context:)
 JoinAggregateTransform.init()
 JoinAggregateTransform.shared
 JoinAggregateTransform.type
+JsDate
+JsDate.MAX_TIME_VALUE
+JsDate.clip(millis:)
+JsDate.init()
+JsDate.make(year:month:date:hours:minutes:seconds:millis:zone:)
+JsDate.shared
 JsSemantics
 JsSemantics.add(left:right:)
 JsSemantics.compare(left:right:)
@@ -4600,8 +4606,10 @@ VegaLiteConversion.isEqual(_:)
 VegaLiteConversion.vegaJson
 VegaLiteConversion.wasVegaLite
 VegaLiteDiagnostics
+VegaLiteDiagnostics.COMPILE_FAILED
 VegaLiteDiagnostics.INFERRED_TYPE
 VegaLiteDiagnostics.INVALID_ENCODING
+VegaLiteDiagnostics.LIMIT_EXCEEDED
 VegaLiteDiagnostics.MISSING_MARK
 VegaLiteDiagnostics.NOT_VEGA_LITE
 VegaLiteDiagnostics.SCHEMA_VERSION

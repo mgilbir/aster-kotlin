@@ -10,6 +10,7 @@ import dev.aster.vega.model.field
 import dev.aster.vega.model.isNullish
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.time.DateValues
+import dev.aster.vega.model.time.JsDate
 import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.model.time.TimeInterval
 import dev.aster.vega.model.time.TimeParse
@@ -36,11 +37,9 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.tan
 import kotlin.time.Instant
-import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.number
 import kotlinx.datetime.offsetAt
@@ -1687,41 +1686,24 @@ public object Functions {
     (DateValues.parse(value, parseIn) as? VegaValue.Num)?.value ?: JsSemantics.toNumber(value)
 
   /**
-   * `datetime(year, month, ...)`, where every component past the year is optional and out-of-range
-   * values roll over — `datetime(2026, 12, 1)` is January 2027, as in JavaScript.
+   * `datetime(year, month, ...)`, where every component past the year is optional.
    *
-   * Building from the first of January and adding is what gives the rollover for free; constructing
-   * the date directly would have to reject month 12 instead.
+   * Upstream is `new Date(...args)` and this is [JsDate.make], which is that constructor written
+   * out: the rollover, the two-digit-year rule and the NaN-rather-than-throw are all its rules
+   * rather than choices made here. It had been open-coded, and got the second of those wrong —
+   * `datetime(99, 1, 1)` is February **1999** to every Vega renderer, and was the year 99 here.
    */
-  private fun construct(args: List<VegaValue>, zone: TimeZone): Double {
-    val year = args.number(0)
-    // A year outside the calendar is an *Invalid Date* upstream, which is NaN. Without this,
-    // `toInt()` saturated at `Int.MAX_VALUE` and `LocalDate` threw — an uncaught
-    // `IllegalArgumentException` out of a public compile, since every catch site here is typed
-    // `ExpressionEvaluationException`. `utc(1600000000000)` is the one-line way to reach it.
-    if (year.isNaN() || year < MIN_YEAR || year > MAX_YEAR) return Double.NaN
-    val start = LocalDate(year.toInt(), 1, 1).atStartOfDayIn(zone)
-    val months = args.numberOr(1, 0.0)
-    val days = args.numberOr(2, 1.0) - 1.0
-    val hours = args.numberOr(3, 0.0)
-    val minutes = args.numberOr(4, 0.0)
-    val seconds = args.numberOr(5, 0.0)
-    val millis = args.numberOr(6, 0.0)
-    if (months.isNaN() || days.isNaN()) return Double.NaN
-
-    // Months and days step through the calendar; the rest is a fixed duration, which is what makes
-    // a
-    // daylight-saving day 23 hours long rather than silently 24.
-    val shifted =
-      start
-        .plus(months.toLong(), DateTimeUnit.MONTH, zone)
-        .plus(days.toLong(), DateTimeUnit.DAY, zone)
-    return shifted.toEpochMilliseconds() +
-      hours * 3_600_000.0 +
-      minutes * 60_000.0 +
-      seconds * 1000.0 +
-      millis
-  }
+  private fun construct(args: List<VegaValue>, zone: TimeZone): Double =
+    JsDate.make(
+      year = args.number(0),
+      month = args.numberOr(1, 0.0),
+      date = args.numberOr(2, 1.0),
+      hours = args.numberOr(3, 0.0),
+      minutes = args.numberOr(4, 0.0),
+      seconds = args.numberOr(5, 0.0),
+      millis = args.numberOr(6, 0.0),
+      zone = zone,
+    )
 
   private fun List<VegaValue>.numberOr(index: Int, fallback: Double): Double =
     if (index < size && at(index) != VegaValue.Null) JsSemantics.toNumber(at(index)) else fallback

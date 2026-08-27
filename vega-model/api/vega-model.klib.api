@@ -2673,6 +2673,14 @@ final object dev.aster.vega.model.time/DateValues { // dev.aster.vega.model.time
     final fun parseTextual(kotlin/String, kotlinx.datetime/TimeZone = ...): kotlin/Double? // dev.aster.vega.model.time/DateValues.parseTextual|parseTextual(kotlin.String;kotlinx.datetime.TimeZone){}[0]
 }
 
+final object dev.aster.vega.model.time/JsDate { // dev.aster.vega.model.time/JsDate|null[0]
+    final const val MAX_TIME_VALUE // dev.aster.vega.model.time/JsDate.MAX_TIME_VALUE|{}MAX_TIME_VALUE[0]
+        final fun <get-MAX_TIME_VALUE>(): kotlin/Double // dev.aster.vega.model.time/JsDate.MAX_TIME_VALUE.<get-MAX_TIME_VALUE>|<get-MAX_TIME_VALUE>(){}[0]
+
+    final fun clip(kotlin/Double): kotlin/Double // dev.aster.vega.model.time/JsDate.clip|clip(kotlin.Double){}[0]
+    final fun make(kotlin/Double, kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlinx.datetime/TimeZone): kotlin/Double // dev.aster.vega.model.time/JsDate.make|make(kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double;kotlinx.datetime.TimeZone){}[0]
+}
+
 final object dev.aster.vega.model.time/TimeFormat { // dev.aster.vega.model.time/TimeFormat|null[0]
     final val MONTHS // dev.aster.vega.model.time/TimeFormat.MONTHS|{}MONTHS[0]
         final fun <get-MONTHS>(): kotlin.collections/List<kotlin/String> // dev.aster.vega.model.time/TimeFormat.MONTHS.<get-MONTHS>|<get-MONTHS>(){}[0]

@@ -2256,6 +2256,14 @@ public final class dev/aster/vega/model/time/DateValues {
 	public static synthetic fun parseTextual$default (Ldev/aster/vega/model/time/DateValues;Ljava/lang/String;Lkotlinx/datetime/TimeZone;ILjava/lang/Object;)Ljava/lang/Double;
 }
 
+public final class dev/aster/vega/model/time/JsDate {
+	public static final field INSTANCE Ldev/aster/vega/model/time/JsDate;
+	public static final field MAX_TIME_VALUE D
+	public final fun clip (D)D
+	public final fun make (DDDDDDDLkotlinx/datetime/TimeZone;)D
+	public static synthetic fun make$default (Ldev/aster/vega/model/time/JsDate;DDDDDDDLkotlinx/datetime/TimeZone;ILjava/lang/Object;)D
+}
+
 public final class dev/aster/vega/model/time/TimeFormat {
 	public static final field INSTANCE Ldev/aster/vega/model/time/TimeFormat;
 	public final fun at (DLkotlinx/datetime/TimeZone;)Lkotlinx/datetime/LocalDateTime;

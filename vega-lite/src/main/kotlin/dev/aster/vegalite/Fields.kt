@@ -1,5 +1,6 @@
 package dev.aster.vegalite
 
+import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.canonicalNumberString
 import dev.aster.vega.model.locale.VegaLocale
@@ -341,18 +342,30 @@ internal object Fields {
    * Not the display canonicaliser: that rounds, and an expression is compared as a string. Upstream
    * writes `String(n)`, which is the shortest text that reads back as the same double — so `2`, not
    * `2.0`, and `0.15000000000000002`, not `0.15`, those two being different numbers.
+   *
+   * Which is `Decimals.jsString`, and delegating is the fix as well as the simplification: the
+   * hand-rolled version wrote `1.0E-7` for `1e-7` and `1.0E21` for `1e+21`, both of which a scale's
+   * computed bounds reach, and both of which Vega's expression parser reads as something else.
    */
-  fun expressionNumber(value: Double): String =
-    if (value == kotlin.math.floor(value) && !value.isInfinite() && kotlin.math.abs(value) < 1e15) {
-      value.toLong().toString()
-    } else {
-      value.toString()
-    }
+  fun expressionNumber(value: Double): String = Decimals.jsString(value)
 
+  /**
+   * `Model.getName`: a name made safe to read as an identifier — upstream's `varName`.
+   *
+   * Upstream is `.replace(/\W/g, '_')`, and JavaScript's `\W` is **ASCII**: every character outside
+   * `[A-Za-z0-9_]` becomes an underscore, accented letters included. Kotlin's `isLetterOrDigit` is
+   * Unicode, so a column called `año` kept its `ñ` here and lost it upstream — two different signal
+   * names for one specification, and the emitted Vega differed on every line that mentioned the
+   * field.
+   */
   fun varName(text: String): String {
-    val cleaned = text.map { if (it.isLetterOrDigit() || it == '_') it else '_' }.joinToString("")
+    val cleaned = text.map { if (it.isAsciiWord()) it else '_' }.joinToString("")
     return if (text.firstOrNull()?.isDigit() == true) "_$cleaned" else cleaned
   }
+
+  /** JavaScript's `\w`: ASCII letters, ASCII digits and the underscore, and nothing else. */
+  private fun Char.isAsciiWord(): Boolean =
+    this in 'a'..'z' || this in 'A'..'Z' || this in '0'..'9' || this == '_'
 
   /** `a.b` stays one nested path in a transform's output; the dots are literal there. */
   private fun removePathFromField(path: String): String = splitAccessPath(path).joinToString(".")

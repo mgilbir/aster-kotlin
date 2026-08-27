@@ -8,6 +8,26 @@ section here does not get released.
 
 ### Changed
 
+- **A Vega-Lite specification with no `data` compiles, and reads a table called `source`.** It used
+  to be an ERROR *and* a non-null result whose marks read a dataset called `""` — so a host
+  following the README's stop-on-null pattern handed the runtime something broken. Upstream compiles
+  it to `"data": [{"name": "source"}]`, which is exactly the seam a host supplies its own rows
+  through: set `VegaChartController.hostData` to `mapOf("source" to rows)`.
+
+- **An encoding channel that is not a channel is dropped, with a diagnostic.** Upstream warns and
+  drops; this engine kept it, so a typo like `colour` entered the aggregate's `groupby`, the spoken
+  description and the tooltip's field list, and produced a chart grouped by a column nothing was
+  coloured with. Unchanged for `geojson`, `xError` and `yError`, which have their own message.
+
+- **`Fields.varName` is ASCII, like the `\W → _` it transcribes.** Kotlin's `isLetterOrDigit` is
+  Unicode, so a column called `año` kept its `ñ` here and lost it upstream — two different signal
+  names for one specification.
+
+- **A number written into an emitted expression is `String(n)`.** Two hand-rolled spellings — one in
+  `Fields`, one in `LayoutSize` — wrote `1.0E-7` where JavaScript writes `1e-7`, and the second
+  saturated `toLong()` at 9.2e18 while allowing values up to 1e21 through. Both delegate to
+  `Decimals.jsString` now.
+
 - **A mark carries a tooltip only when its specification asked for one.** `MarkEncoder` fell back
   to the whole bound row when no `tooltip` channel was written, on the stated grounds that upstream
   does the same. It does not: a probe against vega 6.3.1 answers `undefined`, and `tooltip` is not
@@ -97,6 +117,45 @@ section here does not get released.
   `MarkClicked` carries before following it.
 
 ### Fixed
+
+- **A written date rolls over instead of throwing.** `{"month": 13}`, 30 February, hour 24 and date
+  0 are all legal Vega-Lite, and all mean what the JavaScript date constructor means by them:
+  upstream's `dateTimeToTimestamp` is `+new Date(...parts)`. Building a `LocalDateTime` from the
+  parts instead threw `IllegalArgumentException` on every one of them, out of a public entry point,
+  from a module that had no `try` in it. `JsDate` is that constructor written out — the rollover,
+  the two-digit-year rule and NaN-rather-than-throw — and both `vega-lite` and `vega-expression`
+  call it. Which fixes a second thing on the way: `datetime(99, 1, 1)` is February **1999** to every
+  Vega renderer, and was the year 99 here.
+
+- **The Vega-Lite compiler returns rather than crashing.** `compileJson` and `compile` are guarded,
+  and `VegaLiteInput.toVega` guards its own parse. Two limits close the ways a document could reach
+  a `StackOverflowError` deliberately: view nesting past 64, and more than 512 declared transforms —
+  the second of which is not nesting at all, since each transform becomes a node in a chain that
+  eight optimizer passes walk recursively. Upstream refuses the same documents, with a `RangeError`.
+  A `repeat` grid is capped at 256 cells for the same reason: each cell is a whole compiled view.
+
+- **An interval selection's written dates reach its store as numbers.** A store is a dataset, so
+  upstream converts while compiling; the interval branch emitted the `{"year": …}` object raw, and
+  the initial filtering compared a column of milliseconds against an object — false for every row —
+  until the reader's first drag replaced the store.
+
+- **A comma-separated event selector keeps every stream it names.** `{"on": "click, touchend"}`
+  dropped the touch, silently, from the specification whose whole purpose in writing two was to have
+  both. `Selection.on` is a list now and the emitted `events` is an array, byte-for-byte upstream's.
+
+- **A signal rename no longer rewrites the data.** Folding two bin nodes renames the signals of one,
+  and the rename is a substring replace over every string in the finished specification. A dataset's
+  inline rows are the user's values, and one that happened to contain a generated name would have
+  been quietly rewritten; the walk skips `values` and `datum` now.
+
+- **A layer or concat member that is dropped says so.** A member that failed to parse, and a concat
+  entry that is not an object at all, were both skipped in silence — so the chart came out a plot
+  short with nothing said about which one. Upstream refuses the whole document; this reports and
+  draws the rest, which is what this engine does everywhere else.
+
+- **Two fallback diagnostics that were wrong.** The unsupported-transform message left out `bin`,
+  `stack`, `timeUnit` and `impute`, all four implemented a hundred lines above it; the
+  malformed-predicate message said parameters "are not implemented", and they are.
 
 - **A stale compile cannot publish over a newer one.** Every entry point that recompiles —
   `setSpec`, `setSpecAsync`, `hostData`, `containerSize`, `setContainerSizeAsync` and the recompile

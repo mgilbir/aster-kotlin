@@ -3,9 +3,8 @@ package dev.aster.vegalite
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.canonicalNumberString
-import kotlinx.datetime.LocalDateTime
+import dev.aster.vega.model.time.JsDate
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toInstant
 
 /**
  * The `transform` block, one entry at a time.
@@ -22,6 +21,37 @@ import kotlinx.datetime.toInstant
  *
  * Anything not implemented is reported by name, with what a specification can do instead.
  */
+/**
+ * The `transform` operations this compiler implements, in the order the dispatch above tests them.
+ *
+ * Named here rather than written into the diagnostic, because the diagnostic had drifted: it left
+ * out `bin`, `stack`, `timeUnit` and `impute`, all four of which are implemented a hundred lines
+ * above the message saying they are not. A reader hitting the fallback with a typo in `window` was
+ * told to reach for a list that was missing a quarter of what is there.
+ */
+private val IMPLEMENTED_TRANSFORMS =
+  listOf(
+    "calculate",
+    "filter",
+    "bin",
+    "stack",
+    "timeUnit",
+    "aggregate",
+    "joinaggregate",
+    "window",
+    "fold",
+    "flatten",
+    "pivot",
+    "impute",
+    "sample",
+    "extent",
+    "quantile",
+    "density",
+    "regression",
+    "loess",
+    "lookup",
+  )
+
 internal class Transforms(
   private val diagnostics: DiagnosticCollector,
   /**
@@ -500,9 +530,9 @@ internal class Transforms(
         diagnostics.error(
           VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM,
           "This transform is not implemented: " +
-            "${transform.asObject?.fields?.keys?.joinToString(", ")}. Implemented are calculate, " +
-            "filter, aggregate, joinaggregate, window, fold, flatten, pivot, sample, extent, " +
-            "quantile, density, regression, loess and lookup.",
+            "${transform.asObject?.fields?.keys?.joinToString(", ")}. Implemented are " +
+            "${IMPLEMENTED_TRANSFORMS.dropLast(1).joinToString(", ")} and " +
+            "${IMPLEMENTED_TRANSFORMS.last()}.",
           jsonPath = path,
         )
         emptyList()
@@ -767,8 +797,8 @@ internal class Transforms(
       else -> {
         diagnostics.error(
           VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM,
-          "A `$subject` must be an expression, a field predicate, or `and`/`or`/`not` over them. " +
-            "A selection predicate needs parameters, which are not implemented.",
+          "A `$subject` must be an expression, a field predicate, a `param` naming a parameter, " +
+            "or `and`/`or`/`not` over any of those. This is none of them.",
           jsonPath = path,
         )
         null
@@ -993,30 +1023,34 @@ internal class Transforms(
    * same machine what its zone is.
    */
   fun dateTimeTimestamp(value: VegaValue.Obj): Double {
-    fun part(key: String): Int? =
+    fun part(key: String): Double? =
       when (val own = value.fields[key]) {
-        is VegaValue.Num -> own.value.toInt()
-        is VegaValue.Str -> monthOrDay(key, own.value).toIntOrNull()
+        is VegaValue.Num -> own.value
+        is VegaValue.Str -> monthOrDay(key, own.value).toDoubleOrNull()
         else -> null
       }
-    val year = part("year") ?: 2012
-    val month = part("month")?.minus(1) ?: part("quarter")?.let { (it - 1) * 3 } ?: 0
-    val date = part("date") ?: part("day")?.plus(1) ?: 1
+    val year = part("year") ?: 2012.0
+    val month = part("month")?.minus(1.0) ?: part("quarter")?.let { (it - 1.0) * 3.0 } ?: 0.0
+    val date = part("date") ?: part("day")?.plus(1.0) ?: 1.0
     val zone =
       if (value.fields["utc"] == VegaValue.Bool(true)) TimeZone.UTC
       else timeZone ?: TimeZone.currentSystemDefault()
-    val clock =
-      LocalDateTime(
-        year = year,
-        // `datetime()` counts months from zero and a calendar counts them from one.
-        month = month + 1,
-        day = date,
-        hour = part("hours") ?: 0,
-        minute = part("minutes") ?: 0,
-        second = part("seconds") ?: 0,
-        nanosecond = (part("milliseconds") ?: 0) * 1_000_000,
-      )
-    return clock.toInstant(zone).toEpochMilliseconds().toDouble()
+    // Upstream is `+new Date(...dateTimeParts(d))`, so this is that constructor — not a calendar.
+    // Building a `LocalDateTime` from the parts directly was the same code read as if it were one,
+    // and it **threw** on every value JavaScript rolls over: `{"month": 13}` is January of the next
+    // year, `{"date": 30}` in February is 1 March, `{"hours": 24}` is the next midnight. This
+    // module has no `try` in it and `VegaLiteCompiler` takes pasted text, so an
+    // `IllegalArgumentException` from here left the host.
+    return JsDate.make(
+      year = year,
+      month = month,
+      date = date,
+      hours = part("hours") ?: 0.0,
+      minutes = part("minutes") ?: 0.0,
+      seconds = part("seconds") ?: 0.0,
+      millis = part("milliseconds") ?: 0.0,
+      zone = zone,
+    )
   }
 
   private fun monthOrDay(key: String, name: String): String {

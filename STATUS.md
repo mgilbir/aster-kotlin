@@ -7256,3 +7256,93 @@ And one found by the test written for the first of those: `Uri` stores a host ba
 the form every rule wants, and wrote it out bare too. So `sanitize("http://[2606:4700:4700::1111]/x")`
 returned a string whose authority reparses with a port of `4700:4700::1111` — `sanitize` handing
 back something `load` refuses, against a contract `DataLoaderTest` states in as many words.
+
+### The compiler that takes pasted text, and had no `try` in it
+
+Vega-Lite is the grammar a person writes by hand, so `VegaLiteInput.toVega` takes a `String` and
+three demo apps have a paste screen. That makes the interesting question about a pathological
+document not what chart it makes but what it does to the host, and until this branch the answer was
+too often "takes it down". Four ways, and one of them needs no hostility at all.
+
+**A date that rolls over.** `{"month": 13}` is January of the next year, `{"date": 30}` in February
+is 1 March, `{"hours": 24}` is the next midnight, `{"date": 0}` is the last day of the month before.
+Every one of those is legal Vega-Lite written by someone who knows what a JavaScript date
+constructor does, because upstream's `dateTimeToTimestamp` *is* one: `+new Date(...dateTimeParts(d))`.
+This engine built a `LocalDateTime` from the parts, which throws `IllegalArgumentException` on all
+four — out of a public entry point, from a module with no catch anywhere in it.
+
+The fix is `JsDate` in `vega-model`, which is that constructor written out: `MakeDay`, `MakeTime`,
+`MakeDate` and `TimeClip`, the specification's own decomposition, because reproducing a rollover
+rule in aggregate is exactly the arithmetic that comes out right for the cases someone thought of.
+Two callers share it now — the Vega-Lite compiler and `vega-expression`'s `datetime`/`utc` — which
+is the "one semantic, N implementations" tension the audit named, and finding a *second* defect
+proved the point: the expression side had the rollover and not the two-digit-year rule, so
+`datetime(99, 1, 1)` was February of the year 99 where every Vega renderer says 1999.
+
+**A document too big to walk.** Two limits, and the second is the surprising one:
+
+- *Nesting* recurses through the view builders. This engine overflowed somewhere past 2,000 nested
+  layers; upstream past 200.
+- *Transforms* are not nesting at all. Each becomes one node in a `DataNode` chain, and each of the
+  eight optimizer passes over that chain is written as "do this node, then the children" — so a
+  **flat** list of 2,000 transforms is a 2,000-deep recursion. A limit on nesting alone would have
+  left that open.
+
+`Limits` refuses both before anything walks the document, with a diagnostic naming the limit, and
+walks with an explicit stack rather than by recursion — a function checking whether a document is too
+deep to recurse over must not be the thing that overflows on it. Upstream refuses the same documents
+with a `RangeError`, so refusing is faithful and only the mechanism improved. A `repeat` grid is
+capped at 256 cells beside them, because each cell is a whole compiled view: 100 × 100 is ten
+thousand of them.
+
+**And the catch-all behind all of it.** `compileJson`, `compile` and `VegaLiteInput.toVega`'s own
+parse are guarded now, so the next defect is a `VEGA_LITE_COMPILE_FAILED` carrying the exception.
+`StackOverflowError` is caught there too, and that is worth being honest about: on the JVM it is
+recoverable in practice and on Kotlin/Native it is not catchable at all, which is precisely why
+`Limits` exists rather than the catch being the whole answer.
+
+### Six ways a Vega-Lite chart was quietly not the chart that was written
+
+**A specification with no `data` was an error and a broken result.** It emitted ERROR *and* a
+non-null specification whose marks read a dataset called `""`, so a host following the README's
+stop-on-null pattern passed it straight to the runtime. It is not an error: upstream compiles it to
+`"data": [{"name": "source"}]`, an empty named table, which is exactly the seam a host supplies its
+own rows through — `hostData` here, `view.data(name, rows)` there. The output is now byte-identical
+to upstream's.
+
+**A channel that is not a channel was kept.** `colour` — the spelling half the English-speaking
+world uses — went into the aggregate's `groupby`, the spoken description and the tooltip's field
+list, and produced a chart grouped by a column that nothing was coloured with, silently. Upstream
+warns and drops, and says which name it dropped, which is the half that matters for a typo.
+
+**An interval selection's written dates never became numbers.** A store is a *dataset* — the filter
+compares its numbers against a column of numbers — and the point branch converted while the interval
+branch emitted the `{"year": …}` object raw. So the initial filtering was false for every row until
+the reader's first drag replaced the store with real numbers, at which point it started working and
+nothing explained the first frame. Both branches go through one helper now.
+
+**A comma-separated event selector kept only its first stream.** `{"on": "click, touchend"}` is how a
+chart is made to work with a finger as well as a mouse, and the touch was dropped — from the
+specification whose entire purpose in writing two was to have both. `Selection.on` is a list now, and
+the emitted `events` array is byte-for-byte upstream's.
+
+**A signal rename rewrote the data.** Folding two bin nodes renames the signals of one, and the
+rename is a substring replace over every string in the finished specification. That is right for a
+`datum["…"]` in an expression and wrong for a dataset's rows, which are the user's values: a row
+holding a string that happened to contain a generated name would have been quietly edited. The names
+are long and specific, but they are not reserved.
+
+**Two members dropped in silence, and two diagnostics that lied.** A layer member that failed to
+parse, and a concat entry that is not an object at all, were both skipped without a word — so the
+chart came out a plot short and a reader counting marks had to work out which. And the
+unsupported-transform message listed what is implemented while leaving out `bin`, `stack`,
+`timeUnit` and `impute`, all four of which are implemented a hundred lines above the message saying
+they are not; the malformed-predicate message said selection parameters "are not implemented", and
+they are.
+
+**Two spellings that only differ where it matters.** `varName` transcribes upstream's `\W → _`,
+and JavaScript's `\W` is ASCII, so a column called `año` kept its `ñ` here and lost it upstream —
+two different signal names for one specification, and emitted Vega differing on every line that
+mentions the field. And a number written into an expression is `String(n)`: two hand-rolled versions
+wrote `1.0E-7` for `1e-7`, and the one in `LayoutSize` saturated `toLong()` at 9.2e18 while its own
+guard let 1e21 through, so a step over that came out as `9223372036854775807`.

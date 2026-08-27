@@ -1,6 +1,7 @@
 package dev.aster.vegalite
 
 import dev.aster.vega.model.DiagnosticCollector
+import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
@@ -67,7 +68,33 @@ public object VegaLiteInput {
     locale: VegaLocale = VegaLocale.EnglishUS,
   ): VegaLiteConversion {
     val diagnostics = DiagnosticCollector()
-    val parsed = VegaJson.parseOrNull(json, diagnostics)
+    // Guarded here too, and not only in the compiler below: this reads the text itself, and JSON
+    // deep enough to overflow the parser would have taken the host down before the compiler — which
+    // has the catch-all — ever saw it. See `VegaLiteCompiler.guarded` for what is rethrown.
+    val parsed =
+      try {
+        VegaJson.parseOrNull(json, diagnostics)
+      } catch (cancellation: kotlin.coroutines.cancellation.CancellationException) {
+        throw cancellation
+      } catch (exhausted: OutOfMemoryError) {
+        throw exhausted
+      } catch (failure: Throwable) {
+        return VegaLiteConversion(
+          vegaJson = null,
+          wasVegaLite = false,
+          diagnostics =
+            listOf(
+              VegaDiagnostic(
+                severity = DiagnosticSeverity.FATAL,
+                code = VegaLiteDiagnostics.COMPILE_FAILED,
+                message =
+                  "This text could not be read as JSON: ${failure::class.simpleName}: " +
+                    "${failure.message}.",
+                cause = failure,
+              )
+            ),
+        )
+      }
     // Not JSON at all: hand the text on unchanged and let the Vega parser produce the one
     // diagnostic a reader needs, rather than producing a second one that says the same thing.
     if (parsed !is VegaValue.Obj) return VegaLiteConversion(json, false, emptyList())
