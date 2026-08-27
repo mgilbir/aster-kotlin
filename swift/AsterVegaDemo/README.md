@@ -166,9 +166,16 @@ Listing what the engine could not honour is the point rather than decoration. Th
 that nothing is silently ignored, and these screens are the only place that claim is visible to someone
 who is not reading the test suite.
 
-The bundled specifications all carry their data inline. The app installs `DenyLoader`, so a
-specification reaching for a URL would produce a diagnostic rather than an empty chart — which is why
-the fixtures with `"url"` data are not among them.
+The bundled specifications all carry their data inline. The app installs **`VegaDataLoader`**, not
+`DenyLoader`: a `url` is resolved against the datasets in the app bundle first and fetched from
+`https://vega.github.io/vega/` when it is not there, so a pasted example from Vega's own gallery
+works without the app shipping every dataset Vega has. Every other absolute address is refused, and
+so is every private or loopback one, because a pasted specification chooses that address and this
+screen compiles pasted text — see `VegaDataLoader`'s own note on request forgery.
+
+Both this paragraph and the caption on the paste screen used to say the app had no network loader at
+all, which was true of neither. The claim mattered: a reader deciding whether it was safe to paste
+someone else's chart was being told the wrong thing about what that would fetch.
 
 ## How it is wired
 

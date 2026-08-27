@@ -8,6 +8,20 @@ section here does not get released.
 
 ### Changed
 
+- **`ChartSession.set(signal:to:)` is queued like every other mutation.** It was the one entry point
+  that was not, and it is the one a reader can reach *while* a chart is loading — a slider on a
+  specification still compiling remotely. `setSignal` walks the signal updater and the event
+  dispatcher that `setSpecAsync` is at that moment rebuilding off the main actor, which is the exact
+  race the queue exists to prevent. The value is still recorded immediately, so a choice made during
+  a load survives into the chart that load produces.
+
+- **Three process-lifetime caches on the Apple side are bounded.** Decoded images, `CTFont`s and
+  dataset text all grew without limit for the life of the process, and two of them are keyed on
+  something that varies per chart — a font's *size*, a dataset's URL. Images and dataset text are
+  bounded in bytes rather than in entries, because a `heatmap` raster is megabytes where an icon is
+  kilobytes and Vega's own `flights-200k.json` is twelve megabytes; fonts are bounded by count. All
+  three evict least-recently-used, so a chart being redrawn keeps its working set.
+
 - **`SceneDrawTarget` and `DrawTarget` carry the item's blend mode.** Both the Compose Multiplatform
   renderer and the Apple one ignored the `blend` channel outright — no drawing, no diagnostic, no
   row in the feature table — while the Android View mapped all sixteen and exported SVG carried all
@@ -152,6 +166,46 @@ section here does not get released.
   second keyed on the path's identity.
 
 ### Fixed
+
+- **A drag pans the Apple chart by the distance the finger moved.** The view divided the delta by the
+  fit scale before dispatching, and `InteractionState.viewportOffset` holds a pan in surface pixels —
+  `visibleViewport` is what divides. So at any fit other than 1 the chart moved by a fraction of the
+  finger, and the further from 1 the fit the further the drawing lagged behind the drag. The Compose
+  Multiplatform chart documents this rule beside its own dispatch and the Android View follows it.
+
+- **`load("")` clears the chart even mid-compile.** The clear was synchronous while the compile was
+  not: it emptied what the compile was about to write and the compile wrote it back, so a host
+  emptying its editor was left looking at the previous chart — with `loading` stuck true, because the
+  block that would have cleared it had already been counted and then cancelled.
+
+- **A VoiceOver activation hits the mark the reader was on.** The synthesised tap applied the fit
+  scale and neither the zoom nor the pan, while the frames a reader lands on carry both. So once the
+  chart had been moved, activating a mark activated whichever one was drawn where it used to be.
+
+- **A failed compile reports its own diagnostics.** `try?` gave nil on a throw, the previous
+  document's diagnostics were left in place, and the failure message was read out of them — so a
+  host was told a new document had failed for a reason belonging to the one before it.
+
+- **Letter spacing is measured at the size it is drawn at.** The Apple engine applied the reader's
+  text scale to the font and not to the kern, while the drawing applied it to both: at any Dynamic
+  Type setting other than 1 a spaced label was laid out with one spacing and painted with another,
+  and the layout that decides whether labels overlap had already used the smaller number.
+
+- **`CoreTextTextEngine` locks the one thing it mutates.** Its header said it holds no mutable state
+  and it holds `unresolvedFontFamilies`, inserted into from the measuring path — which
+  `ChartSession` runs off the main actor.
+
+- **A rectangle's image under a transform maps all four corners, on the Apple walk too.**
+
+- **The Apple demo says what its loader actually does.** The paste screen claimed "no network
+  loader" and the README said it installs `DenyLoader`; every session uses `VegaDataLoader`, which
+  falls back to fetching from `vega.github.io`. A reader deciding whether it was safe to paste
+  someone else's chart was being told the wrong thing about what that would fetch.
+
+- **`scripts/host-conformance.py` no longer counts a comment as a reader.** The "read by" check was a
+  substring match over whole source files, so deleting a conformance test's assertions while leaving
+  the sentence above them describing what they used to check would have kept the gate green — the
+  gate's own failure mode, in the gate. It matches inside string literals now, with comments stripped.
 
 - **A continuous pan or pinch survives its own first pixel on Compose Multiplatform.** The chart's
   `pointerInput` was keyed on the viewport, and a `pointerInput` restarts its coroutine — cancelling

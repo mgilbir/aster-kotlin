@@ -503,13 +503,31 @@ struct Affine {
     Point(x: a * point.x + c * point.y + e, y: b * point.x + d * point.y + f)
   }
 
-  /// A rectangle's image, normalised — a transform with a negative scale would otherwise invert it.
+  /// A rectangle's **axis-aligned bounding box** under this transform.
+  ///
+  /// All four corners, not two. Two opposite corners describe the image only while the transform
+  /// maps axes to axes — a translation, a scale, a flip — and `DrawTarget` has no rotated rectangle
+  /// in its vocabulary, so the bounding box is the honest answer for anything else. Mapping the
+  /// diagonal alone silently reported a box that is too small under rotation or shear: a
+  /// 45-degree rotation maps two opposite corners of a square onto a *degenerate* rectangle, and a
+  /// group `clip` built from it would have cut away most of what it was meant to keep.
+  ///
+  /// Nothing this engine compiles reaches it today — a scene's transforms are translations and
+  /// uniform scales, which is why the parity goldens agreed while both walks had the same shape —
+  /// and the Compose Multiplatform walk is corrected the same way. "Silently" is the part removed.
   func apply(rect: RectD) -> Rect {
-    let one = apply(point: Point(x: rect.left, y: rect.top))
-    let two = apply(point: Point(x: rect.right, y: rect.bottom))
+    let corners = [
+      apply(point: Point(x: rect.left, y: rect.top)),
+      apply(point: Point(x: rect.right, y: rect.top)),
+      apply(point: Point(x: rect.right, y: rect.bottom)),
+      apply(point: Point(x: rect.left, y: rect.bottom)),
+    ]
+    let left = corners.map(\.x).min() ?? 0
+    let top = corners.map(\.y).min() ?? 0
     return Rect(
-      x: min(one.x, two.x), y: min(one.y, two.y),
-      width: abs(two.x - one.x), height: abs(two.y - one.y)
+      x: left, y: top,
+      width: (corners.map(\.x).max() ?? 0) - left,
+      height: (corners.map(\.y).max() ?? 0) - top
     )
   }
 }

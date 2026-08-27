@@ -21,8 +21,11 @@ import Foundation
 /// The font comes from ``CoreTextFonts``, which ``CoreTextDrawing`` also uses. Measuring with one font
 /// and drawing with another is the bug in a different disguise.
 ///
-/// Not thread-safe by any special effort and not needing to be: it holds no mutable state, and the font
-/// cache underneath it takes a lock.
+/// **One mutable field, and a lock on it.** The header used to say this engine holds no mutable state,
+/// and it holds ``unresolvedFontFamilies`` — a `Set` inserted into from `font(for:)`, which is on the
+/// measuring path, which `ChartSession` runs off the main actor. Two compiles measuring at once
+/// through one engine were two threads mutating a `Set`, which is a corrupt hash table rather than a
+/// lost entry. Everything else here is immutable and the font cache underneath takes its own lock.
 public final class CoreTextTextEngine: MeasuredTextEngine {
 
   /// What the reader's text-size setting multiplies every font size by; 1 is the size as written.
@@ -78,8 +81,16 @@ public final class CoreTextTextEngine: MeasuredTextEngine {
     // measured every string slightly wider than CoreText would draw it. The drawing path sets no kern
     // attribute at all, so leaving it out here is what makes the two agree — and agreement is the one
     // property this engine exists for.
+    //
+    // **Scaled by `textScale`, like the size beside it.** The font on the line above is built at
+    // `style.fontSize * textScale`; this was the raw value, and `CoreTextDrawing` multiplies by the
+    // same scale before drawing — so at any Dynamic Type setting other than 1 the box was measured
+    // with one spacing and painted with another. Spacing is per character, so a twelve-character
+    // label at the largest setting overruns its box by most of a glyph, and the layout that decides
+    // whether labels overlap had already been done with the smaller number.
     if style.letterSpacing != 0 {
-      attributes[NSAttributedString.Key(kCTKernAttributeName as String)] = style.letterSpacing
+      attributes[NSAttributedString.Key(kCTKernAttributeName as String)] =
+        style.letterSpacing * textScale
     }
     let attributed = NSAttributedString(string: line, attributes: attributes)
     // A typographic width, not a bounding box: this is the advance the drawing will use, so the two
@@ -121,7 +132,19 @@ public final class CoreTextTextEngine: MeasuredTextEngine {
    Filled while **measuring**, so it is complete once a chart has been laid out with this engine. A
    well-formed stack is not in here: one ending in a generic resolves on it.
    */
-  public private(set) var unresolvedFontFamilies: Set<String> = []
+  public var unresolvedFontFamilies: Set<String> {
+    unresolvedLock.withLock { unresolved }
+  }
+
+  /// The set itself, and the lock that is the whole reason it is not the stored property above.
+  ///
+  /// Inserted into from the **measuring** path, which `ChartSession` runs off the main actor, so
+  /// this is genuinely reachable from two threads at once — a host with two sessions sharing an
+  /// engine, or one compiling while another measures a hand-built scene. An `NSLock` rather than an
+  /// actor because measuring is synchronous by contract: `MeasuredTextEngine` is called from Kotlin.
+  private var unresolved: Set<String> = []
+
+  private let unresolvedLock = NSLock()
 
   private func font(for style: TextStyle) -> CTFont {
     // **The resolver is wrapped so the engine knows whether it answered**, which is what
@@ -148,7 +171,7 @@ public final class CoreTextTextEngine: MeasuredTextEngine {
     if !wanted.isEmpty {
       let got = (CTFontCopyFamilyName(resolved) as String).lowercased()
       if !wanted.contains(where: { $0.lowercased() == got }) {
-        unresolvedFontFamilies.insert(style.fontFamily)
+        unresolvedLock.withLock { _ = unresolved.insert(style.fontFamily) }
       }
     }
     return resolved

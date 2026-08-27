@@ -144,20 +144,39 @@ enum CoreTextFonts {
   private static let cache = Cache()
 
   /// `@unchecked Sendable` because every access is behind the lock; the assertion is made once, here.
+  ///
+  /// **Bounded**, and that needs saying because this is a `static` cache and therefore lives for the
+  /// life of the process. The key is a family, a size, a weight and a slant — and a *size*, which is
+  /// the part that made it unbounded in practice: a chart whose label size comes from a signal, or a
+  /// legend whose swatches step through sizes, mints an entry per distinct size for as long as the
+  /// app runs. Least-recently-used, so the working set of a chart being redrawn stays resident.
   private final class Cache: @unchecked Sendable {
+    /// Enough for every face, weight and size a handful of charts asks for at once.
+    private static let limit = 256
+
     private var fonts: [Key: CTFont] = [:]
+    /// Keys in least-recently-used order, oldest first.
+    private var order: [Key] = []
     private let lock = NSLock()
 
     func value(for key: Key) -> CTFont? {
       lock.lock()
       defer { lock.unlock() }
-      return fonts[key]
+      guard let font = fonts[key] else { return nil }
+      order.removeAll { $0 == key }
+      order.append(key)
+      return font
     }
 
     func store(_ font: CTFont, for key: Key) {
       lock.lock()
       defer { lock.unlock() }
       fonts[key] = font
+      order.removeAll { $0 == key }
+      order.append(key)
+      while order.count > Self.limit {
+        fonts.removeValue(forKey: order.removeFirst())
+      }
     }
   }
 }

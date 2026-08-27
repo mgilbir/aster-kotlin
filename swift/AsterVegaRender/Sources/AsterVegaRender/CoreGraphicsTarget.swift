@@ -417,16 +417,62 @@ public struct CoreGraphicsTarget: DrawTarget {
     case unknown
   }
 
+  /// **Bounded**, in bytes of decoded pixels rather than in entries.
+  ///
+  /// This is a `static` cache, so it lives for the life of the *process* — a host that shows a
+  /// hundred charts, each with its own images, holds every one of them until it exits. And an entry
+  /// count is the wrong bound: an engine-produced `heatmap` raster is megabytes where an icon is
+  /// kilobytes, so ten entries can be ten kilobytes or a hundred megabytes. The bound is a byte
+  /// budget, evicted least-recently-used, which is the shape the audit asked for and the reason it
+  /// is not simply a smaller dictionary.
+  ///
+  /// `clearImageCache()` remains, for a host saying an address now holds something different.
   private final class ImageCache: @unchecked Sendable {
+    /// About sixty-four megabytes of decoded pixels, which is several full-screen rasters and
+    /// hundreds of icons.
+    private static let byteBudget = 64 * 1024 * 1024
+
     private var byDigest: [Int64: CGImage] = [:]
     private var byURL: [String: CGImage] = [:]
     private var unresolvable: Set<String> = []
+    /// Keys in least-recently-used order, oldest first, tagged by which dictionary holds them.
+    private var order: [Key] = []
+    private var bytes = 0
     private let lock = NSLock()
+
+    private enum Key: Hashable {
+      case digest(Int64)
+      case url(String)
+    }
+
+    /// A decoded image's cost. `bytesPerRow * height` is what CoreGraphics actually holds.
+    private func cost(_ image: CGImage) -> Int { image.bytesPerRow * image.height }
+
+    /// Marks a key as just used, and evicts from the far end until the budget is met.
+    ///
+    /// Called with the lock already held.
+    private func touch(_ key: Key, adding added: Int) {
+      order.removeAll { $0 == key }
+      order.append(key)
+      bytes += added
+      while bytes > Self.byteBudget, let oldest = order.first, order.count > 1 {
+        order.removeFirst()
+        switch oldest {
+        case .digest(let digest):
+          if let evicted = byDigest.removeValue(forKey: digest) { bytes -= cost(evicted) }
+        case .url(let url):
+          if let evicted = byURL.removeValue(forKey: url) { bytes -= cost(evicted) }
+        }
+      }
+    }
 
     func answer(forURL url: String) -> Answer {
       lock.lock()
       defer { lock.unlock() }
-      if let image = byURL[url] { return .image(image) }
+      if let image = byURL[url] {
+        touch(.url(url), adding: 0)
+        return .image(image)
+      }
       return unresolvable.contains(url) ? .unresolvable : .unknown
     }
 
@@ -443,24 +489,32 @@ public struct CoreGraphicsTarget: DrawTarget {
       byDigest.removeAll()
       byURL.removeAll()
       unresolvable.removeAll()
+      order.removeAll()
+      bytes = 0
     }
 
     func image(forRaster digest: Int64) -> CGImage? {
       lock.lock()
       defer { lock.unlock() }
-      return byDigest[digest]
+      guard let image = byDigest[digest] else { return nil }
+      touch(.digest(digest), adding: 0)
+      return image
     }
 
     func store(_ image: CGImage, forRaster digest: Int64) {
       lock.lock()
       defer { lock.unlock() }
+      if let previous = byDigest[digest] { bytes -= cost(previous) }
       byDigest[digest] = image
+      touch(.digest(digest), adding: cost(image))
     }
 
     func store(_ image: CGImage, forURL url: String) {
       lock.lock()
       defer { lock.unlock() }
+      if let previous = byURL[url] { bytes -= cost(previous) }
       byURL[url] = image
+      touch(.url(url), adding: cost(image))
     }
   }
 

@@ -7487,3 +7487,81 @@ artifact resolves against. Two commits on this branch's own stack shipped exactl
 `check.sh` reported green. Both are corrected here, and the catch that needed it is `Exception`
 rather than `Throwable` now — which is also the *right* rule, since an `Error` is not a failed
 compile and a `StackOverflowError` is not catchable at all on Kotlin/Native.
+
+### The Apple session: the one object an app holds, touched while it was busy
+
+`ChartSession` is the mutable object on the Swift side, and `VegaChartController` underneath it is
+documented as unsafe for concurrent use — which is why every mutation goes through `serialised`. The
+queue exists because a tap during the first compile once left a chart stuck showing "no scene". Two
+paths were not going through it, and both are reachable by an ordinary reader.
+
+**`set(signal:to:)`.** A slider on a chart that is still compiling: `setSignal` walks the signal
+updater and the event dispatcher, and `setSpecAsync` is at that moment rebuilding both of them off
+the main actor. That is precisely the race. The override is still *recorded* outside the queue,
+because the compile reads it when it starts — so a value a reader chose during a load survives into
+the chart that load produces, which is the behaviour the queueing would otherwise have thrown away.
+
+**`load("")`.** The clear was synchronous and the compile was not, so the clear emptied everything
+the compile was about to write and the compile then wrote it back. A host emptying its editor while
+a specification was still compiling got the previous chart back, under a spinner that never stopped:
+`loading` was set true by the compile and the block that would have cleared it had been counted into
+the queue and then cancelled. The clear is enqueued now, behind a cancel, like every other mutation.
+
+**And a failed compile reported the previous document's diagnostics.** `try?` gave nil on a throw,
+`diagnostics` was left holding the last chart's, and the failure message was read out of it — so the
+host was told a new document had failed for a reason belonging to the one before it. `do`/`catch`
+now, because *which* failure it was decides what to report: a cancellation is control flow and
+leaves everything alone; anything else clears the diagnostics before writing a message of its own.
+
+### Two more points in the wrong space, and a measurement that disagreed with its own drawing
+
+**A drag divided by the fit scale before dispatching.** `InteractionState.viewportOffset` holds a pan
+in *surface pixels*, and `visibleViewport` is what divides by `contentScale * viewportScale` — the
+Compose Multiplatform chart says exactly this beside its own dispatch, and the Android View
+dispatches the raw distance for the same reason. Dividing here divided twice, so at any fit other
+than 1 the chart moved by a fraction of the finger, and the further out the fit the worse it got.
+
+**A VoiceOver activation applied the fit scale and neither the zoom nor the pan.** The frames a
+reader lands on go through `drawnPlacement`, which carries both — that was fixed when the drawing
+was — and the synthesised tap did not. So once the chart had been moved, activating a mark activated
+whichever mark was drawn where the one under the reader's finger used to be. This is the same defect
+as the Android helper's, found in the same audit, on the other host: two implementations of one
+conversion, wrong in two different ways.
+
+**And letter spacing was measured unscaled and drawn scaled.** The engine builds its font at
+`fontSize * textScale` and set the kern from the raw `letterSpacing`; `CoreTextDrawing` multiplies
+by the same scale. Spacing is per character, so at the largest Dynamic Type setting a twelve-
+character label overruns the box reserved for it by most of a glyph — and the overlap-removal that
+decides which labels to keep had already run on the smaller number.
+
+### Three caches that lived as long as the process
+
+All three on the Apple side are `static`, so they outlive every session: decoded `CGImage`s by URL
+and by raster digest, `CTFont`s by family/size/weight/slant, and dataset text by URL. Only the images
+were clearable, and only wholesale.
+
+Two of the three are keyed on something that *varies per chart*. A font's key includes its **size**,
+so a chart whose label size comes from a signal mints an entry per distinct size for as long as the
+app runs. A dataset's key is its URL, and `SpecLibrary` shares one loader across the whole app
+deliberately — one fetch per dataset per launch — which also means one *retained copy* per dataset
+ever read.
+
+Images and dataset text are bounded in **bytes**, not entries, because an entry count is a bound on
+nothing when a `heatmap` raster is megabytes beside a kilobyte icon and Vega's own
+`flights-200k.json` is twelve megabytes. Fonts are bounded by count, which for a font is the right
+unit. All three evict least-recently-used, so the working set of a chart being redrawn stays
+resident; the dataset cache keeps the entry just stored even when it alone exceeds the budget, which
+is the right answer for a single dataset larger than the whole cache.
+
+### And the conformance gate counted a comment as a reader
+
+`scripts/host-conformance.py` asserts that every golden in `test-fixtures/host-conformance` is read
+by a test on each of the three engines, and it asked `golden.name in text` — a substring match over
+whole source files. So a *comment* mentioning a golden's filename counted: deleting a conformance
+test's assertions while leaving the sentence above them saying what they used to check would have
+kept the gate green. That is the gate's own failure mode, in the gate, and it is the third time this
+audit has found a comparison that passed because it compared nothing.
+
+It matches inside string literals now, with comments stripped first — a deliberately small scanner
+rather than a parser, because Kotlin and Swift agree on `//`, on `/* */` and on `"`, and a file that
+genuinely reads a golden names it in a string, since that is how a path is written.
