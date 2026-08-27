@@ -71,7 +71,7 @@ public object KdeTransform : Transform {
       val high = domain?.get(1) ?: support.filterNot { it.isNaN() }.max()
 
       val prefix = LinkedHashMap<String, VegaValue>(groupBy.size)
-      groupBy.forEachIndexed { index, path -> prefix[path] = groupKey[index] }
+      groupBy.forEachIndexed { index, path -> prefix[path] = groupKey.values[index] }
       CurveSampler.sample(method, low, high, minSteps, maxSteps).map { p ->
         VegaValue.Obj(
           prefix +

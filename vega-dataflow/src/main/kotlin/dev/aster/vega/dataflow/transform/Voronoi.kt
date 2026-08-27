@@ -2,6 +2,7 @@ package dev.aster.vega.dataflow.transform
 
 import dev.aster.vega.dataflow.voronoi.Delaunay
 import dev.aster.vega.dataflow.voronoi.VoronoiDiagram
+import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.field
@@ -118,11 +119,12 @@ public object VoronoiTransform : Transform {
    * Upstream builds the path with `Array.prototype.join`, so each point is `String([x, y])` — a
    * comma-separated pair in JavaScript's own number formatting. A whole number therefore has no
    * decimal point, and a path string is compared as text.
+   *
+   * `JsSemantics.numberToString`, which is the same function `Links` writes its path text with.
+   * There used to be two: this one fell back to the platform's `toString` for a fractional value,
+   * which switches to exponential notation at 10^7 rather than 10^21 and writes `1.0E-5` where
+   * JavaScript writes `0.00001` — so a small coordinate in a voronoi path was text no browser would
+   * have produced, in the same module where `Links` was producing the right one.
    */
-  private fun number(value: Double): String =
-    if (value == kotlin.math.floor(value) && value.isFinite() && kotlin.math.abs(value) < 1e21) {
-      value.toLong().toString()
-    } else {
-      value.toString()
-    }
+  private fun number(value: Double): String = JsSemantics.numberToString(value)
 }

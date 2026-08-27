@@ -225,7 +225,7 @@ public object ImputeTransform : Transform {
         // two
         // indistinguishable.
         fields[IMPUTE_FLAG] = VegaValue.Bool(true)
-        groupBy.forEachIndexed { index, path -> fields[path] = groupKey[index] }
+        groupBy.forEachIndexed { index, path -> fields[path] = groupKey.values[index] }
         fields[key] = value
         fields[field] = filler
         added += VegaValue.Obj(fields)

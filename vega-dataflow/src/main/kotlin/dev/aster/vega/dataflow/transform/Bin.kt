@@ -9,6 +9,7 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asBoolean
 import dev.aster.vega.model.field
 import dev.aster.vega.model.isMissing
+import dev.aster.vega.model.isNullish
 import dev.aster.vega.model.roundHalfUp
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -91,6 +92,7 @@ public object BinTransform : Transform {
         maxbins = params.number("maxbins")?.toInt() ?: DEFAULT_MAXBINS,
         base = params.number("base") ?: 10.0,
         step = params.number("step"),
+        steps = params.numberList("steps").takeIf { it.isNotEmpty() },
         divide = params.numberList("divide").takeIf { it.isNotEmpty() } ?: listOf(5.0, 2.0),
         minstep = params.number("minstep") ?: 0.0,
         nice = params.boolean("nice") ?: true,
@@ -124,7 +126,6 @@ public object BinTransform : Transform {
 
     return input.map { datum ->
       val value = datum.field(path)
-      val number = if (value.isMissing) Double.NaN else JsSemantics.toNumber(value)
       // A missing value bins to null; a value *outside* the extent bins to an infinity on the side
       // it fell off. That is upstream's own binning function — `v < start ? -Infinity : v > stop ?
       // +Infinity` — and the difference is not cosmetic: `datum.bin0 != null` keeps an out-of-range
@@ -132,7 +133,14 @@ public object BinTransform : Transform {
       // depending on which this writes. Both bounds take the infinity, since the high one is the
       // low
       // one plus a step.
-      if (value.isMissing || number.isNaN()) {
+      //
+      // **Missing is `toNumber`'s missing**, which is `_ == null || _ === ''` — null, undefined and
+      // the empty string, and nothing else. A value that merely *coerces* to NaN, which is what a
+      // dirty text column is full of, bins to **NaN** upstream and was binning to null here: it
+      // then passed the very filter this paragraph is about, in the wrong direction.
+      val readable = !(value.isNullish || (value is VegaValue.Str && value.value.isEmpty()))
+      val number = if (readable) JsSemantics.toNumber(value) else Double.NaN
+      if (!readable) {
         datum.withFields(binFields(lowName, highName, VegaValue.Null, VegaValue.Null, interval))
       } else if (number < settings.start || number > settings.stop) {
         val edge =
@@ -207,6 +215,16 @@ public object BinTransform : Transform {
     maxbins: Int,
     base: Double,
     step: Double?,
+    /**
+     * The step sizes a bin is allowed to take, if a specification names a set.
+     *
+     * Upstream's third branch, and it was neither read nor reported: a chart asking to be binned
+     * only on the round numbers it has axis labels for got whatever the automatic rule chose. The
+     * rule is `v = span / maxbins`, then the **largest** listed step that is still below `v` — `for
+     * (i = 0; i < n && steps[i] < v; ++i); step = steps[max(0, i - 1)]` — so a list whose every
+     * entry is already too large falls back to its first entry rather than to none.
+     */
+    steps: List<Double>?,
     divide: List<Double>,
     minstep: Double,
     nice: Boolean,
@@ -219,6 +237,11 @@ public object BinTransform : Transform {
     var chosen: Double
     if (step != null && step > 0.0) {
       chosen = step
+    } else if (steps != null && steps.isNotEmpty()) {
+      val target = span / maxbins
+      var index = 0
+      while (index < steps.size && steps[index] < target) index++
+      chosen = steps[maxOf(0, index - 1)]
     } else {
       val level = ceil(ln(maxbins.toDouble()) / logBase)
       chosen = maxOf(minstep, base.pow(roundHalfUp(ln(span) / logBase) - level))

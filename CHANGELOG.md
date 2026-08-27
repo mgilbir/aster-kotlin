@@ -24,6 +24,15 @@ section here does not get released.
   engine's job and are done there, so calling it directly with a stack or a generic returns `null`
   where it used to answer.
 
+- **`groupTuples` and `groupKey` answer a `GroupKey` rather than a list of raw values.** What makes
+  two rows one group is upstream's own string coercion — its `fastmap` is object-backed, so the
+  number `1001` and the string `"1001"` are one property and therefore one group — and keying on
+  the raw values split what upstream merges. `GroupKey.values` carries the first row's spelling,
+  which is where upstream reads a group's own fields from too, so a caller reading them positionally
+  changes one line.
+
+  `BinTransform.binSettings` gained a `steps` parameter, in the position upstream reads it.
+
 ### Added
 
 - **Four expression functions upstream has and this engine did not:** `isNaN`, `atob`, `btoa` and
@@ -41,7 +50,91 @@ section here does not get released.
   `"undefined"` where they used to return `"null"` for a value an expression produced from a
   missing field. A host that does not care can test both.
 
+- **`bin` reads `steps`**, upstream's third branch for choosing a step size: `span / maxbins`, then
+  the largest listed step still below it. Neither read nor reported before, so a chart asking to be
+  binned only on the round numbers it has axis labels for got whatever the automatic rule chose.
+
+- **`pie` reads `sort`**, which decides which row gets which sweep and leaves the rows where they
+  were. It is a boolean in upstream's own `Definition`, and a chart asking for its biggest slice
+  first got its slices in data order with no diagnostic.
+
 ### Fixed
+
+- **`window` annotates duplicate rows separately.** Results were keyed by the row itself, and
+  `VegaValue.Obj` is a value class over a map that compares structurally — so two rows that happen
+  to be identical were one key and collapsed onto the last one's answer. `[{v:1},{v:1}]` with
+  `ops:["sum"]` came back as `[2, 2]` where upstream answers `[1, 2]`, and `row_number`, `lag` and
+  `lead` were equally wrong. Duplicate rows are ordinary; none of the fourteen replayed window
+  vectors has one. It groups positions now, which is what `stack` already did and says why.
+
+- **The aggregate cell sorts values into upstream's three boxes, not two.** `add` is
+  `if (v == null || v === '') { ++missing; return } if (v !== v) return; ++valid`, and every
+  boundary in it was in the wrong place:
+  - the **empty string is missing**, and was entering the numeric list as a valid 0 — a dirty CSV
+    column of `""` dragged every mean toward zero;
+  - a **NaN is in neither box**, and was being counted as missing;
+  - a value that merely *coerces* to NaN is **valid** and poisons what is computed from it: the sum
+    of `[1, "abc"]` is NaN upstream and was 1 here, a total that silently omitted the row it could
+    not read;
+  - an **infinity is valid** and takes the extreme, and was being filtered out;
+  - `m.valid ? … : undefined` guards every numeric operation including `sum`, so a group with no
+    valid value has **no sum property at all** rather than a 0 — which passes an `isValid` filter
+    that upstream's answer does not. A comment here claimed upstream reports 0; it was probed
+    false, and the code followed it.
+  - `variance`, `stdev` and `stderr` need two values and `variancep` and `stdevp` need one, so the
+    sample forms over a single value are absent rather than NaN;
+  - `min` and `max` track the extreme over the **raw** values with JavaScript's `<`, so a string in
+    a numeric column never displaces a number rather than making the answer NaN;
+  - `argmin` and `argmax` reach their answer by a different route — `extentIndex` over every stored
+    row — and an infinity or a non-numeric value takes part in it, where both were skipped.
+
+- **`joinaggregate` can compute a confidence interval.** No bootstrap closure was passed, so
+  `Measure.compute` had nothing to ask and `ci0`/`ci1` wrote null onto every row of the group,
+  silently — and the error bars they exist for were drawn nowhere.
+
+- **`stack`'s `center` offset runs one cursor.** Upstream's `stackCenter` starts at
+  `(max - sum) / 2` and advances by the absolute value; splitting it into positive and negative
+  cursors, as `zero` correctly does, made a group holding both signs grow in two directions from
+  the centre line. `[3, -5]` spans `[0,3]` and `[3,8]` upstream and spanned `[0,3]` and `[0,-5]`
+  here; the one committed `center` fixture is all-positive, where the two rules agree. And
+  `normalize` over a group summing to nothing produces NaN — `1/0` times `0` — which draws nothing,
+  where guarding the zero drew a band of zero-height rectangles.
+
+- **`pie` no longer corrects its input.** A negative value runs backwards over its neighbour
+  upstream and a zero total divides by zero; taking the absolute value and guarding the total
+  showed a plausible chart where upstream shows a broken one the reader would have asked about.
+
+- **Eight more places a transform disagreed with upstream**, each probed:
+  - `bin` writes **NaN** for a value that coerces to NaN and null only for a genuinely absent one —
+    the very distinction the file's own header stresses for the out-of-extent infinities;
+  - `extent` lets an infinity take the extreme and then answers `[null, null]` with a warning, as
+    upstream's "Infinite extent" does, rather than reporting the finite extent of a column upstream
+    refuses to report one for;
+  - `pivot` keeps a **null** key, which upstream names `"null"`, and orders its columns by value
+    rather than lexicographically by name — `1, 2, 10` and not `1, 10, 2`;
+  - `ntile` and `nth_value` are refused without a parameter greater than zero, as upstream refuses
+    them, instead of defaulting to 1 and turning `ntile` into a column of ones;
+  - `countpattern` compiles its pattern through the **ECMA-262 engine** the rest of the codebase
+    adopted for exactly this — it is the one transform that compiles a pattern a specification
+    wrote, and Kotlin's `Regex` *throws* on `x{` and `[]`, two ordinary browser patterns;
+  - a force `link`'s `distance` and `strength` expressions read the **link's row**, as upstream's
+    `d => v(d, _)` does; they were evaluated against nothing, so `datum.weight` was NaN for every
+    link and the springs all came out the same length;
+  - `compareFieldValues` is `vega-util`'s `ascending`, so a pair it cannot order — a string against
+    a number — compares equal and keeps its place, rather than falling back to a lexicographic
+    comparison that looked more helpful and ordered a mixed column differently;
+  - a hierarchy layout's `as` names what it names, positionally, instead of being ignored unless it
+    was longer than the default list.
+
+- **The voronoi predicate's scratch buffers are confined to one triangulation.** `Orient2d` was a
+  singleton holding one set of expansion buffers, so two layouts running at once — two compiles on
+  two threads, which is what the controller's async path does — wrote into each other's expansion
+  and produced a triangulation that is not a triangulation of either point set.
+
+- **`Dataflow.kt` stops advertising an engine that does not exist.** Its `ChangeSet`/`TupleId`
+  contract has no consumer outside its own tests, and `TupleId` promised that identity is
+  "preserved across incremental updates" — which nothing implements. Marked
+  `@InternalAsterVegaApi`, so a host reading the surface finds a plan rather than a promise.
 
 - **A signal is a dependency even when a datum field shares its name.** `collectSignals` removed a
   member-access property name **by name** from the whole expression, so `"year == datum.year"`

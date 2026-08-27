@@ -249,7 +249,7 @@ public object ForceTransform : Transform {
     for (row in rows) {
       val source = byId[key(row.field("source"))]
       val target = byId[key(row.field("target"))]
-      if (source == null || target == null) missing++ else links += ForceLink(source, target)
+      if (source == null || target == null) missing++ else links += ForceLink(source, target, row)
     }
     if (missing > 0) {
       // Upstream throws — `node not found` — and draws nothing at all. Reporting and carrying on
@@ -292,7 +292,7 @@ public object ForceTransform : Transform {
     context: TransformContext,
   ): (ForceLink, Int) -> Double {
     val expression = expressionOf(params, key, context)
-    if (expression != null) return { _, _ -> expression.evaluate(VegaValue.Null).number() }
+    if (expression != null) return { link, _ -> expression.evaluate(link.datum).number() }
     val constant = params.number(key) ?: fallback
     return { _, _ -> constant }
   }

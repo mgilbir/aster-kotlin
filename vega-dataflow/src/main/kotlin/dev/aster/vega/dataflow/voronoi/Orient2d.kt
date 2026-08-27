@@ -16,15 +16,15 @@ import kotlin.math.abs
  * sum is the true value, extended only as far as the answer's sign is still in doubt. Shewchuk's
  * adaptive predicate, ported from `robust-predicates` line for line, error bounds included. Nothing
  * here can be simplified — the whole point is which order the roundings happen in.
+ *
+ * **A class, not an object.** The expansion needs scratch buffers, and upstream keeps them at
+ * module level because JavaScript has one thread. This was a singleton holding one set of them, so
+ * two voronoi layouts running at once — two compiles on two threads, which is exactly what the
+ * controller's async path does — wrote into each other's expansion and produced a triangulation
+ * that is not a triangulation of either point set. `Delaunator` owns one of these, so the buffers
+ * are confined to the triangulation that is using them.
  */
-internal object Orient2d {
-
-  private const val EPSILON = 1.1102230246251565e-16
-  private const val SPLITTER = 134217729.0
-  private val RESULT_ERRBOUND = (3 + 8 * EPSILON) * EPSILON
-  private val CCW_ERRBOUND_A = (3 + 16 * EPSILON) * EPSILON
-  private val CCW_ERRBOUND_B = (2 + 12 * EPSILON) * EPSILON
-  private val CCW_ERRBOUND_C = (9 + 64 * EPSILON) * EPSILON * EPSILON
+internal class Orient2d {
 
   /**
    * Positive when `c` is left of the line `a → b`, negative when right, zero when collinear.
@@ -235,5 +235,14 @@ internal object Orient2d {
     var q = e[0]
     for (i in 1 until elen) q += e[i]
     return q
+  }
+
+  private companion object {
+    const val EPSILON = 1.1102230246251565e-16
+    const val SPLITTER = 134217729.0
+    val RESULT_ERRBOUND = (3 + 8 * EPSILON) * EPSILON
+    val CCW_ERRBOUND_A = (3 + 16 * EPSILON) * EPSILON
+    val CCW_ERRBOUND_B = (2 + 12 * EPSILON) * EPSILON
+    val CCW_ERRBOUND_C = (9 + 64 * EPSILON) * EPSILON * EPSILON
   }
 }

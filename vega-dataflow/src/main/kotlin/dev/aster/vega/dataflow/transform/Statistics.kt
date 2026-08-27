@@ -52,7 +52,7 @@ public object QuantileTransform : Transform {
       } else {
         probabilities.map { probability ->
           val fields = LinkedHashMap<String, VegaValue>(groupBy.size + 2)
-          groupBy.forEachIndexed { index, path -> fields[path] = groupKey[index] }
+          groupBy.forEachIndexed { index, path -> fields[path] = groupKey.values[index] }
           fields[probName] = VegaValue.Num(probability)
           fields[valueName] = VegaValue.Num(quantileAt(values, probability))
           VegaValue.Obj(fields)
@@ -152,7 +152,7 @@ public object RegressionTransform : Transform {
       }
       val model = RegressionFits.fit(method, points, order) ?: return@flatMap emptyList()
       val prefix = LinkedHashMap<String, VegaValue>(groupBy.size)
-      groupBy.forEachIndexed { index, path -> prefix[path] = groupKey[index] }
+      groupBy.forEachIndexed { index, path -> prefix[path] = groupKey.values[index] }
 
       if (wantParams) {
         listOf(
@@ -220,7 +220,7 @@ public object LoessTransform : Transform {
       val points = numericPairs(rows, xField, yField)
       if (points.isEmpty()) return@flatMap emptyList()
       val prefix = LinkedHashMap<String, VegaValue>(groupBy.size)
-      groupBy.forEachIndexed { index, path -> prefix[path] = groupKey[index] }
+      groupBy.forEachIndexed { index, path -> prefix[path] = groupKey.values[index] }
       RegressionFits.loess(points, bandwidth).map { p ->
         VegaValue.Obj(prefix + mapOf(xName to VegaValue.Num(p[0]), yName to VegaValue.Num(p[1])))
       }

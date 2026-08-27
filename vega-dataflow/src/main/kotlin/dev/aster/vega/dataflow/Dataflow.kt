@@ -1,15 +1,27 @@
 package dev.aster.vega.dataflow
 
+import dev.aster.vega.model.InternalAsterVegaApi
 import dev.aster.vega.model.VegaValue
 import kotlin.jvm.JvmInline
 
 /**
- * Dataflow API surface.
+ * Dataflow API surface — **a contract with nothing behind it**, marked so it stops advertising
+ * itself.
  *
- * Milestone 0 defines the contracts so the runtime and transforms can be written against a stable
- * shape; the operators themselves arrive in Milestone 4 (PROJECT_BRIEF.md 20). The pieces with real
- * behaviour today — tuple identity and change sets — are implemented and tested here.
+ * Milestone 0 defined these shapes so the runtime and transforms could be written against a stable
+ * one, and the operators were to arrive in Milestone 4 (PROJECT_BRIEF.md 20). They have not. There
+ * is no incremental engine in this repository: every transform recomputes a whole dataset, and
+ * every interaction recompiles the whole specification. Nothing outside this file's own tests
+ * consumes a single declaration in it.
+ *
+ * That would be a harmless placeholder except for what [TupleId] says: that a tuple's identity is
+ * "preserved across incremental updates so scene nodes, selections and accessibility focus survive
+ * a data change". No code implements that, and an SDK consumer reading this file would have found a
+ * promise rather than a plan. `@InternalAsterVegaApi` is the smaller of the audit's two suggestions
+ * — the other was deletion — because the design is still the one Milestone 4 intends and the tests
+ * still pin it; what it stops is the advertisement.
  */
+@InternalAsterVegaApi
 @JvmInline
 public value class OperatorId(public val value: Int) {
   override fun toString(): String = "op$value"
@@ -19,6 +31,7 @@ public value class OperatorId(public val value: Int) {
  * Stable identity for a data tuple, preserved across incremental updates so scene nodes, selections
  * and accessibility focus survive a data change (PROJECT_BRIEF.md 21).
  */
+@InternalAsterVegaApi
 @JvmInline
 public value class TupleId(public val value: Long) {
   public companion object {
@@ -27,6 +40,7 @@ public value class TupleId(public val value: Long) {
 }
 
 /** A datum plus its stable identity. */
+@InternalAsterVegaApi
 public data class Tuple(val id: TupleId, val value: VegaValue) {
   public fun withValue(newValue: VegaValue): Tuple = Tuple(id, newValue)
 }
@@ -37,6 +51,7 @@ public data class Tuple(val id: TupleId, val value: VegaValue) {
  * Ids are sequential rather than hash-based so a rebuild of the same data produces the same ids and
  * snapshots stay comparable.
  */
+@InternalAsterVegaApi
 public class TupleIdAllocator(private var next: Long = 1L) {
   public fun allocate(): TupleId = TupleId(next++)
 
@@ -52,6 +67,7 @@ public class TupleIdAllocator(private var next: Long = 1L) {
  * later incremental implementation avoid recomputing everything, even though the first operators
  * may choose to.
  */
+@InternalAsterVegaApi
 public data class ChangeSet(
   val added: List<Tuple> = emptyList(),
   val removed: List<Tuple> = emptyList(),
@@ -91,6 +107,7 @@ public data class ChangeSet(
  * Passed in rather than reachable from global state, so an evaluation's inputs are always visible
  * at its call site.
  */
+@InternalAsterVegaApi
 public interface EvaluationContext {
   public fun signal(name: String): VegaValue
 
@@ -107,6 +124,7 @@ public interface EvaluationContext {
  * The initial implementation may recompute an operator's entire output, but the signature keeps the
  * door open for incremental evaluation (PROJECT_BRIEF.md 10.1).
  */
+@InternalAsterVegaApi
 public interface DataflowOperator<I, O> {
   public val id: OperatorId
 
@@ -121,6 +139,7 @@ public interface DataflowOperator<I, O> {
  * Deterministic: operators with no ordering constraint between them keep their insertion order, so
  * two runs of the same graph evaluate in the same sequence.
  */
+@InternalAsterVegaApi
 public object DataflowScheduler {
 
   /**
@@ -148,5 +167,6 @@ public object DataflowScheduler {
   }
 }
 
+@InternalAsterVegaApi
 public class CyclicDataflowException(public val cycle: List<OperatorId>) :
   Exception("Dataflow cycle: ${cycle.joinToString(" -> ")}")

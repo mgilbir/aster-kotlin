@@ -6958,3 +6958,74 @@ Two things in the audit's expression cluster are deliberately **not** here.
 branch that gives the controller one confined compile executor: `vega-expression` has no lock
 available, and a copy-on-write map pays an O(n) copy on every cache *hit*, which is the hot path.
 Patching it here is the piecemeal alternative the audit's own T5 argues against.
+
+### The transforms, read out of upstream's cell rather than off their names
+
+Twenty-two findings in `vega-dataflow`, and the thing they have in common is that every one of them
+was found by *reading upstream's implementation* — several are answers no careful reader would have
+guessed, and two of them turned out to disagree with each other.
+
+**A duplicate row is two rows.** `window` keyed its results by the row itself, and `VegaValue.Obj`
+is a value class over a map that compares structurally, so two identical rows were one key and
+collapsed onto the last one's answer: `[{v:1},{v:1}]` with `ops:["sum"]` came back `[2,2]` where
+upstream answers `[1,2]`, and `row_number`, `lag` and `lead` were equally wrong. `Stack` had grouped
+positions for exactly this reason and said so, one file away.
+
+**What makes two rows one group is not one question.** `aggregate` and `window` group through
+upstream's `fastmap`, which is object-backed, so JavaScript coerces every key to a string and the
+number `1001` and the string `"1001"` are one group. `stack` partitions with
+`JSON.stringify(groupby.map(get))` and they are two. `asComparableKey` existed here for the first
+rule, with a KDoc citing the join bug that motivated it, and `groupTuples` was not using it — so the
+fix looked like "one keying function" until a probe showed that `stack` needs the other one. Both
+are now what upstream has, and both say which and why.
+
+**The aggregate cell's three boxes.** Upstream's `add` is
+`if (v == null || v === '') { ++missing; return } if (v !== v) return; ++valid`, and every boundary
+in it was in the wrong place here. The empty string was a valid **0** — a dirty CSV column dragged
+every mean toward zero. A NaN was counted as missing. A value that merely coerces to NaN was
+filtered out, so the sum of `[1, "abc"]` was 1 where upstream answers NaN: a total that silently
+omits the rows it could not read, which is the failure this project exists to refuse. An infinity
+was filtered too, so `max` of `[Infinity, 1]` was 1. And `m.valid ? … : undefined` guards every
+numeric operation including `sum`, so a group of nulls has **no sum property at all** — a comment
+here claimed upstream reports 0, it was probed false, and the code followed the comment.
+
+`min`/`max` and `argmin`/`argmax` turned out to reach their answers by different routes that
+genuinely disagree: the first pair track the extreme incrementally over the raw values with
+JavaScript's `<`, so a string never displaces a number; the second fall back to `extentIndex` over
+every stored row, so `argmin` over `[Infinity, 1]` is the second row while `min` is 1, and `argmin`
+over `['abc', 1]` is the *first* row while `min` is `'abc'`. Both are transcribed now.
+
+**Two transforms were ignoring a parameter and saying nothing.** `pie` never read `sort` — a chart
+asking for its biggest slice first got data order — and `bin` never read `steps`, so a chart asking
+to be binned only on the round numbers it has axis labels for got whatever the automatic rule chose.
+Both are in upstream's own `Definition`, which is the list this module is otherwise loud about.
+
+**And `pie` was correcting its input.** Taking the absolute value and guarding a zero total showed a
+plausible chart where upstream shows a broken one — a negative slice really does run backwards over
+its neighbour there, and a zero total really does divide by zero. The KDoc presented both as
+fidelity.
+
+**`stack center` grew in two directions.** Upstream's `stackCenter` runs **one** cursor from
+`(max − sum) / 2` over the absolute values; this split it into the positive and negative cursors
+that `zero` correctly uses, so `[3, -5]` spanned `[0,3]` and `[0,-5]` instead of `[0,3]` and `[3,8]`.
+The one committed `center` fixture is all-positive, where the two rules agree.
+
+**The rest, one line each and all probed:** `bin` writes NaN for an unreadable value and null only
+for an absent one — the distinction its own header stresses for the out-of-extent infinities;
+`extent` answers `[null, null]` with an "Infinite extent" warning rather than the finite extent of a
+column upstream refuses to measure; `pivot` keeps a null key and orders columns by value rather than
+by the text of their names; `ntile` and `nth_value` are refused without a parameter, as upstream
+refuses them, rather than turning into a column of ones; `countpattern` compiles its
+specification-supplied pattern through the ECMA-262 engine the codebase adopted for exactly that
+class of bug; a force link's `distance` and `strength` expressions read the **link's row**, where
+they were evaluated against nothing and `datum.weight` was NaN for every link; `compareFieldValues`
+is `vega-util`'s `ascending`, so a string against a number compares equal and keeps its place; a
+hierarchy layout's `as` names what it names.
+
+**Two that are about the engine rather than a chart.** `Orient2d` — Shewchuk's exact orientation
+predicate, whose whole purpose is that a nearly-collinear decision comes out right — was a
+**singleton holding one set of expansion buffers**, so two voronoi layouts running at once wrote
+into each other's expansion. It is a class now, owned by the triangulation using it. And
+`Dataflow.kt` is marked `@InternalAsterVegaApi`: its `ChangeSet`/`TupleId` contract has no consumer
+outside its own tests, and `TupleId` was promising an SDK reader that identity is "preserved across
+incremental updates", which nothing implements.

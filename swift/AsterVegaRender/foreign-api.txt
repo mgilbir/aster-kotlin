@@ -261,7 +261,7 @@ BinTransform.BinSettings.step
 BinTransform.BinSettings.stop
 BinTransform.DEFAULT_MAXBINS
 BinTransform.apply(input:params:context:)
-BinTransform.binSettings(min:max:maxbins:base:step:divide:minstep:nice:anchor:)
+BinTransform.binSettings(min:max:maxbins:base:step:steps:divide:minstep:nice:anchor:)
 BinTransform.init()
 BinTransform.publishesSignal
 BinTransform.shared
@@ -1451,6 +1451,12 @@ GraticuleTransform.apply(input:params:context:)
 GraticuleTransform.init()
 GraticuleTransform.shared
 GraticuleTransform.type
+GroupKey
+GroupKey.description()
+GroupKey.hash()
+GroupKey.init(values:)
+GroupKey.isEqual(_:)
+GroupKey.values
 GroupNode
 GroupNode.blendMode
 GroupNode.bounds

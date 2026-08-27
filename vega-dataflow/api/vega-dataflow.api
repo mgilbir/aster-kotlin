@@ -105,7 +105,7 @@ public final class dev/aster/vega/dataflow/TupleIdAllocator {
 
 public final class dev/aster/vega/dataflow/transform/AggregateKt {
 	public static final fun aggregateOver (Ldev/aster/vega/dataflow/transform/AggregateOp;Ljava/lang/String;Ljava/util/List;)Ldev/aster/vega/model/VegaValue;
-	public static final fun groupKey (Ldev/aster/vega/model/VegaValue;Ljava/util/List;)Ljava/util/List;
+	public static final fun groupKey (Ldev/aster/vega/model/VegaValue;Ljava/util/List;)Ldev/aster/vega/dataflow/transform/GroupKey;
 	public static final fun groupTuples (Ljava/util/List;Ljava/util/List;)Ljava/util/Map;
 }
 
@@ -158,8 +158,8 @@ public final class dev/aster/vega/dataflow/transform/BinTransform : dev/aster/ve
 	public static final field DEFAULT_MAXBINS I
 	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/BinTransform;
 	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
-	public final fun binSettings (DDIDLjava/lang/Double;Ljava/util/List;DZLjava/lang/Double;)Ldev/aster/vega/dataflow/transform/BinTransform$BinSettings;
-	public static synthetic fun binSettings$default (Ldev/aster/vega/dataflow/transform/BinTransform;DDIDLjava/lang/Double;Ljava/util/List;DZLjava/lang/Double;ILjava/lang/Object;)Ldev/aster/vega/dataflow/transform/BinTransform$BinSettings;
+	public final fun binSettings (DDIDLjava/lang/Double;Ljava/util/List;Ljava/util/List;DZLjava/lang/Double;)Ldev/aster/vega/dataflow/transform/BinTransform$BinSettings;
+	public static synthetic fun binSettings$default (Ldev/aster/vega/dataflow/transform/BinTransform;DDIDLjava/lang/Double;Ljava/util/List;Ljava/util/List;DZLjava/lang/Double;ILjava/lang/Object;)Ldev/aster/vega/dataflow/transform/BinTransform$BinSettings;
 	public fun getPublishesSignal ()Z
 	public fun getType ()Ljava/lang/String;
 }
@@ -313,6 +313,14 @@ public final class dev/aster/vega/dataflow/transform/GraticuleTransform : dev/as
 	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
 	public fun getPublishesSignal ()Z
 	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/GroupKey {
+	public fun <init> (Ljava/util/List;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValues ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class dev/aster/vega/dataflow/transform/HeatmapTransform : dev/aster/vega/dataflow/transform/Transform {

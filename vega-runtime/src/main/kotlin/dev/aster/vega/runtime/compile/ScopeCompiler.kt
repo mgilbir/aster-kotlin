@@ -1,6 +1,7 @@
 package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.dataflow.transform.AggregateOp
+import dev.aster.vega.dataflow.transform.GroupKey
 import dev.aster.vega.dataflow.transform.ProjectionDefinition
 import dev.aster.vega.dataflow.transform.TransformContext
 import dev.aster.vega.dataflow.transform.TransformPipeline
@@ -1106,21 +1107,23 @@ internal class ScopeCompiler(
    * varying fastest.
    */
   private fun crossed(
-    groups: Map<List<VegaValue>, List<VegaValue>>,
+    groups: Map<GroupKey, List<VegaValue>>,
     facet: FacetSpec,
-  ): List<Pair<List<VegaValue>, List<VegaValue>>> {
+  ): List<Pair<GroupKey, List<VegaValue>>> {
     val ordered = groups.entries.map { it.key to it.value }
     if (!facet.crossed || facet.groupby.size < 2) return ordered
-    fun cellKey(key: List<VegaValue>): String = key.joinToString("|") { it.asString() }
+    // `GroupKey` is the identity now — it compares by upstream's own string coercion — so the
+    // hand-rolled `joinToString` that stood here has nothing left to do.
     val values =
       facet.groupby.indices.map { dimension ->
-        ordered.map { it.first[dimension] }.distinctBy { value -> value.asString() }
+        ordered.map { it.first.values[dimension] }.distinctBy { value -> value.asString() }
       }
-    val present = ordered.mapTo(mutableSetOf()) { cellKey(it.first) }
+    val present = ordered.mapTo(mutableSetOf()) { it.first }
     val filled = ordered.toMutableList()
     fun generate(prefix: List<VegaValue>) {
       if (prefix.size == facet.groupby.size) {
-        if (present.add(cellKey(prefix))) filled += prefix to emptyList()
+        val key = GroupKey(prefix)
+        if (present.add(key)) filled += key to emptyList()
         return
       }
       for (value in values[prefix.size]) generate(prefix + value)
@@ -1159,7 +1162,7 @@ internal class ScopeCompiler(
 
     return crossed(groupTuples(source, facet.groupby), facet).map { (key, rows) ->
       val fields = LinkedHashMap<String, VegaValue>(facet.groupby.size + 1)
-      facet.groupby.forEachIndexed { index, field -> fields[field] = key[index] }
+      facet.groupby.forEachIndexed { index, field -> fields[field] = key.values[index] }
       fields["count"] = VegaValue.Num(rows.size.toDouble())
       // `facet.aggregate` measures each group and writes the answers onto the group's own datum, so
       // the marks inside read them off `parent`. A ridgeline plot scales every band by the number

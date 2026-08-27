@@ -32,6 +32,9 @@ internal class Delaunator(private val coords: DoubleArray) {
 
   private val n = coords.size shr 1
 
+  /** Confined to this triangulation; see the note on the class. */
+  private val orient2d = Orient2d()
+
   private val trianglesBuffer = IntArray(maxOf(2 * n - 5, 0) * 3)
   private val halfedgesBuffer = IntArray(maxOf(2 * n - 5, 0) * 3)
 
@@ -158,7 +161,7 @@ internal class Delaunator(private val coords: DoubleArray) {
     }
 
     // Counter-clockwise, so every triangle added later has a consistent winding.
-    if (Orient2d.orient(i0x, i0y, i1x, i1y, i2x, i2y) < 0) {
+    if (orient2d.orient(i0x, i0y, i1x, i1y, i2x, i2y) < 0) {
       val i = i1
       val x = i1x
       val y = i1y
@@ -231,7 +234,7 @@ internal class Delaunator(private val coords: DoubleArray) {
       while (true) {
         q = hullNext[e]
         if (
-          Orient2d.orient(
+          orient2d.orient(
             x,
             y,
             coords[2 * e],
@@ -260,7 +263,7 @@ internal class Delaunator(private val coords: DoubleArray) {
       while (true) {
         q = hullNext[next]
         if (
-          Orient2d.orient(
+          orient2d.orient(
             x,
             y,
             coords[2 * next],
@@ -283,7 +286,7 @@ internal class Delaunator(private val coords: DoubleArray) {
         while (true) {
           q = hullPrev[e]
           if (
-            Orient2d.orient(
+            orient2d.orient(
               x,
               y,
               coords[2 * q],

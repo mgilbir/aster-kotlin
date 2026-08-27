@@ -3,6 +3,7 @@ package dev.aster.vega.dataflow.transform
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.field
+import dev.aster.vega.model.isMissing
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -150,6 +151,17 @@ class UpstreamD3StatisticsVectorsTest {
           show(
             Distributions.quantiles(rows.map { it.field("v").asDouble() }, listOf(p)).firstOrNull()
           )
+      } else if (op == AggregateOp.SUM && rows.all { it.field("v").isMissing }) {
+        // d3's `sum` and Vega's aggregate `sum` are **not** the same function over nothing.
+        // `d3.sum` starts an accumulator at 0 and skips what it cannot read, so a column of nulls
+        // sums to 0; Vega's cell guards every numeric operation with `m.valid ? … : undefined`, so
+        // that group has no `sum` property at all. Probed both ways. This engine implements the
+        // aggregate, so what is asserted here is that it answers *nothing* — a 0 would pass an
+        // `isValid` filter that upstream's answer does not.
+        expected = "no answer"
+        actual =
+          if (aggregateOver(op, "v", rows) == VegaValue.Null) "no answer"
+          else show(aggregateOver(op, "v", rows).asDouble())
       } else {
         expected = show(scalar(vector["result"])?.asDouble())
         actual = show(aggregateOver(op!!, "v", rows).asDouble())

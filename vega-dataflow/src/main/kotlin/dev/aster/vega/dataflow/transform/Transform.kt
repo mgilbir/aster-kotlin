@@ -6,6 +6,7 @@ import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.expression.ExpressionEvaluationException
 import dev.aster.vega.expression.ExpressionResult
 import dev.aster.vega.expression.ExpressionScope
+import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.InternalAsterVegaApi
@@ -13,7 +14,7 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
-import dev.aster.vega.model.isMissing
+import dev.aster.vega.model.isNullish
 import kotlinx.datetime.TimeZone
 
 /**
@@ -409,29 +410,41 @@ internal class TupleExpression(
 }
 
 /**
- * Vega's ascending comparator for arbitrary field values.
+ * Vega's ascending comparator for arbitrary field values, which is `vega-util`'s `ascending`:
+ * ```js
+ * (u < v || u == null) && v != null ? -1
+ *   : (u > v || v == null) && u != null ? 1
+ *   : (v = v instanceof Date ? +v : v, u = u instanceof Date ? +u : u) !== u && v === v ? -1
+ *   : v !== v && u === u ? 1
+ *   : 0
+ * ```
  *
- * Null and NaN sort first in ascending order, which is what upstream's `collect` does — verified,
- * and the opposite of the SQL convention many people expect. A descending sort negates the result,
- * so those values move to the end rather than staying pinned at the front.
+ * Absent values sort first and NaN sorts after them, which is what upstream's `collect` does — and
+ * the opposite of the SQL convention many people expect. A descending sort negates the result, so
+ * those values move to the end rather than staying pinned at the front.
+ *
+ * The `<` is **JavaScript's** relational comparison, so two strings compare lexicographically and
+ * everything else compares numerically. A pair it cannot order — a string against a number —
+ * compares **equal**, which leaves them where they were, because both engines' sorts are stable.
+ * Falling back to a lexicographic comparison of the two, which is what this did, ordered a mixed
+ * column differently from upstream while looking like the more helpful answer.
  *
  * Public because a discrete scale domain's `sort` orders its values with the same comparator, and
  * two orderings that were meant to agree are the kind of thing that silently stops agreeing.
  */
 public fun compareFieldValues(left: VegaValue, right: VegaValue): Int {
-  val leftMissing = left.isMissing
-  val rightMissing = right.isMissing
-  if (leftMissing || rightMissing) {
-    return when {
-      leftMissing && rightMissing -> 0
-      leftMissing -> -1
-      else -> 1
-    }
+  val leftAbsent = left.isNullish
+  val rightAbsent = right.isNullish
+  val ordering = JsSemantics.compare(left, right)
+  val leftNaN = left is VegaValue.Num && left.value.isNaN()
+  val rightNaN = right is VegaValue.Num && right.value.isNaN()
+  return when {
+    ((ordering != null && ordering < 0) || leftAbsent) && !rightAbsent -> -1
+    ((ordering != null && ordering > 0) || rightAbsent) && !leftAbsent -> 1
+    leftNaN && !rightNaN -> -1
+    rightNaN && !leftNaN -> 1
+    else -> 0
   }
-  val leftNumber = left.asDouble()
-  val rightNumber = right.asDouble()
-  if (!leftNumber.isNaN() && !rightNumber.isNaN()) return leftNumber.compareTo(rightNumber)
-  return left.asString().compareTo(right.asString())
 }
 
 /** Builds a comparator from Vega's `{field, order}` sort parameter, accepting arrays for both. */
