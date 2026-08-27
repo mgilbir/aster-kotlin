@@ -1,6 +1,8 @@
 package dev.aster.vega.compose.mp
 
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -181,6 +183,70 @@ class ComposePointerTest {
     // the phase exists so a host persists a viewport once rather than once a frame — and nothing
     // ever passed it. Exactly one, carrying a zero increment: the movement is already reported.
     assertEquals(listOf(VectorD(0.0, 0.0)), ends, "the pan must be closed exactly once")
+  }
+
+  /**
+   * **A drag survives the host feeding the viewport back**, which is the documented wiring.
+   *
+   * `Modifier.pointerInput` cancels and restarts its coroutine whenever a key changes, and the
+   * viewport was among the keys — so the first pan increment, fed back into `viewportOffset` the
+   * way this composable's own documentation tells a host to, cancelled the detector that produced
+   * it. A continuous drag became a sequence of one-increment gestures, each starting from a fresh
+   * centroid: the chart stuttered and never really followed the finger.
+   *
+   * The audit's open question Q2 asked whether some Compose version synthesises a re-down for a
+   * restarted `pointerInput` mid-gesture and hides this. This test is the answer it asked for, and
+   * it is worth having either way: it is the only thing that pins the viewport out of the keys, and
+   * a future edit adding it back reads as harmless.
+   *
+   * Asserted on the **count** as well as the total. Restarting still delivers *some* movement —
+   * which is why the defect was survivable enough to ship — but each restart costs the touch slop
+   * again, so the reports arrive fewer and smaller. Two increments of a four-move drag is the shape
+   * of a detector being cancelled; four is the shape of one that ran.
+   */
+  @Test
+  fun `a drag continues while the host feeds the viewport back`() = runComposeUiTest {
+    val scene = scene()
+    val moves = mutableListOf<VectorD>()
+    var offset = VectorD.Zero
+    setContent {
+      // The documented wiring: the host accumulates the pan and hands it straight back.
+      var accumulated by
+        androidx.compose.runtime.remember {
+          androidx.compose.runtime.mutableStateOf(VectorD.Zero)
+        }
+      VegaChart(
+        scene,
+        modifier = Modifier.size(scene.width.dp, scene.height.dp),
+        viewportOffset = accumulated,
+        onPan = { delta, ended ->
+          if (!ended) {
+            moves.add(delta)
+            accumulated = VectorD(accumulated.dx + delta.dx, accumulated.dy + delta.dy)
+            offset = accumulated
+          }
+        },
+      )
+    }
+
+    onRoot().performTouchInput {
+      down(Offset(30f, 40f))
+      moveTo(Offset(55f, 40f))
+      moveTo(Offset(80f, 40f))
+      moveTo(Offset(105f, 40f))
+      moveTo(Offset(130f, 40f))
+      up()
+    }
+
+    assertTrue(
+      moves.size >= 4,
+      "a four-move drag should report four increments; got ${moves.size}: $moves",
+    )
+    // The whole travel less one touch slop, and *one* slop rather than one per move — which is what
+    // a restarted detector would charge.
+    val travelled = moves.sumOf { it.dx }
+    assertTrue(travelled > 70.0, "reported $travelled units of a 100-unit drag")
+    assertEquals(travelled, offset.dx, 0.001, "the host's own accumulation must match")
   }
 
   @Test

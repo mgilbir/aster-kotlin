@@ -129,8 +129,10 @@ dependencies {
 }
 ```
 
-`vega-model`, `vega-expression`, `vega-dataflow`, `vega-scene` and `vega-svg` are published too and
-arrive transitively; depend on one directly only to use it on its own.
+`vega-model`, `vega-expression`, `vega-dataflow`, `vega-scene`, `vega-svg` and `vega-loader` are
+published too and arrive transitively; depend on one directly only to use it on its own.
+`vega-loader` is the JVM file-and-network loader, and it was published, ABI-dumped and missing from
+this sentence — a module a consumer can depend on and could not find named.
 
 On **iOS and macOS**, Swift Package Manager. The engine arrives as a pre-compiled XCFramework attached
 to the release, so a consuming build needs no Kotlin toolchain and never runs Gradle:
@@ -871,6 +873,8 @@ JSON specification            vega-model
 Runtime compiler              vega-runtime
         ↓
 Dataflow graph                vega-dataflow, vega-expression
+        ↑
+Data loading (opt-in)         vega-loader
         ↓
 Immutable scene snapshot      vega-scene
         ↓

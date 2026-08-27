@@ -509,12 +509,38 @@ public class VegaChartController(
    * controller has to know that factor or every hit test misses by exactly it — which is why this
    * is a required part of the host contract, not an optimization. Interactive pan and zoom are
    * tracked separately in [InteractionState] and applied on top.
+   *
+   * **One controller draws into one view.** This property is the reason it has to be said: two
+   * views of different sizes sharing a controller each write their own fit here, so the last one
+   * laid out wins and the other one's taps miss by the ratio between them. Nothing else in the
+   * class is per-view, so this is the whole of the restriction — and the same controller behind two
+   * views is otherwise a reasonable-looking thing to try, which is why it is now refused loudly in
+   * a debug build rather than producing a chart that ignores half its taps.
+   *
+   * A host that genuinely wants two views of one chart builds two controllers from the same
+   * specification; they compile to the same scene, which is a value.
    */
   public var contentScale: Double = 1.0
     set(value) {
       // A zero or non-finite scale would make the inverse mapping meaningless; ignore it rather
       // than poisoning every subsequent hit test.
-      if (value > 0.0 && value.isFinite()) field = value
+      if (value > 0.0 && value.isFinite()) {
+        // Two *different* non-trivial fits mean two views. Reported rather than thrown: a host may
+        // legitimately be re-laying-out one view, and a resize writes the same property.
+        if (field != 1.0 && value != field) {
+          report(
+            VegaDiagnostic(
+              severity = DiagnosticSeverity.WARNING,
+              code = DiagnosticCodes.INTERACTION_UNSUPPORTED,
+              message =
+                "contentScale changed from $field to $value. If two views share this controller, " +
+                  "each will overwrite the other's fit and one of them will hit-test wrongly: a " +
+                  "controller belongs to one view. If this is a resize, ignore this.",
+            )
+          )
+        }
+        field = value
+      }
     }
 
   /** The most recent compilation, so a host can read the scales and signals it resolved. */

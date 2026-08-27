@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Changed
 
+- **`VegaLiteCompilation.vega` states its null contract.** An ERROR-severity diagnostic does **not**
+  imply `vega == null`: a document can compile to a usable chart and still report that one construct
+  in it was not honoured. Null means no specification was produced at all. A host should check for
+  null *and* read the diagnostics.
+
+- **`vega-loader` is named in the README.** It is published and ABI-dumped, and was absent from both
+  the module list and the pipeline diagram — a module a consumer can depend on and could not find.
+
 - **`SceneExporter.toPng` no longer takes a `quality`.** PNG is lossless and Android documents the
   argument as ignored for it, so a caller passing 80 to get a smaller file got the same bytes and no
   way to find out why. A smaller file is `BitmapExportOptions.pixelScale`.
@@ -175,6 +183,18 @@ section here does not get released.
   second keyed on the path's identity.
 
 ### Fixed
+
+- **A mark's items are in data order in the scene, as upstream's are.** `zindex` was applied when the
+  scene was *built*, and upstream applies it when it draws — which this engine also does, in
+  `paintOrder`, in every renderer and in the hit index. Sorting twice was not a wrong picture, but it
+  made the scene tree a different tree from upstream's: `children` read positionally gave a different
+  row than `items` does, and **no differential fixture could carry an item `zindex` at all**, because
+  the record is compared position by position. The new `item-zindex` fixture is what found it.
+
+- **A controller shared between two views says so.** `contentScale` is per-view, so two views of
+  different sizes each overwrite the other's fit and one of them hit-tests by the ratio between them.
+  Documented on the property, and a second conflicting fit now reports
+  `VEGA_INTERACTION_UNSUPPORTED`.
 
 - **`invert` is the inverse of `apply` on a multi-stop pow or log scale.** `apply` has been piecewise
   since a three-stop power scale was found interpolating across both segments; `invert` still read

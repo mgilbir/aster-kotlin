@@ -11,7 +11,20 @@ import kotlinx.datetime.TimeZone
 
 /** A compiled Vega-Lite specification: the Vega it became, and everything it could not honour. */
 public data class VegaLiteCompilation(
-  /** The Vega specification, ready to hand to the runtime. Null only if nothing could be built. */
+  /**
+   * The Vega specification, ready to hand to the runtime. Null only if nothing could be built.
+   *
+   * **An ERROR does not imply null**, and the audit was right that this needed saying: a document
+   * can compile to a usable chart and still report that one construct in it was not honoured — an
+   * encoding channel dropped, a transform not implemented, a layer member that would not parse.
+   * That is the whole shape of this engine's diagnostic model, and refusing to draw the other
+   * ninety per cent would serve nobody.
+   *
+   * Null means the compiler produced no specification at all: the input was not an object, it
+   * exceeded a limit in `Limits`, or a defect was caught by the guard. A host following the
+   * README's stop-on-null pattern is therefore checking the right thing, and should *also* read
+   * [diagnostics] and show what they say — a chart that drew is not a chart that drew everything.
+   */
   val vega: VegaValue.Obj?,
   val diagnostics: List<VegaDiagnostic>,
 ) {

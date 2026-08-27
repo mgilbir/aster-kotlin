@@ -1,0 +1,59 @@
+{
+  "marks": [
+    {
+      "fill": "#4c78a8",
+      "height": 40,
+      "role": "mark",
+      "type": "rect",
+      "width": 70,
+      "x": 0,
+      "y": 10
+    },
+    {
+      "fill": "#e45756",
+      "height": 40,
+      "role": "mark",
+      "type": "rect",
+      "width": 70,
+      "x": 30,
+      "y": 10
+    },
+    {
+      "fill": "#54a24b",
+      "height": 40,
+      "role": "mark",
+      "type": "rect",
+      "width": 70,
+      "x": 60,
+      "y": 10
+    },
+    {
+      "align": "center",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 14,
+      "role": "mark",
+      "text": "under",
+      "type": "text",
+      "x": 70,
+      "y": 34
+    },
+    {
+      "role": "mark",
+      "stroke": "#000",
+      "strokeWidth": 2,
+      "type": "rule",
+      "x": 0,
+      "x2": 140,
+      "y": 30,
+      "y2": 30
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 60,
+    "width": 142
+  },
+  "spec": "item-zindex.vg.json",
+  "vegaVersion": "6.3.1"
+}
