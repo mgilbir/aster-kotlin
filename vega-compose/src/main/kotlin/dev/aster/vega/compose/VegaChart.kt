@@ -7,8 +7,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.aster.vega.android.AndroidImageResolver
+import dev.aster.vega.android.AndroidTextEngine
 import dev.aster.vega.android.VegaChartView
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.runtime.ChartEvent
@@ -77,6 +79,48 @@ public fun VegaChart(
   onPlaced: ((ScenePlacement) -> Unit)? = null,
   onEvent: ((ChartEvent) -> Unit)? = null,
 ) {
+  // **Stable across recompositions**, and this is load-bearing rather than tidiness.
+  //
+  // `VegaChartView.imageResolver` and `.fontResolver` both rebuild the renderer — and with it the
+  // image cache and the text engine — when the value assigned differs by *identity*. A lambda
+  // written at a call site is a fresh instance on every recomposition, so `update` handed the view
+  // a different object each time: the renderer was rebuilt per frame, the image cache was emptied
+  // per frame, and the "a URL is asked once, not once per frame" contract the view's own
+  // documentation states became "once per frame" for exactly the hosts that supplied a resolver.
+  // Which is all of them that draw an image.
+  //
+  // The trampolines below are remembered and never replaced, so the view sees one object for the
+  // life of the composition; `rememberUpdatedState` keeps them calling the newest lambda. Keyed on
+  // *nullability* rather than on the value, because null means something different from a resolver
+  // that answers null — the view builds a different text engine for it.
+  val currentImageResolver by rememberUpdatedState(imageResolver)
+  val stableImageResolver = remember { AndroidImageResolver { currentImageResolver.resolve(it) } }
+  val currentFontResolver by rememberUpdatedState(fontResolver)
+  val stableFontResolver =
+    remember(fontResolver == null) {
+      if (fontResolver == null) null else { name: String -> currentFontResolver?.invoke(name) }
+    }
+  val currentOnUnresolvedImage by rememberUpdatedState(onUnresolvedImage)
+  val stableOnUnresolvedImage =
+    remember(onUnresolvedImage == null) {
+      if (onUnresolvedImage == null) null
+      else
+        { url: String ->
+          currentOnUnresolvedImage?.invoke(url)
+          Unit
+        }
+    }
+  val currentOnPlaced by rememberUpdatedState(onPlaced)
+  val stableOnPlaced =
+    remember(onPlaced == null) {
+      if (onPlaced == null) null
+      else
+        { placed: ScenePlacement ->
+          currentOnPlaced?.invoke(placed)
+          Unit
+        }
+    }
+
   AndroidView(
     modifier = modifier,
     factory = { context ->
@@ -84,24 +128,24 @@ public fun VegaChart(
         // Before the controller, because assigning it compiles, and `fontResolver` is documented as
         // wanting to be set before the first compile — the view rebuilds its text engine when it
         // changes, and a chart already measured was measured with whatever this was then.
-        this.fontResolver = fontResolver
+        this.fontResolver = stableFontResolver
         this.accessibilityMaxExposedMarks = accessibilityMaxExposedMarks
         this.tooltipsEnabled = tooltipsEnabled
-        this.imageResolver = imageResolver
-        this.onUnresolvedImage = onUnresolvedImage
-        this.onPlaced = onPlaced
+        this.imageResolver = stableImageResolver
+        this.onUnresolvedImage = stableOnUnresolvedImage
+        this.onPlaced = stableOnPlaced
         this.controller = controller
       }
     },
     update = { view ->
       // Assigned unconditionally: every one of these setters returns early when the value has not
       // changed, so recomposition costs a comparison and does not churn the view.
-      view.fontResolver = fontResolver
+      view.fontResolver = stableFontResolver
       view.accessibilityMaxExposedMarks = accessibilityMaxExposedMarks
       view.tooltipsEnabled = tooltipsEnabled
-      view.imageResolver = imageResolver
-      view.onUnresolvedImage = onUnresolvedImage
-      view.onPlaced = onPlaced
+      view.imageResolver = stableImageResolver
+      view.onUnresolvedImage = stableOnUnresolvedImage
+      view.onPlaced = stableOnPlaced
       // Assigning the same controller would reset the view's state, so only swap when it changed.
       if (view.controller !== controller) view.controller = controller
       view.invalidateIfStale()
@@ -168,7 +212,34 @@ public fun VegaChart(
 public fun rememberVegaChartController(
   scene: Scene = Scene.empty(),
   locale: VegaLocale = VegaLocale.EnglishUS,
-): VegaChartController =
-  remember(locale) {
-    VegaChartController(initialScene = scene, locale = locale)
+  /**
+   * A face this app ships, by the family name a specification asks for; null leaves it to Android.
+   *
+   * The **same** resolver to pass to [VegaChart], and for the same reason the view documents: a
+   * chart is measured when it is compiled and drawn later, so the two have to agree about the faces
+   * or every label sits in a box laid out for different glyphs.
+   */
+  fontResolver: ((String) -> android.graphics.Typeface?)? = null,
+): VegaChartController {
+  // **The device's own text engine, not the deterministic default.**
+  //
+  // A controller built with no `textEngine` measures with `MetricTextEngine` — fixed ratios, font
+  // scale 1, no host faces — while the `VegaChartView` underneath draws with `AndroidTextEngine`
+  // at the reader's own font scale and with the host's faces. So a Compose host following this
+  // function's own name got a chart laid out for one set of metrics and painted with another: at
+  // the largest accessibility text size the labels are drawn about a third wider than the boxes
+  // reserved for them, which is overlapping axis labels and clipped titles on precisely the setting
+  // that exists to make text readable.
+  //
+  // Nothing outside `vega-android-canvas` could reach a compatible engine before this — the view's
+  // is exposed but explicitly not safe to compile with, and `newCompatibleTextEngine()` needs the
+  // view. Building one here from the composition's own configuration needs neither.
+  val fontScale = LocalConfiguration.current.fontScale
+  return remember(locale, fontScale, fontResolver == null) {
+    VegaChartController(
+      initialScene = scene,
+      locale = locale,
+      textEngine = AndroidTextEngine(fontScale, fontResolver ?: { null }),
+    )
   }
+}

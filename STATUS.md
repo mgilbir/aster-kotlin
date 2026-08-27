@@ -7346,3 +7346,144 @@ two different signal names for one specification, and emitted Vega differing on 
 mentions the field. And a number written into an expression is `String(n)`: two hand-rolled versions
 wrote `1.0E-7` for `1e-7`, and the one in `LayoutSize` saturated `toLong()` at 9.2e18 while its own
 guard let 1e21 through, so a step over that came out as `9223372036854775807`.
+
+### One point, two spaces: the audit's host cluster
+
+`ScenePlacement` exists because the same arithmetic — where inside its slot the chart was actually
+drawn — has to be agreed on by the drawing, by every gesture, by the accessibility frames and by
+whatever a host puts on top. It was introduced after this project had twice shipped a finger landing
+beside the mark it looked like it hit. Four dispatch sites were still not going through it, and each
+is the same shape: a point in one space handed to something that reads another.
+
+**A pinch's focus.** `ScaleGestureDetector` reports in raw view coordinates and those went straight
+into `ChartInputEvent.Zoom`, while `toPointD` takes the placement's origin off every other point in
+the file. On any padded or centred chart the zoom pulled towards a point offset from the reader's
+fingers by exactly that origin. There is one conversion now and both sites use it.
+
+**A screen reader's activation.** The helper dispatched `Tap(bounds.centerX, bounds.centerY)` — those
+are *scene* coordinates — into a controller that reads placement-relative view pixels and then
+divides by the fit scale. The two agree only while the fit scale is 1 and nothing has been panned, so
+a TalkBack double-tap activated whichever mark happened to sit at the scene coordinate read as a view
+coordinate. Someone using a screen reader cannot see that happen, which is what makes it the worst of
+the four.
+
+**The drawn viewport's far corner.** Its near corner came from `placement()`, which centres, and its
+far corner was the padding box's — `width - paddingRight`. So the viewport was too large by the whole
+of the slack, all of it on the right and the bottom. Three things followed: an opaque scene
+background, which Vega-Lite gives every chart, painted a margin down two of the four sides; the clip
+let a zoomed chart's content escape there; and the fit scale, recomputed from that box, disagreed
+with the one reported to the host and used by every touch.
+
+**The tooltip's anchor.** Placement-relative, drawn onto a canvas that is not, so the bubble sat off
+by the origin.
+
+### Two hosts that could not finish a gesture, and one that could not start one
+
+**Compose Multiplatform could not pan.** `Modifier.pointerInput` restarts its coroutine — cancelling
+whatever gesture is in flight — whenever a key changes, and the viewport was among the keys. The
+viewport is precisely what a pan changes: the wiring the composable's own documentation describes
+feeds `InteractionState.viewportOffset` back in, so the first pan increment cancelled the detector
+that produced it. A continuous pan was a sequence of one-increment gestures, each starting from a
+fresh centroid. It reads the viewport through a `State` now and keeps it out of the keys.
+
+**Neither Kotlin host could end one.** `GestureDetector` has no "scroll ended" callback and
+`detectTransformGestures` reports increments and nothing else, so the Android View never dispatched
+`GesturePhase.ENDED` for a pan and the Compose Multiplatform chart passed `ended = false` to both of
+its callbacks always — a parameter documented on both and dead on both. The controller emits
+`ChartEvent.ViewportChanged` only on `ENDED`, which is the entire point of the phase: a host persists
+or announces a viewport once rather than sixty times a second. So on Compose Multiplatform that event
+never fired at all. Closing it on the MP side needed a second `pointerInput` watching the same
+stream, because `detectTransformGestures` is a `PointerInputScope` extension and `awaitEachGesture`
+hands out a restricted scope that cannot call one — and the watcher has to read
+`positionChangedIgnoreConsumed`, since by the final pass the detector has consumed every change it
+is looking at.
+
+**And a chart claimed keys it did nothing with.** `onKeyDown` returned true for TAB, ESC, HOME, END
+and the four arrows while `dispatch` has no behaviour for a key and no event stream reaches one. TAB
+never moved focus off the chart, ESC never dismissed the sheet it was in; on a television, where the
+d-pad *is* the keyboard, the chart could be entered and not left.
+
+### A channel two renderers drew and two ignored
+
+`blend` reached the Android canvas — all sixteen CSS modes, with the ones `PorterDuff` lacks reported
+rather than substituted — and reached exported SVG. The Compose Multiplatform walk and the Apple walk
+dropped it on the floor: no drawing, no diagnostic, no row in the feature table saying so. One
+specification, two pictures, and only one of the hosts admitting to a gap.
+
+Both now carry it, through Compose's `BlendMode` and CoreGraphics's `CGBlendMode`, which have all
+sixteen between them because CSS took its list from the same PDF blend modes CoreGraphics did. The
+parity recorder carries it too, and `encode-channels` joins the scene-walk goldens — so the one
+fixture in the corpus with a `blend` on it is now compared call for call across the two walks, which
+is what would have caught this in the first place.
+
+**And the golden list is discovered rather than declared.** It was hard-coded on both sides, which is
+how a golden quietly stops being asserted on one engine while still sitting in the repository looking
+asserted — the exact failure `test-fixtures/host-conformance/README.md` warns about, reproduced by
+the pair of files whose whole job is catching divergence between two implementations. Both scan the
+directory now, so a fixture added to one immediately obliges the other.
+
+One thing is **reported and not fixed**: a group's `clipPath` is honoured on the Android canvas and
+in SVG and ignored by the Compose Multiplatform walk. `SceneDrawTarget.beginGroup` takes a rectangle,
+so honouring it means widening that seam — and widening it for the Swift walk in the same step, since
+the two are compared call for call. A chart using one draws *more* than it should there rather than
+less, which is visible rather than silent.
+
+### The renderers' own allocation claims, and the metrics they measured with
+
+**`AndroidCanvasSceneRenderer`'s header says it allocates nothing per mark.** It built a
+`DashPathEffect` and three lists for every dashed node, and a gradient shader plus two array copies
+for every gradient-painted node, on every frame. A chart with a dashed gridline per tick allocates a
+few dozen of each per frame; during a pan that is a few thousand a second, for patterns that come
+from the *specification* and are therefore identical every time. Both are cached by what they are
+built from, bounded so a document that varies one per datum cannot grow them.
+
+**The Compose Multiplatform draw path had a text cache of eight.** Eight is the number of labels on a
+small axis, so on any real chart every run past the eighth was shaped from scratch per frame —
+resolving the family, breaking the runs and positioning every glyph. And each mark's path was
+re-transformed per frame although the `PathData` behind it is the same object on every frame of a
+pan: a ten-thousand-symbol scene rebuilt ten thousand lists and thirty thousand points a frame for a
+picture that had not changed. Both are cached; the second is keyed on the path's **identity**,
+because comparing a thousand commands to decide whether to rebuild a thousand commands saves nothing.
+
+**And a Compose host could not get the metrics its chart was drawn with.** `rememberVegaChartController`
+built a controller with the deterministic default engine — fixed ratios, font scale 1, no host faces —
+while the `VegaChartView` underneath drew with `AndroidTextEngine` at the reader's own font scale and
+with the host's faces. At the largest accessibility text size that lays every label out about a third
+narrower than it is painted, which is overlapping axis labels on precisely the setting that exists to
+make text readable. Nothing outside `vega-android-canvas` could reach a compatible engine: the view's
+own is exposed but documented as unsafe to compile with, and `newCompatibleTextEngine()` needs a view.
+The demo was making the same mistake in its own code, and is fixed alongside.
+
+**Two seams that voided their own contracts.** `imageResolver` and `fontResolver` rebuild the view's
+renderer when the value assigned differs by *identity*, and `VegaChart`'s `update` block handed over a
+fresh lambda every recomposition — so the renderer was rebuilt and the image cache emptied per frame,
+turning "a URL is asked once, not once per frame" into its opposite for every host that supplies a
+resolver. The composable passes stable trampolines now, the same shape it already used for `onEvent`.
+
+### Smaller, and one gate that was not armed
+
+- **A font stack tries its concrete names before its generic**, which is what CSS says and what every
+  browser does. A generic anywhere in the list preempted the platform resolution of everything before
+  it, so a device that *did* have the named face never drew in it. The `Typeface.DEFAULT` probe has a
+  known false negative on an OEM build whose default family is itself a named face; that is
+  over-eager *reporting* rather than wrong drawing, and the platform exposes nothing that
+  distinguishes the two.
+- **A gradient is resolved against the same box everywhere.** The Android View used the geometric
+  rectangle; upstream's `color(context, item, value)` uses `item.bounds`, which `boundStroke` has
+  already widened, and both the SVG renderer here and the Compose Multiplatform walk do the same.
+- **TalkBack is not re-announced sixty times a second during a pan.** The semantic tree was
+  invalidated on every published snapshot; it is invalidated when what it *says* changes now, and a
+  frame that only moved is re-read by `ExploreByTouchHelper` without one.
+- **`onHover` is mouse and stylus only**, which is what it documents and what hover means.
+- **A rectangle's image under a transform maps all four corners.** Two opposite corners describe it
+  only while the transform maps axes to axes; nothing this engine compiles reaches the difference
+  today, and a `clip` built from a diagonal would have been silently wrong if one ever did.
+
+**And the gradle gate now compiles the common metadata.** Compiling every target is not the same as
+compiling the common source set: a `commonMain` file naming something only the JVM and Native
+standard libraries have — `OutOfMemoryError`, which is not in `kotlin-stdlib-common` — builds for
+every target and fails the metadata compilation, which is what a consumer of the multiplatform
+artifact resolves against. Two commits on this branch's own stack shipped exactly that while
+`check.sh` reported green. Both are corrected here, and the catch that needed it is `Exception`
+rather than `Throwable` now — which is also the *right* rule, since an `Error` is not a failed
+compile and a `StackOverflowError` is not catchable at all on Kotlin/Native.

@@ -26,18 +26,23 @@ import XCTest
 /// When this fails, one of the walks changed. Read the diff before regenerating anything.
 final class SceneWalkParityTests: XCTestCase {
 
-  /// The same list `SceneWalkGoldenTest` writes, and it is asserted rather than trusted below.
-  private let fixtures = [
-    "bar",
-    "label-overlap",
-    "line-area",
-    "symbols-and-curves",
-    "gradient-fills",
-    "arc-padding",
-    "text-anchors",
-    "axis-style",
-    "density-heatmaps",
-  ]
+  /// The fixtures, **discovered from the committed goldens** rather than listed here.
+  ///
+  /// It was a hard-coded list, and so was `SceneWalkGoldenTest`'s on the other side. Two lists is
+  /// how a golden quietly stops being asserted on one engine while still sitting in the repository
+  /// looking asserted — the exact failure `test-fixtures/host-conformance/README.md` warns about,
+  /// reproduced by the file whose whole job is catching divergence between two implementations.
+  /// Both sides read the directory now, so a fixture added to one immediately obliges the other.
+  private var fixtures: [String] {
+    get throws {
+      let directory = Self.repositoryRoot.appendingPathComponent("test-fixtures/scene-walk")
+      return try FileManager.default
+        .contentsOfDirectory(atPath: directory.path)
+        .filter { $0.hasSuffix(".calls.txt") }
+        .map { String($0.dropLast(".calls.txt".count)) }
+        .sorted()
+    }
+  }
 
   private static let repositoryRoot = URL(fileURLWithPath: #filePath)
     .deletingLastPathComponent()  // AsterVegaRenderTests
@@ -47,6 +52,8 @@ final class SceneWalkParityTests: XCTestCase {
     .deletingLastPathComponent()  // the repository
 
   func testEveryGoldenIsReproducedByThisWalk() throws {
+    let fixtures = try self.fixtures
+    XCTAssertFalse(fixtures.isEmpty, "no scene-walk goldens found; the directory scan is wrong")
     for name in fixtures {
       let golden = Self.repositoryRoot
         .appendingPathComponent("test-fixtures/scene-walk/\(name).calls.txt")
@@ -82,6 +89,8 @@ final class SceneWalkParityTests: XCTestCase {
   /// because it compared nothing. An absent golden, an empty one, or a fixture list that stopped
   /// resolving would all otherwise be silent.
   func testTheGoldensAreArmed() throws {
+    let fixtures = try self.fixtures
+    XCTAssertFalse(fixtures.isEmpty, "no scene-walk goldens found; the directory scan is wrong")
     for name in fixtures {
       let golden = Self.repositoryRoot
         .appendingPathComponent("test-fixtures/scene-walk/\(name).calls.txt")

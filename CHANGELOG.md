@@ -8,6 +8,27 @@ section here does not get released.
 
 ### Changed
 
+- **`SceneDrawTarget` and `DrawTarget` carry the item's blend mode.** Both the Compose Multiplatform
+  renderer and the Apple one ignored the `blend` channel outright — no drawing, no diagnostic, no
+  row in the feature table — while the Android View mapped all sixteen and exported SVG carried all
+  sixteen. One specification therefore produced two different pictures depending on the host, and
+  only one of the two admitted to a gap. Both now map every mode, through `BlendMode` on Compose and
+  `CGBlendMode` on Apple. A custom target has one more parameter on each of its five draw methods;
+  on Kotlin it defaults to `SceneBlendMode.NORMAL`.
+
+- **`rememberVegaChartController` takes the device's own text metrics.** It built a controller with
+  the deterministic default engine — fixed ratios, font scale 1, no host faces — while the view
+  underneath drew with `AndroidTextEngine` at the reader's own font scale. At the largest
+  accessibility text size that lays every label out about a third narrower than it is painted. It
+  now builds an `AndroidTextEngine` from the composition's configuration, and takes the same
+  `fontResolver` the chart does.
+
+- **`SceneExporter` centres, caps and says what it needs.** The export drew at the top-left of the
+  page while every renderer centres; a `pixelScale` of 30 asked for a nine-gigabyte bitmap with
+  nothing to stop it; and the default renderer has neither the host's faces nor its image resolver,
+  so an export taken the obvious way was not the chart on screen. `VegaChartView.exporter()` hands
+  over one built from the view's own seams.
+
 - **A Vega-Lite specification with no `data` compiles, and reads a table called `source`.** It used
   to be an ERROR *and* a non-null result whose marks read a dataset called `""` — so a host
   following the README's stop-on-null pattern handed the runtime something broken. Upstream compiles
@@ -116,7 +137,94 @@ section here does not get released.
   **`isSafeHref`**, upstream's `href` allowlist as a predicate a host can apply to the link a
   `MarkClicked` carries before following it.
 
+### Performance
+
+- **The Android draw path allocates per *pattern*, not per mark per frame.** A `DashPathEffect` and
+  three lists for every dashed node, and a gradient shader plus two array copies for every
+  gradient-painted node, were built on every frame — against a file header stating that it allocates
+  nothing per mark. Both are cached by what they are built from, bounded, since both come from the
+  specification rather than from the data.
+
+- **The Compose Multiplatform draw path stops re-shaping text and rebuilding paths every frame.**
+  `rememberTextMeasurer()` defaults to eight cached layouts, which is the number of labels on a small
+  axis, so every run past the eighth was shaped from scratch per frame; and each mark's path was
+  re-transformed per frame although the `PathData` behind it is the same object. Both are cached, the
+  second keyed on the path's identity.
+
 ### Fixed
+
+- **A continuous pan or pinch survives its own first pixel on Compose Multiplatform.** The chart's
+  `pointerInput` was keyed on the viewport, and a `pointerInput` restarts its coroutine — cancelling
+  whatever gesture is in flight — whenever a key changes. The documented wiring feeds
+  `InteractionState.viewportOffset` back into the composable, so the first pan increment cancelled
+  the detector that produced it: a drag was a sequence of one-increment gestures, each from a fresh
+  centroid. The viewport is read through a `State` now and kept out of the keys.
+
+- **A pinch on the Android View zooms about the reader's fingers.** `ScaleGestureDetector` reports
+  its focus in raw view coordinates and those went straight through, while every other point the
+  view dispatches has the placement's origin taken off. On any padded or centred chart the zoom
+  pulled towards a point offset by exactly that origin. There is one conversion now and both
+  dispatch sites use it.
+
+- **A TalkBack activation hits the mark the reader was on.** The helper dispatched a tap in **scene**
+  coordinates into a controller that reads placement-relative view pixels and then divides by the
+  fit scale — so the two agreed only at scale 1, unpanned. A screen-reader user has no way to see
+  that happen.
+
+- **The drawn viewport's far corner comes from the placement.** It was the padding box's, so it was
+  too large by the whole of the centring slack, all of it on the right and the bottom: an opaque
+  scene background — Vega-Lite gives every chart `"background": "white"` — painted a margin down two
+  of the four sides, a zoomed chart's content escaped there, and the fit scale used for drawing
+  disagreed with the one reported to the host.
+
+- **The built-in tooltip is drawn where the pointer is.** Its anchor is placement-relative and the
+  canvas it is drawn on is not, so the bubble sat off by the placement's origin on every padded or
+  centred chart.
+
+- **TAB, ESC, HOME, END and the arrows are no longer swallowed.** `onKeyDown` returned true for all
+  of them while the controller has no behaviour for a key and no event stream reaches one — a focus
+  trap, and on a television, where the d-pad is the keyboard, a chart that could be entered and not
+  left. The key is still reported on `ChartEvent`s.
+
+- **A pan that ends says so, on both Kotlin hosts.** Neither dispatched `GesturePhase.ENDED` for a
+  pan, and the Compose Multiplatform chart never passed `ended = true` to either callback — a
+  parameter documented on both and dead on both. `ChartEvent.ViewportChanged` fires only on `ENDED`,
+  so it never fired at all.
+
+- **`onHover` is mouse and stylus only, as documented.** Every pointer move was reported, so a touch
+  drag churned the hover state and the tooltip with it, sixty times a second, under the reader's own
+  finger.
+
+- **`onPlaced` fires when the placement changes rather than every frame.** It is called from the
+  draw phase, and a host doing the documented thing with it — setting `controller.contentScale` —
+  was writing to a `StateFlow` from inside a draw, which schedules the next frame.
+
+- **A gradient-filled text mark draws its gradient on Compose Multiplatform, and a stroked one draws
+  an outline.** The first fell back to solid black; the second was *filled* with the stroke's
+  colour, which is heavier than an outline and solid where upstream leaves the counters open.
+
+- **`MULTIPLY` is reported rather than approximated below API 29.** Android's
+  `PorterDuff.Mode.MULTIPLY` is `[Sa*Da, Sc*Dc]` — *modulate*, not CSS multiply — so a blended mark
+  over a transparent region vanished, on by far the most-used mode, on the devices where this file
+  already promised to report rather than substitute.
+
+- **An inline `imageResolver` or `fontResolver` no longer rebuilds the renderer every
+  recomposition.** Both setters compare by identity and rebuild the renderer, and a lambda written
+  at a call site is a fresh instance each time — so the image cache was emptied per frame and the
+  "a URL is asked once, not once per frame" contract became its opposite for exactly the hosts that
+  supply a resolver.
+
+- **A font stack tries its concrete names before its generic.** A generic anywhere in the list
+  preempted platform resolution of everything before it, so a device that *did* have the named face
+  never drew in it.
+
+- **A gradient is resolved against the same box on every renderer.** The Android View used the
+  geometric rectangle where upstream, the SVG renderer and the Compose Multiplatform walk all use
+  the stroke-widened bounds.
+
+- **TalkBack is not re-announced on every frame of a pan.** The semantic tree was invalidated on
+  every published snapshot; it is invalidated when what it *says* changes, and a moved frame is
+  re-read by `ExploreByTouchHelper` without one.
 
 - **A written date rolls over instead of throwing.** `{"month": 13}`, 30 February, hour 24 and date
   0 are all legal Vega-Lite, and all mean what the JavaScript date constructor means by them:

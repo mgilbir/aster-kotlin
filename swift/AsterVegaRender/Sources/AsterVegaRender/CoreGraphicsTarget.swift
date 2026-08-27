@@ -62,20 +62,24 @@ public struct CoreGraphicsTarget: DrawTarget {
     context.restoreGState()
   }
 
-  public mutating func rect(_ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?) {
+  public mutating func rect(
+    _ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode
+  ) {
     let path = corners.isSquare ? CGPath(rect: cg(rect), transform: nil) : rounded(rect, corners)
-    paint(path: path, fill: fill, stroke: stroke)
+    paint(path: path, fill: fill, stroke: stroke, blend: blend)
   }
 
-  public mutating func line(from: Point, to: Point, stroke: StrokePaint?) {
+  public mutating func line(from: Point, to: Point, stroke: StrokePaint?, blend: SceneBlendMode) {
     guard let stroke else { return }
     let path = CGMutablePath()
     path.move(to: cg(from))
     path.addLine(to: cg(to))
-    paint(path: path, fill: nil, stroke: stroke)
+    paint(path: path, fill: nil, stroke: stroke, blend: blend)
   }
 
-  public mutating func path(_ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?) {
+  public mutating func path(
+    _ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode
+  ) {
     let path = CGMutablePath()
     for command in commands {
       switch command {
@@ -86,11 +90,22 @@ public struct CoreGraphicsTarget: DrawTarget {
       case .close: path.closeSubpath()
       }
     }
-    paint(path: path, fill: fill, stroke: stroke)
+    paint(path: path, fill: fill, stroke: stroke, blend: blend)
   }
 
-  public mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?) {
+  public mutating func text(
+    _ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode
+  ) {
+    // Bracketed rather than passed down, because the text drawing is a closure the host supplies
+    // and a blend mode is graphics state: setting it here applies to whatever that closure draws.
+    guard blend != SceneBlendMode.normal else {
+      drawText?(run, fill, context)
+      return
+    }
+    context.saveGState()
+    context.setBlendMode(Self.cgBlend(blend))
     drawText?(run, fill, context)
+    context.restoreGState()
   }
 
   public mutating func image(
@@ -99,7 +114,8 @@ public struct CoreGraphicsTarget: DrawTarget {
     in rect: Rect,
     fit: DrawImageFit,
     smooth: Bool,
-    opacity: Double
+    opacity: Double,
+    blend: SceneBlendMode
   ) {
     guard let decoded = resolve(url: url, raster: raster) else {
       // Said rather than swallowed: an image that could not be resolved leaves a hole in the chart, and
@@ -112,6 +128,7 @@ public struct CoreGraphicsTarget: DrawTarget {
 
     let box = fit == .contain ? contained(decoded, in: rect) : cg(rect)
     context.saveGState()
+    context.setBlendMode(Self.cgBlend(blend))
     context.setAlpha(CGFloat(opacity))
     context.interpolationQuality = smooth ? .high : .none
     // Flipped about the destination: a CGImage is drawn bottom-up, and every coordinate here is in a
@@ -192,7 +209,41 @@ public struct CoreGraphicsTarget: DrawTarget {
 
   // MARK: - Painting
 
-  private func paint(path: CGPath, fill: Brush?, stroke: StrokePaint?) {
+  /// CSS `mix-blend-mode` as CoreGraphics's own, which has all sixteen and then some.
+  ///
+  /// The mapping is one-to-one and named identically on both sides, which is not a coincidence:
+  /// `CGBlendMode`'s separable and non-separable modes are the PDF blend modes, and CSS took its
+  /// list from the same place.
+  static func cgBlend(_ blend: SceneBlendMode) -> CGBlendMode {
+    switch blend {
+    case SceneBlendMode.multiply: return .multiply
+    case SceneBlendMode.screen: return .screen
+    case SceneBlendMode.overlay: return .overlay
+    case SceneBlendMode.darken: return .darken
+    case SceneBlendMode.lighten: return .lighten
+    case SceneBlendMode.colorDodge: return .colorDodge
+    case SceneBlendMode.colorBurn: return .colorBurn
+    case SceneBlendMode.hardLight: return .hardLight
+    case SceneBlendMode.softLight: return .softLight
+    case SceneBlendMode.difference: return .difference
+    case SceneBlendMode.exclusion: return .exclusion
+    case SceneBlendMode.hue: return .hue
+    case SceneBlendMode.saturation: return .saturation
+    case SceneBlendMode.color: return .color
+    case SceneBlendMode.luminosity: return .luminosity
+    default: return .normal
+    }
+  }
+
+  private func paint(path: CGPath, fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode) {
+    // Bracketed around the whole item, fill and stroke together, because that is what a blend mode
+    // means: the mark composites against what is under it, once.
+    let blended = blend != SceneBlendMode.normal
+    if blended {
+      context.saveGState()
+      context.setBlendMode(Self.cgBlend(blend))
+    }
+    defer { if blended { context.restoreGState() } }
     if let fill {
       switch fill {
       case .solid(let colour):

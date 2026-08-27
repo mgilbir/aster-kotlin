@@ -197,13 +197,28 @@ public class ComposeTextEngine(
  * against the engine, recompiles the chart. That is the only way a larger font reaches the *layout*
  * rather than only the drawing.
  */
+/**
+ * How many laid-out runs the draw path keeps. See [rememberVegaTextEngine].
+ *
+ * Sized for a dense chart rather than for a label: `TextLayoutResult`s are held by a `LruCache`, so
+ * this is a ceiling on a working set that is in practice the number of distinct strings a scene
+ * draws.
+ */
+private const val TEXT_LAYOUT_CACHE_SIZE: Int = 512
+
 @Composable
 public fun rememberVegaTextEngine(
   fontFamilyResolver: (String) -> FontFamily? = ::genericFontFamily
 ): ComposeTextEngine {
   val density = LocalDensity.current
   val direction = LocalLayoutDirection.current
-  val measurer = rememberTextMeasurer()
+  // **A cache big enough for a chart.** `rememberTextMeasurer()` defaults to eight entries, and
+  // eight is the number of labels on a small axis — so on any real chart the *draw* path re-shaped
+  // text from scratch every frame, for every run past the eighth. Shaping is the expensive half of
+  // text: it resolves the family, breaks the runs and positions every glyph. A trellis has a few
+  // hundred distinct runs and they are the same runs on every frame, because they come from the
+  // scene rather than from the pointer.
+  val measurer = rememberTextMeasurer(cacheSize = TEXT_LAYOUT_CACHE_SIZE)
   return remember(measurer, density.density, density.fontScale, direction, fontFamilyResolver) {
     ComposeTextEngine(measurer, density, fontFamilyResolver)
   }

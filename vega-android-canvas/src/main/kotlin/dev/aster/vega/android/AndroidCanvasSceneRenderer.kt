@@ -239,6 +239,14 @@ public class AndroidCanvasSceneRenderer(
     diagnostics: DiagnosticCollector,
   ) {
     val rect = node.rect
+    // **`node.bounds` for a gradient, `node.rect` for the geometry**, and the two differ by the
+    // stroke's half-width. Upstream resolves a gradient against `item.bounds`, which `boundStroke`
+    // has already widened — `vega-scenegraph`'s `color(context, item, value)` is
+    // `gradient(context, value, item.bounds)` — and both the SVG renderer here and the Compose
+    // Multiplatform walk do the same. This one passed `rect`, so a stroked, gradient-filled mark
+    // had its ramp resolved over a slightly smaller box than everywhere else: the stops landed at
+    // different coordinates on Android than in the exported SVG of the same chart.
+    val gradientBounds = node.bounds
     // Rounded corners go through Vega's own outline rather than `drawRoundRect`: that primitive
     // draws one radius on all four corners, and a true arc where Vega draws a Bézier approximation.
     val rounded = node.roundedPath
@@ -246,13 +254,13 @@ public class AndroidCanvasSceneRenderer(
       rounded.toAndroidPath(androidPath)
       node.fill?.let { fill ->
         if (fill.isVisible) {
-          preparePaint(fillPaint, fill, opacity, rect, node.blendMode, diagnostics)
+          preparePaint(fillPaint, fill, opacity, gradientBounds, node.blendMode, diagnostics)
           canvas.drawPath(androidPath, fillPaint)
         }
       }
       node.stroke?.let { stroke ->
         if (stroke.isVisible) {
-          prepareStroke(stroke, opacity, rect, node.blendMode, diagnostics)
+          prepareStroke(stroke, opacity, gradientBounds, node.blendMode, diagnostics)
           canvas.drawPath(androidPath, strokePaint)
         }
       }
@@ -266,13 +274,13 @@ public class AndroidCanvasSceneRenderer(
     )
     node.fill?.let { fill ->
       if (fill.isVisible) {
-        preparePaint(fillPaint, fill, opacity, rect, node.blendMode, diagnostics)
+        preparePaint(fillPaint, fill, opacity, gradientBounds, node.blendMode, diagnostics)
         canvas.drawRect(scratchRect, fillPaint)
       }
     }
     node.stroke?.let { stroke ->
       if (stroke.isVisible) {
-        prepareStroke(stroke, opacity, rect, node.blendMode, diagnostics)
+        prepareStroke(stroke, opacity, gradientBounds, node.blendMode, diagnostics)
         canvas.drawRect(scratchRect, strokePaint)
       }
     }
@@ -559,10 +567,7 @@ public class AndroidCanvasSceneRenderer(
       }
     strokePaint.strokeMiter = stroke.miterLimit.toFloat()
     if (stroke.dashArray.isNotEmpty()) {
-      // Android requires an even-length interval array.
-      val intervals = stroke.dashArray.map { it.toFloat() }
-      val even = if (intervals.size % 2 == 0) intervals else intervals + intervals
-      strokePaint.pathEffect = DashPathEffect(even.toFloatArray(), stroke.dashOffset.toFloat())
+      strokePaint.pathEffect = dashEffect(stroke)
     }
     applyPaint(strokePaint, stroke.paint, stroke.opacity * opacity, bounds, blendMode, diagnostics)
   }
@@ -595,40 +600,103 @@ public class AndroidCanvasSceneRenderer(
     applyBlendMode(paint, blendMode, diagnostics)
   }
 
+  /**
+   * The dash pattern as a `DashPathEffect`, built once per distinct pattern.
+   *
+   * This file's header says it allocates nothing per mark, and this line did: three lists and a
+   * `DashPathEffect` for **every dashed node on every frame**. A chart with a dashed gridline per
+   * tick and a dashed rule per series allocates a few dozen of each per frame, which during a pan
+   * is a few thousand a second — and the pattern is the same every time, because it comes from the
+   * specification rather than from the data. Bounded, so a document that varies the pattern per
+   * datum cannot grow it without limit; a miss is exactly the work that used to happen always.
+   */
+  private fun dashEffect(stroke: Stroke): DashPathEffect {
+    val key = stroke.dashArray to stroke.dashOffset
+    dashEffects[key]?.let {
+      // Re-inserted, so it moves to the young end: least-recently-*used*, not least-recently-added.
+      dashEffects.remove(key)
+      dashEffects[key] = it
+      return it
+    }
+    // Android requires an even-length interval array, so an odd pattern is written twice — which is
+    // what CSS says an odd `stroke-dasharray` means as well.
+    val count = stroke.dashArray.size
+    val even = if (count % 2 == 0) count else count * 2
+    val intervals = FloatArray(even) { stroke.dashArray[it % count].toFloat() }
+    val effect = DashPathEffect(intervals, stroke.dashOffset.toFloat())
+    if (dashEffects.size >= DASH_CACHE_LIMIT) {
+      dashEffects.remove(dashEffects.keys.first())
+    }
+    dashEffects[key] = effect
+    return effect
+  }
+
+  private val dashEffects = LinkedHashMap<Pair<List<Double>, Double>, DashPathEffect>()
+
+  /**
+   * A gradient shader, built once per (gradient, box) pair.
+   *
+   * The other half of the per-mark allocation this file's header disclaims: a `LinearGradient` or
+   * `RadialGradient` plus two array copies for every gradient-painted node on every frame. A
+   * gradient legend is one node redrawn per frame; a chart whose bars are gradient-filled is one
+   * per bar. The box is part of the key because that is what the stops are resolved against — the
+   * same gradient over two different marks is two different shaders.
+   */
+  private fun shader(
+    key: Pair<ScenePaint, RectD>,
+    build: () -> Shader?,
+  ): Shader? {
+    // `containsKey` rather than a null check, so a gradient that legitimately builds **no** shader
+    // — too many stops, a zero radius — is remembered as such rather than rebuilt every frame.
+    if (shaders.containsKey(key)) {
+      val hit = shaders.remove(key)
+      shaders[key] = hit
+      return hit
+    }
+    val built = build()
+    if (shaders.size >= SHADER_CACHE_LIMIT) shaders.remove(shaders.keys.first())
+    shaders[key] = built
+    return built
+  }
+
+  private val shaders = LinkedHashMap<Pair<ScenePaint, RectD>, Shader?>()
+
   private fun linearShader(
     gradient: ScenePaint.LinearGradient,
     bounds: RectD,
     diagnostics: DiagnosticCollector,
-  ): Shader? {
-    val count = fillGradientStops(gradient.stops, diagnostics) ?: return null
-    return LinearGradient(
-      (bounds.left + gradient.x1 * bounds.width).toFloat(),
-      (bounds.top + gradient.y1 * bounds.height).toFloat(),
-      (bounds.left + gradient.x2 * bounds.width).toFloat(),
-      (bounds.top + gradient.y2 * bounds.height).toFloat(),
-      gradientColors.copyOf(count),
-      gradientOffsets.copyOf(count),
-      Shader.TileMode.CLAMP,
-    )
-  }
+  ): Shader? =
+    shader(gradient to bounds) {
+      val count = fillGradientStops(gradient.stops, diagnostics) ?: return@shader null
+      LinearGradient(
+        (bounds.left + gradient.x1 * bounds.width).toFloat(),
+        (bounds.top + gradient.y1 * bounds.height).toFloat(),
+        (bounds.left + gradient.x2 * bounds.width).toFloat(),
+        (bounds.top + gradient.y2 * bounds.height).toFloat(),
+        gradientColors.copyOf(count),
+        gradientOffsets.copyOf(count),
+        Shader.TileMode.CLAMP,
+      )
+    }
 
   private fun radialShader(
     gradient: ScenePaint.RadialGradient,
     bounds: RectD,
     diagnostics: DiagnosticCollector,
-  ): Shader? {
-    val count = fillGradientStops(gradient.stops, diagnostics) ?: return null
-    val radius = (gradient.radius * maxOf(bounds.width, bounds.height)).toFloat()
-    if (radius <= 0f) return null
-    return RadialGradient(
-      (bounds.left + gradient.cx * bounds.width).toFloat(),
-      (bounds.top + gradient.cy * bounds.height).toFloat(),
-      radius,
-      gradientColors.copyOf(count),
-      gradientOffsets.copyOf(count),
-      Shader.TileMode.CLAMP,
-    )
-  }
+  ): Shader? =
+    shader(gradient to bounds) {
+      val count = fillGradientStops(gradient.stops, diagnostics) ?: return@shader null
+      val radius = (gradient.radius * maxOf(bounds.width, bounds.height)).toFloat()
+      if (radius <= 0f) return@shader null
+      RadialGradient(
+        (bounds.left + gradient.cx * bounds.width).toFloat(),
+        (bounds.top + gradient.cy * bounds.height).toFloat(),
+        radius,
+        gradientColors.copyOf(count),
+        gradientOffsets.copyOf(count),
+        Shader.TileMode.CLAMP,
+      )
+    }
 
   /**
    * Copies stops into the reusable arrays. Returns the stop count, or `null` when the gradient
@@ -695,13 +763,20 @@ public class AndroidCanvasSceneRenderer(
     // approximated (PROJECT_BRIEF.md 3.3).
     val porterDuff =
       when (mode) {
-        SceneBlendMode.MULTIPLY -> PorterDuff.Mode.MULTIPLY
+        // **Not `PorterDuff.Mode.MULTIPLY`.** Android documents that one as `[Sa * Da, Sc * Dc]`,
+        // which is *modulate* and not CSS `multiply`: the two agree only where the destination is
+        // fully opaque, and where it is transparent modulate produces transparent while CSS
+        // multiply produces the source unchanged. So a `"blend": "multiply"` mark drawn over an
+        // empty part of the chart — the ordinary case, since a chart's background is transparent
+        // unless the specification paints one — simply vanished below API 29, on the one mode that
+        // is by far the most used. Reported now, which is what the comment below already promised
+        // and what this file does for the other eleven.
         SceneBlendMode.SCREEN -> PorterDuff.Mode.SCREEN
         SceneBlendMode.OVERLAY -> PorterDuff.Mode.OVERLAY
         SceneBlendMode.DARKEN -> PorterDuff.Mode.DARKEN
         SceneBlendMode.LIGHTEN -> PorterDuff.Mode.LIGHTEN
         SceneBlendMode.NORMAL -> null
-        // `PorterDuff` stops at the five above. The rest are reported below rather than swapped for
+        // `PorterDuff` stops at the four above. The rest are reported below rather than swapped for
         // whichever mode looks closest.
         else -> null
       }
@@ -721,6 +796,17 @@ public class AndroidCanvasSceneRenderer(
      * Reusable gradient arrays are sized once; longer gradients are truncated with a diagnostic.
      */
     public const val GRADIENT_STOP_LIMIT: Int = 32
+
+    /**
+     * How many distinct dash patterns and gradient shaders are kept.
+     *
+     * Both come from the *specification* rather than from the data on every chart anyone draws, so
+     * a handful is the realistic working set and the numbers exist only so a document that varies
+     * one per datum cannot grow the cache without bound.
+     */
+    private const val DASH_CACHE_LIMIT: Int = 64
+
+    private const val SHADER_CACHE_LIMIT: Int = 128
 
     /**
      * How many decoded rasters to keep. A chart with more distinct images than this is not the

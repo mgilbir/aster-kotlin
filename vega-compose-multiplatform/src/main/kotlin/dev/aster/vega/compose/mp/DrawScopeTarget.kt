@@ -5,6 +5,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
@@ -15,6 +16,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -25,6 +27,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import dev.aster.vega.scene.FontStyle as SceneFontStyle
 import dev.aster.vega.scene.RasterImage
+import dev.aster.vega.scene.SceneBlendMode
 import dev.aster.vega.scene.TextStyle as SceneTextStyle
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -124,20 +127,28 @@ public class DrawScopeTarget(
     corners: DrawCorners,
     fill: DrawBrush?,
     stroke: DrawStroke?,
+    blend: SceneBlendMode,
   ) {
     if (!corners.isSquare) {
       // Compose has no four-radius rectangle primitive — `drawRoundRect` takes one `CornerRadius`
       // for
       // all four — so a rounded rectangle becomes a path. The SVG renderer reaches the same answer
       // for the same reason: `rx`/`ry` cannot hold four radii either.
-      paint(roundedPath(rect, corners), fill, stroke)
+      paint(roundedPath(rect, corners), fill, stroke, blend)
       return
     }
     val topLeft = Offset(rect.x.toFloat(), rect.y.toFloat())
     val size = Size(rect.width.toFloat(), rect.height.toFloat())
     clipped {
+      val mode = blendMode(blend)
       fill?.let {
-        scope.drawRect(brush = brush(it), topLeft = topLeft, size = size, alpha = alpha(it))
+        scope.drawRect(
+          brush = brush(it),
+          topLeft = topLeft,
+          size = size,
+          alpha = alpha(it),
+          blendMode = mode,
+        )
       }
       stroke?.let {
         scope.drawRect(
@@ -146,12 +157,18 @@ public class DrawScopeTarget(
           size = size,
           alpha = alpha(it.brush),
           style = style(it),
+          blendMode = mode,
         )
       }
     }
   }
 
-  override fun line(from: DrawPoint, to: DrawPoint, stroke: DrawStroke?) {
+  override fun line(
+    from: DrawPoint,
+    to: DrawPoint,
+    stroke: DrawStroke?,
+    blend: SceneBlendMode,
+  ) {
     val paint = stroke ?: return
     clipped {
       scope.drawLine(
@@ -162,11 +179,17 @@ public class DrawScopeTarget(
         cap = cap(paint.cap),
         pathEffect = dash(paint),
         alpha = alpha(paint.brush),
+        blendMode = blendMode(blend),
       )
     }
   }
 
-  override fun path(commands: List<DrawPathCommand>, fill: DrawBrush?, stroke: DrawStroke?) {
+  override fun path(
+    commands: List<DrawPathCommand>,
+    fill: DrawBrush?,
+    stroke: DrawStroke?,
+    blend: SceneBlendMode,
+  ) {
     if (commands.isEmpty()) return
     val path = Path()
     for (command in commands) {
@@ -185,12 +208,28 @@ public class DrawScopeTarget(
         DrawPathCommand.Close -> path.close()
       }
     }
-    paint(path, fill, stroke)
+    paint(path, fill, stroke, blend)
   }
 
-  override fun text(run: DrawTextRun, fill: DrawBrush?, stroke: DrawStroke?) {
+  override fun text(
+    run: DrawTextRun,
+    fill: DrawBrush?,
+    stroke: DrawStroke?,
+    blend: SceneBlendMode,
+  ) {
     val measurer = textMeasurer ?: return
-    val colour = (fill as? DrawBrush.Solid)?.paint ?: (stroke?.brush as? DrawBrush.Solid)?.paint
+    // **What paints the glyphs**, which is three different answers and used to be one.
+    //
+    // - A *gradient* fill painted them solid **black**: the cast to `DrawBrush.Solid` failed and
+    //   `?: Color.Black` caught it. The Android View draws the gradient, and a text mark filled
+    //   from a colour scale is how a chart labels its own bars in the scale's own colours.
+    // - A run with a stroke and **no fill** was *filled* with the stroke's colour, which is a
+    //   different picture from an outline — heavier, and solid where upstream leaves the counters
+    //   open. `strokeText` with no `fillText` is what upstream's canvas renderer does.
+    // - A run with neither was drawn in black rather than not drawn.
+    val paintBrush = fill ?: stroke?.brush
+    if (paintBrush == null) return
+    val outlineOnly = fill == null && stroke != null
     val layout =
       measurer.measure(
         text = run.text,
@@ -217,7 +256,11 @@ public class DrawScopeTarget(
               spPerSceneUnit = 1f / scope.density,
               fontFamilyResolver = fontFamilyResolver,
             )
-            .copy(color = colour?.let { colour(it) } ?: Color.Black),
+            .copy(
+              brush = brush(paintBrush),
+              // A stroked run is drawn as an outline of the stroke's own width, not as a fill.
+              drawStyle = if (outlineOnly) style(stroke) else Fill,
+            ),
       )
     // The walk has already resolved `align` and `baseline` into a pen position, which is the
     // *baseline*
@@ -227,10 +270,10 @@ public class DrawScopeTarget(
     // the
     // glyphs sit where the chart's arithmetic put them even if the two disagree about the font.
     val topLeft = Offset(run.origin.x.toFloat(), (run.origin.y - run.ascent).toFloat())
-    val alpha = colour?.alpha?.toFloat() ?: 1f
+    val alpha = alpha(paintBrush)
     clipped {
       if (run.angleDegrees == 0.0) {
-        scope.drawText(layout, topLeft = topLeft, alpha = alpha)
+        scope.drawText(layout, topLeft = topLeft, alpha = alpha, blendMode = blendMode(blend))
       } else {
         // Rotation turns about the run's **anchor**, not its pen position: a rotated axis label
         // pivots
@@ -241,7 +284,7 @@ public class DrawScopeTarget(
           degrees = run.angleDegrees.toFloat(),
           pivot = Offset(run.anchor.x.toFloat(), run.anchor.y.toFloat()),
         ) {
-          drawText(layout, topLeft = topLeft, alpha = alpha)
+          drawText(layout, topLeft = topLeft, alpha = alpha, blendMode = blendMode(blend))
         }
       }
     }
@@ -254,6 +297,7 @@ public class DrawScopeTarget(
     fit: DrawImageFit,
     smooth: Boolean,
     opacity: Double,
+    blend: SceneBlendMode,
   ) {
     val decoded = resolve(url, raster)
     if (decoded == null) {
@@ -276,6 +320,7 @@ public class DrawScopeTarget(
           ),
         alpha = opacity.toFloat().coerceIn(0f, 1f),
         filterQuality = if (smooth) FilterQuality.Medium else FilterQuality.None,
+        blendMode = blendMode(blend),
       )
     }
   }
@@ -340,14 +385,54 @@ public class DrawScopeTarget(
 
   // MARK: - Compose translation
 
-  private fun paint(path: Path, fill: DrawBrush?, stroke: DrawStroke?) {
+  private fun paint(path: Path, fill: DrawBrush?, stroke: DrawStroke?, blend: SceneBlendMode) {
+    val mode = blendMode(blend)
     clipped {
-      fill?.let { scope.drawPath(path, brush = brush(it), alpha = alpha(it)) }
+      fill?.let { scope.drawPath(path, brush = brush(it), alpha = alpha(it), blendMode = mode) }
       stroke?.let {
-        scope.drawPath(path, brush = brush(it.brush), alpha = alpha(it.brush), style = style(it))
+        scope.drawPath(
+          path,
+          brush = brush(it.brush),
+          alpha = alpha(it.brush),
+          style = style(it),
+          blendMode = mode,
+        )
       }
     }
   }
+
+  /**
+   * CSS `mix-blend-mode` as Compose's own, which has all sixteen.
+   *
+   * The MP renderer ignored the channel entirely and said nothing about it, while the Android View
+   * mapped every mode — so one specification produced two different pictures and only one of the
+   * two hosts admitted to a gap.
+   *
+   * The Android caveat from the View renderer still applies underneath: Compose maps to
+   * `android.graphics.BlendMode` on API 29 and up and to `PorterDuff` below, where the eleven modes
+   * past `LIGHTEN` do not exist and `MULTIPLY` is *modulate* rather than CSS multiply. That is a
+   * platform difference below this layer rather than something this file can fix, and it is why the
+   * feature table's entry for `blend` is Partial rather than Supported.
+   */
+  private fun blendMode(blend: SceneBlendMode): BlendMode =
+    when (blend) {
+      SceneBlendMode.NORMAL -> BlendMode.SrcOver
+      SceneBlendMode.MULTIPLY -> BlendMode.Multiply
+      SceneBlendMode.SCREEN -> BlendMode.Screen
+      SceneBlendMode.OVERLAY -> BlendMode.Overlay
+      SceneBlendMode.DARKEN -> BlendMode.Darken
+      SceneBlendMode.LIGHTEN -> BlendMode.Lighten
+      SceneBlendMode.COLOR_DODGE -> BlendMode.ColorDodge
+      SceneBlendMode.COLOR_BURN -> BlendMode.ColorBurn
+      SceneBlendMode.HARD_LIGHT -> BlendMode.Hardlight
+      SceneBlendMode.SOFT_LIGHT -> BlendMode.Softlight
+      SceneBlendMode.DIFFERENCE -> BlendMode.Difference
+      SceneBlendMode.EXCLUSION -> BlendMode.Exclusion
+      SceneBlendMode.HUE -> BlendMode.Hue
+      SceneBlendMode.SATURATION -> BlendMode.Saturation
+      SceneBlendMode.COLOR -> BlendMode.Color
+      SceneBlendMode.LUMINOSITY -> BlendMode.Luminosity
+    }
 
   /** Runs [body] inside every clip currently open. */
   private fun clipped(body: () -> Unit) {

@@ -52,19 +52,23 @@ class SceneWalkGoldenTest {
    * - `text-anchors` — every alignment and a rotation, so the anchor and the pen are both compared
    * - `axis-style` — dashed strokes, caps and joins
    * - `density-heatmaps` — an engine-produced raster, the only image path
+   * - `encode-channels` — a `blend`, which is the only channel here that changes *compositing*
+   *   rather than geometry, and which one of the two walks used to drop on the floor
+   *
+   * **Discovered, not listed.** The names come from the committed goldens themselves, and the Swift
+   * side does the same — `SceneWalkParityTests` scans the same directory. Two hard-coded lists is
+   * how a golden stops being asserted on one engine while still looking committed, which is exactly
+   * the failure the conformance README warns about; with both sides reading the directory, adding a
+   * fixture to one immediately obliges the other.
    */
-  private val fixtures =
-    listOf(
-      "bar",
-      "label-overlap",
-      "line-area",
-      "symbols-and-curves",
-      "gradient-fills",
-      "arc-padding",
-      "text-anchors",
-      "axis-style",
-      "density-heatmaps",
-    )
+  private val fixtures: List<String> =
+    File(repositoryRoot, "test-fixtures/scene-walk")
+      .listFiles()
+      .orEmpty()
+      .mapNotNull {
+        it.name.removeSuffix(".calls.txt").takeIf { _ -> it.name.endsWith(".calls.txt") }
+      }
+      .sorted()
 
   @Test
   fun `the canonical call sequences match what is committed`() {

@@ -233,6 +233,16 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
    * are interchangeable — which is what makes compiling on a background thread safe without either
    * side locking. Two *threads* sharing one engine is what is not safe.
    */
+  /**
+   * An exporter that draws with **this view's** seams: its text engine, its faces, its images.
+   *
+   * `SceneExporter()` builds a fresh renderer, and a fresh one measures at font scale 1, knows none
+   * of the host's faces and resolves no image — so an export taken that way is not the chart on
+   * screen, which is the one thing the exporter promises. Every host was reaching for the default
+   * because reaching for this needed a renderer nothing exposed.
+   */
+  public fun exporter(): SceneExporter = SceneExporter(newRenderer())
+
   public fun newCompatibleTextEngine(): AndroidTextEngine =
     // The **same font scale and the same faces**, or the claim above is false: an engine measuring
     // at
@@ -274,6 +284,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
           distanceY: Float,
         ): Boolean {
           // GestureDetector reports the distance travelled, which is the negation of the pan.
+          panning = true
           dispatchChartEvent(
             ChartInputEvent.Pan(
               VectorD(-distanceX.toDouble(), -distanceY.toDouble()),
@@ -293,7 +304,12 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
           dispatchChartEvent(
             ChartInputEvent.Zoom(
               scaleFactor = detector.scaleFactor.toDouble(),
-              anchor = PointD(detector.focusX.toDouble(), detector.focusY.toDouble()),
+              // **Placement-relative**, like every other point this view dispatches. The detector
+              // reports the focus in raw view coordinates, and those were passed straight through
+              // while `toPointD` takes the placement's origin off — so on any chart that is padded
+              // or centred in its slot, a pinch zoomed about a point offset from the reader's
+              // fingers by exactly that origin.
+              anchor = placedPoint(detector.focusX, detector.focusY),
               phase = GesturePhase.CHANGED,
             )
           )
@@ -304,7 +320,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
           dispatchChartEvent(
             ChartInputEvent.Zoom(
               scaleFactor = 1.0,
-              anchor = PointD(detector.focusX.toDouble(), detector.focusY.toDouble()),
+              anchor = placedPoint(detector.focusX, detector.focusY),
               phase = GesturePhase.ENDED,
             )
           )
@@ -341,6 +357,9 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
    * redraw. The observer only ever calls `invalidateIfStale()`, so a revision the view has already
    * drawn costs nothing.
    */
+  /** What the semantic tree looked like when it was last published. See [observeController]. */
+  private var lastSemanticIdentity: List<Any?>? = null
+
   private fun observeController() {
     snapshotObserver?.cancel()
     if (!isAttachedToWindow) return
@@ -352,7 +371,17 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         // And a host holding an overlay has to be told, for the same reason: the scale it was given
         // described the previous scene's size.
         reportPlacement()
-        accessibilityHelper.invalidateSemanticTree()
+        // **Only when the tree actually changed.** A pan publishes a snapshot per frame, and
+        // rebuilding the virtual view tree on each one makes TalkBack re-announce the chart
+        // continuously — the marks are the same marks in the same order, and only their frames
+        // moved. `ExploreByTouchHelper` re-reads a node's bounds when it draws focus, so a moved
+        // frame needs no invalidation; what needs one is a mark appearing, disappearing, changing
+        // its description or changing its selected state.
+        val tree = accessibilityHelper.semanticIdentity()
+        if (tree != lastSemanticIdentity) {
+          lastSemanticIdentity = tree
+          accessibilityHelper.invalidateSemanticTree()
+        }
         updatePreferredSize()
         applyChartDescription()
         invalidateIfStale()
@@ -524,16 +553,25 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 
     // The origin comes from `placement()`, which is what a host is told and what a touch is
     // converted through. Writing `paddingLeft` here again is how the three drift apart.
+    //
+    // **Both corners**, and the far one used to be the padding box's rather than the drawing's:
+    // `width - paddingRight`. `placement()` centres the scene in whatever the fit leaves over, so
+    // the far edges were out by the whole of that slack — all of it on the right and the bottom.
+    // Three things followed. A scene with an opaque background — Vega-Lite gives every chart
+    // `"background": "white"` — painted the right and bottom slack and not the left and top, so a
+    // chart on a dark surface had a white margin down two of its four sides. The clip let a zoomed
+    // chart's content escape there. And the fit scale below was recomputed from the *wrong* box, so
+    // it disagreed with the one `placement()` reports to the host and to every touch.
     val placed = placement()
     viewport.set(
       placed.left.toFloat(),
       placed.top.toFloat(),
-      (width - paddingRight).toFloat(),
-      (height - paddingBottom).toFloat(),
+      (placed.left + scene.width * placed.scale).toFloat(),
+      (placed.top + scene.height * placed.scale).toFloat(),
     )
     if (viewport.width() <= 0f || viewport.height() <= 0f) return
 
-    val fitScale = minOf(viewport.width() / scene.width, viewport.height() / scene.height).toFloat()
+    val fitScale = placed.scale.toFloat()
     val interaction = snapshot.interactionState
 
     val saveCount = canvas.save()
@@ -630,12 +668,21 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
     val boxWidth = textWidth + 2 * pad
     val boxHeight = lineHeight * lines.size + 2 * pad
 
+    // **Back into view coordinates first.** `interactionState.tooltipAnchor` is the point the host
+    // dispatched, which `toPointD` had already made placement-relative; this canvas is not — the
+    // draw restores the identity transform before the tooltip so the bubble is drawn in device
+    // pixels. So the bubble sat off by exactly the placement's origin on every padded or centred
+    // chart, which is every chart given `match_parent` in a slot of a different aspect ratio.
+    val placed = placement()
+    val anchorX = (anchor.x + placed.left).toFloat()
+    val anchorY = (anchor.y + placed.top).toFloat()
+
     // Placed above and right of the pointer, and flipped when that would leave the view.
-    var left = anchor.x.toFloat() + pad
-    var top = anchor.y.toFloat() - boxHeight - pad
-    if (left + boxWidth > width.toFloat()) left = anchor.x.toFloat() - boxWidth - pad
+    var left = anchorX + pad
+    var top = anchorY - boxHeight - pad
+    if (left + boxWidth > width.toFloat()) left = anchorX - boxWidth - pad
     if (left < 0f) left = 0f
-    if (top < 0f) top = anchor.y.toFloat() + pad
+    if (top < 0f) top = anchorY + pad
     if (top + boxHeight > height.toFloat()) top = (height.toFloat() - boxHeight).coerceAtLeast(0f)
 
     tooltipRect.set(left, top, left + boxWidth, top + boxHeight)
@@ -699,7 +746,8 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
             buttons = event.buttonState,
           )
         )
-      MotionEvent.ACTION_UP ->
+      MotionEvent.ACTION_UP -> {
+        endPan()
         dispatchChartEvent(
           ChartInputEvent.PointerUp(
             point = event.toPointD(),
@@ -708,7 +756,11 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
             buttons = event.buttonState,
           )
         )
-      MotionEvent.ACTION_CANCEL -> dispatchChartEvent(ChartInputEvent.PointerExited(null))
+      }
+      MotionEvent.ACTION_CANCEL -> {
+        endPan()
+        dispatchChartEvent(ChartInputEvent.PointerExited(null))
+      }
       else -> Unit
     }
     return scaleHandled || gestureHandled || super.onTouchEvent(event)
@@ -768,7 +820,17 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         ),
       )
     )
-    return true
+    // **Reported, not consumed.** `VegaChartController.dispatch` has no built-in behaviour for a
+    // key and no event stream reaches one either — `fireSignalHandlers` maps only the pointer
+    // family — so returning true claimed a key the chart then did nothing with. That is a focus
+    // trap: TAB never moved focus off the chart, ESC never dismissed the sheet it was in, and HOME
+    // and END never scrolled the list it was in. On a television, where the d-pad *is* the
+    // keyboard, the four arrows meant the chart could be entered and not left.
+    //
+    // A host that wants a key still gets one, on `ChartEvent`s, because the dispatch above happens
+    // either way. When a `keydown` stream is implemented this should consume what a specification
+    // actually listens for, and nothing else.
+    return super.onKeyDown(keyCode, event)
   }
 
   override fun dispatchHoverEvent(event: MotionEvent): Boolean =
@@ -811,8 +873,36 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
       else -> HitTestOptions.Touch
     }
 
-  private fun MotionEvent.toPointD(): PointD {
-    // The same origin the draw uses. See `placement()`.
+  /** Whether a scroll gesture is in flight, so the finger lifting can close it. See [endPan]. */
+  private var panning = false
+
+  /**
+   * Closes a pan when the finger lifts, which is what makes `ChartEvent.ViewportChanged` fire.
+   *
+   * `GestureDetector` has no "scroll ended" callback, so every pan increment was dispatched as
+   * `CHANGED` and the `ENDED` that ends the gesture was never sent by this view at all. The
+   * controller emits `ViewportChanged` only on `ENDED` — that is the whole point of the phase, so a
+   * host can persist or announce a viewport once rather than sixty times a second — so the event
+   * never fired here. A zero delta, because the movement has already been dispatched; what is being
+   * reported is the end of it.
+   */
+  private fun endPan() {
+    if (!panning) return
+    panning = false
+    dispatchChartEvent(ChartInputEvent.Pan(VectorD(0.0, 0.0), GesturePhase.ENDED))
+  }
+
+  private fun MotionEvent.toPointD(): PointD = placedPoint(x, y)
+
+  /**
+   * A raw view coordinate in the space a controller expects: the placement's origin taken off.
+   *
+   * The same origin the draw uses — see `placement()` — and the only conversion in this file, so a
+   * new dispatch site cannot get it wrong by writing `paddingLeft` again. A `ScaleGestureDetector`
+   * reports in view coordinates rather than in `MotionEvent`s, which is why this is separate from
+   * `toPointD`.
+   */
+  internal fun placedPoint(x: Float, y: Float): PointD {
     val placed = placement()
     return PointD(x - placed.left, y - placed.top)
   }

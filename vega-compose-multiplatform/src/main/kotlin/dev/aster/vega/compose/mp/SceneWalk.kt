@@ -24,7 +24,6 @@ import dev.aster.vega.scene.TextBaseline
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.paintOrder
-import kotlin.math.abs
 import kotlin.math.max
 
 /**
@@ -53,6 +52,17 @@ import kotlin.math.max
  * renderers guessed it before pixels said otherwise.
  */
 public class SceneWalk {
+
+  private companion object {
+    /**
+     * How many transformed paths are kept.
+     *
+     * A frame's working set is one entry per path mark, so this is sized for a dense scene — the
+     * `airport-connections` fixture draws six hundred Voronoi cells — and exists only so a chart
+     * that rebuilds its paths every frame anyway cannot grow the map without bound.
+     */
+    const val PATH_CACHE_LIMIT: Int = 4096
+  }
 
   /** Draws [scene] into [target]. */
   public fun draw(scene: Scene, target: SceneDrawTarget) {
@@ -87,6 +97,7 @@ public class SceneWalk {
           corners(node),
           brush(node.fill, node.opacity, node.bounds, local),
           stroke(node.stroke, node.opacity, node.bounds, local),
+          node.blendMode,
         )
       }
       is RuleNode ->
@@ -94,6 +105,7 @@ public class SceneWalk {
           local.applyTo(DrawPoint(node.x1, node.y1)),
           local.applyTo(DrawPoint(node.x2, node.y2)),
           stroke(node.stroke, node.opacity, node.bounds, local),
+          node.blendMode,
         )
       is PathNode ->
         if (!node.absent) {
@@ -101,6 +113,7 @@ public class SceneWalk {
             commands(node.path, local),
             brush(node.fill, node.opacity, node.bounds, local),
             stroke(node.stroke, node.opacity, node.bounds, local),
+            node.blendMode,
           )
         }
       is SymbolNode ->
@@ -110,6 +123,7 @@ public class SceneWalk {
           commands(node.outline, local),
           brush(node.fill, node.opacity, node.bounds, local),
           stroke(node.stroke, node.opacity, node.bounds, local),
+          node.blendMode,
         )
       is TextNode -> if (!node.absent) walkText(node, local, target)
       is ImageNode ->
@@ -125,12 +139,20 @@ public class SceneWalk {
           fit = if (node.fit == ImageFit.CONTAIN) DrawImageFit.CONTAIN else DrawImageFit.FILL,
           smooth = node.smooth,
           opacity = node.opacity,
+          blend = node.blendMode,
         )
     }
   }
 
   private fun walkGroup(node: GroupNode, local: Transform2D, target: SceneDrawTarget) {
     // A group's clip is in its own space, so it is mapped through the transform just composed.
+    //
+    // **`clipPath` is not implemented here**, and this comment is the whole of the report: a group
+    // whose `encode` block gives it a `path` clips to that outline on the Android canvas and in
+    // exported SVG, and to nothing at all in this renderer. `SceneDrawTarget.beginGroup` takes a
+    // rectangle, so honouring one means widening that seam — and widening it for the Swift walk in
+    // the same step, since the two are compared call for call. Until then a chart using it draws
+    // *more* than it should here rather than less, which is visible rather than silent.
     target.beginGroup(node.clip?.let { local.applyTo(it) })
 
     // A group with its own paint draws a rectangle of its declared size, and this is the only thing
@@ -159,10 +181,17 @@ public class SceneWalk {
         corners(node),
         brush(node.fill, node.opacity, paintRect!!, local),
         stroke(node.stroke, node.opacity, paintRect, local),
+        node.blendMode,
       )
     } else if (panel != null) {
       // `strokeForeground` puts the outline over the children; the fill still goes underneath.
-      target.rect(panel, corners(node), brush(node.fill, node.opacity, paintRect!!, local), null)
+      target.rect(
+        panel,
+        corners(node),
+        brush(node.fill, node.opacity, paintRect!!, local),
+        null,
+        node.blendMode,
+      )
     }
 
     // `paintOrder`, not `children`; see the note in `AndroidCanvasSceneRenderer`. The Swift walk
@@ -170,7 +199,13 @@ public class SceneWalk {
     for (child in paintOrder(node.children)) walk(child, local, target)
 
     if (panel != null && node.strokeForeground) {
-      target.rect(panel, corners(node), null, stroke(node.stroke, node.opacity, paintRect!!, local))
+      target.rect(
+        panel,
+        corners(node),
+        null,
+        stroke(node.stroke, node.opacity, paintRect!!, local),
+        node.blendMode,
+      )
     }
 
     target.endGroup()
@@ -232,13 +267,53 @@ public class SceneWalk {
         ),
         fill,
         stroke,
+        node.blendMode,
       )
     }
   }
 
   // MARK: reading the scene
 
-  private fun commands(path: PathData, transform: Transform2D): List<DrawPathCommand> =
+  /**
+   * A path's commands in surface space, **built once per (path, transform)** rather than per frame.
+   *
+   * A scene is immutable and republished by identity, so the `PathData` behind a mark is the same
+   * object on every frame of a pan; the transform is a value, and it changes only when the chart
+   * does. So this list is the same list every frame, and it was rebuilt every frame: a
+   * ten-thousand-symbol scene allocated ten thousand lists and about thirty thousand `DrawPoint`s
+   * per frame, sixty times a second, for a picture that had not changed. Keyed on the `PathData`'s
+   * **identity** rather than its contents, because comparing a thousand commands to decide whether
+   * to rebuild a thousand commands saves nothing.
+   *
+   * **Confined**, like the caches in `TextLayoutCache` and `CachingExpressionCompiler` and for the
+   * same reason: an LRU mutates on a hit, so two threads drawing through one `SceneWalk` would
+   * corrupt the map. A `SceneWalk` belongs to one surface, which draws on one thread.
+   */
+  private fun commands(path: PathData, transform: Transform2D): List<DrawPathCommand> {
+    val key = PathKey(path, transform)
+    transformed[key]?.let {
+      // Re-inserted, so it moves to the young end: least-recently-used, not least-recently-added.
+      transformed.remove(key)
+      transformed[key] = it
+      return it
+    }
+    val built = transform(path, transform)
+    if (transformed.size >= PATH_CACHE_LIMIT) transformed.remove(transformed.keys.first())
+    transformed[key] = built
+    return built
+  }
+
+  /** A path by identity and the matrix it is drawn through. See [commands]. */
+  private class PathKey(private val path: PathData, private val transform: Transform2D) {
+    override fun hashCode(): Int = 31 * path.hashCode() + transform.hashCode()
+
+    override fun equals(other: Any?): Boolean =
+      other is PathKey && other.path === path && other.transform == transform
+  }
+
+  private val transformed = LinkedHashMap<PathKey, List<DrawPathCommand>>()
+
+  private fun transform(path: PathData, transform: Transform2D): List<DrawPathCommand> =
     path.commands.map { command ->
       when (command) {
         is PathCommand.MoveTo -> DrawPathCommand.MoveTo(transform.applyTo(command.x, command.y))
@@ -408,16 +483,34 @@ private fun Transform2D.applyTo(x: Double, y: Double): DrawPoint =
 private fun Transform2D.applyTo(point: DrawPoint): DrawPoint = applyTo(point.x, point.y)
 
 /**
- * A rectangle's image, normalised — a transform with a negative scale would otherwise invert it.
+ * A rectangle's **axis-aligned bounding box** under this transform.
+ *
+ * All four corners, not two. Two opposite corners describe the image only while the transform maps
+ * axes to axes — a translation, a scale, a flip — and the target's vocabulary has no rotated
+ * rectangle, so the bounding box is the honest answer for anything else. Mapping the diagonal alone
+ * silently reported a box that is too small under rotation or shear: a 45-degree rotation of a unit
+ * square has a diagonal of two opposite corners that maps to a *degenerate* rectangle, and a clip
+ * built from it would have cut away most of what it was meant to keep.
+ *
+ * Nothing this engine compiles reaches it today — a scene's transforms are translations and uniform
+ * scales — but a `clip` is the caller that would be silently wrong if one ever did, and "silently"
+ * is the part worth removing.
  */
 private fun Transform2D.applyTo(rect: RectD): DrawRect {
-  val one = applyTo(rect.left, rect.top)
-  val two = applyTo(rect.right, rect.bottom)
+  val corners =
+    listOf(
+      applyTo(rect.left, rect.top),
+      applyTo(rect.right, rect.top),
+      applyTo(rect.right, rect.bottom),
+      applyTo(rect.left, rect.bottom),
+    )
+  val left = corners.minOf { it.x }
+  val top = corners.minOf { it.y }
   return DrawRect(
-    x = minOf(one.x, two.x),
-    y = minOf(one.y, two.y),
-    width = abs(two.x - one.x),
-    height = abs(two.y - one.y),
+    x = left,
+    y = top,
+    width = corners.maxOf { it.x } - left,
+    height = corners.maxOf { it.y } - top,
   )
 }
 

@@ -305,17 +305,27 @@ public class SpecCompiler(
     itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
   ): CompiledSpec = guarded { compileUnguarded(spec, signalOverrides, itemEncodes) }
 
-  /** See [compileJson] for what this catches and why. */
+  /**
+   * See [compileJson] for what this catches and why.
+   *
+   * **`Exception`, not `Throwable`.** An `Error` is not a failed compile: after an
+   * `OutOfMemoryError` nothing this process does is trustworthy, including the diagnostic, and a
+   * `StackOverflowError` is not catchable at all on Kotlin/Native. Both are therefore left to
+   * propagate, and the depth caps this branch added — `MAX_GROUP_DEPTH`, `MAX_CROSSED_CELLS`,
+   * `MAX_TICK_COUNT` — are what stop a *document* reaching either.
+   *
+   * It is also the only spelling that compiles: `OutOfMemoryError` is not in the common standard
+   * library, so catching `Throwable` and rethrowing it explicitly builds for the JVM and fails for
+   * the native targets. The gradle gate did not notice, because it never compiled the common
+   * metadata; `scripts/check.sh` does now.
+   */
   private inline fun guarded(compile: () -> CompiledSpec): CompiledSpec =
     try {
       compile()
     } catch (cancellation: kotlin.coroutines.cancellation.CancellationException) {
       // Control flow, not a failure: swallowing it would leave a cancelled coroutine running.
       throw cancellation
-    } catch (exhausted: OutOfMemoryError) {
-      // Nothing this process does after one of these is trustworthy, including the diagnostic.
-      throw exhausted
-    } catch (failure: Throwable) {
+    } catch (failure: Exception) {
       CompiledSpec(
         scene = null,
         scales = emptyMap(),

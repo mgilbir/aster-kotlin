@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.aster.vega.android.AndroidTextEngine
@@ -84,7 +85,14 @@ private fun DemoScreen() {
   // controller gets a *second* instance: it compiles off the main thread, and one engine must not
   // be
   // touched by two threads at once.
-  val textEngine = remember { AndroidTextEngine() }
+  // **The device's own font scale**, on both engines. `AndroidTextEngine()` defaults to 1, which is
+  // not what `VegaChartView` draws with — it passes `configuration.fontScale` — so the demo
+  // measured
+  // every label at the specification's size and painted it at the reader's. At the largest
+  // accessibility setting that is a third more ink than the layout reserved, which is overlapping
+  // axis labels: the demo was demonstrating the defect this project's text policy exists to avoid.
+  val fontScale = LocalConfiguration.current.fontScale
+  val textEngine = remember(fontScale) { AndroidTextEngine(fontScale) }
   val exporter = remember { SceneExporter() }
   // The demo opts in to loading, which no host gets by default, and states exactly what it is
   // opening. A pasted specification's `"url": "data/cars.json"` is resolved against the cache
@@ -109,9 +117,11 @@ private fun DemoScreen() {
   // tick without anything having to remember to.
   val scope = rememberCoroutineScope()
   val controller =
-    remember(loader, scope) {
+    remember(loader, scope, fontScale) {
       VegaChartController(
-        textEngine = AndroidTextEngine(),
+        // A *second* instance at the same scale: this one compiles off the main thread, and one
+        // engine must not be touched by two threads at once. See `newCompatibleTextEngine`.
+        textEngine = AndroidTextEngine(fontScale),
         loader = loader,
         scheduler = CoroutineScheduler(scope),
       )

@@ -210,59 +210,58 @@ public class AndroidTextEngine(
         return styled(supplied, weight, italic)
       }
     }
-    // Vega's generic families map onto Android's built-in families; anything else is passed through
-    // to the platform, which falls back rather than failing.
-    // Nothing answered, so the platform's own generics. Read off the **stack** rather than the
-    // whole
-    // string: `"Noto Sans, sans-serif"` asks for a sans as its last resort and used to match none
-    // of
-    // these, falling through to `Typeface.create` with the entire list as a family name.
-    val base =
-      when (
-        FontStack.families(family).firstOrNull { it.lowercase() in GENERIC_ALIASES }?.lowercase()
-          ?: family.lowercase()
-      ) {
-        "sans-serif",
-        "helvetica",
-        "arial" -> Typeface.SANS_SERIF
-        "serif",
-        "times",
-        "times new roman" -> Typeface.SERIF
-        "monospace",
-        "courier",
-        "courier new" -> Typeface.MONOSPACE
-        else -> {
-          val first = FontStack.families(family).firstOrNull() ?: family
-          val created = Typeface.create(first, Typeface.NORMAL)
-          // `Typeface.create` never fails: an unknown name answers the default face. Comparing
-          // against it is the only way to tell "this device has that font" from "it does not", and
-          // without the comparison a chart draws in the wrong face and says nothing.
-          if (created == Typeface.DEFAULT && family.isNotBlank()) unresolved.add(family)
-          created
-        }
+    // **Then the platform, name by name, still in order.**
+    //
+    // This used to search the whole stack for a generic *first* — `firstOrNull { it in
+    // GENERIC_ALIASES }` — and use it if one appeared anywhere. But a generic is the **last**
+    // resort, in CSS and in every browser: `"Chart Sans, sans-serif"` means "Chart Sans if this
+    // device has it, otherwise any sans". Preempting it meant a device that *did* have Chart Sans
+    // installed system-wide never drew in it, and the fallback nobody would notice was the one
+    // always taken.
+    val names = FontStack.families(family)
+    for (name in names) {
+      builtIn(name)?.let {
+        return styled(it, weight, italic)
       }
-    return styled(base, weight, italic)
+      val created = Typeface.create(name, Typeface.NORMAL)
+      // `Typeface.create` never fails: an unknown name answers the default face. Comparing against
+      // it is the only way to tell "this device has that font" from "it does not", so a name that
+      // came back as the default is treated as absent and the next name in the stack is tried.
+      if (created != Typeface.DEFAULT) return styled(created, weight, italic)
+    }
+
+    // Nothing in the stack resolved. Reported once, and then drawn in the platform default, which
+    // is what a browser does with a stack it cannot satisfy either.
+    //
+    // The comparison above has a known false negative and it is worth naming: on an OEM build whose
+    // *default* family is a named face, asking for that name by name returns an object equal to
+    // `Typeface.DEFAULT`, so the font is reported unresolved while being exactly what gets drawn.
+    // The report is over-eager rather than the drawing wrong, and there is no API on this platform
+    // that distinguishes the two — `Typeface` exposes no family name to compare against.
+    if (family.isNotBlank()) unresolved.add(family)
+    return styled(Typeface.DEFAULT, weight, italic)
   }
 
   /**
-   * The names the `when` above maps onto a built-in family.
+   * Vega's generic families, and the near-generic names, as Android's built-in families.
    *
    * Wider than CSS's generics on purpose: a specification naming `Helvetica` or `Courier` on a
    * device that has neither is asking for a sans or a mono, and Android answers with the family
    * rather than with nothing.
    */
-  private val GENERIC_ALIASES =
-    setOf(
+  private fun builtIn(name: String): Typeface? =
+    when (name.lowercase()) {
       "sans-serif",
       "helvetica",
-      "arial",
+      "arial" -> Typeface.SANS_SERIF
       "serif",
       "times",
-      "times new roman",
+      "times new roman" -> Typeface.SERIF
       "monospace",
       "courier",
-      "courier new",
-    )
+      "courier new" -> Typeface.MONOSPACE
+      else -> null
+    }
 
   /** A face at a weight and slant, through the widest API the device has. */
   private fun styled(base: Typeface, weight: Int, italic: Boolean): Typeface =

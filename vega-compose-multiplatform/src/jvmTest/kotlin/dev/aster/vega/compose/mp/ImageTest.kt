@@ -261,8 +261,14 @@ class ImageTest {
    * **Two marks on the same URL**, deliberately. It makes the duplication visible inside a single
    * draw, so the assertion does not rest on a redraw happening — `ImageComposeScene.render()` does
    * nothing when nothing has invalidated, and an earlier draft of this test proved exactly nothing
-   * by calling it three times. The cross-frame half is asserted below, with a state change to force
-   * the redraw and `onPlaced` to count it.
+   * by calling it three times.
+   *
+   * The cross-frame half is asserted below with a state change to force the redraw. **What proves
+   * the redraw** is the last frame: after `cache.clear()` the resolver is asked again, which can
+   * only happen inside a draw, and it is driven by the same nudge as the frame before it. This used
+   * to count `onPlaced` calls instead — which worked only because `onPlaced` was firing on every
+   * frame, and that was itself a defect: the seam reports the *fit* placement, which a pan does not
+   * change, and the Android View has always reported it only when it changed.
    */
   @Test
   fun `an unresolved image is reported once per url and the resolver asked once`() {
@@ -285,7 +291,6 @@ class ImageTest {
     val composed = ImageComposeScene(20, 20, density = Density(1f))
     val cache = ImageCache()
     var asked = 0
-    var draws = 0
     val reported = mutableListOf<String>()
     // Read inside the composition, so changing it invalidates the draw. Without something like this
     // `render()` returns the frame it already had.
@@ -302,20 +307,18 @@ class ImageTest {
             null
           },
           onUnresolvedImage = { reported += it },
-          onPlaced = { draws += 1 },
         )
       }
       composed.render()
-      assertEquals(1, draws)
       // Two marks, one URL, one draw: without the negative cache this is two fetches and two
       // reports.
       assertEquals(1, asked, "one fetch for two marks on the same URL")
       assertEquals(listOf("https://example.com/missing.png"), reported)
 
-      // And across frames. The nudge is what makes the redraw real; `draws` is what proves it was.
+      // And across frames. The nudge is what makes the redraw real; the frame after the clear,
+      // below, is what proves the nudge redraws at all.
       nudge.value = 1.0
       composed.render()
-      assertEquals(2, draws, "the scene really was drawn again")
       assertEquals(1, asked, "still one fetch: a refusal outlives the frame")
       assertEquals(1, reported.size, "and still one report")
 
@@ -324,7 +327,8 @@ class ImageTest {
       cache.clear()
       nudge.value = 2.0
       composed.render()
-      assertEquals(3, draws)
+      // The resolver can only be reached from a draw, so this is the proof that a nudge redraws —
+      // and therefore that the frame above drew too, and asked nothing.
       assertEquals(2, asked)
       assertEquals(2, reported.size)
     } finally {

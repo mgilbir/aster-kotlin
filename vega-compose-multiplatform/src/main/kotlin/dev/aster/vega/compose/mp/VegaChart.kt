@@ -1,20 +1,27 @@
 package dev.aster.vega.compose.mp
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChangedIgnoreConsumed
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -176,6 +183,11 @@ public fun VegaChart(
       SceneSizing.Scene -> Modifier
       SceneSizing.Fill -> Modifier.fillMaxSize()
     }
+  // The placement last handed to [onPlaced]; see the note beside the call. A plain holder rather
+  // than a `MutableState`, because writing it must not invalidate anything — it is a record of what
+  // was reported, not an input to the drawing.
+  val lastPlacement = remember { Ref<ChartPlacement>() }
+
   Box(modifier = modifier.then(sized).then(Modifier.size(scene.width.dp, scene.height.dp))) {
     Canvas(
       modifier =
@@ -193,14 +205,26 @@ public fun VegaChart(
             onPan = onPan,
             onZoom = onZoom,
             onHover = onHover,
-            viewportOffset = viewportOffset,
-            viewportScale = viewportScale,
+            // **Read, not keyed.** See `chartPointerInput`: a `pointerInput` restarts when a key
+            // changes, and the viewport changes on the first pixel of every pan.
+            viewport = rememberUpdatedState(Viewport(viewportOffset, viewportScale)),
           )
     ) {
       // Reported before drawing, so a host that sets `contentScale` from it has done so before the
       // first gesture can arrive. The **fit** alone: the controller applies the pan and the zoom
       // itself, and handing it a scale that already carried them would apply each twice.
-      onPlaced?.invoke(fitPlacement(scene, size.width, size.height, fit, density))
+      //
+      // **Only when it changed**, which the Android View's `reportPlacement` has always done and
+      // this did not: `DrawScope` runs per frame, so a host was called from the draw phase sixty
+      // times a second with the same numbers. A host doing the documented thing with them — setting
+      // `controller.contentScale` — was writing to a `StateFlow` from inside a draw, which
+      // schedules the next frame, which draws, which writes. The same seam on two renderers fired
+      // at two different cadences and neither said so.
+      val placed = fitPlacement(scene, size.width, size.height, fit, density)
+      if (placed != lastPlacement.value) {
+        lastPlacement.value = placed
+        onPlaced?.invoke(placed)
+      }
       val placement =
         placement(scene, size.width, size.height, fit, density, viewportOffset, viewportScale)
       translate(left = placement.left, top = placement.top) {
@@ -413,6 +437,19 @@ public typealias ChartPlacement = dev.aster.vega.scene.ScenePlacement
  * is over, which maps onto `ChartInputEvent` as `GesturePhase.CHANGED` while `ended` is false and
  * `GesturePhase.ENDED` when it is true. That is the same pairing the Swift session sends.
  */
+/**
+ * The pan and the zoom together, so `chartPointerInput` reads one state rather than two.
+ *
+ * A value class in all but name: it exists because `rememberUpdatedState` holds one object, and the
+ * point of holding one is to keep both out of the `pointerInput` keys. See [chartPointerInput].
+ */
+private data class Viewport(val offset: VectorD, val scale: Double)
+
+/** A mutable box that is not Compose state: writing it invalidates nothing. See `onPlaced`. */
+private class Ref<T> {
+  var value: T? = null
+}
+
 private fun Modifier.chartPointerInput(
   scene: Scene,
   fit: SceneFit,
@@ -423,8 +460,18 @@ private fun Modifier.chartPointerInput(
   onPan: ((VectorD, Boolean) -> Unit)?,
   onZoom: ((Double, PointD, Boolean) -> Unit)?,
   onHover: ((PointD?, SceneNodeId?) -> Unit)?,
-  viewportOffset: VectorD,
-  viewportScale: Double,
+  /**
+   * The pan and the zoom the host has accumulated, as a **state to read** rather than a value.
+   *
+   * `Modifier.pointerInput` restarts its coroutine whenever a key changes, cancelling whatever
+   * gesture is in flight. The viewport was among the keys, and the viewport is precisely what a pan
+   * changes: the documented wiring feeds `InteractionState.viewportOffset` back into this
+   * composable, so the first pan increment cancelled the detector that produced it. A continuous
+   * pan or pinch was a sequence of one-increment gestures, each starting from a fresh centroid — a
+   * chart that stutters and never really follows the finger. It is read through a `State` and kept
+   * out of the keys, so the detector sees the current viewport and keeps running.
+   */
+  viewport: State<Viewport>,
 ): Modifier {
   if (onTap == null && onLongPress == null && onPan == null && onZoom == null && onHover == null) {
     return this
@@ -432,7 +479,7 @@ private fun Modifier.chartPointerInput(
   return this.then(
       if (onTap == null && onLongPress == null) Modifier
       else
-        Modifier.pointerInput(scene, fit, density, hitIndex, viewportOffset, viewportScale) {
+        Modifier.pointerInput(scene, fit, density, hitIndex) {
           fun reported(offset: Offset): Pair<PointD, SceneNodeId?> =
             controllerPoint(offset, scene, fit, density, size.width, size.height) to
               hitIndex
@@ -444,8 +491,8 @@ private fun Modifier.chartPointerInput(
                     density,
                     size.width,
                     size.height,
-                    viewportOffset,
-                    viewportScale,
+                    viewport.value.offset,
+                    viewport.value.scale,
                   )
                 )
                 ?.node
@@ -472,7 +519,7 @@ private fun Modifier.chartPointerInput(
     .then(
       if (onPan == null && onZoom == null) Modifier
       else
-        Modifier.pointerInput(scene, fit, density, viewportOffset, viewportScale) {
+        Modifier.pointerInput(scene, fit, density) {
           // One detector for both, because a pinch is a two-finger drag: separate detectors would
           // each claim the pointers and a two-finger gesture would arrive as one of the two at
           // random. `detectTransformGestures` reports pan, zoom and rotation from the same stream,
@@ -501,12 +548,81 @@ private fun Modifier.chartPointerInput(
         }
     )
     .then(
+      if (onPan == null && onZoom == null) Modifier
+      else
+      // **The end of the gesture, which the detector above never reports.**
+      //
+      // `detectTransformGestures` reports increments and nothing else, so both callbacks were
+      // always called with `ended = false` and nothing ever passed true — a parameter documented
+      // on both of them and dead on both. `VegaChartController` emits `ChartEvent.ViewportChanged`
+      // only on `GesturePhase.ENDED`, which is the whole point of the phase: a host persists or
+      // announces a viewport once rather than sixty times a second. On this renderer that event
+      // never fired at all.
+      //
+      // A **second** `pointerInput` rather than a wrapper around the first, because
+      // `detectTransformGestures` is a `PointerInputScope` extension and `awaitEachGesture` hands
+      // out a restricted scope that cannot call one. Two of them is not a conflict: this one
+      // consumes nothing, so it observes the same stream the detector does.
+      Modifier.pointerInput(scene, fit, density) {
+          awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false)
+            var moved = false
+            var pinched = false
+            var centroid = Offset.Zero
+            var mostFingers = 0
+            while (true) {
+              // The **final** pass, so this sees the event after the detector above has had it —
+              // which means every position change has already been *consumed* by the detector, and
+              // `positionChanged()` reports false for a consumed one. The ignore-consumed spelling
+              // is the whole point of a watcher that runs behind another handler.
+              val event = awaitPointerEvent(PointerEventPass.Final)
+              val down = event.changes.filter { it.pressed }
+              if (down.size > 1) pinched = true
+              if (event.changes.any { it.positionChangedIgnoreConsumed() }) moved = true
+              // The centroid while the gesture was at its widest, so a pinch closes about the point
+              // it was actually about. Taken from the *last* event instead, a two-finger pinch
+              // closes on wherever the second finger happened to be when the first came up.
+              if (down.size >= mostFingers && down.isNotEmpty()) {
+                mostFingers = down.size
+                centroid =
+                  Offset(
+                    down.sumOf { it.position.x.toDouble() }.toFloat() / down.size,
+                    down.sumOf { it.position.y.toDouble() }.toFloat() / down.size,
+                  )
+              }
+              if (event.changes.none { it.pressed }) break
+            }
+            // A zero increment and a unit factor: the movement has already been dispatched, and
+            // what is being reported is that there will be no more of it. A gesture that never
+            // moved was a tap, and closing a pan that never happened would publish a viewport
+            // change for it.
+            if (!moved) return@awaitEachGesture
+            onPan?.invoke(VectorD(0.0, 0.0), true)
+            // Only where two fingers were down: a one-finger drag is not a pinch, and reporting one
+            // would publish the viewport twice for the same gesture.
+            if (pinched) {
+              onZoom?.invoke(
+                1.0,
+                controllerPoint(centroid, scene, fit, density, size.width, size.height),
+                true,
+              )
+            }
+          }
+        }
+    )
+    .then(
       if (onHover == null) Modifier
       else
-        Modifier.pointerInput(scene, fit, density, hitIndex, viewportOffset, viewportScale) {
+        Modifier.pointerInput(scene, fit, density, hitIndex) {
           awaitPointerEventScope {
             while (true) {
               val event = awaitPointerEvent()
+              // **Mouse and stylus only**, which is what this callback documents and what "hover"
+              // means: a finger on the glass is a press, not a pointer resting somewhere. Every
+              // `Move` was reported, so a touch drag churned the hover state — and with it the
+              // tooltip — sixty times a second through the whole of a pan, on a gesture whose
+              // pointer is under the reader's own finger and cannot be seen anyway.
+              if (event.changes.any { it.type == PointerType.Touch }) continue
               when (event.type) {
                 PointerEventType.Move,
                 PointerEventType.Enter -> {
@@ -522,8 +638,8 @@ private fun Modifier.chartPointerInput(
                         density,
                         size.width,
                         size.height,
-                        viewportOffset,
-                        viewportScale,
+                        viewport.value.offset,
+                        viewport.value.scale,
                       )
                     )
                   onHover(reported, hit?.node?.id)

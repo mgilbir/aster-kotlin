@@ -54,7 +54,9 @@ vega-android-canvas  public class dev.aster.vega.android.VegaChartView extends a
     public final dev.aster.vega.android.AndroidImageResolver getImageResolver();
     public final dev.aster.vega.android.AndroidTextEngine getChartTextEngine();
     public final dev.aster.vega.android.AndroidTextEngine newCompatibleTextEngine();
+    public final dev.aster.vega.android.SceneExporter exporter();
     public final dev.aster.vega.runtime.VegaChartController getController();
+    public final dev.aster.vega.scene.PointD placedPoint$vega_android_canvas(float, float);
     public final dev.aster.vega.scene.ScenePlacement placement();
     public final int getAccessibilityMaxExposedMarks();
     public final kotlin.jvm.functions.Function1<dev.aster.vega.scene.ScenePlacement, kotlin.Unit> getOnPlaced();
@@ -151,8 +153,13 @@ vega-android-canvas  public final class dev.aster.vega.android.SceneExporter {
     public static dev.aster.vega.android.BitmapExport toBitmap$default(dev.aster.vega.android.SceneExporter, dev.aster.vega.scene.Scene, dev.aster.vega.android.BitmapExportOptions, int, java.lang.Object);
     public static dev.aster.vega.android.ByteExport toPdf$default(dev.aster.vega.android.SceneExporter, dev.aster.vega.scene.Scene, double, double, int, java.lang.Object);
     public static dev.aster.vega.android.ByteExport toPng$default(dev.aster.vega.android.SceneExporter, dev.aster.vega.scene.Scene, dev.aster.vega.android.BitmapExportOptions, int, int, java.lang.Object);
+    public static final dev.aster.vega.android.SceneExporter$Companion Companion;
+    public static final long MAX_EXPORT_PIXELS;
+vega-android-canvas  public final class dev.aster.vega.android.SceneExporter$Companion {
+    public dev.aster.vega.android.SceneExporter$Companion(kotlin.jvm.internal.DefaultConstructorMarker);
 vega-android-canvas  public final class dev.aster.vega.android.VegaAccessibilityHelper extends androidx.customview.widget.ExploreByTouchHelper {
     public dev.aster.vega.android.VegaAccessibilityHelper(dev.aster.vega.android.VegaChartView);
+    public final java.util.List<java.lang.Object> semanticIdentity();
     public final void invalidateSemanticTree();
     public static final dev.aster.vega.android.VegaAccessibilityHelper$Companion Companion;
     public static final int MAX_EXPOSED_MARKS;
@@ -181,8 +188,9 @@ vega-android-canvas  }
 vega-android-canvas  }
 vega-android-canvas  }
 vega-android-canvas  }
+vega-android-canvas  }
 vega-compose  public final class dev.aster.vega.compose.VegaChartKt {
-    public static final dev.aster.vega.runtime.VegaChartController rememberVegaChartController(dev.aster.vega.scene.Scene, dev.aster.vega.model.locale.VegaLocale, androidx.compose.runtime.Composer, int, int);
+    public static final dev.aster.vega.runtime.VegaChartController rememberVegaChartController(dev.aster.vega.scene.Scene, dev.aster.vega.model.locale.VegaLocale, kotlin.jvm.functions.Function1<? super java.lang.String, ? extends android.graphics.Typeface>, androidx.compose.runtime.Composer, int, int);
     public static final void VegaChart(dev.aster.vega.runtime.VegaChartController, androidx.compose.ui.Modifier, kotlin.jvm.functions.Function1<? super java.lang.String, ? extends android.graphics.Typeface>, int, boolean, dev.aster.vega.android.AndroidImageResolver, kotlin.jvm.functions.Function1<? super java.lang.String, kotlin.Unit>, kotlin.jvm.functions.Function1<? super dev.aster.vega.scene.ScenePlacement, kotlin.Unit>, kotlin.jvm.functions.Function1<? super dev.aster.vega.runtime.ChartEvent, kotlin.Unit>, androidx.compose.runtime.Composer, int, int);
     public static final void VegaChart(dev.aster.vega.scene.Scene, androidx.compose.ui.Modifier, kotlin.jvm.functions.Function1<? super java.lang.String, ? extends android.graphics.Typeface>, int, boolean, dev.aster.vega.android.AndroidImageResolver, kotlin.jvm.functions.Function1<? super java.lang.String, kotlin.Unit>, kotlin.jvm.functions.Function1<? super dev.aster.vega.scene.ScenePlacement, kotlin.Unit>, kotlin.jvm.functions.Function1<? super dev.aster.vega.runtime.ChartEvent, kotlin.Unit>, androidx.compose.runtime.Composer, int, int);
 vega-compose  }

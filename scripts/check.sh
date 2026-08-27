@@ -181,6 +181,13 @@ fi
 # `--continue` because the inventory is the point: without it the first failing module aborts the
 # build, and a run that stopped after vega-dataflow looks much like one that passed the other eight.
 # A failing task still fails the build.
+#
+# `compileCommonMainKotlinMetadata` is here because **compiling every target is not the same as
+# compiling the common source set**. A `commonMain` file that names something only the JVM and
+# Native standard libraries have — `OutOfMemoryError` is the one that got through — compiles for
+# every target and fails the metadata compilation, which is what a consumer of the multiplatform
+# artifact actually resolves against. Two commits shipped exactly that defect while this gate said
+# green.
 # ---------------------------------------------------------------------------------------------
 gradle_gate() {
   ./gradlew --continue \
@@ -189,6 +196,7 @@ gradle_gate() {
     checkBytecodeLevel \
     test \
     compileKotlinLinuxX64 \
+    compileCommonMainKotlinMetadata \
     "${instrumented_tasks[@]}" \
     "${host_tasks[@]}" \
     lint \

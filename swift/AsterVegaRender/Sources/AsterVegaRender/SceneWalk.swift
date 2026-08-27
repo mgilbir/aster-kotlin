@@ -34,7 +34,8 @@ public struct SceneWalk {
             blue: background.blue, alpha: background.alpha
           )
         ),
-        stroke: nil
+        stroke: nil,
+        blend: SceneBlendMode.normal
       )
     }
     walk(node: scene.root, transform: .identity, into: &target)
@@ -93,7 +94,8 @@ public struct SceneWalk {
           corners: corners(of: group),
           fill: brush(group.fill, opacity: own, bounds: panelBox, through: local),
           stroke: group.strokeForeground
-            ? nil : stroke(group.stroke, opacity: own, bounds: panelBox, through: local)
+            ? nil : stroke(group.stroke, opacity: own, bounds: panelBox, through: local),
+          blend: group.blendMode
         )
       }
       // Drawn whatever the group's own opacity is — a transparent group is not an invisible one.
@@ -115,7 +117,8 @@ public struct SceneWalk {
           local.apply(rect: nudged),
           corners: corners(of: group),
           fill: nil,
-          stroke: stroke(group.stroke, opacity: own, bounds: panelBox, through: local)
+          stroke: stroke(group.stroke, opacity: own, bounds: panelBox, through: local),
+          blend: group.blendMode
         )
       }
       target.endGroup()
@@ -132,7 +135,8 @@ public struct SceneWalk {
         ),
         corners: corners(of: rect),
         fill: brush(rect.fill, opacity: own, bounds: rect.bounds, through: local),
-        stroke: stroke(rect.stroke, opacity: own, bounds: rect.bounds, through: local)
+        stroke: stroke(rect.stroke, opacity: own, bounds: rect.bounds, through: local),
+        blend: rect.blendMode
       )
 
     case "rule":
@@ -141,7 +145,8 @@ public struct SceneWalk {
       target.line(
         from: local.apply(point: Point(x: rule.x1, y: rule.y1)),
         to: local.apply(point: Point(x: rule.x2, y: rule.y2)),
-        stroke: stroke(rule.stroke, opacity: own, bounds: rule.bounds, through: local)
+        stroke: stroke(rule.stroke, opacity: own, bounds: rule.bounds, through: local),
+        blend: rule.blendMode
       )
 
     case "path":
@@ -150,7 +155,8 @@ public struct SceneWalk {
       target.path(
         commands(of: path.path, through: local),
         fill: brush(path.fill, opacity: own, bounds: path.bounds, through: local),
-        stroke: stroke(path.stroke, opacity: own, bounds: path.bounds, through: local)
+        stroke: stroke(path.stroke, opacity: own, bounds: path.bounds, through: local),
+        blend: path.blendMode
       )
 
     case "symbol":
@@ -161,7 +167,8 @@ public struct SceneWalk {
       target.path(
         commands(of: symbol.outline, through: local),
         fill: brush(symbol.fill, opacity: own, bounds: symbol.bounds, through: local),
-        stroke: stroke(symbol.stroke, opacity: own, bounds: symbol.bounds, through: local)
+        stroke: stroke(symbol.stroke, opacity: own, bounds: symbol.bounds, through: local),
+        blend: symbol.blendMode
       )
 
     case "text":
@@ -235,7 +242,8 @@ public struct SceneWalk {
             letterSpacing: style.letterSpacing
           ),
           fill: fill,
-          stroke: stroke
+          stroke: stroke,
+          blend: text.blendMode
         )
       }
 
@@ -251,7 +259,8 @@ public struct SceneWalk {
         in: local.apply(rect: image.rect),
         fit: image.fit == ImageFit.contain ? .contain : .fill,
         smooth: image.smooth,
-        opacity: own
+        opacity: own,
+        blend: image.blendMode
       )
 
     default:

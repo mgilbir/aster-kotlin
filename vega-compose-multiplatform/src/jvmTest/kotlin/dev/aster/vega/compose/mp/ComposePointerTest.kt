@@ -150,11 +150,12 @@ class ComposePointerTest {
   fun `a drag is reported as an increment in scene units`() = runComposeUiTest {
     val scene = scene()
     val moves = mutableListOf<VectorD>()
+    val ends = mutableListOf<VectorD>()
     setContent {
       VegaChart(
         scene,
         modifier = Modifier.size(scene.width.dp, scene.height.dp),
-        onPan = { delta, _ -> moves.add(delta) },
+        onPan = { delta, ended -> (if (ended) ends else moves).add(delta) },
       )
     }
 
@@ -176,6 +177,10 @@ class ComposePointerTest {
       moves.all { abs(it.dy) < 1.0 },
       "a horizontal drag reported vertical movement: $moves",
     )
+    // **And the gesture ends.** `ended = true` is what makes `ChartEvent.ViewportChanged` fire —
+    // the phase exists so a host persists a viewport once rather than once a frame — and nothing
+    // ever passed it. Exactly one, carrying a zero increment: the movement is already reported.
+    assertEquals(listOf(VectorD(0.0, 0.0)), ends, "the pan must be closed exactly once")
   }
 
   @Test
@@ -183,13 +188,14 @@ class ComposePointerTest {
     val scene = scene()
     val factors = mutableListOf<Double>()
     val anchors = mutableListOf<PointD>()
+    val endedAt = mutableListOf<PointD>()
     setContent {
       VegaChart(
         scene,
         modifier = Modifier.size(scene.width.dp, scene.height.dp),
-        onZoom = { factor, at, _ ->
-          factors.add(factor)
-          anchors.add(at)
+        onZoom = { factor, at, ended ->
+          if (ended) endedAt.add(at) else factors.add(factor)
+          if (!ended) anchors.add(at)
         },
       )
     }
@@ -220,6 +226,13 @@ class ComposePointerTest {
     assertTrue(
       anchors.all { it.x > 40.0 && it.x < 80.0 && abs(it.y - 45.0) < 2.0 },
       "an anchor was not between the two fingers: $anchors",
+    )
+    // **And the pinch ends**, once, about the point the fingers were last on. Without this the
+    // controller never emits `ChartEvent.ViewportChanged` for a pinch on this renderer at all.
+    assertEquals(1, endedAt.size, "the pinch must be closed exactly once: $endedAt")
+    assertTrue(
+      endedAt.all { it.x > 40.0 && it.x < 80.0 && abs(it.y - 45.0) < 2.0 },
+      "the closing anchor was not between the two fingers: $endedAt",
     )
   }
 

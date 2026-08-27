@@ -150,18 +150,21 @@ public class VegaLiteCompiler(
    * like. Cancellation is rethrown, because swallowing it would leave a cancelled coroutine
    * running, and so is `OutOfMemoryError`, after which nothing this process does is trustworthy.
    *
-   * `StackOverflowError` is caught here, and that is worth being honest about: on the JVM it is
-   * recoverable in practice, and on Kotlin/Native it is not catchable at all. Which is the reason
-   * `Limits` exists rather than this being the whole answer.
+   * **`Exception`, not `Throwable`**, which is both the portable spelling and the right rule. An
+   * `Error` is not a failed compile: `OutOfMemoryError` leaves nothing this process does
+   * trustworthy, and `StackOverflowError` is not catchable at all on Kotlin/Native, so catching
+   * either would turn "the host dies" into "the host dies later, holding a diagnostic". That is
+   * exactly why `Limits` refuses an over-deep document *before* walking it rather than relying on a
+   * catch. (`OutOfMemoryError` is also not in the common standard library, so a `Throwable` catch
+   * with an explicit rethrow of it does not compile for the native targets at all — which the
+   * gradle gate did not notice, because it does not compile the common metadata.)
    */
   private inline fun guarded(compile: () -> VegaLiteCompilation): VegaLiteCompilation =
     try {
       compile()
     } catch (cancellation: kotlin.coroutines.cancellation.CancellationException) {
       throw cancellation
-    } catch (exhausted: OutOfMemoryError) {
-      throw exhausted
-    } catch (failure: Throwable) {
+    } catch (failure: Exception) {
       VegaLiteCompilation(
         vega = null,
         diagnostics =

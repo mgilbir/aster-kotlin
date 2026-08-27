@@ -40,19 +40,25 @@ struct CanonicalCalls: DrawTarget {
     note("end")
   }
 
-  mutating func rect(_ rect: Rect, corners: AsterVegaRender.Corners, fill: Brush?, stroke: StrokePaint?) {
+  mutating func rect(
+    _ rect: Rect, corners: AsterVegaRender.Corners, fill: Brush?, stroke: StrokePaint?,
+    blend: SceneBlendMode
+  ) {
     note(
       "rect \(show(rect)) corners=[\(num(corners.topLeft)),\(num(corners.topRight)),"
         + "\(num(corners.bottomRight)),\(num(corners.bottomLeft))]"
-        + " fill=\(show(fill)) stroke=\(show(stroke))"
+        + " fill=\(show(fill)) stroke=\(show(stroke)) blend=\(show(blend))"
     )
   }
 
-  mutating func line(from: Point, to: Point, stroke: StrokePaint?) {
-    note("line \(show(from))-\(show(to)) stroke=\(show(stroke))")
+  mutating func line(from: Point, to: Point, stroke: StrokePaint?, blend: SceneBlendMode) {
+    note("line \(show(from))-\(show(to)) stroke=\(show(stroke)) blend=\(show(blend))")
   }
 
-  mutating func path(_ commands: [AsterVegaRender.PathCommand], fill: Brush?, stroke: StrokePaint?) {
+  mutating func path(
+    _ commands: [AsterVegaRender.PathCommand], fill: Brush?, stroke: StrokePaint?,
+    blend: SceneBlendMode
+  ) {
     let written = commands.map { command -> String in
       switch command {
       case .move(let to): return "M\(show(to))"
@@ -62,16 +68,18 @@ struct CanonicalCalls: DrawTarget {
       }
     }
     .joined()
-    note("path \(written) fill=\(show(fill)) stroke=\(show(stroke))")
+    note("path \(written) fill=\(show(fill)) stroke=\(show(stroke)) blend=\(show(blend))")
   }
 
-  mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?) {
+  mutating func text(
+    _ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode
+  ) {
     note(
       "text \(quoted(run.text)) origin=\(show(run.origin)) anchor=\(show(run.anchor))"
         + " ascent=\(num(run.ascent)) font=\(quoted(run.fontFamily)) size=\(num(run.fontSize))"
         + " weight=\(run.fontWeight) italic=\(flag(run.italic))"
         + " angle=\(num(run.angleDegrees)) spacing=\(num(run.letterSpacing))"
-        + " fill=\(show(fill)) stroke=\(show(stroke))"
+        + " fill=\(show(fill)) stroke=\(show(stroke)) blend=\(show(blend))"
     )
   }
 
@@ -81,12 +89,14 @@ struct CanonicalCalls: DrawTarget {
     in rect: Rect,
     fit: DrawImageFit,
     smooth: Bool,
-    opacity: Double
+    opacity: Double,
+    blend: SceneBlendMode
   ) {
     note(
       "image url=\(quoted(url)) raster="
         + (raster.map { "\($0.width)x\($0.height)" } ?? "-")
         + " \(show(rect)) fit=\(fit.rawValue) smooth=\(flag(smooth)) opacity=\(num(opacity))"
+        + " blend=\(show(blend))"
     )
   }
 
@@ -95,6 +105,12 @@ struct CanonicalCalls: DrawTarget {
   }
 
   private func flag(_ value: Bool) -> String { value ? "1" : "0" }
+
+  /// The blend mode's own name, lower-cased, which is what the Kotlin recorder writes.
+  ///
+  /// Kotlin's enum entries come across as `SceneBlendMode` objects whose `name` is the Kotlin
+  /// spelling — `COLOR_DODGE` — so lower-casing it gives one string on both sides.
+  private func show(_ blend: SceneBlendMode) -> String { blend.name.lowercased() }
 
   private func show(_ point: Point) -> String { "(\(num(point.x)),\(num(point.y)))" }
 

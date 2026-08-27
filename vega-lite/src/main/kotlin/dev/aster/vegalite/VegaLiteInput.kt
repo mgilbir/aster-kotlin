@@ -76,9 +76,7 @@ public object VegaLiteInput {
         VegaJson.parseOrNull(json, diagnostics)
       } catch (cancellation: kotlin.coroutines.cancellation.CancellationException) {
         throw cancellation
-      } catch (exhausted: OutOfMemoryError) {
-        throw exhausted
-      } catch (failure: Throwable) {
+      } catch (failure: Exception) {
         return VegaLiteConversion(
           vegaJson = null,
           wasVegaLite = false,
