@@ -1037,6 +1037,18 @@ class TransformReferenceTest {
     )
   }
 
+  private val TABLE_WITH_A_NULL_KEY =
+    """[{"id": null, "label": "None"}, {"id": "a", "label": "Alpha"}]"""
+
+  private val ROWS_WITH_A_NULL_KEY = """[{"k": "a"}, {"k": null}, {"k": "b"}]"""
+
+  private val NULL_KEY_LOOKUP =
+    """[{"type": "lookup", "from": "nullable", "key": "id", "fields": ["k"],
+         "values": ["label"], "default": "MISS"}]"""
+
+  private val NULL_KEY_EXPECTED =
+    """[{"k":"a","label":"Alpha"},{"k":null,"label":"None"},{"k":"b","label":"MISS"}]"""
+
   private val lookupRows = """[{"k": "a", "v": 1}, {"k": "b", "v": 2}, {"k": "zz", "v": 3}]"""
 
   private fun runWithTable(transforms: String): String {
@@ -1049,6 +1061,30 @@ class TransformReferenceTest {
     val input = (VegaJson.parse(lookupRows) as VegaValue.Arr).values
     val definitions = (VegaJson.parse(transforms) as VegaValue.Arr).values
     return pipeline.run(input, definitions, context).joinToString(",", "[", "]") { asJson(it) }
+  }
+
+  /**
+   * A **null** key is a key, on both sides of the join.
+   *
+   * Upstream's index is `fastmap`, which is object-backed, so a null key is stored under
+   * `String(null)` — `"null"` — and a row whose key is null finds it. Probed against vega 6.3.1: a
+   * table holding `{"k": null, "label": "NULL ROW"}` labels the null row, and only a key genuinely
+   * absent from the table takes the default.
+   *
+   * Skipping null keys when building the index meant a table that deliberately provides a row for
+   * "no value" — the ordinary way to label a missing category — gave every such row the default
+   * instead, silently.
+   */
+  @Test
+  fun `lookup matches a null key`() {
+    context = TestContext()
+    context.tables["nullable"] = (VegaJson.parse(TABLE_WITH_A_NULL_KEY) as VegaValue.Arr).values
+    val input = (VegaJson.parse(ROWS_WITH_A_NULL_KEY) as VegaValue.Arr).values
+    val definitions = (VegaJson.parse(NULL_KEY_LOOKUP) as VegaValue.Arr).values
+    assertEquals(
+      NULL_KEY_EXPECTED,
+      pipeline.run(input, definitions, context).joinToString(",", "[", "]") { asJson(it) },
+    )
   }
 
   @Test

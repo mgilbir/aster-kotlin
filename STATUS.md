@@ -7664,3 +7664,62 @@ notes are still the only place a decision is explained — and points at `STATUS
   the byte stream is sized from the bitmap rather than growing from 32 bytes by repeated doubling.
 - **Every GitHub Action is pinned by SHA**, not by a mutable tag, on a workflow whose release job
   holds `contents: write`.
+
+### The scale arithmetic an interaction reads
+
+Five findings in one place, and they share a shape: the *forward* direction had been checked against
+upstream and the inverse, or the label, or the edge of the range had not.
+
+**`invert` was not the inverse of `apply`.** `TransformedScale.apply` has been piecewise since a
+three-stop power scale was caught interpolating across both segments; `invert` still read only the
+first and last stop. So on any domain of more than two the two functions disagreed, by however much
+the segments differ. That is what `invert('s', x())` reads — it is how a specification turns a
+pointer into a data value — so a brush on a multi-stop log or power axis selected a range with the
+wrong numbers in it, silently, and the wrongness grew with how unevenly the stops were spread.
+
+**A time tick was labelled by local field values.** d3's cascade is a chain of *interval floors* —
+`second(date) < date ? … : minute(date) < date ? …` — and this asked `at.hour != 0`. The two are the
+same question in every zone whose day begins at midnight, and a different one where a daylight-saving
+jump **skips** it: Santiago, Havana and Tehran move the clock forward at 00:00, so the first instant
+of that day is 01:00, and there a day tick was labelled as an hour. Once a year, in the one place a
+reader most needs the date back.
+
+**A label past 2^63 was `Long.MAX_VALUE`.** `Double.toLong()` saturates rather than overflowing, so
+every value above about 9.2e18 printed the identical `9223372036854775807`. A linear axis over a
+domain that size is unusual and entirely legal, and every one of its labels was the same wrong number
+with nothing said. `Decimals.fixed(x, 0)` is the same rounding without the range, and it agrees with
+JavaScript's `toFixed(0)` — which is the *exact* value of the double, not its shortest spelling.
+
+**`nice` wrote back a half-niced domain.** d3's has no iteration cap at all; its step converges, so
+`while (true)` terminates. The cap here is a safety net for an input d3 never sees, it was eight, and
+on reaching it the loop wrote back whatever it had — a domain that is neither the one asked for nor a
+rounded one, with no way to tell from the outside which had happened.
+
+**And a log scale's non-integer base lost its fractional tick count.** d3 passes `j - i`, the
+difference of the two *logarithms*, straight to `ticks`, which divides by it; this truncated it to an
+integer and then raised anything below one back up to one, so a base-2.5 axis over a fifth of a
+decade asked for one tick where d3 asks for 0.7 — a different step, and therefore different labels.
+
+### Three that were about saying what is true
+
+**`lookup` refused a null key.** Upstream's index is `fastmap`, object-backed, so a null key is
+stored under `String(null)` — `"null"` — and a row whose key is null finds it. Probed: a table
+holding `{"id": null, "label": "None"}` labels the null row, and only a key genuinely absent takes
+the default. Skipping them meant a table that deliberately provides a row for "no value" — the
+ordinary way to label a missing category — gave every such row the default instead.
+
+**A rotated group's clip window is its bounding box**, and now says so. `mapBounds` answers the box
+of the mapped rectangle, so under a rotation the hit-test window is larger than what is drawn and a
+point in a cut-away corner still reaches the children beneath. Left as a bounding box deliberately —
+an exact answer means carrying the clip as a polygon and testing every candidate against it, on
+every hit test, and nothing this engine compiles produces a rotated *group*. What was missing is the
+sentence saying so, since the code read as though it handled the general case.
+
+**And the controller's serialization claim is now the one it can keep.** `setSpecAsync` said
+"compilations are serialized", unqualified, and the `Mutex` covers the two suspending entry points
+and nothing else: `setSpec`, the `hostData` and `containerSize` setters and every interaction
+recompile call the compiler inline, and a `Mutex` cannot be taken from a function that does not
+suspend. Kotlin's common standard library has no blocking lock, and blocking the main thread for the
+length of a background compile is an ANR by another name — so the honest answer is the one already
+built beside it: one place every compile goes through, and `VEGA_COMPILE_CONCURRENT` when two
+overlap. The claim now matches the mechanism.

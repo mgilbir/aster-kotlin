@@ -141,6 +141,18 @@ public class SceneHitIndex(
       }
       if (node is GroupNode) {
         val nextAncestors = ancestors + node
+        // **An axis-aligned window, and it is a window rather than the clip.** `mapBounds` answers
+        // the bounding box of the mapped rectangle, so under a rotated or sheared group transform
+        // the window is *larger* than the region that is actually drawn — a point in a corner the
+        // clip cuts away still reaches the children beneath it, and a tap there hits a mark the
+        // reader cannot see.
+        //
+        // Left as a bounding box on purpose: an exact answer means carrying the clip as a polygon
+        // and testing each candidate against it, which is real work on every node of every hit
+        // test, and nothing this engine compiles produces a rotated *group* — the transforms in a
+        // published scene are translations and uniform scales, under which a bounding box **is**
+        // the region. What was missing is the sentence saying so, since the code reads as though it
+        // handles the general case.
         val nextWindow =
           node.clip?.let { clip ->
             val mapped = world.mapBounds(clip)

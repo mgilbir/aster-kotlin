@@ -381,7 +381,10 @@ public class VegaChartController(
    */
   private var timerKeys: List<Pair<String, Double>> = emptyList()
 
-  /** Serializes compilation, so one text engine is only ever used by one compile at a time. */
+  /**
+   * Serializes the two `…Async` entry points against each other. **Not every compile** — see
+   * [compilesRunning], which is what covers the synchronous paths and why they cannot take this.
+   */
   private val compileLock = Mutex()
 
   /**
@@ -588,8 +591,16 @@ public class VegaChartController(
   /**
    * Compiles a specification off the calling thread, then publishes on it.
    *
-   * Compilations are serialized, so the text engine is only ever touched by one at a time. The host
-   * still must not hand this controller the engine its renderer draws with; see the class docs.
+   * The two `…Async` entry points are serialized **against each other**, so two of them never touch
+   * the text engine at once. They are not serialized against `setSpec`, the `hostData` and
+   * `containerSize` setters or an interaction's recompile, which call the compiler inline and
+   * cannot take a `Mutex` from a function that does not suspend — see [compilesRunning] for why
+   * that is a report rather than a lock, and for the diagnostic a host gets when it happens. This
+   * sentence used to say "compilations are serialized", unqualified, which is the claim the audit
+   * was right to call the class's own.
+   *
+   * The host still must not hand this controller the engine its renderer draws with; see the class
+   * docs.
    *
    * A host that is not Kotlin should call the single-argument [setSpecAsync] instead: a default
    * argument does not survive the Obj-C boundary, so from Swift this overload demands a

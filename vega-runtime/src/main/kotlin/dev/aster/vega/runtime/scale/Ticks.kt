@@ -147,13 +147,22 @@ public object Ticks {
     }
     if (!start.isFinite() || !stop.isFinite() || start == stop) return domain
 
+    // **The original domain on non-convergence, not a half-niced one.** d3's `nice` has no cap: it
+    // loops until the step stops changing, which it always does. The cap here is a safety net for
+    // an input d3 never sees, and it used to write back whatever the loop had reached — a domain
+    // that is neither the one asked for nor a nicely rounded one, and no way to tell from the
+    // outside which had happened. Returning the input is the honest failure.
     var previousStep = Double.NaN
+    var converged = false
     var iterations = MAX_NICE_PASSES
     while (iterations-- > 0) {
       val step = tickIncrement(start, stop, count)
       // d3 stops on any step it cannot widen with: unchanged, zero, or not finite. Without the last
       // two, a count of zero or a NaN bound walked into the arithmetic below and returned NaN.
-      if (step == previousStep || step == 0.0 || !step.isFinite()) break
+      if (step == previousStep || step == 0.0 || !step.isFinite()) {
+        converged = true
+        break
+      }
       when {
         step > 0 -> {
           start = floor(start / step) * step
@@ -164,10 +173,14 @@ public object Ticks {
           start = ceil(start * step) / step
           stop = floor(stop * step) / step
         }
-        else -> break
+        else -> {
+          converged = true
+          break
+        }
       }
       previousStep = step
     }
+    if (!converged) return domain
 
     result[i0] = start
     result[i1] = stop
@@ -314,7 +327,14 @@ public object Ticks {
         return if (reverse) linear.reversed() else linear
       }
     } else {
-      val span = ticks(logLo, logHi, minOf((logHi - logLo).toInt(), count).coerceAtLeast(1))
+      // **A fractional count, and no floor of one.** d3 is `ticks(i, j, Math.min(j - i, n))` where
+      // `i` and `j` are the *logarithms* of the bounds — so `j - i` is a fraction on any base that
+      // is not an integer power apart, and it reaches `tickIncrement`, which divides by it. This
+      // truncated it to an integer and then raised anything below one back up to one, so a
+      // base-2.5 axis over a fifth of a decade asked for one tick where d3 asks for 0.7 and got a
+      // different step, hence a different set of labels. `ticks` answers an empty list for a
+      // non-positive count, which is d3's own behaviour and the reason the floor is not needed.
+      val span = ticks(logLo, logHi, minOf(logHi - logLo, count.toDouble()))
       values.addAll(span.map { base.pow(it) })
     }
     return if (reverse) values.reversed() else values
@@ -344,5 +364,13 @@ public object Ticks {
 
   private fun log(value: Double, base: Double): Double = ln(value) / ln(base)
 
-  private const val MAX_NICE_PASSES = 8
+  /**
+   * How many times `nice` will widen a domain before giving up and returning it unchanged.
+   *
+   * d3 has no cap at all — the step converges, so its `while (true)` always terminates — and this
+   * is a safety net against an input d3 never sees rather than a rule of the algorithm. It was
+   * eight, which is fewer than d3's own tick loop uses for a comparable job and close enough to a
+   * real number of passes to be reachable; a domain that reaches it is now returned as it arrived.
+   */
+  private const val MAX_NICE_PASSES = 64
 }

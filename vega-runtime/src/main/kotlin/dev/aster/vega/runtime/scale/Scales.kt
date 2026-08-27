@@ -9,6 +9,7 @@ import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.withTypographicMinus
 import dev.aster.vega.scene.ColorSpaces
 import dev.aster.vega.scene.SceneColor
+import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.ln
@@ -521,9 +522,32 @@ public abstract class TransformedScale(
     // to `invert` as well as to the scale, so a pointer past the end of a log or power axis reads
     // the end of the domain rather than a value beyond it.
     val clamped = if (clamp) position.coerceIn(minOf(r0, r1), maxOf(r0, r1)) else position
-    val d0 = forward(domain.first())
-    val d1 = forward(domain.last())
-    return backward(d0 + ((clamped - r0) / (r1 - r0)) * (d1 - d0))
+
+    // **Piecewise, exactly as [apply] is.** This read only the first and last stop, so on a domain
+    // of more than two it was not the inverse of the function above: `apply` interpolated within a
+    // segment and `invert` straight across all of them, and the two disagreed by however much the
+    // segments differ. That is not a rounding difference. It is what an interactive brush reads —
+    // `invert('s', x())` is how a specification turns a pointer into a data value — so a brush on a
+    // three-stop log or power axis selected a range with the wrong numbers in it, silently, and the
+    // wrongness grew with how unevenly the stops were spread.
+    val stops = minOf(domain.size, range.size)
+    if (stops < 2) return Double.NaN
+    val ascendingRange = range[stops - 1] > range[0]
+    var segment = 0
+    while (segment < stops - 2) {
+      val upper = range[segment + 1]
+      val past = if (ascendingRange) clamped > upper else clamped < upper
+      if (!past) break
+      segment++
+    }
+    val lowRange = range[segment]
+    val highRange = range[segment + 1]
+    val low = forward(domain[segment])
+    val high = forward(domain[segment + 1])
+    // A zero-width range segment has no inverse; answer its own domain stop rather than a NaN that
+    // travels. `apply` answers the midpoint for the mirror case, which is d3's own rule there.
+    if (lowRange == highRange) return backward(low)
+    return backward(low + ((clamped - lowRange) / (highRange - lowRange)) * (high - low))
   }
 
   public open fun ticks(count: Int = LinearScale.DEFAULT_TICK_COUNT): List<Double> =
@@ -1301,6 +1325,11 @@ private fun grouped(digits: String, locale: VegaLocale): String {
 }
 
 /**
+ * The largest magnitude a `Double` can carry into a `Long` without saturating. See [formatNumber].
+ */
+private const val LONG_EXACT_LIMIT: Double = 9.223372036854775E18
+
+/**
  * Formats a number with a fixed number of decimals, trimming a trailing `.0`.
  *
  * A deliberately small subset of d3-format: enough for default tick labels. An explicit `format`
@@ -1313,8 +1342,15 @@ public fun formatNumber(value: Double, decimals: Int): String {
   if (value.isInfinite()) return if (value > 0) "Infinity" else "-Infinity"
   val normalized = if (value == 0.0) 0.0 else value
   if (decimals <= 0) {
-    val rounded = roundHalfUp(normalized).toLong()
-    return rounded.toString()
+    val rounded = roundHalfUp(normalized)
+    // **`Long` cannot hold it past 2^63**, and `Double.toLong()` does not overflow — it
+    // *saturates*,
+    // so every value above about 9.2e18 printed the same `9223372036854775807`. A linear axis over
+    // a domain of that size is unusual and entirely legal, and its labels were all the identical
+    // wrong number with nothing to say so. `Decimals.fixed(x, 0)` is the same rounding without the
+    // range, which is what the branch below already uses for every other decimal count.
+    return if (abs(rounded) < LONG_EXACT_LIMIT) rounded.toLong().toString()
+    else Decimals.fixed(rounded, 0)
   }
   val text = Decimals.fixed(normalized, decimals)
   return if (text == "-0" || text.matches(Regex("-0\\.0+"))) text.substring(1) else text
