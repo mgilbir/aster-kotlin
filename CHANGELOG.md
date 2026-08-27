@@ -8,6 +8,23 @@ section here does not get released.
 
 ### Changed
 
+- **A mark carries a tooltip only when its specification asked for one.** `MarkEncoder` fell back
+  to the whole bound row when no `tooltip` channel was written, on the stated grounds that upstream
+  does the same. It does not: a probe against vega 6.3.1 answers `undefined`, and `tooltip` is not
+  even a property on the item. So every mark on every chart carried a tooltip holding whatever its
+  dataset held — and a chart is routinely drawn from a table with more columns in it than the chart
+  shows, which makes that a disclosure on hover from a specification that asked for no tooltip.
+  `NodeMetadata.tooltip` is now null unless the channel produced a non-nullish value; a host that
+  wants the row reads `NodeMetadata.datum`, which is also what `MarkHovered` and `MarkClicked`
+  carry. The facet-cell path in `AxisBuilder` and `LegendBuilder` already worked this way.
+
+- **`HttpTransport.get` takes the byte budget.** A cap applied after the read is not a cap: the
+  whole response is in memory by the time it is checked, which is the thing being defended against.
+  The loader hands its `maxResponseBytes` down so a transport can stop reading, and the JVM one now
+  does — a bounded streaming read, decoded with the charset the response declared. A custom
+  transport has one more parameter; ignoring it leaves the old behaviour, since the loader still
+  checks the body it gets back.
+
 - **A font resolver is asked for one name, on every host.** `ComposeTextEngine` called a host's
   `fontFamilyResolver` once with the whole CSS stack — `"Noto Sans, Chart Sans"` — and let
   `namedFontFamily` split it, while the Android and Apple engines called theirs once per entry.
@@ -80,6 +97,61 @@ section here does not get released.
   `MarkClicked` carries before following it.
 
 ### Fixed
+
+- **A stale compile cannot publish over a newer one.** Every entry point that recompiles —
+  `setSpec`, `setSpecAsync`, `hostData`, `containerSize`, `setContainerSizeAsync` and the recompile
+  an interaction triggers — now stamps a request number when the *caller asks*, and publishes only
+  if it is still the newest. The asynchronous ones held a lock, so the compiles were ordered; the
+  publishes were not, because each asked "am I finished?" rather than "am I still the answer?". A
+  host that resizes while a specification is still compiling could be left looking at the earlier
+  result. Two compiles running at once on one controller now also report `VEGA_COMPILE_CONCURRENT`,
+  since they share one text engine and one signal table.
+
+- **A URL is fetched once per document, not once per compile.** Every interaction here recompiles
+  the whole specification and a compile resolves every dataset from scratch, so with a loader opted
+  in a tap issued a blocking GET per `url` dataset — on the dispatching thread, with the loader's
+  own timeouts — and a `{"type": "timer", "throttle": 500}` stream polled the network twice a
+  second. `VegaChartController` now wraps the host's loader in a `CachingDataLoader`, cleared when a
+  new specification arrives, because a new document is a new decision about what is behind a URL.
+
+- **`stop()` stays stopped.** It cancelled the timers and the next publish started them again — any
+  publish, and a host that keeps feeding `hostData` to a view it has torn down publishes constantly.
+  A chart the host had explicitly stopped went on ticking with a repaint attached to every tick. The
+  flag is a latch now, cleared only by `setSpec`/`setSpecAsync`.
+
+- **A private address written as IPv6 is refused like any other.** `blockPrivateNetworks` read
+  dotted quads, so `::ffff:169.254.169.254` — the cloud metadata endpoint in the mapped form every
+  dual-stack socket connects straight through — was one notation away from being fetched.
+  `::ffff:`, `64:ff9b::` and the `::` forms are unwrapped to the IPv4 address they carry, and
+  `fec0::/10` joins the ranges that are refused. A public IPv6 address is still allowed: the rule is
+  about reach, not notation.
+
+- **A URL with no host, or a port that speaks another protocol, is refused.** `http:///x` parses
+  with a host of `""`, which is not null — so it passed the null check and, under an empty
+  allowlist, reached the transport with nowhere to connect but the local machine. And neither the
+  allowlist nor the private-network rule looked at the port, so `http://host:25/` was an SMTP
+  conversation whose first line a specification got to write.
+
+- **A `Uri` writes an IPv6 literal back with its brackets.** The host is stored bare, because that
+  is the form every policy rule wants, and it was written out bare too — so `sanitize` returned
+  `http://2606:4700:4700::1111/x`, whose authority reparses with a port of `4700:4700::1111`.
+  `sanitize` was returning something `load` would refuse.
+
+- **A gesture carrying a number that is not a number is refused.** A NaN reaching the pan offset or
+  the zoom anchor poisons every coordinate derived from it, and the failure then surfaces three
+  layers away as a chart that draws nothing. Platform recognisers do produce these — a fling whose
+  velocity divides by a zero time delta, a pinch whose two pointers land on one pixel — so it is
+  reported as `VEGA_INTERACTION_UNSUPPORTED` and dropped.
+
+- **A click reports the row its mark was built from.** The datum was read back out of the hit-test
+  index by identity, which finds the *node*; the metadata carries the row, and it is the only thing
+  that is right when two marks share a position.
+
+- **A `window:` stream says it will not fire on its own.** Nothing in `VegaChartController` produces
+  a window-sourced event, so a specification using the commonest idiom for a drag that continues
+  outside the chart got a signal that never changed and no diagnostic. The watch is still
+  registered — a host driving `EventDispatcher` itself can dispatch one, and does — but it is now
+  reported.
 
 - **Nothing throws, by construction.** The README stakes the whole diagnostic model on it —
   "nothing throws; a compile returns diagnostics" — and no public boundary had a catch-all or a

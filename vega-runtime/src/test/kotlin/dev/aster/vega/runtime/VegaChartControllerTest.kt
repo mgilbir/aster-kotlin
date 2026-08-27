@@ -228,10 +228,21 @@ class VegaChartControllerTest {
     assertEquals(VegaChartController.MAX_ZOOM, controller.snapshot.interactionState.viewportScale)
 
     controller.dispatch(ChartInputEvent.Zoom(0.0, PointD.Origin, GesturePhase.CHANGED))
+    // `INTERACTION_UNSUPPORTED` and not `TRANSFORM_INVALID_PARAMETER`: this is a gesture the
+    // controller refused, not a transform parameter it could not read.
     assertEquals(
-      DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+      DiagnosticCodes.INTERACTION_UNSUPPORTED,
       controller.diagnostics.value.last().code,
     )
+
+    // A NaN in the delta or the anchor poisons the viewport permanently — every subsequent offset
+    // is NaN and every hit test misses — so both are refused, and the viewport is left where it
+    // was.
+    val before = controller.snapshot.interactionState
+    controller.dispatch(ChartInputEvent.Pan(VectorD(Double.NaN, 0.0), GesturePhase.CHANGED))
+    controller.dispatch(ChartInputEvent.Zoom(2.0, PointD(Double.NaN, 0.0), GesturePhase.CHANGED))
+    assertEquals(before.viewportOffset, controller.snapshot.interactionState.viewportOffset)
+    assertEquals(before.viewportScale, controller.snapshot.interactionState.viewportScale)
   }
 
   @Test

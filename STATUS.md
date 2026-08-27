@@ -7172,3 +7172,87 @@ the function each belonged to had moved and the comment had not. `AxisBuilder`'s
 thousand lines in `LegendBuilder` and `TitleBuilder` had been contradicting for several releases.
 Each was moved to the declaration it describes, or deleted where it was an older wording of the
 block below it.
+
+### The one mutable object in the engine, asked two things at once
+
+`VegaChartController` is the only mutable object here, and it is the one a host holds: everything
+below it is a value. So every question about ordering, staleness and repeated work lands on it, and
+the audit's fifth cluster is those questions. Six of them.
+
+**A compile that finished late published over a newer one.** The asynchronous entry points hold a
+lock, so the *compiles* were ordered; what was not ordered was the publish, because each one asked
+"am I finished?" rather than "am I still the answer?". Six entry points recompile — `setSpec`,
+`setSpecAsync`, `hostData`, `containerSize`, `setContainerSizeAsync`, and the recompile an
+interaction triggers — and mixing any two of them across a thread boundary could leave a reader
+looking at the older result. Each now stamps a request number *at the moment the caller asks*, and
+publishes only while it is still the newest. Two compiles running at once on one controller also
+report `VEGA_COMPILE_CONCURRENT` now, because they share one text engine and one signal table, and
+that is a fact about the host's calling pattern rather than about the document.
+
+**A tap fetched the network.** Every interaction here recompiles the whole specification, and a
+compile resolves every dataset from scratch — that is the design, and a whole recompile of the
+heaviest fixture is well inside a frame. What was not inside a frame was the *loading*: with a
+loader opted in, a tap issued a blocking GET per `url` dataset, on the dispatching thread, with the
+loader's own timeouts, and a `{"type": "timer", "throttle": 500}` stream polled the network twice a
+second. Upstream loads once because its dataflow only re-runs what changed. A `CachingDataLoader`
+now sits between the controller and the host's loader, cleared when a new specification arrives —
+a new document is a new decision about what is behind a URL. This is what makes "correct, and
+slower" an honest description rather than merely a slow one.
+
+**`stop()` did not stay stopped.** It cancelled the timers, and the next publish — any publish, and
+a host feeding `hostData` to a view it has torn down publishes constantly — started them again. A
+chart the host had explicitly stopped went on ticking, with a repaint attached to every tick. It is
+a latch now, cleared only by a new document.
+
+**Every mark carried its row as a tooltip.** `MarkEncoder` fell back to the whole bound datum when a
+specification wrote no `tooltip` channel, and the comment beside it said upstream does the same.
+Upstream does not: a probe against vega 6.3.1 answers `undefined`, and `tooltip` is not a property
+on the item at all. So a chart drawn from a table with more columns than it shows — which is the
+ordinary case, not a corner — disclosed the rest of them on hover, from a specification that asked
+for no tooltip. The guide builders in `AxisBuilder` and `LegendBuilder` had it right already. A host
+that wants the row still has `NodeMetadata.datum`, which is what `MarkHovered` and `MarkClicked`
+carry, and what the click path reads now instead of looking the node back up by identity.
+
+**A gesture with a NaN in it.** Platform recognisers produce them — a fling whose velocity divides
+by a zero time delta, a pinch whose two pointers land on one pixel — and one reaching the pan offset
+or the zoom anchor poisons every coordinate derived from it, surfacing three layers away as a chart
+that draws nothing. Refused and reported now, which is the difference between a diagnostic and a
+bug report.
+
+**A `window:` stream was inert and silent.** Nothing in the controller *produces* a window-sourced
+event, so the commonest idiom for a drag that continues outside the chart got a signal that never
+changed. The watch is still registered, because `EventDispatcher` is public and a host driving it
+directly can dispatch one — `EventDispatcherTest` proves that path works, which is why the audit's
+stated premise for this finding is not what shipped — but it is reported.
+
+### Two caches that say what confines them, and one URL parser that did not round-trip
+
+**The caches.** `CachingExpressionCompiler` and `TextLayoutCache` are both LRU, which means both
+mutate on every *hit*: an entry is removed and re-added to move it to the young end. Two threads
+doing that at once corrupt a `LinkedHashMap`, and on the JVM a concurrent resize can spin rather
+than merely lose an entry. Neither said so. Both now document what confines them and why there is no
+lock: Kotlin's common standard library has no blocking one, and a copy-on-write map would pay an
+O(n) copy on the hot path each class exists to make fast.
+
+**The loader.** Four things, and three of them are the same shape — a rule that reads one notation.
+
+- `blockPrivateNetworks` read dotted quads, so `::ffff:169.254.169.254` was the cloud metadata
+  endpoint one notation away, in the mapped form every dual-stack socket connects straight through.
+  The `::ffff:`, `64:ff9b::` and bare `::` wrappings are unwrapped now, and `fec0::/10` joins the
+  refused ranges. A public IPv6 address is still allowed: the rule is about reach, not notation.
+- `http:///x` parses with a host of `""`, which is not null — so it passed the null check, matched no
+  entry in a non-empty allowlist (correct) and passed an *empty* one outright, reaching the transport
+  with nowhere to connect but the local machine.
+- Neither the allowlist nor the private-network rule looked at the **port**, so `http://host:25/` was
+  an SMTP conversation whose first line a specification got to write. The handful of ports that are
+  never a data endpoint are refused, which is a narrower rule than an allowlist and stops the two
+  that matter: a shell and a mail relay, reached from a chart.
+- The response cap was checked on `body.length`, which counts UTF-16 units — so the real ceiling was
+  a third of the nominal one for CJK and half for emoji — and it was checked *after* the read, by
+  which point the whole response is in memory, which is the thing being defended against. The budget
+  is bytes now and is handed to the transport; the JVM one reads to it and stops.
+
+And one found by the test written for the first of those: `Uri` stores a host bare, because that is
+the form every rule wants, and wrote it out bare too. So `sanitize("http://[2606:4700:4700::1111]/x")`
+returned a string whose authority reparses with a port of `4700:4700::1111` — `sanitize` handing
+back something `load` refuses, against a contract `DataLoaderTest` states in as many words.

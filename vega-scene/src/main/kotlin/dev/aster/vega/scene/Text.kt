@@ -341,6 +341,14 @@ public fun textBounds(run: TextRun, metrics: TextMetrics): RectD {
  * class is final there besides. A map that keeps insertion order does exist everywhere, and moving
  * an entry to the young end by removing and re-adding it turns that into the same policy in four
  * lines. This was the only place in the core where portability was a claim rather than a fact.
+ *
+ * **Confined, not synchronized**, and it has to be said because the map is mutated on every *hit*:
+ * an entry is removed and re-added to move it to the young end. Two threads doing that at once
+ * corrupt a `LinkedHashMap`. What confines it is whoever owns it — a `TextEngine` belongs to one
+ * renderer or one compile, and `VegaChartController` reports `VEGA_COMPILE_CONCURRENT` when two
+ * compiles overlap on the one it owns. There is no lock here to make that automatic: Kotlin's
+ * common standard library has no blocking one, and a copy-on-write map would pay an O(n) copy on
+ * every hit, which is the hot path this class exists to make fast.
  */
 public class TextLayoutCache(private val engine: TextEngine, private val maxEntries: Int = 2048) :
   TextEngine {

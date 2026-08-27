@@ -673,7 +673,9 @@ class GroupMarkTest {
         }
         """
       )
-    val datum = groups.first().metadata.tooltip as VegaValue.Obj
+    // `datum`, not `tooltip`: a cell whose specification wrote no `tooltip` channel has none, and
+    // the aggregated row a facet was built from is what a host actually wants here.
+    val datum = groups.first().metadata.datum as VegaValue.Obj
     assertEquals(VegaValue.Str("north"), datum.fields["c"])
     assertEquals(VegaValue.Num(2.0), datum.fields["count"])
   }

@@ -12,6 +12,7 @@ import dev.aster.vegalite.VegaLiteInput
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -78,7 +79,10 @@ class SpecCompilerTest {
     assertEquals("bars", rects[0].metadata.markName)
     assertEquals(0, rects[0].metadata.datumIndex)
     assertTrue(rects[0].metadata.interactive)
-    assertNotNull(rects[0].metadata.tooltip)
+    assertNotNull(rects[0].metadata.datum)
+    // No `tooltip` channel in this specification, so no tooltip: the row is on `datum` and reaching
+    // it is a host's decision rather than something every hover discloses.
+    assertNull(rects[0].metadata.tooltip)
     assertEquals("a", rects[0].metadata.accessibility?.label)
   }
 

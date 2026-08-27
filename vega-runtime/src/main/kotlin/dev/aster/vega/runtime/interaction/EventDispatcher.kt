@@ -217,6 +217,22 @@ public class EventDispatcher(
       )
       return
     }
+    if (stream.source == EventStream.SOURCE_WINDOW) {
+      // A `window:` stream listens to the **page**, and a chart drawn on a canvas has none. The
+      // watch is still registered — this class will dispatch one, and `EventDispatcherTest` proves
+      // it, so a host driving the dispatcher directly can deliver a window event itself — but
+      // nothing in `VegaChartController` ever *produces* one. So a specification that uses the
+      // commonest idiom for it, `window:mousemove` for a drag that continues outside the chart,
+      // gets a signal that never changes, and said nothing: exactly the shape of failure this
+      // class reports three times in the twenty lines below.
+      diagnostics.warn(
+        DiagnosticCodes.INTERACTION_UNSUPPORTED,
+        "A 'window:' stream listens to the page, and this engine draws on a canvas rather than in " +
+          "one; nothing dispatches a window-sourced event, so signal '${binding.signalName}' will " +
+          "keep its initial value unless the host dispatches one itself",
+        operator = binding.signalName,
+      )
+    }
     if (stream.debounce != null && !deferrable) {
       // A debounce fires *after* a quiet period, so honouring it needs something that can wake up
       // later. Nothing here schedules, and silently treating it as a throttle would fire on the

@@ -23,7 +23,22 @@ public data class HttpResponse(
  * hop; a transport that follows them silently would defeat that.
  */
 public fun interface HttpTransport {
-  public fun get(url: String, connectTimeoutMillis: Int, readTimeoutMillis: Int): HttpResponse
+  /**
+   * One GET, following no redirects.
+   *
+   * @param maxResponseBytes the **byte** budget, or a negative number for none. A transport must
+   *   stop reading once it is exceeded and throw, rather than returning a truncated body: half a
+   *   dataset is a wrong chart and no error. The budget is a parameter rather than a check the
+   *   caller applies afterwards because by then the whole response is already in memory, which is
+   *   the one thing the cap exists to prevent — the class documentation says a hostile server
+   *   "cannot stream unbounded data into memory", and until this parameter existed it could.
+   */
+  public fun get(
+    url: String,
+    connectTimeoutMillis: Int,
+    readTimeoutMillis: Int,
+    maxResponseBytes: Long,
+  ): HttpResponse
 }
 
 /**
@@ -83,6 +98,17 @@ public class HttpDataLoader(
     public const val DEFAULT_MAX_RESPONSE_BYTES: Long = 64L shl 20
 
     private const val MAX_REDIRECTS = 10
+
+    /**
+     * Ports a data URL never legitimately names, and a request forgery often does.
+     *
+     * Not an allowlist — an ordinary data endpoint runs on any port a host chose — but the handful
+     * where reaching them at all is the attack: a shell, a mail relay, a printer daemon. Browsers
+     * block a longer list for the same reason (Fetch's "bad port" table); this is the subset a
+     * chart could plausibly be pointed at.
+     */
+    private val REFUSED_PORTS =
+      setOf(22, 23, 25, 465, 587, 445, 135, 137, 138, 139, 515, 6379, 11211)
   }
 
   override fun sanitize(uri: String): String {
@@ -109,12 +135,21 @@ public class HttpDataLoader(
     var hops = 0
     while (true) {
       check(current)
-      val response = transport.get(current.toString(), connectTimeoutMillis, readTimeoutMillis)
+      val response =
+        transport.get(
+          current.toString(),
+          connectTimeoutMillis,
+          readTimeoutMillis,
+          maxResponseBytes,
+        )
       if (response.status in 300..399) {
         val location =
           response.header("Location")
             ?: throw LoadDeniedException("Redirect from '$current' carried no Location header")
-        if (++hops >= MAX_REDIRECTS) {
+        // `> `, not `>= `: the message says ten and the check stopped at nine, so a chain of
+        // exactly ten hops — which the documented limit permits — was refused with a sentence
+        // saying it was not.
+        if (++hops > MAX_REDIRECTS) {
           throw LoadDeniedException("Stopped after $MAX_REDIRECTS redirects loading '$uri'")
         }
         current = current.resolve(Uri.parse(location))
@@ -123,7 +158,10 @@ public class HttpDataLoader(
       if (response.status !in 200..299) {
         throw LoadDeniedException("HTTP ${response.status} loading '$current'")
       }
-      if (maxResponseBytes >= 0 && response.body.length > maxResponseBytes) {
+      // Belt and braces, for a transport that ignores the budget it was handed — and in **bytes**,
+      // which is what the option is named for. `body.length` counts UTF-16 code units, so a
+      // 60 MiB response of ASCII passed a 64 MiB cap that a 40 MiB response of CJK failed.
+      if (maxResponseBytes >= 0 && response.body.encodeToByteArray().size > maxResponseBytes) {
         throw LoadDeniedException(
           "Response from '$current' exceeds $maxResponseBytes bytes; raise maxResponseBytes to " +
             "allow a larger payload"
@@ -142,7 +180,24 @@ public class HttpDataLoader(
         "Scheme '${uri.scheme}' is not allowed in '$uri'; only http and https are"
       )
     }
-    val host = uri.host ?: throw LoadDeniedException("URI '$uri' names no host")
+    // **Empty, not just absent.** `http:///path` parses to a host of `""`, which is not null — so
+    // it passed the null check, matched no entry in a non-empty allowlist (correct) and passed an
+    // *empty* allowlist outright, reaching a transport with nowhere to connect to.
+    val host =
+      uri.host?.takeIf { it.isNotEmpty() } ?: throw LoadDeniedException("URI '$uri' names no host")
+    // A port is part of the address a policy is about: `http://localhost:9200/` and
+    // `http://localhost:22/` are different requests, and neither the allowlist nor the
+    // private-network rule looked at one. Refusing the ports that are never a data endpoint is a
+    // narrower rule than an allowlist and stops the two that matter — a shell and a mail relay
+    // reached from a chart.
+    uri.port?.let { port ->
+      if (port in REFUSED_PORTS) {
+        throw LoadDeniedException(
+          "Port $port is not one this loader will fetch from; it is a well-known service port " +
+            "rather than a data endpoint"
+        )
+      }
+    }
 
     if (allowedDomains.isNotEmpty() && allowedDomains.none { it.equals(host, ignoreCase = true) }) {
       throw LoadDeniedException(
@@ -177,15 +232,29 @@ public class HttpDataLoader(
    * single most valuable thing an SSRF can reach.
    */
   private fun isPrivate(address: String): Boolean {
-    if (address.contains(':')) {
-      val v6 = address.lowercase().removeSurrounding("[", "]")
-      return v6 == "::1" ||
-        v6 == "::" ||
-        v6.startsWith("fe80") || // link-local
-        v6.startsWith("fc") || // unique local
-        v6.startsWith("fd")
+    val bare = address.lowercase().removeSurrounding("[", "]")
+    if (bare.contains(':')) {
+      // **An IPv6 literal may be an IPv4 address wearing a hat.** `::ffff:127.0.0.1` and
+      // `::ffff:169.254.169.254` are the v4-mapped form, which every socket stack connects to as
+      // plain IPv4 — so `[::ffff:169.254.169.254]` reached the cloud metadata endpoint straight
+      // through a rule whose whole purpose is to stop that. `64:ff9b::/96` is NAT64, which is the
+      // same trick with a different prefix. Both are unwrapped and re-checked as v4.
+      mappedV4(bare)?.let {
+        return isPrivate(it)
+      }
+      return bare == "::1" ||
+        bare == "::" ||
+        bare.startsWith("fe80") || // link-local
+        bare.startsWith("fc") || // unique local
+        bare.startsWith("fd") ||
+        // `fec0::/10`, the deprecated site-local range. Deprecated is not unreachable: a stack that
+        // still routes it routes it to somewhere on the local network.
+        bare.startsWith("fec") ||
+        bare.startsWith("fed") ||
+        bare.startsWith("fee") ||
+        bare.startsWith("fef")
     }
-    val parts = address.split('.').mapNotNull { it.toIntOrNull() }
+    val parts = bare.split('.').mapNotNull { it.toIntOrNull() }
     if (parts.size != 4) return false
     val (a, b) = parts
     return a == 0 ||
@@ -195,5 +264,33 @@ public class HttpDataLoader(
       (a == 192 && b == 168) || // private
       (a == 169 && b == 254) || // link-local, including cloud metadata
       a >= 224 // multicast and reserved
+  }
+
+  /**
+   * The IPv4 address an IPv6 literal is standing in for, or null when it is not standing in for
+   * one.
+   *
+   * Two prefixes, and both connect as IPv4: `::ffff:a.b.c.d` (and its all-hex spelling
+   * `::ffff:7f00:1`) is the v4-mapped form every dual-stack socket produces, and `64:ff9b::a.b.c.d`
+   * is NAT64. `::a.b.c.d` — the deprecated v4-compatible form — is covered too, since it is
+   * likewise routed as v4.
+   */
+  private fun mappedV4(address: String): String? {
+    val dotted = address.substringAfterLast(':')
+    if (dotted.count { it == '.' } == 3 && dotted.split('.').all { it.toIntOrNull() != null }) {
+      val prefix = address.removeSuffix(dotted).lowercase()
+      if (prefix.endsWith("::ffff:") || prefix.endsWith("64:ff9b::") || prefix.endsWith("::")) {
+        return dotted
+      }
+      return null
+    }
+    // The all-hex spelling of the same thing: `::ffff:7f00:1`.
+    val hex = address.removePrefix("::ffff:").takeIf { it != address } ?: return null
+    val groups = hex.split(':')
+    if (groups.size != 2) return null
+    val high = groups[0].toIntOrNull(16) ?: return null
+    val low = groups[1].toIntOrNull(16) ?: return null
+    if (high !in 0..0xFFFF || low !in 0..0xFFFF) return null
+    return "${high shr 8}.${high and 0xFF}.${low shr 8}.${low and 0xFF}"
   }
 }

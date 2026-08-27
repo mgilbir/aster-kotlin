@@ -38,6 +38,7 @@ public final class dev/aster/vega/model/DelimitedText {
 }
 
 public final class dev/aster/vega/model/DiagnosticCodes {
+	public static final field COMPILE_CONCURRENT Ljava/lang/String;
 	public static final field COMPILE_FAILED Ljava/lang/String;
 	public static final field COMPILE_LIMIT_EXCEEDED Ljava/lang/String;
 	public static final field DATA_LOAD_FAILED Ljava/lang/String;

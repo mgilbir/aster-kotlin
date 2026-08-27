@@ -300,6 +300,12 @@ BinsSpecValues.hash()
 BinsSpecValues.init(values:)
 BinsSpecValues.isEqual(_:)
 BinsSpecValues.values
+CachingDataLoader
+CachingDataLoader.clear()
+CachingDataLoader.init(delegate:)
+CachingDataLoader.load(uri:)
+CachingDataLoader.sanitize(uri:)
+CachingDataLoader.size
 CachingExpressionCompiler
 CachingExpressionCompiler.clear()
 CachingExpressionCompiler.compile(source:)
@@ -873,6 +879,7 @@ DenyLoader.load(uri:)
 DenyLoader.sanitize(uri:)
 DenyLoader.shared
 DiagnosticCodes
+DiagnosticCodes.COMPILE_CONCURRENT
 DiagnosticCodes.COMPILE_FAILED
 DiagnosticCodes.COMPILE_LIMIT_EXCEEDED
 DiagnosticCodes.DATA_LOAD_FAILED
@@ -1602,7 +1609,7 @@ HttpResponse.init(status:headers:body:)
 HttpResponse.isEqual(_:)
 HttpResponse.status
 HttpTransport
-HttpTransport.get(url:connectTimeoutMillis:readTimeoutMillis:)
+HttpTransport.get(url:connectTimeoutMillis:readTimeoutMillis:maxResponseBytes:)
 IdentifierTransform
 IdentifierTransform.apply(input:params:context:)
 IdentifierTransform.init()

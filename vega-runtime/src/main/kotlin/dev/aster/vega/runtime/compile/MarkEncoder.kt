@@ -1457,9 +1457,19 @@ public class MarkEncoder(
       datumIndex = index,
       interactive = spec.interactive,
       datum = datum,
-      // The `tooltip` channel when there is one, and the whole row when there is not. Upstream does
-      // the same, and the difference shows on a chart that wants one line rather than a table.
-      tooltip = channels["tooltip"]?.let { value(it, datum) }?.takeIf { !it.isNullish } ?: datum,
+      // The `tooltip` channel, and **nothing** when a specification did not write one.
+      //
+      // It used to fall back to the whole bound row, on the stated grounds that upstream does the
+      // same. Upstream does not: `item.tooltip` is not even a property on a rect drawn from an
+      // encode block without the channel, which is what a probe against vega 6.3.1 answers and what
+      // `vega-scenegraph`'s own item construction says. So every mark on every chart carried a
+      // tooltip holding whatever its dataset held — and a chart is routinely drawn from a table
+      // with more columns in it than the chart shows. That is a disclosure on hover, from a
+      // specification that asked for no tooltip at all.
+      //
+      // A host that *wants* the row still has it: `NodeMetadata.datum` is right there, and is what
+      // `MarkHovered` and `MarkClicked` carry.
+      tooltip = channels["tooltip"]?.let { value(it, datum) }?.takeIf { !it.isNullish },
       cursor = string(channels["cursor"], datum),
       href = string(channels["href"], datum)?.takeIf { it.isNotEmpty() },
       zindex = number(channels["zindex"], datum)?.toInt() ?: 0,

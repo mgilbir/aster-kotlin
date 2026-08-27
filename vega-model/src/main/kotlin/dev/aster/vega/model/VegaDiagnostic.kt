@@ -147,6 +147,16 @@ public object DiagnosticCodes {
    */
   public const val COMPILE_FAILED: String = "VEGA_COMPILE_FAILED"
 
+  /**
+   * Two compiles ran at once on one controller.
+   *
+   * A controller holds one text engine and one signal table, and the class documentation asks a
+   * host to use the suspending entry points or to call from one thread. Nothing said when it did
+   * not: the synchronous paths take no lock, and Kotlin's common standard library has no blocking
+   * one for them to take. This is what a host can act on.
+   */
+  public const val COMPILE_CONCURRENT: String = "VEGA_COMPILE_CONCURRENT"
+
   public const val TRANSFORM_NOT_IMPLEMENTED: String = "VEGA_TRANSFORM_NOT_IMPLEMENTED"
   public const val TRANSFORM_INVALID_PARAMETER: String = "VEGA_TRANSFORM_INVALID_PARAMETER"
 

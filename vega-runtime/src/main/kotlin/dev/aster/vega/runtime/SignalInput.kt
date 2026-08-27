@@ -74,7 +74,15 @@ public data class SignalInput(
       if (bind !is SignalBind.Range) return bind
       val current = value.asDouble()
       val stated = if (current.isNaN()) null else current
-      val max = bind.max ?: maxOf(100.0, stated ?: 0.0).takeIf { it != 0.0 } ?: 100.0
+      // The two ends are guarded **differently upstream**, and it is not an oversight there:
+      // `max = param.max != null ? param.max : …` but `min = param.min || …`. So an explicit
+      // `max: 0` is honoured and an explicit `min: 0` is not — JavaScript's `||` treats zero as
+      // absent — which is worth reproducing exactly, because a slider whose bounds differ from
+      // upstream's puts the same reader gesture at a different value.
+      //
+      // `maxOf(100.0, …)` cannot be zero, so the fallback's own `takeIf`/`?: 100.0` was dead code
+      // standing where the asymmetry should have been explained.
+      val max = bind.max ?: maxOf(100.0, stated ?: 0.0)
       val min =
         bind.min?.takeIf { it != 0.0 } ?: minOf(0.0, max, stated ?: 0.0).takeIf { it != 0.0 } ?: 0.0
       val step = bind.step ?: Ticks.stepFrom(Ticks.tickIncrement(min, max, RANGE_DIVISIONS))

@@ -69,7 +69,7 @@ abstract fun interface dev.aster.vega.runtime.load/HostResolver { // dev.aster.v
 }
 
 abstract fun interface dev.aster.vega.runtime.load/HttpTransport { // dev.aster.vega.runtime.load/HttpTransport|null[0]
-    abstract fun get(kotlin/String, kotlin/Int, kotlin/Int): dev.aster.vega.runtime.load/HttpResponse // dev.aster.vega.runtime.load/HttpTransport.get|get(kotlin.String;kotlin.Int;kotlin.Int){}[0]
+    abstract fun get(kotlin/String, kotlin/Int, kotlin/Int, kotlin/Long): dev.aster.vega.runtime.load/HttpResponse // dev.aster.vega.runtime.load/HttpTransport.get|get(kotlin.String;kotlin.Int;kotlin.Int;kotlin.Long){}[0]
 }
 
 abstract interface dev.aster.vega.runtime.load/DataLoader { // dev.aster.vega.runtime.load/DataLoader|null[0]
@@ -741,6 +741,17 @@ final class dev.aster.vega.runtime.interaction/SignalUpdater { // dev.aster.vega
     final fun apply(kotlin.collections/List<dev.aster.vega.runtime.interaction/FiredHandler>, dev.aster.vega.expression/ExpressionScope): kotlin.collections/Set<kotlin/String> // dev.aster.vega.runtime.interaction/SignalUpdater.apply|apply(kotlin.collections.List<dev.aster.vega.runtime.interaction.FiredHandler>;dev.aster.vega.expression.ExpressionScope){}[0]
     final fun reset() // dev.aster.vega.runtime.interaction/SignalUpdater.reset|reset(){}[0]
     final fun set(kotlin/String, dev.aster.vega.model/VegaValue) // dev.aster.vega.runtime.interaction/SignalUpdater.set|set(kotlin.String;dev.aster.vega.model.VegaValue){}[0]
+}
+
+final class dev.aster.vega.runtime.load/CachingDataLoader : dev.aster.vega.runtime.load/DataLoader { // dev.aster.vega.runtime.load/CachingDataLoader|null[0]
+    constructor <init>(dev.aster.vega.runtime.load/DataLoader) // dev.aster.vega.runtime.load/CachingDataLoader.<init>|<init>(dev.aster.vega.runtime.load.DataLoader){}[0]
+
+    final val size // dev.aster.vega.runtime.load/CachingDataLoader.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // dev.aster.vega.runtime.load/CachingDataLoader.size.<get-size>|<get-size>(){}[0]
+
+    final fun clear() // dev.aster.vega.runtime.load/CachingDataLoader.clear|clear(){}[0]
+    final fun load(kotlin/String): kotlin/String // dev.aster.vega.runtime.load/CachingDataLoader.load|load(kotlin.String){}[0]
+    final fun sanitize(kotlin/String): kotlin/String // dev.aster.vega.runtime.load/CachingDataLoader.sanitize|sanitize(kotlin.String){}[0]
 }
 
 final class dev.aster.vega.runtime.load/FallbackDataLoader : dev.aster.vega.runtime.load/DataLoader { // dev.aster.vega.runtime.load/FallbackDataLoader|null[0]

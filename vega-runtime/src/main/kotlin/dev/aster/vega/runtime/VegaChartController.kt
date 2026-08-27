@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalAtomicApi::class)
+
 package dev.aster.vega.runtime
 
 // Aliased: this class already has a `ChartInputEvent`, and the two are different things — one is a
@@ -15,6 +17,7 @@ import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.spec.EventConfig
 import dev.aster.vega.model.spec.EventStream
 import dev.aster.vega.runtime.compile.CompiledSpec
+import dev.aster.vega.runtime.compile.ItemEncode
 import dev.aster.vega.runtime.compile.SpecCompiler
 import dev.aster.vega.runtime.interaction.EventDispatcher
 import dev.aster.vega.runtime.interaction.FiredHandler
@@ -23,6 +26,7 @@ import dev.aster.vega.runtime.interaction.InputEvent as VegaEvent
 import dev.aster.vega.runtime.interaction.ScheduledTask
 import dev.aster.vega.runtime.interaction.Scheduler
 import dev.aster.vega.runtime.interaction.SignalUpdater
+import dev.aster.vega.runtime.load.CachingDataLoader
 import dev.aster.vega.runtime.load.DataLoader
 import dev.aster.vega.runtime.load.DenyLoader
 import dev.aster.vega.scene.HitTestOptions
@@ -34,6 +38,12 @@ import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeId
 import dev.aster.vega.scene.SizeD
 import dev.aster.vega.scene.TextEngine
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.fetchAndDecrement
+import kotlin.concurrent.atomics.fetchAndIncrement
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.Clock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -45,6 +55,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -180,12 +191,24 @@ public class VegaChartController(
   private val timeZone: TimeZone? = null,
 ) {
 
+  /**
+   * The host's loader, wrapped so a URL is fetched **once per document** rather than once per
+   * compile.
+   *
+   * Every interaction here recompiles the whole specification and a compile resolves every dataset
+   * from scratch, so with a loader opted in a tap issued a blocking GET per `url` dataset — on the
+   * dispatching thread, with the loader's own timeouts — and a `{"type": "timer", "throttle": 500}`
+   * stream polled the network twice a second. Upstream loads once, because its dataflow only
+   * re-runs what changed; this is what makes "correct, and slower" honest rather than merely slow.
+   */
+  private val loads = CachingDataLoader(loader)
+
   private var compiler = newCompiler(containerSize, hostData)
 
   private fun newCompiler(size: SizeD?, data: Map<String, List<VegaValue>>?) =
     SpecCompiler(
       textEngine,
-      loader,
+      loads,
       locale = locale,
       hostConfig = hostConfig,
       containerSize = size,
@@ -217,7 +240,9 @@ public class VegaChartController(
       field = value
       compiler = newCompiler(containerSize, value)
       val json = loadedSpecJson ?: return
-      publish(compiler.compileJson(json, signals.overrides, signals.itemEncodes))
+      val generation = nextRequest()
+      val compiled = compileNow(compiler, json, signals.overrides, signals.itemEncodes)
+      if (isCurrent(generation)) publish(compiled)
     }
 
   /**
@@ -253,7 +278,9 @@ public class VegaChartController(
       // Runs on the calling thread, like [setSpec]. A host that reports its layout size on every
       // resize should prefer [setContainerSizeAsync], which is the same work on a dispatcher.
       val work = adoptContainerSize(value) ?: return
-      publish(work.compiler.compileJson(work.json, signals.overrides, signals.itemEncodes))
+      val generation = nextRequest()
+      val compiled = compileNow(work.compiler, work.json, signals.overrides, signals.itemEncodes)
+      if (isCurrent(generation)) publish(compiled)
     }
 
   private var container: SizeD? = containerSize
@@ -317,18 +344,25 @@ public class VegaChartController(
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
   ): CompiledSpec? {
     val work = adoptContainerSize(size) ?: return null
-    _state.value = _state.value.copy(isLoading = true)
+    val generation = nextRequest()
+    _state.update { it.copy(isLoading = true) }
     val compiled =
       try {
         compileLock.withLock {
           withContext(dispatcher) {
-            work.compiler.compileJson(work.json, signals.overrides, signals.itemEncodes)
+            compileNow(work.compiler, work.json, signals.overrides, signals.itemEncodes)
           }
         }
       } catch (e: CancellationException) {
-        _state.value = _state.value.copy(isLoading = false)
+        _state.update { it.copy(isLoading = false) }
         throw e
       }
+    // A resize that has been overtaken publishes nothing: the compile it raced is the one the host
+    // asked for last, and putting this scene on screen after it would show a size nobody is at.
+    if (!isCurrent(generation)) {
+      _state.update { it.copy(isLoading = false) }
+      return compiled
+    }
     return publish(compiled)
   }
 
@@ -350,7 +384,42 @@ public class VegaChartController(
   /** Serializes compilation, so one text engine is only ever used by one compile at a time. */
   private val compileLock = Mutex()
 
-  private var nextRevision = initialScene.revision + 1
+  /**
+   * Stamps every compile request, so a slow one cannot overwrite a newer answer.
+   *
+   * `setSpecAsync(A)` in flight, the host calls `setSpec(B)`, A resumes and publishes: the reader
+   * saw B for a moment and is now looking at A, and every subsequent interaction recompiles A
+   * because `loadedSpecJson` was overwritten too. The compile itself ran under `compileLock`; the
+   * three lines *after* it — `loadedSpecJson`, `signals.reset()`, `publish` — did not, and there
+   * was no epoch anywhere in the class to compare against.
+   *
+   * Every entry point takes a generation at the moment it is called, and a publish happens only
+   * while that is still the newest. Last writer wins, which is what a host reading these names
+   * expects and what the class documentation claimed.
+   */
+  private val requests = AtomicLong(0L)
+
+  private val newestRequest = AtomicLong(0L)
+
+  /**
+   * How many compiles are running.
+   *
+   * The lock above serializes the two `…Async` entry points and nothing else: `setSpec`, the
+   * `hostData` and `containerSize` setters and every interaction recompile call the compiler
+   * inline, and a `Mutex` cannot be taken from a function that does not suspend. Kotlin's common
+   * standard library has no blocking lock, and this module's source set cannot reach `runBlocking`
+   * — so a *fully* serialized sync path would mean an `expect`/`actual` per target and a main
+   * thread that blocks for the length of a background compile, which is an ANR on Android by
+   * another name.
+   *
+   * What is here instead: one place that every compile goes through, and a counter that turns the
+   * race from a silent one into a reported one. A host that sees `VEGA_COMPILE_CONCURRENT` is being
+   * told the exact thing it can act on — that it is mixing the synchronous and asynchronous entry
+   * points, which the class documentation asks it not to do.
+   */
+  private val compilesRunning = AtomicInt(0)
+
+  private var nextRevision = AtomicLong(initialScene.revision + 1)
 
   private val _state =
     MutableStateFlow(
@@ -405,14 +474,14 @@ public class VegaChartController(
    * revisions rather than diffing the scene.
    */
   public fun setScene(scene: Scene) {
-    val revision = nextRevision++
+    val revision = nextRevision.fetchAndIncrement()
     hitIndex = SceneHitIndex(scene, hitOptions)
-    _state.value =
-      _state.value.copy(
+    _state.update { previous ->
+      previous.copy(
         snapshot =
           ChartSnapshot(
             scene = scene.copy(revision = revision),
-            interactionState = _state.value.snapshot.interactionState,
+            interactionState = previous.snapshot.interactionState,
             revision = revision,
           ),
         isLoading = false,
@@ -420,6 +489,7 @@ public class VegaChartController(
         // earlier compile no longer describes anything.
         failure = null,
       )
+    }
   }
 
   /** Switches hit-test tuning, e.g. when the last input device changed from touch to mouse. */
@@ -462,9 +532,16 @@ public class VegaChartController(
    * blanking it. The diagnostics say why, and a reader keeps the chart they were looking at.
    */
   public fun setSpec(json: String): CompiledSpec {
+    // A new document is a new decision about whether this chart runs; see [stop] — and a new set of
+    // data, so nothing the previous one downloaded is kept.
+    stopped = false
+    loads.clear()
+    val generation = nextRequest()
+    val compiled = compileNow(compiler, json)
+    if (!isCurrent(generation)) return compiled
     loadedSpecJson = json
     signals.reset()
-    return publish(compiler.compileJson(json))
+    return publish(compiled)
   }
 
   /**
@@ -522,14 +599,26 @@ public class VegaChartController(
     json: String,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
   ): CompiledSpec {
-    _state.value = _state.value.copy(isLoading = true)
+    stopped = false
+    loads.clear()
+    val generation = nextRequest()
+    _state.update { it.copy(isLoading = true) }
     val compiled =
       try {
-        compileLock.withLock { withContext(dispatcher) { compiler.compileJson(json) } }
+        compileLock.withLock { withContext(dispatcher) { compileNow(compiler, json) } }
       } catch (e: CancellationException) {
-        _state.value = _state.value.copy(isLoading = false)
+        _state.update { it.copy(isLoading = false) }
         throw e
       }
+    // **The generation check, and it is the whole of C5.** These three lines used to run
+    // unconditionally, outside the lock: a `setSpecAsync(A)` that was still compiling when the host
+    // called `setSpec(B)` resumed here and overwrote B — the reader saw B for a moment and was left
+    // looking at A, and every interaction from then on recompiled A, because `loadedSpecJson` had
+    // been overwritten too.
+    if (!isCurrent(generation)) {
+      _state.update { it.copy(isLoading = false) }
+      return compiled
+    }
     // The same two lines [setSpec] runs, and leaving them out made this the quietest bug in the
     // controller: a chart loaded through here had no text to recompile from, so **no signal change
     // could redraw it** — not a control, not a handler, not a tap on a mark. Every JVM test used
@@ -541,6 +630,48 @@ public class VegaChartController(
     signals.reset()
     return publish(compiled)
   }
+
+  /**
+   * The one place `SpecCompiler` is called from, whichever entry point asked.
+   *
+   * See [compilesRunning] for what this can and cannot serialize.
+   */
+  private fun compileNow(
+    compiler: SpecCompiler,
+    json: String,
+    overrides: Map<String, VegaValue> = emptyMap(),
+    itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
+  ): CompiledSpec {
+    val concurrent = compilesRunning.fetchAndIncrement() > 0
+    try {
+      val compiled = compiler.compileJson(json, overrides, itemEncodes)
+      if (!concurrent) return compiled
+      return compiled.copy(
+        diagnostics =
+          compiled.diagnostics +
+            VegaDiagnostic(
+              severity = DiagnosticSeverity.WARNING,
+              code = DiagnosticCodes.COMPILE_CONCURRENT,
+              message =
+                "Two compiles ran at once on this controller, which share one text engine and one " +
+                  "signal table. Use the suspending entry points for every change, or make every " +
+                  "call from one thread; mixing them is what this reports.",
+            )
+      )
+    } finally {
+      compilesRunning.fetchAndDecrement()
+    }
+  }
+
+  /** A request number, taken at the moment a caller asks rather than when the work starts. */
+  private fun nextRequest(): Long {
+    val generation = requests.incrementAndFetch()
+    newestRequest.store(generation)
+    return generation
+  }
+
+  /** Whether [generation] is still the newest request, and so still worth publishing. */
+  private fun isCurrent(generation: Long): Boolean = newestRequest.load() == generation
 
   private fun publish(compiled: CompiledSpec): CompiledSpec {
     lastCompiled = compiled
@@ -579,25 +710,26 @@ public class VegaChartController(
       // compile just failed. The first ERROR or FATAL is what a reader is shown, and the fallback
       // covers a compile that produced neither a scene nor a complaint, which is a bug elsewhere
       // but must not read as success here.
-      _state.value =
-        _state.value.copy(
+      _state.update {
+        it.copy(
           isLoading = false,
           diagnostics = diagnostics,
           failure =
-            diagnostics.firstOrNull { it.severity >= DiagnosticSeverity.ERROR }?.message
+            diagnostics.firstOrNull { d -> d.severity >= DiagnosticSeverity.ERROR }?.message
               ?: "the specification compiled to no scene",
         )
+      }
       return compiled
     }
-    val revision = nextRevision++
+    val revision = nextRevision.fetchAndIncrement()
     val published = scene.copy(revision = revision)
     hitIndex = SceneHitIndex(published, hitOptions)
-    _state.value =
+    _state.update { previous ->
       ChartState(
         snapshot =
           ChartSnapshot(
             scene = published,
-            interactionState = _state.value.snapshot.interactionState,
+            interactionState = previous.snapshot.interactionState,
             revision = revision,
           ),
         isLoading = false,
@@ -607,17 +739,18 @@ public class VegaChartController(
         // screen.
         failure = null,
       )
+    }
     return compiled
   }
 
   public fun report(diagnostic: VegaDiagnostic) {
     _diagnostics.value = _diagnostics.value + diagnostic
-    _state.value = _state.value.copy(diagnostics = _diagnostics.value)
+    _state.update { it.copy(diagnostics = _diagnostics.value) }
   }
 
   public fun clearDiagnostics() {
     _diagnostics.value = emptyList()
-    _state.value = _state.value.copy(diagnostics = emptyList())
+    _state.update { it.copy(diagnostics = emptyList()) }
   }
 
   /**
@@ -761,7 +894,10 @@ public class VegaChartController(
     // is what makes this simple enough to be obviously correct (STATUS.md, Performance
     // observations).
     val json = loadedSpecJson ?: return
-    publish(compiler.compileJson(json, signals.overrides, signals.itemEncodes))
+    val generation = nextRequest()
+    val compiled = compileNow(compiler, json, signals.overrides, signals.itemEncodes)
+    if (!isCurrent(generation)) return
+    publish(compiled)
     // The overlays that were fresh have now been applied once; from here on the mark's own `update`
     // takes back the channels it sets, which is what ageing them expresses.
     signals.ageItemEncodes()
@@ -849,7 +985,7 @@ public class VegaChartController(
    */
   private fun startTimers(compiled: CompiledSpec) {
     val scheduler = this.scheduler
-    if (scheduler == null) {
+    if (stopped || scheduler == null) {
       stopTimers()
       return
     }
@@ -903,10 +1039,18 @@ public class VegaChartController(
    * call twice.
    */
   public fun stop() {
+    // **Latched.** `stop()` cancelled the timers and the next publish started them again, and a
+    // host that keeps feeding `setData` to a detached view publishes constantly — so a chart the
+    // host had explicitly stopped went on ticking against a view nobody is looking at. Cleared by
+    // `setSpec`, which is a new document and therefore a new decision.
+    stopped = true
     stopTimers()
     for (task in pendingDebounces.values) task.cancel()
     pendingDebounces.clear()
   }
+
+  /** See [stop]: a latch, not a one-shot cancel. */
+  private var stopped = false
 
   private fun stopTimers() {
     for (task in timerTasks) task.cancel()
@@ -929,7 +1073,15 @@ public class VegaChartController(
     val hit = point?.let { hitIndex.hitTest(toSceneSpace(it)) }
     val node = hit?.node
     val current = _state.value.snapshot.interactionState
-    if (current.hoveredNodeId == node?.id) return
+    // The **anchor moves with the pointer**, even over one mark. Returning early on an unchanged
+    // node froze `tooltipAnchor` at wherever the pointer entered, so a bubble a host places at that
+    // point stayed at the mark's edge while the pointer walked across it. Only a *node* change
+    // costs a republish of the scene; an anchor change is a cheaper update of the same one.
+    if (current.hoveredNodeId == node?.id) {
+      val anchor = if (node?.metadata?.tooltip != null) point else null
+      if (current.tooltipAnchor != anchor) publishInteraction(current.copy(tooltipAnchor = anchor))
+      return
+    }
 
     publishInteraction(
       current.copy(
@@ -982,6 +1134,21 @@ public class VegaChartController(
   }
 
   private fun handlePan(event: ChartInputEvent.Pan) {
+    // A NaN delta poisons the viewport **permanently**: every subsequent offset is NaN, every hit
+    // test maps to NaN and misses, and nothing short of `resetViewport()` recovers. A gesture
+    // recogniser that divides by a zero-length interval produces one, and the zoom path already
+    // guarded its factor — this one guarded nothing.
+    if (!event.delta.dx.isFinite() || !event.delta.dy.isFinite()) {
+      report(
+        VegaDiagnostic(
+          severity = DiagnosticSeverity.WARNING,
+          code = DiagnosticCodes.INTERACTION_UNSUPPORTED,
+          message =
+            "Ignoring a pan whose delta is not a number: (${event.delta.dx}, ${event.delta.dy})",
+        )
+      )
+      return
+    }
     val current = _state.value.snapshot.interactionState
     val moved =
       current.copy(
@@ -1000,8 +1167,21 @@ public class VegaChartController(
       report(
         VegaDiagnostic(
           severity = DiagnosticSeverity.WARNING,
-          code = DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+          code = DiagnosticCodes.INTERACTION_UNSUPPORTED,
           message = "Ignoring a zoom with a non-positive scale factor: ${event.scaleFactor}",
+        )
+      )
+      return
+    }
+    // The **anchor** as well as the factor: the arithmetic below multiplies the anchor into the
+    // offset, so a NaN there poisons the viewport exactly as a NaN pan delta does.
+    if (!event.anchor.x.isFinite() || !event.anchor.y.isFinite()) {
+      report(
+        VegaDiagnostic(
+          severity = DiagnosticSeverity.WARNING,
+          code = DiagnosticCodes.INTERACTION_UNSUPPORTED,
+          message =
+            "Ignoring a zoom whose anchor is not a number: (${event.anchor.x}, ${event.anchor.y})",
         )
       )
       return
@@ -1103,14 +1283,23 @@ public class VegaChartController(
     /** Defaults to whatever is on screen, so a selection or a pan keeps the hover styling. */
     scene: Scene = _state.value.snapshot.scene,
   ) {
-    val revision = nextRevision++
-    _state.value =
-      _state.value.copy(
+    val revision = nextRevision.fetchAndIncrement()
+    _state.update {
+      it.copy(
         snapshot = ChartSnapshot(scene = scene, interactionState = interaction, revision = revision)
       )
+    }
   }
 
-  private fun datumOf(node: SceneNode?): VegaValue? = node?.metadata?.tooltip
+  /**
+   * The **row** a mark was encoded from, which is not its tooltip.
+   *
+   * This read `metadata.tooltip`, so `MarkClicked.datum` was the tooltip's *value* wherever a chart
+   * declared a `tooltip` channel — the string `"bar b"` rather than the row `{c: "b", v: 2}` — and
+   * the README's own example passes it straight to a host's `handleClick`. The two are separate
+   * properties on the item for exactly this reason.
+   */
+  private fun datumOf(node: SceneNode?): VegaValue? = node?.metadata?.datum
 
   private fun emit(event: ChartEvent) {
     _events.tryEmit(event)

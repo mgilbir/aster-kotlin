@@ -31,7 +31,13 @@ internal data class Uri(
     if (host != null) {
       append("//")
       userInfo?.let { append(it).append('@') }
-      append(host)
+      // [host] is stored bare, because every rule in the policy wants the address and not the
+      // punctuation. RFC 3986 requires the brackets back on an `IP-literal` when it is written out,
+      // and it is not cosmetic: without them `http://[::1]:80/x` renders as `http://::1:80/x`,
+      // whose authority reparses with a port of `:1:80` — so `sanitize` returned something `load`
+      // would refuse, and `DataLoaderTest.sanitize is idempotent` is the contract that says it may
+      // not. A host is a literal exactly when it contains a colon; a registered name cannot.
+      if (host.contains(':')) append('[').append(host).append(']') else append(host)
       port?.let { append(':').append(it) }
     }
     append(path)
@@ -135,7 +141,10 @@ internal data class Uri(
             userInfo = authority.substring(0, it)
             authority = authority.substring(it + 1)
           }
-        // A bracketed IPv6 literal contains colons that are not a port separator.
+        // A bracketed IPv6 literal contains colons that are not a port separator. An *unbracketed*
+        // one is not a URI at all — `http://::1/x` has no way to say where the address stops — so
+        // the second colon in a bare authority is a malformed port and is reported as one rather
+        // than being cut somewhere arbitrary.
         val portSeparator =
           if (authority.startsWith("["))
             authority.indexOf(':', authority.indexOf(']').coerceAtLeast(0))

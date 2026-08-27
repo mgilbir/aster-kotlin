@@ -2731,6 +2731,8 @@ final object dev.aster.vega.model/DelimitedText { // dev.aster.vega.model/Delimi
 }
 
 final object dev.aster.vega.model/DiagnosticCodes { // dev.aster.vega.model/DiagnosticCodes|null[0]
+    final const val COMPILE_CONCURRENT // dev.aster.vega.model/DiagnosticCodes.COMPILE_CONCURRENT|{}COMPILE_CONCURRENT[0]
+        final fun <get-COMPILE_CONCURRENT>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.COMPILE_CONCURRENT.<get-COMPILE_CONCURRENT>|<get-COMPILE_CONCURRENT>(){}[0]
     final const val COMPILE_FAILED // dev.aster.vega.model/DiagnosticCodes.COMPILE_FAILED|{}COMPILE_FAILED[0]
         final fun <get-COMPILE_FAILED>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.COMPILE_FAILED.<get-COMPILE_FAILED>|<get-COMPILE_FAILED>(){}[0]
     final const val COMPILE_LIMIT_EXCEEDED // dev.aster.vega.model/DiagnosticCodes.COMPILE_LIMIT_EXCEEDED|{}COMPILE_LIMIT_EXCEEDED[0]

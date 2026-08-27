@@ -343,6 +343,18 @@ public interface ExpressionCompiler {
  * Vega specifications reuse the same expression strings across many marks and updates, so caching
  * by source text avoids reparsing. Owned by its creator rather than being a singleton, so its
  * lifetime is controllable (PROJECT_BRIEF.md 21).
+ *
+ * **Confined, not synchronized**, and the distinction matters because the map is mutated on every
+ * *hit*: an entry is removed and re-added to move it to the young end. Two threads doing that at
+ * once corrupt a `LinkedHashMap`, and on the JVM a concurrent resize can spin forever rather than
+ * merely losing an entry.
+ *
+ * What confines it is `VegaChartController`, which owns the only instance the engine builds and
+ * calls it from its compile path — see that class's note on concurrent compiles, which reports
+ * `VEGA_COMPILE_CONCURRENT` when two of those overlap. A caller that builds one of these and shares
+ * it across threads has to serialize it, and there is no lock here to make that automatic: Kotlin's
+ * common standard library has no blocking one, and a copy-on-write map would pay an O(n) copy on
+ * every hit, which is the hot path this class exists to make fast.
  */
 public class CachingExpressionCompiler(
   private val delegate: ExpressionCompiler,
