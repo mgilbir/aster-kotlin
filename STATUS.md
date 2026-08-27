@@ -6847,3 +6847,47 @@ d3-time-format floors, which is a second late for every instant before 1970. Bot
 **And a parser that could not be used twice.** `SpecParser` is public and its name is a verb, and it
 accumulated: a second specification came back carrying the first one's diagnostics, and read the
 first one's `config` for any block it did not set itself.
+
+### JavaScript has two absent values, and this model had one
+
+C1, and the audit's own reading of why it is the first Critical: every JavaScript-fidelity defect in
+that report bottoms out in the value substrate, and this is the substrate.
+
+`VegaValue` carried one `Null` and it coerced as JavaScript's `null`. A field a row does not have is
+`undefined`, and the two coerce **oppositely** in the one place a chart cares about: `Number(null)`
+is 0 and `Number(undefined)` is NaN. So a filter `datum.x < 10` over rows with no `x` at all
+compared 0 to 10 and **kept** every one of them, where upstream compares NaN and drops them. Not an
+exotic input — a column some rows are missing is the ordinary shape of real data — and nothing said
+anything, because both engines were doing exactly what they were told.
+
+`VegaValue.Undefined` is the second value. Where it comes from is deliberately narrow:
+`Evaluator.property` reading a key that is not there, an index outside an array or a string, and
+nothing else. `field()` still answers `Null` for a missing path, because that accessor feeds the
+encoders and the transforms and both treat the two alike; what flows out of an *expression* is a
+signal value, and upstream's signal values carry `undefined`, so these do too.
+
+The rest followed from the definition, and each line of it was probed rather than reasoned about:
+
+- `'' + datum.missing` is `"undefined"`. `GroupMarkTest` had pinned `"null"` for `parent.width` with
+  a comment saying upstream prints the other thing; it prints the other thing now.
+- `undefined == null` is true and `undefined === null` is false. `isNullish` is the loose test,
+  spelled once, because `_ == null` is the idiom upstream writes every missing-value screen with —
+  `toNumber`, `toString`, `toBoolean` and `isValid` are all that shape.
+- **`isDefined` was inverted for the case it exists for.** `_ !== undefined` is true for a field that
+  is present and null, and it answered false. A predicate whose entire job is telling the two apart
+  could not, because there was nothing to tell apart.
+- `indata` answers `undefined` for a value no row carries. The reference table said `null` and a
+  comment beside it said upstream says `undefined`; the table was recording what this engine could
+  express rather than what upstream does, which is the failure mode a reference table has.
+- **One function must not treat them alike.** Upstream's `timeParse`/`utcParse` wrapper is
+  `value === null ? 'null' : locale[method](spec)(value)` — a *strict* test — so a null input comes
+  back as the string `"null"` and an undefined one goes on to the parser and fails. Probed, because
+  no amount of reading the Kotlin would have suggested it.
+
+One divergence is deliberate and now written down rather than implied: reading a property **of**
+nothing throws a `TypeError` upstream and takes the whole chart with it. Here it answers `undefined`,
+which is what a further read would have answered anyway, and which is the "nothing throws" contract.
+
+`ForeignValue.kind` and `ForeignSignals.kind` grew a ninth answer, `"undefined"`. A host that does
+not care which kind of nothing it is holding can test both; one that wants to tell a missing field
+from a null one now can.

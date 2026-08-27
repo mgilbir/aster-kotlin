@@ -6,6 +6,7 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.isNullish
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.spec.Anchor
 import dev.aster.vega.model.spec.AxisSpec
@@ -976,7 +977,7 @@ public class AxisBuilder(
     val encoder = channels ?: return base
     fun channel(name: String) = block[name]
     val tooltip =
-      channel("tooltip")?.let { encoder.channelAny(it, datum) }?.takeIf { it !is VegaValue.Null }
+      channel("tooltip")?.let { encoder.channelAny(it, datum) }?.takeIf { !it.isNullish }
     val cursor =
       channel("cursor")?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotEmpty() }
     val href = channel("href")?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotEmpty() }

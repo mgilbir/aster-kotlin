@@ -18,6 +18,7 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
+import dev.aster.vega.model.isNullish
 import kotlin.math.pow
 
 /** The four values a simulation writes back, in the order upstream's `as` defaults to. */
@@ -171,7 +172,7 @@ public object ForceTransform : Transform {
 
   private fun coordinate(item: VegaValue, name: String): Double {
     val value = item.field(name)
-    if (value is VegaValue.Null) return Double.NaN
+    if (value.isNullish) return Double.NaN
     return value.asDouble()
   }
 
@@ -337,7 +338,8 @@ public object ForceTransform : Transform {
   private fun VegaValue.Obj.truthy(key: String): Boolean =
     when (val value = fields[key]) {
       null,
-      is VegaValue.Null -> false
+      is VegaValue.Null,
+      is VegaValue.Undefined -> false
       is VegaValue.Bool -> value.value
       is VegaValue.Num -> value.value != 0.0 && !value.value.isNaN()
       is VegaValue.Str -> value.value.isNotEmpty() && value.value != "false"

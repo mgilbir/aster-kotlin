@@ -4676,6 +4676,7 @@ VegaValueKt.asNumberOrNull(_:)
 VegaValueKt.asString(_:)
 VegaValueKt.field(_:path:)
 VegaValueKt.isMissing(_:)
+VegaValueKt.isNullish(_:)
 VegaValueKt.parseFieldPath(path:)
 VegaValueNull
 VegaValueNull.description()
@@ -4692,6 +4693,12 @@ VegaValuePattern.isEqual(_:)
 VegaValuePattern.regex
 VegaValuePattern.source
 VegaValuePattern.text
+VegaValueUndefined
+VegaValueUndefined.description()
+VegaValueUndefined.hash()
+VegaValueUndefined.init()
+VegaValueUndefined.isEqual(_:)
+VegaValueUndefined.shared
 VoronoiTransform
 VoronoiTransform.apply(input:params:context:)
 VoronoiTransform.init()

@@ -34,6 +34,8 @@ class ExpressionReferenceTest {
   private fun asJson(value: VegaValue): String =
     when (value) {
       is VegaValue.Null -> "null"
+      // `eval-probe.js` writes the literal `undefined` where `JSON.stringify` gives nothing.
+      is VegaValue.Undefined -> "undefined"
       is VegaValue.Bool -> value.value.toString()
       // JSON has no NaN or Infinity, so JSON.stringify emits null; match that.
       is VegaValue.Num ->
@@ -956,7 +958,8 @@ class ExpressionReferenceTest {
       [
         "indata('t', 'k', 'a')|2",
         "indata('t', 'k', 'b')|1",
-        "indata('t', 'k', 'zzz')|null",
+        // Upstream answers **undefined** for a value no row carries, not null. Probed.
+        "indata('t', 'k', 'zzz')|undefined",
         // The row whose k is the string "1", found by the number 1.
         "indata('t', 'k', 1)|1",
         // The row whose k is the number 5, found by either spelling.
@@ -968,7 +971,7 @@ class ExpressionReferenceTest {
         "indata('t', 'n', 3)|1",
         "indata('t', 'n', '3')|1",
         // A field no row has: upstream groups them all under one absent key, which nothing matches.
-        "indata('t', 'nosuchfield', 'a')|null",
+        "indata('t', 'nosuchfield', 'a')|undefined",
         "if(indata('t', 'k', 'a'), 'yes', 'no')|\"yes\"",
         "if(indata('t', 'k', 'zzz'), 'yes', 'no')|\"no\"",
       ],

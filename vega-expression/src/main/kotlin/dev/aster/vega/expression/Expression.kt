@@ -104,8 +104,8 @@ public interface ExpressionScope {
    *
    * Not a boolean, despite the documentation: upstream returns the **count** of matching rows, or
    * `undefined` when there are none, and a specification that prints the result prints a number.
-   * [VegaValue.Null] stands in for that `undefined`; both are falsey, so the usual
-   * `if(indata(...))` reads the same either way.
+   * That `undefined` is [VegaValue.Undefined] — it used to be [VegaValue.Null] standing in for one,
+   * which read the same through `if(indata(...))` and the opposite through `isDefined`.
    *
    * The default scans, which is correct and quadratic when called once per datum. A scope that
    * answers many of these — a mark encoding, in practice — should override with an index.
@@ -319,7 +319,7 @@ public fun indataCounts(rows: List<VegaValue>, field: String): Map<String, Int> 
 
 /** Reads [indataCounts] the way upstream does: the count, or absent rather than zero. */
 public fun indataLookup(counts: Map<String, Int>, value: VegaValue): VegaValue =
-  counts[value.asString()]?.let { VegaValue.Num(it.toDouble()) } ?: VegaValue.Null
+  counts[value.asString()]?.let { VegaValue.Num(it.toDouble()) } ?: VegaValue.Undefined
 
 public sealed interface ExpressionResult {
   public data class Compiled(val expression: Expression) : ExpressionResult

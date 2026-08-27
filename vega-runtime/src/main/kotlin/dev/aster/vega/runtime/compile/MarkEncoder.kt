@@ -14,6 +14,7 @@ import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
 import dev.aster.vega.model.isMissing
+import dev.aster.vega.model.isNullish
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.spec.ChannelValue
@@ -246,7 +247,7 @@ public class MarkEncoder(
       val fields = LinkedHashMap<String, VegaValue>(channels.size + 1)
       for ((name, channel) in channels) {
         val value = channelValue(channel, datum)
-        if (value != null && value !is VegaValue.Null) fields[name] = value
+        if (value != null && !value.isNullish) fields[name] = value
       }
       adjustSpatial(fields, channels, spec.type)
       fields["datum"] = datum
@@ -1466,8 +1467,7 @@ public class MarkEncoder(
       datum = datum,
       // The `tooltip` channel when there is one, and the whole row when there is not. Upstream does
       // the same, and the difference shows on a chart that wants one line rather than a table.
-      tooltip =
-        channels["tooltip"]?.let { value(it, datum) }?.takeIf { it !is VegaValue.Null } ?: datum,
+      tooltip = channels["tooltip"]?.let { value(it, datum) }?.takeIf { !it.isNullish } ?: datum,
       cursor = string(channels["cursor"], datum),
       href = string(channels["href"], datum)?.takeIf { it.isNotEmpty() },
       zindex = number(channels["zindex"], datum)?.toInt() ?: 0,
@@ -1542,7 +1542,7 @@ public class MarkEncoder(
    * specification never asked for, drawn where upstream draws nothing at all.
    */
   private fun string(channel: ChannelValue?, datum: VegaValue): String? =
-    value(channel, datum)?.takeUnless { it is VegaValue.Null }?.asString()
+    value(channel, datum)?.takeUnless { it.isNullish }?.asString()
 
   /** The same, before it is turned into text. */
   private fun value(channel: ChannelValue?, datum: VegaValue): VegaValue? =

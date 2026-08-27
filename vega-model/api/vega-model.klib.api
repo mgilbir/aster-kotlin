@@ -1117,6 +1117,12 @@ sealed interface dev.aster.vega.model/VegaValue { // dev.aster.vega.model/VegaVa
         final fun hashCode(): kotlin/Int // dev.aster.vega.model/VegaValue.Null.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // dev.aster.vega.model/VegaValue.Null.toString|toString(){}[0]
     }
+
+    final object Undefined : dev.aster.vega.model/VegaValue { // dev.aster.vega.model/VegaValue.Undefined|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.model/VegaValue.Undefined.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.model/VegaValue.Undefined.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.model/VegaValue.Undefined.toString|toString(){}[0]
+    }
 }
 
 final class dev.aster.vega.model.locale/DateNameContext { // dev.aster.vega.model.locale/DateNameContext|null[0]
@@ -2804,6 +2810,8 @@ final const val dev.aster.vega.model/MINUS_SIGN // dev.aster.vega.model/MINUS_SI
 
 final val dev.aster.vega.model/isMissing // dev.aster.vega.model/isMissing|@dev.aster.vega.model.VegaValue{}isMissing[0]
     final fun (dev.aster.vega.model/VegaValue).<get-isMissing>(): kotlin/Boolean // dev.aster.vega.model/isMissing.<get-isMissing>|<get-isMissing>@dev.aster.vega.model.VegaValue(){}[0]
+final val dev.aster.vega.model/isNullish // dev.aster.vega.model/isNullish|@dev.aster.vega.model.VegaValue{}isNullish[0]
+    final fun (dev.aster.vega.model/VegaValue).<get-isNullish>(): kotlin/Boolean // dev.aster.vega.model/isNullish.<get-isNullish>|<get-isNullish>@dev.aster.vega.model.VegaValue(){}[0]
 
 final fun (dev.aster.vega.model/VegaValue).dev.aster.vega.model/asBoolean(): kotlin/Boolean // dev.aster.vega.model/asBoolean|asBoolean@dev.aster.vega.model.VegaValue(){}[0]
 final fun (dev.aster.vega.model/VegaValue).dev.aster.vega.model/asDouble(): kotlin/Double // dev.aster.vega.model/asDouble|asDouble@dev.aster.vega.model.VegaValue(){}[0]

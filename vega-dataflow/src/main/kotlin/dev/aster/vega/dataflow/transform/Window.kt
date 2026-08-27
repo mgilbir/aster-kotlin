@@ -4,6 +4,7 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.field
+import dev.aster.vega.model.isNullish
 import kotlin.math.ceil
 
 /**
@@ -113,7 +114,7 @@ public object WindowTransform : Transform {
     fun at(index: Int): Int? =
       values
         .getOrNull(index)
-        ?.takeIf { it !is VegaValue.Null }
+        ?.takeIf { !it.isNullish }
         ?.asDouble()
         ?.takeIf { it.isFinite() }
         ?.toInt()
@@ -232,12 +233,12 @@ public object WindowTransform : Transform {
         // The last non-null seen up to here, and the next one from here on.
         Kind.PREV_VALUE -> {
           var at = index
-          while (at >= 0 && valueAt(at) is VegaValue.Null) at--
+          while (at >= 0 && valueAt(at).isNullish) at--
           valueAt(at)
         }
         Kind.NEXT_VALUE -> {
           var at = index
-          while (at < data.size && valueAt(at) is VegaValue.Null) at++
+          while (at < data.size && valueAt(at).isNullish) at++
           valueAt(at)
         }
         Kind.AGGREGATE ->

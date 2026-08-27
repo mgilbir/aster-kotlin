@@ -7,6 +7,7 @@ import dev.aster.vega.model.asBoolean
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
 import dev.aster.vega.model.isMissing
+import dev.aster.vega.model.isNullish
 import dev.aster.vega.model.parseFieldPath
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -158,7 +159,7 @@ public object AggregateTransform : Transform {
         // `formula` reading the field, where absent and null coerce alike, and in an `isValid`
         // test, where they do not.
         val value = measure.compute(tuples, confidence)
-        if (value !is VegaValue.Null) output[measure.outputName] = value
+        if (!value.isNullish) output[measure.outputName] = value
       }
       VegaValue.Obj(output)
     }

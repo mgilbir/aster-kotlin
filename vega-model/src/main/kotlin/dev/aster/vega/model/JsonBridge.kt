@@ -60,6 +60,11 @@ private fun writeJson(value: VegaValue, out: StringBuilder, depth: Int) {
   val closePad = "  ".repeat(depth)
   when (value) {
     is VegaValue.Null -> out.append("null")
+    // `JSON.stringify` drops an object property whose value is `undefined` and writes `null` for
+    // an array element that is one. Neither can arrive here — nothing that compiles into a
+    // specification holds an `undefined`, which only an expression produces — and `null` is the
+    // answer that keeps the document readable if one ever does.
+    is VegaValue.Undefined -> out.append("null")
     is VegaValue.Bool -> out.append(value.value)
     is VegaValue.Num -> out.append(jsonNumber(value.value))
     is VegaValue.Timestamp -> out.append(jsonNumber(value.epochMillis))

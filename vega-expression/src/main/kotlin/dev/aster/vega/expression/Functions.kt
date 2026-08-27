@@ -4,6 +4,7 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
+import dev.aster.vega.model.isNullish
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.time.DateValues
 import dev.aster.vega.model.time.TimeFormat
@@ -292,9 +293,7 @@ public object Functions {
     map["extent"] = ExpressionFunction { args ->
       val values =
         (args.at(0) as? VegaValue.Arr)?.values ?: return@ExpressionFunction VegaValue.Null
-      val usable = values.filterNot {
-        it is VegaValue.Null || (it.asNumberOrNull()?.isNaN() == true)
-      }
+      val usable = values.filterNot { it.isNullish || (it.asNumberOrNull()?.isNaN() == true) }
       if (usable.isEmpty()) {
         return@ExpressionFunction VegaValue.Arr(listOf(VegaValue.Null, VegaValue.Null))
       }
@@ -363,7 +362,10 @@ public object Functions {
     map.predicate("isObject") { it is VegaValue.Obj || it is VegaValue.Timestamp }
     map.predicate("isString") { it is VegaValue.Str }
     map.predicate("isRegExp") { it is VegaValue.Pattern }
-    map.predicate("isDefined") { it !is VegaValue.Null }
+    // `_ !== undefined`, and the strictness is the whole function: a field that is **present and
+    // null** is defined, and answering false for it — which is what one value for both did — makes
+    // `isDefined` a slower `isValid`.
+    map.predicate("isDefined") { it !is VegaValue.Undefined }
     // Upstream tests `value instanceof Date`, so a *number* of milliseconds is not a date to it
     // either — which is answerable here only because an instant is its own type in this value
     // model. Every Vega-Lite chart over a temporal field filters with
@@ -371,7 +373,8 @@ public object Functions {
     map.predicate("isDate") { it is VegaValue.Timestamp }
     // `isValid` is narrower than truthiness: it rejects null and NaN but accepts 0 and "".
     map.predicate("isValid") {
-      it !is VegaValue.Null && !(it is VegaValue.Num && it.value.isNaN())
+      // `_ != null && _ === _`: the loose comparison, so both kinds of nothing are invalid.
+      !it.isNullish && !(it is VegaValue.Num && it.value.isNaN())
     }
     // `Number.isFinite`, not the global `isFinite` — `vega-expression` maps it to the former, so
     // there is **no coercion**: `isFinite('5')` is false, and so is `isFinite(null)` where the
@@ -382,17 +385,16 @@ public object Functions {
     // ---- coercion -----------------------------------------------------------
     map["toNumber"] = ExpressionFunction { args ->
       val value = args.at(0)
-      if (value is VegaValue.Null) VegaValue.Null else VegaValue.Num(JsSemantics.toNumber(value))
+      if (value.isNullish) VegaValue.Null else VegaValue.Num(JsSemantics.toNumber(value))
     }
     map["toString"] = ExpressionFunction { args ->
       val value = args.at(0)
-      if (value is VegaValue.Null) VegaValue.Null
-      else VegaValue.Str(JsSemantics.toStringValue(value))
+      if (value.isNullish) VegaValue.Null else VegaValue.Str(JsSemantics.toStringValue(value))
     }
     // Upstream returns null rather than false for null and the empty string.
     map["toBoolean"] = ExpressionFunction { args ->
       val value = args.at(0)
-      val empty = value is VegaValue.Null || (value is VegaValue.Str && value.value.isEmpty())
+      val empty = value.isNullish || (value is VegaValue.Str && value.value.isEmpty())
       if (empty) VegaValue.Null else VegaValue.Bool(JsSemantics.truthy(value))
     }
     map["parseFloat"] = ExpressionFunction { args ->
@@ -551,7 +553,7 @@ public object Functions {
       val separator = if (args.size > 1) args.string(1) else ","
       VegaValue.Str(
         array.values.joinToString(separator) {
-          if (it is VegaValue.Null) "" else JsSemantics.toStringValue(it)
+          if (it.isNullish) "" else JsSemantics.toStringValue(it)
         }
       )
     }
@@ -1270,9 +1272,7 @@ public object Functions {
     val (d0, d1) = endsOf(domain) ?: return domain
     val lifted0 = lift(d0)
     val lifted1 = lift(d1)
-    val at =
-      if (anchor is VegaValue.Null) (lifted0 + lifted1) / 2.0
-      else lift(JsSemantics.toNumber(anchor))
+    val at = if (anchor.isNullish) (lifted0 + lifted1) / 2.0 else lift(JsSemantics.toNumber(anchor))
     return interval(
       ground(at + (lifted0 - at) * scale),
       ground(at + (lifted1 - at) * scale),
@@ -1487,7 +1487,10 @@ public object Functions {
   private fun parsed(args: List<VegaValue>, zone: TimeZone, utc: Boolean): VegaValue {
     val text = args.at(0)
     // Upstream's wrapper answers the *string* `"null"` for a null input, before any parsing
-    // happens.
+    // happens — and its test is `value === null`, so an **undefined** input is not caught by it and
+    // goes on to the parser, which reads `"undefined"` and fails. `timeParse(datum.nul, '%Y')` is
+    // therefore the string `"null"` and `timeParse(datum.missing, '%Y')` is null, which is the one
+    // place in this file the two kinds of nothing must not be treated alike. Probed.
     if (text is VegaValue.Null) return VegaValue.Str("null")
     val specifier = args.string(1)
     val millis = TimeParse.parse(text.asString(), specifier, zone, utc) ?: return VegaValue.Null

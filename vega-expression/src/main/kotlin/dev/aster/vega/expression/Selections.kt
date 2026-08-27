@@ -3,6 +3,7 @@ package dev.aster.vega.expression
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
+import dev.aster.vega.model.isNullish
 
 /**
  * The `vlSelection*` family: whether a row is inside an interactive selection, and what one
@@ -105,7 +106,7 @@ internal object Selections {
   /** `vlSelectionIdTest(name, datum, op)` — the same question for a selection stored by id. */
   fun idTest(rows: List<VegaValue>, datum: VegaValue, op: String?): Boolean {
     val value = datum.field(SELECTION_ID)
-    if (value is VegaValue.Null) return false
+    if (value.isNullish) return false
     val matching = rows.count { it.field(SELECTION_ID) == value }
     if (matching == 0) return false
     if (op == INTERSECT) {
@@ -256,7 +257,7 @@ internal object Selections {
           TYPE_LESS_EQUAL -> number(actual) <= number(expected)
           TYPE_GREATER -> number(actual) > number(expected)
           TYPE_GREATER_EQUAL -> number(actual) >= number(expected)
-          TYPE_VALID -> actual !is VegaValue.Null && !number(actual).isNaN()
+          TYPE_VALID -> !actual.isNullish && !number(actual).isNaN()
           TYPE_ONE_OF -> (expected as? VegaValue.Arr)?.values?.any { same(it, actual) } == true
           else -> true
         }

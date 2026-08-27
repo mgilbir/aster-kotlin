@@ -24,7 +24,39 @@ section here does not get released.
   engine's job and are done there, so calling it directly with a stack or a generic returns `null`
   where it used to answer.
 
+### Added
+
+- **`VegaValue.Undefined`, because JavaScript has two absent values and this model had one.**
+  Reading a property that is not there now yields it, and nothing else produces one. `isNullish`
+  is the `_ == null` screen that covers both, which is the idiom upstream writes every one of its
+  own missing-value tests with.
+
+  Two host-facing readers gained an answer: `ForeignValue.kind` and `ForeignSignals.kind` return
+  `"undefined"` where they used to return `"null"` for a value an expression produced from a
+  missing field. A host that does not care can test both.
+
 ### Fixed
+
+- **A field a row does not have is `undefined`, not `null`, and the difference is the chart.**
+  `Number(null)` is 0 and `Number(undefined)` is NaN, so a filter `datum.x < 10` over rows that
+  have no `x` at all **kept** every one of them where upstream drops them — ordinary dirty data,
+  the opposite answer, and no diagnostic. The value model carried one absent value and it coerced
+  as `null`.
+
+  Everything that follows from the distinction follows now: `'' + datum.missing` is `"undefined"`
+  rather than `"null"`, `undefined == null` is true while `undefined === null` is false,
+  `isDefined` answers **true** for a field that is present and null (its whole job, and it
+  answered false), `isValid` and `toNumber`/`toString`/`toBoolean` screen with the loose
+  comparison that covers both, and `indata` answers `undefined` for a value no row carries rather
+  than a `null` standing in for one.
+
+  One function must *not* treat them alike and now does not: upstream's `timeParse`/`utcParse`
+  wrapper screens with `value === null`, so `timeParse(datum.nul, '%Y')` is the string `"null"`
+  and `timeParse(datum.missing, '%Y')` is null. Probed rather than reasoned about, like every
+  other expectation in `UndefinedSemanticsTest`.
+
+  Reading a property **of** nothing still differs from upstream, deliberately and now in writing:
+  JavaScript throws a `TypeError` and takes the whole chart down, and this answers `undefined`.
 
 - **A bracket followed by a dot reads the field behind it.** `"field": "coordinates[0].lat"` —
   the ordinary shape of a GeoJSON-derived row — resolved to nothing at all, so the mark was not

@@ -5,6 +5,7 @@ import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.isNullish
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.spec.Anchor
@@ -162,8 +163,7 @@ internal class LegendBuilder(
   ): NodeMetadata {
     val block = spec.encode[part]?.effective ?: return base
     val encoder = channels ?: return base
-    val tooltip =
-      block["tooltip"]?.let { encoder.channelAny(it, datum) }?.takeIf { it !is VegaValue.Null }
+    val tooltip = block["tooltip"]?.let { encoder.channelAny(it, datum) }?.takeIf { !it.isNullish }
     val cursor = block["cursor"]?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotEmpty() }
     val href = block["href"]?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotEmpty() }
     val zindex = block["zindex"]?.let { encoder.channelNumber(it, datum) }?.toInt()

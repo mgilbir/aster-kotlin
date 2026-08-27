@@ -8,6 +8,7 @@ import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.isNullish
 import dev.aster.vega.model.spec.EventConfig
 import dev.aster.vega.model.spec.EventPermit
 import dev.aster.vega.model.spec.EventStream
@@ -65,7 +66,7 @@ public data class InputEvent(
     fields["x"] = VegaValue.Num(x)
     fields["y"] = VegaValue.Num(y)
     fields["timeStamp"] = VegaValue.Num(timestampMillis.toDouble())
-    if (markType != null || markName != null || datum !is VegaValue.Null) {
+    if (markType != null || markName != null || !datum.isNullish) {
       val mark = LinkedHashMap<String, VegaValue>(2)
       markType?.let { mark["marktype"] = VegaValue.Str(it) }
       markName?.let { mark["name"] = VegaValue.Str(it) }

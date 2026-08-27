@@ -3,6 +3,7 @@ package dev.aster.vega.dataflow.transform
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.field
+import dev.aster.vega.model.isNullish
 import kotlin.math.ceil
 
 /**
@@ -144,7 +145,7 @@ public object LookupTransform : Transform {
     }
   }
 
-  private fun VegaValue.isMissing(): Boolean = this is VegaValue.Null
+  private fun VegaValue.isMissing(): Boolean = isNullish
 }
 
 /**

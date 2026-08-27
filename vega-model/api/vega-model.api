@@ -272,6 +272,13 @@ public final class dev/aster/vega/model/VegaValue$Timestamp : dev/aster/vega/mod
 	public final synthetic fun unbox-impl ()D
 }
 
+public final class dev/aster/vega/model/VegaValue$Undefined : dev/aster/vega/model/VegaValue {
+	public static final field INSTANCE Ldev/aster/vega/model/VegaValue$Undefined;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class dev/aster/vega/model/VegaValueKt {
 	public static final fun asBoolean (Ldev/aster/vega/model/VegaValue;)Z
 	public static final fun asDouble (Ldev/aster/vega/model/VegaValue;)D
@@ -279,6 +286,7 @@ public final class dev/aster/vega/model/VegaValueKt {
 	public static final fun asString (Ldev/aster/vega/model/VegaValue;)Ljava/lang/String;
 	public static final fun field (Ldev/aster/vega/model/VegaValue;Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
 	public static final fun isMissing (Ldev/aster/vega/model/VegaValue;)Z
+	public static final fun isNullish (Ldev/aster/vega/model/VegaValue;)Z
 	public static final fun parseFieldPath (Ljava/lang/String;)Ljava/util/List;
 }
 

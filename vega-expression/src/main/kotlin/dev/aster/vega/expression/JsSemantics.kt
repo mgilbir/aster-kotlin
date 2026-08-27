@@ -2,6 +2,7 @@ package dev.aster.vega.expression
 
 import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.isNullish
 import io.github.mgilbir.ecma262.number.toEcmaDouble
 import kotlin.math.truncate
 
@@ -24,7 +25,8 @@ public object JsSemantics {
    */
   public fun truthy(value: VegaValue): Boolean =
     when (value) {
-      is VegaValue.Null -> false
+      is VegaValue.Null,
+      is VegaValue.Undefined -> false
       is VegaValue.Bool -> value.value
       is VegaValue.Num -> value.value != 0.0 && !value.value.isNaN()
       is VegaValue.Timestamp -> value.epochMillis != 0.0 && !value.epochMillis.isNaN()
@@ -42,10 +44,15 @@ public object JsSemantics {
    *
    * Note the JavaScript-specific cases: `Number(null)` is 0 rather than NaN, `Number("")` is 0, and
    * an array coerces via its string form, so `Number([5])` is 5 but `Number([1,2])` is NaN.
+   *
+   * `Number(undefined)` is **NaN**, and that one line is the whole of C1: the two used to be one
+   * value here and it coerced as `null`, so `datum.x < 10` over rows with no `x` compared 0 to 10
+   * and kept every one of them, where upstream compares NaN and drops them.
    */
   public fun toNumber(value: VegaValue): Double =
     when (value) {
       is VegaValue.Null -> 0.0
+      is VegaValue.Undefined -> Double.NaN
       is VegaValue.Bool -> if (value.value) 1.0 else 0.0
       is VegaValue.Num -> value.value
       is VegaValue.Timestamp -> value.epochMillis
@@ -79,15 +86,16 @@ public object JsSemantics {
   public fun toStringValue(value: VegaValue): String =
     when (value) {
       is VegaValue.Null -> "null"
+      is VegaValue.Undefined -> "undefined"
       is VegaValue.Bool -> value.value.toString()
       is VegaValue.Num -> numberToString(value.value)
       is VegaValue.Timestamp -> numberToString(value.epochMillis)
       is VegaValue.Str -> value.value
       // `String([1,2])` is "1,2", and `String([null])` is "" — null elements stringify to empty.
+      // `Array.prototype.join` writes an empty string for an **undefined** element too, which is
+      // why this is not a plain recursion: `String([undefined])` is "" and not "undefined".
       is VegaValue.Arr ->
-        value.values.joinToString(",") {
-          if (it is VegaValue.Null) "" else toStringValue(it)
-        }
+        value.values.joinToString(",") { if (it.isNullish) "" else toStringValue(it) }
       is VegaValue.Obj -> "[object Object]"
       // Not `[object Object]`: a RegExp has a `toString` of its own, and it is the literal —
       // `'' + regexp('a.b','i')` is `/a.b/i`, probed against upstream.
@@ -148,7 +156,10 @@ public object JsSemantics {
       return false
     }
     return when (left) {
-      is VegaValue.Null -> true
+      // Two singletons, and each is strictly equal only to itself: `undefined === null` is false,
+      // which is the half of the pair `==` does not agree with.
+      is VegaValue.Null,
+      is VegaValue.Undefined -> true
       is VegaValue.Bool -> left.value == (right as VegaValue.Bool).value
       is VegaValue.Str -> left.value == (right as VegaValue.Str).value
       is VegaValue.Timestamp -> left.epochMillis == (right as VegaValue.Timestamp).epochMillis
@@ -174,11 +185,13 @@ public object JsSemantics {
    * `null == null` is true, `"" == 0` is true, `1 == "1"` is true; a `null` compared with anything
    * else is false. Objects and arrays fall back to strict equality here rather than invoking
    * `valueOf`, which Vega expressions have no way to define.
+   *
+   * `null` and `undefined` are loosely equal to each other and to nothing else — the one place the
+   * specification puts them in the same box, and the reason `_ == null` is the idiom upstream
+   * screens a missing value with.
    */
   public fun looseEquals(left: VegaValue, right: VegaValue): Boolean {
-    val leftNull = left is VegaValue.Null
-    val rightNull = right is VegaValue.Null
-    if (leftNull || rightNull) return leftNull && rightNull
+    if (left.isNullish || right.isNullish) return left.isNullish && right.isNullish
 
     val leftComposite = left is VegaValue.Arr || left is VegaValue.Obj
     val rightComposite = right is VegaValue.Arr || right is VegaValue.Obj

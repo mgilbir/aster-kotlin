@@ -5,6 +5,7 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
+import dev.aster.vega.model.isNullish
 import dev.aster.vega.scene.SceneColor
 
 /**
@@ -183,7 +184,7 @@ private class PixelExpression(
 
   fun colour(proxy: VegaValue): SceneColor {
     val resolved = value(proxy)
-    val text = resolved?.takeIf { it !is VegaValue.Null }?.asString()
+    val text = resolved?.takeIf { !it.isNullish }?.asString()
     if (text.isNullOrEmpty()) return MID_GREY
     return SceneColor.parse(text) ?: MID_GREY
   }

@@ -75,19 +75,28 @@ public class Evaluator(
    * Reads one property or element.
    *
    * `length` on a string or array is a property in JavaScript, not a method, and Vega expressions
-   * rely on that. A missing property yields null rather than raising, matching how Vega treats
-   * absent datum fields.
+   * rely on that.
+   *
+   * **A property that is not there yields [VegaValue.Undefined], not `null`**, and this function is
+   * the only place in the engine that produces one. The two used to be the same value, and it
+   * behaved as `null` — so `datum.x` over a row with no `x` was 0 in arithmetic and false in a
+   * comparison against a number, and `datum.x < 10` kept every such row where upstream drops it. A
+   * different chart, from ordinary dirty data, with nothing said about it.
+   *
+   * Reading a property **of** nothing is where the two engines part company: JavaScript throws a
+   * `TypeError`, so upstream takes the whole chart down and this answers `undefined`. That is the
+   * "nothing throws" contract, and the answer is the one a further read would have given anyway.
    */
   private fun property(target: VegaValue, key: VegaValue): VegaValue =
     when (target) {
-      is VegaValue.Obj -> target.fields[key.asString()] ?: VegaValue.Null
+      is VegaValue.Obj -> target.fields[key.asString()] ?: VegaValue.Undefined
       is VegaValue.Arr -> {
         val name = key.asString()
         if (name == "length") {
           VegaValue.Num(target.values.size.toDouble())
         } else {
           val index = JsSemantics.toNumber(key)
-          if (index.isNaN() || index < 0 || index >= target.values.size) VegaValue.Null
+          if (index.isNaN() || index < 0 || index >= target.values.size) VegaValue.Undefined
           else target.values[index.toInt()]
         }
       }
@@ -97,11 +106,11 @@ public class Evaluator(
           VegaValue.Num(target.value.length.toDouble())
         } else {
           val index = JsSemantics.toNumber(key)
-          if (index.isNaN() || index < 0 || index >= target.value.length) VegaValue.Null
+          if (index.isNaN() || index < 0 || index >= target.value.length) VegaValue.Undefined
           else VegaValue.Str(target.value[index.toInt()].toString())
         }
       }
-      else -> VegaValue.Null
+      else -> VegaValue.Undefined
     }
 
   private fun call(node: Node.Call, scope: ExpressionScope): VegaValue {
