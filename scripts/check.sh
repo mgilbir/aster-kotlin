@@ -48,6 +48,12 @@
 # it agrees. `iosSimulatorArm64Test` would be the natural addition on a machine with the iOS platform
 # installed — this one has no simulator runtime, so Xcode refuses the task outright.
 #
+# `linuxX64Test` is the same argument for the target a Mac cannot run: it was **compiled and never
+# executed**, so `linuxX64` shipped with its `commonTest` suites having run on no machine at all.
+# That gap is the one this repository keeps finding in another costume — a target a gate names and
+# does not exercise — and it matters most for `DeepInputTest`, because a stack overflow on
+# Kotlin/Native is a `SIGSEGV` that kills the process rather than a catchable `StackOverflowError`.
+#
 # Requires the Kotlin/Native toolchain (downloaded once, into ~/.konan) and, for the Apple targets,
 # Xcode command-line tools. `linuxX64` cross-compiles from macOS.
 set -euo pipefail
@@ -90,9 +96,13 @@ apple_tasks=(
 if [ "$(uname -s)" = "Darwin" ]; then
   host_tasks=("${apple_tasks[@]}")
 else
-  host_tasks=()
+  # **Named only on Linux**, because a Linux binary is what a Mac cannot run: Kotlin registers
+  # `linuxX64Test` everywhere and disables it off Linux, and a disabled task is the silent skip the
+  # block above exists to avoid. So it goes in this branch rather than in the unconditional list.
+  host_tasks=(linuxX64Test)
   echo "note: this host is $(uname -s), so the Apple targets (${apple_tasks[*]}) are not being built."
-  echo "      Only a macOS run covers them; linuxX64 below is the portability check available here."
+  echo "      Only a macOS run covers them; linuxX64Test below runs commonTest on the native target"
+  echo "      this host can execute."
 fi
 
 # The instrumented suites are **compiled** here, though they are run on a device. They were compiled

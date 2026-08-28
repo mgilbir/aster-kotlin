@@ -19,6 +19,12 @@ section here does not get released.
   This closed the last hole in "nothing throws": `SpecCompiler.compileJson`, `VegaLiteCompiler
   .compileJson` and `VegaLiteInput.toVega` all guard the *compile*, and all three parse first.
 
+- **`linuxX64Test` runs in the gate.** `linuxX64` was compiled and never executed, so its
+  `commonTest` suites — the decimal expansion, a specification's own regular expressions, the two LRU
+  caches, and now `DeepInputTest` — had run on no machine at all for a shipped target. Named only in
+  the Linux branch, because Kotlin registers the task everywhere and disables it off Linux, and a
+  disabled task is the silent skip the Apple block beside it already exists to prevent.
+
 - **The deep-input gate runs on every target, not just the JVM.** It matters most where it was not
   running: on Kotlin/Native a stack overflow is a `SIGSEGV` that kills the process — exit 139, no
   catch, no teardown — where the JVM raises a catchable `StackOverflowError`. So the target with the
