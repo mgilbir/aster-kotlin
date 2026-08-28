@@ -7,8 +7,6 @@ import dev.aster.vega.model.time.TimeStepper
 import kotlin.math.abs
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.isoDayNumber
-import kotlinx.datetime.number
 
 /**
  * Choosing and formatting the ticks of a time axis, ported from d3-time and d3-time-format.
@@ -138,18 +136,29 @@ public object TimeTicks {
     // field order and the clock are the two things a language decides and this cascade did not ask
     // it about: `%I %p` is an afternoon in a place that writes 14:00.
     fun pattern(step: String, d3: String) = locale.timeTickFormats[step] ?: d3
+
+    // **Interval floors, not local field values**, which is what d3 tests:
+    // `second(date) < date ? … : minute(date) < date ? …`. Asking `at.hour != 0` instead is the
+    // same question in every zone whose day begins at midnight, and a different one in the zones
+    // where a daylight-saving jump **skips midnight** — Santiago, Havana, Tehran and others move
+    // the clock forward at 00:00, so the first instant of that day is 01:00. There, an axis's day
+    // tick had `hour == 1` and was labelled as an *hour* rather than a day, once a year, in the one
+    // place a reader most needs the date back.
+    fun onBoundary(interval: TimeInterval): Boolean =
+      TimeStepper(interval, zone = zone).floor(millis) >= millis
+
     return when {
-      at.nanosecond != 0 -> TimeFormat.format(at, pattern("millisecond", ".%L"), locale)
-      at.second != 0 -> TimeFormat.format(at, pattern("second", ":%S"), locale)
-      at.minute != 0 -> TimeFormat.format(at, pattern("minute", "%I:%M"), locale)
-      at.hour != 0 -> TimeFormat.format(at, pattern("hour", "%I %p"), locale)
-      at.day != 1 ->
-        // A Sunday is a week boundary, so it gets the month back; any other day only needs its
-        // name.
-        if (at.date.dayOfWeek.isoDayNumber == 7)
-          TimeFormat.format(at, pattern("week", "%b %d"), locale)
+      !onBoundary(TimeInterval.SECOND) ->
+        TimeFormat.format(at, pattern("millisecond", ".%L"), locale)
+      !onBoundary(TimeInterval.MINUTE) -> TimeFormat.format(at, pattern("second", ":%S"), locale)
+      !onBoundary(TimeInterval.HOUR) -> TimeFormat.format(at, pattern("minute", "%I:%M"), locale)
+      !onBoundary(TimeInterval.DAY) -> TimeFormat.format(at, pattern("hour", "%I %p"), locale)
+      !onBoundary(TimeInterval.MONTH) ->
+        // A week boundary gets the month back; any other day only needs its name. d3's default
+        // week is `timeSunday`, which is what `TimeInterval.WEEK` floors to.
+        if (onBoundary(TimeInterval.WEEK)) TimeFormat.format(at, pattern("week", "%b %d"), locale)
         else TimeFormat.format(at, pattern("day", "%a %d"), locale)
-      at.month.number != 1 -> TimeFormat.format(at, pattern("month", "%B"), locale)
+      !onBoundary(TimeInterval.YEAR) -> TimeFormat.format(at, pattern("month", "%B"), locale)
       else -> TimeFormat.format(at, pattern("year", "%Y"), locale)
     }
   }

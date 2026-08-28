@@ -320,15 +320,18 @@ internal class ScopeCompiler(
         // pointer
         // would leave the pointer over nothing.
         val before = ids.mark()
-        // Sorted by each item's own `zindex`, which is paint order *within* the mark: a bar the
-        // specification raised draws over its neighbours and still under the axis. Stable, so items
-        // sharing a `zindex` keep the order the data gave them.
-        built[index] =
-          markContainer(
-            mark,
-            encoder.encode(mark, rows, transformed.written).sortedBy { it.metadata.zindex },
-            index,
-          )
+        // **Data order, not paint order.** An item's `zindex` is paint order *within* the mark —
+        // a bar the specification raised draws over its neighbours and still under the axis — and
+        // this used to apply it here, when the scene was built. Upstream does not: its `item.items`
+        // stay in the order the data gave them and `vega-scenegraph` sorts as it *draws*, which is
+        // what `paintOrder` does here too, in every renderer, in the hit index and in `Scene.walk`.
+        //
+        // Sorting twice was not a wrong picture — `paintOrder` is stable and idempotent — but it
+        // made this engine's scene tree a different tree from upstream's, so `children` read
+        // positionally gave a different row than `items` does, and no differential fixture could
+        // carry an item `zindex` at all: the record is compared position by position and upstream's
+        // is in data order. `item-zindex` is that fixture, and it is what found this.
+        built[index] = markContainer(mark, encoder.encode(mark, rows, transformed.written), index)
         if (mark.encode.hover.isNotEmpty()) {
           val after = ids.mark()
           ids.rewind(before)
@@ -336,10 +339,10 @@ internal class ScopeCompiler(
           ids.rewind(after)
           val resting = built[index].orEmpty()
           if (hovered.size == resting.size) {
-            // Paired by **id**, not by position: `resting` has been sorted by `zindex` and the
-            // hovered pass has not, so a mark that raises one of its items and also has a `hover`
-            // block would otherwise swap in another item's hover appearance. The ids match because
-            // the allocator was rewound before the second pass.
+            // Paired by **id**, not by position. Both passes are in data order now, so this is
+            // no longer load-bearing against a `zindex` reordering — but it is still the right
+            // pairing, because it says what it means and survives either pass changing. The ids
+            // match because the allocator was rewound before the second pass.
             val byId = hovered.associateBy { it.id }
             for (node in resting) byId[node.id]?.let { hoverVariants[node.id] = it }
           } else {

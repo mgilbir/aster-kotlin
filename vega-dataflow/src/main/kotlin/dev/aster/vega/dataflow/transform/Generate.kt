@@ -3,7 +3,6 @@ package dev.aster.vega.dataflow.transform
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.field
-import dev.aster.vega.model.isNullish
 import kotlin.math.ceil
 
 /**
@@ -119,12 +118,20 @@ public object LookupTransform : Transform {
         operator = type,
       )
     }
+    // **A null key is a key.** Upstream builds its index with `map.set(field(row), row)` and looks
+    // rows up the same way, and its `fastmap` is object-backed — so a `null` key is stored under
+    // `String(null)`, which is `"null"`, and a row whose key is null finds it. Probed: a lookup
+    // table holding `{"k": null, "label": "NULL ROW"}` labels the null row, and only a key absent
+    // from the table takes the default.
+    //
+    // Skipping them here meant a null could never match, so a table that deliberately provides a
+    // row for "no value" — which is the ordinary way to label a missing category — silently gave
+    // every such row the default instead. `asComparableKey` already spells a null the same way on
+    // both sides of the join, which is why nothing else was needed.
+    //
     // Last one wins, matching a map built by insertion.
     val index = LinkedHashMap<String, VegaValue>(table.size)
-    for (row in table) {
-      val id = row.field(key)
-      if (!id.isMissing()) index[id.asComparableKey()] = row
-    }
+    for (row in table) index[row.field(key).asComparableKey()] = row
 
     return input.map { datum ->
       val updates = LinkedHashMap<String, VegaValue>()
@@ -144,8 +151,6 @@ public object LookupTransform : Transform {
       datum.withFields(updates)
     }
   }
-
-  private fun VegaValue.isMissing(): Boolean = isNullish
 }
 
 /**

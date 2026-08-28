@@ -27,7 +27,7 @@ end to end — expressions, signals, 49 of upstream's 51 documented data transfo
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-194 Vega differential fixtures and 283 Vega-Lite fixtures pass, every one of them matching upstream
+195 Vega differential fixtures and 283 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -194,7 +194,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 194 Vega differential fixtures and 283 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 195 Vega differential fixtures and 283 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -226,7 +226,7 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests, and every renderer now exposes the tree: the Android View, the Swift one and Compose Multiplatform. Not verified on physical hardware or with a real user |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 194 Vega differential fixtures |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 195 Vega differential fixtures |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -7664,3 +7664,172 @@ notes are still the only place a decision is explained — and points at `STATUS
   the byte stream is sized from the bitmap rather than growing from 32 bytes by repeated doubling.
 - **Every GitHub Action is pinned by SHA**, not by a mutable tag, on a workflow whose release job
   holds `contents: write`.
+
+### The scale arithmetic an interaction reads
+
+Five findings in one place, and they share a shape: the *forward* direction had been checked against
+upstream and the inverse, or the label, or the edge of the range had not.
+
+**`invert` was not the inverse of `apply`.** `TransformedScale.apply` has been piecewise since a
+three-stop power scale was caught interpolating across both segments; `invert` still read only the
+first and last stop. So on any domain of more than two the two functions disagreed, by however much
+the segments differ. That is what `invert('s', x())` reads — it is how a specification turns a
+pointer into a data value — so a brush on a multi-stop log or power axis selected a range with the
+wrong numbers in it, silently, and the wrongness grew with how unevenly the stops were spread.
+
+**A time tick was labelled by local field values.** d3's cascade is a chain of *interval floors* —
+`second(date) < date ? … : minute(date) < date ? …` — and this asked `at.hour != 0`. The two are the
+same question in every zone whose day begins at midnight, and a different one where a daylight-saving
+jump **skips** it: Santiago, Havana and Tehran move the clock forward at 00:00, so the first instant
+of that day is 01:00, and there a day tick was labelled as an hour. Once a year, in the one place a
+reader most needs the date back.
+
+**A label past 2^63 was `Long.MAX_VALUE`.** `Double.toLong()` saturates rather than overflowing, so
+every value above about 9.2e18 printed the identical `9223372036854775807`. A linear axis over a
+domain that size is unusual and entirely legal, and every one of its labels was the same wrong number
+with nothing said. `Decimals.fixed(x, 0)` is the same rounding without the range, and it agrees with
+JavaScript's `toFixed(0)` — which is the *exact* value of the double, not its shortest spelling.
+
+**`nice` wrote back a half-niced domain.** d3's has no iteration cap at all; its step converges, so
+`while (true)` terminates. The cap here is a safety net for an input d3 never sees, it was eight, and
+on reaching it the loop wrote back whatever it had — a domain that is neither the one asked for nor a
+rounded one, with no way to tell from the outside which had happened.
+
+**And a log scale's non-integer base lost its fractional tick count.** d3 passes `j - i`, the
+difference of the two *logarithms*, straight to `ticks`, which divides by it; this truncated it to an
+integer and then raised anything below one back up to one, so a base-2.5 axis over a fifth of a
+decade asked for one tick where d3 asks for 0.7 — a different step, and therefore different labels.
+
+### Three that were about saying what is true
+
+**`lookup` refused a null key.** Upstream's index is `fastmap`, object-backed, so a null key is
+stored under `String(null)` — `"null"` — and a row whose key is null finds it. Probed: a table
+holding `{"id": null, "label": "None"}` labels the null row, and only a key genuinely absent takes
+the default. Skipping them meant a table that deliberately provides a row for "no value" — the
+ordinary way to label a missing category — gave every such row the default instead.
+
+**A rotated group's clip window is its bounding box**, and now says so. `mapBounds` answers the box
+of the mapped rectangle, so under a rotation the hit-test window is larger than what is drawn and a
+point in a cut-away corner still reaches the children beneath. Left as a bounding box deliberately —
+an exact answer means carrying the clip as a polygon and testing every candidate against it, on
+every hit test, and nothing this engine compiles produces a rotated *group*. What was missing is the
+sentence saying so, since the code read as though it handled the general case.
+
+**And the controller's serialization claim is now the one it can keep.** `setSpecAsync` said
+"compilations are serialized", unqualified, and the `Mutex` covers the two suspending entry points
+and nothing else: `setSpec`, the `hostData` and `containerSize` setters and every interaction
+recompile call the compiler inline, and a `Mutex` cannot be taken from a function that does not
+suspend. Kotlin's common standard library has no blocking lock, and blocking the main thread for the
+length of a background compile is an ANR by another name — so the honest answer is the one already
+built beside it: one place every compile goes through, and `VEGA_COMPILE_CONCURRENT` when two
+overlap. The claim now matches the mechanism.
+
+### The audit's open questions, answered
+
+Section 6 of `docs/audits/codebase-audit-2026-08-27.md` lists fifteen questions the audit could not
+settle from the code alone. Ten are now settled by probing upstream or by a test written for the
+purpose, one was a decision, two are partly open, and two are the maintainer's to make. They are
+recorded here because an open question nobody writes down is a question that gets asked again.
+
+**Q2 — does any Compose version synthesise a re-down for a restarted `pointerInput` mid-gesture?**
+No. `ComposePointerTest.a drag continues while the host feeds the viewport back` is the test the
+question asked for: putting the viewport back into the keys turns a four-move drag into **one**
+reported increment. The gesture is cancelled and nothing revives it, so C6 was as bad as it looked.
+
+**Q4 — how reachable is static item `zindex` from a compiled scene?** Entirely: it is a plain encode
+channel on any mark, and it reorders painting — a rect with `zindex: 5` paints last however early
+its row. So M17 was on-screen wrongness, not SVG-only machinery. Writing the fixture the question
+asked for found something else as well; see the note below on `item-zindex`.
+
+**Q5 — what does upstream put in a `defined: false` item's x/y?** The scaled coordinates, exactly as
+for any other item: `{"x": 100, "y": 80, "defined": false}`. It is an ordinary item carrying a flag,
+not a hole — so the auditor's suspicion was right, the two engines *did* agree only because both
+echo the datum's position, and the whole difference lived in the path. Which is what
+`line-defined-gaps` and the command-carrying vertices now measure.
+
+**Q8 — does upstream sanitize `href` through the loader?** Yes: `vega-scenegraph`'s `sanitizeURL` is
+`loader.sanitize(uri, {context: 'href'})`, which is what the question guessed, so matching upstream
+and closing the `javascript:` hole were indeed one change. What the question did not anticipate is
+what upstream does when the loader *refuses*: `sanitizeURL` resolves to `null` and `href(item)` then
+runs `attr['xlink:href'] = attr.href` on it. Rendering a `javascript:` href through
+`vega-scenegraph` in Node throws `TypeError: Cannot read properties of null`. This engine's
+`isSafeHref` refuses the same addresses and reports `VEGA_SVG_HREF_REFUSED` instead.
+
+**Q9 — were the workflow comments claiming the replays "fail rather than skip" ever true?** No, and
+the dates are unambiguous. `assumeTrue` arrived on 2026-08-15 in `b7a3f0dd` ("Stop committing the
+vectors, and make their absence loud rather than green"); the comment asserting the opposite was
+written on 2026-08-18 in `9fcef4b6`, three days later. It described a mechanism that had already
+been replaced.
+
+**Q11 — is the vendored `vega-transforms/src/Window.js` a patched oracle?** No. It is byte-identical
+to the 5.2.1 tarball from the registry and to the cloned upstream source in `build/vega-upstream`,
+verified both ways. The signed frame offsets and the local explanatory comment that made it look
+patched are upstream's own. Worth having asked: a patched oracle would have quietly invalidated
+every "matches upstream" claim about window transforms.
+
+**Q12 — do the loaders parse `""` to null before transforms see it?** With `parse: "auto"`, yes —
+`read("a,b\n1,\n2,3", {type:"csv", parse:"auto"})` gives `{"a":1,"b":null}`. Without a parse
+specification the raw `""` survives. So H21 bites inline `values` data and unparsed columns rather
+than every loaded CSV — and the fix belongs where it was put regardless, because it transcribes
+upstream's own aggregate cell (`v == null || v === ''`) rather than guessing at a layer.
+
+**Q15 — does this repo's expression parser accept non-ASCII identifiers?** Yes, both bare and
+bracketed, and so does upstream — probed. The lexer asks **ktecma262** for `ID_Start`/`ID_Continue`
+rather than approximating with a Unicode category test, so a decomposed `café` and a letter number
+work. That settles what the audit wanted settled: making `Fields.varName` ASCII to match upstream's
+`\W → _` is a **parity** fix and there is no broken chart behind it. Pinned by
+`ExpressionFidelityTest.a non-ascii field name is reachable bare and bracketed`.
+
+**Q7 — should ERROR-severity Vega-Lite output imply `vega == null`?** No, and
+`VegaLiteCompilation.vega` now says so in as many words: a document can compile to a usable chart
+and still report that one construct in it was not honoured, which is the whole shape of this
+engine's diagnostic model. Null means no specification was produced at all. A host should check for
+null *and* read the diagnostics.
+
+**Q13 — is a controller shared across two live views supported?** No, and `contentScale` is the
+reason: two views of different sizes each write their own fit, so the last laid out wins and the
+other hit-tests by the ratio between them. It is documented on the property and a second,
+conflicting fit now reports `VEGA_INTERACTION_UNSUPPORTED` rather than silently ignoring half a
+reader's taps. A host wanting two views builds two controllers from the same specification — they
+compile to the same scene, which is a value.
+
+**Q3 — does "match upstream" outrank the crash-free contract for `tickCount: 1e9`?** A decision
+rather than a finding, and the one taken is the documented clamp: `MAX_TICK_COUNT` with
+`VEGA_COMPILE_LIMIT_EXCEEDED` naming the limit. Upstream hangs on the same document, so nothing is
+lost by refusing, and "nothing throws" is a promise this engine makes and upstream does not.
+
+**Q1 — is there interaction-layer compensation making the overview-plus-detail brush appear to
+work?** Nothing in `interaction/` does, and C4/H2 is fixed at the source: `buildTime` climbs the
+same ladder every other continuous scale does. **The device check the question asked for has not
+been run**, so this is answered from the code rather than from a screen.
+
+**Q6 — is `"push": "outer"` moot under the flat recompile model, or are faceted interval selections
+broken?** Still open. `parseSignal` no longer drops the property in silence (M39), so a document
+using it now says so; whether the semantics are reachable at all under a whole-specification
+recompile needs a runtime-scoping answer or a fixture, and neither is written.
+
+**Q10 and Q14 are for the maintainer.** Q10 — should the release workflow require a green `ci.yml`
+run on the dispatched sha before verify? Today the Vega-Lite scene gate's only other coverage is
+that CI happened to run, and nothing enforces it; the verify job renders the references itself now,
+which closes the hole this branch was about but not the broader question. Q14 — is PROJECT_BRIEF
+still the contract? MVP item 13 (performance on physical hardware) remains unmet and honestly
+disclosed, and the benchmark module covers a fraction of §18.6.
+
+### What the `item-zindex` fixture found
+
+The fixture written to answer Q4 failed on its first run, and not for the reason it was written.
+
+Upstream's scenegraph keeps a mark's `items` in **data order** and sorts by `zindex` as it *draws* —
+`vega-scenegraph` does the sorting, not the parser. This engine sorted at *build* time, in
+`ScopeCompiler`, so its scene tree was in paint order while upstream's was in data order. The
+picture was right either way, because `paintOrder` is stable and idempotent and every renderer, the
+hit index and `Scene.walk` all apply it. What was wrong is subtler and worth more than the picture:
+
+- the scene tree was not upstream's scene tree, so `children` read positionally gave a different row
+  than upstream's `items` does — and `NodeMetadata.datumIndex` is right there inviting exactly that;
+- **no differential fixture could carry an item `zindex` at all**, because the record is compared
+  position by position and upstream's is in data order. The gate could not have caught a regression
+  in this channel, which is why the corpus had no fixture for it after all this time.
+
+The build-time sort is gone. `paintOrder` was always the single place this belongs, and now it is
+the only one. 195 Vega fixtures pass.

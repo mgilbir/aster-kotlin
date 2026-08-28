@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Changed
 
+- **`VegaLiteCompilation.vega` states its null contract.** An ERROR-severity diagnostic does **not**
+  imply `vega == null`: a document can compile to a usable chart and still report that one construct
+  in it was not honoured. Null means no specification was produced at all. A host should check for
+  null *and* read the diagnostics.
+
+- **`vega-loader` is named in the README.** It is published and ABI-dumped, and was absent from both
+  the module list and the pipeline diagram — a module a consumer can depend on and could not find.
+
 - **`SceneExporter.toPng` no longer takes a `quality`.** PNG is lossless and Android documents the
   argument as ignored for it, so a caller passing 80 to get a smaller file got the same bytes and no
   way to find out why. A smaller file is `BitmapExportOptions.pixelScale`.
@@ -175,6 +183,45 @@ section here does not get released.
   second keyed on the path's identity.
 
 ### Fixed
+
+- **A mark's items are in data order in the scene, as upstream's are.** `zindex` was applied when the
+  scene was *built*, and upstream applies it when it draws — which this engine also does, in
+  `paintOrder`, in every renderer and in the hit index. Sorting twice was not a wrong picture, but it
+  made the scene tree a different tree from upstream's: `children` read positionally gave a different
+  row than `items` does, and **no differential fixture could carry an item `zindex` at all**, because
+  the record is compared position by position. The new `item-zindex` fixture is what found it.
+
+- **A controller shared between two views says so.** `contentScale` is per-view, so two views of
+  different sizes each overwrite the other's fit and one of them hit-tests by the ratio between them.
+  Documented on the property, and a second conflicting fit now reports
+  `VEGA_INTERACTION_UNSUPPORTED`.
+
+- **`invert` is the inverse of `apply` on a multi-stop pow or log scale.** `apply` has been piecewise
+  since a three-stop power scale was found interpolating across both segments; `invert` still read
+  only the first and last stop, so the two were not each other's inverse and the gap grew with how
+  unevenly the stops were spread. `invert('s', x())` is how a specification turns a pointer into a
+  data value, so a brush on such an axis selected a range with the wrong numbers in it.
+
+- **`lookup` matches a null key.** Upstream's index is object-backed, so a null key is stored under
+  `String(null)` and a row whose key is null finds it — probed. Skipping them meant a table that
+  deliberately provides a row for "no value", which is the ordinary way to label a missing category,
+  gave every such row the default instead.
+
+- **A tick label past 2^63 is the number.** `Double.toLong()` saturates rather than overflowing, so
+  every value above about 9.2e18 printed the identical `9223372036854775807`.
+
+- **A time tick is labelled by interval floors, not local field values.** d3 asks `hour(date) <
+  date`; this asked `at.hour != 0`, which is the same question only in zones whose day begins at
+  midnight. Santiago, Havana and Tehran move the clock forward at 00:00, so the first instant of
+  that day is 01:00 — and there, once a year, a day tick was labelled as an hour.
+
+- **`Ticks.nice` answers the domain it was given when it cannot converge**, rather than a
+  half-niced one that is neither what was asked for nor a rounded number. Its cap is a safety net —
+  d3 has none, because the step converges — and it was low enough to be reachable.
+
+- **A log scale's non-integer base keeps its fractional tick count.** d3 passes `j - i`, the
+  difference of two *logarithms*, straight to `ticks`, which divides by it; this truncated it to an
+  integer and raised anything below one back up to one.
 
 - **The differential comparison can see a `defined` gap.** Both sides flattened a `moveTo` and a
   `lineTo` into a bare point, and `normalize.js` never read the `defined` channel at all — so a line

@@ -40,6 +40,21 @@ class ExpressionFidelityTest {
     return (result as ExpressionResult.Compiled).expression.evaluate(EmptyScope)
   }
 
+  /** The same, over a row, for the expressions that read one. */
+  private fun evaluate(source: String, datum: VegaValue): VegaValue {
+    val result = VegaExpressionCompiler().compile(source)
+    assertTrue(result is ExpressionResult.Compiled, "failed to parse '$source': $result")
+    val scope =
+      object : ExpressionScope {
+        override val datum: VegaValue = datum
+
+        override fun signal(name: String): VegaValue = VegaValue.Null
+
+        override fun dataset(name: String): List<VegaValue> = emptyList()
+      }
+    return (result as ExpressionResult.Compiled).expression.evaluate(scope)
+  }
+
   private fun text(source: String): String =
     when (val value = evaluate(source)) {
       is VegaValue.Str -> value.value
@@ -179,6 +194,34 @@ class ExpressionFidelityTest {
     assertEquals(text("'' + time(utc(2012, 2, 1))"), text("'' + time(utc(2012, 1, 30))"))
     assertEquals(text("'' + time(utc(2012, 0, 2))"), text("'' + time(utc(2012, 0, 1, 24))"))
     assertEquals(text("'' + time(utc(2011, 11, 31))"), text("'' + time(utc(2012, 0, 0))"))
+  }
+
+  /**
+   * A non-ASCII field name is reachable, bare and bracketed — the audit's open question Q15.
+   *
+   * It matters because `Fields.varName` was made ASCII to match upstream's `\W → _`, and that is
+   * only the right fix if the *parser* accepts these names in the first place: if it did not, a
+   * chart over a column called `año` would be broken rather than merely spelled differently from
+   * upstream's. Probed against vega 6.3.1, which reads both forms; this lexer asks **ktecma262**
+   * for `ID_Start`/`ID_Continue` rather than approximating with a category test, so it does too.
+   *
+   * So the `varName` change is a parity fix and nothing is broken behind it.
+   */
+  @Test
+  fun `a non-ascii field name is reachable bare and bracketed`() {
+    val datum =
+      VegaValue.Obj(
+        linkedMapOf(
+          "año" to VegaValue.Num(5.0),
+          "café" to VegaValue.Str("x"),
+          // A decomposed e-acute: two code points, and a letter to the specification.
+          "cafe\u0301" to VegaValue.Str("decomposed"),
+        )
+      )
+    assertEquals(VegaValue.Num(5.0), evaluate("datum.año", datum))
+    assertEquals(VegaValue.Str("x"), evaluate("datum.café", datum))
+    assertEquals(VegaValue.Str("x"), evaluate("datum['café']", datum))
+    assertEquals(VegaValue.Str("decomposed"), evaluate("datum.cafe\u0301", datum))
   }
 
   /** A year outside the calendar is an Invalid Date upstream, and used to throw here. */
