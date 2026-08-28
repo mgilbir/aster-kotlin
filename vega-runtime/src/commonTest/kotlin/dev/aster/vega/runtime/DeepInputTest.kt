@@ -133,6 +133,52 @@ class DeepInputTest {
     VegaLiteInput.toVega(json)
   }
 
+  /**
+   * Input that asks for too much **memory**, which is the same failure one resource over.
+   *
+   * An `OutOfMemoryError` is an `Error`, so `SpecCompiler`'s guard does not catch it for exactly
+   * the reason it does not catch a `StackOverflowError` — and on Kotlin/Native neither is catchable
+   * at all. So a document must not be able to ask for an allocation the heap cannot serve, and the
+   * limits that stop it (`MAX_SEQUENCE`, `MAX_TICK_COUNT`, `MAX_CROSSED_CELLS`, `MAX_REPEAT_CELLS`)
+   * have to hold on the *count a specification wrote*, before anything is allocated.
+   *
+   * `sequence` is here because it was the one that did not: three numbers from the document decided
+   * the row count directly, so `{"stop": 1e9}` was an `OutOfMemoryError` about four seconds later.
+   * Its own expression twin had been bounded since it was written, which is what made the gap an
+   * asymmetry rather than an oversight.
+   */
+  @Test
+  fun `no shape of oversized input throws`() {
+    val escaped = mutableListOf<String>()
+    val huge = listOf(1_000_000, 1_000_000_000)
+    for (n in huge) {
+      val cases =
+        listOf(
+          "sequence of $n rows" to
+            """{"width":10,"height":10,"padding":0,
+               "data":[{"name":"t","transform":[
+                 {"type":"sequence","start":0,"stop":$n}]}],"marks":[]}""",
+          "axis asking for $n ticks" to
+            """{"width":10,"height":10,"padding":0,
+               "data":[{"name":"t","values":[{"a":1}]}],
+               "scales":[{"name":"x","type":"linear","domain":[0,1],"range":"width"}],
+               "axes":[{"orient":"bottom","scale":"x","tickCount":$n}],"marks":[]}""",
+        )
+      for ((name, json) in cases) {
+        try {
+          SpecCompiler().compileJson(json)
+        } catch (failure: Throwable) {
+          escaped += "$name: ${failure::class.simpleName}"
+        }
+      }
+    }
+    assertTrue(
+      escaped.isEmpty(),
+      "input this large must come back as a diagnostic, not as a throw:\n" +
+        escaped.joinToString("\n") { "  $it" },
+    )
+  }
+
   @Test
   fun `no shape of deeply nested input throws`() {
     val escaped = mutableListOf<String>()

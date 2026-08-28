@@ -19,6 +19,17 @@ section here does not get released.
   This closed the last hole in "nothing throws": `SpecCompiler.compileJson`, `VegaLiteCompiler
   .compileJson` and `VegaLiteInput.toVega` all guard the *compile*, and all three parse first.
 
+- **A `sequence` transform cannot ask for more rows than the heap holds.** Its count came straight
+  from three numbers a document wrote, so `{"type": "sequence", "stop": 1e9}` was an
+  `OutOfMemoryError` about four seconds later — an `Error`, so not something `SpecCompiler`'s guard
+  catches, and not something Kotlin/Native could catch at all. The same shape as the stack overflows,
+  one resource over. Bounded at `MAX_SEQUENCE`, which is the number its own **expression** twin has
+  used since it was written; the asymmetry was the defect rather than the number.
+
+  `density`, `cross`, `kde2d` and `isocontour` were probed for the same shape and already clamp.
+  Catastrophic regex backtracking was probed too: ktecma262 has a step limit, so a
+  specification-supplied `(a+)+$` is refused rather than hanging.
+
 - **`linuxX64Test` runs in the gate.** `linuxX64` was compiled and never executed, so its
   `commonTest` suites — the decimal expansion, a specification's own regular expressions, the two LRU
   caches, and now `DeepInputTest` — had run on no machine at all for a shipped target. Named only in
