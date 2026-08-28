@@ -316,11 +316,14 @@ jobs:
           emulator-options: >-
             -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -camera-back none
             -dns-server 8.8.8.8,1.1.1.1
-          script: |
-            ./gradlew --console=plain \
-              :vega-android-canvas:connectedDebugAndroidTest \
-              :vega-compose:connectedDebugAndroidTest \
-              :demo:connectedDebugAndroidTest
+          # Folded to a single line with `>-`, not `|` with backslashes: this action hands the
+          # script to `sh -c`, where a trailing backslash survives as a literal argument rather
+          # than as a continuation — Gradle answered `Task '\' not found`.
+          script: >-
+            ./gradlew --console=plain
+            :vega-android-canvas:connectedDebugAndroidTest
+            :vega-compose:connectedDebugAndroidTest
+            :demo:connectedDebugAndroidTest
 
       - name: Say how many instrumented tests actually ran
         # The same argument as the JVM counts above, and it bites harder here: a `connectedAndroidTest`
