@@ -87,12 +87,12 @@ CoreGraphicsTarget  ::  struct CoreGraphicsTarget
 CoreGraphicsTarget.beginGroup(clip:)  ::  mutating func beginGroup(clip: Rect?)
 CoreGraphicsTarget.clearImageCache()  ::  static func clearImageCache()
 CoreGraphicsTarget.endGroup()  ::  mutating func endGroup()
-CoreGraphicsTarget.image(url:raster:in:fit:smooth:opacity:)  ::  mutating func image(url: String, raster: DrawRaster?, in rect: Rect, fit: DrawImageFit, smooth: Bool, opacity: Double)
+CoreGraphicsTarget.image(url:raster:in:fit:smooth:opacity:blend:)  ::  mutating func image(url: String, raster: DrawRaster?, in rect: Rect, fit: DrawImageFit, smooth: Bool, opacity: Double, blend: SceneBlendMode)
 CoreGraphicsTarget.init(context:drawText:resolveImage:onUnresolvedImage:)  ::  init(context: CGContext, drawText: ((DrawTextRun, Brush?, CGContext) -> Void)? = nil, resolveImage: ((String) -> CGImage?)? = nil, onUnresolvedImage: ((String) -> Void)? = nil)
-CoreGraphicsTarget.line(from:to:stroke:)  ::  mutating func line(from: Point, to: Point, stroke: StrokePaint?)
-CoreGraphicsTarget.path(_:fill:stroke:)  ::  mutating func path(_ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?)
-CoreGraphicsTarget.rect(_:corners:fill:stroke:)  ::  mutating func rect(_ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?)
-CoreGraphicsTarget.text(_:fill:stroke:)  ::  mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?)
+CoreGraphicsTarget.line(from:to:stroke:blend:)  ::  mutating func line(from: Point, to: Point, stroke: StrokePaint?, blend: SceneBlendMode)
+CoreGraphicsTarget.path(_:fill:stroke:blend:)  ::  mutating func path(_ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode)
+CoreGraphicsTarget.rect(_:corners:fill:stroke:blend:)  ::  mutating func rect(_ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode)
+CoreGraphicsTarget.text(_:fill:stroke:blend:)  ::  mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode)
 CoreGraphicsTarget.unresolved  ::  var unresolved: [String] { get }
 CoreTextDrawing  ::  enum CoreTextDrawing
 CoreTextDrawing.draw(_:_:_:)  ::  static func draw(_ run: DrawTextRun, _ fill: Brush?, _ context: CGContext)
@@ -126,11 +126,11 @@ DrawRaster.width  ::  let width: Int
 DrawTarget  ::  protocol DrawTarget
 DrawTarget.beginGroup(clip:)  ::  mutating func beginGroup(clip: Rect?)
 DrawTarget.endGroup()  ::  mutating func endGroup()
-DrawTarget.image(url:raster:in:fit:smooth:opacity:)  ::  mutating func image(url: String, raster: DrawRaster?, in rect: Rect, fit: DrawImageFit, smooth: Bool, opacity: Double)
-DrawTarget.line(from:to:stroke:)  ::  mutating func line(from: Point, to: Point, stroke: StrokePaint?)
-DrawTarget.path(_:fill:stroke:)  ::  mutating func path(_ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?)
-DrawTarget.rect(_:corners:fill:stroke:)  ::  mutating func rect(_ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?)
-DrawTarget.text(_:fill:stroke:)  ::  mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?)
+DrawTarget.image(url:raster:in:fit:smooth:opacity:blend:)  ::  mutating func image(url: String, raster: DrawRaster?, in rect: Rect, fit: DrawImageFit, smooth: Bool, opacity: Double, blend: SceneBlendMode)
+DrawTarget.line(from:to:stroke:blend:)  ::  mutating func line(from: Point, to: Point, stroke: StrokePaint?, blend: SceneBlendMode)
+DrawTarget.path(_:fill:stroke:blend:)  ::  mutating func path(_ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode)
+DrawTarget.rect(_:corners:fill:stroke:blend:)  ::  mutating func rect(_ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode)
+DrawTarget.text(_:fill:stroke:blend:)  ::  mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode)
 DrawTextRun  ::  struct DrawTextRun
 DrawTextRun.anchor  ::  let anchor: Point
 DrawTextRun.angleDegrees  ::  let angleDegrees: Double
@@ -175,12 +175,12 @@ RecordingTarget  ::  struct RecordingTarget
 RecordingTarget.beginGroup(clip:)  ::  mutating func beginGroup(clip: Rect?)
 RecordingTarget.calls  ::  var calls: [String] { get }
 RecordingTarget.endGroup()  ::  mutating func endGroup()
-RecordingTarget.image(url:raster:in:fit:smooth:opacity:)  ::  mutating func image(url: String, raster: DrawRaster?, in rect: Rect, fit: DrawImageFit, smooth: Bool, opacity: Double)
+RecordingTarget.image(url:raster:in:fit:smooth:opacity:blend:)  ::  mutating func image(url: String, raster: DrawRaster?, in rect: Rect, fit: DrawImageFit, smooth: Bool, opacity: Double, blend: SceneBlendMode)
 RecordingTarget.init()  ::  init()
-RecordingTarget.line(from:to:stroke:)  ::  mutating func line(from: Point, to: Point, stroke: StrokePaint?)
-RecordingTarget.path(_:fill:stroke:)  ::  mutating func path(_ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?)
-RecordingTarget.rect(_:corners:fill:stroke:)  ::  mutating func rect(_ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?)
-RecordingTarget.text(_:fill:stroke:)  ::  mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?)
+RecordingTarget.line(from:to:stroke:blend:)  ::  mutating func line(from: Point, to: Point, stroke: StrokePaint?, blend: SceneBlendMode)
+RecordingTarget.path(_:fill:stroke:blend:)  ::  mutating func path(_ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode)
+RecordingTarget.rect(_:corners:fill:stroke:blend:)  ::  mutating func rect(_ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode)
+RecordingTarget.text(_:fill:stroke:blend:)  ::  mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode)
 Rect  ::  struct Rect
 Rect.height  ::  let height: Double
 Rect.init(x:y:width:height:)  ::  init(x: Double, y: Double, width: Double, height: Double)

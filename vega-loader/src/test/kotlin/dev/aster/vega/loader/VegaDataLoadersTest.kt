@@ -28,8 +28,19 @@ class VegaDataLoadersTest {
   private class Recorder(private val bodies: Map<String, String> = emptyMap()) : HttpTransport {
     val requested = mutableListOf<String>()
 
-    override fun get(url: String, connectTimeoutMillis: Int, readTimeoutMillis: Int): HttpResponse {
+    /**
+     * The byte budget the loader hands down, so a transport can stop reading rather than truncate.
+     */
+    var budget: Long = -1
+
+    override fun get(
+      url: String,
+      connectTimeoutMillis: Int,
+      readTimeoutMillis: Int,
+      maxResponseBytes: Long,
+    ): HttpResponse {
       requested += url
+      budget = maxResponseBytes
       val body = bodies[url] ?: return HttpResponse(404)
       return HttpResponse(200, emptyMap(), body)
     }

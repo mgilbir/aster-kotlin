@@ -18,6 +18,7 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
+import dev.aster.vega.model.isNullish
 import kotlin.math.pow
 
 /** The four values a simulation writes back, in the order upstream's `as` defaults to. */
@@ -171,7 +172,7 @@ public object ForceTransform : Transform {
 
   private fun coordinate(item: VegaValue, name: String): Double {
     val value = item.field(name)
-    if (value is VegaValue.Null) return Double.NaN
+    if (value.isNullish) return Double.NaN
     return value.asDouble()
   }
 
@@ -248,7 +249,7 @@ public object ForceTransform : Transform {
     for (row in rows) {
       val source = byId[key(row.field("source"))]
       val target = byId[key(row.field("target"))]
-      if (source == null || target == null) missing++ else links += ForceLink(source, target)
+      if (source == null || target == null) missing++ else links += ForceLink(source, target, row)
     }
     if (missing > 0) {
       // Upstream throws — `node not found` — and draws nothing at all. Reporting and carrying on
@@ -291,7 +292,7 @@ public object ForceTransform : Transform {
     context: TransformContext,
   ): (ForceLink, Int) -> Double {
     val expression = expressionOf(params, key, context)
-    if (expression != null) return { _, _ -> expression.evaluate(VegaValue.Null).number() }
+    if (expression != null) return { link, _ -> expression.evaluate(link.datum).number() }
     val constant = params.number(key) ?: fallback
     return { _, _ -> constant }
   }
@@ -337,7 +338,8 @@ public object ForceTransform : Transform {
   private fun VegaValue.Obj.truthy(key: String): Boolean =
     when (val value = fields[key]) {
       null,
-      is VegaValue.Null -> false
+      is VegaValue.Null,
+      is VegaValue.Undefined -> false
       is VegaValue.Bool -> value.value
       is VegaValue.Num -> value.value != 0.0 && !value.value.isNaN()
       is VegaValue.Str -> value.value.isNotEmpty() && value.value != "false"

@@ -4,6 +4,7 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.field
+import dev.aster.vega.model.isNullish
 import kotlin.math.ceil
 
 /**
@@ -43,17 +44,31 @@ public object WindowTransform : Transform {
     val ignorePeers = params.fields["ignorePeers"]?.let { it == VegaValue.Bool(true) } ?: false
     val frame = frame(params)
 
+    // Group **positions**, not tuples, so duplicate rows stay distinct.
+    //
+    // `VegaValue.Obj` is a value class over a map and compares structurally, so two rows that
+    // happen to be identical are the same key. Keying the results by the row itself therefore
+    // collapsed them onto the last row's answer: `[{v:1},{v:1}]` with `ops:["sum"]` came back as
+    // `[2,2]` where upstream answers `[1,2]`, and `row_number` and `lag` were equally wrong.
+    // Duplicate rows are ordinary, and none of the fourteen replayed window vectors has one.
+    // `Stack` groups positions for exactly this reason and says so.
+    //
     // Partitions keep their first-seen order, and a partition's rows keep theirs unless sorted —
     // Kotlin's sort is stable, as upstream's is, so ties never shuffle.
-    val partitions = groupTuples(input, groupBy)
-    val results = HashMap<VegaValue, VegaValue>()
-    for ((_, rows) in partitions) {
-      val ordered = if (comparator == null) rows else rows.sortedWith(comparator)
-      val computed = process(ordered, operations, frame, comparator, ignorePeers)
-      for ((original, updated) in ordered.zip(computed)) results[original] = updated
+    val partitions = LinkedHashMap<GroupKey, MutableList<Int>>()
+    input.forEachIndexed { index, datum ->
+      partitions.getOrPut(groupKey(datum, groupBy)) { mutableListOf() }.add(index)
+    }
+    val results = arrayOfNulls<VegaValue>(input.size)
+    for ((_, positions) in partitions) {
+      val ordered =
+        if (comparator == null) positions
+        else positions.sortedWith { left, right -> comparator.compare(input[left], input[right]) }
+      val computed = process(ordered.map { input[it] }, operations, frame, comparator, ignorePeers)
+      for ((slot, updated) in ordered.zip(computed)) results[slot] = updated
     }
     // Emitted in input order: `window` annotates rows, it does not reorder them.
-    return input.map { results[it] ?: it }
+    return input.mapIndexed { index, datum -> results[index] ?: datum }
   }
 
   private fun process(
@@ -113,7 +128,7 @@ public object WindowTransform : Transform {
     fun at(index: Int): Int? =
       values
         .getOrNull(index)
-        ?.takeIf { it !is VegaValue.Null }
+        ?.takeIf { !it.isNullish }
         ?.asDouble()
         ?.takeIf { it.isFinite() }
         ?.toInt()
@@ -232,12 +247,12 @@ public object WindowTransform : Transform {
         // The last non-null seen up to here, and the next one from here on.
         Kind.PREV_VALUE -> {
           var at = index
-          while (at >= 0 && valueAt(at) is VegaValue.Null) at--
+          while (at >= 0 && valueAt(at).isNullish) at--
           valueAt(at)
         }
         Kind.NEXT_VALUE -> {
           var at = index
-          while (at < data.size && valueAt(at) is VegaValue.Null) at++
+          while (at < data.size && valueAt(at).isNullish) at++
           valueAt(at)
         }
         Kind.AGGREGATE ->
@@ -273,6 +288,23 @@ public object WindowTransform : Transform {
           operator = type,
         )
         return null
+      }
+      // `ntile` and `nth_value` are the two window operations whose parameter upstream
+      // **requires**:
+      // `num = +num; if (!(num > 0)) error('ntile num must be greater than zero.')`. Defaulting a
+      // missing one to 1 turned `ntile` into a column of ones and `nth_value` into `first_value`,
+      // which is a plausible-looking chart made out of a specification upstream refuses to run.
+      // `lag` and `lead` are not in this box: theirs is `+offset || 1`, an explicit default.
+      if (kind == Operation.Kind.NTILE || kind == Operation.Kind.NTH_VALUE) {
+        if (param == null || param <= 0.0) {
+          context.diagnostics.error(
+            DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+            "Window operation '$op' needs a 'params' entry greater than zero; upstream refuses " +
+              "the specification outright rather than choosing one",
+            operator = type,
+          )
+          return null
+        }
       }
       // Upstream names an output `{op}_{field}` unless `as` says otherwise, the same way aggregate
       // does — except that a fieldless ranking operation is just its own name.

@@ -15,6 +15,25 @@ public sealed interface VegaValue {
 
   public data object Null : VegaValue
 
+  /**
+   * JavaScript's `undefined`, which is **not** `null` and which a datum lacking a field yields.
+   *
+   * The two used to be one value here, and that one value behaved as `null`, which is the opposite
+   * of what a chart needs: `Number(null)` is 0 and `Number(undefined)` is NaN, so a filter `datum.x
+   * < 10` over rows that have no `x` at all **kept** every one of them where upstream drops them.
+   * Ordinary dirty data, and a different chart. `String(undefined)` is `"undefined"` rather than
+   * `"null"`, `undefined == null` is true while `undefined === null` is false, and `isDefined` is
+   * the one predicate whose whole job is to tell them apart — it answers true for a field that is
+   * present and null, and did not.
+   *
+   * Where it comes from is deliberately narrow: reading a property that is not there, and nothing
+   * else. [field] still answers [Null] for a missing path, because that accessor feeds the encoders
+   * and transforms, which treat both as missing anyway and would gain nothing but risk from the
+   * distinction. What flows out of an expression is a signal value, and upstream's does carry
+   * `undefined`, so this one does too.
+   */
+  public data object Undefined : VegaValue
+
   @JvmInline public value class Bool(public val value: Boolean) : VegaValue
 
   @JvmInline public value class Num(public val value: Double) : VegaValue
@@ -85,14 +104,29 @@ public sealed interface VegaValue {
   }
 }
 
-/** `true` for [VegaValue.Null] and for numeric NaN, matching Vega's notion of a missing value. */
+/**
+ * `true` for [VegaValue.Null], [VegaValue.Undefined] and numeric NaN, matching Vega's notion of a
+ * missing value.
+ */
 public val VegaValue.isMissing: Boolean
   get() =
     when (this) {
-      is VegaValue.Null -> true
+      is VegaValue.Null,
+      is VegaValue.Undefined -> true
       is VegaValue.Num -> value.isNaN()
       else -> false
     }
+
+/**
+ * `_ == null` in JavaScript: true for both [VegaValue.Null] and [VegaValue.Undefined].
+ *
+ * The loose comparison against `null` is the one JavaScript idiom that deliberately covers both,
+ * and upstream leans on it everywhere — `toNumber`, `toString`, `toBoolean` and `isValid` are all
+ * written as `_ == null ? …`. Spelling it once keeps a call site from picking one of the two by
+ * accident, which is what the whole of C1 was.
+ */
+public val VegaValue.isNullish: Boolean
+  get() = this is VegaValue.Null || this is VegaValue.Undefined
 
 /**
  * A value that already **is** a number, as a number: `Num` or `Timestamp`, and nothing else.
@@ -121,7 +155,8 @@ public fun VegaValue.asDouble(): Double =
     is VegaValue.Timestamp -> epochMillis
     is VegaValue.Bool -> if (value) 1.0 else 0.0
     is VegaValue.Str -> value.trim().toDoubleOrNull() ?: Double.NaN
-    is VegaValue.Null -> Double.NaN
+    is VegaValue.Null,
+    is VegaValue.Undefined -> Double.NaN
     is VegaValue.Arr -> if (values.size == 1) values[0].asDouble() else Double.NaN
     is VegaValue.Obj -> Double.NaN
     // `+/a/` in JavaScript is NaN too: a pattern is not a quantity.
@@ -139,6 +174,7 @@ public fun VegaValue.asString(): String =
     is VegaValue.Timestamp -> canonicalNumberString(epochMillis)
     is VegaValue.Bool -> value.toString()
     is VegaValue.Null -> "null"
+    is VegaValue.Undefined -> "undefined"
     is VegaValue.Arr -> values.joinToString(",") { it.asString() }
     is VegaValue.Obj -> fields.entries.joinToString(",") { "${it.key}:${it.value.asString()}" }
     // `'' + regexp('a.b','i')` is `/a.b/i`, which is the literal a reader would have written.
@@ -152,7 +188,8 @@ public fun VegaValue.asBoolean(): Boolean =
     is VegaValue.Num -> value != 0.0 && !value.isNaN()
     is VegaValue.Timestamp -> epochMillis != 0.0 && !epochMillis.isNaN()
     is VegaValue.Str -> value.isNotEmpty()
-    is VegaValue.Null -> false
+    is VegaValue.Null,
+    is VegaValue.Undefined -> false
     is VegaValue.Arr -> true
     is VegaValue.Obj -> true
     // Every object is truthy in JavaScript, and a pattern is one.
@@ -186,51 +223,109 @@ public fun VegaValue.field(path: String): VegaValue {
  *
  * Supports `a.b`, `a[0]`, `a['b']`, `a["b"]` and backslash-escaped separators (`a\.b` is a single
  * segment named `a.b`).
+ *
+ * A transcription of vega-util's `splitAccessPath`, which is the function every upstream `field`
+ * accessor is built from, rather than a re-derivation of what the notation looks like it means. The
+ * re-derivation was wrong in ways only the original explains: a `.` after a closing bracket
+ * separates nothing, because upstream splits on a separator only when there are characters in front
+ * of it — so `list[1].b` is three segments and not four with an empty one in the middle, and `a..b`
+ * and `.a` are likewise two segments and one. A quote is a quote only immediately after the `[`
+ * that opened its bracket, which is what lets `a["b]c"]` keep its `]` and `a[ "b" ]` tolerate the
+ * spaces, and what a scan for the next `]` cannot do.
+ *
+ * One deliberate divergence: upstream *throws* on an unterminated bracket or quote. A field path is
+ * data, often pasted data, so the unterminated remainder becomes a literal segment instead and the
+ * lookup simply misses (PROJECT_BRIEF.md 3.3).
  */
 public fun parseFieldPath(path: String): List<String> {
   if (path.isEmpty()) return emptyList()
+  val length = path.length
   val segments = mutableListOf<String>()
-  val current = StringBuilder()
+  // Text carried over a backslash escape, prepended to the next segment pushed.
+  val carried = StringBuilder()
+  // The start of the segment being read, and the start of the open bracket's contents: 0 while no
+  // bracket is open, and -1 once a quoted bracket segment has been pushed and only its `]` remains.
+  var start = 0
+  var bracket = 0
+  var quote: Char? = null
+  // Where an unterminated bracket or quote began, and how many segments were complete before it,
+  // so the remainder can be recovered as literal text instead of throwing.
+  var openAt = -1
+  var openSegments = 0
+
+  fun push(end: Int) {
+    segments.add(carried.toString() + path.substring(start, end))
+    carried.setLength(0)
+    start = end + 1
+  }
+
   var index = 0
-  while (index < path.length) {
-    when (val ch = path[index]) {
-      '\\' -> {
-        if (index + 1 < path.length) {
-          current.append(path[index + 1])
-          index += 2
-        } else {
-          index += 1
+  while (index < length) {
+    val ch = path[index]
+    when {
+      ch == '\\' -> {
+        // The escaped character stays in the pending window, so it lands in the next segment
+        // verbatim: `a\.b` is the single segment `a.b`.
+        carried.append(path, start, index)
+        start = index + 1
+        index += 2
+        continue
+      }
+      quote != null -> {
+        if (ch == quote) {
+          push(index)
+          quote = null
+          // Not 0: the bracket this quote sat in is still open, and only its `]` closes it. A
+          // top-level quoted path never reaches 0, which is exactly why upstream rejects one.
+          bracket = -1
         }
       }
-      '.' -> {
-        segments.add(current.toString())
-        current.setLength(0)
-        index += 1
+      start == bracket && (ch == '"' || ch == '\'') -> {
+        if (bracket == 0) {
+          openAt = index
+          openSegments = segments.size
+        }
+        start = index + 1
+        quote = ch
       }
-      '[' -> {
-        if (current.isNotEmpty() || segments.isEmpty()) {
-          if (current.isNotEmpty()) {
-            segments.add(current.toString())
-            current.setLength(0)
+      ch == '.' && bracket == 0 -> if (index > start) push(index) else start = index + 1
+      ch == '[' -> {
+        if (index > start) push(index)
+        openAt = index
+        openSegments = segments.size
+        bracket = index + 1
+        start = index + 1
+      }
+      ch == ']' -> {
+        when {
+          // The bracket's contents are the segment.
+          bracket > 0 -> {
+            push(index)
+            bracket = 0
+            openAt = -1
           }
+          // A quoted bracket already pushed its segment when the quote closed; this only shuts it.
+          bracket < 0 -> {
+            start = index + 1
+            bracket = 0
+            openAt = -1
+          }
+          // A `]` with no bracket open is where upstream errors. Here it is an ordinary character,
+          // so it stays in the segment and the lookup misses — dropping it instead would let
+          // `a]b` read a field genuinely named `b`, which is worse than reading nothing.
+          else -> {}
         }
-        val close = path.indexOf(']', index)
-        if (close < 0) {
-          // Unterminated bracket: treat the remainder as literal text.
-          current.append(path.substring(index))
-          index = path.length
-        } else {
-          val raw = path.substring(index + 1, close).trim()
-          segments.add(raw.removeSurrounding("\"").removeSurrounding("'"))
-          index = close + 1
-        }
-      }
-      else -> {
-        current.append(ch)
-        index += 1
       }
     }
+    index += 1
   }
-  if (current.isNotEmpty()) segments.add(current.toString())
+
+  if (bracket != 0 || quote != null) {
+    // Unterminated. Everything since the opener is literal text, including the opener itself.
+    while (segments.size > openSegments) segments.removeAt(segments.size - 1)
+    segments.add(path.substring(openAt))
+    return segments
+  }
+  if (index > start) push(minOf(index, length))
   return segments
 }

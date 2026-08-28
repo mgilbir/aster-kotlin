@@ -245,6 +245,20 @@ internal class Parse(
         )
         continue
       }
+      // **Not a channel at all**, which upstream drops with `"<name>-encoding is dropped as <name>
+      // is not a valid encoding channel"`. This engine kept it: it went into `result`, and from
+      // there into an aggregate's `groupby`, the spoken description and the tooltip's field list.
+      // So `"colour"` — the spelling half the English-speaking world uses — produced a chart that
+      // was grouped by a column nothing was coloured with, and said nothing about it.
+      if (channel !in Channels.UNIT_CHANNELS && channel !in Channels.FACET_CHANNELS) {
+        diagnostics.warn(
+          VegaLiteDiagnostics.UNSUPPORTED_CHANNEL,
+          "`$channel` is not an encoding channel, so its encoding is dropped — upstream does the " +
+            "same. A near miss for one that is, such as `colour` for `color`, is worth checking.",
+          jsonPath = "$path.$channel",
+        )
+        continue
+      }
       // A multi-definition channel may hold an array. The first entry is the definition proper,
       // because everything that reads a channel reads one; the others are kept beside it, and
       // losing them loses every field but the first from a tooltip.

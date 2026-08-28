@@ -326,6 +326,7 @@ class UpstreamTransformVectorsTest {
       is VegaValue.Timestamp -> value.epochMillis.toLong().toString()
       is VegaValue.Bool -> value.value.toString()
       is VegaValue.Null -> "null"
+      is VegaValue.Undefined -> "undefined"
       is VegaValue.Pattern -> value.text
     }
 }

@@ -31,8 +31,28 @@ public object FontStack {
    *
    * Empty for a stack that names nothing, which a caller treats as "ask the platform".
    */
-  public fun families(stack: String): List<String> =
-    stack.split(',').map { it.trim().trim('"', '\'') }.filter { it.isNotEmpty() }
+  public fun families(stack: String): List<String> {
+    // Split **outside quotes**. A family name is allowed to contain a comma, and CSS is why the
+    // quotes are there: `"Foo, Bar", serif` names two families, and splitting on the comma first
+    // named three, none of which a host could ever answer. A quote is a quote only where a name
+    // starts, which is what keeps an apostrophe inside one — `Bob's Sans` — from opening a string.
+    val names = mutableListOf<String>()
+    val current = StringBuilder()
+    var quote: Char? = null
+    for (char in stack) {
+      when {
+        quote != null -> if (char == quote) quote = null else current.append(char)
+        (char == '"' || char == '\'') && current.isBlank() -> quote = char
+        char == ',' -> {
+          names.add(current.toString())
+          current.setLength(0)
+        }
+        else -> current.append(char)
+      }
+    }
+    names.add(current.toString())
+    return names.map { it.trim() }.filter { it.isNotEmpty() }
+  }
 
   /**
    * Whether a name is one of CSS's generic keywords rather than a face.

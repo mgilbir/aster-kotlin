@@ -302,7 +302,24 @@ internal fun applyTreeLayout(
 
   if (!layout(root)) return input
 
-  val names = params.stringList("as").takeIf { it.size > outputs.size } ?: defaultNames
+  // `as = _.as || fields`, indexed positionally, so upstream honours whatever is given and
+  // writes `undefined` for the rest. This required `as` to be *longer* than the output list before
+  // it counted at all, so a specification renaming the first two outputs got none of them renamed
+  // and no diagnostic. Each name is taken where it is given and defaulted where it is not, and a
+  // short list is reported rather than silently completed, because upstream's answer there is a
+  // field literally named `undefined`.
+  val declared = params.stringList("as")
+  if (declared.isNotEmpty() && declared.size < defaultNames.size) {
+    context.diagnostics.warn(
+      DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+      "'as' names ${declared.size} of this layout's ${defaultNames.size} outputs; the rest keep " +
+        "their default names, where upstream would write them onto a field named 'undefined'",
+      operator = type,
+    )
+  }
+  val names = defaultNames.mapIndexed { index, fallback ->
+    declared.getOrNull(index)?.takeIf { it.isNotEmpty() } ?: fallback
+  }
   val updates = HashMap<Int, Map<String, VegaValue>>()
   root.eachBefore { node ->
     if (node.index >= 0) {
@@ -536,7 +553,6 @@ public object PackTransform : Transform {
   ): List<VegaValue> =
     applyTreeLayout(input, params, context, type, OUTPUTS, NAMES) { root ->
       val (width, height) = sizeOf(params)
-      val radiusField = params.string("radius")?.takeIf { it.isNotEmpty() }
       val radiusOf = radiusAccessor(params.string("radius"), context)
       TreeCircles.pack(root, width, height, params.number("padding") ?: 0.0, radiusOf)
       true

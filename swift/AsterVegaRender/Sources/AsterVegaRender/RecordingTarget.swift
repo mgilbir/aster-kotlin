@@ -28,27 +28,35 @@ public struct RecordingTarget: DrawTarget {
     depth = max(0, depth - 1)
   }
 
-  public mutating func rect(_ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?) {
+  public mutating func rect(
+    _ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode
+  ) {
     var text = "rect \(show(rect))"
     if !corners.isSquare { text += " corners \(show(corners))" }
-    note(text + paints(fill, stroke))
+    note(text + paints(fill, stroke) + blended(blend))
   }
 
-  public mutating func line(from: Point, to: Point, stroke: StrokePaint?) {
-    note("line \(show(from)) -> \(show(to))" + paints(nil, stroke))
+  public mutating func line(from: Point, to: Point, stroke: StrokePaint?, blend: SceneBlendMode) {
+    note("line \(show(from)) -> \(show(to))" + paints(nil, stroke) + blended(blend))
   }
 
-  public mutating func path(_ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?) {
-    note("path \(commands.count) commands \(summary(commands))" + paints(fill, stroke))
+  public mutating func path(
+    _ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode
+  ) {
+    note(
+      "path \(commands.count) commands \(summary(commands))" + paints(fill, stroke)
+        + blended(blend))
   }
 
-  public mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?) {
+  public mutating func text(
+    _ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode
+  ) {
     var text = "text \(quoted(run.text)) at \(show(run.origin))"
     if run.angleDegrees != 0 { text += " about \(show(run.anchor))" }
     text += " \(run.fontFamily) \(show(run.fontSize)) w\(run.fontWeight)"
     if run.italic { text += " italic" }
     if run.angleDegrees != 0 { text += " rotated \(show(run.angleDegrees))" }
-    note(text + paints(fill, stroke))
+    note(text + paints(fill, stroke) + blended(blend))
   }
 
   public mutating func image(
@@ -57,7 +65,8 @@ public struct RecordingTarget: DrawTarget {
     in rect: Rect,
     fit: DrawImageFit,
     smooth: Bool,
-    opacity: Double
+    opacity: Double,
+    blend: SceneBlendMode
   ) {
     // A raster is described by its size rather than its address: it has no URL, and printing its pixels
     // would be neither readable nor stable.
@@ -67,10 +76,17 @@ public struct RecordingTarget: DrawTarget {
       "image \(source) in \(show(rect)) \(fit.rawValue)"
         + (smooth ? "" : " sharp")
         + (opacity < 1 ? " opacity \(show(opacity))" : "")
+        + blended(blend)
     )
   }
 
   // MARK: - Description
+
+  /// The item's blend mode, and nothing at all where it is the default, so existing expectations
+  /// are unchanged.
+  private func blended(_ blend: SceneBlendMode) -> String {
+    blend == SceneBlendMode.normal ? "" : " blend \(blend.name.lowercased())"
+  }
 
   private func paints(_ fill: Brush?, _ stroke: StrokePaint?) -> String {
     var text = ""

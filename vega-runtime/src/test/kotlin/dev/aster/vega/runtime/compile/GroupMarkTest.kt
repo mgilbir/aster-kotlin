@@ -181,9 +181,9 @@ class GroupMarkTest {
     // A specification reading `parent.width` relies on something Vega does not provide, and this
     // engine must not provide it either.
     //
-    // It stringifies as "null" here where upstream prints "undefined": this value model has one
-    // absent value, not JavaScript's two. That gap is general rather than specific to groups, and
-    // is recorded in SUPPORTED_FEATURES.md.
+    // It stringifies as "undefined", which is what upstream prints. It used to print "null",
+    // because the value model had one absent value where JavaScript has two; `VegaValue.Undefined`
+    // is the second, and this is one of the places the difference is visible on a chart.
     val labels =
       texts(
         """
@@ -201,7 +201,7 @@ class GroupMarkTest {
         }
         """
       )
-    assertEquals(listOf("null", "null"), labels)
+    assertEquals(listOf("undefined", "undefined"), labels)
   }
 
   @Test
@@ -673,7 +673,9 @@ class GroupMarkTest {
         }
         """
       )
-    val datum = groups.first().metadata.tooltip as VegaValue.Obj
+    // `datum`, not `tooltip`: a cell whose specification wrote no `tooltip` channel has none, and
+    // the aggregated row a facet was built from is what a host actually wants here.
+    val datum = groups.first().metadata.datum as VegaValue.Obj
     assertEquals(VegaValue.Str("north"), datum.fields["c"])
     assertEquals(VegaValue.Num(2.0), datum.fields["count"])
   }

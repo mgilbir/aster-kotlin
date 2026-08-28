@@ -157,6 +157,7 @@ class UpstreamStatisticsVectorsTest {
               maxbins = number(params["maxbins"])?.toInt() ?: DEFAULT_MAXBINS,
               base = number(params["base"]) ?: 10.0,
               step = number(params["step"]),
+              steps = (params["steps"] as? JsonArray)?.mapNotNull { number(it) },
               divide =
                 (params["divide"] as? JsonArray)?.mapNotNull { number(it) } ?: listOf(5.0, 2.0),
               minstep = number(params["minstep"]) ?: 0.0,

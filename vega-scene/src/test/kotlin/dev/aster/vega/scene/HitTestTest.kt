@@ -569,4 +569,154 @@ class HitTestTest {
       "the corner of the bounding box holds no ink: $box",
     )
   }
+
+  // ---- what the audit found, each probed or reasoned from the renderers ------
+
+  /**
+   * M15 — a fully transparent **group** still contributes its children.
+   *
+   * Every canvas renderer here draws them, and each of them says so: a group's opacity applies to
+   * its own panel and is not inherited. Pruning the whole subtree from the index made marks that
+   * are visible on screen impossible to tap.
+   */
+  @Test
+  fun `a transparent group's children are still tappable`() {
+    val child =
+      RectNode(
+        id = ids.allocate(),
+        x = 10.0,
+        y = 10.0,
+        width = 20.0,
+        height = 20.0,
+        fill = Fill(ScenePaint.Black),
+        metadata = interactive,
+      )
+    val invisible =
+      GroupNode(
+        id = ids.allocate(),
+        opacity = 0.0,
+        size = SizeD(100.0, 100.0),
+        children = listOf(child),
+      )
+    val hit = assertPresent(SceneHitIndex(sceneOf(invisible)).hitTest(PointD(15.0, 15.0)))
+    assertEquals(child.id, hit.node.id)
+  }
+
+  /**
+   * M16 — the broad phase must not be tighter than the narrow one.
+   *
+   * `Mouse` has a `boundsTolerance` of 0 and a `strokeTolerance` of 2, and the broad phase was
+   * gated on the first alone — so the second was reachable only where a node's bounds happened to
+   * be fatter than its geometry. On an axis-aligned rule, whose bounds *are* its stroke width, it
+   * was zero: a tap two pixels off a gridline missed, which is the case the tolerance exists for.
+   */
+  @Test
+  fun `a mouse tap within the stroke tolerance of a rule hits it`() {
+    val rule =
+      RuleNode(
+        id = ids.allocate(),
+        x1 = 10.0,
+        y1 = 50.0,
+        x2 = 90.0,
+        y2 = 50.0,
+        stroke = Stroke(ScenePaint.Black, width = 1.0),
+        metadata = interactive,
+      )
+    val index = SceneHitIndex(sceneOf(rule), HitTestOptions.Mouse)
+    assertNotNull(index.hitTest(PointD(50.0, 51.5)), "1.5 px away, inside a 2 px tolerance")
+    assertNull(index.hitTest(PointD(50.0, 60.0)), "10 px away is a miss")
+  }
+
+  /**
+   * M17 — `zindex` decides paint order, so it decides which mark a tap lands on.
+   *
+   * Only the SVG renderer was applying the reordering, so a raised mark was on top in the export
+   * and underneath everywhere else — and the tap went to whichever was drawn second in declaration
+   * order.
+   */
+  @Test
+  fun `a raised mark wins the tap it wins in the picture`() {
+    fun bar(z: Int, name: String) =
+      RectNode(
+        id = ids.allocate(),
+        x = 10.0,
+        y = 10.0,
+        width = 20.0,
+        height = 20.0,
+        fill = Fill(ScenePaint.Black),
+        metadata =
+          NodeMetadata(
+            interactive = true,
+            zindex = z,
+            role = "mark",
+            markName = name,
+            markKind = "rect",
+          ),
+      )
+    // Same mark, same place, and the first one is raised.
+    val raised = bar(1, "bars")
+    val plain = bar(0, "bars")
+    val hit = assertPresent(SceneHitIndex(sceneOf(raised, plain)).hitTest(PointD(15.0, 15.0)))
+    assertEquals(raised.id, hit.node.id, "the raised item is painted last and is tapped first")
+  }
+
+  /**
+   * M18 — a fill is picked with the rule it was **painted** with, which is nonzero winding.
+   *
+   * The even-odd rule calls the middle of a self-intersecting outline outside, so a tap on the
+   * visibly solid centre of a star missed.
+   */
+  @Test
+  fun `the solid centre of a self-intersecting path is tappable`() {
+    // A five-pointed star, written as one closed outline that crosses itself. Its centre is filled
+    // by every renderer and is *outside* by the even-odd rule.
+    val star =
+      PathNode(
+        id = ids.allocate(),
+        path =
+          PathData.build {
+            moveTo(50.0, 20.0)
+            lineTo(68.0, 74.0)
+            lineTo(22.0, 40.0)
+            lineTo(78.0, 40.0)
+            lineTo(32.0, 74.0)
+            close()
+          },
+        fill = Fill(ScenePaint.Black),
+        metadata = interactive,
+      )
+    val path = star.path
+    assertTrue(path.containsNonZero(PointD(50.0, 45.0)), "the centre is inside by winding")
+    assertFalse(path.containsEvenOdd(PointD(50.0, 45.0)), "and outside by parity, which is the bug")
+    assertNotNull(
+      SceneHitIndex(sceneOf(star)).hitTest(PointD(50.0, 45.0)),
+      "the centre of a star is filled and must be tappable",
+    )
+  }
+
+  /**
+   * M21 — a transparent fill is still a fill.
+   *
+   * `isPointInPath` never looks at alpha, so `"fill": "transparent"` is the idiom for an invisible
+   * tap target and specifications in the wild use it. `hitsRect` already said so and cited
+   * upstream; the `path` branch beside it was testing `isVisible` and losing the interior.
+   */
+  @Test
+  fun `a path with a transparent fill keeps its interior`() {
+    val square =
+      PathNode(
+        id = ids.allocate(),
+        path =
+          PathData.build {
+            moveTo(10.0, 10.0)
+            lineTo(40.0, 10.0)
+            lineTo(40.0, 40.0)
+            lineTo(10.0, 40.0)
+            close()
+          },
+        fill = Fill(ScenePaint.Black, opacity = 0.0),
+        metadata = interactive,
+      )
+    assertNotNull(SceneHitIndex(sceneOf(square)).hitTest(PointD(25.0, 25.0)))
+  }
 }

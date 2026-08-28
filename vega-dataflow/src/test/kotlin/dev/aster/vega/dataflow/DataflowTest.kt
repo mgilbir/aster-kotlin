@@ -1,3 +1,5 @@
+@file:OptIn(dev.aster.vega.model.InternalAsterVegaApi::class)
+
 package dev.aster.vega.dataflow
 
 import dev.aster.vega.model.VegaValue

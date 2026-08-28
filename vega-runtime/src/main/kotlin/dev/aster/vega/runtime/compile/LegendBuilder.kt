@@ -5,6 +5,7 @@ import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.isNullish
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.spec.Anchor
@@ -162,8 +163,7 @@ internal class LegendBuilder(
   ): NodeMetadata {
     val block = spec.encode[part]?.effective ?: return base
     val encoder = channels ?: return base
-    val tooltip =
-      block["tooltip"]?.let { encoder.channelAny(it, datum) }?.takeIf { it !is VegaValue.Null }
+    val tooltip = block["tooltip"]?.let { encoder.channelAny(it, datum) }?.takeIf { !it.isNullish }
     val cursor = block["cursor"]?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotEmpty() }
     val href = block["href"]?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotEmpty() }
     val zindex = block["zindex"]?.let { encoder.channelNumber(it, datum) }?.toInt()
@@ -765,7 +765,7 @@ internal class LegendBuilder(
     val parsed = SvgPath.parse(name)
     if (!parsed.complete || parsed.path.isEmpty) {
       diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        DiagnosticCodes.ENCODE_INVALID_VALUE,
         "Legend symbolType '$name' is neither one of the twelve names nor a path this engine " +
           "could read; a circle was drawn instead",
         operator = spec.scale,
@@ -819,18 +819,6 @@ internal class LegendBuilder(
     return mapped.values.mapNotNull { (it as? VegaValue.Num)?.value }.takeIf { it.isNotEmpty() }
   }
 
-  /**
-   * A legend swatch's fill.
-   *
-   * A legend that maps no colour still gets an explicit transparent fill rather than none, which is
-   * what upstream does — a `size` legend's swatches are outlines, and saying "transparent" says so
-   * where saying nothing would leave it to whatever default the renderer has.
-   *
-   * The test is on the **fill** channel alone (`config.symbolBaseFillColor`, applied by upstream
-   * under `if (!spec.fill)`), not on whether the legend maps any colour at all. A legend over a
-   * `stroke` scale therefore gets the transparent fill too — it draws the same either way, but a
-   * comparison against upstream can see the difference and a stroke-only legend is common.
-   */
   /**
    * A legend symbol's fill.
    *
@@ -986,7 +974,7 @@ internal class LegendBuilder(
     val labels = mutableListOf<TextNode>()
 
     for ((index, entry) in gradientLabels(spec, scale, scaleName).withIndex()) {
-      val fraction = scale.fraction((entry.value as VegaValue.Num).value)
+      val fraction = scale.fraction(entry.value.asNumberOrNull() ?: 0.0)
       // The end labels hang inside the swatch rather than past it, so a ramp's extremes stay
       // legible
       // against the chart edge.
@@ -1229,7 +1217,22 @@ internal class LegendBuilder(
     scaleName: String,
   ): List<Entry> {
     spec.values?.let { explicit ->
-      return explicit.map { Entry(it, it.asString()) }
+      // A gradient's position along the ramp is a **number**, and `LegendSpec.values` is whatever
+      // the specification wrote. `"values": ["2020-01-01"]` on a continuous colour scale — the
+      // natural way to write date stops — cast straight through to `VegaValue.Num` further down
+      // and threw a `ClassCastException` out of the public `compileJson`, past every catch site in
+      // the engine. Anything that is not readable as a number is reported and dropped, which is
+      // this module's rule everywhere else.
+      val readable = explicit.filter { it.asNumberOrNull()?.isFinite() == true }
+      for (value in explicit - readable.toSet()) {
+        diagnostics.error(
+          DiagnosticCodes.ENCODE_INVALID_VALUE,
+          "Legend for scale '$scaleName' lists '${value.asString()}' among its values, and a " +
+            "gradient legend places each value along the ramp by its number; it was left out",
+          operator = scaleName,
+        )
+      }
+      if (readable.isNotEmpty()) return readable.map { Entry(it, it.asString()) }
     }
     val length = numbers.resolve(spec.gradientLength, scaleName) ?: LegendDefaults.GRADIENT_LENGTH
     // Upstream scales the label count to the ramp's length rather than using a fixed five, so a
@@ -1237,7 +1240,7 @@ internal class LegendBuilder(
     // gradient does not end up with labels on top of each other.
     val count =
       GuideFormat.countWithMinStep(
-        numbers.resolveInt(spec.tickCount, scaleName)
+        numbers.resolveTickCount(spec.tickCount, scaleName)
           ?: maxOf(2, 2 * floor(length / 100.0).toInt()),
         numbers.resolve(spec.tickMinStep, scaleName),
         scale.domain,
@@ -1349,7 +1352,8 @@ internal class LegendBuilder(
     spec.values?.let { explicit ->
       return explicit.map { Entry(it, it.asString()) }
     }
-    val count = numbers.resolveInt(spec.tickCount, scaleName) ?: LegendDefaults.SYMBOL_TICK_COUNT
+    val count =
+      numbers.resolveTickCount(spec.tickCount, scaleName) ?: LegendDefaults.SYMBOL_TICK_COUNT
     // A discrete domain of *instants* is labelled as dates, which nothing about the scale can say:
     // its values are its own categories. `formatType` is where the specification says so, and the
     // specifier beside it may itself be computed — `timeUnitSpecifier([...])` for a bucketed one.

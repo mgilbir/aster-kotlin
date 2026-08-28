@@ -52,10 +52,14 @@ final class dev.aster.vegalite/VegaLiteConversion { // dev.aster.vegalite/VegaLi
 }
 
 final object dev.aster.vegalite/VegaLiteDiagnostics { // dev.aster.vegalite/VegaLiteDiagnostics|null[0]
+    final const val COMPILE_FAILED // dev.aster.vegalite/VegaLiteDiagnostics.COMPILE_FAILED|{}COMPILE_FAILED[0]
+        final fun <get-COMPILE_FAILED>(): kotlin/String // dev.aster.vegalite/VegaLiteDiagnostics.COMPILE_FAILED.<get-COMPILE_FAILED>|<get-COMPILE_FAILED>(){}[0]
     final const val INFERRED_TYPE // dev.aster.vegalite/VegaLiteDiagnostics.INFERRED_TYPE|{}INFERRED_TYPE[0]
         final fun <get-INFERRED_TYPE>(): kotlin/String // dev.aster.vegalite/VegaLiteDiagnostics.INFERRED_TYPE.<get-INFERRED_TYPE>|<get-INFERRED_TYPE>(){}[0]
     final const val INVALID_ENCODING // dev.aster.vegalite/VegaLiteDiagnostics.INVALID_ENCODING|{}INVALID_ENCODING[0]
         final fun <get-INVALID_ENCODING>(): kotlin/String // dev.aster.vegalite/VegaLiteDiagnostics.INVALID_ENCODING.<get-INVALID_ENCODING>|<get-INVALID_ENCODING>(){}[0]
+    final const val LIMIT_EXCEEDED // dev.aster.vegalite/VegaLiteDiagnostics.LIMIT_EXCEEDED|{}LIMIT_EXCEEDED[0]
+        final fun <get-LIMIT_EXCEEDED>(): kotlin/String // dev.aster.vegalite/VegaLiteDiagnostics.LIMIT_EXCEEDED.<get-LIMIT_EXCEEDED>|<get-LIMIT_EXCEEDED>(){}[0]
     final const val MISSING_MARK // dev.aster.vegalite/VegaLiteDiagnostics.MISSING_MARK|{}MISSING_MARK[0]
         final fun <get-MISSING_MARK>(): kotlin/String // dev.aster.vegalite/VegaLiteDiagnostics.MISSING_MARK.<get-MISSING_MARK>|<get-MISSING_MARK>(){}[0]
     final const val NOT_VEGA_LITE // dev.aster.vegalite/VegaLiteDiagnostics.NOT_VEGA_LITE|{}NOT_VEGA_LITE[0]

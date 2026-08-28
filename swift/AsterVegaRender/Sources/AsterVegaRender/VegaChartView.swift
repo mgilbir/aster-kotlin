@@ -339,12 +339,21 @@ public struct VegaChartView: View {
         lastDown = value.startLocation
         // Incremental, because the controller adds each delta to the viewport offset: handing it the
         // gesture's cumulative translation every time would accelerate the pan quadratically.
+        //
+        // **Pixels, undivided.** A pan is a *distance*, and `InteractionState.viewportOffset` holds
+        // it in surface pixels — `visibleViewport` is what divides by `contentScale *
+        // viewportScale`. Dividing here divided it a second time, so at any fit other than 1 the
+        // chart moved by a fraction of the finger: on a chart scaled to a third of its natural size
+        // the drawing crept along at three times the reader's speed in the wrong direction of the
+        // ratio, and the further out the fit the worse it got. The Compose Multiplatform chart says
+        // exactly this beside its own dispatch, and the Android View dispatches the raw pixel
+        // distance for the same reason.
         let previous = panned
         panned = value.translation
         session.pan(
           by: Point(
-            x: Double(value.translation.width - previous.width) / max(scale, 0.0001),
-            y: Double(value.translation.height - previous.height) / max(scale, 0.0001)
+            x: Double(value.translation.width - previous.width),
+            y: Double(value.translation.height - previous.height)
           ),
           phase: GesturePhase.changed
         )
@@ -439,14 +448,25 @@ public struct VegaChartView: View {
             // `.default` rather than an unnamed action: without the kind this registers a *custom* action,
             // which a reader has to go looking for and which an activation does not invoke.
             .accessibilityAction(.default) {
-              // Scaled, because `tap` takes surface coordinates and the controller divides by
-              // `contentScale` to reach the scene. Handing it the element's scene-space centre applied the
-              // fit factor twice — the same trap `contentScale` has set twice before on this project.
+              // **Through the drawn placement**, which is the same map the frames above use.
+              //
+              // `tap` takes surface coordinates and the controller subtracts its own
+              // `viewportOffset` and divides by `contentScale * viewportScale`. So the forward map
+              // is scale-then-translate, and this used to do only the first half with only the fit
+              // scale — no `viewportScale`, no offset. The frames a reader lands on were right
+              // (`drawnPlacement` carries both), so a VoiceOver double-tap on a mark activated a
+              // *different* mark as soon as the chart had been panned or zoomed: the one drawn where
+              // the tapped one had been before the reader moved anything. `scale` below is
+              // `placement.scale * viewport.scale`, and `placement.left/top` already carry the pan,
+              // which is why the offsets here are the frame's own offsets minus the fit's centring.
               guard let session, activatable(entry.element) else { return }
+              let centreX = entry.element.bounds.left + entry.element.bounds.width / 2
+              let centreY = entry.element.bounds.top + entry.element.bounds.height / 2
+              let viewport = session.viewport
               session.tap(
                 at: Point(
-                  x: (entry.element.bounds.left + entry.element.bounds.width / 2) * scale,
-                  y: (entry.element.bounds.top + entry.element.bounds.height / 2) * scale
+                  x: centreX * scale + viewport.offsetX,
+                  y: centreY * scale + viewport.offsetY
                 )
               )
             }

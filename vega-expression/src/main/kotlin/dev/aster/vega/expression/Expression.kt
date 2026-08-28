@@ -104,8 +104,8 @@ public interface ExpressionScope {
    *
    * Not a boolean, despite the documentation: upstream returns the **count** of matching rows, or
    * `undefined` when there are none, and a specification that prints the result prints a number.
-   * [VegaValue.Null] stands in for that `undefined`; both are falsey, so the usual
-   * `if(indata(...))` reads the same either way.
+   * That `undefined` is [VegaValue.Undefined] — it used to be [VegaValue.Null] standing in for one,
+   * which read the same through `if(indata(...))` and the opposite through `isDefined`.
    *
    * The default scans, which is correct and quadratic when called once per datum. A scope that
    * answers many of these — a mark encoding, in practice — should override with an index.
@@ -319,7 +319,7 @@ public fun indataCounts(rows: List<VegaValue>, field: String): Map<String, Int> 
 
 /** Reads [indataCounts] the way upstream does: the count, or absent rather than zero. */
 public fun indataLookup(counts: Map<String, Int>, value: VegaValue): VegaValue =
-  counts[value.asString()]?.let { VegaValue.Num(it.toDouble()) } ?: VegaValue.Null
+  counts[value.asString()]?.let { VegaValue.Num(it.toDouble()) } ?: VegaValue.Undefined
 
 public sealed interface ExpressionResult {
   public data class Compiled(val expression: Expression) : ExpressionResult
@@ -343,6 +343,18 @@ public interface ExpressionCompiler {
  * Vega specifications reuse the same expression strings across many marks and updates, so caching
  * by source text avoids reparsing. Owned by its creator rather than being a singleton, so its
  * lifetime is controllable (PROJECT_BRIEF.md 21).
+ *
+ * **Confined, not synchronized**, and the distinction matters because the map is mutated on every
+ * *hit*: an entry is removed and re-added to move it to the young end. Two threads doing that at
+ * once corrupt a `LinkedHashMap`, and on the JVM a concurrent resize can spin forever rather than
+ * merely losing an entry.
+ *
+ * What confines it is `VegaChartController`, which owns the only instance the engine builds and
+ * calls it from its compile path — see that class's note on concurrent compiles, which reports
+ * `VEGA_COMPILE_CONCURRENT` when two of those overlap. A caller that builds one of these and shares
+ * it across threads has to serialize it, and there is no lock here to make that automatic: Kotlin's
+ * common standard library has no blocking one, and a copy-on-write map would pay an O(n) copy on
+ * every hit, which is the hot path this class exists to make fast.
  */
 public class CachingExpressionCompiler(
   private val delegate: ExpressionCompiler,

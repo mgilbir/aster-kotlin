@@ -666,6 +666,8 @@ public final class dev/aster/vega/scene/PathData {
 	public fun <init> (Ljava/util/List;)V
 	public final fun containsEvenOdd (Ldev/aster/vega/scene/PointD;D)Z
 	public static synthetic fun containsEvenOdd$default (Ldev/aster/vega/scene/PathData;Ldev/aster/vega/scene/PointD;DILjava/lang/Object;)Z
+	public final fun containsNonZero (Ldev/aster/vega/scene/PointD;D)Z
+	public static synthetic fun containsNonZero$default (Ldev/aster/vega/scene/PathData;Ldev/aster/vega/scene/PointD;DILjava/lang/Object;)Z
 	public final fun distanceToOutline (Ldev/aster/vega/scene/PointD;D)D
 	public static synthetic fun distanceToOutline$default (Ldev/aster/vega/scene/PathData;Ldev/aster/vega/scene/PointD;DILjava/lang/Object;)D
 	public fun equals (Ljava/lang/Object;)Z

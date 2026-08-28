@@ -319,7 +319,19 @@ internal class CollideForce(
 }
 
 /** One edge of a `link` force, with its ends already resolved to nodes. */
-internal class ForceLink(val source: ForceNode, val target: ForceNode)
+internal class ForceLink(
+  val source: ForceNode,
+  val target: ForceNode,
+  /**
+   * The row the link was read from, which its `distance` and `strength` expressions read.
+   *
+   * Upstream's `setForceParam` wraps an expression accessor as `d => v(d, _)` and d3-force calls it
+   * with the **link**, so `datum.weight` is the link row's `weight`. Without the row there was
+   * nothing to evaluate against and every such expression saw an empty datum: `datum.weight` was
+   * NaN for every link, silently, and the springs all came out the same length.
+   */
+  val datum: VegaValue = VegaValue.Null,
+)
 
 /** `link`: a spring of a given rest length between two nodes. */
 internal class LinkForce(

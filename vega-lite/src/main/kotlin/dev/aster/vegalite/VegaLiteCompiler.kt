@@ -1,6 +1,7 @@
 package dev.aster.vegalite
 
 import dev.aster.vega.model.DiagnosticCollector
+import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
@@ -90,15 +91,17 @@ public class VegaLiteCompiler(
   private val locale: VegaLocale = VegaLocale.EnglishUS,
 ) {
 
-  public fun compileJson(json: String): VegaLiteCompilation {
+  public fun compileJson(json: String): VegaLiteCompilation = guarded {
     val diagnostics = DiagnosticCollector()
     val parsed =
       VegaJson.parseOrNull(json, diagnostics)
-        ?: return VegaLiteCompilation(null, diagnostics.diagnostics)
-    return compile(parsed)
+        ?: return@guarded VegaLiteCompilation(null, diagnostics.diagnostics)
+    compileUnguarded(parsed)
   }
 
-  public fun compile(spec: VegaValue): VegaLiteCompilation {
+  public fun compile(spec: VegaValue): VegaLiteCompilation = guarded { compileUnguarded(spec) }
+
+  private fun compileUnguarded(spec: VegaValue): VegaLiteCompilation {
     val diagnostics = DiagnosticCollector()
     if (spec !is VegaValue.Obj) {
       diagnostics.fatal(
@@ -107,8 +110,77 @@ public class VegaLiteCompiler(
       )
       return VegaLiteCompilation(null, diagnostics.diagnostics)
     }
-    return Compilation(withHostConfig(spec), diagnostics, timeZone, locale).run()
+    // Before anything walks it: a document too deep or too long to recurse over is refused with a
+    // diagnostic, rather than proving the point with a `StackOverflowError`. See `Limits`.
+    if (!Limits.check(spec, diagnostics)) {
+      return VegaLiteCompilation(null, diagnostics.diagnostics)
+    }
+    return Compilation(withDefaultData(withHostConfig(spec)), diagnostics, timeZone, locale).run()
   }
+
+  /**
+   * A specification that names no `data` reads an **empty named table**, which is what upstream
+   * gives it: `"data": [{"name": "source"}]` and marks drawn from `source`.
+   *
+   * This used to be an ERROR *and* a non-null result whose marks read a dataset called `""` — so a
+   * host following the README's stop-on-null pattern passed a broken specification straight to the
+   * runtime. It is not an error at all: a chart with no data is how a host supplies rows itself,
+   * which is `VegaChartController.hostData` on this side and `view.data(name, rows)` on upstream's,
+   * and the name it is supplied under is the one written here.
+   *
+   * Injected at the root because that is where upstream creates it — a child with no `data` of its
+   * own inherits the parent's, and one that has its own goes on using it, so a specification whose
+   * every view brings its own table is unchanged: the injected root is unread and never emitted.
+   */
+  private fun withDefaultData(spec: VegaValue.Obj): VegaValue.Obj {
+    if (spec.fields.containsKey("data")) return spec
+    return VegaValue.Obj(
+      LinkedHashMap(spec.fields).apply {
+        put("data", VegaValue.Obj(linkedMapOf("name" to VegaValue.Str(DEFAULT_DATA_NAME))))
+      }
+    )
+  }
+
+  /**
+   * The catch-all behind both entry points.
+   *
+   * This module takes **pasted text** and had no `try` in it anywhere, so a defect reached on a
+   * hostile or merely unusual document was a crash in the host rather than a diagnostic. `Limits`
+   * closes the two ways a document could reach one deliberately; this is what the *next* one looks
+   * like. Cancellation is rethrown, because swallowing it would leave a cancelled coroutine
+   * running, and so is `OutOfMemoryError`, after which nothing this process does is trustworthy.
+   *
+   * **`Exception`, not `Throwable`**, which is both the portable spelling and the right rule. An
+   * `Error` is not a failed compile: `OutOfMemoryError` leaves nothing this process does
+   * trustworthy, and `StackOverflowError` is not catchable at all on Kotlin/Native, so catching
+   * either would turn "the host dies" into "the host dies later, holding a diagnostic". That is
+   * exactly why `Limits` refuses an over-deep document *before* walking it rather than relying on a
+   * catch. (`OutOfMemoryError` is also not in the common standard library, so a `Throwable` catch
+   * with an explicit rethrow of it does not compile for the native targets at all — which the
+   * gradle gate did not notice, because it does not compile the common metadata.)
+   */
+  private inline fun guarded(compile: () -> VegaLiteCompilation): VegaLiteCompilation =
+    try {
+      compile()
+    } catch (cancellation: kotlin.coroutines.cancellation.CancellationException) {
+      throw cancellation
+    } catch (failure: Exception) {
+      VegaLiteCompilation(
+        vega = null,
+        diagnostics =
+          listOf(
+            VegaDiagnostic(
+              severity = DiagnosticSeverity.FATAL,
+              code = VegaLiteDiagnostics.COMPILE_FAILED,
+              message =
+                "The Vega-Lite compiler failed on this specification with " +
+                  "${failure::class.simpleName}: ${failure.message}. That is a defect in this " +
+                  "engine rather than in the document — please report it.",
+              cause = failure,
+            )
+          ),
+      )
+    }
 
   /** The specification with the host's configuration merged **under** its own. */
   private fun withHostConfig(spec: VegaValue.Obj): VegaValue.Obj {
@@ -117,6 +189,20 @@ public class VegaLiteCompiler(
     return VegaValue.Obj(LinkedHashMap(spec.fields).apply { put("config", merged) })
   }
 }
+
+/**
+ * What an unnamed, un-valued table is called: upstream's `DataSourceType.Raw` with no counter.
+ *
+ * A host supplying rows for a Vega-Lite chart with no `data` writes them under this name.
+ */
+internal const val DEFAULT_DATA_NAME: String = "source"
+
+/**
+ * Keys whose contents are the **user's data** rather than anything this compiler names.
+ *
+ * A dataset's inline rows, and a `datum` written into an encoding. See `renamedValue`.
+ */
+private val LITERAL_DATA_KEYS = setOf("values", "datum")
 
 /** The side an axis moves to when two land on one channel — upstream's `OPPOSITE_ORIENT`. */
 private val OPPOSITE_ORIENT =
@@ -1231,7 +1317,17 @@ private class Compilation(
         }
         is VegaValue.Arr -> VegaValue.Arr(node.values.map { walk(it) })
         is VegaValue.Obj ->
-          VegaValue.Obj(node.fields.entries.associate { (key, own) -> key to walk(own) })
+          VegaValue.Obj(
+            node.fields.entries.associate { (key, own) ->
+              // **Not into the data.** The rename is a substring replace over every string in the
+              // finished specification, which is right for the places a signal name is read as text
+              // and wrong for a dataset's rows: those are the user's values, and a row holding a
+              // string that happened to contain a generated name — they are long and specific, but
+              // they are not reserved — would have been quietly rewritten. Nothing under `values`
+              // is a reference to anything.
+              key to if (key in LITERAL_DATA_KEYS) own else walk(own)
+            }
+          )
         else -> node
       }
     return walk(value)
@@ -1983,12 +2079,26 @@ private class Compilation(
       }
       collect(spec, namePrefix, null, "$", mineHere)
 
+      // A member the parser could not read is **dropped**, and the rest of the layer is drawn.
+      // Upstream throws on the same document, which takes the whole chart with it; keeping the
+      // members that parsed is this engine's rule, and the parser has already said what was wrong
+      // with the one that did not — `parser.unit` reports before it answers null. What was missing
+      // is the fact that a layer came back smaller than it was written, which a reader counting
+      // marks would otherwise have to work out.
       return units.mapNotNull { (named, path) ->
         val (name, unit, child) = named
-        parser.unit(unit, path)?.let {
-          UnitView(it, config, name, child, parentIsLayer = true).also { view ->
-            view.transformOwners = owners[unit].orEmpty()
-          }
+        val parsed = parser.unit(unit, path)
+        if (parsed == null) {
+          diagnostics.error(
+            VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
+            "This layer member could not be read, so the layer is drawn without it. The " +
+              "diagnostic above says what was wrong with it.",
+            jsonPath = path,
+          )
+          return@mapNotNull null
+        }
+        UnitView(parsed, config, name, child, parentIsLayer = true).also { view ->
+          view.transformOwners = owners[unit].orEmpty()
         }
       }
     }

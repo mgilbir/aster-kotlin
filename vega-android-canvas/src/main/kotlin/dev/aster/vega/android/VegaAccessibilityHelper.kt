@@ -43,6 +43,18 @@ internal class VegaAccessibilityHelper(private val view: VegaChartView) :
   private var cachedRevision = Long.MIN_VALUE
   private var cachedNodes: List<VirtualNode> = emptyList()
 
+  /**
+   * What the tree *says*, with no geometry in it, so a caller can tell a real change from a pan.
+   *
+   * `invalidateSemanticTree` makes TalkBack re-read the chart, and the view called it on every
+   * published snapshot — which during a pan is once a frame, on a tree whose marks, labels and
+   * order have not changed at all. A screen reader then talks over itself for the length of the
+   * gesture. Bounds are deliberately **not** part of this: `ExploreByTouchHelper` re-reads a node's
+   * frame when it draws focus, so a mark that only moved needs no invalidation.
+   */
+  fun semanticIdentity(): List<Any?> =
+    nodes().map { listOf(it.id, it.label, it.selected, it.activatable, it.roleDescription) }
+
   /** Drops the cached semantic tree; the next query rebuilds it from the current snapshot. */
   fun invalidateSemanticTree() {
     cachedRevision = Long.MIN_VALUE
@@ -142,9 +154,36 @@ internal class VegaAccessibilityHelper(private val view: VegaChartView) :
     if (action != AccessibilityNodeInfo.ACTION_CLICK) return false
     val virtual = nodes().firstOrNull { it.id == virtualViewId } ?: return false
     val bounds = virtual.bounds
-    view.controller.dispatch(ChartInputEvent.Tap(PointD(bounds.centerX, bounds.centerY)))
+    // **Out of scene space first.** `virtual.bounds` is in scene coordinates, and
+    // `VegaChartController.dispatch` expects the space a finger arrives in: placement-relative
+    // view pixels, which it then divides by `contentScale * viewportScale` and shifts by the pan.
+    // Handing it a scene point meant the two spaces agreed only while the fit scale was exactly 1
+    // and nothing had been panned — so a TalkBack double-tap on a mark activated whichever mark
+    // happened to sit at the scene coordinate read as a view coordinate. That is the same class of
+    // defect as a finger landing beside the mark it hit, except that a screen-reader user has no
+    // way to see it happen.
+    //
+    // The inverse of `toScene`, minus the placement's origin, because that is the one part
+    // `dispatch` does not undo — `toPointD` takes it off before a touch is dispatched too.
+    view.controller.dispatch(ChartInputEvent.Tap(toControllerSpace(bounds.centerX, bounds.centerY)))
     view.invalidateIfStale()
     return true
+  }
+
+  /**
+   * A scene point in the space [VegaChartController.dispatch] reads: view pixels with the
+   * placement's origin already taken off.
+   *
+   * The exact inverse of the controller's own `toSceneSpace`, and it has to stay that way — see
+   * `onPerformActionForVirtualView` for what happened when it was skipped.
+   */
+  private fun toControllerSpace(sceneX: Double, sceneY: Double): PointD {
+    val scale = viewToSceneScale()
+    val interaction = view.controller.snapshot.interactionState
+    return PointD(
+      sceneX * scale + interaction.viewportOffset.dx,
+      sceneY * scale + interaction.viewportOffset.dy,
+    )
   }
 
   /**

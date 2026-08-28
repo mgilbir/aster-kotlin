@@ -12,6 +12,7 @@ import dev.aster.vegalite.VegaLiteInput
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -78,7 +79,10 @@ class SpecCompilerTest {
     assertEquals("bars", rects[0].metadata.markName)
     assertEquals(0, rects[0].metadata.datumIndex)
     assertTrue(rects[0].metadata.interactive)
-    assertNotNull(rects[0].metadata.tooltip)
+    assertNotNull(rects[0].metadata.datum)
+    // No `tooltip` channel in this specification, so no tooltip: the row is on `datum` and reaching
+    // it is a host's decision rather than something every hover discloses.
+    assertNull(rects[0].metadata.tooltip)
     assertEquals("a", rects[0].metadata.accessibility?.label)
   }
 
@@ -184,8 +188,12 @@ class SpecCompilerTest {
       diagnostics.any { it.code == DiagnosticCodes.SCALE_UNSUPPORTED_TYPE },
       "$diagnostics",
     )
-    // The mark that referenced it must complain as well, rather than positioning at the origin.
-    assertTrue(diagnostics.count { it.code == DiagnosticCodes.SCALE_UNSUPPORTED_TYPE } > 1)
+    // The mark that referenced it must complain as well, rather than positioning at the origin —
+    // and under `SCALE_NOT_BUILT`, which is the distinction: the *scale* has a type upstream does
+    // not have, and the *mark* refers to a scale that consequently was not built. Both used to
+    // report `SCALE_UNSUPPORTED_TYPE`, so a host reading that code to decide whether the type was
+    // supported was told the wrong thing by the mark.
+    assertTrue(diagnostics.any { it.code == DiagnosticCodes.SCALE_NOT_BUILT }, "$diagnostics")
   }
 
   @Test
@@ -324,7 +332,9 @@ class SpecCompilerTest {
         """"url": "data/table.json"""",
       )
     val compiled = compile(remote)
-    assertTrue(compiled.diagnostics.any { it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY })
+    // `DATA_LOAD_FAILED` and not `PARSE_UNKNOWN_PROPERTY`: the document is fine and the *fetch* is
+    // what did not happen, which is the one condition in this file a host might retry.
+    assertTrue(compiled.diagnostics.any { it.code == DiagnosticCodes.DATA_LOAD_FAILED })
     assertTrue(compiled.scene!!.flatten().none { it.node is RectNode })
   }
 
@@ -333,7 +343,7 @@ class SpecCompilerTest {
     val broken = minimalBar.replace("""{"data": "t"}""", """{"data": "nope"}""")
     assertTrue(
       compile(broken).diagnostics.any {
-        it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY && it.message.contains("nope")
+        it.code == DiagnosticCodes.DATA_UNREADABLE && it.message.contains("nope")
       }
     )
   }
@@ -482,9 +492,15 @@ class SpecCompilerTest {
         .filterIsInstance<PathNode>()
         .single()
     val moves = path.path.commands.count { it is dev.aster.vega.scene.PathCommand.MoveTo }
-    // Three subpaths, not two: the run before the gap, the point that was not defined — which is
-    // still one of the series' points, drawn as nothing — and the run after it.
-    assertEquals(3, moves, "the runs either side of the gap, and the point that made it")
+    // **Two** subpaths: the run before the gap and the run after it, and *nothing* at the point
+    // that was not defined. This asserted three — the undefined point was made a subpath of its own
+    // — which is not what `d3.line().defined()` does and not what upstream draws: its SVG for
+    // `line-defined-gaps` is `M0,100L50,70 M150,50L200,80`, with no third `M`. A degenerate subpath
+    // is invisible under a butt cap and a round *dot* under a round one, at a coordinate the chart
+    // is saying it has no value for. The differential harness could not see the difference until
+    // the `defined` channel reached `normalize.js` and both sides began recording which command
+    // produced each vertex.
+    assertEquals(2, moves, "the runs either side of the gap, and nothing where the gap is")
   }
 
   // ---- scale reverse ----------------------------------------------------------

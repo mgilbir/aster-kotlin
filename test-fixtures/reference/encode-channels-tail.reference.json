@@ -25,7 +25,7 @@
     {
       "closed": 0,
       "interpolate": "linear",
-      "points": "10 40 40 100 70 40 100 100 130 40",
+      "points": "M 10 40 L 40 100 L 70 40 L 100 100 L 130 40",
       "role": "mark",
       "stroke": "#54a24b",
       "strokeWidth": 10,

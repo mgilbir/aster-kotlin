@@ -26,6 +26,14 @@ import dev.aster.vega.model.VegaValue
  */
 internal object Repeat {
 
+  /**
+   * How many cells one `repeat` may lay out.
+   *
+   * Two hundred and fifty-six is a 16×16 grid, which is already past what anyone reads; the number
+   * exists because the cost is a *whole compiled view* per cell and nothing else was bounding it.
+   */
+  const val MAX_REPEAT_CELLS: Long = 256
+
   /** The concatenation (or layer) this repetition is, or null where the spec is not one. */
   fun normalize(spec: VegaValue.Obj, diagnostics: DiagnosticCollector): VegaValue.Obj? {
     val repeat = spec.fields["repeat"] ?: return null
@@ -69,6 +77,24 @@ internal object Repeat {
           ),
         )
       }
+    }
+
+    // A repeat grid is a **cross product**, and each cell is a fully compiled copy of the template:
+    // its own scales, its own axes, its own datasets. `{"row": [10 fields], "column": [10 fields]}`
+    // is a hundred of those, which is a real chart; a hundred by a hundred is ten thousand, which
+    // is not a chart at all but does compile, slowly, until it does not. Reported rather than
+    // truncated, because half a grid is a wrong chart where no grid is a clear one.
+    val cells =
+      (values?.size ?: 1).toLong() * (rows?.size ?: 1).toLong() * (columns?.size ?: 1).toLong()
+    if (cells > MAX_REPEAT_CELLS) {
+      diagnostics.fatal(
+        VegaLiteDiagnostics.LIMIT_EXCEEDED,
+        "This `repeat` asks for $cells cells, and each is a whole compiled view. The limit is " +
+          "$MAX_REPEAT_CELLS. A grid this size is not readable at any size a screen has, so the " +
+          "shape to reach for is a smaller repeat or a `facet` over one field.",
+        jsonPath = "$.repeat",
+      )
+      return null
     }
 
     val children = mutableListOf<VegaValue>()

@@ -1,6 +1,8 @@
 # 0003. The Compose API hosts the canonical View
 
-Status: accepted (2026-08-06)
+Status: **amended (2026-08-27).** Still accepted for `vega-compose` on Android; the "revisit if"
+clause was met and `vega-compose-multiplatform` draws on a `DrawScope`. See "What happened" below.
+Accepted 2026-08-06.
 
 ## Decision
 
@@ -36,3 +38,24 @@ The Canvas backend is proven and stable, and a measured benefit appears for a di
 backend — most plausibly Compose Multiplatform. At that point the scene graph is already
 platform-independent, so a second backend is additive. It must not ship before the Canvas backend is
 correct (PROJECT_BRIEF.md 21).
+
+## What happened
+
+The clause was met, in the order it named. `vega-compose-multiplatform` ships and draws directly on
+a `DrawScope` — the benefit being iOS and desktop, which an Android `View` cannot reach at all — and
+it came after the Canvas backend was passing the differential fixtures.
+
+**The decision above is unchanged for what it covers.** `vega-compose`'s `VegaChart` still wraps
+`VegaChartView` in an `AndroidView`, for the reason given: two rendering paths on *one* platform
+would be two sets of behaviour to keep identical. What ships is not that. It is one platform-neutral
+`SceneWalk` speaking to a target interface, with a `DrawScope` target beside the CoreGraphics one —
+so the second backend is the additive shape this record anticipated rather than the duplicate one it
+refused.
+
+The cost the record predicted arrived too, and is paid explicitly: "two sets of behaviour to keep
+identical" is real, and `test-fixtures/scene-walk/` is the answer to it. `SceneWalkGoldenTest` writes
+the call sequence from one walk and `SceneWalkParityTests` asserts the other reproduces it, call for
+call — which is how a divergence that both renderers' own tests passed was eventually found.
+
+Recorded here because `docs/adr/README.md` says to amend a record rather than silently changing
+behaviour that contradicts it, and this one read as flatly forbidding a module that had shipped.

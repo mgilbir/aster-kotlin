@@ -101,6 +101,17 @@ abstract interface dev.aster.vega.dataflow/EvaluationContext { // dev.aster.vega
     abstract fun signal(kotlin/String): dev.aster.vega.model/VegaValue // dev.aster.vega.dataflow/EvaluationContext.signal|signal(kotlin.String){}[0]
 }
 
+final class dev.aster.vega.dataflow.transform/GroupKey { // dev.aster.vega.dataflow.transform/GroupKey|null[0]
+    constructor <init>(kotlin.collections/List<dev.aster.vega.model/VegaValue>) // dev.aster.vega.dataflow.transform/GroupKey.<init>|<init>(kotlin.collections.List<dev.aster.vega.model.VegaValue>){}[0]
+
+    final val values // dev.aster.vega.dataflow.transform/GroupKey.values|{}values[0]
+        final fun <get-values>(): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/GroupKey.values.<get-values>|<get-values>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.dataflow.transform/GroupKey.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.dataflow.transform/GroupKey.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.dataflow.transform/GroupKey.toString|toString(){}[0]
+}
+
 final class dev.aster.vega.dataflow.transform/ProjectionDefinition { // dev.aster.vega.dataflow.transform/ProjectionDefinition|null[0]
     constructor <init>(kotlin/String, kotlin/String, kotlin/Double? = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin/Double? = ..., kotlin/Double? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin/Double? = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin/Double? = ..., dev.aster.vega.model/VegaValue? = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin.collections/List<kotlin/Double> = ...) // dev.aster.vega.dataflow.transform/ProjectionDefinition.<init>|<init>(kotlin.String;kotlin.String;kotlin.Double?;kotlin.collections.List<kotlin.Double>;kotlin.collections.List<kotlin.Double>;kotlin.collections.List<kotlin.Double>;kotlin.Double?;kotlin.Double?;kotlin.Boolean;kotlin.Boolean;kotlin.collections.List<kotlin.Double>;kotlin.Double?;kotlin.collections.List<kotlin.Double>;kotlin.Double?;dev.aster.vega.model.VegaValue?;kotlin.collections.List<kotlin.Double>;kotlin.collections.List<kotlin.Double>){}[0]
 
@@ -291,7 +302,7 @@ final object dev.aster.vega.dataflow.transform/BinTransform : dev.aster.vega.dat
         final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/BinTransform.type.<get-type>|<get-type>(){}[0]
 
     final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/BinTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
-    final fun binSettings(kotlin/Double, kotlin/Double, kotlin/Int, kotlin/Double, kotlin/Double?, kotlin.collections/List<kotlin/Double>, kotlin/Double, kotlin/Boolean, kotlin/Double? = ...): dev.aster.vega.dataflow.transform/BinTransform.BinSettings // dev.aster.vega.dataflow.transform/BinTransform.binSettings|binSettings(kotlin.Double;kotlin.Double;kotlin.Int;kotlin.Double;kotlin.Double?;kotlin.collections.List<kotlin.Double>;kotlin.Double;kotlin.Boolean;kotlin.Double?){}[0]
+    final fun binSettings(kotlin/Double, kotlin/Double, kotlin/Int, kotlin/Double, kotlin/Double?, kotlin.collections/List<kotlin/Double>?, kotlin.collections/List<kotlin/Double>, kotlin/Double, kotlin/Boolean, kotlin/Double? = ...): dev.aster.vega.dataflow.transform/BinTransform.BinSettings // dev.aster.vega.dataflow.transform/BinTransform.binSettings|binSettings(kotlin.Double;kotlin.Double;kotlin.Int;kotlin.Double;kotlin.Double?;kotlin.collections.List<kotlin.Double>?;kotlin.collections.List<kotlin.Double>;kotlin.Double;kotlin.Boolean;kotlin.Double?){}[0]
 
     final class BinSettings { // dev.aster.vega.dataflow.transform/BinTransform.BinSettings|null[0]
         constructor <init>(kotlin/Double, kotlin/Double, kotlin/Double) // dev.aster.vega.dataflow.transform/BinTransform.BinSettings.<init>|<init>(kotlin.Double;kotlin.Double;kotlin.Double){}[0]
@@ -672,5 +683,5 @@ final object dev.aster.vega.dataflow/DataflowScheduler { // dev.aster.vega.dataf
 
 final fun dev.aster.vega.dataflow.transform/aggregateOver(dev.aster.vega.dataflow.transform/AggregateOp, kotlin/String?, kotlin.collections/List<dev.aster.vega.model/VegaValue>): dev.aster.vega.model/VegaValue // dev.aster.vega.dataflow.transform/aggregateOver|aggregateOver(dev.aster.vega.dataflow.transform.AggregateOp;kotlin.String?;kotlin.collections.List<dev.aster.vega.model.VegaValue>){}[0]
 final fun dev.aster.vega.dataflow.transform/compareFieldValues(dev.aster.vega.model/VegaValue, dev.aster.vega.model/VegaValue): kotlin/Int // dev.aster.vega.dataflow.transform/compareFieldValues|compareFieldValues(dev.aster.vega.model.VegaValue;dev.aster.vega.model.VegaValue){}[0]
-final fun dev.aster.vega.dataflow.transform/groupKey(dev.aster.vega.model/VegaValue, kotlin.collections/List<kotlin/String>): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/groupKey|groupKey(dev.aster.vega.model.VegaValue;kotlin.collections.List<kotlin.String>){}[0]
-final fun dev.aster.vega.dataflow.transform/groupTuples(kotlin.collections/List<dev.aster.vega.model/VegaValue>, kotlin.collections/List<kotlin/String>): kotlin.collections/Map<kotlin.collections/List<dev.aster.vega.model/VegaValue>, kotlin.collections/List<dev.aster.vega.model/VegaValue>> // dev.aster.vega.dataflow.transform/groupTuples|groupTuples(kotlin.collections.List<dev.aster.vega.model.VegaValue>;kotlin.collections.List<kotlin.String>){}[0]
+final fun dev.aster.vega.dataflow.transform/groupKey(dev.aster.vega.model/VegaValue, kotlin.collections/List<kotlin/String>): dev.aster.vega.dataflow.transform/GroupKey // dev.aster.vega.dataflow.transform/groupKey|groupKey(dev.aster.vega.model.VegaValue;kotlin.collections.List<kotlin.String>){}[0]
+final fun dev.aster.vega.dataflow.transform/groupTuples(kotlin.collections/List<dev.aster.vega.model/VegaValue>, kotlin.collections/List<kotlin/String>): kotlin.collections/Map<dev.aster.vega.dataflow.transform/GroupKey, kotlin.collections/List<dev.aster.vega.model/VegaValue>> // dev.aster.vega.dataflow.transform/groupTuples|groupTuples(kotlin.collections.List<dev.aster.vega.model.VegaValue>;kotlin.collections.List<kotlin.String>){}[0]

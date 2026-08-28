@@ -93,7 +93,8 @@ public object DelimitedText {
   private fun cellText(value: VegaValue?): String =
     when (value) {
       null,
-      is VegaValue.Null -> ""
+      is VegaValue.Null,
+      is VegaValue.Undefined -> ""
       is VegaValue.Str -> value.value
       is VegaValue.Num -> Decimals.jsString(value.value)
       is VegaValue.Bool -> value.value.toString()

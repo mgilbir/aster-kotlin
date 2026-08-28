@@ -232,11 +232,11 @@ public final class dev/aster/vega/compose/mp/DrawScopeTarget : dev/aster/vega/co
 	public fun beginGroup (Ldev/aster/vega/compose/mp/DrawRect;)V
 	public fun endGroup ()V
 	public final fun getUnresolvedImages ()Ljava/util/List;
-	public fun image (Ljava/lang/String;Ldev/aster/vega/scene/RasterImage;Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawImageFit;ZD)V
-	public fun line (Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawStroke;)V
-	public fun path (Ljava/util/List;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;)V
-	public fun rect (Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawCorners;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;)V
-	public fun text (Ldev/aster/vega/compose/mp/DrawTextRun;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;)V
+	public fun image (Ljava/lang/String;Ldev/aster/vega/scene/RasterImage;Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawImageFit;ZDLdev/aster/vega/scene/SceneBlendMode;)V
+	public fun line (Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;)V
+	public fun path (Ljava/util/List;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;)V
+	public fun rect (Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawCorners;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;)V
+	public fun text (Ldev/aster/vega/compose/mp/DrawTextRun;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;)V
 }
 
 public final class dev/aster/vega/compose/mp/DrawStop {
@@ -324,22 +324,35 @@ public final class dev/aster/vega/compose/mp/RecordingTarget : dev/aster/vega/co
 	public fun beginGroup (Ldev/aster/vega/compose/mp/DrawRect;)V
 	public fun endGroup ()V
 	public final fun getCalls ()Ljava/util/List;
-	public fun image (Ljava/lang/String;Ldev/aster/vega/scene/RasterImage;Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawImageFit;ZD)V
-	public fun line (Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawStroke;)V
-	public fun path (Ljava/util/List;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;)V
-	public fun rect (Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawCorners;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;)V
-	public fun text (Ldev/aster/vega/compose/mp/DrawTextRun;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;)V
+	public fun image (Ljava/lang/String;Ldev/aster/vega/scene/RasterImage;Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawImageFit;ZDLdev/aster/vega/scene/SceneBlendMode;)V
+	public fun line (Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;)V
+	public fun path (Ljava/util/List;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;)V
+	public fun rect (Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawCorners;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;)V
+	public fun text (Ldev/aster/vega/compose/mp/DrawTextRun;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;)V
 	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class dev/aster/vega/compose/mp/SceneDrawTarget {
 	public abstract fun beginGroup (Ldev/aster/vega/compose/mp/DrawRect;)V
 	public abstract fun endGroup ()V
-	public abstract fun image (Ljava/lang/String;Ldev/aster/vega/scene/RasterImage;Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawImageFit;ZD)V
-	public abstract fun line (Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawStroke;)V
-	public abstract fun path (Ljava/util/List;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;)V
-	public abstract fun rect (Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawCorners;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;)V
-	public abstract fun text (Ldev/aster/vega/compose/mp/DrawTextRun;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;)V
+	public abstract fun image (Ljava/lang/String;Ldev/aster/vega/scene/RasterImage;Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawImageFit;ZDLdev/aster/vega/scene/SceneBlendMode;)V
+	public static synthetic fun image$default (Ldev/aster/vega/compose/mp/SceneDrawTarget;Ljava/lang/String;Ldev/aster/vega/scene/RasterImage;Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawImageFit;ZDLdev/aster/vega/scene/SceneBlendMode;ILjava/lang/Object;)V
+	public abstract fun line (Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;)V
+	public static synthetic fun line$default (Ldev/aster/vega/compose/mp/SceneDrawTarget;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;ILjava/lang/Object;)V
+	public abstract fun path (Ljava/util/List;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;)V
+	public static synthetic fun path$default (Ldev/aster/vega/compose/mp/SceneDrawTarget;Ljava/util/List;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;ILjava/lang/Object;)V
+	public abstract fun rect (Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawCorners;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;)V
+	public static synthetic fun rect$default (Ldev/aster/vega/compose/mp/SceneDrawTarget;Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawCorners;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;ILjava/lang/Object;)V
+	public abstract fun text (Ldev/aster/vega/compose/mp/DrawTextRun;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;)V
+	public static synthetic fun text$default (Ldev/aster/vega/compose/mp/SceneDrawTarget;Ldev/aster/vega/compose/mp/DrawTextRun;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;ILjava/lang/Object;)V
+}
+
+public final class dev/aster/vega/compose/mp/SceneDrawTarget$DefaultImpls {
+	public static synthetic fun image$default (Ldev/aster/vega/compose/mp/SceneDrawTarget;Ljava/lang/String;Ldev/aster/vega/scene/RasterImage;Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawImageFit;ZDLdev/aster/vega/scene/SceneBlendMode;ILjava/lang/Object;)V
+	public static synthetic fun line$default (Ldev/aster/vega/compose/mp/SceneDrawTarget;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;ILjava/lang/Object;)V
+	public static synthetic fun path$default (Ldev/aster/vega/compose/mp/SceneDrawTarget;Ljava/util/List;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;ILjava/lang/Object;)V
+	public static synthetic fun rect$default (Ldev/aster/vega/compose/mp/SceneDrawTarget;Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawCorners;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;ILjava/lang/Object;)V
+	public static synthetic fun text$default (Ldev/aster/vega/compose/mp/SceneDrawTarget;Ldev/aster/vega/compose/mp/DrawTextRun;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/scene/SceneBlendMode;ILjava/lang/Object;)V
 }
 
 public final class dev/aster/vega/compose/mp/SceneFit : java/lang/Enum {

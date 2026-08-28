@@ -26,8 +26,13 @@ package dev.aster.vega.model
 public object ForeignValue {
 
   /**
-   * What this value *is*: `"null"`, `"boolean"`, `"number"`, `"string"`, `"timestamp"`, `"array"`,
-   * `"object"`, `"pattern"`, or `"missing"` for a null reference.
+   * What this value *is*: `"null"`, `"undefined"`, `"boolean"`, `"number"`, `"string"`,
+   * `"timestamp"`, `"array"`, `"object"`, `"pattern"`, or `"missing"` for a null reference.
+   *
+   * `"undefined"` and `"null"` are two answers because JavaScript has two values, and an expression
+   * reading a field a row does not have produces the first — see [VegaValue.Undefined]. A host that
+   * treats them alike can compare against either and get the same reading it had before; one that
+   * tells a missing field from a null one now can.
    *
    * Deliberately strings rather than an enum: an enum crosses as a boxed class a host has to import
    * and compare, where a string is a `switch` in any language. `foreignKind()` made the same
@@ -37,6 +42,7 @@ public object ForeignValue {
     when (value) {
       null -> "missing"
       is VegaValue.Null -> "null"
+      is VegaValue.Undefined -> "undefined"
       is VegaValue.Bool -> "boolean"
       is VegaValue.Num -> "number"
       is VegaValue.Str -> "string"

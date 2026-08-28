@@ -69,6 +69,8 @@ class SelectionsTest {
   private fun asJson(value: VegaValue): String =
     when (value) {
       is VegaValue.Null -> "null"
+      // `eval-probe.js` writes the literal `undefined` where `JSON.stringify` gives nothing.
+      is VegaValue.Undefined -> "undefined"
       is VegaValue.Bool -> value.value.toString()
       is VegaValue.Num ->
         if (!value.value.isFinite()) "null" else JsSemantics.numberToString(value.value)

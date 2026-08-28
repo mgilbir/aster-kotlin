@@ -190,7 +190,7 @@ internal class DataResolver(
     if (spec.sources.isNotEmpty()) {
       claimedHostData.add(spec.name)
       diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        DiagnosticCodes.DATA_UNREADABLE,
         "Dataset '${spec.name}' derives from ${spec.sources.joinToString(", ")}, so the rows " +
           "supplied for it are ignored: filling a derived dataset would discard the transforms it " +
           "is there for. Supply the rows for the dataset it sources from instead.",
@@ -201,13 +201,13 @@ internal class DataResolver(
     claimedHostData.add(spec.name)
     if (spec.url != null || spec.urlSignal != null) {
       diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        DiagnosticCodes.DATA_UNREADABLE,
         "Dataset '${spec.name}' was supplied by the host, so its `url` was not fetched.",
         operator = spec.name,
       )
     } else if (!spec.values.isNullOrEmpty() || spec.document != null) {
       diagnostics.info(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        DiagnosticCodes.DATA_UNREADABLE,
         "Dataset '${spec.name}' was supplied by the host, replacing the values in the " +
           "specification.",
         operator = spec.name,
@@ -232,14 +232,14 @@ internal class DataResolver(
         loader.load(loader.sanitize(url))
       } catch (denied: LoadDeniedException) {
         diagnostics.error(
-          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          DiagnosticCodes.DATA_LOAD_FAILED,
           "Dataset '${spec.name}' was not loaded. ${denied.message}",
           operator = spec.name,
         )
         return emptyList()
       } catch (failure: Exception) {
         diagnostics.error(
-          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          DiagnosticCodes.DATA_LOAD_FAILED,
           "Dataset '${spec.name}' could not be loaded from '$url': ${failure.message}",
           operator = spec.name,
         )
@@ -254,7 +254,7 @@ internal class DataResolver(
         val delimiter = spec.delimiter
         if (delimiter.isNullOrEmpty()) {
           diagnostics.error(
-            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            DiagnosticCodes.DATA_UNREADABLE,
             "Dataset '${spec.name}' is 'dsv' but names no 'format.delimiter'",
             operator = spec.name,
           )
@@ -320,7 +320,7 @@ internal class DataResolver(
     val name = spec.feature ?: spec.mesh
     if (name == null) {
       diagnostics.error(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        DiagnosticCodes.DATA_UNREADABLE,
         "Dataset '${spec.name}' is TopoJSON but names neither 'format.feature' nor " +
           "'format.mesh'; a TopoJSON file holds several objects and nothing says which",
         operator = spec.name,
@@ -334,7 +334,7 @@ internal class DataResolver(
         null -> TopoJson.MeshFilter.ALL
         else -> {
           diagnostics.error(
-            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            DiagnosticCodes.DATA_UNREADABLE,
             "Dataset '${spec.name}' has 'format.filter: ${spec.meshFilter}'; " +
               "the only filters are 'interior' and 'exterior'",
             operator = spec.name,
@@ -347,7 +347,7 @@ internal class DataResolver(
       else TopoJson.mesh(document, name, filter)
     if (decoded == null) {
       diagnostics.error(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        DiagnosticCodes.DATA_UNREADABLE,
         "Dataset '${spec.name}' names TopoJSON object '$name', which the file does not contain",
         operator = spec.name,
       )
@@ -382,7 +382,7 @@ internal class DataResolver(
       is VegaValue.Obj -> listOf(rows)
       else -> {
         diagnostics.error(
-          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          DiagnosticCodes.DATA_UNREADABLE,
           "Dataset '${spec.name}' did not contain an array of rows" +
             (spec.property?.let { " at property '$it'" } ?: ""),
           operator = spec.name,
@@ -495,7 +495,7 @@ internal class DataResolver(
           val upstream = result[name]
           if (upstream == null) {
             diagnostics.error(
-              DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+              DiagnosticCodes.DATA_UNREADABLE,
               "Dataset '${spec.name}' sources from unknown dataset '$name'",
               operator = spec.name,
             )
@@ -649,7 +649,7 @@ internal class DataResolver(
           kind.equals("boolean", ignoreCase = true) -> VegaValue.Bool(JsSemantics.truthy(raw))
           else -> {
             diagnostics.warn(
-              DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+              DiagnosticCodes.DATA_UNREADABLE,
               "Cannot read field '$field' as '$kind'; it was left as it came",
               operator = spec.name,
             )

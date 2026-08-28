@@ -8,6 +8,7 @@ import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.isNullish
 import dev.aster.vega.model.spec.EventConfig
 import dev.aster.vega.model.spec.EventPermit
 import dev.aster.vega.model.spec.EventStream
@@ -65,7 +66,7 @@ public data class InputEvent(
     fields["x"] = VegaValue.Num(x)
     fields["y"] = VegaValue.Num(y)
     fields["timeStamp"] = VegaValue.Num(timestampMillis.toDouble())
-    if (markType != null || markName != null || datum !is VegaValue.Null) {
+    if (markType != null || markName != null || !datum.isNullish) {
       val mark = LinkedHashMap<String, VegaValue>(2)
       markType?.let { mark["marktype"] = VegaValue.Str(it) }
       markName?.let { mark["name"] = VegaValue.Str(it) }
@@ -184,7 +185,7 @@ public class EventDispatcher(
       // but nothing in the corpus uses it and guessing at the ordering would be worse than saying
       // so.
       diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        DiagnosticCodes.INTERACTION_UNSUPPORTED,
         "A 'between' selector wrapping another 'between' is not dispatched; signal " +
           "'${binding.signalName}' will not update from it",
         operator = binding.signalName,
@@ -209,19 +210,35 @@ public class EventDispatcher(
       // happened. Reported rather than dropped, because a signal driven by a timer is one that
       // never changes here and the reason is not visible from the drawing.
       diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        DiagnosticCodes.INTERACTION_UNSUPPORTED,
         "A timer stream needs a clock to fire it; signal '${binding.signalName}' will keep its " +
           "initial value",
         operator = binding.signalName,
       )
       return
     }
+    if (stream.source == EventStream.SOURCE_WINDOW) {
+      // A `window:` stream listens to the **page**, and a chart drawn on a canvas has none. The
+      // watch is still registered — this class will dispatch one, and `EventDispatcherTest` proves
+      // it, so a host driving the dispatcher directly can deliver a window event itself — but
+      // nothing in `VegaChartController` ever *produces* one. So a specification that uses the
+      // commonest idiom for it, `window:mousemove` for a drag that continues outside the chart,
+      // gets a signal that never changes, and said nothing: exactly the shape of failure this
+      // class reports three times in the twenty lines below.
+      diagnostics.warn(
+        DiagnosticCodes.INTERACTION_UNSUPPORTED,
+        "A 'window:' stream listens to the page, and this engine draws on a canvas rather than in " +
+          "one; nothing dispatches a window-sourced event, so signal '${binding.signalName}' will " +
+          "keep its initial value unless the host dispatches one itself",
+        operator = binding.signalName,
+      )
+    }
     if (stream.debounce != null && !deferrable) {
       // A debounce fires *after* a quiet period, so honouring it needs something that can wake up
       // later. Nothing here schedules, and silently treating it as a throttle would fire on the
       // leading edge instead of the trailing one — the opposite behaviour.
       diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        DiagnosticCodes.INTERACTION_UNSUPPORTED,
         "A debounce needs a scheduler to fire after the quiet period; signal " +
           "'${binding.signalName}' will fire on every matching event instead",
         operator = binding.signalName,
@@ -290,7 +307,7 @@ public class EventDispatcher(
       }
     if (!blocked) return true
     diagnostics.warn(
-      DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+      DiagnosticCodes.INTERACTION_UNSUPPORTED,
       "Blocked $key $type event listener; 'config.events' does not permit it, so signal " +
         "'${binding.signalName}' will not update from it",
       operator = binding.signalName,

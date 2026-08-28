@@ -7,6 +7,7 @@ import dev.aster.vega.model.asBoolean
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
 import dev.aster.vega.model.isMissing
+import dev.aster.vega.model.isNullish
 import dev.aster.vega.model.parseFieldPath
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -134,23 +135,8 @@ public object AggregateTransform : Transform {
       groups.entries.map { it.key to it.value } + crossed.map { it to emptyList<VegaValue>() }
     return cells.map { (key, tuples) ->
       val output = LinkedHashMap<String, VegaValue>(groupBy.size + measures.size)
-      groupBy.forEachIndexed { index, path -> output[path] = key[index] }
-      // One bootstrap per group and field, memoized: `ci0` and `ci1` are two ends of the same
-      // interval, and upstream caches it on the cell for exactly that reason.
-      val intervals = HashMap<String, Pair<Double, Double>?>()
-      val confidence: (String) -> Pair<Double, Double>? = { path ->
-        intervals.getOrPut(path) {
-          // Upstream's `numbers`: not null, not the empty string, and not NaN. Infinity survives
-          // that test, so it is deliberately not filtered here either.
-          val values =
-            tuples
-              .map { it.field(path) }
-              .filterNot { it.isMissing || (it is VegaValue.Str && it.value.isEmpty()) }
-              .map { JsSemantics.toNumber(it) }
-              .filterNot { it.isNaN() }
-          context.scope.random.bootstrapConfidence(values)
-        }
-      }
+      groupBy.forEachIndexed { index, path -> output[path] = key.values[index] }
+      val confidence = bootstrapFor(tuples, context)
       for (measure in measures) {
         // A measure with no answer is *absent* from the row rather than null: upstream's operations
         // return `undefined` when they cannot be computed — `stderr` of one value, `min` of nothing
@@ -158,9 +144,36 @@ public object AggregateTransform : Transform {
         // `formula` reading the field, where absent and null coerce alike, and in an `isValid`
         // test, where they do not.
         val value = measure.compute(tuples, confidence)
-        if (value !is VegaValue.Null) output[measure.outputName] = value
+        if (!value.isNullish) output[measure.outputName] = value
       }
       VegaValue.Obj(output)
+    }
+  }
+}
+
+/**
+ * One bootstrap per group and field, memoized.
+ *
+ * `ci0` and `ci1` are two ends of the same interval, and upstream caches it on the cell for exactly
+ * that reason: running the resampling twice would give two different intervals *and* leave the
+ * seeded stream in a different place for every group after it.
+ */
+private fun bootstrapFor(
+  tuples: List<VegaValue>,
+  context: TransformContext,
+): (String) -> Pair<Double, Double>? {
+  val intervals = HashMap<String, Pair<Double, Double>?>()
+  return { path ->
+    intervals.getOrPut(path) {
+      // Upstream's `numbers`: not null, not the empty string, and not NaN. Infinity survives that
+      // test, so it is deliberately not filtered here either.
+      val values =
+        tuples
+          .map { it.field(path) }
+          .filterNot { it.isMissing || (it is VegaValue.Str && it.value.isEmpty()) }
+          .map { JsSemantics.toNumber(it) }
+          .filterNot { it.isNaN() }
+      context.scope.random.bootstrapConfidence(values)
     }
   }
 }
@@ -171,17 +184,17 @@ public object AggregateTransform : Transform {
  * The order is the product's own — the first dimension varies slowest — which is what puts
  * upstream's empty cells where it puts them once the observed ones are removed.
  */
-private fun crossProduct(observed: List<List<VegaValue>>, dimensions: Int): List<List<VegaValue>> {
+private fun crossProduct(observed: List<GroupKey>, dimensions: Int): List<GroupKey> {
   if (observed.isEmpty()) return emptyList()
   val values =
     List(dimensions) { index ->
-      observed.map { it[index] }.distinctBy { it.asComparableKey() }
+      observed.map { it.values[index] }.distinctBy { it.asComparableKey() }
     }
   var product = listOf(emptyList<VegaValue>())
   for (dimension in values) {
     product = product.flatMap { prefix -> dimension.map { prefix + it } }
   }
-  return product
+  return product.map { GroupKey(it) }
 }
 
 /**
@@ -202,9 +215,14 @@ public object JoinAggregateTransform : Transform {
     val measures = measures(params, context) ?: return input
 
     val groups = groupTuples(input, groupBy)
-    val summaries = HashMap<List<VegaValue>, Map<String, VegaValue>>(groups.size)
+    val summaries = HashMap<GroupKey, Map<String, VegaValue>>(groups.size)
     for ((key, tuples) in groups) {
-      summaries[key] = measures.associate { it.outputName to it.compute(tuples) }
+      // The **same** bootstrap closure `aggregate` builds. Without one, `Measure.compute` had
+      // nothing to ask and returned null for `ci0` and `ci1`, silently — so a `joinaggregate`
+      // asking for a confidence interval wrote nulls onto every row of its group and the error
+      // bars it was for were drawn nowhere.
+      val confidence = bootstrapFor(tuples, context)
+      summaries[key] = measures.associate { it.outputName to it.compute(tuples, confidence) }
     }
     return input.map { datum ->
       datum.withFields(summaries[groupKey(datum, groupBy)] ?: emptyMap())
@@ -290,37 +308,56 @@ internal class Measure(
 
     // `count` is deliberately computed before filtering: it counts tuples, not values.
     if (op == AggregateOp.COUNT) return VegaValue.Num(raw.size.toDouble())
+    // Upstream's cell sorts every value into exactly one of three boxes, and the boundaries are
+    // not the ones this engine's `isMissing` draws:
+    // ```js
+    // if (v == null || v === '') { ++this.missing; return; }
+    // if (v !== v) return;                       // a NaN is neither missing nor valid
+    // ++this.valid;
+    // ```
+    // So the empty string is **missing** — a dirty CSV column of `""` was entering the numeric
+    // list as a valid 0 and dragging every mean toward it — and a NaN is counted in neither box,
+    // where `missing` was counting it.
     if (op == AggregateOp.MISSING) {
-      return VegaValue.Num(raw.count { it.isMissing }.toDouble())
+      return VegaValue.Num(raw.count { it.isCellMissing() }.toDouble())
     }
-    val present = raw.filterNot { it.isMissing }
+    // The **valid** values, raw and unfiltered. Not coerced and not screened for finiteness: an
+    // infinity is a valid value upstream and so is a string that coerces to NaN, and both are
+    // meant to poison the sum. Filtering them answered 1 for the sum of `[1, "abc"]`, where
+    // upstream answers NaN — a total that silently omits the rows it could not read.
+    val present = raw.filter { !it.isCellMissing() && !it.isCellNaN() }
     if (op == AggregateOp.VALID) return VegaValue.Num(present.size.toDouble())
-    // The arg operations pick a *tuple*, so they run over the rows rather than over the values the
-    // rows hold, and a row whose field is missing cannot win. Upstream keeps the first row at the
-    // extreme, which is why this compares strictly.
-    if (op == AggregateOp.ARGMIN || op == AggregateOp.ARGMAX) {
+    // `min` and `max` track the extreme **incrementally**, over the raw values and with
+    // JavaScript's relational comparison: `if (v < m.min || m.min === undefined) m.min = v`. A
+    // string in a numeric column therefore never displaces a number, because `1 < "abc"` and
+    // `"abc" < 1` are both false — where coercing first would have made the answer NaN.
+    if (op == AggregateOp.MIN || op == AggregateOp.MAX) {
       var best: VegaValue? = null
-      var bestValue = 0.0
-      for (tuple in tuples) {
-        val value = tuple.field(path)
-        if (value.isMissing) continue
-        val number = JsSemantics.toNumber(value)
-        if (!number.isFinite()) continue
+      for (value in present) {
+        val ordering = best?.let { JsSemantics.compare(value, it) }
         val better =
-          best == null || if (op == AggregateOp.ARGMIN) number < bestValue else number > bestValue
-        if (better) {
-          best = tuple
-          bestValue = number
-        }
+          best == null ||
+            (ordering != null && if (op == AggregateOp.MIN) ordering < 0 else ordering > 0)
+        if (better) best = value
       }
       return best ?: VegaValue.Null
     }
-
-    val numbers = present.map { JsSemantics.toNumber(it) }.filter { it.isFinite() }
-    if (numbers.isEmpty()) {
-      // Upstream reports 0 for a sum over nothing and null for everything else.
-      return if (op == AggregateOp.SUM) VegaValue.Num(0.0) else VegaValue.Null
+    // The arg operations pick a **tuple**, and upstream reaches them through a different route
+    // from `min`/`max`: `m.argmin || m.cell.data.argmin(m.get)`, whose fallback is `extentIndex`
+    // over every stored row. That is transcribed below, because the two routes genuinely disagree
+    // — `argmin` over `[Infinity, 1]` is the second row while `min` is 1, and `argmin` over
+    // `['abc', 1]` is the *first* row while `min` is `'abc'`. An infinity and a non-numeric value
+    // both take part, where this used to skip them.
+    if (op == AggregateOp.ARGMIN || op == AggregateOp.ARGMAX) {
+      return extremeTuple(tuples, path, smallest = op == AggregateOp.ARGMIN) ?: VegaValue.Null
     }
+
+    val numbers = present.map { JsSemantics.toNumber(it) }
+    // `m.valid ? … : undefined` guards every numeric operation upstream, sum included: a group
+    // with no valid value at all answers **undefined** and not 0. A comment here said upstream
+    // reports 0 for a sum over nothing; it was probed false, and the code followed it — so a total
+    // over a group of nulls passed an `isValid` filter that upstream's drops.
+    if (numbers.isEmpty()) return VegaValue.Null
 
     return when (op) {
       AggregateOp.SUM -> VegaValue.Num(numbers.sum())
@@ -346,14 +383,19 @@ internal class Measure(
       // company where the sum overflows — the mean of `[MAX_VALUE, MAX_VALUE]` is `MAX_VALUE`
       // upstream and `Infinity` from a sum that overflowed before it divided.
       AggregateOp.AVERAGE -> VegaValue.Num(welford(numbers).mean)
-      AggregateOp.MIN -> VegaValue.Num(numbers.min())
-      AggregateOp.MAX -> VegaValue.Num(numbers.max())
       AggregateOp.MEDIAN -> VegaValue.Num(quantile(numbers.sorted(), 0.5))
       AggregateOp.Q1 -> VegaValue.Num(quantile(numbers.sorted(), 0.25))
       AggregateOp.Q3 -> VegaValue.Num(quantile(numbers.sorted(), 0.75))
-      AggregateOp.VARIANCE -> VegaValue.Num(variance(numbers, sample = true))
+      // `m.valid > 1 ? … : undefined` for the three sample forms, `m.valid ? … : undefined` for
+      // the two population ones. One value gives **no** variance rather than a NaN one: the
+      // property is absent from the row upstream, and an absent property and a NaN read the same
+      // through arithmetic and the opposite through `isValid`.
+      AggregateOp.VARIANCE ->
+        if (numbers.size < 2) VegaValue.Null else VegaValue.Num(variance(numbers, sample = true))
       AggregateOp.VARIANCEP -> VegaValue.Num(variance(numbers, sample = false))
-      AggregateOp.STDEV -> VegaValue.Num(sqrt(variance(numbers, sample = true)))
+      AggregateOp.STDEV ->
+        if (numbers.size < 2) VegaValue.Null
+        else VegaValue.Num(sqrt(variance(numbers, sample = true)))
       AggregateOp.STDEVP -> VegaValue.Num(sqrt(variance(numbers, sample = false)))
       // `sqrt(dev / (n * (n - 1)))`, upstream's own arrangement — the sample standard deviation
       // divided by `sqrt(n)`, which is what an error bar's half-length is.
@@ -365,12 +407,62 @@ internal class Measure(
       AggregateOp.VALID,
       AggregateOp.MISSING,
       AggregateOp.DISTINCT,
+      AggregateOp.MIN,
+      AggregateOp.MAX,
       AggregateOp.ARGMIN,
       AggregateOp.ARGMAX,
       AggregateOp.CI0,
       AggregateOp.CI1,
       AggregateOp.VALUES -> VegaValue.Null
     }
+  }
+
+  /** Upstream's cell: `v == null || v === ''`. The empty string is missing, and NaN is not. */
+  private fun VegaValue.isCellMissing(): Boolean =
+    isNullish || (this is VegaValue.Str && value.isEmpty())
+
+  /** Upstream's `v !== v`, which is true for a NaN **number** and for nothing else. */
+  private fun VegaValue.isCellNaN(): Boolean = this is VegaValue.Num && value.isNaN()
+
+  /**
+   * `extentIndex`, transcribed: the rows holding the least and greatest value of [path].
+   *
+   * The first candidate has to pass `b != null && b >= b`, which admits a string — `'abc' >= 'abc'`
+   * is true — and rejects null and NaN. Every later value is compared with `>` and `<` under
+   * JavaScript's relational rules, so a value that cannot be ordered against the running extreme
+   * simply never displaces it, and the **first** row wins a tie.
+   */
+  private fun extremeTuple(
+    tuples: List<VegaValue>,
+    path: String,
+    smallest: Boolean,
+  ): VegaValue? {
+    var lowest: VegaValue? = null
+    var highest: VegaValue? = null
+    var lowestRow: VegaValue? = null
+    var highestRow: VegaValue? = null
+    for (tuple in tuples) {
+      val value = tuple.field(path)
+      if (lowest == null) {
+        // `b != null && b >= b`
+        if (value.isNullish || value.isCellNaN()) continue
+        lowest = value
+        highest = value
+        lowestRow = tuple
+        highestRow = tuple
+        continue
+      }
+      if (value.isNullish) continue
+      if (JsSemantics.compare(lowest, value)?.let { it > 0 } == true) {
+        lowest = value
+        lowestRow = tuple
+      }
+      if (JsSemantics.compare(highest!!, value)?.let { it < 0 } == true) {
+        highest = value
+        highestRow = tuple
+      }
+    }
+    return if (smallest) lowestRow else highestRow
   }
 
   /** Sample variance divides by `n - 1`; the population form divides by `n`. */
@@ -444,7 +536,7 @@ internal fun measures(params: VegaValue.Obj, context: TransformContext): List<Me
     if (op == null) {
       context.diagnostics.error(
         DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-        "'$opName' is not one of Vega's aggregate operations" + (REFUSED[opName.lowercase()] ?: ""),
+        "'$opName' is not one of Vega's aggregate operations",
         operator = opName,
       )
       return null
@@ -467,9 +559,6 @@ internal fun measures(params: VegaValue.Obj, context: TransformContext): List<Me
   return measures
 }
 
-/** Operations that are missing on purpose, and why, so a reader is not left waiting for them. */
-private val REFUSED = emptyMap<String, String>()
-
 /**
  * Groups tuples by the `groupby` field values, preserving first-seen group order.
  *
@@ -477,27 +566,49 @@ private val REFUSED = emptyMap<String, String>()
  * inserting an `aggregate` transform with the group's `groupby`, so the two must agree on both the
  * grouping and its order.
  */
+/**
+ * What makes two rows the same group, which is **not** the raw values they were grouped on.
+ *
+ * Upstream groups through `fastmap`, which is object-backed, so JavaScript coerces every key to a
+ * string before storing it: the integer `1001` and the string `"1001"` are one property and
+ * therefore one group. Keying on the raw values split what upstream merges — the same defect
+ * [asComparableKey] was written for, and which `lookup`, `impute` and `dotbin` already avoided
+ * while `aggregate`, `window`, `pivot`, `regression`, `density` and the facet compiler did not.
+ *
+ * [values] are the **first** row's, which is where upstream reads a group's own fields from too, so
+ * a group formed from a string and a number carries the spelling that arrived first.
+ */
+public class GroupKey(public val values: List<VegaValue>) {
+
+  private val identity: List<String> = values.map { it.asComparableKey() }
+
+  override fun equals(other: Any?): Boolean = other is GroupKey && other.identity == identity
+
+  override fun hashCode(): Int = identity.hashCode()
+
+  override fun toString(): String = identity.toString()
+}
+
 public fun groupTuples(
   input: List<VegaValue>,
   groupBy: List<String>,
-): Map<List<VegaValue>, List<VegaValue>> {
+): Map<GroupKey, List<VegaValue>> {
   // No `groupby` means one group over everything — but only if there is something. An aggregate
   // over nothing produces **no rows**, not a row of nulls: upstream never invents a group it saw no
   // tuples for, with or without a groupby. The difference shows wherever a filter can empty a
   // dataset, which is every tooltip and every brush — a row of nulls there draws the tooltip's
   // frame at the origin over a chart nobody is pointing at.
   if (input.isEmpty()) return emptyMap()
-  if (groupBy.isEmpty()) return mapOf(emptyList<VegaValue>() to input)
-  val groups = LinkedHashMap<List<VegaValue>, MutableList<VegaValue>>()
+  if (groupBy.isEmpty()) return mapOf(GroupKey(emptyList()) to input)
+  val groups = LinkedHashMap<GroupKey, MutableList<VegaValue>>()
   for (datum in input) {
     groups.getOrPut(groupKey(datum, groupBy)) { mutableListOf() }.add(datum)
   }
   return groups
 }
 
-public fun groupKey(datum: VegaValue, groupBy: List<String>): List<VegaValue> = groupBy.map {
-  datum.field(it)
-}
+public fun groupKey(datum: VegaValue, groupBy: List<String>): GroupKey =
+  GroupKey(groupBy.map { datum.field(it) })
 
 /**
  * A value usable as a map key.

@@ -835,6 +835,7 @@ final class dev.aster.vega.scene/PathData { // dev.aster.vega.scene/PathData|nul
         final fun <get-isEmpty>(): kotlin/Boolean // dev.aster.vega.scene/PathData.isEmpty.<get-isEmpty>|<get-isEmpty>(){}[0]
 
     final fun containsEvenOdd(dev.aster.vega.scene/PointD, kotlin/Double = ...): kotlin/Boolean // dev.aster.vega.scene/PathData.containsEvenOdd|containsEvenOdd(dev.aster.vega.scene.PointD;kotlin.Double){}[0]
+    final fun containsNonZero(dev.aster.vega.scene/PointD, kotlin/Double = ...): kotlin/Boolean // dev.aster.vega.scene/PathData.containsNonZero|containsNonZero(dev.aster.vega.scene.PointD;kotlin.Double){}[0]
     final fun distanceToOutline(dev.aster.vega.scene/PointD, kotlin/Double = ...): kotlin/Double // dev.aster.vega.scene/PathData.distanceToOutline|distanceToOutline(dev.aster.vega.scene.PointD;kotlin.Double){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.scene/PathData.equals|equals(kotlin.Any?){}[0]
     final fun flatten(kotlin/Double = ...): kotlin.collections/List<kotlin.collections/List<dev.aster.vega.scene/PointD>> // dev.aster.vega.scene/PathData.flatten|flatten(kotlin.Double){}[0]

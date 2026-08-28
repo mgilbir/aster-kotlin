@@ -17,7 +17,7 @@ public final class dev/aster/vega/loader/JvmHostResolver : dev/aster/vega/runtim
 
 public final class dev/aster/vega/loader/JvmHttpTransport : dev/aster/vega/runtime/load/HttpTransport {
 	public static final field INSTANCE Ldev/aster/vega/loader/JvmHttpTransport;
-	public fun get (Ljava/lang/String;II)Ldev/aster/vega/runtime/load/HttpResponse;
+	public fun get (Ljava/lang/String;IIJ)Ldev/aster/vega/runtime/load/HttpResponse;
 }
 
 public final class dev/aster/vega/loader/VegaDataLoaders {

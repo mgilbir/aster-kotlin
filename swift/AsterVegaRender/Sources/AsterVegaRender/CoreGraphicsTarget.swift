@@ -62,20 +62,24 @@ public struct CoreGraphicsTarget: DrawTarget {
     context.restoreGState()
   }
 
-  public mutating func rect(_ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?) {
+  public mutating func rect(
+    _ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode
+  ) {
     let path = corners.isSquare ? CGPath(rect: cg(rect), transform: nil) : rounded(rect, corners)
-    paint(path: path, fill: fill, stroke: stroke)
+    paint(path: path, fill: fill, stroke: stroke, blend: blend)
   }
 
-  public mutating func line(from: Point, to: Point, stroke: StrokePaint?) {
+  public mutating func line(from: Point, to: Point, stroke: StrokePaint?, blend: SceneBlendMode) {
     guard let stroke else { return }
     let path = CGMutablePath()
     path.move(to: cg(from))
     path.addLine(to: cg(to))
-    paint(path: path, fill: nil, stroke: stroke)
+    paint(path: path, fill: nil, stroke: stroke, blend: blend)
   }
 
-  public mutating func path(_ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?) {
+  public mutating func path(
+    _ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode
+  ) {
     let path = CGMutablePath()
     for command in commands {
       switch command {
@@ -86,11 +90,22 @@ public struct CoreGraphicsTarget: DrawTarget {
       case .close: path.closeSubpath()
       }
     }
-    paint(path: path, fill: fill, stroke: stroke)
+    paint(path: path, fill: fill, stroke: stroke, blend: blend)
   }
 
-  public mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?) {
+  public mutating func text(
+    _ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode
+  ) {
+    // Bracketed rather than passed down, because the text drawing is a closure the host supplies
+    // and a blend mode is graphics state: setting it here applies to whatever that closure draws.
+    guard blend != SceneBlendMode.normal else {
+      drawText?(run, fill, context)
+      return
+    }
+    context.saveGState()
+    context.setBlendMode(Self.cgBlend(blend))
     drawText?(run, fill, context)
+    context.restoreGState()
   }
 
   public mutating func image(
@@ -99,7 +114,8 @@ public struct CoreGraphicsTarget: DrawTarget {
     in rect: Rect,
     fit: DrawImageFit,
     smooth: Bool,
-    opacity: Double
+    opacity: Double,
+    blend: SceneBlendMode
   ) {
     guard let decoded = resolve(url: url, raster: raster) else {
       // Said rather than swallowed: an image that could not be resolved leaves a hole in the chart, and
@@ -112,6 +128,7 @@ public struct CoreGraphicsTarget: DrawTarget {
 
     let box = fit == .contain ? contained(decoded, in: rect) : cg(rect)
     context.saveGState()
+    context.setBlendMode(Self.cgBlend(blend))
     context.setAlpha(CGFloat(opacity))
     context.interpolationQuality = smooth ? .high : .none
     // Flipped about the destination: a CGImage is drawn bottom-up, and every coordinate here is in a
@@ -192,7 +209,41 @@ public struct CoreGraphicsTarget: DrawTarget {
 
   // MARK: - Painting
 
-  private func paint(path: CGPath, fill: Brush?, stroke: StrokePaint?) {
+  /// CSS `mix-blend-mode` as CoreGraphics's own, which has all sixteen and then some.
+  ///
+  /// The mapping is one-to-one and named identically on both sides, which is not a coincidence:
+  /// `CGBlendMode`'s separable and non-separable modes are the PDF blend modes, and CSS took its
+  /// list from the same place.
+  static func cgBlend(_ blend: SceneBlendMode) -> CGBlendMode {
+    switch blend {
+    case SceneBlendMode.multiply: return .multiply
+    case SceneBlendMode.screen: return .screen
+    case SceneBlendMode.overlay: return .overlay
+    case SceneBlendMode.darken: return .darken
+    case SceneBlendMode.lighten: return .lighten
+    case SceneBlendMode.colorDodge: return .colorDodge
+    case SceneBlendMode.colorBurn: return .colorBurn
+    case SceneBlendMode.hardLight: return .hardLight
+    case SceneBlendMode.softLight: return .softLight
+    case SceneBlendMode.difference: return .difference
+    case SceneBlendMode.exclusion: return .exclusion
+    case SceneBlendMode.hue: return .hue
+    case SceneBlendMode.saturation: return .saturation
+    case SceneBlendMode.color: return .color
+    case SceneBlendMode.luminosity: return .luminosity
+    default: return .normal
+    }
+  }
+
+  private func paint(path: CGPath, fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode) {
+    // Bracketed around the whole item, fill and stroke together, because that is what a blend mode
+    // means: the mark composites against what is under it, once.
+    let blended = blend != SceneBlendMode.normal
+    if blended {
+      context.saveGState()
+      context.setBlendMode(Self.cgBlend(blend))
+    }
+    defer { if blended { context.restoreGState() } }
     if let fill {
       switch fill {
       case .solid(let colour):
@@ -366,16 +417,62 @@ public struct CoreGraphicsTarget: DrawTarget {
     case unknown
   }
 
+  /// **Bounded**, in bytes of decoded pixels rather than in entries.
+  ///
+  /// This is a `static` cache, so it lives for the life of the *process* — a host that shows a
+  /// hundred charts, each with its own images, holds every one of them until it exits. And an entry
+  /// count is the wrong bound: an engine-produced `heatmap` raster is megabytes where an icon is
+  /// kilobytes, so ten entries can be ten kilobytes or a hundred megabytes. The bound is a byte
+  /// budget, evicted least-recently-used, which is the shape the audit asked for and the reason it
+  /// is not simply a smaller dictionary.
+  ///
+  /// `clearImageCache()` remains, for a host saying an address now holds something different.
   private final class ImageCache: @unchecked Sendable {
+    /// About sixty-four megabytes of decoded pixels, which is several full-screen rasters and
+    /// hundreds of icons.
+    private static let byteBudget = 64 * 1024 * 1024
+
     private var byDigest: [Int64: CGImage] = [:]
     private var byURL: [String: CGImage] = [:]
     private var unresolvable: Set<String> = []
+    /// Keys in least-recently-used order, oldest first, tagged by which dictionary holds them.
+    private var order: [Key] = []
+    private var bytes = 0
     private let lock = NSLock()
+
+    private enum Key: Hashable {
+      case digest(Int64)
+      case url(String)
+    }
+
+    /// A decoded image's cost. `bytesPerRow * height` is what CoreGraphics actually holds.
+    private func cost(_ image: CGImage) -> Int { image.bytesPerRow * image.height }
+
+    /// Marks a key as just used, and evicts from the far end until the budget is met.
+    ///
+    /// Called with the lock already held.
+    private func touch(_ key: Key, adding added: Int) {
+      order.removeAll { $0 == key }
+      order.append(key)
+      bytes += added
+      while bytes > Self.byteBudget, let oldest = order.first, order.count > 1 {
+        order.removeFirst()
+        switch oldest {
+        case .digest(let digest):
+          if let evicted = byDigest.removeValue(forKey: digest) { bytes -= cost(evicted) }
+        case .url(let url):
+          if let evicted = byURL.removeValue(forKey: url) { bytes -= cost(evicted) }
+        }
+      }
+    }
 
     func answer(forURL url: String) -> Answer {
       lock.lock()
       defer { lock.unlock() }
-      if let image = byURL[url] { return .image(image) }
+      if let image = byURL[url] {
+        touch(.url(url), adding: 0)
+        return .image(image)
+      }
       return unresolvable.contains(url) ? .unresolvable : .unknown
     }
 
@@ -392,24 +489,32 @@ public struct CoreGraphicsTarget: DrawTarget {
       byDigest.removeAll()
       byURL.removeAll()
       unresolvable.removeAll()
+      order.removeAll()
+      bytes = 0
     }
 
     func image(forRaster digest: Int64) -> CGImage? {
       lock.lock()
       defer { lock.unlock() }
-      return byDigest[digest]
+      guard let image = byDigest[digest] else { return nil }
+      touch(.digest(digest), adding: 0)
+      return image
     }
 
     func store(_ image: CGImage, forRaster digest: Int64) {
       lock.lock()
       defer { lock.unlock() }
+      if let previous = byDigest[digest] { bytes -= cost(previous) }
       byDigest[digest] = image
+      touch(.digest(digest), adding: cost(image))
     }
 
     func store(_ image: CGImage, forURL url: String) {
       lock.lock()
       defer { lock.unlock() }
+      if let previous = byURL[url] { bytes -= cost(previous) }
       byURL[url] = image
+      touch(.url(url), adding: cost(image))
     }
   }
 

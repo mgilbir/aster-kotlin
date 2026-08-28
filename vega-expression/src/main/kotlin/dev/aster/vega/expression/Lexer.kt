@@ -66,8 +66,32 @@ public class Lexer(private val source: String) {
   }
 
   private fun skipWhitespace() {
-    while (index < source.length && source[index].isWhitespace()) index++
+    while (index < source.length && isJsWhitespace(source[index])) index++
   }
+
+  /**
+   * JavaScript's *WhiteSpace* and *LineTerminator*, which are not Kotlin's.
+   *
+   * The one that matters in practice is the **no-break space**. `Char.isWhitespace` excludes U+00A0
+   * on purpose — it is not a separator when you are breaking text into words — and JavaScript's
+   * grammar includes it, so an expression copied out of a rendered web page failed with `Unexpected
+   * character ' '` and no way to see what the character was. U+FEFF is the other one worth naming:
+   * it is what a UTF-8 byte-order mark decodes to, so a specification saved with one had an
+   * unlexable first token.
+   */
+  private fun isJsWhitespace(ch: Char): Boolean =
+    when (ch) {
+      '\u0009',
+      '\u000B',
+      '\u000C',
+      '\u00A0',
+      '\uFEFF',
+      '\n',
+      '\r',
+      '\u2028',
+      '\u2029' -> true
+      else -> ch.category == CharCategory.SPACE_SEPARATOR
+    }
 
   private fun number(start: Int): Token {
     // Hex and binary literals are legal JavaScript and appear in colour arithmetic.
@@ -120,8 +144,7 @@ public class Lexer(private val source: String) {
           if (index >= source.length) {
             throw ExpressionSyntaxException("Unterminated escape", index, source)
           }
-          text.append(unescape(source[index]))
-          index++
+          appendEscape(text)
         }
         else -> {
           text.append(c)
@@ -131,29 +154,97 @@ public class Lexer(private val source: String) {
     }
   }
 
-  private fun unescape(c: Char): Char =
-    when (c) {
-      'n' -> '\n'
-      't' -> '\t'
-      'r' -> '\r'
-      'b' -> '\b'
-      'f' -> '\u000C'
-      'v' -> '\u000B'
-      '0' -> '\u0000'
-      'u' -> {
-        // \uXXXX; the four hex digits follow, so consume them here.
-        if (index + 4 >= source.length) {
-          throw ExpressionSyntaxException("Truncated unicode escape", index, source)
-        }
-        val hex = source.substring(index + 1, index + 5)
-        val code =
-          hex.toIntOrNull(16)
-            ?: throw ExpressionSyntaxException("Invalid unicode escape '\\u$hex'", index, source)
-        index += 4
-        code.toChar()
+  /**
+   * One escape sequence, appended to [text], with [index] left after it.
+   *
+   * Three of JavaScript's forms were missing and each of them **silently produced the wrong text**,
+   * because the fallback is the identity: `'\x41'` came out as `"x41"` rather than `"A"`,
+   * `'\u{1F600}'` as `"u{1F600}"`, and a backslash at the end of a line — a *line continuation*,
+   * which is how a long pattern is written across two lines — put the newline into the string.
+   * Nothing reported any of it, so a label was simply wrong.
+   *
+   * A whole code point, not a character, because `\u{...}` above U+FFFF is a surrogate pair.
+   */
+  private fun appendEscape(text: StringBuilder) {
+    when (val c = source[index]) {
+      'n' -> {
+        text.append('\n')
+        index++
       }
-      else -> c
+      't' -> {
+        text.append('\t')
+        index++
+      }
+      'r' -> {
+        text.append('\r')
+        index++
+      }
+      'b' -> {
+        text.append('\b')
+        index++
+      }
+      'f' -> {
+        text.append('\u000C')
+        index++
+      }
+      'v' -> {
+        text.append('\u000B')
+        index++
+      }
+      '0' -> {
+        text.append('\u0000')
+        index++
+      }
+      // A *LineContinuation*: the backslash and the line terminator both vanish. `\r\n` is one
+      // terminator, not two.
+      '\n',
+      '\u2028',
+      '\u2029' -> index++
+      '\r' -> {
+        index++
+        if (index < source.length && source[index] == '\n') index++
+      }
+      'x' -> {
+        val code = hexAt(index + 1, 2) ?: throw invalidEscape("x", index, 2)
+        text.append(code.toChar())
+        index += 3
+      }
+      'u' -> {
+        if (index + 1 < source.length && source[index + 1] == '{') {
+          val close = source.indexOf('}', index + 2)
+          val digits = if (close < 0) null else source.substring(index + 2, close)
+          val code = digits?.takeIf { it.isNotEmpty() }?.toIntOrNull(16)
+          if (code == null || code > 0x10FFFF) {
+            throw ExpressionSyntaxException("Invalid unicode escape", index, source)
+          }
+          text.appendCodePointCompat(code)
+          index = close + 1
+        } else {
+          // \uXXXX; the four hex digits follow, so consume them here.
+          val code = hexAt(index + 1, 4) ?: throw invalidEscape("u", index, 4)
+          text.append(code.toChar())
+          index += 5
+        }
+      }
+      else -> {
+        text.append(c)
+        index++
+      }
     }
+  }
+
+  /** [count] hexadecimal digits starting at [from], or null when they are not all there. */
+  private fun hexAt(from: Int, count: Int): Int? {
+    if (from + count > source.length) return null
+    return source.substring(from, from + count).toIntOrNull(16)
+  }
+
+  private fun invalidEscape(marker: String, at: Int, digits: Int) =
+    ExpressionSyntaxException(
+      "Invalid escape '\\$marker': it takes $digits hexadecimal digits",
+      at,
+      source,
+    )
 
   private fun isIdentifierStart(ch: Char): Boolean = IdentifierChars.isStart(ch)
 
@@ -224,9 +315,10 @@ public class Lexer(private val source: String) {
  * version the platform happens to ship. Comparing the two found 86 characters where a category test
  * and the specification disagree.
  *
- * The library answers for a whole string, so each character is asked once and remembered. Two
- * arrays of the Basic Multilingual Plane is a hundred and twenty kilobytes, filled only where a
- * specification actually reaches; a lexer runs this per character and cannot afford to allocate.
+ * The library answers for a whole string, so each character is asked once and remembered. Four
+ * arrays of the Basic Multilingual Plane — a known flag and an answer, for each of the two
+ * questions — is a quarter of a megabyte, filled only where a specification actually reaches; a
+ * lexer runs this per character and cannot afford to allocate.
  */
 private object IdentifierChars {
   private const val PLANE = 0x10000
@@ -253,5 +345,20 @@ private object IdentifierChars {
       partKnown[at] = true
     }
     return partValue[at]
+  }
+}
+
+/**
+ * `StringBuilder.appendCodePoint`, which the common standard library does not have.
+ *
+ * A code point above U+FFFF is a surrogate pair, and `\u{1F600}` is how a specification writes one.
+ */
+private fun StringBuilder.appendCodePointCompat(code: Int) {
+  if (code <= 0xFFFF) {
+    append(code.toChar())
+  } else {
+    val shifted = code - 0x10000
+    append((0xD800 + (shifted shr 10)).toChar())
+    append((0xDC00 + (shifted and 0x3FF)).toChar())
   }
 }

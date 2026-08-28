@@ -1,11 +1,11 @@
 package dev.aster.vega.model.time
 
+import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.locale.DateName
 import dev.aster.vega.model.locale.DateNameContext
 import dev.aster.vega.model.locale.VegaLocale
 import kotlin.time.Instant
 import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
@@ -201,8 +201,11 @@ public object TimeFormat {
         'S' -> number(at.second, 2)
         'L' -> number(at.nanosecond / 1_000_000, 3)
         'f' -> number(at.nanosecond / 1_000, 6)
-        'Q' -> out.append(digits(millis.toLong().toString()))
-        's' -> out.append(digits((millis / 1000.0).toLong().toString()))
+        'Q' -> out.append(digits(Decimals.jsString(millis)))
+        // `Math.floor(+d / 1000)`, and the floor is the whole of it: a division that truncates
+        // toward zero is a second late for every instant before 1970. d3 writes `-2` for
+        // `-1500`; truncation writes `-1`, which is the same second twice and a missing one.
+        's' -> out.append(digits(Decimals.jsString(kotlin.math.floor(millis / 1000.0))))
         'Z' -> out.append(digits(offset(millis, zone)))
         // The locale's own compositions. d3's en-US spells these three out as the defaults on
         // `VegaLocale`, and a locale that writes its dates the other way round says so there rather
@@ -275,8 +278,10 @@ public object TimeFormat {
   /** `%V`: the ISO week, where a week belongs to the year holding its Thursday. */
   private fun isoWeek(at: LocalDateTime): Int {
     val thursday = at.date.plus(4 - at.date.dayOfWeek.isoDayNumber, DateTimeUnit.DAY)
-    val firstOfYear = LocalDate(thursday.year, 1, 1)
-    return ((thursday.dayOfYear - 1) / 7) + 1 + if (firstOfYear.dayOfWeek.isoDayNumber > 4) 0 else 0
+    // The week is the Thursday's day of the year divided by seven, and nothing else: this used to
+    // add `if (firstOfYear.dayOfWeek > 4) 0 else 0`, which is zero either way and read as though a
+    // correction were being applied.
+    return ((thursday.dayOfYear - 1) / 7) + 1
   }
 
   /** `%G`: the year that ISO week belongs to, which is not always the calendar year. */
@@ -304,6 +309,4 @@ public object TimeFormat {
     val day = at.date.dayOfYear
     return if (day < firstSunday) 0 else (day - firstSunday) / 7 + 1
   }
-
-  private fun pad(value: Int, width: Int): String = value.toString().padStart(width, '0')
 }

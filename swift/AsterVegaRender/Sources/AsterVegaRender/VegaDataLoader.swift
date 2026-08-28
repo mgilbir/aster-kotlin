@@ -169,21 +169,47 @@ public final class VegaDataLoader: NSObject, DataLoader, @unchecked Sendable {
     )
   }
 
-  /// A small locked dictionary. `load` is called synchronously from Kotlin, so it cannot await an actor.
+  /// A locked, **bounded** dictionary of dataset text.
+  ///
+  /// `load` is called synchronously from Kotlin, so it cannot await an actor — hence the lock rather
+  /// than an actor. Bounded in *characters* rather than entries, because that is what varies: Vega's
+  /// own `flights-200k.json` is twelve megabytes and its `cars.json` is a hundred kilobytes, so an
+  /// entry count would be a bound on nothing. A loader shared across a whole app — which
+  /// `SpecLibrary` does deliberately, so one dataset is fetched once per launch — would otherwise
+  /// hold every dataset every chart ever read until the process exits.
   private final class Cache {
+    /// About thirty-two megabytes of text, which is several of Vega's largest datasets at once.
+    private static let characterBudget = 32 * 1024 * 1024
+
     private var contents: [String: String] = [:]
+    /// Keys in least-recently-used order, oldest first.
+    private var order: [String] = []
+    private var characters = 0
     private let lock = NSLock()
 
     func value(for key: String) -> String? {
       lock.lock()
       defer { lock.unlock() }
-      return contents[key]
+      guard let value = contents[key] else { return nil }
+      order.removeAll { $0 == key }
+      order.append(key)
+      return value
     }
 
     func store(_ value: String, for key: String) {
       lock.lock()
       defer { lock.unlock() }
+      if let previous = contents[key] { characters -= previous.count }
       contents[key] = value
+      order.removeAll { $0 == key }
+      order.append(key)
+      characters += value.count
+      // `order.count > 1` keeps the entry just stored, so a single dataset larger than the whole
+      // budget still works — it is simply the only thing cached, which is the right answer for it.
+      while characters > Self.characterBudget, order.count > 1 {
+        let oldest = order.removeFirst()
+        if let evicted = contents.removeValue(forKey: oldest) { characters -= evicted.count }
+      }
     }
   }
 }

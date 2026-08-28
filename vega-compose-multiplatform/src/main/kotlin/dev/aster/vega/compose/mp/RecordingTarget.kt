@@ -1,6 +1,7 @@
 package dev.aster.vega.compose.mp
 
 import dev.aster.vega.scene.RasterImage
+import dev.aster.vega.scene.SceneBlendMode
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
@@ -41,19 +42,31 @@ public class RecordingTarget : SceneDrawTarget {
     corners: DrawCorners,
     fill: DrawBrush?,
     stroke: DrawStroke?,
+    blend: SceneBlendMode,
   ) {
     note(
       "rect ${show(rect)}" +
         (if (corners.isSquare) "" else " corners ${show(corners)}") +
-        paints(fill, stroke)
+        paints(fill, stroke) +
+        blended(blend)
     )
   }
 
-  override fun line(from: DrawPoint, to: DrawPoint, stroke: DrawStroke?) {
-    note("line ${show(from)}->${show(to)}${paints(null, stroke)}")
+  override fun line(
+    from: DrawPoint,
+    to: DrawPoint,
+    stroke: DrawStroke?,
+    blend: SceneBlendMode,
+  ) {
+    note("line ${show(from)}->${show(to)}${paints(null, stroke)}${blended(blend)}")
   }
 
-  override fun path(commands: List<DrawPathCommand>, fill: DrawBrush?, stroke: DrawStroke?) {
+  override fun path(
+    commands: List<DrawPathCommand>,
+    fill: DrawBrush?,
+    stroke: DrawStroke?,
+    blend: SceneBlendMode,
+  ) {
     // A path's every coordinate would swamp the recording, so its shape is summarised: how many
     // commands, of which kinds, starting where. That is enough to tell an arc from a rectangle and
     // a
@@ -72,17 +85,23 @@ public class RecordingTarget : SceneDrawTarget {
             .joinToString(", ") { "${it.value} ${it.key}" }
         "${commands.size} commands ($tally) from ${show(start(commands))}"
       }
-    note("path $shape${paints(fill, stroke)}")
+    note("path $shape${paints(fill, stroke)}${blended(blend)}")
   }
 
-  override fun text(run: DrawTextRun, fill: DrawBrush?, stroke: DrawStroke?) {
+  override fun text(
+    run: DrawTextRun,
+    fill: DrawBrush?,
+    stroke: DrawStroke?,
+    blend: SceneBlendMode,
+  ) {
     note(
       "text \"${run.text}\" at ${show(run.origin)} ${run.fontFamily} ${show(run.fontSize)}" +
         (if (run.fontWeight != 400) " w${run.fontWeight}" else "") +
         (if (run.italic) " italic" else "") +
         (if (run.angleDegrees != 0.0) " angle ${show(run.angleDegrees)} about ${show(run.anchor)}"
         else "") +
-        paints(fill, stroke)
+        paints(fill, stroke) +
+        blended(blend)
     )
   }
 
@@ -93,6 +112,7 @@ public class RecordingTarget : SceneDrawTarget {
     fit: DrawImageFit,
     smooth: Boolean,
     opacity: Double,
+    blend: SceneBlendMode,
   ) {
     // A raster is described by its size: it has no address, and its pixels are neither readable nor
     // stable
@@ -101,7 +121,8 @@ public class RecordingTarget : SceneDrawTarget {
     note(
       "image $source ${show(rect)} ${fit.name.lowercase()}" +
         (if (!smooth) " sharp" else "") +
-        (if (opacity != 1.0) " opacity ${show(opacity)}" else "")
+        (if (opacity != 1.0) " opacity ${show(opacity)}" else "") +
+        blended(blend)
     )
   }
 
@@ -125,6 +146,16 @@ public class RecordingTarget : SceneDrawTarget {
       is DrawPathCommand.CubicTo -> "cubic"
       DrawPathCommand.Close -> "close"
     }
+
+  /**
+   * The item's blend mode, and nothing at all where it is the default.
+   *
+   * Recorded because a golden that cannot see a channel cannot notice it going missing, which is
+   * exactly how the MP renderer ignored `blend` outright while the parity goldens stayed green.
+   * Written only when it is not `NORMAL`, so every existing golden is byte-identical.
+   */
+  private fun blended(blend: SceneBlendMode): String =
+    if (blend == SceneBlendMode.NORMAL) "" else " blend ${blend.name.lowercase()}"
 
   private fun paints(fill: DrawBrush?, stroke: DrawStroke?): String =
     (fill?.let { " fill ${show(it)}" } ?: "") +

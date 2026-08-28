@@ -1,6 +1,7 @@
 package dev.aster.vega.compose.mp
 
 import dev.aster.vega.scene.RasterImage
+import dev.aster.vega.scene.SceneBlendMode
 import dev.aster.vega.scene.SceneColor
 
 /**
@@ -26,17 +27,46 @@ public interface SceneDrawTarget {
 
   public fun endGroup()
 
-  /** An axis-aligned rectangle, with per-corner radii already resolved. */
-  public fun rect(rect: DrawRect, corners: DrawCorners, fill: DrawBrush?, stroke: DrawStroke?)
+  /**
+   * An axis-aligned rectangle, with per-corner radii already resolved.
+   *
+   * [blend] is the item's `blend` channel, and it belongs to the *item* rather than to either
+   * paint: a mark with both a fill and a stroke composites both the same way. Every draw method
+   * below takes it for that reason, and each defaults to [SceneBlendMode.NORMAL] so a target that
+   * has no notion of blending is still a legal implementation — it simply has to say so, which is
+   * what `SceneWalk`'s diagnostics are for.
+   */
+  public fun rect(
+    rect: DrawRect,
+    corners: DrawCorners,
+    fill: DrawBrush?,
+    stroke: DrawStroke?,
+    blend: SceneBlendMode = SceneBlendMode.NORMAL,
+  )
 
   /** A straight segment. A rule is a line, not a thin rectangle, so its caps matter. */
-  public fun line(from: DrawPoint, to: DrawPoint, stroke: DrawStroke?)
+  public fun line(
+    from: DrawPoint,
+    to: DrawPoint,
+    stroke: DrawStroke?,
+    blend: SceneBlendMode = SceneBlendMode.NORMAL,
+  )
 
   /** An arbitrary path, already reduced to move/line/cubic/close by the engine. */
-  public fun path(commands: List<DrawPathCommand>, fill: DrawBrush?, stroke: DrawStroke?)
+  public fun path(
+    commands: List<DrawPathCommand>,
+    fill: DrawBrush?,
+    stroke: DrawStroke?,
+    blend: SceneBlendMode = SceneBlendMode.NORMAL,
+  )
 
   /** One line of text, positioned at its anchor with alignment already resolved by the engine. */
-  public fun text(run: DrawTextRun, fill: DrawBrush?, stroke: DrawStroke?)
+  public fun text(
+    run: DrawTextRun,
+    fill: DrawBrush?,
+    stroke: DrawStroke?,
+    blend: SceneBlendMode = SceneBlendMode.NORMAL,
+  )
 
   /**
    * A bitmap.
@@ -56,6 +86,7 @@ public interface SceneDrawTarget {
     fit: DrawImageFit,
     smooth: Boolean,
     opacity: Double,
+    blend: SceneBlendMode = SceneBlendMode.NORMAL,
   )
 }
 

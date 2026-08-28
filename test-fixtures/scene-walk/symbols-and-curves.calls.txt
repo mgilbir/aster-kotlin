@@ -1,22 +1,22 @@
-rect (0.000,0.000,270.000,180.000) corners=[0.000,0.000,0.000,0.000] fill=#ffffffff stroke=-
+rect (0.000,0.000,270.000,180.000) corners=[0.000,0.000,0.000,0.000] fill=#ffffffff stroke=- blend=normal
 group clip=-
   group clip=-
-    path M(16.340,26.536)L(16.340,33.464)L(21.536,33.464)L(21.536,38.660)L(28.464,38.660)L(28.464,33.464)L(33.660,33.464)L(33.660,26.536)L(28.464,26.536)L(28.464,21.340)L(21.536,21.340)L(21.536,26.536)Z fill=#c6dbefff stroke=#08519cff w=1.500 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
-    path M(61.667,20.000)L(53.006,35.000)L(70.327,35.000)Z fill=#c6dbefff stroke=#08519cff w=1.500 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
-    path M(105.833,30.000)L(90.833,21.340)L(90.833,38.660)Z fill=#c6dbefff stroke=#08519cff w=1.500 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
-    path M(127.500,30.000)L(142.500,21.340)L(142.500,38.660)Z fill=#c6dbefff stroke=#08519cff w=1.500 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
-    path M(170.429,38.660)L(172.904,38.660)L(172.904,28.917)L(175.131,28.917)L(171.667,21.340)L(168.203,28.917)L(170.429,28.917)Z fill=#c6dbefff stroke=#08519cff w=1.500 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
-    path M(208.333,20.000)L(206.168,35.000)L(210.498,35.000)Z fill=#c6dbefff stroke=#08519cff w=1.500 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
-    path M(236.340,30.000)L(253.660,30.000) fill=#c6dbefff stroke=#08519cff w=1.500 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
-    text "cross" origin=(14.500,53.000) anchor=(25.000,53.000) ascent=5.600 font="sans-serif" size=7.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#333333ff stroke=-
-    text "triangle" origin=(44.867,53.000) anchor=(61.667,53.000) ascent=5.600 font="sans-serif" size=7.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#333333ff stroke=-
-    text "triangle-right" origin=(68.933,53.000) anchor=(98.333,53.000) ascent=5.600 font="sans-serif" size=7.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#333333ff stroke=-
-    text "triangle-left" origin=(107.700,53.000) anchor=(135.000,53.000) ascent=5.600 font="sans-serif" size=7.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#333333ff stroke=-
-    text "arrow" origin=(161.167,53.000) anchor=(171.667,53.000) ascent=5.600 font="sans-serif" size=7.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#333333ff stroke=-
-    text "wedge" origin=(197.833,53.000) anchor=(208.333,53.000) ascent=5.600 font="sans-serif" size=7.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#333333ff stroke=-
-    text "stroke" origin=(232.400,53.000) anchor=(245.000,53.000) ascent=5.600 font="sans-serif" size=7.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#333333ff stroke=-
-    path M(69.000,136.500)C(83.667,132.000)(98.333,108.000)(113.000,103.500)C(127.667,99.000)(142.333,114.000)(157.000,116.100)C(171.667,118.200)(186.333,107.400)(201.000,111.000) fill=- stroke=#4c78a8ff w=2.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
-    path M(69.000,144.000)C(84.909,142.198)(97.091,73.802)(113.000,72.000)C(126.740,70.443)(141.777,115.765)(157.000,117.000)C(171.184,118.151)(187.121,82.839)(201.000,84.600) fill=- stroke=#f58518ff w=2.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
-    path M(69.000,168.000)C(84.909,166.198)(97.091,97.802)(113.000,96.000)C(126.740,94.443)(141.777,139.765)(157.000,141.000)C(171.184,142.151)(187.121,106.839)(201.000,108.600)C(216.670,110.588)(250.253,153.688)(245.000,162.600)C(235.590,178.565)(32.363,109.107)(25.000,123.000)C(21.093,130.372)(55.260,169.557)(69.000,168.000) fill=- stroke=#54a24bff w=2.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000
+    path M(16.340,26.536)L(16.340,33.464)L(21.536,33.464)L(21.536,38.660)L(28.464,38.660)L(28.464,33.464)L(33.660,33.464)L(33.660,26.536)L(28.464,26.536)L(28.464,21.340)L(21.536,21.340)L(21.536,26.536)Z fill=#c6dbefff stroke=#08519cff w=1.500 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000 blend=normal
+    path M(61.667,20.000)L(53.006,35.000)L(70.327,35.000)Z fill=#c6dbefff stroke=#08519cff w=1.500 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000 blend=normal
+    path M(105.833,30.000)L(90.833,21.340)L(90.833,38.660)Z fill=#c6dbefff stroke=#08519cff w=1.500 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000 blend=normal
+    path M(127.500,30.000)L(142.500,21.340)L(142.500,38.660)Z fill=#c6dbefff stroke=#08519cff w=1.500 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000 blend=normal
+    path M(170.429,38.660)L(172.904,38.660)L(172.904,28.917)L(175.131,28.917)L(171.667,21.340)L(168.203,28.917)L(170.429,28.917)Z fill=#c6dbefff stroke=#08519cff w=1.500 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000 blend=normal
+    path M(208.333,20.000)L(206.168,35.000)L(210.498,35.000)Z fill=#c6dbefff stroke=#08519cff w=1.500 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000 blend=normal
+    path M(236.340,30.000)L(253.660,30.000) fill=#c6dbefff stroke=#08519cff w=1.500 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000 blend=normal
+    text "cross" origin=(14.500,53.000) anchor=(25.000,53.000) ascent=5.600 font="sans-serif" size=7.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#333333ff stroke=- blend=normal
+    text "triangle" origin=(44.867,53.000) anchor=(61.667,53.000) ascent=5.600 font="sans-serif" size=7.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#333333ff stroke=- blend=normal
+    text "triangle-right" origin=(68.933,53.000) anchor=(98.333,53.000) ascent=5.600 font="sans-serif" size=7.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#333333ff stroke=- blend=normal
+    text "triangle-left" origin=(107.700,53.000) anchor=(135.000,53.000) ascent=5.600 font="sans-serif" size=7.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#333333ff stroke=- blend=normal
+    text "arrow" origin=(161.167,53.000) anchor=(171.667,53.000) ascent=5.600 font="sans-serif" size=7.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#333333ff stroke=- blend=normal
+    text "wedge" origin=(197.833,53.000) anchor=(208.333,53.000) ascent=5.600 font="sans-serif" size=7.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#333333ff stroke=- blend=normal
+    text "stroke" origin=(232.400,53.000) anchor=(245.000,53.000) ascent=5.600 font="sans-serif" size=7.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#333333ff stroke=- blend=normal
+    path M(69.000,136.500)C(83.667,132.000)(98.333,108.000)(113.000,103.500)C(127.667,99.000)(142.333,114.000)(157.000,116.100)C(171.667,118.200)(186.333,107.400)(201.000,111.000) fill=- stroke=#4c78a8ff w=2.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000 blend=normal
+    path M(69.000,144.000)C(84.909,142.198)(97.091,73.802)(113.000,72.000)C(126.740,70.443)(141.777,115.765)(157.000,117.000)C(171.184,118.151)(187.121,82.839)(201.000,84.600) fill=- stroke=#f58518ff w=2.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000 blend=normal
+    path M(69.000,168.000)C(84.909,166.198)(97.091,97.802)(113.000,96.000)C(126.740,94.443)(141.777,139.765)(157.000,141.000)C(171.184,142.151)(187.121,106.839)(201.000,108.600)C(216.670,110.588)(250.253,153.688)(245.000,162.600)C(235.590,178.565)(32.363,109.107)(25.000,123.000)C(21.093,130.372)(55.260,169.557)(69.000,168.000) fill=- stroke=#54a24bff w=2.000 cap=butt join=miter miter=4.000 dash=[] dashOffset=0.000 blend=normal
   end
 end

@@ -25,11 +25,20 @@ public object ForeignSignals {
 
   // --- Reading a value -------------------------------------------------------
 
-  /** `null`, `boolean`, `number`, `string`, `timestamp`, `array`, `object` or `pattern`. */
+  /**
+   * `null`, `undefined`, `boolean`, `number`, `string`, `timestamp`, `array`, `object` or
+   * `pattern`.
+   *
+   * `undefined` is the newest of the nine and is what an expression reading a field its row does
+   * not have produces — see `VegaValue.Undefined`. A host that does not care which kind of nothing
+   * it has can test both; the distinction is here because upstream's signal values carry it and a
+   * chart's arithmetic turns on it.
+   */
   public fun kind(value: VegaValue?): String =
     when (value) {
       null,
       VegaValue.Null -> "null"
+      VegaValue.Undefined -> "undefined"
       is VegaValue.Bool -> "boolean"
       is VegaValue.Num -> "number"
       is VegaValue.Str -> "string"

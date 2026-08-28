@@ -72,7 +72,10 @@ struct PasteSpecView: View {
         .frame(minHeight: 280)
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3)))
 
-      Text("Data must be inline: this app has no network loader, so a `url` becomes a diagnostic.")
+      Text(
+        "A `url` is resolved against the bundled datasets first, then fetched from "
+          + "vega.github.io — and nowhere else. Any other address becomes a diagnostic."
+      )
         .font(.caption)
         .foregroundStyle(.secondary)
     }

@@ -1,5 +1,6 @@
 package dev.aster.vegalite
 
+import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.VegaValue
 
 /**
@@ -236,8 +237,11 @@ internal class LayoutSize(
 
   /**
    * JavaScript's number-to-text, so `0.1` and `0` read as upstream writes them in an expression.
+   *
+   * `Decimals.jsString` is `String(x)` exactly, which is what this was approximating in two ways
+   * that break: `toLong()` saturates at 9.2e18 while the guard let 1e21 through, so a step over
+   * that turned into `9223372036854775807`; and `Double.toString` writes `1.0E-7` where JavaScript
+   * writes `1e-7`.
    */
-  private fun number(value: Double): String =
-    if (value % 1.0 == 0.0 && kotlin.math.abs(value) < 1e21) value.toLong().toString()
-    else value.toString()
+  private fun number(value: Double): String = Decimals.jsString(value)
 }

@@ -60,13 +60,19 @@ public object AxisDefaults {
   public const val TITLE_FONT_WEIGHT: Int = 700
 
   /**
-   * How far a title may be pushed away from its axis.
+   * How far an axis's ticks and labels may reach on its own side: upstream's `minExtent` and
+   * `maxExtent` defaults.
    *
-   * Upstream clamps to `[0, 200]`, so an axis with pathologically long labels stops pushing its
-   * title outwards rather than dragging the whole surface with it.
+   * Named for the **axis extent**, which is what they clamp — `depth()` applies them to the reach
+   * of the ticks and labels, and the title is placed a padding beyond whatever that comes to. They
+   * used to be called `TITLE_MIN_EXTENT`/`TITLE_MAX_EXTENT`, which reads as a property of the title
+   * and is not one; upstream's own names are `minExtent` and `maxExtent` on the axis.
+   *
+   * The clamp is why an axis with pathologically long labels stops pushing its title outwards
+   * rather than dragging the whole surface with it.
    */
-  public const val TITLE_MIN_EXTENT: Double = 0.0
-  public const val TITLE_MAX_EXTENT: Double = 200.0
+  public const val MIN_EXTENT: Double = 0.0
+  public const val MAX_EXTENT: Double = 200.0
 
   public val titleColor: SceneColor = SceneColor.parse("#000")!!
 }

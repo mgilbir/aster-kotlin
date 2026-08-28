@@ -60,4 +60,20 @@ class FontStackTest {
     // the names after it, so `"sans-serif, Chart Sans"` reached no resolver at all.
     assertEquals(listOf("sans-serif", "Chart Sans"), FontStack.families("sans-serif, Chart Sans"))
   }
+
+  /**
+   * A family name may contain a comma, and the quotes are why CSS has them.
+   *
+   * `"Foo, Bar", serif` names **two** families. Splitting on the comma before stripping the quotes
+   * named three, none of which a host could ever answer — and an unresolved family is a chart drawn
+   * in the platform default with, until recently, nothing said about it.
+   */
+  @Test
+  fun `a quoted family keeps its comma`() {
+    assertEquals(listOf("Foo, Bar", "serif"), FontStack.families("\"Foo, Bar\", serif"))
+    assertEquals(listOf("Foo, Bar"), FontStack.families("'Foo, Bar'"))
+    // A quote that is not where a name starts is an ordinary character, which is what keeps an
+    // apostrophe inside a name from opening a string.
+    assertEquals(listOf("Bob's Sans", "serif"), FontStack.families("Bob's Sans, serif"))
+  }
 }

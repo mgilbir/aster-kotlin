@@ -22,16 +22,22 @@ public protocol DrawTarget {
   mutating func endGroup()
 
   /// An axis-aligned rectangle, with per-corner radii already resolved.
-  mutating func rect(_ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?)
+  ///
+  /// `blend` is the item's CSS `mix-blend-mode`, and it belongs to the *item* rather than to either
+  /// paint: a mark with both a fill and a stroke composites both the same way. Every method below
+  /// carries it for that reason. It was not carried at all until this: the channel reached the
+  /// walk and stopped there, so a `"blend": "multiply"` drew normally on Apple and in Compose
+  /// Multiplatform while the Android View and the SVG export both honoured it.
+  mutating func rect(_ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode)
 
   /// A straight segment. A rule is a line, not a thin rectangle, so its caps matter.
-  mutating func line(from: Point, to: Point, stroke: StrokePaint?)
+  mutating func line(from: Point, to: Point, stroke: StrokePaint?, blend: SceneBlendMode)
 
   /// An arbitrary path, already reduced to move/line/cubic/close by the engine.
-  mutating func path(_ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?)
+  mutating func path(_ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode)
 
   /// One line of text, positioned at its anchor with alignment already resolved by the engine.
-  mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?)
+  mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?, blend: SceneBlendMode)
 
   /// A bitmap.
   ///
@@ -48,7 +54,8 @@ public protocol DrawTarget {
     in rect: Rect,
     fit: DrawImageFit,
     smooth: Bool,
-    opacity: Double
+    opacity: Double,
+    blend: SceneBlendMode
   )
 }
 

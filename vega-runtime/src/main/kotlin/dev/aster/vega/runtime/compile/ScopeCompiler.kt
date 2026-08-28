@@ -1,6 +1,7 @@
 package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.dataflow.transform.AggregateOp
+import dev.aster.vega.dataflow.transform.GroupKey
 import dev.aster.vega.dataflow.transform.ProjectionDefinition
 import dev.aster.vega.dataflow.transform.TransformContext
 import dev.aster.vega.dataflow.transform.TransformPipeline
@@ -139,9 +140,19 @@ internal class ScopeCompiler(
 ) {
 
   /**
-   * @param extent the size of the group being filled, which positions its bottom and right axes. At
-   *   the top level this is the chart's plotting area.
+   * How many groups deep the walk currently is.
+   *
+   * A group mark is the only construct that nests, and it nests by *recursion* — several Kotlin
+   * frames per level. A machine-generated or adversarial document nested a few thousand levels down
+   * was a `StackOverflowError`, which is an `Error` rather than an exception, is caught by nothing
+   * typed, and is unrecoverable on Kotlin/Native. A specification is data, so it gets a diagnostic
+   * and an empty group instead.
+   *
+   * [MAX_GROUP_DEPTH] is far past anything a chart does: the deepest nesting in the whole fixture
+   * corpus is three, and Vega-Lite's own concat-of-facet-of-layer output reaches five.
    */
+  private var depth: Int = 0
+
   /**
    * A scope's scene nodes, and how far the drawing they make up reaches.
    *
@@ -186,6 +197,10 @@ internal class ScopeCompiler(
     return mark.copy(encode = mark.encode.copy(update = update))
   }
 
+  /**
+   * @param extent the size of the group being filled, which positions its bottom and right axes. At
+   *   the top level this is the chart's plotting area.
+   */
   fun compile(
     marks: List<MarkSpec>,
     axes: List<AxisSpec>,
@@ -460,13 +475,6 @@ internal class ScopeCompiler(
   private data class BuiltGroup(val content: ScopeContent, val datums: List<VegaValue>)
 
   /**
-   * Compiles a group mark, keeping each cell's *reach* as well as its nodes.
-   *
-   * A cell's reach is not the same as its node bounds: the axes inside it measure by their extent,
-   * so asking the finished [GroupNode] how big it is would quietly reintroduce the half-pixel crisp
-   * offset that everything outside the cell is careful to exclude.
-   */
-  /**
    * A **clipped** non-group mark's nodes, wrapped in the clip that upstream draws them under.
    *
    * `mark.clip` was already read for *bounds* — a clipped mark reaches no further than its group,
@@ -515,26 +523,6 @@ internal class ScopeCompiler(
   }
 
   /**
-   * The order a mark's items are taken in, as indices into the built list.
-   *
-   * Identity when the mark declares no `sort`. The fields are **field accessors on the scene
-   * item**, not expressions — Vega hands them to `vega-util`'s `field()`, which reads
-   * `datum["era"]` as the path `datum` → `era` — so `x` and `y` name where the item ended up and
-   * anything under `datum` names a column of the row it was bound to. A trellis whose cells go in
-   * alphabetical order rather than in the order the rows arrived depends entirely on the second:
-   * the group is sorted by its own facet key. A path neither can read leaves the order alone rather
-   * than inventing one.
-   */
-  /**
-   * A legend measures as its own box rather than as the union of what it drew.
-   *
-   * Upstream's `legendBounds` anchors the aggregate at the legend's padding and then *sets* the
-   * item's bounds to the resulting rectangle, so anything hanging above or to the left of the
-   * origin is drawn and not measured. A title beside the entries is exactly that case: it is
-   * vertically centred, so its text reaches a fraction above the legend's own top edge, and
-   * measuring it there pushes the whole chart down by a unit.
-   */
-  /**
    * How far a legend reaches: its declared extent, widened by its own outline.
    *
    * The declared extent rather than its bounds, because a legend that clips an entry still occupies
@@ -549,6 +537,17 @@ internal class ScopeCompiler(
       node.transform.mapBounds(widened)
     } ?: node.transformedBounds
 
+  /**
+   * The order a mark's items are taken in, as indices into the built list.
+   *
+   * Identity when the mark declares no `sort`. The fields are **field accessors on the scene
+   * item**, not expressions — Vega hands them to `vega-util`'s `field()`, which reads
+   * `datum["era"]` as the path `datum` → `era` — so `x` and `y` name where the item ended up and
+   * anything under `datum` names a column of the row it was bound to. A trellis whose cells go in
+   * alphabetical order rather than in the order the rows arrived depends entirely on the second:
+   * the group is sorted by its own facet key. A path neither can read leaves the order alone rather
+   * than inventing one.
+   */
   private fun sortOrder(
     sort: MarkSort?,
     nodes: List<SceneNode>,
@@ -567,7 +566,14 @@ internal class ScopeCompiler(
           val comparison = compareFieldValues(left, right)
           if (comparison != 0) return@Comparator if (descending) -comparison else comparison
         }
-        0
+        // **Declaration order**, not zero. A comparator that answers zero for a pair it cannot
+        // order is not a total order — a row whose key is unreadable compares equal to two rows
+        // that compare *unequal* to each other — and the JVM's TimSort detects that and throws
+        // `IllegalArgumentException: Comparison method violates its general contract!` once there
+        // are 32 or more items. A field some rows lack is all it takes. JavaScript's sort does not
+        // check, so upstream simply produces some order; this produces the same one it would have
+        // produced by stability, and never throws.
+        a.compareTo(b)
       }
     return nodes.indices.sortedWith(comparator)
   }
@@ -602,7 +608,36 @@ internal class ScopeCompiler(
     }
   }
 
+  /**
+   * Compiles a group mark, keeping each cell's *reach* as well as its nodes.
+   *
+   * A cell's reach is not the same as its node bounds: the axes inside it measure by their extent,
+   * so asking the finished [GroupNode] how big it is would quietly reintroduce the half-pixel crisp
+   * offset that everything outside the cell is careful to exclude.
+   */
   private fun group(spec: MarkSpec, outer: CompileScope, encoder: MarkEncoder): BuiltGroup {
+    if (depth >= MAX_GROUP_DEPTH) {
+      diagnostics.error(
+        DiagnosticCodes.COMPILE_LIMIT_EXCEEDED,
+        "Group marks are nested more than $MAX_GROUP_DEPTH deep; this one and everything inside " +
+          "it was not built",
+        operator = spec.name,
+      )
+      return BuiltGroup(ScopeContent(emptyList(), RectD.Empty), emptyList())
+    }
+    depth++
+    try {
+      return groupContents(spec, outer, encoder)
+    } finally {
+      depth--
+    }
+  }
+
+  private fun groupContents(
+    spec: MarkSpec,
+    outer: CompileScope,
+    encoder: MarkEncoder,
+  ): BuiltGroup {
     val partitions = partition(spec, outer)
     val inner = arrayOfNulls<RectD>(partitions.size)
     val nodes =
@@ -1075,7 +1110,7 @@ internal class ScopeCompiler(
     val rows = outer.datasets[dataName]
     if (rows == null) {
       diagnostics.error(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        DiagnosticCodes.DATA_UNREADABLE,
         unknownSource(dataName, "Group mark"),
         operator = spec.name,
       )
@@ -1087,15 +1122,6 @@ internal class ScopeCompiler(
   }
 
   /**
-   * Partitions a faceted group's source data.
-   *
-   * The datum shape — the groupby fields plus a `count` — is not invented here. Upstream implements
-   * faceting by inserting an `aggregate` transform with the same `groupby`, so the group's own
-   * encode block sees an aggregate tuple; verified against upstream, which yields `{cat: "A",
-   * count: 2}` for a two-row partition. Group order is first appearance in the source data, not
-   * sorted order.
-   */
-  /**
    * The grouping keys, with every *combination* filled in where `aggregate.cross` asks for it.
    *
    * A trellis crossed by two fields is a rectangle, and a combination no row carries still has to
@@ -1106,21 +1132,38 @@ internal class ScopeCompiler(
    * varying fastest.
    */
   private fun crossed(
-    groups: Map<List<VegaValue>, List<VegaValue>>,
+    groups: Map<GroupKey, List<VegaValue>>,
     facet: FacetSpec,
-  ): List<Pair<List<VegaValue>, List<VegaValue>>> {
+  ): List<Pair<GroupKey, List<VegaValue>>> {
     val ordered = groups.entries.map { it.key to it.value }
     if (!facet.crossed || facet.groupby.size < 2) return ordered
-    fun cellKey(key: List<VegaValue>): String = key.joinToString("|") { it.asString() }
+    // `GroupKey` is the identity now — it compares by upstream's own string coercion — so the
+    // hand-rolled `joinToString` that stood here has nothing left to do.
     val values =
       facet.groupby.indices.map { dimension ->
-        ordered.map { it.first[dimension] }.distinctBy { value -> value.asString() }
+        ordered.map { it.first.values[dimension] }.distinctBy { value -> value.asString() }
       }
-    val present = ordered.mapTo(mutableSetOf()) { cellKey(it.first) }
+    // The product is `values[0].size × values[1].size × …`, and nothing bounded it: two columns of
+    // a thousand distinct values each is a million cells, every one of them a compiled group with
+    // its own scales, axes and marks. `ScaleResolver`'s `MAX_BINS` is the same guard one file over,
+    // and the cost of not having one here is an out-of-memory error rather than a slow chart.
+    val cells = values.fold(1L) { total, dimension -> total * maxOf(1, dimension.size) }
+    if (cells > MAX_CROSSED_CELLS) {
+      diagnostics.error(
+        DiagnosticCodes.COMPILE_LIMIT_EXCEEDED,
+        "Crossing ${facet.groupby.joinToString(" × ")} would make $cells cells and " +
+          "$MAX_CROSSED_CELLS is the most this engine will build; only the combinations the data " +
+          "carries were drawn",
+        operator = facet.name,
+      )
+      return ordered
+    }
+    val present = ordered.mapTo(mutableSetOf()) { it.first }
     val filled = ordered.toMutableList()
     fun generate(prefix: List<VegaValue>) {
       if (prefix.size == facet.groupby.size) {
-        if (present.add(cellKey(prefix))) filled += prefix to emptyList()
+        val key = GroupKey(prefix)
+        if (present.add(key)) filled += key to emptyList()
         return
       }
       for (value in values[prefix.size]) generate(prefix + value)
@@ -1129,6 +1172,15 @@ internal class ScopeCompiler(
     return filled
   }
 
+  /**
+   * Partitions a faceted group's source data.
+   *
+   * The datum shape — the groupby fields plus a `count` — is not invented here. Upstream implements
+   * faceting by inserting an `aggregate` transform with the same `groupby`, so the group's own
+   * encode block sees an aggregate tuple; verified against upstream, which yields `{cat: "A",
+   * count: 2}` for a two-row partition. Group order is first appearance in the source data, not
+   * sorted order.
+   */
   private fun facetPartitions(
     spec: MarkSpec,
     facet: FacetSpec,
@@ -1137,7 +1189,7 @@ internal class ScopeCompiler(
     val source = outer.datasets[facet.data]
     if (source == null) {
       diagnostics.error(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        DiagnosticCodes.DATA_UNREADABLE,
         "Facet on group mark refers to unknown dataset '${facet.data}'",
         operator = spec.name,
       )
@@ -1159,7 +1211,7 @@ internal class ScopeCompiler(
 
     return crossed(groupTuples(source, facet.groupby), facet).map { (key, rows) ->
       val fields = LinkedHashMap<String, VegaValue>(facet.groupby.size + 1)
-      facet.groupby.forEachIndexed { index, field -> fields[field] = key[index] }
+      facet.groupby.forEachIndexed { index, field -> fields[field] = key.values[index] }
       fields["count"] = VegaValue.Num(rows.size.toDouble())
       // `facet.aggregate` measures each group and writes the answers onto the group's own datum, so
       // the marks inside read them off `parent`. A ridgeline plot scales every band by the number
@@ -1270,7 +1322,7 @@ internal class ScopeCompiler(
     val rows = scope.datasets[dataName]
     if (rows == null) {
       diagnostics.error(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        DiagnosticCodes.DATA_UNREADABLE,
         unknownSource(dataName),
         operator = mark.name,
       )
@@ -1431,3 +1483,9 @@ private val TRELLIS_BANDS =
     TrellisBand(TrellisRole.ROW_FOOTER, alongRows = true, leading = false),
     TrellisBand(TrellisRole.COLUMN_FOOTER, alongRows = false, leading = false),
   )
+
+/** See `ScopeCompiler.depth`. */
+private const val MAX_GROUP_DEPTH: Int = 64
+
+/** See `crossed`: a cap on `facet.aggregate.cross`, which is otherwise an unbounded product. */
+private const val MAX_CROSSED_CELLS: Long = 10_000L

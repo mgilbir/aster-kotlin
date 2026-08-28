@@ -1,6 +1,7 @@
 package dev.aster.vega.compose.mp
 
 import dev.aster.vega.scene.RasterImage
+import dev.aster.vega.scene.SceneBlendMode
 import kotlin.math.abs
 import kotlin.math.floor
 
@@ -64,19 +65,30 @@ internal class CanonicalCalls : SceneDrawTarget {
     corners: DrawCorners,
     fill: DrawBrush?,
     stroke: DrawStroke?,
+    blend: SceneBlendMode,
   ) {
     note(
       "rect ${rect(rect)} corners=[${num(corners.topLeft)},${num(corners.topRight)}," +
         "${num(corners.bottomRight)},${num(corners.bottomLeft)}]" +
-        " fill=${brush(fill)} stroke=${stroke(stroke)}"
+        " fill=${brush(fill)} stroke=${stroke(stroke)} blend=${blend(blend)}"
     )
   }
 
-  override fun line(from: DrawPoint, to: DrawPoint, stroke: DrawStroke?) {
-    note("line ${point(from)}-${point(to)} stroke=${stroke(stroke)}")
+  override fun line(
+    from: DrawPoint,
+    to: DrawPoint,
+    stroke: DrawStroke?,
+    blend: SceneBlendMode,
+  ) {
+    note("line ${point(from)}-${point(to)} stroke=${stroke(stroke)} blend=${blend(blend)}")
   }
 
-  override fun path(commands: List<DrawPathCommand>, fill: DrawBrush?, stroke: DrawStroke?) {
+  override fun path(
+    commands: List<DrawPathCommand>,
+    fill: DrawBrush?,
+    stroke: DrawStroke?,
+    blend: SceneBlendMode,
+  ) {
     val written =
       commands.joinToString("") {
         when (it) {
@@ -86,16 +98,21 @@ internal class CanonicalCalls : SceneDrawTarget {
           DrawPathCommand.Close -> "Z"
         }
       }
-    note("path $written fill=${brush(fill)} stroke=${stroke(stroke)}")
+    note("path $written fill=${brush(fill)} stroke=${stroke(stroke)} blend=${blend(blend)}")
   }
 
-  override fun text(run: DrawTextRun, fill: DrawBrush?, stroke: DrawStroke?) {
+  override fun text(
+    run: DrawTextRun,
+    fill: DrawBrush?,
+    stroke: DrawStroke?,
+    blend: SceneBlendMode,
+  ) {
     note(
       "text ${quoted(run.text)} origin=${point(run.origin)} anchor=${point(run.anchor)}" +
         " ascent=${num(run.ascent)} font=${quoted(run.fontFamily)} size=${num(run.fontSize)}" +
         " weight=${run.fontWeight} italic=${flag(run.italic)}" +
         " angle=${num(run.angleDegrees)} spacing=${num(run.letterSpacing)}" +
-        " fill=${brush(fill)} stroke=${stroke(stroke)}"
+        " fill=${brush(fill)} stroke=${stroke(stroke)} blend=${blend(blend)}"
     )
   }
 
@@ -106,6 +123,7 @@ internal class CanonicalCalls : SceneDrawTarget {
     fit: DrawImageFit,
     smooth: Boolean,
     opacity: Double,
+    blend: SceneBlendMode,
   ) {
     // A raster's pixels are neither readable nor stable as text, so it is written by its extent.
     // Its
@@ -114,7 +132,7 @@ internal class CanonicalCalls : SceneDrawTarget {
       "image url=${quoted(url)} raster=" +
         (raster?.let { "${it.width}x${it.height}" } ?: "-") +
         " ${rect(rect)} fit=${fit.name.lowercase()} smooth=${flag(smooth)}" +
-        " opacity=${num(opacity)}"
+        " opacity=${num(opacity)} blend=${blend(blend)}"
     )
   }
 
@@ -123,6 +141,9 @@ internal class CanonicalCalls : SceneDrawTarget {
   }
 
   private fun flag(value: Boolean) = if (value) "1" else "0"
+
+  /** The mode's own name, lower-cased. The Swift recorder writes the same string. */
+  private fun blend(blend: SceneBlendMode) = blend.name.lowercase()
 
   private fun point(point: DrawPoint) = "(${num(point.x)},${num(point.y)})"
 

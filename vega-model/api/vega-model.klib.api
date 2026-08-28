@@ -1117,6 +1117,12 @@ sealed interface dev.aster.vega.model/VegaValue { // dev.aster.vega.model/VegaVa
         final fun hashCode(): kotlin/Int // dev.aster.vega.model/VegaValue.Null.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // dev.aster.vega.model/VegaValue.Null.toString|toString(){}[0]
     }
+
+    final object Undefined : dev.aster.vega.model/VegaValue { // dev.aster.vega.model/VegaValue.Undefined|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.model/VegaValue.Undefined.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.model/VegaValue.Undefined.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.model/VegaValue.Undefined.toString|toString(){}[0]
+    }
 }
 
 final class dev.aster.vega.model.locale/DateNameContext { // dev.aster.vega.model.locale/DateNameContext|null[0]
@@ -2667,6 +2673,14 @@ final object dev.aster.vega.model.time/DateValues { // dev.aster.vega.model.time
     final fun parseTextual(kotlin/String, kotlinx.datetime/TimeZone = ...): kotlin/Double? // dev.aster.vega.model.time/DateValues.parseTextual|parseTextual(kotlin.String;kotlinx.datetime.TimeZone){}[0]
 }
 
+final object dev.aster.vega.model.time/JsDate { // dev.aster.vega.model.time/JsDate|null[0]
+    final const val MAX_TIME_VALUE // dev.aster.vega.model.time/JsDate.MAX_TIME_VALUE|{}MAX_TIME_VALUE[0]
+        final fun <get-MAX_TIME_VALUE>(): kotlin/Double // dev.aster.vega.model.time/JsDate.MAX_TIME_VALUE.<get-MAX_TIME_VALUE>|<get-MAX_TIME_VALUE>(){}[0]
+
+    final fun clip(kotlin/Double): kotlin/Double // dev.aster.vega.model.time/JsDate.clip|clip(kotlin.Double){}[0]
+    final fun make(kotlin/Double, kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlinx.datetime/TimeZone): kotlin/Double // dev.aster.vega.model.time/JsDate.make|make(kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double;kotlinx.datetime.TimeZone){}[0]
+}
+
 final object dev.aster.vega.model.time/TimeFormat { // dev.aster.vega.model.time/TimeFormat|null[0]
     final val MONTHS // dev.aster.vega.model.time/TimeFormat.MONTHS|{}MONTHS[0]
         final fun <get-MONTHS>(): kotlin.collections/List<kotlin/String> // dev.aster.vega.model.time/TimeFormat.MONTHS.<get-MONTHS>|<get-MONTHS>(){}[0]
@@ -2725,6 +2739,20 @@ final object dev.aster.vega.model/DelimitedText { // dev.aster.vega.model/Delimi
 }
 
 final object dev.aster.vega.model/DiagnosticCodes { // dev.aster.vega.model/DiagnosticCodes|null[0]
+    final const val COMPILE_CONCURRENT // dev.aster.vega.model/DiagnosticCodes.COMPILE_CONCURRENT|{}COMPILE_CONCURRENT[0]
+        final fun <get-COMPILE_CONCURRENT>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.COMPILE_CONCURRENT.<get-COMPILE_CONCURRENT>|<get-COMPILE_CONCURRENT>(){}[0]
+    final const val COMPILE_FAILED // dev.aster.vega.model/DiagnosticCodes.COMPILE_FAILED|{}COMPILE_FAILED[0]
+        final fun <get-COMPILE_FAILED>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.COMPILE_FAILED.<get-COMPILE_FAILED>|<get-COMPILE_FAILED>(){}[0]
+    final const val COMPILE_LIMIT_EXCEEDED // dev.aster.vega.model/DiagnosticCodes.COMPILE_LIMIT_EXCEEDED|{}COMPILE_LIMIT_EXCEEDED[0]
+        final fun <get-COMPILE_LIMIT_EXCEEDED>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.COMPILE_LIMIT_EXCEEDED.<get-COMPILE_LIMIT_EXCEEDED>|<get-COMPILE_LIMIT_EXCEEDED>(){}[0]
+    final const val DATA_LOAD_FAILED // dev.aster.vega.model/DiagnosticCodes.DATA_LOAD_FAILED|{}DATA_LOAD_FAILED[0]
+        final fun <get-DATA_LOAD_FAILED>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.DATA_LOAD_FAILED.<get-DATA_LOAD_FAILED>|<get-DATA_LOAD_FAILED>(){}[0]
+    final const val DATA_UNREADABLE // dev.aster.vega.model/DiagnosticCodes.DATA_UNREADABLE|{}DATA_UNREADABLE[0]
+        final fun <get-DATA_UNREADABLE>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.DATA_UNREADABLE.<get-DATA_UNREADABLE>|<get-DATA_UNREADABLE>(){}[0]
+    final const val DUPLICATE_DEFINITION // dev.aster.vega.model/DiagnosticCodes.DUPLICATE_DEFINITION|{}DUPLICATE_DEFINITION[0]
+        final fun <get-DUPLICATE_DEFINITION>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.DUPLICATE_DEFINITION.<get-DUPLICATE_DEFINITION>|<get-DUPLICATE_DEFINITION>(){}[0]
+    final const val ENCODE_INVALID_VALUE // dev.aster.vega.model/DiagnosticCodes.ENCODE_INVALID_VALUE|{}ENCODE_INVALID_VALUE[0]
+        final fun <get-ENCODE_INVALID_VALUE>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.ENCODE_INVALID_VALUE.<get-ENCODE_INVALID_VALUE>|<get-ENCODE_INVALID_VALUE>(){}[0]
     final const val EXPORT_IMAGE_UNRESOLVED // dev.aster.vega.model/DiagnosticCodes.EXPORT_IMAGE_UNRESOLVED|{}EXPORT_IMAGE_UNRESOLVED[0]
         final fun <get-EXPORT_IMAGE_UNRESOLVED>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.EXPORT_IMAGE_UNRESOLVED.<get-EXPORT_IMAGE_UNRESOLVED>|<get-EXPORT_IMAGE_UNRESOLVED>(){}[0]
     final const val EXPORT_UNSUPPORTED_OPERATION // dev.aster.vega.model/DiagnosticCodes.EXPORT_UNSUPPORTED_OPERATION|{}EXPORT_UNSUPPORTED_OPERATION[0]
@@ -2737,6 +2765,8 @@ final object dev.aster.vega.model/DiagnosticCodes { // dev.aster.vega.model/Diag
         final fun <get-EXPRESSION_PARSE_ERROR>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.EXPRESSION_PARSE_ERROR.<get-EXPRESSION_PARSE_ERROR>|<get-EXPRESSION_PARSE_ERROR>(){}[0]
     final const val EXPRESSION_UNSUPPORTED_FUNCTION // dev.aster.vega.model/DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION|{}EXPRESSION_UNSUPPORTED_FUNCTION[0]
         final fun <get-EXPRESSION_UNSUPPORTED_FUNCTION>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION.<get-EXPRESSION_UNSUPPORTED_FUNCTION>|<get-EXPRESSION_UNSUPPORTED_FUNCTION>(){}[0]
+    final const val INTERACTION_UNSUPPORTED // dev.aster.vega.model/DiagnosticCodes.INTERACTION_UNSUPPORTED|{}INTERACTION_UNSUPPORTED[0]
+        final fun <get-INTERACTION_UNSUPPORTED>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.INTERACTION_UNSUPPORTED.<get-INTERACTION_UNSUPPORTED>|<get-INTERACTION_UNSUPPORTED>(){}[0]
     final const val PARSE_INVALID_JSON // dev.aster.vega.model/DiagnosticCodes.PARSE_INVALID_JSON|{}PARSE_INVALID_JSON[0]
         final fun <get-PARSE_INVALID_JSON>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.PARSE_INVALID_JSON.<get-PARSE_INVALID_JSON>|<get-PARSE_INVALID_JSON>(){}[0]
     final const val PARSE_MISSING_PROPERTY // dev.aster.vega.model/DiagnosticCodes.PARSE_MISSING_PROPERTY|{}PARSE_MISSING_PROPERTY[0]
@@ -2753,6 +2783,8 @@ final object dev.aster.vega.model/DiagnosticCodes { // dev.aster.vega.model/Diag
         final fun <get-RENDER_UNSUPPORTED_NODE>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.RENDER_UNSUPPORTED_NODE.<get-RENDER_UNSUPPORTED_NODE>|<get-RENDER_UNSUPPORTED_NODE>(){}[0]
     final const val SCALE_INVALID_DOMAIN // dev.aster.vega.model/DiagnosticCodes.SCALE_INVALID_DOMAIN|{}SCALE_INVALID_DOMAIN[0]
         final fun <get-SCALE_INVALID_DOMAIN>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.SCALE_INVALID_DOMAIN.<get-SCALE_INVALID_DOMAIN>|<get-SCALE_INVALID_DOMAIN>(){}[0]
+    final const val SCALE_NOT_BUILT // dev.aster.vega.model/DiagnosticCodes.SCALE_NOT_BUILT|{}SCALE_NOT_BUILT[0]
+        final fun <get-SCALE_NOT_BUILT>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.SCALE_NOT_BUILT.<get-SCALE_NOT_BUILT>|<get-SCALE_NOT_BUILT>(){}[0]
     final const val SCALE_UNSUPPORTED_TYPE // dev.aster.vega.model/DiagnosticCodes.SCALE_UNSUPPORTED_TYPE|{}SCALE_UNSUPPORTED_TYPE[0]
         final fun <get-SCALE_UNSUPPORTED_TYPE>(): kotlin/String // dev.aster.vega.model/DiagnosticCodes.SCALE_UNSUPPORTED_TYPE.<get-SCALE_UNSUPPORTED_TYPE>|<get-SCALE_UNSUPPORTED_TYPE>(){}[0]
     final const val SIGNAL_CYCLE // dev.aster.vega.model/DiagnosticCodes.SIGNAL_CYCLE|{}SIGNAL_CYCLE[0]
@@ -2804,6 +2836,8 @@ final const val dev.aster.vega.model/MINUS_SIGN // dev.aster.vega.model/MINUS_SI
 
 final val dev.aster.vega.model/isMissing // dev.aster.vega.model/isMissing|@dev.aster.vega.model.VegaValue{}isMissing[0]
     final fun (dev.aster.vega.model/VegaValue).<get-isMissing>(): kotlin/Boolean // dev.aster.vega.model/isMissing.<get-isMissing>|<get-isMissing>@dev.aster.vega.model.VegaValue(){}[0]
+final val dev.aster.vega.model/isNullish // dev.aster.vega.model/isNullish|@dev.aster.vega.model.VegaValue{}isNullish[0]
+    final fun (dev.aster.vega.model/VegaValue).<get-isNullish>(): kotlin/Boolean // dev.aster.vega.model/isNullish.<get-isNullish>|<get-isNullish>@dev.aster.vega.model.VegaValue(){}[0]
 
 final fun (dev.aster.vega.model/VegaValue).dev.aster.vega.model/asBoolean(): kotlin/Boolean // dev.aster.vega.model/asBoolean|asBoolean@dev.aster.vega.model.VegaValue(){}[0]
 final fun (dev.aster.vega.model/VegaValue).dev.aster.vega.model/asDouble(): kotlin/Double // dev.aster.vega.model/asDouble|asDouble@dev.aster.vega.model.VegaValue(){}[0]

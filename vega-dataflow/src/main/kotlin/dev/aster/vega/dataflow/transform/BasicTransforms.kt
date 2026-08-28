@@ -7,7 +7,7 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.InternalAsterVegaApi
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.field
-import dev.aster.vega.model.isMissing
+import dev.aster.vega.model.isNullish
 
 /** `filter`: keeps tuples whose `expr` is truthy. */
 public object FilterTransform : Transform {
@@ -220,20 +220,38 @@ public object ExtentTransform : Transform {
       )
       return input
     }
-    val numbers =
-      input
-        .map { it.field(path) }
-        .filterNot { it.isMissing }
-        .map { JsSemantics.toNumber(it) }
-        .filter { it.isFinite() }
+    // `toNumber(field(t))` first — null, undefined and the empty string are skipped — then
+    // `if (v < min) min = v; if (v > max) max = v`, with a comment upstream that says why:
+    // "NaNs will fail all comparisons!". An **infinity** does not fail them, so it takes the
+    // extreme; filtering it out here reported the finite extent of a column that upstream refuses
+    // to report an extent for at all.
+    var low = Double.POSITIVE_INFINITY
+    var high = Double.NEGATIVE_INFINITY
+    for (datum in input) {
+      val value = datum.field(path)
+      if (value.isNullish || (value is VegaValue.Str && value.value.isEmpty())) continue
+      val number = JsSemantics.toNumber(value)
+      if (number < low) low = number
+      if (number > high) high = number
+    }
+    // "Infinite extent": upstream warns and answers `[undefined, undefined]`, which is what an
+    // empty column gives too — a scale over it has no domain rather than a domain of infinities.
+    val infinite = !low.isFinite() || !high.isFinite()
+    if (infinite && input.isNotEmpty()) {
+      context.diagnostics.warn(
+        DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+        "Infinite extent for field '$path': [$low, $high]; the signal is left with no extent",
+        operator = type,
+      )
+    }
 
     val signal = params.string("signal")
     if (signal != null) {
       val extent =
-        if (numbers.isEmpty()) {
+        if (infinite) {
           VegaValue.Arr(listOf(VegaValue.Null, VegaValue.Null))
         } else {
-          VegaValue.Arr(listOf(VegaValue.Num(numbers.min()), VegaValue.Num(numbers.max())))
+          VegaValue.Arr(listOf(VegaValue.Num(low), VegaValue.Num(high)))
         }
       context.setSignal(signal, extent)
     }

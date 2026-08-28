@@ -2,7 +2,7 @@
   "marks": [
     {
       "closed": 0,
-      "points": "0 96 200 24",
+      "points": "M 0 96 L 200 24",
       "role": "mark",
       "stroke": "#333333",
       "strokeDash": "1,0",
@@ -11,7 +11,7 @@
     },
     {
       "closed": 0,
-      "points": "0 48 200 72",
+      "points": "M 0 48 L 200 72",
       "role": "mark",
       "stroke": "#333333",
       "strokeDash": "6,3",
@@ -20,7 +20,7 @@
     },
     {
       "closed": 0,
-      "points": "0 72 200 0",
+      "points": "M 0 72 L 200 0",
       "role": "mark",
       "stroke": "#333333",
       "strokeDash": "2,2,8,2",

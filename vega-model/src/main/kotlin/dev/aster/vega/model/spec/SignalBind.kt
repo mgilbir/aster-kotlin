@@ -2,6 +2,7 @@ package dev.aster.vega.model.spec
 
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.isNullish
 
 /**
  * `bind` — the control a specification asks for so a **reader** can change a signal.
@@ -122,7 +123,6 @@ public sealed interface SignalBind {
      * same option — which matters because an option list written in JSON and a signal computed by
      * an expression often disagree about which of the two they hold.
      */
-    public fun valueText(value: VegaValue): String =
-      if (value is VegaValue.Null) "" else value.asString()
+    public fun valueText(value: VegaValue): String = if (value.isNullish) "" else value.asString()
   }
 }

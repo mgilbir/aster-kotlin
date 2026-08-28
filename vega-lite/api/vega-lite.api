@@ -37,9 +37,11 @@ public final class dev/aster/vegalite/VegaLiteConversion {
 }
 
 public final class dev/aster/vegalite/VegaLiteDiagnostics {
+	public static final field COMPILE_FAILED Ljava/lang/String;
 	public static final field INFERRED_TYPE Ljava/lang/String;
 	public static final field INSTANCE Ldev/aster/vegalite/VegaLiteDiagnostics;
 	public static final field INVALID_ENCODING Ljava/lang/String;
+	public static final field LIMIT_EXCEEDED Ljava/lang/String;
 	public static final field MISSING_MARK Ljava/lang/String;
 	public static final field NOT_VEGA_LITE Ljava/lang/String;
 	public static final field SCHEMA_VERSION Ljava/lang/String;

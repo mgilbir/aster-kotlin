@@ -86,7 +86,47 @@ public class PathData(public val commands: List<PathCommand>) {
     return subpaths
   }
 
-  /** Even-odd containment test against the flattened outline. */
+  /**
+   * **Nonzero-winding** containment, which is what every renderer here and upstream *paints* with.
+   *
+   * `isPointInPath` defaults to `"nonzero"` and so does every canvas fill, so this is the test that
+   * agrees with the picture. The difference is the interior of a self-intersecting outline — the
+   * middle of a pentagram, the overlap of a figure-of-eight — which is painted and which the
+   * even-odd rule calls outside. Hit testing was asking the even-odd question of geometry the
+   * renderers had filled, so a tap on the visibly solid centre of a `symbol` shaped like a star
+   * missed.
+   *
+   * Winding rather than crossing parity: each edge crossing counts +1 or −1 by its direction, and
+   * the point is inside when the total is not zero.
+   */
+  public fun containsNonZero(
+    point: PointD,
+    tolerance: Double = DEFAULT_FLATTEN_TOLERANCE,
+  ): Boolean {
+    if (!bounds.contains(point)) return false
+    var winding = 0
+    for (ring in flatten(tolerance)) {
+      var j = ring.size - 1
+      for (i in ring.indices) {
+        val a = ring[i]
+        val b = ring[j]
+        if (a.y <= point.y) {
+          if (b.y > point.y && cross(a, b, point) > 0.0) winding++
+        } else {
+          if (b.y <= point.y && cross(a, b, point) < 0.0) winding--
+        }
+        j = i
+      }
+    }
+    return winding != 0
+  }
+
+  /**
+   * Even-odd containment test against the flattened outline.
+   *
+   * Kept because `clip` in SVG and a `fill-rule: evenodd` path are real things; **not** what hit
+   * testing asks — see [containsNonZero].
+   */
   public fun containsEvenOdd(
     point: PointD,
     tolerance: Double = DEFAULT_FLATTEN_TOLERANCE,
@@ -107,6 +147,10 @@ public class PathData(public val commands: List<PathCommand>) {
     }
     return inside
   }
+
+  /** Twice the signed area of the triangle `a, b, p`: positive when `p` is left of `a → b`. */
+  private fun cross(a: PointD, b: PointD, p: PointD): Double =
+    (b.x - a.x) * (p.y - a.y) - (p.x - a.x) * (b.y - a.y)
 
   /**
    * Shortest distance from [point] to the flattened outline; `POSITIVE_INFINITY` for an empty path.

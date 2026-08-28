@@ -25,8 +25,16 @@ internal class Selection(
   val fields: List<String>,
   val channels: List<String>,
   val resolve: String,
-  /** The event that picks a row, as a Vega stream — `click` unless the selection says otherwise. */
-  val on: VegaValue,
+  /**
+   * The events that pick a row, as Vega streams — `click` unless the selection says otherwise.
+   *
+   * A **list**, because an event selector is a comma-separated list of them and upstream emits all
+   * of them: `"click, touchend"` compiles to `"events": [{…click…}, {…touchend…}]`, which is how a
+   * chart is made to work with a finger as well as a mouse. Keeping only the first — which is what
+   * a single `VegaValue` here forced — dropped the touch, silently, from the specification whose
+   * whole purpose in writing two was to have both.
+   */
+  val on: List<VegaValue>,
   /**
    * Whether the specification **stated** the stream, rather than falling to the default.
    *
@@ -123,7 +131,9 @@ internal class Selection(
       // from the widget rather than from the drawing.
       if (inputs != null || bindsScales || legendStreams.isNotEmpty()) false
       else
-        type == "point" && !bindsScales && (on as? VegaValue.Obj)?.string("type") != "pointerover"
+        type == "point" &&
+          !bindsScales &&
+          on.none { (it as? VegaValue.Obj)?.string("type") == "pointerover" }
 
   /**
    * Whether a picked row is remembered by its **identity** rather than by any column of it.
@@ -336,20 +346,23 @@ internal class Selection(
       return EventSelector.parse(written, source = "scope")
     }
 
-    private fun stream(stated: VegaValue?, type: String): VegaValue {
+    private fun stream(stated: VegaValue?, type: String): List<VegaValue> {
       val default = if (type == "point") "click" else DEFAULT_DRAG
       val name = (stated as? VegaValue.Str)?.value ?: default
-      if (stated != null && stated !is VegaValue.Str) return stated
+      if (stated != null && stated !is VegaValue.Str) return listOf(stated)
       // Anything with selector syntax in it is *parsed*, not passed through: a drag is written as
       // `[pointerdown, pointerup] > pointermove`, and a stream listening for an event of that name
-      // listens for nothing at all.
+      // listens for nothing at all. A comma separates two whole selectors, so the parse answers
+      // more than one stream and **all** of them are kept — see [on].
       if (name.any { it in "[],>:!@ " }) {
-        return EventSelector.parse(name, source = "scope").firstOrNull() ?: VegaValue.Str(name)
+        return EventSelector.parse(name, source = "scope").ifEmpty { listOf(VegaValue.Str(name)) }
       }
-      return obj {
-        put("source", "scope")
-        put("type", name)
-      }
+      return listOf(
+        obj {
+          put("source", "scope")
+          put("type", name)
+        }
+      )
     }
 
     /**
@@ -424,15 +437,7 @@ internal class Selection(
                       (row as? VegaValue.Obj)?.let { own ->
                         channel?.let { own.fields[it] } ?: own.fields[field]
                       } ?: (row as? VegaValue.Obj)?.fields?.get(field)
-                    when (stated) {
-                      null -> VegaValue.Null
-                      is VegaValue.Obj ->
-                        VegaValue.Num(
-                          Transforms(DiagnosticCollector(), timeZone = timeZone)
-                            .dateTimeTimestamp(stated)
-                        )
-                      else -> stated
-                    }
+                    if (stated == null) VegaValue.Null else asStoredValue(stated, timeZone)
                   }
                 ),
               )
@@ -477,11 +482,17 @@ internal class Selection(
                   }
                 ),
               )
+              // Each bound is a **timestamp** when it was written as a date, for the same reason
+              // the point branch above converts one: a store is data and not an expression, so
+              // upstream's `dateTimeToTimestamp` runs at compile time and the store holds numbers.
+              // Emitting the `{"year": …, "month": …}` object raw left the initial filtering
+              // comparing a column of milliseconds against an object — false for every row — until
+              // the reader's first drag replaced the store with real numbers.
               put(
                 "values",
                 arr(
                   projected.map { (channel, _) ->
-                    arr(initial.array(channel).orEmpty())
+                    arr(initial.array(channel).orEmpty().map { asStoredValue(it, timeZone) })
                   }
                 ),
               )
@@ -943,7 +954,7 @@ internal class Selection(
               arr(
                 listOf(
                   obj {
-                    put("events", arr(listOf(pickStream(view))))
+                    put("events", arr(pickStream(view)))
                     put(
                       "update",
                       "datum && item().mark.marktype !== 'group' ? " +
@@ -970,12 +981,14 @@ internal class Selection(
     listOf((view ?: owner)?.name.orEmpty(), "voronoi").filter { it.isNotEmpty() }.joinToString("_")
 
   /** The stream a pick listens on, scoped to the voronoi overlay where there is one. */
-  private fun pickStream(view: UnitView? = null): VegaValue {
-    val stream = on as? VegaValue.Obj ?: return on
-    if (!nearest) return stream
-    return obj {
-      stream.fields.forEach { (key, value) -> put(key, value) }
-      put("markname", voronoiName(view))
+  private fun pickStream(view: UnitView? = null): List<VegaValue> {
+    if (!nearest) return on
+    return on.map { stream ->
+      val fields = (stream as? VegaValue.Obj)?.fields ?: return@map stream
+      obj {
+        fields.forEach { (key, value) -> put(key, value) }
+        put("markname", voronoiName(view))
+      }
     }
   }
 
@@ -1044,7 +1057,7 @@ internal class Selection(
    * store, and the store is written by a signal that walks the `time` scale's domain.
    */
   val isTimer: Boolean
-    get() = (on as? VegaValue.Obj)?.string("type") == "timer"
+    get() = on.any { (it as? VegaValue.Obj)?.string("type") == "timer" }
 
   /**
    * The clock itself, which belongs at the top of the chart — `point.topLevelSignals`.
@@ -1234,7 +1247,7 @@ internal class Selection(
           arr(
             listOfNotNull(
               obj {
-                put("events", arr(listOf(pickStream(view))))
+                put("events", arr(pickStream(view)))
                 put("update", "$guard ? {$picked} : null")
                 put("force", VegaValue.Bool(true))
               },
@@ -1297,7 +1310,7 @@ internal class Selection(
                   // on a mark to read the shift key from.
                   if (legendStreams.isNotEmpty()) {
                     put("events", obj { put("merge", arr(legendStreams)) })
-                  } else put("events", arr(listOf(pickStream(view))))
+                  } else put("events", arr(pickStream(view)))
                   put("update", expression)
                 },
                 clear?.let {
@@ -1379,24 +1392,22 @@ internal class Selection(
    */
   private fun dragStreams(): List<VegaValue> {
     val guard = "!event.item || event.item.mark.name !== ${quoted("${name}_brush")}"
-    return on
-      .let { if (it is VegaValue.Arr) it.values else listOf(it) }
-      .map { drag ->
-        val stream = drag as? VegaValue.Obj ?: return@map drag
-        val window = stream.array("between") ?: return@map stream
-        if (translate.isEmpty() || bindsScales) return@map stream
-        obj {
-          stream.fields.forEach { (key, value) -> put(key, value) }
-          put(
-            "between",
-            arr(
-              window.mapIndexed { index, event ->
-                if (index != 0) event else withFilter(event, guard)
-              }
-            ),
-          )
-        }
+    return on.map { drag ->
+      val stream = drag as? VegaValue.Obj ?: return@map drag
+      val window = stream.array("between") ?: return@map stream
+      if (translate.isEmpty() || bindsScales) return@map stream
+      obj {
+        stream.fields.forEach { (key, value) -> put(key, value) }
+        put(
+          "between",
+          arr(
+            window.mapIndexed { index, event ->
+              if (index != 0) event else withFilter(event, guard)
+            }
+          ),
+        )
       }
+    }
   }
 
   /**
@@ -1659,6 +1670,20 @@ internal class Selection(
    * categories it covered. A binned field stores a range that is closed at the left and open at the
    * right, which is how a bucket's own boundary is written.
    */
+  /**
+   * A written value as a **store** holds it: a date object becomes the millisecond it names.
+   *
+   * A selection's `value` is written in the specification's own vocabulary, where a date is
+   * `{"year": 2020, "month": 1}`. A store is a *dataset* — the filter compares its numbers against
+   * a column of numbers — so upstream runs `dateTimeToTimestamp` while compiling and puts a number
+   * there. Both the point store and the interval store go through here, because they were not doing
+   * the same thing and only one of them was right.
+   */
+  private fun asStoredValue(value: VegaValue, timeZone: TimeZone?): VegaValue =
+    if (value is VegaValue.Obj)
+      VegaValue.Num(Transforms(DiagnosticCollector(), timeZone = timeZone).dateTimeTimestamp(value))
+    else value
+
   private fun projectionType(view: UnitView, channel: String?): String =
     when {
       channel == null -> "E"

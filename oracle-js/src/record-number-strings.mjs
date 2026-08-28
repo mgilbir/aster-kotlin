@@ -49,9 +49,26 @@ for (const v of [
   1e-7, 9.9e-7, 1e-6, 1e20, 1e21, 1.5e21, 9007199254740992, 9007199254740994,
   2 ** 63, 2 ** 63 + 2048, 1.7976931348623157e308, 5e-324, 0.1 + 0.2, 1 / 3
 ])
-  push(v, push(-v));
+{
+  // The same defect one line up, and more obviously: the negative was pushed *inside* the argument
+  // list of the positive, so `push` saw a number and `undefined` — the negative landed only by the
+  // accident of the inner call running first.
+  push(v);
+  push(-v);
+}
 
-for (let i = 1; i < 400; i++) push(i / 7, i / 3, 2 ** i, 1 / i, i * 1e15, i * 1e18);
+// **Six calls, not six arguments.** `push` takes one number; passing it six meant five of every
+// six were evaluated and thrown away, so the corpus held `i / 7` and none of `i / 3`, `2 ** i`,
+// `1 / i`, `i * 1e15` or `i * 1e18` — the powers of two and the large-integer families being
+// exactly where `String(x)` switches notation and where a port is most likely to be wrong.
+for (let i = 1; i < 400; i++) {
+  push(i / 7);
+  push(i / 3);
+  push(2 ** i);
+  push(1 / i);
+  push(i * 1e15);
+  push(i * 1e18);
+}
 
 const target = join(here, '..', '..', 'test-fixtures', 'upstream-vectors');
 mkdirSync(target, {recursive: true});

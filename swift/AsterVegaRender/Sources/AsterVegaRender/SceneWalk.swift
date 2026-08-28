@@ -34,7 +34,8 @@ public struct SceneWalk {
             blue: background.blue, alpha: background.alpha
           )
         ),
-        stroke: nil
+        stroke: nil,
+        blend: SceneBlendMode.normal
       )
     }
     walk(node: scene.root, transform: .identity, into: &target)
@@ -93,11 +94,17 @@ public struct SceneWalk {
           corners: corners(of: group),
           fill: brush(group.fill, opacity: own, bounds: panelBox, through: local),
           stroke: group.strokeForeground
-            ? nil : stroke(group.stroke, opacity: own, bounds: panelBox, through: local)
+            ? nil : stroke(group.stroke, opacity: own, bounds: panelBox, through: local),
+          blend: group.blendMode
         )
       }
       // Drawn whatever the group's own opacity is — a transparent group is not an invisible one.
-      for child in group.children {
+      //
+      // `paintOrder`, not `children`: an item's `zindex` reorders what is painted, and only the
+      // SVG renderer was applying it, so a `zindex` raised a mark in the export and nowhere else.
+      // The Compose walk reorders identically, which is what keeps the scene-walk goldens
+      // byte-identical.
+      for child in SceneKt.paintOrder(children: group.children) {
         walk(node: child, transform: local, into: &target)
       }
       if let panelBox = panel, group.strokeForeground {
@@ -110,7 +117,8 @@ public struct SceneWalk {
           local.apply(rect: nudged),
           corners: corners(of: group),
           fill: nil,
-          stroke: stroke(group.stroke, opacity: own, bounds: panelBox, through: local)
+          stroke: stroke(group.stroke, opacity: own, bounds: panelBox, through: local),
+          blend: group.blendMode
         )
       }
       target.endGroup()
@@ -127,7 +135,8 @@ public struct SceneWalk {
         ),
         corners: corners(of: rect),
         fill: brush(rect.fill, opacity: own, bounds: rect.bounds, through: local),
-        stroke: stroke(rect.stroke, opacity: own, bounds: rect.bounds, through: local)
+        stroke: stroke(rect.stroke, opacity: own, bounds: rect.bounds, through: local),
+        blend: rect.blendMode
       )
 
     case "rule":
@@ -136,7 +145,8 @@ public struct SceneWalk {
       target.line(
         from: local.apply(point: Point(x: rule.x1, y: rule.y1)),
         to: local.apply(point: Point(x: rule.x2, y: rule.y2)),
-        stroke: stroke(rule.stroke, opacity: own, bounds: rule.bounds, through: local)
+        stroke: stroke(rule.stroke, opacity: own, bounds: rule.bounds, through: local),
+        blend: rule.blendMode
       )
 
     case "path":
@@ -145,7 +155,8 @@ public struct SceneWalk {
       target.path(
         commands(of: path.path, through: local),
         fill: brush(path.fill, opacity: own, bounds: path.bounds, through: local),
-        stroke: stroke(path.stroke, opacity: own, bounds: path.bounds, through: local)
+        stroke: stroke(path.stroke, opacity: own, bounds: path.bounds, through: local),
+        blend: path.blendMode
       )
 
     case "symbol":
@@ -156,7 +167,8 @@ public struct SceneWalk {
       target.path(
         commands(of: symbol.outline, through: local),
         fill: brush(symbol.fill, opacity: own, bounds: symbol.bounds, through: local),
-        stroke: stroke(symbol.stroke, opacity: own, bounds: symbol.bounds, through: local)
+        stroke: stroke(symbol.stroke, opacity: own, bounds: symbol.bounds, through: local),
+        blend: symbol.blendMode
       )
 
     case "text":
@@ -230,7 +242,8 @@ public struct SceneWalk {
             letterSpacing: style.letterSpacing
           ),
           fill: fill,
-          stroke: stroke
+          stroke: stroke,
+          blend: text.blendMode
         )
       }
 
@@ -246,7 +259,8 @@ public struct SceneWalk {
         in: local.apply(rect: image.rect),
         fit: image.fit == ImageFit.contain ? .contain : .fill,
         smooth: image.smooth,
-        opacity: own
+        opacity: own,
+        blend: image.blendMode
       )
 
     default:
@@ -489,13 +503,31 @@ struct Affine {
     Point(x: a * point.x + c * point.y + e, y: b * point.x + d * point.y + f)
   }
 
-  /// A rectangle's image, normalised — a transform with a negative scale would otherwise invert it.
+  /// A rectangle's **axis-aligned bounding box** under this transform.
+  ///
+  /// All four corners, not two. Two opposite corners describe the image only while the transform
+  /// maps axes to axes — a translation, a scale, a flip — and `DrawTarget` has no rotated rectangle
+  /// in its vocabulary, so the bounding box is the honest answer for anything else. Mapping the
+  /// diagonal alone silently reported a box that is too small under rotation or shear: a
+  /// 45-degree rotation maps two opposite corners of a square onto a *degenerate* rectangle, and a
+  /// group `clip` built from it would have cut away most of what it was meant to keep.
+  ///
+  /// Nothing this engine compiles reaches it today — a scene's transforms are translations and
+  /// uniform scales, which is why the parity goldens agreed while both walks had the same shape —
+  /// and the Compose Multiplatform walk is corrected the same way. "Silently" is the part removed.
   func apply(rect: RectD) -> Rect {
-    let one = apply(point: Point(x: rect.left, y: rect.top))
-    let two = apply(point: Point(x: rect.right, y: rect.bottom))
+    let corners = [
+      apply(point: Point(x: rect.left, y: rect.top)),
+      apply(point: Point(x: rect.right, y: rect.top)),
+      apply(point: Point(x: rect.right, y: rect.bottom)),
+      apply(point: Point(x: rect.left, y: rect.bottom)),
+    ]
+    let left = corners.map(\.x).min() ?? 0
+    let top = corners.map(\.y).min() ?? 0
     return Rect(
-      x: min(one.x, two.x), y: min(one.y, two.y),
-      width: abs(two.x - one.x), height: abs(two.y - one.y)
+      x: left, y: top,
+      width: (corners.map(\.x).max() ?? 0) - left,
+      height: (corners.map(\.y).max() ?? 0) - top
     )
   }
 }

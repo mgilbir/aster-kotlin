@@ -48,6 +48,56 @@ def cases(golden: pathlib.Path) -> list[str]:
     return found
 
 
+
+def string_literals(source):
+    """
+    Every double-quoted string in `source`, with comments removed first.
+
+    The check this feeds used to be `golden.name in text` — a substring match over the whole file —
+    so a **comment** mentioning a golden's filename counted as a reader. That is the failure this
+    gate exists to catch, in the gate: deleting the assertions from a conformance test while leaving
+    the sentence above them saying what they used to check would have kept it green. A file that
+    genuinely reads a golden names it in a string, because that is how a path is written.
+
+    A deliberately small scanner rather than a parser: Kotlin and Swift agree on `//`, on `/* */`
+    and on `"`, and nothing in `test-fixtures/host-conformance` has a name that could hide in a
+    character literal or an interpolation.
+    """
+    literals = []
+    index = 0
+    length = len(source)
+    while index < length:
+        character = source[index]
+        if character == "/" and index + 1 < length:
+            following = source[index + 1]
+            if following == "/":
+                index = source.find("\n", index)
+                if index < 0:
+                    break
+                continue
+            if following == "*":
+                end = source.find("*/", index + 2)
+                index = length if end < 0 else end + 2
+                continue
+        if character == '"':
+            # A raw string, `"""..."""` in both languages, holds no escapes.
+            if source.startswith('"""', index):
+                end = source.find('"""', index + 3)
+                if end < 0:
+                    break
+                literals.append(source[index + 3 : end])
+                index = end + 3
+                continue
+            cursor = index + 1
+            while cursor < length and source[cursor] != '"':
+                cursor += 2 if source[cursor] == "\\" else 1
+            literals.append(source[index + 1 : cursor])
+            index = cursor + 1
+            continue
+        index += 1
+    return literals
+
+
 def main() -> int:
     goldens = sorted(p for p in GOLDENS.glob("*.txt"))
     if not goldens:
@@ -59,7 +109,7 @@ def main() -> int:
 
     readers = {
         engine: {
-            path: path.read_text()
+            path: string_literals(path.read_text())
             for path in (ROOT / directory).rglob("*")
             if path.is_file() and path.suffix in (".kt", ".swift")
         }
@@ -77,7 +127,11 @@ def main() -> int:
 
         line = f"  {golden.name:24}{len(found):4} cases"
         for engine, sources in readers.items():
-            reading = [p.name for p, text in sources.items() if golden.name in text]
+            reading = [
+                p.name
+                for p, literals in sources.items()
+                if any(golden.name in literal for literal in literals)
+            ]
             if reading:
                 line += f"  ✓ {engine.split(' (')[0]}"
             else:

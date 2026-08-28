@@ -8,6 +8,87 @@ section here does not get released.
 
 ### Changed
 
+- **`SceneExporter.toPng` no longer takes a `quality`.** PNG is lossless and Android documents the
+  argument as ignored for it, so a caller passing 80 to get a smaller file got the same bytes and no
+  way to find out why. A smaller file is `BitmapExportOptions.pixelScale`.
+
+- **`scripts/test-core.sh` runs every core module.** It named six by hand and predated two of them,
+  so `vega-lite` and `vega-loader` — about eight hundred tests, the whole Vega-Lite compiler among
+  them — were absent from what the README sells as the JVM suite. A broken Vega-Lite compiler passed
+  it cleanly. The list is derived from `settings.gradle.kts` now, so the next module added is in it.
+
+- **`ChartSession.set(signal:to:)` is queued like every other mutation.** It was the one entry point
+  that was not, and it is the one a reader can reach *while* a chart is loading — a slider on a
+  specification still compiling remotely. `setSignal` walks the signal updater and the event
+  dispatcher that `setSpecAsync` is at that moment rebuilding off the main actor, which is the exact
+  race the queue exists to prevent. The value is still recorded immediately, so a choice made during
+  a load survives into the chart that load produces.
+
+- **Three process-lifetime caches on the Apple side are bounded.** Decoded images, `CTFont`s and
+  dataset text all grew without limit for the life of the process, and two of them are keyed on
+  something that varies per chart — a font's *size*, a dataset's URL. Images and dataset text are
+  bounded in bytes rather than in entries, because a `heatmap` raster is megabytes where an icon is
+  kilobytes and Vega's own `flights-200k.json` is twelve megabytes; fonts are bounded by count. All
+  three evict least-recently-used, so a chart being redrawn keeps its working set.
+
+- **`SceneDrawTarget` and `DrawTarget` carry the item's blend mode.** Both the Compose Multiplatform
+  renderer and the Apple one ignored the `blend` channel outright — no drawing, no diagnostic, no
+  row in the feature table — while the Android View mapped all sixteen and exported SVG carried all
+  sixteen. One specification therefore produced two different pictures depending on the host, and
+  only one of the two admitted to a gap. Both now map every mode, through `BlendMode` on Compose and
+  `CGBlendMode` on Apple. A custom target has one more parameter on each of its five draw methods;
+  on Kotlin it defaults to `SceneBlendMode.NORMAL`.
+
+- **`rememberVegaChartController` takes the device's own text metrics.** It built a controller with
+  the deterministic default engine — fixed ratios, font scale 1, no host faces — while the view
+  underneath drew with `AndroidTextEngine` at the reader's own font scale. At the largest
+  accessibility text size that lays every label out about a third narrower than it is painted. It
+  now builds an `AndroidTextEngine` from the composition's configuration, and takes the same
+  `fontResolver` the chart does.
+
+- **`SceneExporter` centres, caps and says what it needs.** The export drew at the top-left of the
+  page while every renderer centres; a `pixelScale` of 30 asked for a nine-gigabyte bitmap with
+  nothing to stop it; and the default renderer has neither the host's faces nor its image resolver,
+  so an export taken the obvious way was not the chart on screen. `VegaChartView.exporter()` hands
+  over one built from the view's own seams.
+
+- **A Vega-Lite specification with no `data` compiles, and reads a table called `source`.** It used
+  to be an ERROR *and* a non-null result whose marks read a dataset called `""` — so a host
+  following the README's stop-on-null pattern handed the runtime something broken. Upstream compiles
+  it to `"data": [{"name": "source"}]`, which is exactly the seam a host supplies its own rows
+  through: set `VegaChartController.hostData` to `mapOf("source" to rows)`.
+
+- **An encoding channel that is not a channel is dropped, with a diagnostic.** Upstream warns and
+  drops; this engine kept it, so a typo like `colour` entered the aggregate's `groupby`, the spoken
+  description and the tooltip's field list, and produced a chart grouped by a column nothing was
+  coloured with. Unchanged for `geojson`, `xError` and `yError`, which have their own message.
+
+- **`Fields.varName` is ASCII, like the `\W → _` it transcribes.** Kotlin's `isLetterOrDigit` is
+  Unicode, so a column called `año` kept its `ñ` here and lost it upstream — two different signal
+  names for one specification.
+
+- **A number written into an emitted expression is `String(n)`.** Two hand-rolled spellings — one in
+  `Fields`, one in `LayoutSize` — wrote `1.0E-7` where JavaScript writes `1e-7`, and the second
+  saturated `toLong()` at 9.2e18 while allowing values up to 1e21 through. Both delegate to
+  `Decimals.jsString` now.
+
+- **A mark carries a tooltip only when its specification asked for one.** `MarkEncoder` fell back
+  to the whole bound row when no `tooltip` channel was written, on the stated grounds that upstream
+  does the same. It does not: a probe against vega 6.3.1 answers `undefined`, and `tooltip` is not
+  even a property on the item. So every mark on every chart carried a tooltip holding whatever its
+  dataset held — and a chart is routinely drawn from a table with more columns in it than the chart
+  shows, which makes that a disclosure on hover from a specification that asked for no tooltip.
+  `NodeMetadata.tooltip` is now null unless the channel produced a non-nullish value; a host that
+  wants the row reads `NodeMetadata.datum`, which is also what `MarkHovered` and `MarkClicked`
+  carry. The facet-cell path in `AxisBuilder` and `LegendBuilder` already worked this way.
+
+- **`HttpTransport.get` takes the byte budget.** A cap applied after the read is not a cap: the
+  whole response is in memory by the time it is checked, which is the thing being defended against.
+  The loader hands its `maxResponseBytes` down so a transport can stop reading, and the JVM one now
+  does — a bounded streaming read, decoded with the charset the response declared. A custom
+  transport has one more parameter; ignoring it leaves the old behaviour, since the loader still
+  checks the body it gets back.
+
 - **A font resolver is asked for one name, on every host.** `ComposeTextEngine` called a host's
   `fontFamilyResolver` once with the whole CSS stack — `"Noto Sans, Chart Sans"` — and let
   `namedFontFamily` split it, while the Android and Apple engines called theirs once per entry.
@@ -24,7 +105,703 @@ section here does not get released.
   engine's job and are done there, so calling it directly with a stack or a generic returns `null`
   where it used to answer.
 
+- **`SvgOptions.idPrefix` says what it is for.** Ids are sequential from document order, so two
+  documents rendered with the same prefix generate the same ids and an `xlink:href="#vc0"` in the
+  second resolves against the first when both are inlined into one page. No behaviour changed; the
+  documentation did.
+
+- **`AxisDefaults.TITLE_MIN_EXTENT`/`TITLE_MAX_EXTENT` are `MIN_EXTENT`/`MAX_EXTENT`.** They clamp
+  the **axis** extent — the reach of its ticks and labels — which is what upstream calls `minExtent`
+  and `maxExtent`; the old names read as a property of the title and are not one.
+
+- **`groupTuples` and `groupKey` answer a `GroupKey` rather than a list of raw values.** What makes
+  two rows one group is upstream's own string coercion — its `fastmap` is object-backed, so the
+  number `1001` and the string `"1001"` are one property and therefore one group — and keying on
+  the raw values split what upstream merges. `GroupKey.values` carries the first row's spelling,
+  which is where upstream reads a group's own fields from too, so a caller reading them positionally
+  changes one line.
+
+  `BinTransform.binSettings` gained a `steps` parameter, in the position upstream reads it.
+
+### Added
+
+- **Four expression functions upstream has and this engine did not:** `isNaN`, `atob`, `btoa` and
+  `encodeURIComponent`. They live in `vega-expression`'s **codegen whitelist** rather than in its
+  `functionContext`, and the test asserting that `knownUnsupported` is empty read only the second
+  table — so the guarantee was auditing the wrong list and all four were missing behind it. The
+  test now reads both. `isNaN` is `Number.isNaN`, so it does not coerce: `isNaN('x')` is false.
+
+- **`VegaValue.Undefined`, because JavaScript has two absent values and this model had one.**
+  Reading a property that is not there now yields it, and nothing else produces one. `isNullish`
+  is the `_ == null` screen that covers both, which is the idiom upstream writes every one of its
+  own missing-value tests with.
+
+  Two host-facing readers gained an answer: `ForeignValue.kind` and `ForeignSignals.kind` return
+  `"undefined"` where they used to return `"null"` for a value an expression produced from a
+  missing field. A host that does not care can test both.
+
+- **`bin` reads `steps`**, upstream's third branch for choosing a step size: `span / maxbins`, then
+  the largest listed step still below it. Neither read nor reported before, so a chart asking to be
+  binned only on the round numbers it has axis labels for got whatever the automatic rule chose.
+
+- **`pie` reads `sort`**, which decides which row gets which sweep and leaves the rows where they
+  were. It is a boolean in upstream's own `Definition`, and a chart asking for its biggest slice
+  first got its slices in data order with no diagnostic.
+
+- **Eight diagnostic codes**, so a host can tell apart conditions that used to share one:
+  `VEGA_DATA_LOAD_FAILED` (the only one that describes something outside the specification, and the
+  only one a retry is meaningful for), `VEGA_DATA_UNREADABLE`, `VEGA_SCALE_NOT_BUILT`,
+  `VEGA_ENCODE_INVALID_VALUE`, `VEGA_DUPLICATE_DEFINITION`, `VEGA_INTERACTION_UNSUPPORTED`,
+  `VEGA_COMPILE_LIMIT_EXCEEDED` and `VEGA_COMPILE_FAILED`. Nothing was renamed or removed; the
+  conditions that used to report `VEGA_PARSE_UNKNOWN_PROPERTY`, `VEGA_SCALE_UNSUPPORTED_TYPE` or
+  `VEGA_EXPORT_IMAGE_UNRESOLVED` from the *runtime* now report one of these instead.
+
+- **`PathData.containsNonZero`**, the containment test that agrees with what a fill paints, and
+  **`isSafeHref`**, upstream's `href` allowlist as a predicate a host can apply to the link a
+  `MarkClicked` carries before following it.
+
+### Performance
+
+- **The Android draw path allocates per *pattern*, not per mark per frame.** A `DashPathEffect` and
+  three lists for every dashed node, and a gradient shader plus two array copies for every
+  gradient-painted node, were built on every frame — against a file header stating that it allocates
+  nothing per mark. Both are cached by what they are built from, bounded, since both come from the
+  specification rather than from the data.
+
+- **The Compose Multiplatform draw path stops re-shaping text and rebuilding paths every frame.**
+  `rememberTextMeasurer()` defaults to eight cached layouts, which is the number of labels on a small
+  axis, so every run past the eighth was shaped from scratch per frame; and each mark's path was
+  re-transformed per frame although the `PathData` behind it is the same object. Both are cached, the
+  second keyed on the path's identity.
+
 ### Fixed
+
+- **The differential comparison can see a `defined` gap.** Both sides flattened a `moveTo` and a
+  `lineTo` into a bare point, and `normalize.js` never read the `defined` channel at all — so a line
+  broken into subpaths and a line drawn straight through the break produced the *identical* record.
+  A regression joining across a gap passed every assertion on both sides, and a gap is the entire
+  point of the channel. Each vertex now carries the command that produced it, the recorder honours
+  `defined` through d3's own generator, and an area records front-and-back per segment the way
+  `d3.area()` emits it. The new `line-defined-gaps` fixture is the only one in the corpus with an
+  interior `moveTo`.
+
+- **An undefined point is not drawn.** With the comparison able to see it: the engine made the point
+  that *broke* a series a subpath of its own, where `d3.line().defined()` drops it. Invisible under
+  a butt cap, a round dot under a round one, at a coordinate the chart is saying it has no value
+  for. And a subpath of exactly one point closes itself, which is a rule per subpath rather than per
+  series — this was being suppressed for the whole series as soon as any break existed.
+
+- **`scripts/check.sh` arms the Vega-Lite scene gate before running it.** The references were
+  rendered at the last step, *after* the Gradle gate that needs them, so a single run armed the gate
+  for the next one and never for the one printing "Green, and every gate ran" — 1126 cases skipping
+  in silence. They are rendered first now, and reported as a gate of their own when `--fast` or a
+  missing node skips them. `VegaLiteFixtureDifferentialTest` also fails on a *partly* rendered set
+  rather than skipping most of itself.
+
+- **The release workflow arms it too.** Its verify job never rendered the references at all, so
+  every release since the gate was added published with it skipped in full — while the publish job's
+  own comment said verify "has already run that comparison in full".
+
+- **A release page cannot claim Maven Central coordinates that do not exist.** When the publish
+  step's credentials are absent it skips, and the release job still tagged, pushed and wrote a page
+  telling readers to add a dependency that resolves to nothing — and a tag cannot be moved, so the
+  version was unreleasable afterwards. The job now reports whether it published and the notes say
+  so. `--latest` is also computed rather than passed unconditionally, so a patch for an older line
+  cannot move the badge backwards.
+
+- **One `[api-snapshot-only]` marker no longer exempts a whole branch.** It was a substring search
+  over every message on the branch, so a commit that re-recorded a snapshot for a cosmetic reason
+  waved through a real API break in another commit. Each snapshot is now traced to the commits that
+  touched it, and every one of those has to carry the marker.
+
+- **`scripts/host-conformance.py` no longer counts a comment as a reader.**
+
+- **The oracle's number corpus records what it meant to.** `record-number-strings.mjs` passed six
+  expressions to one `push()`, which takes one — so five of six families were evaluated and thrown
+  away, including the powers of two and the large integers, which is exactly where `String(x)`
+  switches notation.
+
+- **`eval-probe.js` and `transform-probe.js` pin determinism.** Without it `now()` answered the wall
+  clock and `random()` an unseeded generator, so a probe of either was irreproducible — and a probe
+  exists to be quoted in a comment or turned into a fixture.
+
+- **`acorn` is pinned exactly**, in the oracle whose own rule forbids ranges.
+
+- **A drag pans the Apple chart by the distance the finger moved.** The view divided the delta by the
+  fit scale before dispatching, and `InteractionState.viewportOffset` holds a pan in surface pixels —
+  `visibleViewport` is what divides. So at any fit other than 1 the chart moved by a fraction of the
+  finger, and the further from 1 the fit the further the drawing lagged behind the drag. The Compose
+  Multiplatform chart documents this rule beside its own dispatch and the Android View follows it.
+
+- **`load("")` clears the chart even mid-compile.** The clear was synchronous while the compile was
+  not: it emptied what the compile was about to write and the compile wrote it back, so a host
+  emptying its editor was left looking at the previous chart — with `loading` stuck true, because the
+  block that would have cleared it had already been counted and then cancelled.
+
+- **A VoiceOver activation hits the mark the reader was on.** The synthesised tap applied the fit
+  scale and neither the zoom nor the pan, while the frames a reader lands on carry both. So once the
+  chart had been moved, activating a mark activated whichever one was drawn where it used to be.
+
+- **A failed compile reports its own diagnostics.** `try?` gave nil on a throw, the previous
+  document's diagnostics were left in place, and the failure message was read out of them — so a
+  host was told a new document had failed for a reason belonging to the one before it.
+
+- **Letter spacing is measured at the size it is drawn at.** The Apple engine applied the reader's
+  text scale to the font and not to the kern, while the drawing applied it to both: at any Dynamic
+  Type setting other than 1 a spaced label was laid out with one spacing and painted with another,
+  and the layout that decides whether labels overlap had already used the smaller number.
+
+- **`CoreTextTextEngine` locks the one thing it mutates.** Its header said it holds no mutable state
+  and it holds `unresolvedFontFamilies`, inserted into from the measuring path — which
+  `ChartSession` runs off the main actor.
+
+- **A rectangle's image under a transform maps all four corners, on the Apple walk too.**
+
+- **The Apple demo says what its loader actually does.** The paste screen claimed "no network
+  loader" and the README said it installs `DenyLoader`; every session uses `VegaDataLoader`, which
+  falls back to fetching from `vega.github.io`. A reader deciding whether it was safe to paste
+  someone else's chart was being told the wrong thing about what that would fetch.
+
+- **`scripts/host-conformance.py` no longer counts a comment as a reader.** The "read by" check was a
+  substring match over whole source files, so deleting a conformance test's assertions while leaving
+  the sentence above them describing what they used to check would have kept the gate green — the
+  gate's own failure mode, in the gate. It matches inside string literals now, with comments stripped.
+
+- **A continuous pan or pinch survives its own first pixel on Compose Multiplatform.** The chart's
+  `pointerInput` was keyed on the viewport, and a `pointerInput` restarts its coroutine — cancelling
+  whatever gesture is in flight — whenever a key changes. The documented wiring feeds
+  `InteractionState.viewportOffset` back into the composable, so the first pan increment cancelled
+  the detector that produced it: a drag was a sequence of one-increment gestures, each from a fresh
+  centroid. The viewport is read through a `State` now and kept out of the keys.
+
+- **A pinch on the Android View zooms about the reader's fingers.** `ScaleGestureDetector` reports
+  its focus in raw view coordinates and those went straight through, while every other point the
+  view dispatches has the placement's origin taken off. On any padded or centred chart the zoom
+  pulled towards a point offset by exactly that origin. There is one conversion now and both
+  dispatch sites use it.
+
+- **A TalkBack activation hits the mark the reader was on.** The helper dispatched a tap in **scene**
+  coordinates into a controller that reads placement-relative view pixels and then divides by the
+  fit scale — so the two agreed only at scale 1, unpanned. A screen-reader user has no way to see
+  that happen.
+
+- **The drawn viewport's far corner comes from the placement.** It was the padding box's, so it was
+  too large by the whole of the centring slack, all of it on the right and the bottom: an opaque
+  scene background — Vega-Lite gives every chart `"background": "white"` — painted a margin down two
+  of the four sides, a zoomed chart's content escaped there, and the fit scale used for drawing
+  disagreed with the one reported to the host.
+
+- **The built-in tooltip is drawn where the pointer is.** Its anchor is placement-relative and the
+  canvas it is drawn on is not, so the bubble sat off by the placement's origin on every padded or
+  centred chart.
+
+- **TAB, ESC, HOME, END and the arrows are no longer swallowed.** `onKeyDown` returned true for all
+  of them while the controller has no behaviour for a key and no event stream reaches one — a focus
+  trap, and on a television, where the d-pad is the keyboard, a chart that could be entered and not
+  left. The key is still reported on `ChartEvent`s.
+
+- **A pan that ends says so, on both Kotlin hosts.** Neither dispatched `GesturePhase.ENDED` for a
+  pan, and the Compose Multiplatform chart never passed `ended = true` to either callback — a
+  parameter documented on both and dead on both. `ChartEvent.ViewportChanged` fires only on `ENDED`,
+  so it never fired at all.
+
+- **`onHover` is mouse and stylus only, as documented.** Every pointer move was reported, so a touch
+  drag churned the hover state and the tooltip with it, sixty times a second, under the reader's own
+  finger.
+
+- **`onPlaced` fires when the placement changes rather than every frame.** It is called from the
+  draw phase, and a host doing the documented thing with it — setting `controller.contentScale` —
+  was writing to a `StateFlow` from inside a draw, which schedules the next frame.
+
+- **A gradient-filled text mark draws its gradient on Compose Multiplatform, and a stroked one draws
+  an outline.** The first fell back to solid black; the second was *filled* with the stroke's
+  colour, which is heavier than an outline and solid where upstream leaves the counters open.
+
+- **`MULTIPLY` is reported rather than approximated below API 29.** Android's
+  `PorterDuff.Mode.MULTIPLY` is `[Sa*Da, Sc*Dc]` — *modulate*, not CSS multiply — so a blended mark
+  over a transparent region vanished, on by far the most-used mode, on the devices where this file
+  already promised to report rather than substitute.
+
+- **An inline `imageResolver` or `fontResolver` no longer rebuilds the renderer every
+  recomposition.** Both setters compare by identity and rebuild the renderer, and a lambda written
+  at a call site is a fresh instance each time — so the image cache was emptied per frame and the
+  "a URL is asked once, not once per frame" contract became its opposite for exactly the hosts that
+  supply a resolver.
+
+- **A font stack tries its concrete names before its generic.** A generic anywhere in the list
+  preempted platform resolution of everything before it, so a device that *did* have the named face
+  never drew in it.
+
+- **A gradient is resolved against the same box on every renderer.** The Android View used the
+  geometric rectangle where upstream, the SVG renderer and the Compose Multiplatform walk all use
+  the stroke-widened bounds.
+
+- **TalkBack is not re-announced on every frame of a pan.** The semantic tree was invalidated on
+  every published snapshot; it is invalidated when what it *says* changes, and a moved frame is
+  re-read by `ExploreByTouchHelper` without one.
+
+- **A written date rolls over instead of throwing.** `{"month": 13}`, 30 February, hour 24 and date
+  0 are all legal Vega-Lite, and all mean what the JavaScript date constructor means by them:
+  upstream's `dateTimeToTimestamp` is `+new Date(...parts)`. Building a `LocalDateTime` from the
+  parts instead threw `IllegalArgumentException` on every one of them, out of a public entry point,
+  from a module that had no `try` in it. `JsDate` is that constructor written out — the rollover,
+  the two-digit-year rule and NaN-rather-than-throw — and both `vega-lite` and `vega-expression`
+  call it. Which fixes a second thing on the way: `datetime(99, 1, 1)` is February **1999** to every
+  Vega renderer, and was the year 99 here.
+
+- **The Vega-Lite compiler returns rather than crashing.** `compileJson` and `compile` are guarded,
+  and `VegaLiteInput.toVega` guards its own parse. Two limits close the ways a document could reach
+  a `StackOverflowError` deliberately: view nesting past 64, and more than 512 declared transforms —
+  the second of which is not nesting at all, since each transform becomes a node in a chain that
+  eight optimizer passes walk recursively. Upstream refuses the same documents, with a `RangeError`.
+  A `repeat` grid is capped at 256 cells for the same reason: each cell is a whole compiled view.
+
+- **An interval selection's written dates reach its store as numbers.** A store is a dataset, so
+  upstream converts while compiling; the interval branch emitted the `{"year": …}` object raw, and
+  the initial filtering compared a column of milliseconds against an object — false for every row —
+  until the reader's first drag replaced the store.
+
+- **A comma-separated event selector keeps every stream it names.** `{"on": "click, touchend"}`
+  dropped the touch, silently, from the specification whose whole purpose in writing two was to have
+  both. `Selection.on` is a list now and the emitted `events` is an array, byte-for-byte upstream's.
+
+- **A signal rename no longer rewrites the data.** Folding two bin nodes renames the signals of one,
+  and the rename is a substring replace over every string in the finished specification. A dataset's
+  inline rows are the user's values, and one that happened to contain a generated name would have
+  been quietly rewritten; the walk skips `values` and `datum` now.
+
+- **A layer or concat member that is dropped says so.** A member that failed to parse, and a concat
+  entry that is not an object at all, were both skipped in silence — so the chart came out a plot
+  short with nothing said about which one. Upstream refuses the whole document; this reports and
+  draws the rest, which is what this engine does everywhere else.
+
+- **Two fallback diagnostics that were wrong.** The unsupported-transform message left out `bin`,
+  `stack`, `timeUnit` and `impute`, all four implemented a hundred lines above it; the
+  malformed-predicate message said parameters "are not implemented", and they are.
+
+- **A stale compile cannot publish over a newer one.** Every entry point that recompiles —
+  `setSpec`, `setSpecAsync`, `hostData`, `containerSize`, `setContainerSizeAsync` and the recompile
+  an interaction triggers — now stamps a request number when the *caller asks*, and publishes only
+  if it is still the newest. The asynchronous ones held a lock, so the compiles were ordered; the
+  publishes were not, because each asked "am I finished?" rather than "am I still the answer?". A
+  host that resizes while a specification is still compiling could be left looking at the earlier
+  result. Two compiles running at once on one controller now also report `VEGA_COMPILE_CONCURRENT`,
+  since they share one text engine and one signal table.
+
+- **A URL is fetched once per document, not once per compile.** Every interaction here recompiles
+  the whole specification and a compile resolves every dataset from scratch, so with a loader opted
+  in a tap issued a blocking GET per `url` dataset — on the dispatching thread, with the loader's
+  own timeouts — and a `{"type": "timer", "throttle": 500}` stream polled the network twice a
+  second. `VegaChartController` now wraps the host's loader in a `CachingDataLoader`, cleared when a
+  new specification arrives, because a new document is a new decision about what is behind a URL.
+
+- **`stop()` stays stopped.** It cancelled the timers and the next publish started them again — any
+  publish, and a host that keeps feeding `hostData` to a view it has torn down publishes constantly.
+  A chart the host had explicitly stopped went on ticking with a repaint attached to every tick. The
+  flag is a latch now, cleared only by `setSpec`/`setSpecAsync`.
+
+- **A private address written as IPv6 is refused like any other.** `blockPrivateNetworks` read
+  dotted quads, so `::ffff:169.254.169.254` — the cloud metadata endpoint in the mapped form every
+  dual-stack socket connects straight through — was one notation away from being fetched.
+  `::ffff:`, `64:ff9b::` and the `::` forms are unwrapped to the IPv4 address they carry, and
+  `fec0::/10` joins the ranges that are refused. A public IPv6 address is still allowed: the rule is
+  about reach, not notation.
+
+- **A URL with no host, or a port that speaks another protocol, is refused.** `http:///x` parses
+  with a host of `""`, which is not null — so it passed the null check and, under an empty
+  allowlist, reached the transport with nowhere to connect but the local machine. And neither the
+  allowlist nor the private-network rule looked at the port, so `http://host:25/` was an SMTP
+  conversation whose first line a specification got to write.
+
+- **A `Uri` writes an IPv6 literal back with its brackets.** The host is stored bare, because that
+  is the form every policy rule wants, and it was written out bare too — so `sanitize` returned
+  `http://2606:4700:4700::1111/x`, whose authority reparses with a port of `4700:4700::1111`.
+  `sanitize` was returning something `load` would refuse.
+
+- **A gesture carrying a number that is not a number is refused.** A NaN reaching the pan offset or
+  the zoom anchor poisons every coordinate derived from it, and the failure then surfaces three
+  layers away as a chart that draws nothing. Platform recognisers do produce these — a fling whose
+  velocity divides by a zero time delta, a pinch whose two pointers land on one pixel — so it is
+  reported as `VEGA_INTERACTION_UNSUPPORTED` and dropped.
+
+- **A click reports the row its mark was built from.** The datum was read back out of the hit-test
+  index by identity, which finds the *node*; the metadata carries the row, and it is the only thing
+  that is right when two marks share a position.
+
+- **A `window:` stream says it will not fire on its own.** Nothing in `VegaChartController` produces
+  a window-sourced event, so a specification using the commonest idiom for a drag that continues
+  outside the chart got a signal that never changed and no diagnostic. The watch is still
+  registered — a host driving `EventDispatcher` itself can dispatch one, and does — but it is now
+  reported.
+
+- **Nothing throws, by construction.** The README stakes the whole diagnostic model on it —
+  "nothing throws; a compile returns diagnostics" — and no public boundary had a catch-all or a
+  depth cap, so a *specification* could take the host down seven different ways. Each of those is
+  fixed where it was; `SpecCompiler.compileJson` and `compile` are now guarded as well, so the next
+  one is a `VEGA_COMPILE_FAILED` diagnostic carrying the exception rather than a crash. Cancellation
+  and `OutOfMemoryError` are deliberately not caught.
+
+- **A time scale honours `domainRaw`, and nices from its bounded domain.** The time branch read
+  `spec.domain` and consulted the raw domain only to suppress `nice`, so the whole ladder every
+  other continuous scale climbs — raw domain, `zero`, the three `domain*` overrides, padding, nice —
+  was computed and thrown away. `domainRaw` is how an interactive zoom publishes the exact interval
+  it wants: the committed `overview-plus-detail.vg.json` fixture is that shape, and brushing the
+  overview recompiled the detail panel with the full domain and rendered it unzoomed. A static
+  compile passes the oracle because the brush signal is null at compile time, so the flagship
+  interaction was inert with nothing to read. And the `nice` step re-derived from the *original*
+  domain, discarding `domainMin`/`domainMax` and the padding computed immediately above it —
+  Vega-Lite defaults every temporal scale to `nice: true`, so a VL `scale.domainMax` on a time axis
+  silently showed the whole span.
+
+- **A gradient legend's `values` need not be numbers.** `"values": ["2020-01-01"]` on a continuous
+  colour scale — the natural way to write date stops — cast straight to `VegaValue.Num` and threw a
+  `ClassCastException` out of the public `compileJson`. Unreadable entries are reported and left
+  out.
+
+- **A `tickCount` of a billion is clamped and said so.** Nothing bounded it, so it was an
+  out-of-memory error on the way to building the list, or a billion-iteration walk-down before
+  that. Upstream hangs on the same specification, so the limit is named in the diagnostic rather
+  than hidden.
+
+- **A mark tree nested past 64 groups is a diagnostic.** A group is the only construct that nests
+  and it nests by recursion, so a machine-generated document a few thousand deep was a
+  `StackOverflowError` — an `Error`, caught by nothing typed, unrecoverable on Kotlin/Native. The
+  deepest nesting in the whole fixture corpus is three.
+
+- **A projection is readable from a mark's `encode` block.** `SignalScope.withDatum` carried every
+  field except the projections, so `{"size": {"signal": "4 * geoScale('p')"}}` reported
+  "projection 'p' is not defined" once per compile and left the channel unset. Every geo fixture
+  passed, because none of them calls a geo function inside `encode`.
+
+- **A sort over a field some rows lack no longer throws.** A comparator that answers zero for a pair
+  it cannot order is not a total order, and the JVM's TimSort detects that and throws
+  `IllegalArgumentException: Comparison method violates its general contract!` once there are 32 or
+  more items. Both sort paths fall back to declaration order, which is the order stability would
+  have given anyway.
+
+- **A missing scale is reported once, not once per row.** A 10,000-row mark produced 10,000
+  identical ERROR diagnostics and buried everything else; `reportOnce` was in the same file, unused
+  by any of the three per-datum reports. Unparseable colours and unpositionable scales are reported
+  once too.
+
+- **Diagnostic codes say what happened.** Codes are a documented public contract, and several were
+  semantically wrong: a *load failure* reported `VEGA_PARSE_UNKNOWN_PROPERTY`, which says the
+  document is at fault; an image with no size reported `VEGA_EXPORT_IMAGE_UNRESOLVED`, a code about
+  export that a compile has no business emitting; "the scale was not built" reported
+  `VEGA_SCALE_UNSUPPORTED_TYPE`, which says this engine has no such scale type. Around thirty
+  unrelated runtime conditions shared one parse code. See the Added section for the eight new ones.
+
+- **`autosize.contains: "padding"` with padding wider than the size says so.** The plotting area
+  comes out negative — upstream's does too, probed — and nothing said why the chart was empty.
+
+- **One font-weight parser, not three.** `MarkEncoder`, `TitleBuilder` and `GuideStyle` each had
+  their own and they had drifted: `bolder` was 700, 800 and 700, and two of the three read a numeric
+  string while the third answered 400 for it, so a title and an axis label written with the same
+  weight came out at different weights. `bolder` and `lighter` are **relative** to the inherited
+  weight, which in a chart is the initial 400, so CSS Fonts 4's table gives 700 and 100; `lighter`
+  was 300 everywhere, a value the table does not contain.
+
+- **A non-position scaled channel reads its `signal`.** One of the two readers of the same rule had
+  drifted and skipped it, so `{"scale": "ord", "signal": "…"}` on a non-position scale silently lost
+  its value while the position path eighty lines away read it.
+
+- **`fontStyle: "oblique"` says what it drew.** It is a slanted upright face, which no text engine
+  here can ask a platform for; it was drawn upright and silently, in a file where `strokeCap` and
+  `strokeJoin` report an unknown value two hundred lines down.
+
+- **`facet.aggregate.cross` is capped.** The product of the dimensions' distinct values was
+  unbounded: two columns of a thousand values each is a million fully compiled cells.
+
+- **Thirty orphaned documentation blocks were reattached to the code they describe.** Each was a
+  KDoc block sitting above a *different* declaration than the one it documents — the function it
+  belonged to had moved and the comment had not — so `AxisBuilder`'s explanation of `validTicks`
+  documented `offsetOf`, and `SpecCompiler`'s class comment described a compiler that could not
+  draw legends or titles, which two thousand lines had been contradicting for several releases.
+
+- **A group's opacity paints its panel and is not inherited, in the SVG export too.** `opacity` was
+  emitted on the `<g>` container, which composites the whole subtree — so a half-opaque group drew
+  its opaque children at half, and an `opacity: 0` group made its children **vanish**. Every canvas
+  renderer here does the opposite and documents it, and so does upstream: probed by rendering a
+  half-opaque group with an opaque child through `view.toSVG()`, which comes back
+  `<path class="background" … opacity="0.5"/>` with the child untouched. The renderer's own test
+  said all this and could not see it, because "exactly one element carries an opacity" was
+  satisfied by the container just as well as by the panel.
+
+- **`zindex` decides paint order everywhere, not only in the export.** `paintOrder` reorders a
+  mark's items by their `zindex`, its own comment says every renderer has to apply it, and only
+  `SvgRenderer` did. So a raised mark was on top in an exported file and underneath on every screen
+  — and the hit index, which numbers its entries in walk order, sent the tap to the mark drawn
+  *below* it. The scene walk, the hit index, the Android canvas renderer, the Compose Multiplatform
+  walk and the Swift walk all reorder now.
+
+- **Four ways a mark could be visible and untappable.**
+  - A fully transparent **group**'s children were pruned from the hit index while every renderer
+    drew them.
+  - The broad phase was gated on `boundsTolerance` alone, so `strokeTolerance` was unreachable past
+    it: `Mouse` has a `boundsTolerance` of 0, and on an axis-aligned rule — whose bounds *are* its
+    stroke width — its 2 px tolerance was effectively zero.
+  - A fill was picked with the **even-odd** rule while every renderer painted it with **nonzero
+    winding**, so a tap on the visibly solid centre of a self-intersecting outline missed.
+  - A `path` with `fillOpacity: 0` lost its interior. `isPointInPath` never looks at alpha, so a
+    transparent fill is the idiom for an invisible tap target; `hitsRect` already said so and cited
+    upstream, and the branch beside it was testing `isVisible`.
+
+- **A multi-line label is exported where it is drawn.** The export set a `dominant-baseline` on the
+  `<text>` element, which is a **per-line** instruction, so a three-line label with
+  `baseline: middle` had each line centred on its own `y` and the block came out
+  (n − 1)·lineHeight/2 lower than every canvas renderer draws it. The one offset from the anchor to
+  the first baseline is folded into `y` now, which is the rule the canvas renderers apply and the
+  shape upstream emits.
+
+- **A `javascript:` link does not survive into an export.** An `href` is a specification-controlled
+  string and this project's threat model treats a specification as untrusted, so escaping it and
+  writing it through produced a file that is clickable the moment a browser opens it. Upstream
+  sanitizes the same string — `loader.sanitize(href, {context: 'href'})`, whose allowlist is now
+  transcribed in `isSafeHref` — and refuses this set; a refused link is reported as an
+  `SVG_HREF_REFUSED` warning and the mark is still drawn.
+
+- **A control character no longer makes an export unreadable.** XML 1.0 has no way to write a C0
+  control character, not even as a numeric reference, so one stray byte in a data-derived label
+  made the whole file malformed and a viewer refused all of it.
+
+- **A group with a fill and no size paints nothing**, which is what upstream paints — `M0,0h0v0h0Z`,
+  probed. Falling back to the clip rectangle filled the whole clipped region instead.
+
+- **A quoted font family keeps its comma.** `"Foo, Bar", serif` names two families and was being
+  split into three, none of which a host could answer.
+
+- **One gradient definition, however many marks share it.** The `<defs>` key carried the node's
+  bounds, which the emitted `<linearGradient>` does not mention, so two marks of different sizes
+  with the same gradient produced two identical definitions.
+
+- **The canonical snapshot can see eight more things.** ADR-0008 calls it the level-2 regression
+  check, and a property it does not write is a property it cannot check: `dashOffset`, `miterLimit`,
+  the four **per-corner** radii, `blendMode`, a symbol's custom path, an image's `align`, `baseline`
+  and `smooth`, an item's `href` and its `zindex` were all invisible to it. It also recorded
+  `effectiveCornerRadius`, which is a different clamp from the `Corners.of` every renderer draws
+  with — a number nothing draws.
+
+- **`window` annotates duplicate rows separately.** Results were keyed by the row itself, and
+  `VegaValue.Obj` is a value class over a map that compares structurally — so two rows that happen
+  to be identical were one key and collapsed onto the last one's answer. `[{v:1},{v:1}]` with
+  `ops:["sum"]` came back as `[2, 2]` where upstream answers `[1, 2]`, and `row_number`, `lag` and
+  `lead` were equally wrong. Duplicate rows are ordinary; none of the fourteen replayed window
+  vectors has one. It groups positions now, which is what `stack` already did and says why.
+
+- **The aggregate cell sorts values into upstream's three boxes, not two.** `add` is
+  `if (v == null || v === '') { ++missing; return } if (v !== v) return; ++valid`, and every
+  boundary in it was in the wrong place:
+  - the **empty string is missing**, and was entering the numeric list as a valid 0 — a dirty CSV
+    column of `""` dragged every mean toward zero;
+  - a **NaN is in neither box**, and was being counted as missing;
+  - a value that merely *coerces* to NaN is **valid** and poisons what is computed from it: the sum
+    of `[1, "abc"]` is NaN upstream and was 1 here, a total that silently omitted the row it could
+    not read;
+  - an **infinity is valid** and takes the extreme, and was being filtered out;
+  - `m.valid ? … : undefined` guards every numeric operation including `sum`, so a group with no
+    valid value has **no sum property at all** rather than a 0 — which passes an `isValid` filter
+    that upstream's answer does not. A comment here claimed upstream reports 0; it was probed
+    false, and the code followed it.
+  - `variance`, `stdev` and `stderr` need two values and `variancep` and `stdevp` need one, so the
+    sample forms over a single value are absent rather than NaN;
+  - `min` and `max` track the extreme over the **raw** values with JavaScript's `<`, so a string in
+    a numeric column never displaces a number rather than making the answer NaN;
+  - `argmin` and `argmax` reach their answer by a different route — `extentIndex` over every stored
+    row — and an infinity or a non-numeric value takes part in it, where both were skipped.
+
+- **`joinaggregate` can compute a confidence interval.** No bootstrap closure was passed, so
+  `Measure.compute` had nothing to ask and `ci0`/`ci1` wrote null onto every row of the group,
+  silently — and the error bars they exist for were drawn nowhere.
+
+- **`stack`'s `center` offset runs one cursor.** Upstream's `stackCenter` starts at
+  `(max - sum) / 2` and advances by the absolute value; splitting it into positive and negative
+  cursors, as `zero` correctly does, made a group holding both signs grow in two directions from
+  the centre line. `[3, -5]` spans `[0,3]` and `[3,8]` upstream and spanned `[0,3]` and `[0,-5]`
+  here; the one committed `center` fixture is all-positive, where the two rules agree. And
+  `normalize` over a group summing to nothing produces NaN — `1/0` times `0` — which draws nothing,
+  where guarding the zero drew a band of zero-height rectangles.
+
+- **`pie` no longer corrects its input.** A negative value runs backwards over its neighbour
+  upstream and a zero total divides by zero; taking the absolute value and guarding the total
+  showed a plausible chart where upstream shows a broken one the reader would have asked about.
+
+- **Eight more places a transform disagreed with upstream**, each probed:
+  - `bin` writes **NaN** for a value that coerces to NaN and null only for a genuinely absent one —
+    the very distinction the file's own header stresses for the out-of-extent infinities;
+  - `extent` lets an infinity take the extreme and then answers `[null, null]` with a warning, as
+    upstream's "Infinite extent" does, rather than reporting the finite extent of a column upstream
+    refuses to report one for;
+  - `pivot` keeps a **null** key, which upstream names `"null"`, and orders its columns by value
+    rather than lexicographically by name — `1, 2, 10` and not `1, 10, 2`;
+  - `ntile` and `nth_value` are refused without a parameter greater than zero, as upstream refuses
+    them, instead of defaulting to 1 and turning `ntile` into a column of ones;
+  - `countpattern` compiles its pattern through the **ECMA-262 engine** the rest of the codebase
+    adopted for exactly this — it is the one transform that compiles a pattern a specification
+    wrote, and Kotlin's `Regex` *throws* on `x{` and `[]`, two ordinary browser patterns;
+  - a force `link`'s `distance` and `strength` expressions read the **link's row**, as upstream's
+    `d => v(d, _)` does; they were evaluated against nothing, so `datum.weight` was NaN for every
+    link and the springs all came out the same length;
+  - `compareFieldValues` is `vega-util`'s `ascending`, so a pair it cannot order — a string against
+    a number — compares equal and keeps its place, rather than falling back to a lexicographic
+    comparison that looked more helpful and ordered a mixed column differently;
+  - a hierarchy layout's `as` names what it names, positionally, instead of being ignored unless it
+    was longer than the default list.
+
+- **The voronoi predicate's scratch buffers are confined to one triangulation.** `Orient2d` was a
+  singleton holding one set of expansion buffers, so two layouts running at once — two compiles on
+  two threads, which is what the controller's async path does — wrote into each other's expansion
+  and produced a triangulation that is not a triangulation of either point set.
+
+- **`Dataflow.kt` stops advertising an engine that does not exist.** Its `ChangeSet`/`TupleId`
+  contract has no consumer outside its own tests, and `TupleId` promised that identity is
+  "preserved across incremental updates" — which nothing implements. Marked
+  `@InternalAsterVegaApi`, so a host reading the surface finds a plan rather than a promise.
+
+- **A signal is a dependency even when a datum field shares its name.** `collectSignals` removed a
+  member-access property name **by name** from the whole expression, so `"year == datum.year"`
+  reported no dependency on the signal `year` at all. `DataflowOrder` then resolved the expression
+  before the signal existed and never re-evaluated it after: a slider bound to `year` moved
+  nothing, with no diagnostic, because from the compiler's point of view the expression did not
+  mention it. The removal was undoing something that never happened — the AST walk does not descend
+  into a non-computed property — so it is gone.
+
+- **`datetime(x)` with one argument is a time value, not a year.** Upstream's codegen is
+  `datetime: 'new Date'`, so `datetime(datum.epochMillis)` — a documented idiom — is that instant.
+  Reading the first argument as a year regardless made it the year 1.6 trillion, `toInt()`
+  saturated on the way, and `LocalDate` threw an `IllegalArgumentException` out of a public
+  compile, which every catch site in the engine is too narrowly typed to see. A one-argument
+  `datetime` is now a time value (a string is parsed, as `new Date` parses one), the calendar
+  constructor starts at two arguments, and a year outside the calendar is an Invalid Date rather
+  than an exception. `utc(x)` keeps reading a year, because `Date.UTC` does.
+
+- **Three ways a specification could crash the host are diagnostics.** `data()` with no arguments
+  raised `NoSuchElementException`; `regexp('(')` raised the regular-expression engine's own syntax
+  error from a field initializer — the exact failure class its KDoc says that engine was adopted to
+  end — and a deeply nested expression raised `StackOverflowError`, which is an `Error`, is caught
+  by nothing typed, and is unrecoverable on Kotlin/Native. All three now produce the ordinary
+  diagnostic, and the parser counts its depth (256 levels; the deepest expression in the whole
+  fixture corpus nests eight).
+
+- **`quantileNormal(0)` is −Infinity.** `erfInverse` returned from its last branch instead of
+  falling through to upstream's `p * x`, so the sign of the input was lost: the lowest rank of a QQ
+  plot was drawn at the *top* of the chart, and `quantileLogNormal(0)` was +Infinity where upstream
+  answers 0.
+
+- **`span` of nothing is 0.** Upstream's is `(+a[a.length-1]) - (+a[0]) || 0`, and the `|| 0` is
+  the whole of it. `span(domain('x'))` over a scale with no data answered NaN, which poisons every
+  layout signal computed from it.
+
+- **`utcOffset` answers a date.** It was registered twice and the second registration won,
+  answering a number — so `isDate(utcOffset(…))` was false while `isDate(timeOffset(…))`, its
+  documented twin, was true.
+
+- **A `Date` behaves like an object, because it is one.** `datetime(0)` is truthy (it was falsey,
+  so `if(datum.when, …)` took the wrong branch for exactly one instant in history and for every
+  date that failed to parse), `'' + datetime(t)` is the date string rather than the epoch
+  milliseconds a tooltip was showing, and a date is never `==` or `===` a number. Relational
+  comparison stays numeric, because `<` asks `ToPrimitive` for the number hint.
+
+  `String(date)` is ECMA-262 21.4.4.41's form — `Thu Jan 01 1970 01:00:00 GMT+0100`, in English,
+  in the host's own zone as a browser prints it. One thing is missing and the specification is why:
+  an implementation *may* append a parenthesised zone name and V8 does, and producing it needs CLDR
+  data that is not available on every target this engine compiles for.
+
+- **Eleven more places the expression engine disagreed with JavaScript**, each probed against the
+  pinned upstream rather than reasoned about:
+  - `sort()` is vega-util's `ascending`, so two strings compare lexicographically and everything
+    else compares numerically. Comparing everything-but-two-numbers as text sorted an array of
+    dates spanning a digit-count boundary backwards.
+  - `clampRange` normalizes a descending range before clamping it, which is what a reversed
+    y-domain feeding pan or zoom hands in.
+  - `inrange`'s third and fourth arguments are **inclusivity** flags, and were being ignored — so a
+    brush that deliberately excluded its upper end selected the row sitting exactly on it.
+  - `timeSequence` with a step that is not a positive whole number is `[]`. A negative one walked
+    *downwards*, away from `stop`, and emitted a hundred thousand timestamps before the guard
+    stopped it.
+  - `ToInt32`/`ToUint32` wrap modulo 2^32 rather than saturating at ±2^63, so `1e20 | 0` is
+    1661992960 and not −1.
+  - A property key is a **string**: `[10,20,30][1.5]` and `[10,20,30]['01']` are undefined, where
+    coercing the key to a number read element 1 for both.
+  - An array or a date against a primitive primitivizes to a **string**, so `[1,2] == '1,2'` is
+    true where comparing numerically said false.
+  - `clamp(5, 10, 0)` is 10: upstream composes `max(min, min(max, value))` and does not correct
+    swapped bounds.
+  - `hypot` scales by the largest magnitude before squaring, so `hypot(1e200, 1e200)` is
+    1.41e200 rather than Infinity.
+  - `round` keeps a negative zero and no longer rounds the tie's lower neighbour up:
+    `round(0.49999999999999994)` is 0.
+  - `parseInt('0xFF')` is 255 (an omitted radix is 0, not 10, and 0 means the prefix decides) and
+    `parseFloat('Infinity')` is Infinity.
+  - `format(null, spec)` is the string `"null"`, as its `timeParse` sibling already was.
+
+- **Three JavaScript string escapes were silently producing the wrong text.** The lexer's fallback
+  is the identity, so `'\x41'` came out as `"x41"`, `'\u{1F600}'` as `"u{1F600}"`, and a line
+  continuation put a newline into the string. And a **no-break space** is JavaScript whitespace and
+  is not Kotlin's, so an expression copied out of a rendered web page failed with
+  `Unexpected character ' '` — two characters that look identical in a diagnostic. U+FEFF, which is
+  what a UTF-8 byte-order mark decodes to, is whitespace now for the same reason.
+
+- **A field a row does not have is `undefined`, not `null`, and the difference is the chart.**
+  `Number(null)` is 0 and `Number(undefined)` is NaN, so a filter `datum.x < 10` over rows that
+  have no `x` at all **kept** every one of them where upstream drops them — ordinary dirty data,
+  the opposite answer, and no diagnostic. The value model carried one absent value and it coerced
+  as `null`.
+
+  Everything that follows from the distinction follows now: `'' + datum.missing` is `"undefined"`
+  rather than `"null"`, `undefined == null` is true while `undefined === null` is false,
+  `isDefined` answers **true** for a field that is present and null (its whole job, and it
+  answered false), `isValid` and `toNumber`/`toString`/`toBoolean` screen with the loose
+  comparison that covers both, and `indata` answers `undefined` for a value no row carries rather
+  than a `null` standing in for one.
+
+  One function must *not* treat them alike and now does not: upstream's `timeParse`/`utcParse`
+  wrapper screens with `value === null`, so `timeParse(datum.nul, '%Y')` is the string `"null"`
+  and `timeParse(datum.missing, '%Y')` is null. Probed rather than reasoned about, like every
+  other expectation in `UndefinedSemanticsTest`.
+
+  Reading a property **of** nothing still differs from upstream, deliberately and now in writing:
+  JavaScript throws a `TypeError` and takes the whole chart down, and this answers `undefined`.
+
+- **A bracket followed by a dot reads the field behind it.** `"field": "coordinates[0].lat"` —
+  the ordinary shape of a GeoJSON-derived row — resolved to nothing at all, so the mark was not
+  drawn and nothing said why. `parseFieldPath` added an empty segment for the `.` after the
+  closing bracket, and a lookup through an empty segment misses by construction.
+
+  The whole function is now a transcription of vega-util's `splitAccessPath`, which is what every
+  upstream field accessor is built from, rather than a re-derivation of what the notation looks
+  like it means. The re-derivation was wrong in three more ways the original explains: `a..b` and
+  `.a` were two segments and one where upstream reads one and one, a quoted bracket ended at the
+  next `]` rather than at its own closing quote (so `a["b]c"]` was cut in half), and a quote was
+  honoured anywhere in a bracket rather than only where upstream honours one. One divergence is
+  kept deliberately: upstream *throws* on an unterminated bracket or quote, and a field path is
+  data — often pasted data — so the remainder becomes a literal segment and the lookup misses.
+
+- **Numbers in emitted JSON are written the way `JSON.stringify` writes them.** `VegaJson.write`
+  fell back to the platform's `Double.toString` for any value that was not a small integer, under
+  a comment claiming JavaScript's rules. The platform's rules are not JavaScript's — it switches
+  to exponential notation at 10^7 rather than 10^21, and writes `1.5E-6` where JavaScript writes
+  `0.0000015` — and, being the platform's, it answers differently on each Kotlin/Native target, so
+  the same value was not even the same text on two of the five hosts that emit it. It goes through
+  `Decimals.jsString` now, which is the same specification the rest of the engine prints with.
+
+- **A signal and a dataset say what they cannot honour.** Every other block in `SpecParser` names
+  the properties it consumes and reports the remainder; these two read the handful they knew and
+  dropped the rest in silence, against the class's own "nothing is silently dropped". Four
+  properties were disappearing: a dataset's `on` triggers and `async`, and a signal's `react` and
+  `push`. `push` is the expensive one — this repository's own Vega-Lite compiler emits
+  `"push": "outer"` for a faceted selection, and a group's signals are resolved into a copy of the
+  enclosing scope, so the name was shadowed inside the group and the outer signal never changed.
+  Each now says that, by name, with its JSON path.
+
+- **`%s` floors the epoch instead of truncating it.** d3-time-format writes
+  `Math.floor(+d / 1000)`; a division that truncates toward zero is a second late for every
+  instant in the half-second before an epoch second, which before 1970 is the whole axis. `%Q` and
+  `%s` also write their number through `Decimals.jsString` now rather than through a `Long`, for
+  the same reason the JSON writer does.
+
+- **A `SpecParser` may be used twice.** It is public, its name is a verb, and it accumulated: a
+  second specification came back carrying the first one's diagnostics and read the first one's
+  `config` for any block it did not set itself. Each `parse` and `parseJson` starts from nothing.
 
 - **One specification names one font on every host.** A specification writes a CSS stack —
   `"Noto Sans, Chart Sans"` — and `TextStyle.fontFamily` carries it whole, so each text

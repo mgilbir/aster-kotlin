@@ -136,18 +136,31 @@ internal object GuideStyle {
         },
     )
 
-  /**
-   * CSS font weights: a keyword or a number, and the scene graph wants the number.
-   *
-   * Anything unrecognized falls back to normal rather than throwing, since a weight is a rendering
-   * detail and a chart that refuses to draw over one is the worse outcome.
-   */
-  private fun weightOf(weight: String): Int =
-    when (weight.lowercase()) {
+  private fun weightOf(weight: String): Int = FontWeights.of(weight)
+}
+
+/**
+ * CSS font weights: a keyword or a number, and the scene graph wants the number.
+ *
+ * **One** parser. There were three — here, in `TitleBuilder` and in `MarkEncoder` — and they had
+ * already drifted: `bolder` was 700, 800 and 700, and two of the three read a numeric *string*
+ * while the third answered 400 for it. A title and an axis label written with the same weight came
+ * out at different weights.
+ *
+ * `bolder` and `lighter` are **relative** to the inherited weight, which in a chart is the initial
+ * 400 — so CSS Fonts 4's table gives 700 and 100. `lighter` was 300 in all three, which is a value
+ * the table does not contain at all.
+ *
+ * Anything unrecognized falls back to normal rather than throwing, since a weight is a rendering
+ * detail and a chart that refuses to draw over one is the worse outcome.
+ */
+public object FontWeights {
+  public fun of(weight: String): Int =
+    when (weight.trim().lowercase()) {
       "normal" -> 400
       "bold" -> 700
-      "lighter" -> 300
       "bolder" -> 700
-      else -> weight.toIntOrNull()?.coerceIn(1, 1000) ?: 400
+      "lighter" -> 100
+      else -> weight.trim().toIntOrNull()?.coerceIn(1, 1000) ?: 400
     }
 }

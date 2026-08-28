@@ -89,18 +89,27 @@ public object PivotTransform : Transform {
           return input
         }
 
+    // `pivotKeys`: every distinct value of the field, **including null**, sorted with vega-util's
+    // `ascending` and named by `k + ''`.
+    //
+    // Two things were wrong. A null key was dropped, where upstream indexes it as the property
+    // `"null"` and emits a `null` column — a pivot over a column with gaps lost the gap rather
+    // than naming it. And the sort was lexicographic over the *names*, so numeric keys came back
+    // as `1, 10, 2` where upstream orders them `1, 2, 10`.
+    val distinct = LinkedHashMap<String, VegaValue>()
+    for (datum in input) {
+      val value = datum.field(field)
+      distinct.getOrPut(value.asString()) { value }
+    }
     val columns =
-      input
-        .map { it.field(field) }
-        .filterNot { it is VegaValue.Null }
+      distinct.values
+        .sortedWith(::compareFieldValues)
         .map { it.asString() }
-        .distinct()
-        .sorted()
         .let { if (limit > 0) it.take(limit) else it }
 
     return groupTuples(input, groupBy).map { (groupKey, rows) ->
       val fields = LinkedHashMap<String, VegaValue>(groupBy.size + columns.size)
-      groupBy.forEachIndexed { index, path -> fields[path] = groupKey[index] }
+      groupBy.forEachIndexed { index, path -> fields[path] = groupKey.values[index] }
       for (column in columns) {
         val cells = rows.filter { it.field(field).asString() == column }
         // A column no row in this group reaches is absent rather than zero, which is what a mark
@@ -146,8 +155,15 @@ public object CountPatternTransform : Transform {
     val textName = names.getOrNull(0)?.takeIf { it.isNotEmpty() } ?: "text"
     val countName = names.getOrNull(1)?.takeIf { it.isNotEmpty() } ?: "count"
 
+    // `VegaValue.Pattern`, which compiles through **ktecma262**, and not Kotlin's `Regex`.
+    //
+    // This is the one transform that compiles a pattern a *specification* wrote, which is the exact
+    // case the ECMA-262 engine was adopted for: Kotlin's `Regex` is the platform's, and
+    // `java.util.regex` differs from JavaScript on `$` before a final newline, rejects `\a` as an
+    // escape, and **throws** on `x{` and `[]` — two ordinary browser patterns. A `countpattern`
+    // over pasted text had every one of those failure modes and none of the reasons.
     val pattern = runCatching {
-      Regex(patternSource)
+      VegaValue.Pattern(patternSource, "g").regex
     }
       .getOrElse {
         context.diagnostics.error(
@@ -158,8 +174,10 @@ public object CountPatternTransform : Transform {
         return input
       }
     // Anchored, as upstream anchors it: a stopword list names whole words, not substrings.
+    // Upstream writes `new RegExp('^' + (stopwords || '') + '$', 'i')` — no group around it, which
+    // matters for an alternation: `a|b` anchors as `^a|b$`, so `b` matches anywhere.
     val stopwords = runCatching {
-      Regex("^($stopSource)$", RegexOption.IGNORE_CASE)
+      VegaValue.Pattern("^$stopSource$", "i").regex
     }
       .getOrElse {
         context.diagnostics.error(
@@ -182,7 +200,7 @@ public object CountPatternTransform : Transform {
         }
       for (match in pattern.findAll(text)) {
         val token = match.value
-        if (stopSource.isNotEmpty() && stopwords.matches(token)) continue
+        if (stopSource.isNotEmpty() && stopwords.findAll(token).isNotEmpty()) continue
         counts[token] = (counts[token] ?: 0) + 1
       }
     }

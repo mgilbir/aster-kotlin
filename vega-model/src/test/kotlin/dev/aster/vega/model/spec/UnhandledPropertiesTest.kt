@@ -201,6 +201,53 @@ class UnhandledPropertiesTest {
     assertEquals(emptyList<String>(), reported.sorted())
   }
 
+  /**
+   * The signal's nine schema properties, and the two of them this engine cannot act on.
+   *
+   * `push` is the one worth a test of its own. This repo's Vega-Lite compiler emits `"push":
+   * "outer"` for a faceted selection, so a signal written by one half of this project was being
+   * dropped by the other half without either saying anything.
+   */
+  @Test
+  fun `a signal reports the two properties it cannot act on`() {
+    val reported =
+      ignored(
+        spec(
+          """"signals": [{"name": "s", "description": "a slider", "value": 1,
+             "init": "0", "update": "s + 1", "on": [], "bind": {"input": "range"},
+             "push": "outer", "react": false}]"""
+        )
+      )
+    assertEquals(listOf("push", "react"), reported.sorted())
+
+    val push =
+      diagnostics(spec(""""signals": [{"name": "s", "value": 1, "push": "outer"}]""")).single {
+        it.jsonPath?.endsWith("push") == true
+      }
+    assertTrue("shadowed inside the group" in push.message, push.message)
+  }
+
+  /**
+   * The dataset's eight, and the two — in-place triggers and a deferred load — it cannot act on.
+   */
+  @Test
+  fun `a dataset reports the two properties it cannot act on`() {
+    val reported =
+      ignored(
+        """
+        {
+          "width": 100, "height": 60,
+          "data": [{"name": "t", "values": [{"c": "a"}], "format": {"type": "json"},
+                    "transform": [], "on": [{"trigger": "true", "insert": "1"}], "async": true},
+                   {"name": "u", "source": "t"}],
+          "marks": [{"type": "rect", "from": {"data": "t"}}]
+        }
+        """
+          .trimIndent()
+      )
+    assertEquals(listOf("async", "on"), reported.sorted())
+  }
+
   /** A channel the engine does read is not reported, or the diagnostics would be noise. */
   @Test
   fun `an ordinary mark reports nothing`() {

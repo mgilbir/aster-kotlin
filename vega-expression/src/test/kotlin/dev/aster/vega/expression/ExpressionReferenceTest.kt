@@ -34,6 +34,8 @@ class ExpressionReferenceTest {
   private fun asJson(value: VegaValue): String =
     when (value) {
       is VegaValue.Null -> "null"
+      // `eval-probe.js` writes the literal `undefined` where `JSON.stringify` gives nothing.
+      is VegaValue.Undefined -> "undefined"
       is VegaValue.Bool -> value.value.toString()
       // JSON has no NaN or Infinity, so JSON.stringify emits null; match that.
       is VegaValue.Num ->
@@ -218,6 +220,39 @@ class ExpressionReferenceTest {
       )
     val unaccounted = upstream.filterNot {
       it in Functions.functions || it in Functions.knownUnsupported || it in scopeBound
+    }
+    assertEquals(emptyList<String>(), unaccounted)
+  }
+
+  /**
+   * `functionContext` is not the whole surface: the **codegen whitelist** is the other half.
+   *
+   * `vega-expression` keeps a second table of names it passes straight through to the JavaScript
+   * runtime, and the test above could not see it. Four names lived only there — `isNaN`, `atob`,
+   * `btoa` and `encodeURIComponent` — so all four were unimplemented while `knownUnsupported` was
+   * empty and a test asserted that it was. A guarantee that audits the wrong table is not one.
+   *
+   * The list is upstream's own, read out of the pinned build:
+   * ```
+   * node --input-type=module -e "import {functions} from 'vega-expression';
+   *   console.log(Object.keys(functions({})).sort().join(' '))"
+   * ```
+   */
+  @Test
+  fun `every name in upstream's codegen table is implemented or explained`() {
+    val codegen =
+      ("abs acos asin atan atan2 atob btoa ceil clamp cos date datetime day encodeURIComponent " +
+          "exp floor hours hypot if isFinite isNaN length log lower max milliseconds min minutes " +
+          "month now parseFloat parseInt pow random regexp round seconds sin split sqrt substring " +
+          "tan test time timezoneoffset trim upper utc utcdate utcday utchours utcmilliseconds " +
+          "utcminutes utcmonth utcseconds utcyear year")
+        .split(" ")
+
+    // `if` short-circuits and `now`/`random` need the scope's clock and generator, so all three are
+    // intercepted by `Evaluator` before the table is consulted; see the note above on `scopeBound`.
+    val intercepted = setOf("if", "now", "random")
+    val unaccounted = codegen.filterNot {
+      it in Functions.functions || it in Functions.knownUnsupported || it in intercepted
     }
     assertEquals(emptyList<String>(), unaccounted)
   }
@@ -956,7 +991,8 @@ class ExpressionReferenceTest {
       [
         "indata('t', 'k', 'a')|2",
         "indata('t', 'k', 'b')|1",
-        "indata('t', 'k', 'zzz')|null",
+        // Upstream answers **undefined** for a value no row carries, not null. Probed.
+        "indata('t', 'k', 'zzz')|undefined",
         // The row whose k is the string "1", found by the number 1.
         "indata('t', 'k', 1)|1",
         // The row whose k is the number 5, found by either spelling.
@@ -968,7 +1004,7 @@ class ExpressionReferenceTest {
         "indata('t', 'n', 3)|1",
         "indata('t', 'n', '3')|1",
         // A field no row has: upstream groups them all under one absent key, which nothing matches.
-        "indata('t', 'nosuchfield', 'a')|null",
+        "indata('t', 'nosuchfield', 'a')|undefined",
         "if(indata('t', 'k', 'a'), 'yes', 'no')|\"yes\"",
         "if(indata('t', 'k', 'zzz'), 'yes', 'no')|\"no\"",
       ],

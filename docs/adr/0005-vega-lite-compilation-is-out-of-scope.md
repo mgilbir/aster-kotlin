@@ -1,6 +1,7 @@
 # 0005. Vega-Lite compilation is outside the first release
 
-Status: accepted (2026-08-06)
+Status: **superseded (2026-08-27) by the shipped `vega-lite` module.** See "What happened" below.
+Accepted 2026-08-06.
 
 ## Decision
 
@@ -37,3 +38,23 @@ stage precisely so it can be added without disturbing anything below it.
 The Vega runtime passes its compatibility fixtures and applications are repeatedly blocked by not
 having compilation on-device. The differential harness against upstream compilation would then be the
 first thing to build.
+
+## What happened
+
+Both conditions were met and the decision was reversed. `vega-lite` is a shipped module:
+`VegaLiteCompiler` compiles the grammar on-device and `VegaLiteInput.toVega` accepts either grammar
+from a host that cannot know which it has been handed.
+
+The "revisit if" clause turned out to be exactly right about the order, which is why it is worth
+recording rather than deleting. The Vega runtime passed its fixtures first, so the compiler had a
+correct target; and the differential harness against upstream compilation *was* the first thing
+built — `scripts/vega-lite-oracle.sh` compiles each fixture with upstream and with this compiler and
+compares the emitted Vega property by property, and `VegaLiteFixtureDifferentialTest` then compares
+the two drawings. 283 fixtures match byte for byte.
+
+What the record got wrong is the cost estimate underneath it: "comparable in size to the Vega
+runtime itself" was an argument for never starting, and the module is about a third of it.
+
+This section is here because `docs/adr/README.md` says to amend a record rather than silently
+changing behaviour that contradicts it — and this one was contradicted by a shipped module for
+several releases while still reading as accepted, which is the failure that rule exists to prevent.

@@ -305,13 +305,20 @@ public data class GroupNode(
   val blendMode: SceneBlendMode = SceneBlendMode.NORMAL,
 ) : SceneNode {
 
-  /** The rectangle this group's own fill and stroke cover, or `null` when it paints nothing. */
+  /**
+   * The rectangle this group's own fill and stroke cover, or `null` when it paints nothing.
+   *
+   * The **declared size**, and nothing else. Upstream's group path is `rectangle(context, item, x,
+   * y)` over `item.width || 0` and `item.height || 0`, so a group with a fill and no size paints
+   * `M0,0h0v0h0Z` — probed. Falling back to the clip rectangle painted the whole clipped region
+   * instead, which is a panel of colour where upstream draws nothing.
+   */
   public val paintRect: RectD?
     get() =
       when {
         fill == null && stroke == null -> null
         size != null -> RectD(0.0, 0.0, size.width, size.height)
-        else -> clip
+        else -> RectD(0.0, 0.0, 0.0, 0.0)
       }
 
   /**

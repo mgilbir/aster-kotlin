@@ -384,14 +384,29 @@ public final class ChartSession {
 
   private func compile() {
     guard !json.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-      scene = nil
-      hasScene = false
-      diagnostics = []
-      controls = []
-      failure = nil
-      grammar = nil
-      vegaLiteDiagnostics = []
-      usermeta = nil
+      // **Cancel first, and clear inside the queue.** Clearing synchronously while a compile was in
+      // flight cleared everything the compile was about to write, and then the compile wrote it
+      // back: `load("")` on a session that was still compiling resurrected the cleared chart, and
+      // `loading` stayed true forever because the block that would have set it false had been
+      // cancelled after it had already been counted. So a host emptying its editor was left with the
+      // previous chart, a spinner, and no way to get out of either.
+      //
+      // Enqueued for the same reason every other mutation is: the controller is not safe for
+      // concurrent use, so "clear" is a mutation that has to wait its turn like the rest.
+      compileTask?.cancel()
+      compileTask = nil
+      enqueue { [weak self] in
+        guard let self else { return }
+        self.scene = nil
+        self.hasScene = false
+        self.diagnostics = []
+        self.controls = []
+        self.failure = nil
+        self.grammar = nil
+        self.vegaLiteDiagnostics = []
+        self.usermeta = nil
+        self.loading = false
+      }
       return
     }
 
@@ -454,7 +469,28 @@ public final class ChartSession {
       // the two-argument form demands a `CoroutineDispatcher` that no exported symbol can produce, so
       // a foreign host could not reach this path at all and had to run the synchronous `setSpec` on a
       // thread of its own.
-      let compiled = try? await self.controller.setSpecAsync(json: vega)
+      // `do`/`catch` rather than `try?`, because **which** failure it was decides what to report.
+      // A cancellation is control flow and leaves everything alone; anything else is a compile that
+      // did not answer, and the diagnostics it did not produce must not be the *previous*
+      // document's. They were: `try?` gave nil, `diagnostics` was left holding the last chart's, and
+      // the failure below read a message out of it — so a host was told a new document had failed
+      // for a reason that belonged to the one before it, which is worse than being told nothing.
+      var compiled: CompiledSpec?
+      do {
+        compiled = try await self.controller.setSpecAsync(json: vega)
+      } catch is CancellationError {
+        return
+      } catch {
+        guard !Task.isCancelled else { return }
+        self.diagnostics = []
+        self.usermeta = nil
+        self.hasScene = false
+        self.failure = "the compiler failed on this specification: \(error)"
+        self.refreshControls()
+        self.publish()
+        self.loading = false
+        return
+      }
       guard !Task.isCancelled else { return }
 
       // A preset control is applied through the dataflow rather than by recompiling with it.
@@ -462,7 +498,9 @@ public final class ChartSession {
         self.controller.setSignal(name: name, value: value)
       }
 
-      if let compiled { self.diagnostics = compiled.diagnostics }
+      // Cleared rather than carried: a compile that answered no diagnostics answered none, and the
+      // previous document's are not this one's. Same rule as `usermeta` below.
+      self.diagnostics = compiled?.diagnostics ?? []
       // Republished with every compile, like the diagnostics: it belongs to the document now loaded,
       // and carrying the previous one's metadata forward would be worse than carrying none.
       self.usermeta = compiled?.spec?.usermeta
@@ -599,11 +637,24 @@ public final class ChartSession {
   // MARK: - Controls
 
   /// Sets a bound signal **through the dataflow**, which is what a control is for.
+  ///
+  /// Queued behind any compile in flight, like every other mutation here — see ``serialised(_:)``.
+  /// This was the one entry point that was not, and it is the one a reader can reach *while* a chart
+  /// is loading: a slider on a spec that is still compiling remotely. `setSignal` walks the signal
+  /// updater and the event dispatcher that `setSpecAsync` is at that moment rebuilding off this
+  /// actor, which is the exact race the queue exists to prevent, and the reason it exists is that a
+  /// tap during the first compile left a chart stuck showing "no scene".
+  ///
+  /// `overrides` is written **outside** the queue on purpose: it is this actor's own state and the
+  /// compile reads it when it starts, so recording the reader's choice immediately is what makes a
+  /// value set during a load survive into the chart that load produces.
   public func set(signal: String, to value: VegaValue) {
     overrides[signal] = value
-    controller.setSignal(name: signal, value: value)
-    refreshControls()
-    publish()
+    serialised {
+      self.controller.setSignal(name: signal, value: value)
+      self.refreshControls()
+      self.publish()
+    }
   }
 
   public func value(of control: SignalInput) -> VegaValue {

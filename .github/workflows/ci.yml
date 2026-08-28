@@ -46,16 +46,16 @@ jobs:
             oracles: "false"
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: "21"
 
       - name: Set up node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "20"
 
@@ -64,12 +64,16 @@ jobs:
         # open-source action into a separate library under Gradle's Terms of Use, which upgrading
         # accepts on the project's behalf. v5 is what clears the Node 20 deprecation without taking
         # that on. Revisit as a licensing decision, not a version bump.
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
 
       - name: Record upstream's test vectors
-        # `check.sh` says it will skip the replays without these, but the replay guards also assert
-        # the harness has not *shrunk* — `replayed >= 60` — so on a fresh clone they fail rather than
-        # skip. The vectors are gitignored by design, being derived, so CI records them first.
+        # **This step is the protection, not a convenience.** Each replay guards its own vector file
+        # with an assumption, so a missing file *skips* the whole test and the `replayed >= N` floor
+        # inside it never runs — a skipped test runs nothing. The floor catches a set that is partly
+        # there, which is a different failure. This comment used to claim the replays fail rather
+        # than skip on a fresh clone, which read as though forgetting this step would be loud.
+        #
+        # The vectors are gitignored by design, being derived from the pinned upstream packages.
         run: ./scripts/record-upstream-vectors.sh
 
       - name: Render upstream's Vega-Lite scenes
@@ -233,7 +237,7 @@ jobs:
 
       - name: Upload test reports
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-reports-${{ matrix.os }}
           path: |

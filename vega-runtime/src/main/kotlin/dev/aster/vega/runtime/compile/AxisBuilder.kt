@@ -6,6 +6,7 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.isNullish
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.spec.Anchor
 import dev.aster.vega.model.spec.AxisSpec
@@ -179,7 +180,7 @@ public class AxisBuilder(
     val scale = scales[spec.scale]
     if (scale == null) {
       diagnostics.error(
-        DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+        DiagnosticCodes.SCALE_NOT_BUILT,
         "Axis refers to scale '${spec.scale}', which was not built; the axis was skipped",
         operator = spec.scale,
       )
@@ -193,7 +194,7 @@ public class AxisBuilder(
     val ticks = ticksFor(scale, spec, specifier)?.let { withExtraTick(it, scale, spec) }
     if (ticks == null) {
       diagnostics.error(
-        DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+        DiagnosticCodes.SCALE_NOT_BUILT,
         "Cannot generate ticks for scale '${spec.scale}'; the axis was skipped",
         operator = spec.scale,
       )
@@ -589,8 +590,8 @@ public class AxisBuilder(
       Orient.LEFT -> -reach.left
       Orient.RIGHT -> reach.right
     }.coerceIn(
-      numbers.resolve(spec.minExtent, spec.scale) ?: AxisDefaults.TITLE_MIN_EXTENT,
-      numbers.resolve(spec.maxExtent, spec.scale) ?: AxisDefaults.TITLE_MAX_EXTENT,
+      numbers.resolve(spec.minExtent, spec.scale) ?: AxisDefaults.MIN_EXTENT,
+      numbers.resolve(spec.maxExtent, spec.scale) ?: AxisDefaults.MAX_EXTENT,
     )
 
   /**
@@ -777,31 +778,6 @@ public class AxisBuilder(
     }
 
   /**
-   * Tick values and positions for a scale.
-   *
-   * A band or point scale ticks at every domain entry; a linear scale ticks at d3's chosen round
-   * values. Band positions are the band centres shifted back half a pixel, which is what upstream
-   * emits — verified by comparing against Vega's own axis items for band, point and linear scales.
-   */
-  /**
-   * The ticks an axis draws, from the scale or from an explicit `values` list.
-   *
-   * Upstream's `validTicks`, reproduced rather than approximated, because three of its four steps
-   * are surprises:
-   * - a value that falls outside the scale's *range* is dropped, not clamped;
-   * - the survivors are ordered by where they land, so a list written out of order comes out in
-   *   order — and backwards when the range is reversed;
-   * - if there are more of them than `tickCount` allows, every other one is dropped repeatedly
-   *   until few enough remain, and if that leaves fewer than three the first and last are used
-   *   instead. Five values with `tickCount: 4` therefore give three, not four.
-   *
-   * The fourth is the label format, and it is the one a specification is most likely to trip over:
-   * with no `tickCount`, upstream formats using a count equal to the **number of values given**. So
-   * `values: [0.5, 1.5]` on a `[0, 2]` domain formats at the precision a two-tick axis would use,
-   * which is none, and both labels read as whole numbers. Reproduced, because a specification
-   * written against upstream is looking at those labels.
-   */
-  /**
    * How far the axis is pushed off the plotting area's edge.
    *
    * Usually a number, and sometimes a whole value reference: a parallel-coordinates plot writes
@@ -812,35 +788,6 @@ public class AxisBuilder(
     spec.offsetChannel?.let { channels?.channelNumber(it, VegaValue.EmptyObject) }
       ?: numbers.resolve(spec.offset, spec.scale)
       ?: 0.0
-
-  /**
-   * How many ticks to ask a continuous scale for, after `tickMinStep` has had its say.
-   *
-   * `tickMinStep` does not place ticks; it *caps the count* — `tickCount` in `vega-scale/ticks.js`.
-   * A span that holds only one minimum step allows two ticks, its two ends, whatever the axis asked
-   * for. Vega-Lite writes the step on every bucketed axis as one bucket's duration, so an axis over
-   * two months offers two ticks rather than the sixteen a request for ten would otherwise produce.
-   *
-   * @param refine whether to keep shrinking the count while the step d3 would choose is still under
-   *   the minimum. Upstream does that only for a plain numeric scale: `!scale.bins &&
-   *   !isLogarithmic && !isTemporal`, because those three do not shrink their step monotonically
-   *   with the count.
-   */
-  private fun tickCountFor(spec: AxisSpec, domain: List<Double>, refine: Boolean): Int {
-    var count = numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
-    val minStep = numbers.resolve(spec.tickMinStep, spec.scale) ?: return count
-    if (domain.isEmpty()) return count
-    val lo = minOf(domain.first(), domain.last())
-    val hi = maxOf(domain.first(), domain.last())
-    val spans = (hi - lo) / minStep
-    // `Math.floor((hi - lo) / minStep || 1) + 1`: a span of nothing still allows two ticks.
-    val allowed = floor(if (spans.isFinite() && spans != 0.0) spans else 1.0).toInt() + 1
-    count = minOf(count, allowed)
-    if (refine && lo < hi) {
-      while (count > 1 && Ticks.stepFrom(Ticks.tickIncrement(lo, hi, count)) < minStep) count--
-    }
-    return count.coerceAtLeast(1)
-  }
 
   /**
    * `tickExtra`: one more tick at the **start** of the first tick's band, labelled with nothing.
@@ -877,6 +824,24 @@ public class AxisBuilder(
       else -> null
     }
 
+  /**
+   * The ticks an axis draws, from the scale or from an explicit `values` list.
+   *
+   * Upstream's `validTicks`, reproduced rather than approximated, because three of its four steps
+   * are surprises:
+   * - a value that falls outside the scale's *range* is dropped, not clamped;
+   * - the survivors are ordered by where they land, so a list written out of order comes out in
+   *   order — and backwards when the range is reversed;
+   * - if there are more of them than `tickCount` allows, every other one is dropped repeatedly
+   *   until few enough remain, and if that leaves fewer than three the first and last are used
+   *   instead. Five values with `tickCount: 4` therefore give three, not four.
+   *
+   * The fourth is the label format, and it is the one a specification is most likely to trip over:
+   * with no `tickCount`, upstream formats using a count equal to the **number of values given**. So
+   * `values: [0.5, 1.5]` on a `[0, 2]` domain formats at the precision a two-tick axis would use,
+   * which is none, and both labels read as whole numbers. Reproduced, because a specification
+   * written against upstream is looking at those labels.
+   */
   private fun ticksFor(scale: VegaScale, spec: AxisSpec, specifier: String?): List<Tick>? {
     // A scale with `bins` has its tick values already decided: upstream's `tickValues` returns the
     // boundaries themselves rather than asking the scale to generate any. An axis that *also* names
@@ -891,9 +856,9 @@ public class AxisBuilder(
     // the halving that a long `values` list gets never applies to them.
     val count =
       if (spec.values == null && scale.bins != null) {
-        maxOf(numbers.resolveInt(spec.tickCount, spec.scale) ?: 0, explicit.size)
+        maxOf(numbers.resolveTickCount(spec.tickCount, spec.scale) ?: 0, explicit.size)
       } else {
-        numbers.resolveInt(spec.tickCount, spec.scale) ?: explicit.size.coerceAtLeast(1)
+        numbers.resolveTickCount(spec.tickCount, spec.scale) ?: explicit.size.coerceAtLeast(1)
       }
     val label = labeller(scale, count, specifier, spec.formatType)
 
@@ -929,12 +894,6 @@ public class AxisBuilder(
   }
 
   /**
-   * A band scale positions a value at its band's *start*; a tick belongs at the centre.
-   *
-   * Half a pixel comes back off, the same shift the generated band ticks carry, so the labels stay
-   * centred on the band while the ticks stay crisp.
-   */
-  /**
    * One channel of the axis's `encode.labels` block, resolved against the tick being labelled.
    *
    * `update` over `enter`, as everywhere else. Returns null when the block says nothing about this
@@ -943,15 +902,6 @@ public class AxisBuilder(
   /** A label's `encode` text, when the specification replaces it rather than formatting it. */
   private fun labelText(spec: AxisSpec, tick: Tick): String? = labelString(spec, "text", tick)
 
-  /**
-   * A text channel of a label's own `encode`, resolved against the tick.
-   *
-   * `text` is the one a specification usually writes, but `ellipsis` and `lineBreak` are read the
-   * same way and change what the reader sees: the first is the mark a truncated label ends with and
-   * the second is the character a long label is broken on, so a path can be shown as a stack.
-   * Neither has a guide *property* upstream, which is why they are resolved here rather than
-   * folded.
-   */
   /**
    * The item metadata one part of a guide's `encode` can carry: a tooltip, a cursor, a paint order
    * and what a screen reader hears.
@@ -976,7 +926,7 @@ public class AxisBuilder(
     val encoder = channels ?: return base
     fun channel(name: String) = block[name]
     val tooltip =
-      channel("tooltip")?.let { encoder.channelAny(it, datum) }?.takeIf { it !is VegaValue.Null }
+      channel("tooltip")?.let { encoder.channelAny(it, datum) }?.takeIf { !it.isNullish }
     val cursor =
       channel("cursor")?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotEmpty() }
     val href = channel("href")?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotEmpty() }
@@ -1090,6 +1040,15 @@ public class AxisBuilder(
     )
   }
 
+  /**
+   * A text channel of a label's own `encode`, resolved against the tick.
+   *
+   * `text` is the one a specification usually writes, but `ellipsis` and `lineBreak` are read the
+   * same way and change what the reader sees: the first is the mark a truncated label ends with and
+   * the second is the character a long label is broken on, so a path can be shown as a stack.
+   * Neither has a guide *property* upstream, which is why they are resolved here rather than
+   * folded.
+   */
   private fun labelChannel(spec: AxisSpec, channel: String, tick: Tick): Double? {
     val encoder = channels ?: return null
     val block = spec.encode["labels"] ?: return null
@@ -1151,6 +1110,12 @@ public class AxisBuilder(
   private fun tickCoordinate(position: Double, spec: AxisSpec): Double =
     if (spec.tickRound == false) position else AxisDefaults.crispRound(position)
 
+  /**
+   * A band scale positions a value at its band's *start*; a tick belongs at the centre.
+   *
+   * Half a pixel comes back off, the same shift the generated band ticks carry, so the labels stay
+   * centred on the band while the ticks stay crisp.
+   */
   private fun bandOffset(scale: PositionScale, spec: AxisSpec): Double {
     if (scale !is BandScale) return 0.0
     val position = numbers.resolve(spec.bandPosition, spec.scale) ?: AxisDefaults.BAND_POSITION
@@ -1252,6 +1217,13 @@ public class AxisBuilder(
     }
   }
 
+  /**
+   * Tick values and positions for a scale.
+   *
+   * A band or point scale ticks at every domain entry; a linear scale ticks at d3's chosen round
+   * values. Band positions are the band centres shifted back half a pixel, which is what upstream
+   * emits — verified by comparing against Vega's own axis items for band, point and linear scales.
+   */
   private fun generatedTicks(scale: VegaScale, spec: AxisSpec, specifier: String?): List<Tick>? =
     when (scale) {
       // A discrete domain's values *are* its labels unless a format type says how to read them,
@@ -1283,7 +1255,7 @@ public class AxisBuilder(
       is LinearScale -> {
         val count =
           GuideFormat.countWithMinStep(
-            numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT,
+            numbers.resolveTickCount(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT,
             numbers.resolve(spec.tickMinStep, spec.scale),
             scale.domain,
             linear = true,
@@ -1304,7 +1276,7 @@ public class AxisBuilder(
       is TransformedScale -> {
         val count =
           GuideFormat.countWithMinStep(
-            numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT,
+            numbers.resolveTickCount(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT,
             numbers.resolve(spec.tickMinStep, spec.scale),
             scale.domain,
             // A log or power scale's steps are not linear in the count, so upstream applies only
@@ -1348,7 +1320,7 @@ public class AxisBuilder(
         }
         val count =
           GuideFormat.countWithMinStep(
-            numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT,
+            numbers.resolveTickCount(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT,
             numbers.resolve(spec.tickMinStep, spec.scale),
             scale.domain,
             linear = false,
@@ -1375,7 +1347,7 @@ public class AxisBuilder(
       // something different, and only one of them is filtered.
       is BinnedScale -> {
         val count =
-          numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
+          numbers.resolveTickCount(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
         val values =
           when (scale) {
             // d3's quantize delegates to the linear scale it is built on, so an axis on one is
@@ -1401,13 +1373,6 @@ public class AxisBuilder(
       else -> null
     }
 
-  /**
-   * Upstream's `validTicks`: keep the candidates that land inside the range, in range order.
-   *
-   * The filter is what drops a bin scale's last edge — it bounds the topmost bucket rather than
-   * opening one, so it maps to nothing — and the thinning that follows is the same halving a long
-   * `values` list gets, ends restored when it overshoots below three.
-   */
   /**
    * How a discretizing scale's ticks are labelled, which is not how a positional scale's are.
    *
@@ -1443,6 +1408,13 @@ public class AxisBuilder(
     return { value -> value.asString() }
   }
 
+  /**
+   * Upstream's `validTicks`: keep the candidates that land inside the range, in range order.
+   *
+   * The filter is what drops a bin scale's last edge — it bounds the topmost bucket rather than
+   * opening one, so it maps to nothing — and the thinning that follows is the same halving a long
+   * `values` list gets, ends restored when it overshoots below three.
+   */
   private fun validTicks(scale: BinnedScale, candidates: List<Double>, count: Int): List<Double> {
     val positions = scale.rangeValues.mapNotNull { it.asNumberOrNull() }
     if (positions.isEmpty()) return emptyList()

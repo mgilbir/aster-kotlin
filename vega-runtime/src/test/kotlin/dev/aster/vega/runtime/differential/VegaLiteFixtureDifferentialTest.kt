@@ -30,6 +30,33 @@ import org.junit.jupiter.params.provider.MethodSource
  */
 class VegaLiteFixtureDifferentialTest {
 
+  /**
+   * The scene references are **all there, or none are** — a partial set is a failure, not a skip.
+   *
+   * A missing reference is answered with an assumption, which is right for a fresh clone and the
+   * edit-run loop: the references are gitignored, being sixteen megabytes of derived output nobody
+   * reads a diff of. It is wrong for every other case, and this is the floor that separates the
+   * two, the same shape as `replayed >= 60` in the upstream replays.
+   *
+   * What it catches is the gate quietly shrinking: a rendering step that failed part way, a fixture
+   * added to `test-fixtures/vega-lite/` without the references being rebuilt, or a stale directory
+   * from before a fixture was renamed. Any of those left most of the 1126 cases skipping while a
+   * run still reported green — and `scripts/check.sh` used to render the references *after* the
+   * tests that need them, so a single run could not arm this gate at all.
+   */
+  @Test
+  fun `the upstream scenes are all present or all absent`() {
+    val directory = File(repositoryRoot, "test-fixtures/vega-lite-reference")
+    val missing = fixtures().filter { !File(directory, "$it.reference.json").isFile }
+    if (missing.size == fixtures().size) return // A fresh clone. Every case will say so itself.
+    assertEquals(
+      emptyList<String>(),
+      missing,
+      "the upstream scenes are only partly rendered, so ${missing.size} fixtures would skip " +
+        "rather than compare. Run scripts/vega-lite-oracle.sh --references-only",
+    )
+  }
+
   private fun compile(name: String): Pair<Differential.Reference, CompiledSpec> {
     val source = File(repositoryRoot, "test-fixtures/vega-lite/$name.vl.json").readText()
     val compiled = VegaLiteCompiler().compileJson(source)

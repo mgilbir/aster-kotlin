@@ -27,7 +27,7 @@ end to end — expressions, signals, 49 of upstream's 51 documented data transfo
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-193 Vega differential fixtures and 283 Vega-Lite fixtures pass, every one of them matching upstream
+194 Vega differential fixtures and 283 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -194,7 +194,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 193 Vega differential fixtures and 283 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 194 Vega differential fixtures and 283 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -226,7 +226,7 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests, and every renderer now exposes the tree: the Android View, the Swift one and Compose Multiplatform. Not verified on physical hardware or with a real user |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 193 Vega differential fixtures |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 194 Vega differential fixtures |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -6804,3 +6804,863 @@ where a reviewer reads it.
 Five paths, all checked in a throwaway worktree rather than reasoned about: a snapshot moved with no
 entry fails; with an entry passes; with the marker passes; a source-only change is not flagged; and on
 `main` with nothing changed there is nothing to compare.
+
+### A whole-repository audit, and the first of the four places its findings cluster
+
+`docs/audits/codebase-audit-2026-08-27.md` is an adversarial read of everything in this repository —
+nine areas, each read in full, every Critical re-traced against the source before it was written
+down. It found 11 Critical, 33 High, 61 Medium and 66 Low, and its own summary is that they cluster
+in four places: promises without mechanisms, JavaScript semantics that leaked Kotlin, one semantic
+implemented once per host, and gates that skip instead of failing. The findings carry stable ids, so
+a fix can cite one instead of restating it, and the work is going through them in a stack of pull
+requests rather than in one.
+
+This is the first, and it is the value model's own reading and printing.
+
+**A bracket followed by a dot read nothing.** `parseFieldPath` was written from what the notation
+looks like it means rather than from vega-util's `splitAccessPath`, which is what every upstream
+field accessor is built from — and the difference is not decoration. A `.` after a closing bracket
+appended an *empty* segment, and a lookup through an empty segment misses by construction, so
+`"field": "coordinates[0].lat"` over GeoJSON-shaped rows drew nothing and said nothing. Three more
+divergences came out of the same reading: `a..b` and `.a` split one segment too many, a quoted
+bracket ended at the next `]` rather than at its own quote (so `a["b]c"]` was cut in half), and a
+quote counted as one anywhere inside a bracket rather than only where upstream counts it. The
+function is a transcription now. One divergence is kept and written down: upstream *throws* on an
+unterminated bracket, and a field path is pasted data.
+
+**Two blocks of the parser were still silent.** `SpecParser` names what each block consumes and
+reports the remainder — the inversion that made the axis's fifty-nine dropped properties visible —
+and `signals` and `data` were the two that had never been wired into it. Four properties were
+disappearing: a dataset's `on` triggers and `async`, and a signal's `react` and `push`. `push` is
+the one that matters, because this repository's own Vega-Lite compiler emits `"push": "outer"` for
+a faceted selection and a group's signals are resolved into a *copy* of the enclosing scope — so
+the name is shadowed inside the group and the outer signal never changes. One half of this project
+was writing something the other half was dropping, and neither said so.
+
+**Two number printers and one clock.** `VegaJson.write` fell back to the platform's `Double.toString`
+under a comment claiming `JSON.stringify`'s rules, which switches to exponential notation fourteen
+orders of magnitude early and is the *platform's* — so the same value was not the same text on two
+of the five targets that emit it. `%s` divided by a thousand and truncated toward zero where
+d3-time-format floors, which is a second late for every instant before 1970. Both go through
+`Decimals.jsString` now, which is the specification the rest of the engine already prints with.
+
+**And a parser that could not be used twice.** `SpecParser` is public and its name is a verb, and it
+accumulated: a second specification came back carrying the first one's diagnostics, and read the
+first one's `config` for any block it did not set itself.
+
+### JavaScript has two absent values, and this model had one
+
+C1, and the audit's own reading of why it is the first Critical: every JavaScript-fidelity defect in
+that report bottoms out in the value substrate, and this is the substrate.
+
+`VegaValue` carried one `Null` and it coerced as JavaScript's `null`. A field a row does not have is
+`undefined`, and the two coerce **oppositely** in the one place a chart cares about: `Number(null)`
+is 0 and `Number(undefined)` is NaN. So a filter `datum.x < 10` over rows with no `x` at all
+compared 0 to 10 and **kept** every one of them, where upstream compares NaN and drops them. Not an
+exotic input — a column some rows are missing is the ordinary shape of real data — and nothing said
+anything, because both engines were doing exactly what they were told.
+
+`VegaValue.Undefined` is the second value. Where it comes from is deliberately narrow:
+`Evaluator.property` reading a key that is not there, an index outside an array or a string, and
+nothing else. `field()` still answers `Null` for a missing path, because that accessor feeds the
+encoders and the transforms and both treat the two alike; what flows out of an *expression* is a
+signal value, and upstream's signal values carry `undefined`, so these do too.
+
+The rest followed from the definition, and each line of it was probed rather than reasoned about:
+
+- `'' + datum.missing` is `"undefined"`. `GroupMarkTest` had pinned `"null"` for `parent.width` with
+  a comment saying upstream prints the other thing; it prints the other thing now.
+- `undefined == null` is true and `undefined === null` is false. `isNullish` is the loose test,
+  spelled once, because `_ == null` is the idiom upstream writes every missing-value screen with —
+  `toNumber`, `toString`, `toBoolean` and `isValid` are all that shape.
+- **`isDefined` was inverted for the case it exists for.** `_ !== undefined` is true for a field that
+  is present and null, and it answered false. A predicate whose entire job is telling the two apart
+  could not, because there was nothing to tell apart.
+- `indata` answers `undefined` for a value no row carries. The reference table said `null` and a
+  comment beside it said upstream says `undefined`; the table was recording what this engine could
+  express rather than what upstream does, which is the failure mode a reference table has.
+- **One function must not treat them alike.** Upstream's `timeParse`/`utcParse` wrapper is
+  `value === null ? 'null' : locale[method](spec)(value)` — a *strict* test — so a null input comes
+  back as the string `"null"` and an undefined one goes on to the parser and fails. Probed, because
+  no amount of reading the Kotlin would have suggested it.
+
+One divergence is deliberate and now written down rather than implied: reading a property **of**
+nothing throws a `TypeError` upstream and takes the whole chart with it. Here it answers `undefined`,
+which is what a further read would have answered anyway, and which is the "nothing throws" contract.
+
+`ForeignValue.kind` and `ForeignSignals.kind` grew a ninth answer, `"undefined"`. A host that does
+not care which kind of nothing it is holding can test both; one that wants to tell a missing field
+from a null one now can.
+
+### The expression engine, against upstream rather than against a reading of it
+
+Twenty findings, all in `vega-expression`, and the shape they share is the one the audit named: a
+rule implemented from what it plausibly means, where it had to be transcribed from the thing it has
+to agree with. Every expectation in `ExpressionFidelityTest` was read off the pinned Vega through
+`oracle-js/src/eval-probe.js`, and several of them are answers no amount of reading the Kotlin would
+have suggested.
+
+**A dependency that was never recorded was never missed.** `collectSignals` removed a member-access
+property name **by name** from the whole expression, so `"year == datum.year"` reported no
+dependency on the signal `year` at all — `DataflowOrder` resolved it before the signal existed and
+never re-evaluated it, so a slider bound to `year` moved nothing and there was no diagnostic to
+read. The removal was undoing something that never happened: the AST walk does not descend into a
+non-computed property, so the name was never added.
+
+**Three ways a pasted string took the host down.** `data()` raised `NoSuchElementException`,
+`regexp('(')` raised the regular-expression engine's own syntax error from a field initializer —
+the exact failure class that engine's KDoc says it was adopted to end — and a deeply nested
+expression raised `StackOverflowError`, which is an `Error`, is caught by nothing typed, and is
+**unrecoverable on Kotlin/Native**. `regexp(query, 'i')` over a text field a reader types into
+reaches a half-typed pattern on nearly every keystroke. All three are diagnostics, and the parser
+counts its depth now: 256, against a corpus whose deepest expression nests eight.
+
+**`datetime(x)` was the year 1.6 trillion.** Upstream's codegen is `datetime: 'new Date'`, so a
+single argument is a *time value* and not a year — `datetime(datum.epochMillis)` is a documented
+idiom. Reading it as a year saturated `toInt()` and threw an `IllegalArgumentException` out of a
+public compile, past every catch site, all of which are typed `ExpressionEvaluationException`.
+`utc(x)` keeps reading a year, because `Date.UTC` does; the two are not twins and it took a probe
+to see it.
+
+**A `Date` is an object.** It was behaving as its number, so `datetime(0)` was falsey — one instant
+in history, and every date that failed to parse, taking the wrong branch of an `if` — `'' + date`
+printed epoch milliseconds into a tooltip, and `date == 0` was true where upstream says false.
+Relational comparison is the exception and stays numeric, because `<` asks `ToPrimitive` for the
+number hint while `+` and `==` ask for the default one, which a `Date` answers with a string.
+`String(date)` is now ECMA-262's own form. What is left out is left out by the specification's
+leave: an implementation *may* append a parenthesised zone name after the offset, V8 does, and
+producing it needs CLDR data no Kotlin/Native target has.
+
+**`functionContext` was the wrong list.** `Functions.knownUnsupported` is empty and a test asserts
+that it is, which was meant to be the guarantee that nothing is missing. `vega-expression` keeps a
+**second** table — a codegen whitelist of names passed straight through to the JavaScript runtime —
+and four of those, `isNaN`, `atob`, `btoa` and `encodeURIComponent`, were unimplemented behind it.
+The test reads both now.
+
+**And the rest, one line each, all probed:** `erfInverse` lost the sign of its input, so
+`quantileNormal(0)` was +Infinity and a QQ plot's lowest rank was drawn at the top of the chart;
+`span` of nothing is 0 and was NaN, which poisons every layout signal built from it; `utcOffset` was
+registered twice and the survivor answered a number where its twin answers a date; `sort` compared
+everything-but-two-numbers as text, which sorts dates by the digits of their epoch; `clampRange`
+left a descending range untouched; `inrange`'s two flags are **inclusivity** and were ignored
+outright; a negative `timeSequence` step walked away from `stop` and emitted a hundred thousand
+timestamps; `ToInt32` saturated instead of wrapping; a property key is a string, so `arr[1.5]` is
+undefined and not `arr[1]`; `[1,2] == '1,2'` is true; `clamp` does not correct swapped bounds;
+`hypot` overflowed; `round` lost a negative zero and rounded the tie's neighbour up; `parseInt`
+never worked out its own radix; `parseFloat('Infinity')` was NaN; `format(null, …)` printed a zero
+the data does not contain. Three string escapes — `\xNN`, `\u{…}` and a line continuation — were
+silently producing the wrong text, and a **no-break space** is JavaScript whitespace and is not
+Kotlin's, so an expression copied out of a rendered web page failed with `Unexpected character ' '`
+on a character indistinguishable from a space in the diagnostic.
+
+Two things in the audit's expression cluster are deliberately **not** here.
+`CachingExpressionCompiler`'s unsynchronized LRU (M40) goes with `TextLayoutCache` (L22) to the
+branch that gives the controller one confined compile executor: `vega-expression` has no lock
+available, and a copy-on-write map pays an O(n) copy on every cache *hit*, which is the hot path.
+Patching it here is the piecemeal alternative the audit's own T5 argues against.
+
+### The transforms, read out of upstream's cell rather than off their names
+
+Twenty-two findings in `vega-dataflow`, and the thing they have in common is that every one of them
+was found by *reading upstream's implementation* — several are answers no careful reader would have
+guessed, and two of them turned out to disagree with each other.
+
+**A duplicate row is two rows.** `window` keyed its results by the row itself, and `VegaValue.Obj`
+is a value class over a map that compares structurally, so two identical rows were one key and
+collapsed onto the last one's answer: `[{v:1},{v:1}]` with `ops:["sum"]` came back `[2,2]` where
+upstream answers `[1,2]`, and `row_number`, `lag` and `lead` were equally wrong. `Stack` had grouped
+positions for exactly this reason and said so, one file away.
+
+**What makes two rows one group is not one question.** `aggregate` and `window` group through
+upstream's `fastmap`, which is object-backed, so JavaScript coerces every key to a string and the
+number `1001` and the string `"1001"` are one group. `stack` partitions with
+`JSON.stringify(groupby.map(get))` and they are two. `asComparableKey` existed here for the first
+rule, with a KDoc citing the join bug that motivated it, and `groupTuples` was not using it — so the
+fix looked like "one keying function" until a probe showed that `stack` needs the other one. Both
+are now what upstream has, and both say which and why.
+
+**The aggregate cell's three boxes.** Upstream's `add` is
+`if (v == null || v === '') { ++missing; return } if (v !== v) return; ++valid`, and every boundary
+in it was in the wrong place here. The empty string was a valid **0** — a dirty CSV column dragged
+every mean toward zero. A NaN was counted as missing. A value that merely coerces to NaN was
+filtered out, so the sum of `[1, "abc"]` was 1 where upstream answers NaN: a total that silently
+omits the rows it could not read, which is the failure this project exists to refuse. An infinity
+was filtered too, so `max` of `[Infinity, 1]` was 1. And `m.valid ? … : undefined` guards every
+numeric operation including `sum`, so a group of nulls has **no sum property at all** — a comment
+here claimed upstream reports 0, it was probed false, and the code followed the comment.
+
+`min`/`max` and `argmin`/`argmax` turned out to reach their answers by different routes that
+genuinely disagree: the first pair track the extreme incrementally over the raw values with
+JavaScript's `<`, so a string never displaces a number; the second fall back to `extentIndex` over
+every stored row, so `argmin` over `[Infinity, 1]` is the second row while `min` is 1, and `argmin`
+over `['abc', 1]` is the *first* row while `min` is `'abc'`. Both are transcribed now.
+
+**Two transforms were ignoring a parameter and saying nothing.** `pie` never read `sort` — a chart
+asking for its biggest slice first got data order — and `bin` never read `steps`, so a chart asking
+to be binned only on the round numbers it has axis labels for got whatever the automatic rule chose.
+Both are in upstream's own `Definition`, which is the list this module is otherwise loud about.
+
+**And `pie` was correcting its input.** Taking the absolute value and guarding a zero total showed a
+plausible chart where upstream shows a broken one — a negative slice really does run backwards over
+its neighbour there, and a zero total really does divide by zero. The KDoc presented both as
+fidelity.
+
+**`stack center` grew in two directions.** Upstream's `stackCenter` runs **one** cursor from
+`(max − sum) / 2` over the absolute values; this split it into the positive and negative cursors
+that `zero` correctly uses, so `[3, -5]` spanned `[0,3]` and `[0,-5]` instead of `[0,3]` and `[3,8]`.
+The one committed `center` fixture is all-positive, where the two rules agree.
+
+**The rest, one line each and all probed:** `bin` writes NaN for an unreadable value and null only
+for an absent one — the distinction its own header stresses for the out-of-extent infinities;
+`extent` answers `[null, null]` with an "Infinite extent" warning rather than the finite extent of a
+column upstream refuses to measure; `pivot` keeps a null key and orders columns by value rather than
+by the text of their names; `ntile` and `nth_value` are refused without a parameter, as upstream
+refuses them, rather than turning into a column of ones; `countpattern` compiles its
+specification-supplied pattern through the ECMA-262 engine the codebase adopted for exactly that
+class of bug; a force link's `distance` and `strength` expressions read the **link's row**, where
+they were evaluated against nothing and `datum.weight` was NaN for every link; `compareFieldValues`
+is `vega-util`'s `ascending`, so a string against a number compares equal and keeps its place; a
+hierarchy layout's `as` names what it names.
+
+**Two that are about the engine rather than a chart.** `Orient2d` — Shewchuk's exact orientation
+predicate, whose whole purpose is that a nearly-collinear decision comes out right — was a
+**singleton holding one set of expansion buffers**, so two voronoi layouts running at once wrote
+into each other's expansion. It is a class now, owned by the triangulation using it. And
+`Dataflow.kt` is marked `@InternalAsterVegaApi`: its `ChangeSet`/`TupleId` contract has no consumer
+outside its own tests, and `TupleId` was promising an SDK reader that identity is "preserved across
+incremental updates", which nothing implements.
+
+### One scene, five readings of it, and the two that were not readings at all
+
+The audit's third design tension is "one semantic, N implementations", and this is the half of it
+that lives in shared code: what a scene *means* before any host touches it.
+
+**`zindex` was a private arrangement between the scene and the SVG renderer.** `paintOrder` reorders
+a mark's items by their `zindex`, and its own comment says every renderer has to apply it. One did.
+So a raised mark was on top in an exported file and underneath on every screen — and the hit index,
+which numbers its entries in the order it walks them, sent the tap to the mark drawn *below* the one
+the reader could see. The scene walk, the hit index, the Android renderer, the Compose walk and the
+Swift walk all reorder now, which is also what keeps the two scene-walk goldens byte-identical.
+
+**A group's opacity composited its children in the export.** `opacity` on a `<g>` applies to the
+whole subtree; every canvas renderer here applies a group's opacity to its own panel and says so in
+a comment, and so does upstream — probed, and it emits `<path class="background" … opacity="0.5"/>`
+with the child element bare. The renderer's own test asserted "exactly one element carries an
+opacity", which the container satisfied as well as the panel would have. The test now says *which*.
+
+**Four ways a mark could be visible and untappable.** A fully transparent group's children were
+pruned from the hit index while every renderer drew them. The broad phase was gated on
+`boundsTolerance` alone, so `strokeTolerance` could not be reached past it — `Mouse` has a
+`boundsTolerance` of 0, and on an axis-aligned rule, whose bounds *are* its stroke width, its 2 px
+tolerance was zero. A fill was picked with the **even-odd** rule while every renderer painted it with
+**nonzero winding**, so a tap on the visibly solid centre of a self-intersecting outline missed. And
+a `path` with `fillOpacity: 0` lost its interior, in the same file where `hitsRect` explains — citing
+upstream — that a transparent fill is precisely the idiom for an invisible tap target.
+
+**An export that does not match the screen.** A `dominant-baseline` is a per-line instruction, so a
+three-line label with `baseline: middle` had each line centred on its own `y` and the block came out
+(n − 1)·lineHeight/2 below where every canvas renderer puts it. The offset from the anchor to the
+first baseline is folded into `y` now, which is both the canvas rule and the shape upstream emits.
+
+There is a **larger** version of that question this branch deliberately does not answer. Upstream's
+own offset is `Math.round(0.30 * fontSize)` for `middle` — a function of the font size and nothing
+else, with the remaining lines stacked below — where this engine offsets by `ascent − height/2` over
+the **block's** height. For one line the two agree exactly; for three they differ by a whole line.
+The differential harness cannot settle it: `oracle-js/src/normalize.js` says in its own header that
+text is compared by content and anchor rather than by glyph bounds, because font metrics legitimately
+differ between a browser and Android (ADR-0006) — so `text-array-lines.vg.json`, which has multi-line
+labels at `middle` and `bottom`, passes either way. Changing it would move `textBounds`, which feeds
+`autosize: fit` and every guide's extent, with no oracle to check the result against. It is written
+down here instead, which is what this project does with a difference it cannot yet verify.
+
+**A link, a control character and a rectangle nobody asked for.** An `href` is a
+specification-controlled string, and the export was XML-escaping it and writing it through — so a
+`javascript:` URL survived into a file that is clickable the moment a browser opens it. Upstream
+sanitizes the same string through `loader.sanitize(href, {context: 'href'})`, which answers the
+audit's open question about whether it does; its allowlist is transcribed as `isSafeHref`, a refused
+link becomes a warning, and the mark is still drawn. A C0 control character cannot be written in XML
+at all, not even as a numeric reference, so one stray byte in a data-derived label made the whole
+document malformed and a viewer refused all of it. And a group with a fill and no size was painting
+its whole **clip** rectangle, where upstream paints `M0,0h0v0h0Z` — nothing.
+
+**The snapshot could not see eight of the things it is for.** ADR-0008 calls it the level-2
+regression check, and a property it does not write is a property it cannot check: `dashOffset`,
+`miterLimit`, the four per-corner radii, `blendMode`, a symbol's custom path, an image's placement
+and smoothing, an item's `href` and its `zindex`. It also recorded `effectiveCornerRadius`, which is
+a different clamp of the same input from the `Corners.of` every renderer draws with — a number
+nothing draws.
+
+### "Nothing throws" had no mechanism, and six ways a document could prove it
+
+The audit's first design tension: the README stakes the whole diagnostic model on one sentence —
+"nothing throws; a compile returns diagnostics" — and no public boundary had a catch-all or a depth
+cap. The contract held only if every one of sixty thousand compiler lines was individually careful,
+and seven of them were not.
+
+Each of the seven is fixed where it was, across this branch and the three before it. What is new
+here is the **boundary**: `SpecCompiler.compileJson` and `compile` are guarded, so the *next* one is
+a `VEGA_COMPILE_FAILED` diagnostic carrying the exception rather than a crash in the host.
+Cancellation is rethrown, because swallowing it would leave a cancelled coroutine running, and so is
+`OutOfMemoryError`, after which nothing the process does is trustworthy. The three fixed here:
+
+- **A gradient legend's `values` are whatever the specification wrote.** `"values": ["2020-01-01"]`
+  on a continuous colour scale cast straight to `VegaValue.Num` and threw a `ClassCastException` out
+  of a public entry point.
+- **A `tickCount` of a billion** was an out-of-memory error on the way to building the list, or a
+  billion-iteration walk-down before that. Upstream hangs on the same document, so the clamp is
+  named in a diagnostic rather than hidden.
+- **A mark tree nested a few thousand groups deep** was a `StackOverflowError` — an `Error`, caught
+  by nothing typed, unrecoverable on Kotlin/Native. The deepest nesting in the whole fixture corpus
+  is three.
+
+**And one that could throw without being a document's fault.** A comparator that answers zero for a
+pair it cannot order is not a total order — a row whose sort key is unreadable compares equal to two
+rows that compare unequal to each other — and the JVM's TimSort detects exactly that and throws
+`Comparison method violates its general contract!` once there are 32 or more items. A field some
+rows lack is all it takes. JavaScript's sort does not check, so upstream simply produces some order;
+both sort paths here now fall back to declaration order, which is the order stability would have
+given anyway.
+
+### The flagship interaction was inert, and a static compile could not see it
+
+`buildTime` read `spec.domain` and consulted `domainRaw` only to suppress `nice`, so the ladder every
+other continuous scale climbs — raw domain, `zero`, the three `domain*` overrides, padding, nice —
+was computed and thrown away. `domainRaw` is how an interactive zoom publishes the exact interval it
+wants; the committed `overview-plus-detail.vg.json` fixture is that shape, and brushing the overview
+recompiled the detail panel with the full domain and rendered it unzoomed. The oracle passes it
+because the brush signal is null at compile time, which is the shape of blind spot worth naming: the
+differential harness compares the *initial* scene, and an interaction's first frame is the only one
+it ever sees.
+
+The same rewrite fixed the `nice` step, which re-derived from the original domain and discarded both
+the bounds and the padding computed immediately above it. Vega-Lite defaults every temporal scale to
+`nice: true`, so a VL `scale.domainMax` on a time axis silently showed the whole span — and the
+comment beside the code said the opposite was intended.
+
+### A diagnostic code is a contract, and thirty conditions were sharing one
+
+Codes are documented as part of the public surface: a host matches on them. Three were flatly wrong.
+A **load failure** reported `VEGA_PARSE_UNKNOWN_PROPERTY`, which says the document is at fault, when
+it is the only condition in the whole file that describes something *outside* the specification and
+the only one a retry is meaningful for. An image with no size reported `VEGA_EXPORT_IMAGE_UNRESOLVED`
+— a code about export, from a compile. "The scale was not built" reported
+`VEGA_SCALE_UNSUPPORTED_TYPE`, which says this engine has no such scale type, so a host reading that
+code to decide whether a type was supported was told the wrong thing by the *mark* that referenced
+it.
+
+Eight new codes, and the runtime's conditions redistributed across them. Nothing was renamed or
+removed.
+
+### Two floods, three parsers and thirty comments in the wrong place
+
+**The flood.** A missing scale is a property of the specification and it was reported once per
+*row*: a 10,000-row mark produced 10,000 identical ERROR diagnostics and buried everything else,
+including whatever a reader was looking for. `reportOnce` was in the same file, unused by any of the
+three per-datum reports.
+
+**The parsers.** `MarkEncoder`, `TitleBuilder` and `GuideStyle` each had their own CSS font-weight
+parser and they had drifted: `bolder` was 700, 800 and 700, and two of the three read a numeric
+string while the third answered 400 for it. A title and an axis label written with the same weight
+came out at different weights. One parser now, and `bolder`/`lighter` are **relative** to the
+inherited weight — the initial 400 in a chart — so CSS Fonts 4's table gives 700 and 100. All three
+had said 300 for `lighter`, which is a value the table does not contain.
+
+**The comments.** Thirty KDoc blocks sat above a *different* declaration from the one they document:
+the function each belonged to had moved and the comment had not. `AxisBuilder`'s explanation of
+`validTicks` — three of whose four steps are surprises worth writing down — documented `offsetOf`.
+`SpecCompiler`'s class comment described a compiler that could not draw legends or titles, which two
+thousand lines in `LegendBuilder` and `TitleBuilder` had been contradicting for several releases.
+Each was moved to the declaration it describes, or deleted where it was an older wording of the
+block below it.
+
+### The one mutable object in the engine, asked two things at once
+
+`VegaChartController` is the only mutable object here, and it is the one a host holds: everything
+below it is a value. So every question about ordering, staleness and repeated work lands on it, and
+the audit's fifth cluster is those questions. Six of them.
+
+**A compile that finished late published over a newer one.** The asynchronous entry points hold a
+lock, so the *compiles* were ordered; what was not ordered was the publish, because each one asked
+"am I finished?" rather than "am I still the answer?". Six entry points recompile — `setSpec`,
+`setSpecAsync`, `hostData`, `containerSize`, `setContainerSizeAsync`, and the recompile an
+interaction triggers — and mixing any two of them across a thread boundary could leave a reader
+looking at the older result. Each now stamps a request number *at the moment the caller asks*, and
+publishes only while it is still the newest. Two compiles running at once on one controller also
+report `VEGA_COMPILE_CONCURRENT` now, because they share one text engine and one signal table, and
+that is a fact about the host's calling pattern rather than about the document.
+
+**A tap fetched the network.** Every interaction here recompiles the whole specification, and a
+compile resolves every dataset from scratch — that is the design, and a whole recompile of the
+heaviest fixture is well inside a frame. What was not inside a frame was the *loading*: with a
+loader opted in, a tap issued a blocking GET per `url` dataset, on the dispatching thread, with the
+loader's own timeouts, and a `{"type": "timer", "throttle": 500}` stream polled the network twice a
+second. Upstream loads once because its dataflow only re-runs what changed. A `CachingDataLoader`
+now sits between the controller and the host's loader, cleared when a new specification arrives —
+a new document is a new decision about what is behind a URL. This is what makes "correct, and
+slower" an honest description rather than merely a slow one.
+
+**`stop()` did not stay stopped.** It cancelled the timers, and the next publish — any publish, and
+a host feeding `hostData` to a view it has torn down publishes constantly — started them again. A
+chart the host had explicitly stopped went on ticking, with a repaint attached to every tick. It is
+a latch now, cleared only by a new document.
+
+**Every mark carried its row as a tooltip.** `MarkEncoder` fell back to the whole bound datum when a
+specification wrote no `tooltip` channel, and the comment beside it said upstream does the same.
+Upstream does not: a probe against vega 6.3.1 answers `undefined`, and `tooltip` is not a property
+on the item at all. So a chart drawn from a table with more columns than it shows — which is the
+ordinary case, not a corner — disclosed the rest of them on hover, from a specification that asked
+for no tooltip. The guide builders in `AxisBuilder` and `LegendBuilder` had it right already. A host
+that wants the row still has `NodeMetadata.datum`, which is what `MarkHovered` and `MarkClicked`
+carry, and what the click path reads now instead of looking the node back up by identity.
+
+**A gesture with a NaN in it.** Platform recognisers produce them — a fling whose velocity divides
+by a zero time delta, a pinch whose two pointers land on one pixel — and one reaching the pan offset
+or the zoom anchor poisons every coordinate derived from it, surfacing three layers away as a chart
+that draws nothing. Refused and reported now, which is the difference between a diagnostic and a
+bug report.
+
+**A `window:` stream was inert and silent.** Nothing in the controller *produces* a window-sourced
+event, so the commonest idiom for a drag that continues outside the chart got a signal that never
+changed. The watch is still registered, because `EventDispatcher` is public and a host driving it
+directly can dispatch one — `EventDispatcherTest` proves that path works, which is why the audit's
+stated premise for this finding is not what shipped — but it is reported.
+
+### Two caches that say what confines them, and one URL parser that did not round-trip
+
+**The caches.** `CachingExpressionCompiler` and `TextLayoutCache` are both LRU, which means both
+mutate on every *hit*: an entry is removed and re-added to move it to the young end. Two threads
+doing that at once corrupt a `LinkedHashMap`, and on the JVM a concurrent resize can spin rather
+than merely lose an entry. Neither said so. Both now document what confines them and why there is no
+lock: Kotlin's common standard library has no blocking one, and a copy-on-write map would pay an
+O(n) copy on the hot path each class exists to make fast.
+
+**The loader.** Four things, and three of them are the same shape — a rule that reads one notation.
+
+- `blockPrivateNetworks` read dotted quads, so `::ffff:169.254.169.254` was the cloud metadata
+  endpoint one notation away, in the mapped form every dual-stack socket connects straight through.
+  The `::ffff:`, `64:ff9b::` and bare `::` wrappings are unwrapped now, and `fec0::/10` joins the
+  refused ranges. A public IPv6 address is still allowed: the rule is about reach, not notation.
+- `http:///x` parses with a host of `""`, which is not null — so it passed the null check, matched no
+  entry in a non-empty allowlist (correct) and passed an *empty* one outright, reaching the transport
+  with nowhere to connect but the local machine.
+- Neither the allowlist nor the private-network rule looked at the **port**, so `http://host:25/` was
+  an SMTP conversation whose first line a specification got to write. The handful of ports that are
+  never a data endpoint are refused, which is a narrower rule than an allowlist and stops the two
+  that matter: a shell and a mail relay, reached from a chart.
+- The response cap was checked on `body.length`, which counts UTF-16 units — so the real ceiling was
+  a third of the nominal one for CJK and half for emoji — and it was checked *after* the read, by
+  which point the whole response is in memory, which is the thing being defended against. The budget
+  is bytes now and is handed to the transport; the JVM one reads to it and stops.
+
+And one found by the test written for the first of those: `Uri` stores a host bare, because that is
+the form every rule wants, and wrote it out bare too. So `sanitize("http://[2606:4700:4700::1111]/x")`
+returned a string whose authority reparses with a port of `4700:4700::1111` — `sanitize` handing
+back something `load` refuses, against a contract `DataLoaderTest` states in as many words.
+
+### The compiler that takes pasted text, and had no `try` in it
+
+Vega-Lite is the grammar a person writes by hand, so `VegaLiteInput.toVega` takes a `String` and
+three demo apps have a paste screen. That makes the interesting question about a pathological
+document not what chart it makes but what it does to the host, and until this branch the answer was
+too often "takes it down". Four ways, and one of them needs no hostility at all.
+
+**A date that rolls over.** `{"month": 13}` is January of the next year, `{"date": 30}` in February
+is 1 March, `{"hours": 24}` is the next midnight, `{"date": 0}` is the last day of the month before.
+Every one of those is legal Vega-Lite written by someone who knows what a JavaScript date
+constructor does, because upstream's `dateTimeToTimestamp` *is* one: `+new Date(...dateTimeParts(d))`.
+This engine built a `LocalDateTime` from the parts, which throws `IllegalArgumentException` on all
+four — out of a public entry point, from a module with no catch anywhere in it.
+
+The fix is `JsDate` in `vega-model`, which is that constructor written out: `MakeDay`, `MakeTime`,
+`MakeDate` and `TimeClip`, the specification's own decomposition, because reproducing a rollover
+rule in aggregate is exactly the arithmetic that comes out right for the cases someone thought of.
+Two callers share it now — the Vega-Lite compiler and `vega-expression`'s `datetime`/`utc` — which
+is the "one semantic, N implementations" tension the audit named, and finding a *second* defect
+proved the point: the expression side had the rollover and not the two-digit-year rule, so
+`datetime(99, 1, 1)` was February of the year 99 where every Vega renderer says 1999.
+
+**A document too big to walk.** Two limits, and the second is the surprising one:
+
+- *Nesting* recurses through the view builders. This engine overflowed somewhere past 2,000 nested
+  layers; upstream past 200.
+- *Transforms* are not nesting at all. Each becomes one node in a `DataNode` chain, and each of the
+  eight optimizer passes over that chain is written as "do this node, then the children" — so a
+  **flat** list of 2,000 transforms is a 2,000-deep recursion. A limit on nesting alone would have
+  left that open.
+
+`Limits` refuses both before anything walks the document, with a diagnostic naming the limit, and
+walks with an explicit stack rather than by recursion — a function checking whether a document is too
+deep to recurse over must not be the thing that overflows on it. Upstream refuses the same documents
+with a `RangeError`, so refusing is faithful and only the mechanism improved. A `repeat` grid is
+capped at 256 cells beside them, because each cell is a whole compiled view: 100 × 100 is ten
+thousand of them.
+
+**And the catch-all behind all of it.** `compileJson`, `compile` and `VegaLiteInput.toVega`'s own
+parse are guarded now, so the next defect is a `VEGA_LITE_COMPILE_FAILED` carrying the exception.
+`StackOverflowError` is caught there too, and that is worth being honest about: on the JVM it is
+recoverable in practice and on Kotlin/Native it is not catchable at all, which is precisely why
+`Limits` exists rather than the catch being the whole answer.
+
+### Six ways a Vega-Lite chart was quietly not the chart that was written
+
+**A specification with no `data` was an error and a broken result.** It emitted ERROR *and* a
+non-null specification whose marks read a dataset called `""`, so a host following the README's
+stop-on-null pattern passed it straight to the runtime. It is not an error: upstream compiles it to
+`"data": [{"name": "source"}]`, an empty named table, which is exactly the seam a host supplies its
+own rows through — `hostData` here, `view.data(name, rows)` there. The output is now byte-identical
+to upstream's.
+
+**A channel that is not a channel was kept.** `colour` — the spelling half the English-speaking
+world uses — went into the aggregate's `groupby`, the spoken description and the tooltip's field
+list, and produced a chart grouped by a column that nothing was coloured with, silently. Upstream
+warns and drops, and says which name it dropped, which is the half that matters for a typo.
+
+**An interval selection's written dates never became numbers.** A store is a *dataset* — the filter
+compares its numbers against a column of numbers — and the point branch converted while the interval
+branch emitted the `{"year": …}` object raw. So the initial filtering was false for every row until
+the reader's first drag replaced the store with real numbers, at which point it started working and
+nothing explained the first frame. Both branches go through one helper now.
+
+**A comma-separated event selector kept only its first stream.** `{"on": "click, touchend"}` is how a
+chart is made to work with a finger as well as a mouse, and the touch was dropped — from the
+specification whose entire purpose in writing two was to have both. `Selection.on` is a list now, and
+the emitted `events` array is byte-for-byte upstream's.
+
+**A signal rename rewrote the data.** Folding two bin nodes renames the signals of one, and the
+rename is a substring replace over every string in the finished specification. That is right for a
+`datum["…"]` in an expression and wrong for a dataset's rows, which are the user's values: a row
+holding a string that happened to contain a generated name would have been quietly edited. The names
+are long and specific, but they are not reserved.
+
+**Two members dropped in silence, and two diagnostics that lied.** A layer member that failed to
+parse, and a concat entry that is not an object at all, were both skipped without a word — so the
+chart came out a plot short and a reader counting marks had to work out which. And the
+unsupported-transform message listed what is implemented while leaving out `bin`, `stack`,
+`timeUnit` and `impute`, all four of which are implemented a hundred lines above the message saying
+they are not; the malformed-predicate message said selection parameters "are not implemented", and
+they are.
+
+**Two spellings that only differ where it matters.** `varName` transcribes upstream's `\W → _`,
+and JavaScript's `\W` is ASCII, so a column called `año` kept its `ñ` here and lost it upstream —
+two different signal names for one specification, and emitted Vega differing on every line that
+mentions the field. And a number written into an expression is `String(n)`: two hand-rolled versions
+wrote `1.0E-7` for `1e-7`, and the one in `LayoutSize` saturated `toLong()` at 9.2e18 while its own
+guard let 1e21 through, so a step over that came out as `9223372036854775807`.
+
+### One point, two spaces: the audit's host cluster
+
+`ScenePlacement` exists because the same arithmetic — where inside its slot the chart was actually
+drawn — has to be agreed on by the drawing, by every gesture, by the accessibility frames and by
+whatever a host puts on top. It was introduced after this project had twice shipped a finger landing
+beside the mark it looked like it hit. Four dispatch sites were still not going through it, and each
+is the same shape: a point in one space handed to something that reads another.
+
+**A pinch's focus.** `ScaleGestureDetector` reports in raw view coordinates and those went straight
+into `ChartInputEvent.Zoom`, while `toPointD` takes the placement's origin off every other point in
+the file. On any padded or centred chart the zoom pulled towards a point offset from the reader's
+fingers by exactly that origin. There is one conversion now and both sites use it.
+
+**A screen reader's activation.** The helper dispatched `Tap(bounds.centerX, bounds.centerY)` — those
+are *scene* coordinates — into a controller that reads placement-relative view pixels and then
+divides by the fit scale. The two agree only while the fit scale is 1 and nothing has been panned, so
+a TalkBack double-tap activated whichever mark happened to sit at the scene coordinate read as a view
+coordinate. Someone using a screen reader cannot see that happen, which is what makes it the worst of
+the four.
+
+**The drawn viewport's far corner.** Its near corner came from `placement()`, which centres, and its
+far corner was the padding box's — `width - paddingRight`. So the viewport was too large by the whole
+of the slack, all of it on the right and the bottom. Three things followed: an opaque scene
+background, which Vega-Lite gives every chart, painted a margin down two of the four sides; the clip
+let a zoomed chart's content escape there; and the fit scale, recomputed from that box, disagreed
+with the one reported to the host and used by every touch.
+
+**The tooltip's anchor.** Placement-relative, drawn onto a canvas that is not, so the bubble sat off
+by the origin.
+
+### Two hosts that could not finish a gesture, and one that could not start one
+
+**Compose Multiplatform could not pan.** `Modifier.pointerInput` restarts its coroutine — cancelling
+whatever gesture is in flight — whenever a key changes, and the viewport was among the keys. The
+viewport is precisely what a pan changes: the wiring the composable's own documentation describes
+feeds `InteractionState.viewportOffset` back in, so the first pan increment cancelled the detector
+that produced it. A continuous pan was a sequence of one-increment gestures, each starting from a
+fresh centroid. It reads the viewport through a `State` now and keeps it out of the keys.
+
+**Neither Kotlin host could end one.** `GestureDetector` has no "scroll ended" callback and
+`detectTransformGestures` reports increments and nothing else, so the Android View never dispatched
+`GesturePhase.ENDED` for a pan and the Compose Multiplatform chart passed `ended = false` to both of
+its callbacks always — a parameter documented on both and dead on both. The controller emits
+`ChartEvent.ViewportChanged` only on `ENDED`, which is the entire point of the phase: a host persists
+or announces a viewport once rather than sixty times a second. So on Compose Multiplatform that event
+never fired at all. Closing it on the MP side needed a second `pointerInput` watching the same
+stream, because `detectTransformGestures` is a `PointerInputScope` extension and `awaitEachGesture`
+hands out a restricted scope that cannot call one — and the watcher has to read
+`positionChangedIgnoreConsumed`, since by the final pass the detector has consumed every change it
+is looking at.
+
+**And a chart claimed keys it did nothing with.** `onKeyDown` returned true for TAB, ESC, HOME, END
+and the four arrows while `dispatch` has no behaviour for a key and no event stream reaches one. TAB
+never moved focus off the chart, ESC never dismissed the sheet it was in; on a television, where the
+d-pad *is* the keyboard, the chart could be entered and not left.
+
+### A channel two renderers drew and two ignored
+
+`blend` reached the Android canvas — all sixteen CSS modes, with the ones `PorterDuff` lacks reported
+rather than substituted — and reached exported SVG. The Compose Multiplatform walk and the Apple walk
+dropped it on the floor: no drawing, no diagnostic, no row in the feature table saying so. One
+specification, two pictures, and only one of the hosts admitting to a gap.
+
+Both now carry it, through Compose's `BlendMode` and CoreGraphics's `CGBlendMode`, which have all
+sixteen between them because CSS took its list from the same PDF blend modes CoreGraphics did. The
+parity recorder carries it too, and `encode-channels` joins the scene-walk goldens — so the one
+fixture in the corpus with a `blend` on it is now compared call for call across the two walks, which
+is what would have caught this in the first place.
+
+**And the golden list is discovered rather than declared.** It was hard-coded on both sides, which is
+how a golden quietly stops being asserted on one engine while still sitting in the repository looking
+asserted — the exact failure `test-fixtures/host-conformance/README.md` warns about, reproduced by
+the pair of files whose whole job is catching divergence between two implementations. Both scan the
+directory now, so a fixture added to one immediately obliges the other.
+
+One thing is **reported and not fixed**: a group's `clipPath` is honoured on the Android canvas and
+in SVG and ignored by the Compose Multiplatform walk. `SceneDrawTarget.beginGroup` takes a rectangle,
+so honouring it means widening that seam — and widening it for the Swift walk in the same step, since
+the two are compared call for call. A chart using one draws *more* than it should there rather than
+less, which is visible rather than silent.
+
+### The renderers' own allocation claims, and the metrics they measured with
+
+**`AndroidCanvasSceneRenderer`'s header says it allocates nothing per mark.** It built a
+`DashPathEffect` and three lists for every dashed node, and a gradient shader plus two array copies
+for every gradient-painted node, on every frame. A chart with a dashed gridline per tick allocates a
+few dozen of each per frame; during a pan that is a few thousand a second, for patterns that come
+from the *specification* and are therefore identical every time. Both are cached by what they are
+built from, bounded so a document that varies one per datum cannot grow them.
+
+**The Compose Multiplatform draw path had a text cache of eight.** Eight is the number of labels on a
+small axis, so on any real chart every run past the eighth was shaped from scratch per frame —
+resolving the family, breaking the runs and positioning every glyph. And each mark's path was
+re-transformed per frame although the `PathData` behind it is the same object on every frame of a
+pan: a ten-thousand-symbol scene rebuilt ten thousand lists and thirty thousand points a frame for a
+picture that had not changed. Both are cached; the second is keyed on the path's **identity**,
+because comparing a thousand commands to decide whether to rebuild a thousand commands saves nothing.
+
+**And a Compose host could not get the metrics its chart was drawn with.** `rememberVegaChartController`
+built a controller with the deterministic default engine — fixed ratios, font scale 1, no host faces —
+while the `VegaChartView` underneath drew with `AndroidTextEngine` at the reader's own font scale and
+with the host's faces. At the largest accessibility text size that lays every label out about a third
+narrower than it is painted, which is overlapping axis labels on precisely the setting that exists to
+make text readable. Nothing outside `vega-android-canvas` could reach a compatible engine: the view's
+own is exposed but documented as unsafe to compile with, and `newCompatibleTextEngine()` needs a view.
+The demo was making the same mistake in its own code, and is fixed alongside.
+
+**Two seams that voided their own contracts.** `imageResolver` and `fontResolver` rebuild the view's
+renderer when the value assigned differs by *identity*, and `VegaChart`'s `update` block handed over a
+fresh lambda every recomposition — so the renderer was rebuilt and the image cache emptied per frame,
+turning "a URL is asked once, not once per frame" into its opposite for every host that supplies a
+resolver. The composable passes stable trampolines now, the same shape it already used for `onEvent`.
+
+### Smaller, and one gate that was not armed
+
+- **A font stack tries its concrete names before its generic**, which is what CSS says and what every
+  browser does. A generic anywhere in the list preempted the platform resolution of everything before
+  it, so a device that *did* have the named face never drew in it. The `Typeface.DEFAULT` probe has a
+  known false negative on an OEM build whose default family is itself a named face; that is
+  over-eager *reporting* rather than wrong drawing, and the platform exposes nothing that
+  distinguishes the two.
+- **A gradient is resolved against the same box everywhere.** The Android View used the geometric
+  rectangle; upstream's `color(context, item, value)` uses `item.bounds`, which `boundStroke` has
+  already widened, and both the SVG renderer here and the Compose Multiplatform walk do the same.
+- **TalkBack is not re-announced sixty times a second during a pan.** The semantic tree was
+  invalidated on every published snapshot; it is invalidated when what it *says* changes now, and a
+  frame that only moved is re-read by `ExploreByTouchHelper` without one.
+- **`onHover` is mouse and stylus only**, which is what it documents and what hover means.
+- **A rectangle's image under a transform maps all four corners.** Two opposite corners describe it
+  only while the transform maps axes to axes; nothing this engine compiles reaches the difference
+  today, and a `clip` built from a diagonal would have been silently wrong if one ever did.
+
+**And the gradle gate now compiles the common metadata.** Compiling every target is not the same as
+compiling the common source set: a `commonMain` file naming something only the JVM and Native
+standard libraries have — `OutOfMemoryError`, which is not in `kotlin-stdlib-common` — builds for
+every target and fails the metadata compilation, which is what a consumer of the multiplatform
+artifact resolves against. Two commits on this branch's own stack shipped exactly that while
+`check.sh` reported green. Both are corrected here, and the catch that needed it is `Exception`
+rather than `Throwable` now — which is also the *right* rule, since an `Error` is not a failed
+compile and a `StackOverflowError` is not catchable at all on Kotlin/Native.
+
+### The Apple session: the one object an app holds, touched while it was busy
+
+`ChartSession` is the mutable object on the Swift side, and `VegaChartController` underneath it is
+documented as unsafe for concurrent use — which is why every mutation goes through `serialised`. The
+queue exists because a tap during the first compile once left a chart stuck showing "no scene". Two
+paths were not going through it, and both are reachable by an ordinary reader.
+
+**`set(signal:to:)`.** A slider on a chart that is still compiling: `setSignal` walks the signal
+updater and the event dispatcher, and `setSpecAsync` is at that moment rebuilding both of them off
+the main actor. That is precisely the race. The override is still *recorded* outside the queue,
+because the compile reads it when it starts — so a value a reader chose during a load survives into
+the chart that load produces, which is the behaviour the queueing would otherwise have thrown away.
+
+**`load("")`.** The clear was synchronous and the compile was not, so the clear emptied everything
+the compile was about to write and the compile then wrote it back. A host emptying its editor while
+a specification was still compiling got the previous chart back, under a spinner that never stopped:
+`loading` was set true by the compile and the block that would have cleared it had been counted into
+the queue and then cancelled. The clear is enqueued now, behind a cancel, like every other mutation.
+
+**And a failed compile reported the previous document's diagnostics.** `try?` gave nil on a throw,
+`diagnostics` was left holding the last chart's, and the failure message was read out of it — so the
+host was told a new document had failed for a reason belonging to the one before it. `do`/`catch`
+now, because *which* failure it was decides what to report: a cancellation is control flow and
+leaves everything alone; anything else clears the diagnostics before writing a message of its own.
+
+### Two more points in the wrong space, and a measurement that disagreed with its own drawing
+
+**A drag divided by the fit scale before dispatching.** `InteractionState.viewportOffset` holds a pan
+in *surface pixels*, and `visibleViewport` is what divides by `contentScale * viewportScale` — the
+Compose Multiplatform chart says exactly this beside its own dispatch, and the Android View
+dispatches the raw distance for the same reason. Dividing here divided twice, so at any fit other
+than 1 the chart moved by a fraction of the finger, and the further out the fit the worse it got.
+
+**A VoiceOver activation applied the fit scale and neither the zoom nor the pan.** The frames a
+reader lands on go through `drawnPlacement`, which carries both — that was fixed when the drawing
+was — and the synthesised tap did not. So once the chart had been moved, activating a mark activated
+whichever mark was drawn where the one under the reader's finger used to be. This is the same defect
+as the Android helper's, found in the same audit, on the other host: two implementations of one
+conversion, wrong in two different ways.
+
+**And letter spacing was measured unscaled and drawn scaled.** The engine builds its font at
+`fontSize * textScale` and set the kern from the raw `letterSpacing`; `CoreTextDrawing` multiplies
+by the same scale. Spacing is per character, so at the largest Dynamic Type setting a twelve-
+character label overruns the box reserved for it by most of a glyph — and the overlap-removal that
+decides which labels to keep had already run on the smaller number.
+
+### Three caches that lived as long as the process
+
+All three on the Apple side are `static`, so they outlive every session: decoded `CGImage`s by URL
+and by raster digest, `CTFont`s by family/size/weight/slant, and dataset text by URL. Only the images
+were clearable, and only wholesale.
+
+Two of the three are keyed on something that *varies per chart*. A font's key includes its **size**,
+so a chart whose label size comes from a signal mints an entry per distinct size for as long as the
+app runs. A dataset's key is its URL, and `SpecLibrary` shares one loader across the whole app
+deliberately — one fetch per dataset per launch — which also means one *retained copy* per dataset
+ever read.
+
+Images and dataset text are bounded in **bytes**, not entries, because an entry count is a bound on
+nothing when a `heatmap` raster is megabytes beside a kilobyte icon and Vega's own
+`flights-200k.json` is twelve megabytes. Fonts are bounded by count, which for a font is the right
+unit. All three evict least-recently-used, so the working set of a chart being redrawn stays
+resident; the dataset cache keeps the entry just stored even when it alone exceeds the budget, which
+is the right answer for a single dataset larger than the whole cache.
+
+### And the conformance gate counted a comment as a reader
+
+`scripts/host-conformance.py` asserts that every golden in `test-fixtures/host-conformance` is read
+by a test on each of the three engines, and it asked `golden.name in text` — a substring match over
+whole source files. So a *comment* mentioning a golden's filename counted: deleting a conformance
+test's assertions while leaving the sentence above them saying what they used to check would have
+kept the gate green. That is the gate's own failure mode, in the gate, and it is the third time this
+audit has found a comparison that passed because it compared nothing.
+
+It matches inside string literals now, with comments stripped first — a deliberately small scanner
+rather than a parser, because Kotlin and Swift agree on `//`, on `/* */` and on `"`, and a file that
+genuinely reads a golden names it in a string, since that is how a path is written.
+
+### The gates that reported on themselves
+
+The last cluster of the audit is the one that matters most, because everything above it is only as
+true as the checks that established it. Four of those checks were not running, and each said it was.
+
+**The Vega-Lite scene comparison was unarmed, everywhere.** `VegaLiteFixtureDifferentialTest` is
+1126 cases and the gate that catches a specification matching upstream property for property while
+still drawing the wrong chart. It answers a missing reference with an *assumption*, and the
+references are gitignored by design — sixteen megabytes of derived output nobody reads a diff of. So:
+
+- `scripts/check.sh` rendered them at **step 9**, after the Gradle step that runs the test. A single
+  run armed the gate for the *next* run and never for the one printing "Green, and every gate ran".
+- `release.yml`'s verify job never rendered them at all, so every release since the gate was added
+  published with it skipped in full — while the publish job's own comment said verify "has already
+  run that comparison in full".
+
+They are rendered first now, reported as a gate of their own so a `--fast` run says the comparison
+is unarmed, and the test fails rather than skips when the set is only *partly* there — the same
+shape as the `replayed >= N` floors in the upstream replays.
+
+**The differential model could not see a gap in a line.** This is the deeper one. Both sides —
+`normalize.js` and `Differential.kt` — flattened a `moveTo` and a `lineTo` into a bare coordinate
+pair, so a line broken into subpaths and a line drawn straight through the break produced the
+**identical** record. And `normalize.js` never read the `defined` channel at all, so upstream's own
+two subpaths were recorded as one outline. Two independent implementations of the same erasure read
+as agreement, which is precisely what a differential harness exists to prevent.
+
+Each vertex carries the command that produced it now; the recorder honours `defined` through d3's
+own generator; and an area is recorded front-and-back **per segment**, which is what `d3.area()`
+emits. Nothing in the corpus had an interior `moveTo`, so `line-defined-gaps` was written for it —
+and it immediately found a real defect in the engine, which is the point: the point that *breaks* a
+series was being drawn as a subpath of its own, where `d3.line().defined()` drops it. Invisible
+under a butt cap, a round dot under a round one, at a coordinate the chart is saying it has no value
+for. Two Vega-Lite fixtures had been agreeing about the same erasure and now compare properly.
+
+**`test-core.sh` was missing a third of the suite.** It named six modules by hand and predated two of
+them, so `vega-lite` and `vega-loader` — about eight hundred tests, the whole Vega-Lite compiler
+among them — were absent from what README.md sells as the JVM suite. Deriving the list from
+`settings.gradle.kts` and running it found three stale assertions on the first run.
+
+**And the gradle gate never compiled the common metadata**, which is what a consumer of the
+multiplatform artefact resolves against. Two commits on this audit's own stack shipped a
+`commonMain` catch of `OutOfMemoryError` — not in `kotlin-stdlib-common` — that builds for every
+target and fails the metadata compilation, while the gate said green. Both fixed, and the task is in
+the gate.
+
+### Documents that had stopped being true, and a check for the next one
+
+**A release page could name coordinates that did not exist.** The publish step skips with `exit 0`
+when its credentials are absent, which is deliberate for a fork; the release job then tagged, pushed
+and wrote a page telling readers to add `io.github.mgilbir.astervega:vega-runtime:$version` to their
+build. A tag cannot be moved, so that version was also unreleasable afterwards. The job reports
+whether it published now and the notes say so, and `--latest` is computed from the tag list rather
+than passed unconditionally — a patch for an older line was moving the badge backwards.
+
+**One `[api-snapshot-only]` marker exempted a whole branch.** It was a substring search over every
+message on the branch, so a commit that re-recorded a snapshot for a genuinely cosmetic reason waved
+through a real API break in a later one. The marker is a claim about *one* change; each snapshot is
+traced to the commits that touched it now, and every one of them has to carry it.
+
+**Two ADRs were contradicted by shipped modules and still read as accepted.** 0005 said Vega-Lite
+compilation was out of scope; `vega-lite` ships. 0003 said the public Composable does not draw on a
+`DrawScope`; `vega-compose-multiplatform` does. `docs/adr/README.md`'s own rule is to amend a record
+rather than silently changing behaviour that contradicts it, and nothing checked whether that had
+been done — so `DocumentedNumbersTest` now insists that a record marked superseded or amended says
+so in **both** its Status line and the index beside it. It cannot tell whether a record is *true*;
+it can stop the index and the file disagreeing, which is how a reader scanning one gets misled.
+
+Both records were amended rather than rewritten, and 0005's "revisit if" clause turned out to be
+exactly right about the order — the runtime passed its fixtures first, and the differential harness
+against upstream compilation was the first thing built. What it got wrong is the cost estimate that
+was the argument for never starting.
+
+**And HANDOFF.md violated its own opening line.** "Delete it when it stops being true" sat above a
+branch name that has not existed for a long time and "177 differential fixtures pass" in bold as
+"the only number here that means what it says" — against a corpus of 194 and 283. A document whose
+stated rule is that it must be true or gone, out by seventeen on the one number it vouches for, is
+worse than no document: nothing tells a reader which of its other three thousand lines aged the same
+way. It is framed as what it is now — a record of how things came to be, which is why several of its
+notes are still the only place a decision is explained — and points at `STATUS.md` for the present.
+
+### Smaller things in the oracle, and one meaningless parameter
+
+- **`record-number-strings.mjs` recorded one family in six.** Six expressions were passed to a
+  `push()` that takes one, so five were evaluated and discarded — including the powers of two and
+  the large integers, which is exactly where `String(x)` changes notation and where a port is most
+  likely to be wrong. The same mistake appeared one line above, where the negative of each value was
+  pushed *inside* the argument list of the positive.
+- **`eval-probe.js` and `transform-probe.js` did not pin determinism.** `now()` answered the wall
+  clock and `random()` an unseeded generator, so a probe of anything built on either answered
+  differently every run — and a probe exists to be quoted in a comment or turned into a fixture.
+- **`acorn` was a range**, in the oracle whose whole argument is that a version range makes the
+  reference unreproducible. The lockfile was saving it.
+- **`toPng(quality)` did nothing.** PNG is lossless and Android documents the argument as ignored, so
+  a caller passing 80 for a smaller file got the same bytes and no way to find out why. Removed, and
+  the byte stream is sized from the bitmap rather than growing from 32 bytes by repeated doubling.
+- **Every GitHub Action is pinned by SHA**, not by a mutable tag, on a workflow whose release job
+  holds `contents: write`.

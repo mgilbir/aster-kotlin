@@ -10376,6 +10376,38 @@
   "hidden": false
  },
  {
+  "fixture": "line-defined-gaps",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "line-defined-gaps",
+  "kind": "area",
+  "role": "graphics-symbol",
+  "roleDescription": "area mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "line-defined-gaps",
+  "kind": "line",
+  "role": "graphics-symbol",
+  "roleDescription": "line mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "line-defined-gaps",
+  "kind": "line",
+  "role": "graphics-symbol",
+  "roleDescription": "line mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "link-paths",
   "kind": "group",
   "role": "graphics-object",

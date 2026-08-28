@@ -12,7 +12,7 @@
  */
 
 import { canonicalNumber, DEFAULT_PRECISION } from './canonical.js';
-import { line } from 'd3-shape';
+import { curveLinear, line } from 'd3-shape';
 // Vega's own name table, reached by file path because the package does not export its sources.
 // Taken from upstream rather than restated here: it maps an `interpolate` name to a d3 curve, picks
 // between the two monotone forms from the mark's `orient`, and knows that `tension` means a cardinal
@@ -232,16 +232,31 @@ function curveFor(interpolate, orient, tension) {
  * comparison's tolerance.
  */
 function expandCurve(points, curve) {
-  if (!curve) return {points, closed: false};
+  // **`defined` is honoured**, and it was not read at all. Each point carries its own flag, and
+  // `vega-scenegraph`'s own line path is `.defined(item => item.defined !== false)` — so without it
+  // this recorder drew upstream's series as one unbroken outline while upstream drew two, and the
+  // comparison then agreed with an engine that had *also* joined across the gap. Two independent
+  // implementations of the same mistake read as agreement, which is the whole failure mode a
+  // differential harness exists to avoid.
+  const allDefined = points.every(p => p[2] !== false);
+  if (!curve && allDefined) {
+    return {points: points.map((p, i) => [i === 0 ? 'M' : 'L', p[0], p[1]]), closed: false};
+  }
   const collected = [];
   let closed = false;
   const context = {
-    moveTo: (x, y) => collected.push([x, y]),
-    lineTo: (x, y) => collected.push([x, y]),
+    // **The command, not only the point.** A `moveTo` and a `lineTo` were both pushed as a bare
+    // pair, so the two flattened into one list and the comparison could not tell a polyline from a
+    // set of separate subpaths. That is exactly what `defined: false` produces: a line with a gap
+    // in it is one path with a `moveTo` in the middle, and a regression drawing straight through
+    // the gap emits a `lineTo` there and the identical point list. The gap is the *point* of the
+    // channel, and no assertion on either side could see it.
+    moveTo: (x, y) => collected.push(['M', x, y]),
+    lineTo: (x, y) => collected.push(['L', x, y]),
     // A cubic's control points are part of the outline: two curves through the same anchors are
     // different shapes, and comparing anchors alone would not see it.
     bezierCurveTo: (x1, y1, x2, y2, x, y) =>
-      collected.push([x1, y1], [x2, y2], [x, y]),
+      collected.push(['C', x1, y1], ['C', x2, y2], ['C', x, y]),
     // Whether the outline joins back onto itself, which no point list can express. `linear-closed`
     // emits exactly the same points as `linear` and draws a polygon rather than a polyline, so
     // without this the comparison cannot tell the two apart. Read from d3 rather than inferred from
@@ -249,8 +264,30 @@ function expandCurve(points, curve) {
     // and only d3 knows which does which.
     closePath: () => { closed = true; },
   };
-  line().curve(curve).x(p => p[0]).y(p => p[1]).context(context)(points);
-  return {points: collected.length ? collected : points, closed};
+  // `curveLinear` where the mark named no interpolation, because the `defined` handling below only
+  // exists inside d3's generator: it is what decides where a subpath ends and the next begins.
+  line()
+    .curve(curve || curveLinear)
+    .defined(p => p[2] !== false)
+    .x(p => p[0])
+    .y(p => p[1])
+    .context(context)(points);
+  return {
+    points: collected.length
+      ? collected
+      : points.map((p, i) => [i === 0 ? 'M' : 'L', p[0], p[1]]),
+    closed,
+  };
+}
+
+/** Splits a command list into runs, each beginning at a `moveTo`. */
+function subpaths(commands) {
+  const runs = [];
+  for (const command of commands) {
+    if (command[0] === 'M' || runs.length === 0) runs.push([]);
+    runs[runs.length - 1].push(command);
+  }
+  return runs;
 }
 
 /**
@@ -291,7 +328,8 @@ function seriesRecord(type, marktype, dx, dy, precision) {
   // The outline, in the order it would be drawn: forward along the primary boundary, and for an area
   // back along the secondary one. Both sides emit this same order so the lists compare textually.
   const points = [];
-  const push = (x, y) => {
+  const push = (command, x, y) => {
+    points.push(command);
     points.push(canonicalNumber((x || 0) + dx, precision));
     points.push(canonicalNumber((y || 0) + dy, precision));
   };
@@ -302,19 +340,38 @@ function seriesRecord(type, marktype, dx, dy, precision) {
   // which is what Vega draws with.
   const curve = curveFor(first.interpolate, first.orient, first.tension);
 
-  const primary = items.map(i => [i.x || 0, i.y || 0]);
+  const primary = items.map(i => [i.x || 0, i.y || 0, i.defined !== false]);
   const drawn = expandCurve(primary, curve);
-  for (const [x, y] of drawn.points) push(x, y);
   if (type === 'area') {
     const secondary = [...items]
       .reverse()
-      .map(i => [i.x2 !== undefined ? i.x2 : i.x || 0, i.y2 !== undefined ? i.y2 : i.y || 0]);
+      .map(i => [
+        i.x2 !== undefined ? i.x2 : i.x || 0,
+        i.y2 !== undefined ? i.y2 : i.y || 0,
+        i.defined !== false,
+      ]);
     const back = expandCurve(
       secondary,
       curveFor(MIRRORED[first.interpolate] || first.interpolate, first.orient, first.tension)
     );
-    for (const [x, y] of back.points) push(x, y);
+    // **Front and back per segment**, which is what `d3.area()` emits and what
+    // `vega-scenegraph` draws: an area broken by `defined` is a closed shape *per run*, not one
+    // outline with every front edge followed by every back edge. Recording it the second way made
+    // this comparison disagree with the engine about an area that both were drawing correctly —
+    // upstream's own SVG for `line-defined-gaps` is `M0,100L50,70L50,110L0,110Z M150,50…Z`.
+    //
+    // `back` is built from the items reversed, so its runs arrive in the opposite order and the
+    // pairing is front[i] with back[n-1-i].
+    const fronts = subpaths(drawn.points);
+    const backs = subpaths(back.points);
+    fronts.forEach((front, index) => {
+      for (const [command, x, y] of front) push(command, x, y);
+      const rear = backs[backs.length - 1 - index] || [];
+      // The back edge continues the same subpath, so its opening `moveTo` is a `lineTo`.
+      rear.forEach(([command, x, y], at) => push(at === 0 ? 'L' : command, x, y));
+    });
   } else {
+    for (const [command, x, y] of drawn.points) push(command, x, y);
     // An area's outline is closed on both sides by construction, so the flag would say nothing
     // there; on a line it is the whole difference between a polyline and a polygon.
     entry.closed = drawn.closed ? 1 : 0;

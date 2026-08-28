@@ -72,9 +72,28 @@ if "CHANGELOG.md" in changed:
     print(f"changelog: {len(moved)} API snapshot(s) changed, and the changelog with them")
     sys.exit(0)
 
-if MARKER in git("log", "--format=%B", f"{base}..HEAD"):
-    print(f"changelog: {len(moved)} API snapshot(s) changed, marked {MARKER}")
+# **The marker exempts the commit that carries it, not the branch.**
+#
+# It used to be a substring search over every message on the branch, so one `[api-snapshot-only]`
+# anywhere — a commit that re-recorded a snapshot for a genuinely cosmetic reason — waved through
+# every other snapshot change on the branch, including a real API break in a later commit. That is
+# the opposite of what the marker is for: it is a claim about *one* change, made by the person
+# making it.
+#
+# So each snapshot has to be traced to the commits that touched it, and every one of those has to
+# carry the marker.
+unexplained = []
+for path in moved:
+    messages = git("log", "--format=%B%x00", f"{base}..HEAD", "--", path).split("\0")
+    touching = [m for m in messages if m.strip()]
+    if touching and all(MARKER in m for m in touching):
+        continue
+    unexplained.append(path)
+
+if not unexplained:
+    print(f"changelog: {len(moved)} API snapshot(s) changed, each marked {MARKER}")
     sys.exit(0)
+moved = unexplained
 
 print("This branch changes what a host compiles against and says nothing in the changelog:")
 print()
@@ -86,5 +105,7 @@ print("change nobody is told about — which is how 0.4.0 nearly shipped a sourc
 print("unmentioned. Add the entry.")
 print()
 print(f"If the surface did not really change — a snapshot re-recorded for another reason — put")
-print(f"{MARKER} in a commit message on this branch and say there why.")
+print(f"{MARKER} in the message of **every commit that touches that snapshot**, and say there why.")
+print("One marked commit no longer exempts the rest of the branch: it used to, so a cosmetic")
+print("re-record in one commit waved through a real break in another.")
 sys.exit(1)

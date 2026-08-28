@@ -203,7 +203,7 @@ public class SignalScope(
       // that quietly finds nothing; it is a chart that does not compile. Reported rather than
       // fatal, since the rest of the specification is still worth drawing.
       diagnostics?.error(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        DiagnosticCodes.DATA_UNREADABLE,
         "indata() names dataset '$name', which this specification does not define",
         operator = name,
       )
@@ -343,6 +343,14 @@ public class SignalScope(
     return scale
   }
 
+  /**
+   * The same scope, reading one row.
+   *
+   * Every field is carried, **including the projections** — this used to stop one short of them, so
+   * `{"size": {"signal": "4 * geoScale('p')"}}` in a mark's encode block reported "projection 'p'
+   * is not defined" once per compile and left the channel unset. Every geo fixture passed, because
+   * none of them calls a geo function inside `encode`.
+   */
   public fun withDatum(datum: VegaValue): SignalScope =
     SignalScope(
       values,
@@ -356,6 +364,7 @@ public class SignalScope(
       trees,
       random,
       clock,
+      projections,
     )
 
   /** Adds the scales once they exist, which is after every signal has resolved. */
@@ -449,13 +458,6 @@ public class SignalScope(
   }
 
   /**
-   * `geoScale('name')` — the projection's own scale.
-   *
-   * Worth having for the same reason `fit` is: a fitted projection's scale is computed from the
-   * data, so a chart that draws anything sized in projected units — a symbol whose radius is in
-   * kilometres — has no other way to ask what one unit currently means.
-   */
-  /**
    * `warn(...)`, `info(...)` and `debug(...)` — routed to the diagnostics rather than to a console.
    *
    * Upstream writes these to the dataflow's logger at the matching level. There is no console here
@@ -533,6 +535,13 @@ public class SignalScope(
       ?: VegaValue.Null
   }
 
+  /**
+   * `geoScale('name')` — the projection's own scale.
+   *
+   * Worth having for the same reason `fit` is: a fitted projection's scale is computed from the
+   * data, so a chart that draws anything sized in projected units — a symbol whose radius is in
+   * kilometres — has no other way to ask what one unit currently means.
+   */
   override fun geoScale(projection: String?): VegaValue {
     val definition = projectionFor(projection, "geoScale")?.orNull() ?: return VegaValue.Null
     return GeoMeasure.scaleOf(definition)?.let { VegaValue.Num(it) } ?: VegaValue.Null
@@ -670,7 +679,7 @@ public class SignalResolver(
       for (signal in signals) {
         if (specs.containsKey(signal.name)) {
           diagnostics.warn(
-            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            DiagnosticCodes.DUPLICATE_DEFINITION,
             "Duplicate signal '${signal.name}'; the later definition wins",
             operator = signal.name,
           )
@@ -684,7 +693,7 @@ public class SignalResolver(
           // handler had set the signal. Nothing here tracks that, so the handler's value simply
           // stays — which is right until a dependency moves, and wrong after.
           diagnostics.warn(
-            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            DiagnosticCodes.DUPLICATE_DEFINITION,
             "Signal '$name' was set by an event handler and also has an update expression; the " +
               "handler's value stays and the expression will not run again",
             operator = name,
@@ -697,6 +706,11 @@ public class SignalResolver(
     public fun scope(
       datasets: Map<String, List<VegaValue>>,
       scales: Map<String, VegaScale> = emptyMap(),
+      /**
+       * See [SignalScope.withDatum]: a scope without these answers "not defined" to every geo
+       * function, which is the wrong answer wherever a projection has been built.
+       */
+      projections: Map<String, ProjectionDefinition> = emptyMap(),
     ): SignalScope =
       SignalScope(
         values,
@@ -706,6 +720,7 @@ public class SignalResolver(
         datasetSink = datasetSink,
         random = random,
         clock = clock,
+        projections = projections,
       )
 
     public fun resolve(
