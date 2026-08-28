@@ -45,8 +45,15 @@
 # `macosArm64Test` goes further and *runs* the `commonTest` suites on Kotlin/Native: the decimal
 # expansion, a specification's own regular expressions, and the two LRU caches that only exist in
 # their present form because of these targets. Compiling proves the code links; running is what says
-# it agrees. `iosSimulatorArm64Test` would be the natural addition on a machine with the iOS platform
-# installed — this one has no simulator runtime, so Xcode refuses the task outright.
+# it agrees.
+#
+# `iosSimulatorArm64Test` is here for the same reason and used to be only in CI, on the belief that
+# this machine had no simulator runtime. It has one, and the whole run costs about thirty seconds.
+# Leaving it to CI cost a red run: a zone pin that reached the JVM and a macOS host process reached
+# neither the simulator nor Linux, and the local gate was green because it never asked the simulator
+# anything. A Mac without an iOS runtime installed will see Xcode refuse this task — install one
+# through Xcode's Platforms pane rather than dropping the task, because a target this repository
+# ships to is a target something must execute.
 #
 # `linuxX64Test` is the same argument for the target a Mac cannot run: it was **compiled and never
 # executed**, so `linuxX64` shipped with its `commonTest` suites having run on no machine at all.
@@ -92,6 +99,7 @@ apple_tasks=(
   compileKotlinIosArm64
   compileKotlinIosSimulatorArm64
   macosArm64Test
+  iosSimulatorArm64Test
 )
 if [ "$(uname -s)" = "Darwin" ]; then
   host_tasks=("${apple_tasks[@]}")
@@ -165,8 +173,10 @@ if [ "$list_only" = true ]; then
   cat <<'GATES'
 Gates, and what each needs:
 
-  gradle              always. Format, ABI, bytecode level, every JVM test, native compiles,
-                      lint, the demo APK, and the instrumented suites compiled.
+  gradle              always. Format, ABI, bytecode level, every JVM test, the native compiles,
+                      the commonTest suites *run* on the host's native targets (macOS and the
+                      iOS simulator on a Mac, linuxX64 on Linux), lint, the demo APK, and the
+                      instrumented suites compiled.
   android-api         always. The surface of the two Android artifacts, which Kotlin's ABI
                       validation cannot dump.
   host-parity         always. Every seam checked against every host's recorded surface, so the
