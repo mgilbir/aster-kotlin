@@ -122,12 +122,12 @@ jobs:
         if: matrix.oracles == 'true'
         run: ./scripts/vega-lite-oracle.sh
 
-# The iOS simulator suite used to be a step of its own here, because this project's machine was
-# believed to have no simulator runtime. It has one, so `check.sh` runs `iosSimulatorArm64Test`
-# itself now and a separate step would only run it twice. That direction matters: a gate that lives
-# only in this file is one nobody runs before landing, which is the failure the header above
-# describes and which this exact step demonstrated — it was the step that caught a zone pin the
-# local gate could not see.
+      # The iOS simulator suite used to be a step of its own here, because this project's machine
+      # was believed to have no simulator runtime. It has one, so `check.sh` runs
+      # `iosSimulatorArm64Test` itself now and a separate step would only run it twice. That
+      # direction matters: a gate that lives only in this file is one nobody runs before landing,
+      # which is the failure the header above describes and which this exact step demonstrated — it
+      # was the step that caught a zone pin the local gate could not see.
 
       - name: Check every declared target is in the module metadata
         # macOS only, and deliberately: on any other host it is *expected* to fail, because Kotlin
@@ -244,4 +244,142 @@ jobs:
             **/build/reports/tests/**
             **/build/test-results/**/*.xml
             build/upstream-transform-ledger.txt
+          retention-days: 14
+
+  # -------------------------------------------------------------------------------------------
+  # The instrumented suites, on a real Android runtime.
+  #
+  # These had never executed anywhere but a developer's own emulator. `check.sh` runs them when a
+  # device is on adb and says `instrumented SKIPPED — no device on adb` when one is not, which is
+  # what every CI run and every *release* run has printed: `release.yml` calls the same script on a
+  # runner with no emulator. So the two Android artifacts were published on a green tick that had
+  # compiled their tests and never run them.
+  #
+  # That gap is wider than it looks, because these modules have no other tests. Every one of the
+  # eighteen test files in `vega-android-canvas` and `vega-compose` is instrumented — no JVM unit
+  # tests, no Robolectric — so with the emulator absent those modules are checked by nothing but the
+  # compiler and the API snapshot. And what the suites cover is exactly what cannot be inferred from
+  # a JVM run: `AndroidTextEngine` measuring with real `Paint` and `Typeface`, and
+  # `AndroidCanvasSceneRenderer` issuing real `Canvas` calls.
+  #
+  # Robolectric was considered and rejected for the same reason: its `Canvas` records calls rather
+  # than rasterising, so it would go green without exercising the draw behaviour and text metrics
+  # that are the whole point.
+  #
+  # Its own job rather than a third entry in the matrix above: it shares none of that job's steps,
+  # and a matrix entry that skipped all of them would be harder to read than this.
+  android:
+    name: Instrumented (Android API ${{ matrix.api }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both ends of the range the library promises. 26 is `minSdk` and is the one nothing has
+        # ever run: the local AVD is API 37, so the floor has been a declaration rather than a
+        # tested claim. 36 is the newest plain system image there is — `compileSdk` is 37, but API
+        # 37 ships only as minor-versioned platforms (`android-37.0`, `android-37.1`) and this
+        # action builds `system-images;android-<level>;<target>;<arch>`, which has no 37 to resolve.
+        api: [26, 36]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
+
+      - name: Enable KVM
+        # Without this the emulator falls back to software rendering of the whole machine and takes
+        # long enough to look hung. The runners have the device; only the permission is missing.
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run the instrumented suites
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          # **Name servers, stated**, for the reason `scripts/emulator.sh` states them: an emulator
+          # that cannot resolve a name is not obviously broken. It boots and draws, and only the
+          # handful of `DemoActivityTest` cases that fetch from the gallery stop running — and those
+          # skip themselves loudly rather than failing, so without DNS this job would go green having
+          # quietly dropped them. The step below prints any that skip anyway.
+          emulator-options: >-
+            -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -camera-back none
+            -dns-server 8.8.8.8,1.1.1.1
+          script: |
+            ./gradlew --console=plain \
+              :vega-android-canvas:connectedDebugAndroidTest \
+              :vega-compose:connectedDebugAndroidTest \
+              :demo:connectedDebugAndroidTest
+
+      - name: Say how many instrumented tests actually ran
+        # The same argument as the JVM counts above, and it bites harder here: a `connectedAndroidTest`
+        # against a device that died mid-run reports success with an empty result directory. A floor
+        # per module is what makes "the suite ran" checkable rather than plausible.
+        if: always()
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob, sys, xml.etree.ElementTree as ET
+          from collections import Counter
+
+          total = failed = 0
+          per, skipped = Counter(), []
+          for path in glob.glob("*/build/outputs/androidTest-results/**/*.xml", recursive=True):
+              try:
+                  suite = ET.parse(path).getroot()
+              except ET.ParseError:
+                  continue
+              total += int(suite.get("tests", 0))
+              failed += int(suite.get("failures", 0)) + int(suite.get("errors", 0))
+              per[path.split("/")[0]] += int(suite.get("tests", 0))
+              for case in suite.iter("testcase"):
+                  for skip in case.iter("skipped"):
+                      why = (skip.get("message") or "no reason given").strip()
+                      skipped.append(f"  {case.get('name')}: {why}")
+
+          problems = []
+          # Observed on the project's own emulator at API 37, less a margin. A shrink detector, not
+          # a target to grow.
+          for module, least in (
+              ("vega-android-canvas", 150),
+              ("demo", 15),
+              ("vega-compose", 6),
+          ):
+              if per[module] < least:
+                  problems.append(f"{module} ran {per[module]} instrumented tests, expected at least {least}")
+
+          # A skip here is a device fact, not a pass. They are reported by name because the build
+          # does not fail for them, which is how a suite that stopped exercising something looks
+          # exactly like one that checked it.
+          if skipped:
+              print(f"NOTE: {len(skipped)} instrumented test(s) skipped:")
+              for line in skipped:
+                  print(line)
+
+          for problem in problems:
+              print(f"::error::{problem}")
+          if problems:
+              sys.exit(1)
+          print(f"{total} instrumented tests ran, {len(skipped)} skipped, {failed} failed.")
+          PY
+
+      - name: Upload instrumented reports
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: instrumented-reports-api${{ matrix.api }}
+          path: |
+            **/build/reports/androidTests/**
+            **/build/outputs/androidTest-results/**
           retention-days: 14
