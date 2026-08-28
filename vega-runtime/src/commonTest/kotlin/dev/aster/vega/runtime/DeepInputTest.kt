@@ -6,8 +6,8 @@ import dev.aster.vega.model.VegaJson
 import dev.aster.vega.runtime.compile.SpecCompiler
 import dev.aster.vegalite.VegaLiteCompiler
 import dev.aster.vegalite.VegaLiteInput
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Test
+import kotlin.test.Test
+import kotlin.test.assertTrue
 
 /**
  * **Nothing throws, on input built to make something recurse.**

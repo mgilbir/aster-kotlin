@@ -21,6 +21,13 @@ public struct SceneWalk {
   public init() {}
 
   /// Draws `scene` into `target`.
+  /// Draws `scene` into `target`.
+  ///
+  /// **This recurses once per group.** A scene from `SpecCompiler` is bounded — the compiler refuses
+  /// a mark tree deeper than its own `MAX_GROUP_DEPTH`, so no document a reader pastes can reach the
+  /// limit here. A scene a *host* assembles from `GroupNode(...)` by hand has no such bound, and a
+  /// stack overflow in Swift is a crash rather than something you can catch. Keep a hand-built tree
+  /// shallower than a chart's, which is a handful of levels.
   public func draw<T: DrawTarget>(scene: Scene, into target: inout T) {
     // A scene's own background is not a node — nothing in the tree paints it — so a renderer that
     // only walked the tree would leave a transparent chart on whatever was behind it.

@@ -19,6 +19,15 @@ section here does not get released.
   This closed the last hole in "nothing throws": `SpecCompiler.compileJson`, `VegaLiteCompiler
   .compileJson` and `VegaLiteInput.toVega` all guard the *compile*, and all three parse first.
 
+- **The deep-input gate runs on every target, not just the JVM.** It matters most where it was not
+  running: on Kotlin/Native a stack overflow is a `SIGSEGV` that kills the process — exit 139, no
+  catch, no teardown — where the JVM raises a catchable `StackOverflowError`. So the target with the
+  smallest thread stacks and the hardest failure was the one the test could not see. `DeepInputTest`
+  moved to `commonTest` and now executes on all five.
+
+  Every bound this needed was already in `commonMain`, which is why moving the test found nothing
+  new — bounding rather than catching was the only thing that could have worked there.
+
 - **A deeply nested event selector no longer takes the compiler down.** `EventSelector`'s `one` and
   `between` are **mutually** recursive over bracket nesting in a selector string, so a pasted
   Vega-Lite document with a few thousand `[` in a `select.on` threw `StackOverflowError` out of
