@@ -54,10 +54,26 @@ class JsDateTest {
   @Test
   fun `a two-digit year is nineteen hundreds`() {
     assertEquals(917823600000.0, make(99.0, 1.0, 1.0), "year 99 is 1999")
-    assertEquals(-2208988800000.0, make(0.0, 0.0, 1.0), "year 0 is 1900")
-    // 100 is not two digits, so it is the year 100 — and the offset that far back is the zone's
-    // own local mean time, which is why the number is not a round one.
-    assertEquals(-59011460250000.0, make(100.0, 0.0, 1.0), "year 100 is the year 100, not 2000")
+    // The years before this zone's first recorded transition are stated in UTC, deliberately.
+    //
+    // What an implementation answers for an instant *earlier* than a zone's earliest transition is
+    // not something the time-zone database settles, and the offset itself moves between editions:
+    // Amsterdam became a link to Brussels in tzdata 2022b, which changed its local mean time from
+    // +00:19:32 to +00:17:30 and its 1900 offset to zero. So `make(100, …)` in a local zone
+    // answers one thing on a host with one tzdata and another on a host with another — which is
+    // how this suite passed on macOS and failed on Linux the first time it ran on both. The rule
+    // under test is how a *year* is read, and that rule has nothing to do with the offset.
+    assertEquals(
+      -2208988800000.0,
+      JsDate.make(0.0, 0.0, 1.0, zone = TimeZone.UTC),
+      "year 0 is 1900",
+    )
+    // 100 is not two digits, so it is the year 100.
+    assertEquals(
+      -59011459200000.0,
+      JsDate.make(100.0, 0.0, 1.0, zone = TimeZone.UTC),
+      "year 100 is the year 100, not 2000",
+    )
   }
 
   /** Out of range is an *Invalid Date*, whose time value is NaN — never an exception. */

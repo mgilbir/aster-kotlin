@@ -14,21 +14,17 @@ section here does not get released.
   engine can rely on: the same document parsed on a macOS laptop and took the process down on a
   Linux CI runner, in the same commit. `VegaJson.MAX_JSON_DEPTH` is checked by a scan that does not
   itself recurse, so it works on Kotlin/Native too, where a `StackOverflowError` cannot be caught at
-  all. It is 512, against a corpus whose deepest document is twelve.
+  all.
+
+  It is **192**, and the number was measured against the tightest target rather than the roomiest: a
+  document that parses is one the compiler then walks, and through `ChartSession` on macOS that walk
+  dies at about 450 where the JVM survives 511, so the parse bound has to leave room for everything
+  downstream of it. 192 is sixteen times the deepest document in this repository's corpus, and still
+  high enough that a document can reach `MAX_GROUP_DEPTH` and `MAX_VIEW_DEPTH` — a limit the parser
+  refuses first is a limit nothing can ever report.
 
   This closed the last hole in "nothing throws": `SpecCompiler.compileJson`, `VegaLiteCompiler
   .compileJson` and `VegaLiteInput.toVega` all guard the *compile*, and all three parse first.
-
-- **`MAX_JSON_DEPTH` is 192, not 512, because 512 was measured against the wrong platform.** A
-  document that parses is one the compiler then walks, and through `ChartSession` on macOS that walk
-  dies at about 450 where the JVM survives 511. The parse bound has to leave room for everything
-  downstream of it on the *tightest* target. It is now sixteen times the deepest document in this
-  repository's corpus, and still high enough that a document can reach `MAX_GROUP_DEPTH` and
-  `MAX_VIEW_DEPTH` — a limit the parser refuses first is a limit nothing can ever report.
-
-  Found because the Swift gate below compiles what it parses and the Kotlin one did not: its "nested
-  JSON" shape called `parseOrNull` and stopped, so it proved the parser survived and said nothing
-  about the pipeline behind it. Both shapes now compile.
 
 - **A `sequence` transform cannot ask for more rows than the heap holds.** Its count came straight
   from three numbers a document wrote, so `{"type": "sequence", "stop": 1e9}` was an
@@ -51,7 +47,28 @@ section here does not get released.
   shapes through `ChartSession` — the way an app reaches them, across the Obj-C boundary, on text a
   reader pasted. Two things can break there that cannot break in the Kotlin suites: the bridge could
   lose a diagnostic, and `ChartSession` parses `hostConfigJson` itself on a path no Kotlin test
-  takes. It found the `MAX_JSON_DEPTH` miscalibration on its first run.
+  takes.
+
+  It found the `MAX_JSON_DEPTH` miscalibration on its first run, because it compiles what it parses
+  and the Kotlin suite did not: that suite's "nested JSON" shape called `parseOrNull` and stopped,
+  so it proved the parser survived and said nothing about the pipeline behind it. Both shapes now
+  compile.
+
+- **A date test no longer depends on which edition of the time-zone database the host ships.**
+  `JsDateTest` pinned absolute timestamps for the years 0 and 100 in a *local* zone. What an
+  implementation answers for an instant earlier than a zone's first recorded transition is not
+  something the database settles, and the offset itself moves between editions — Amsterdam became a
+  link to Brussels in tzdata 2022b, which changed its local mean time from +00:19:32 to +00:17:30.
+  So the suite passed on macOS and failed on Linux the first time it ran on both. Those two years
+  are stated in UTC now; the rule under test is how a *year* is read, which has nothing to do with
+  the offset.
+
+- **The native test binaries run in the pinned zone, which they had never done.**
+  `tasks.withType<Test>()` is Gradle's *JVM* test task and a `KotlinNativeTest` is a sibling of it
+  rather than a subtype, so the zone, the heap and the stack were pinned for `jvmTest` and for
+  nothing else — `linuxX64Test` and `macosArm64Test` ran in whatever zone the machine was in.
+  `PinnedTestZoneTest` now asserts the pin arrived, on every target, because a build script cannot
+  assert what a test process actually got and that is exactly the distinction that went unnoticed.
 
 - **Eight suites moved from `jvmTest` to `commonTest`.** An audit of the 132 JVM suites found 76 that
   use no JVM-only API; moving all of them would be wrong, because a native run is slow and most

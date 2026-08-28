@@ -57,8 +57,9 @@ class VegaJsonDepthTest {
    * A document at the limit still parses, so the guard is a ceiling rather than a haircut.
    *
    * The deepest document in this repository's own corpus of 761 specifications and references is
-   * **twelve** levels, which is where the limit's number comes from: forty times the deepest real
-   * chart, and far below where any parser this runs on gives out.
+   * **twelve** levels, which is where the limit's number comes from: sixteen times the deepest real
+   * chart, and far below where the tightest target this runs on gives out — which is `ChartSession`
+   * on macOS, at about 450, rather than the JVM parser that first raised the question.
    */
   @Test
   fun `a document at the limit still parses`() {

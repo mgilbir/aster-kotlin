@@ -7,6 +7,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 /**
@@ -432,6 +433,23 @@ subprojects {
     )
     testLogging { showStandardStreams = false }
   }
+
+  // **And the same zone for the native test binaries, which the block above does not reach.**
+  //
+  // `tasks.withType<Test>()` is Gradle's *JVM* test task. A Kotlin/Native test is a
+  // `KotlinNativeTest`, a sibling of it rather than a subtype, so every pin above — the zone, the
+  // heap, the stack — applied to `jvmTest` and to nothing else. Which meant `linuxX64Test` and
+  // `macosArm64Test` ran in whatever zone the machine was in: Amsterdam on the laptop that wrote
+  // this, UTC on both CI runners, and nothing anywhere said they differed.
+  //
+  // No suite depends on the ambient zone today. This is here so that the first one to try cannot
+  // do it silently — a `time` scale is local, and a golden written under one zone and compared
+  // under another is a failure that reads as a rendering bug.
+  //
+  // The heap and the stack have no equivalent here on purpose: a native binary's stack is the
+  // host's and is not the runner's to set, which is the whole reason `VegaJson.MAX_JSON_DEPTH`
+  // bounds the input rather than trusting the stack to be big enough.
+  tasks.withType<KotlinNativeTest>().configureEach { environment("TZ", TEST_TIME_ZONE) }
 }
 
 /**
