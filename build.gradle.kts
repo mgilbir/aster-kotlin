@@ -434,22 +434,34 @@ subprojects {
     testLogging { showStandardStreams = false }
   }
 
-  // **And the same zone for the native test binaries, which the block above does not reach.**
+  // **The native test binaries are pinned to UTC — deliberately *not* to the zone above.**
   //
-  // `tasks.withType<Test>()` is Gradle's *JVM* test task. A Kotlin/Native test is a
-  // `KotlinNativeTest`, a sibling of it rather than a subtype, so every pin above — the zone, the
-  // heap, the stack — applied to `jvmTest` and to nothing else. Which meant `linuxX64Test` and
-  // `macosArm64Test` ran in whatever zone the machine was in: Amsterdam on the laptop that wrote
-  // this, UTC on both CI runners, and nothing anywhere said they differed.
+  // First, why they need saying at all: `tasks.withType<Test>()` is Gradle's *JVM* test task, and a
+  // `KotlinNativeTest` is a sibling of it rather than a subtype, so every pin above applied to
+  // `jvmTest` and to nothing else. `linuxX64Test` and `macosArm64Test` ran in whatever zone the
+  // machine happened to be in, and nothing anywhere said so.
   //
-  // No suite depends on the ambient zone today. This is here so that the first one to try cannot
-  // do it silently — a `time` scale is local, and a golden written under one zone and compared
-  // under another is a failure that reads as a rendering bug.
+  // Second, why UTC and not `TEST_TIME_ZONE`. The zone above is pinned because *goldens* depend on
+  // it: the references, the oracle comparisons and `scripts/oracle.sh`'s Node process all run on
+  // the JVM and must agree by construction. No native test consumes a zone-dependent golden. What
+  // native testing is for is a `commonTest` suite that reads the ambient zone *without meaning to*,
+  // and the only thing that catches one is running it somewhere the JVM is not. Pinning both sides
+  // to Amsterdam would throw that away to buy nothing.
+  //
+  // So this is a pin *away* from the JVM's zone. A suite that quietly depends on the ambient zone
+  // now fails on the machine of whoever writes it, rather than on `main` after the merge — which
+  // is the failure this workflow's own header warns is the price of not checking branches on both
+  // hosts, and which has cost two red runs on `main` already.
+  //
+  // Kotlin/Native on **Linux** does not honour `TZ` at all — it reported `Etc/UTC` under a pin of
+  // `Europe/Amsterdam`, which is how this was found — so on that target this matches what the
+  // runtime does anyway rather than changing it. A Linux developer whose machine is not UTC gets
+  // their own zone there and loses only this early warning, not correctness.
   //
   // The heap and the stack have no equivalent here on purpose: a native binary's stack is the
   // host's and is not the runner's to set, which is the whole reason `VegaJson.MAX_JSON_DEPTH`
   // bounds the input rather than trusting the stack to be big enough.
-  tasks.withType<KotlinNativeTest>().configureEach { environment("TZ", TEST_TIME_ZONE) }
+  tasks.withType<KotlinNativeTest>().configureEach { environment("TZ", "UTC") }
 }
 
 /**

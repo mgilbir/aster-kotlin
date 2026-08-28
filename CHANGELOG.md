@@ -63,12 +63,24 @@ section here does not get released.
   are stated in UTC now; the rule under test is how a *year* is read, which has nothing to do with
   the offset.
 
-- **The native test binaries run in the pinned zone, which they had never done.**
+- **The native test binaries have a zone at all now, and it is deliberately not the JVM's.**
   `tasks.withType<Test>()` is Gradle's *JVM* test task and a `KotlinNativeTest` is a sibling of it
   rather than a subtype, so the zone, the heap and the stack were pinned for `jvmTest` and for
   nothing else — `linuxX64Test` and `macosArm64Test` ran in whatever zone the machine was in.
-  `PinnedTestZoneTest` now asserts the pin arrived, on every target, because a build script cannot
-  assert what a test process actually got and that is exactly the distinction that went unnoticed.
+
+  They are pinned to **UTC**, not to `TEST_TIME_ZONE`. Everything that depends on the zone — the
+  references, the oracle comparisons, the Node process — runs on the JVM, and no native test
+  consumes a zone-dependent golden. What a native run is *for* is a `commonTest` suite that reads
+  the ambient zone without meaning to, and the only thing that catches one is running it somewhere
+  the JVM is not; pinning both sides to Amsterdam would throw that away to buy nothing. So a suite
+  that picks up the ambient zone now fails on the machine of whoever writes it rather than on
+  `main` after the merge.
+
+  `PinnedTestZoneTest` asserts the JVM pin arrived, because a build script can state a pin but
+  cannot observe what the test process got. It checks the zone by its **rules** rather than its
+  name: `Europe/Amsterdam` is a link to `Europe/Brussels`, so an id comparison can fail on a host
+  where the pin worked. Kotlin/Native on Linux turns out not to honour `TZ` at all — it reports
+  `Etc/UTC` under a pin of `Europe/Amsterdam`, which is how all of this was found.
 
 - **Eight suites moved from `jvmTest` to `commonTest`.** An audit of the 132 JVM suites found 76 that
   use no JVM-only API; moving all of them would be wrong, because a native run is slow and most
