@@ -1,9 +1,9 @@
 package dev.aster.vega.model.locale
 
 import dev.aster.vega.model.time.TimeFormat
+import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlinx.datetime.LocalDateTime
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Test
 
 /**
  * The host's own **rules**, and the precedence they sit under.
@@ -94,7 +94,7 @@ class VegaFormatRulesTest {
   }
 
   @Test
-  fun `a name may depend on the rest of the format, which no list can express`() {
+  fun `a name may depend on the rest of the format which no list can express`() {
     val plain = polish
     val ruled = polish.copy(rules = PolishForms)
 
@@ -109,7 +109,7 @@ class VegaFormatRulesTest {
   }
 
   @Test
-  fun `digits reach every number the engine writes, in a time format and in a number`() {
+  fun `digits reach every number the engine writes in a time format and in a number`() {
     val eastern = VegaLocale.EnglishUS.copy(rules = EasternArabicDigits)
 
     assertEquals("٢١/٠٥/٢٠٢٦", TimeFormat.format(at, "%d/%m/%Y", eastern))
@@ -122,7 +122,7 @@ class VegaFormatRulesTest {
   }
 
   @Test
-  fun `a specification's format decides the shape, and a rule cannot change it`() {
+  fun `a specification's format decides the shape and a rule cannot change it`() {
     val eastern = VegaLocale.EnglishUS.copy(rules = EasternArabicDigits)
 
     // The order, the fields and the separators are the document's, and stay so.

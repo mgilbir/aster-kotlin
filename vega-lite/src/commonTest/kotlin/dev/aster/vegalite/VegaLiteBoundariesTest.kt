@@ -1,14 +1,15 @@
 package dev.aster.vegalite
 
+import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * What the Vega-Lite compiler does with a document that is wrong, hostile, or merely unusual.
@@ -51,7 +52,7 @@ class VegaLiteBoundariesTest {
       val vega = compile(spec).vega
       assertNotNull(vega, "a rolled-over date must compile, not throw")
       val store =
-        (vega!!.fields["data"] as VegaValue.Arr).values.first {
+        (vega.fields["data"] as VegaValue.Arr).values.first {
           (it as VegaValue.Obj).fields["name"] == VegaValue.Str("p_store")
         } as VegaValue.Obj
       val row = ((store.fields["values"] as VegaValue.Arr).values.first() as VegaValue.Obj)
@@ -132,10 +133,26 @@ class VegaLiteBoundariesTest {
    */
   @Test
   fun `a document too deep or too long is refused rather than fatal`() {
+    // **Deep enough for the compiler to refuse, shallow enough for the parser to read.**
+    //
+    // This used to nest two thousand deep, and that number was wrong in a way that only a different
+    // machine could show: `kotlinx.serialization`'s lexer descends once per `{`, so two thousand
+    // levels exhausted the *parser's* stack before `Limits` was ever consulted — on a Linux CI
+    // runner. The same document parsed on a macOS laptop, where the thread's stack is larger, and
+    // the test passed. `VegaJson.MAX_JSON_DEPTH` is what refuses that document now, and it is
+    // asserted where it belongs, in `VegaJsonDepthTest`.
+    //
+    // Eighty nested layers is eighty *view* levels and about a hundred and sixty JSON levels: past
+    // `Limits.MAX_VIEW_DEPTH`, and inside `MAX_JSON_DEPTH`. So this still tests the thing it was
+    // written to test — that the *view* limit is what refuses the document, not the parser.
+    //
+    // Eighty rather than a round hundred because two JSON levels go in per layer, and a hundred
+    // would be two hundred, which is past `MAX_JSON_DEPTH` — the parser would refuse it first and
+    // this would assert the wrong diagnostic for the right-looking reason.
     val deep = buildString {
-      repeat(2000) { append("""{"layer":[""") }
+      repeat(80) { append("""{"layer":[""") }
       append("""{"mark":"point","encoding":{}}""")
-      repeat(2000) { append("]}") }
+      repeat(80) { append("]}") }
     }
     val nested = compile(deep)
     assertNull(nested.vega)
@@ -157,6 +174,33 @@ class VegaLiteBoundariesTest {
       repeat(8) { append("]}") }
     }
     assertNotNull(compile(fine).vega)
+  }
+
+  /**
+   * A document too deep for the **parser** is refused by the parser's own limit, not this one.
+   *
+   * The two limits guard different recursions and neither substitutes for the other:
+   * `Limits.MAX_VIEW_DEPTH` is about the compiler walking a composition, and it can only run on a
+   * document that has already been parsed. `VegaJson.MAX_JSON_DEPTH` is about the lexer descending,
+   * and it has to run first. This asserts the hand-off — that a document deep enough to overflow
+   * the parser comes back as a diagnostic from *somewhere*, at any depth.
+   */
+  @Test
+  fun `a document too deep for the parser is refused by the parser`() {
+    for (depth in listOf(2_000, 50_000)) {
+      val deep = buildString {
+        repeat(depth) { append("""{"layer":[""") }
+        append("""{"mark":"point","encoding":{}}""")
+        repeat(depth) { append("]}") }
+      }
+      val result = compile(deep)
+      assertNull(result.vega, "depth $depth must not compile")
+      assertEquals(
+        listOf(DiagnosticCodes.COMPILE_LIMIT_EXCEEDED),
+        result.diagnostics.map { it.code },
+        "depth $depth should be refused by the JSON depth limit",
+      )
+    }
   }
 
   /** A repeat grid is a cross product of *fully compiled* views, and nothing was bounding it. */

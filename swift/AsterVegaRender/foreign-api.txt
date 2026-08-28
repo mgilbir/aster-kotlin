@@ -4577,6 +4577,7 @@ VegaFormatRules
 VegaFormatRules.digits(number:)
 VegaFormatRules.name(field:index:context:locale:)
 VegaJson
+VegaJson.MAX_JSON_DEPTH
 VegaJson.init()
 VegaJson.parse(text:)
 VegaJson.parseOrNull(text:diagnostics:)

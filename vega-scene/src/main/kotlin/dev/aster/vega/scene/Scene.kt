@@ -199,6 +199,21 @@ private fun SceneNode.walkInternal(
 }
 
 /** Every node in paint order, paired with the accumulated transform of its ancestors. */
+/**
+ * **The scene walks recurse, and a scene the compiler built is bounded; one you built is not.**
+ *
+ * Every walk over a scene tree — this, `SceneWalk`, `SceneHitIndex`, the SVG renderer, the Swift
+ * and Compose Multiplatform targets — descends once per group. A scene that came from
+ * `SpecCompiler` can only be `MAX_GROUP_DEPTH` deep, so those are safe by construction, and
+ * `DeepInputTest` holds that true for every document a *reader* can supply.
+ *
+ * A scene a **host** assembles from `GroupNode(...)` by hand has no such bound, and the failure is
+ * not a diagnostic: on Kotlin/Native a stack overflow is a `SIGSEGV` that kills the process — not a
+ * catchable `Throwable`, as it is on the JVM — and on iOS that is the app disappearing. This is not
+ * guarded here because it is the host's own data structure and a depth counter on every node of
+ * every frame is a real cost on the draw path; it is written down because the contract is otherwise
+ * invisible. Keep a hand-built tree shallower than a chart's, which is a handful of levels.
+ */
 public fun Scene.flatten(): List<PlacedNode> {
   val result = mutableListOf<PlacedNode>()
   root.walk { node, parentTransform ->

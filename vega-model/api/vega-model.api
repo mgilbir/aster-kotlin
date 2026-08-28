@@ -154,6 +154,7 @@ public final class dev/aster/vega/model/VegaDiagnostic {
 
 public final class dev/aster/vega/model/VegaJson {
 	public static final field INSTANCE Ldev/aster/vega/model/VegaJson;
+	public static final field MAX_JSON_DEPTH I
 	public final fun parse (Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
 	public final fun parseOrNull (Ljava/lang/String;Ldev/aster/vega/model/DiagnosticCollector;)Ldev/aster/vega/model/VegaValue;
 	public final fun write (Ldev/aster/vega/model/VegaValue;)Ljava/lang/String;

@@ -2824,6 +2824,9 @@ final object dev.aster.vega.model/TopoJson { // dev.aster.vega.model/TopoJson|nu
 }
 
 final object dev.aster.vega.model/VegaJson { // dev.aster.vega.model/VegaJson|null[0]
+    final const val MAX_JSON_DEPTH // dev.aster.vega.model/VegaJson.MAX_JSON_DEPTH|{}MAX_JSON_DEPTH[0]
+        final fun <get-MAX_JSON_DEPTH>(): kotlin/Int // dev.aster.vega.model/VegaJson.MAX_JSON_DEPTH.<get-MAX_JSON_DEPTH>|<get-MAX_JSON_DEPTH>(){}[0]
+
     final fun parse(kotlin/String): dev.aster.vega.model/VegaValue // dev.aster.vega.model/VegaJson.parse|parse(kotlin.String){}[0]
     final fun parseOrNull(kotlin/String, dev.aster.vega.model/DiagnosticCollector): dev.aster.vega.model/VegaValue? // dev.aster.vega.model/VegaJson.parseOrNull|parseOrNull(kotlin.String;dev.aster.vega.model.DiagnosticCollector){}[0]
     final fun write(dev.aster.vega.model/VegaValue): kotlin/String // dev.aster.vega.model/VegaJson.write|write(dev.aster.vega.model.VegaValue){}[0]

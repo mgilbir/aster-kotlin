@@ -7,6 +7,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 /**
@@ -283,6 +284,26 @@ subprojects {
         // Kotlin/Native as well as on the JVM, and that is the only way portability stops being a
         // compile-time claim. `kotlin("test")` is the assertion library that exists on all of them;
         // the JUnit 5 suites stay in `jvmTest`, where they read files and need a real framework.
+        //
+        // **Which suites belong here is a decision, not a leftover.** An audit of the 132 JVM
+        // suites found 76 that use no JVM-only API and could move — about nine hundred tests — and
+        // moving all of them would be wrong: a native test run is slow, and most of those assert
+        // chart semantics that cannot vary by target. A suite earns a place here by testing
+        // something where the JVM and Kotlin/Native can genuinely differ:
+        //
+        //  - **limits**, because an overflow is a catchable `StackOverflowError` on the JVM and a
+        //    `SIGSEGV` that kills the process on Native — `CompileBoundariesTest`,
+        //    `VegaLiteBoundariesTest`, `DeepInputTest`;
+        //  - **numbers and dates**, which go through each platform's own maths and calendar —
+        //    `JsDateTest`, `EpochDirectivesTest`, `VegaFormatRulesTest`, `NumberFormatRulesTest`,
+        //    `LocaleDatePatternTest`;
+        //  - **regular expressions and identifier grammar**, where ktecma262 sits on a different
+        //    engine underneath — `IdentifierGrammarTest`, and the pattern suites already here.
+        //
+        // Two things to know before moving one. `kotlin.test.assertNotNull` carries a contract the
+        // JUnit 5 assertion does not, so a following `!!` becomes an *error* under `-Werror`. And
+        // Kotlin/Native rejects a **comma** in a backticked function name where the JVM accepts it,
+        // so `fun \`a, b\`()` compiles on one target and not the other.
         if (name == "commonTest") {
           dependencies { implementation(kotlin("test")) }
         }
@@ -346,6 +367,17 @@ subprojects {
     // the gate mean the same thing on a laptop and on CI, and 2 GB is roughly four times what
     // that fixture actually needs.
     maxHeapSize = "2g"
+    // **And the stack, for the same reason the heap is pinned.** A thread's default stack size is
+    // the platform's, not the project's: a document nested two thousand deep parsed on a macOS
+    // laptop and overflowed on a Linux CI runner, in the same commit, so the local gate said green
+    // for a defect CI caught. That is precisely the failure `maxHeapSize` above exists to prevent,
+    // one resource over.
+    //
+    // 1 MB is HotSpot's own default on 64-bit Linux, so this pins the gate to the *smaller* of the
+    // two behaviours rather than inventing a third: a recursion that survives locally now survives
+    // on CI, which is the direction that matters. `VegaJson.MAX_JSON_DEPTH` is what keeps a
+    // document from reaching the limit at all; this is what keeps the limit from moving.
+    jvmArgs("-Xss1m")
     // A `time` scale is *local*, so its output depends on the machine's zone. Pinning one makes
     // the differential references reproducible off this machine, and lets a fixture cross a
     // daylight-saving boundary deliberately — which is where local time scales actually break.
@@ -401,6 +433,35 @@ subprojects {
     )
     testLogging { showStandardStreams = false }
   }
+
+  // **The native test binaries are pinned to UTC — deliberately *not* to the zone above.**
+  //
+  // First, why they need saying at all: `tasks.withType<Test>()` is Gradle's *JVM* test task, and a
+  // `KotlinNativeTest` is a sibling of it rather than a subtype, so every pin above applied to
+  // `jvmTest` and to nothing else. `linuxX64Test` and `macosArm64Test` ran in whatever zone the
+  // machine happened to be in, and nothing anywhere said so.
+  //
+  // Second, why UTC and not `TEST_TIME_ZONE`. The zone above is pinned because *goldens* depend on
+  // it: the references, the oracle comparisons and `scripts/oracle.sh`'s Node process all run on
+  // the JVM and must agree by construction. No native test consumes a zone-dependent golden. What
+  // native testing is for is a `commonTest` suite that reads the ambient zone *without meaning to*,
+  // and the only thing that catches one is running it somewhere the JVM is not. Pinning both sides
+  // to Amsterdam would throw that away to buy nothing.
+  //
+  // So this is a pin *away* from the JVM's zone. A suite that quietly depends on the ambient zone
+  // now fails on the machine of whoever writes it, rather than on `main` after the merge — which
+  // is the failure this workflow's own header warns is the price of not checking branches on both
+  // hosts, and which has cost two red runs on `main` already.
+  //
+  // Kotlin/Native on **Linux** does not honour `TZ` at all — it reported `Etc/UTC` under a pin of
+  // `Europe/Amsterdam`, which is how this was found — so on that target this matches what the
+  // runtime does anyway rather than changing it. A Linux developer whose machine is not UTC gets
+  // their own zone there and loses only this early warning, not correctness.
+  //
+  // The heap and the stack have no equivalent here on purpose: a native binary's stack is the
+  // host's and is not the runner's to set, which is the whole reason `VegaJson.MAX_JSON_DEPTH`
+  // bounds the input rather than trusting the stack to be big enough.
+  tasks.withType<KotlinNativeTest>().configureEach { environment("TZ", "UTC") }
 }
 
 /**

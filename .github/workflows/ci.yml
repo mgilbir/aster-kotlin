@@ -122,12 +122,12 @@ jobs:
         if: matrix.oracles == 'true'
         run: ./scripts/vega-lite-oracle.sh
 
-      - name: Run the suite on an iOS simulator target
-        # macOS only, and the one gate an external adopter asked for by name: `check.sh` runs
-        # `macosArm64Test`, so until now the engine had never been *executed* on an iOS target at all —
-        # only compiled for one. A runner has the simulator runtime this project's own machine does not.
-        if: runner.os == 'macOS'
-        run: ./gradlew iosSimulatorArm64Test
+      # The iOS simulator suite used to be a step of its own here, because this project's machine
+      # was believed to have no simulator runtime. It has one, so `check.sh` runs
+      # `iosSimulatorArm64Test` itself now and a separate step would only run it twice. That
+      # direction matters: a gate that lives only in this file is one nobody runs before landing,
+      # which is the failure the header above describes and which this exact step demonstrated — it
+      # was the step that caught a zone pin the local gate could not see.
 
       - name: Check every declared target is in the module metadata
         # macOS only, and deliberately: on any other host it is *expected* to fail, because Kotlin
@@ -245,3 +245,10 @@ jobs:
             **/build/test-results/**/*.xml
             build/upstream-transform-ledger.txt
           retention-days: 14
+
+  # The instrumented Android suites, defined in their own workflow and called from here and from
+  # `release.yml`. See `.github/workflows/instrumented.yml` for why they exist and why both callers
+  # share one definition.
+  android:
+    name: Instrumented
+    uses: ./.github/workflows/instrumented.yml

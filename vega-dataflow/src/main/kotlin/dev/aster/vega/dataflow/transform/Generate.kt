@@ -20,6 +20,15 @@ import kotlin.math.ceil
 public object SequenceTransform : Transform {
   override val type: String = "sequence"
 
+  /**
+   * How many rows one `sequence` may generate.
+   *
+   * The same number as the expression function's `MAX_SEQUENCE`, deliberately: they are the same
+   * operation and a document can reach either. A hundred thousand rows is far more than any chart
+   * draws and far less than the heap.
+   */
+  private const val MAX_SEQUENCE: Int = 100_000
+
   override fun apply(
     input: List<VegaValue>,
     params: VegaValue.Obj,
@@ -47,7 +56,29 @@ public object SequenceTransform : Transform {
       return input
     }
 
-    val count = ceil((stop - start) / step).toInt()
+    // **Bounded**, and this is the last of the resources a pasted document could exhaust. The
+    // count comes straight from three numbers a specification wrote, so
+    // `{"type": "sequence", "start": 0, "stop": 1e9}` asked for a billion rows — an
+    // `OutOfMemoryError` about four seconds later, which is an `Error` and therefore not something
+    // `SpecCompiler`'s guard catches (an `Error` is not a failed compile) and not something
+    // Kotlin/Native could catch at all. The same shape as the stack overflows, one resource over.
+    //
+    // The expression function of the same name has been bounded at `MAX_SEQUENCE` since it was
+    // written — "a runaway step cannot spin forever; no axis has this many boundaries" — and the
+    // *transform* was not, which is the asymmetry rather than the number being wrong. Same limit,
+    // for the same reason, and reported rather than truncated silently: half a sequence is a wrong
+    // chart where a refusal is a clear one.
+    val exact = ceil((stop - start) / step)
+    if (exact > MAX_SEQUENCE) {
+      context.diagnostics.error(
+        DiagnosticCodes.COMPILE_LIMIT_EXCEEDED,
+        "sequence asks for ${exact.toLong()} rows, and the limit is $MAX_SEQUENCE. Widen the step " +
+          "or narrow the bounds.",
+        operator = type,
+      )
+      return emptyList()
+    }
+    val count = exact.toInt()
     if (count <= 0) return emptyList()
     // Multiplied out from the start rather than accumulated, so a fractional step does not drift:
     // ten additions of 0.1 do not reach 1.0, and d3 counts the same way for the same reason.

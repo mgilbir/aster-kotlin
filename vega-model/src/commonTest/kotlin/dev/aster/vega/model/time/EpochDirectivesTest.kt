@@ -1,8 +1,8 @@
 package dev.aster.vega.model.time
 
+import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlinx.datetime.TimeZone
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Test
 
 /**
  * `%Q` and `%s`, the two directives that write the instant rather than a field of it.
@@ -25,7 +25,7 @@ class EpochDirectivesTest {
   private fun instant(millis: Double) = TimeFormat.format(millis, "%Q", TimeZone.UTC)
 
   @Test
-  fun `seconds since the epoch floor, they do not truncate`() {
+  fun `seconds since the epoch floor they do not truncate`() {
     assertEquals("-2", seconds(-1500.0))
     assertEquals("-1", seconds(-1.0))
     assertEquals("0", seconds(0.0))

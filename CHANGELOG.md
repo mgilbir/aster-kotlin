@@ -6,6 +6,115 @@ section here does not get released.
 
 ## Unreleased
 
+### Fixed
+
+- **A deeply nested document is refused before the JSON parser descends into it.** The parser
+  recurses once per `{`, so a document a few thousand levels deep exhausted the thread's stack —
+  and *how many* thousand depends on the stack the host gave that thread, which is not something an
+  engine can rely on: the same document parsed on a macOS laptop and took the process down on a
+  Linux CI runner, in the same commit. `VegaJson.MAX_JSON_DEPTH` is checked by a scan that does not
+  itself recurse, so it works on Kotlin/Native too, where a `StackOverflowError` cannot be caught at
+  all.
+
+  It is **192**, and the number was measured against the tightest target rather than the roomiest: a
+  document that parses is one the compiler then walks, and through `ChartSession` on macOS that walk
+  dies at about 450 where the JVM survives 511, so the parse bound has to leave room for everything
+  downstream of it. 192 is sixteen times the deepest document in this repository's corpus, and still
+  high enough that a document can reach `MAX_GROUP_DEPTH` and `MAX_VIEW_DEPTH` — a limit the parser
+  refuses first is a limit nothing can ever report.
+
+  This closed the last hole in "nothing throws": `SpecCompiler.compileJson`, `VegaLiteCompiler
+  .compileJson` and `VegaLiteInput.toVega` all guard the *compile*, and all three parse first.
+
+- **A `sequence` transform cannot ask for more rows than the heap holds.** Its count came straight
+  from three numbers a document wrote, so `{"type": "sequence", "stop": 1e9}` was an
+  `OutOfMemoryError` about four seconds later — an `Error`, so not something `SpecCompiler`'s guard
+  catches, and not something Kotlin/Native could catch at all. The same shape as the stack overflows,
+  one resource over. Bounded at `MAX_SEQUENCE`, which is the number its own **expression** twin has
+  used since it was written; the asymmetry was the defect rather than the number.
+
+  `density`, `cross`, `kde2d` and `isocontour` were probed for the same shape and already clamp.
+  Catastrophic regex backtracking was probed too: ktecma262 has a step limit, so a
+  specification-supplied `(a+)+$` is refused rather than hanging.
+
+- **`linuxX64Test` runs in the gate.** `linuxX64` was compiled and never executed, so its
+  `commonTest` suites — the decimal expansion, a specification's own regular expressions, the two LRU
+  caches, and now `DeepInputTest` — had run on no machine at all for a shipped target. Named only in
+  the Linux branch, because Kotlin registers the task everywhere and disables it off Linux, and a
+  disabled task is the silent skip the Apple block beside it already exists to prevent.
+
+- **The Apple surface has a generative gate too.** `DeepInputTests` drives the same pathological
+  shapes through `ChartSession` — the way an app reaches them, across the Obj-C boundary, on text a
+  reader pasted. Two things can break there that cannot break in the Kotlin suites: the bridge could
+  lose a diagnostic, and `ChartSession` parses `hostConfigJson` itself on a path no Kotlin test
+  takes.
+
+  It found the `MAX_JSON_DEPTH` miscalibration on its first run, because it compiles what it parses
+  and the Kotlin suite did not: that suite's "nested JSON" shape called `parseOrNull` and stopped,
+  so it proved the parser survived and said nothing about the pipeline behind it. Both shapes now
+  compile.
+
+- **A date test no longer depends on which edition of the time-zone database the host ships.**
+  `JsDateTest` pinned absolute timestamps for the years 0 and 100 in a *local* zone. What an
+  implementation answers for an instant earlier than a zone's first recorded transition is not
+  something the database settles, and the offset itself moves between editions — Amsterdam became a
+  link to Brussels in tzdata 2022b, which changed its local mean time from +00:19:32 to +00:17:30.
+  So the suite passed on macOS and failed on Linux the first time it ran on both. Those two years
+  are stated in UTC now; the rule under test is how a *year* is read, which has nothing to do with
+  the offset.
+
+- **The native test binaries have a zone at all now, and it is deliberately not the JVM's.**
+  `tasks.withType<Test>()` is Gradle's *JVM* test task and a `KotlinNativeTest` is a sibling of it
+  rather than a subtype, so the zone, the heap and the stack were pinned for `jvmTest` and for
+  nothing else — `linuxX64Test` and `macosArm64Test` ran in whatever zone the machine was in.
+
+  They are pinned to **UTC**, not to `TEST_TIME_ZONE`. Everything that depends on the zone — the
+  references, the oracle comparisons, the Node process — runs on the JVM, and no native test
+  consumes a zone-dependent golden. What a native run is *for* is a `commonTest` suite that reads
+  the ambient zone without meaning to, and the only thing that catches one is running it somewhere
+  the JVM is not; pinning both sides to Amsterdam would throw that away to buy nothing. So a suite
+  that picks up the ambient zone now fails on the machine of whoever writes it rather than on
+  `main` after the merge.
+
+  `PinnedTestZoneTest` asserts the JVM pin arrived, because a build script can state a pin but
+  cannot observe what the test process got. It checks the zone by its **rules** rather than its
+  name: `Europe/Amsterdam` is a link to `Europe/Brussels`, so an id comparison can fail on a host
+  where the pin worked. Kotlin/Native on Linux turns out not to honour `TZ` at all — it reports
+  `Etc/UTC` under a pin of `Europe/Amsterdam`, which is how all of this was found.
+
+- **Eight suites moved from `jvmTest` to `commonTest`.** An audit of the 132 JVM suites found 76 that
+  use no JVM-only API; moving all of them would be wrong, because a native run is slow and most
+  assert chart semantics that cannot vary by target. The eight that moved are the ones where the
+  platforms genuinely differ — the limit suites, where an overflow is catchable on the JVM and a
+  `SIGSEGV` on Native, and the number, date and identifier-grammar suites, which sit on each
+  platform's own maths, calendar and regex engine. The rule is written down in `build.gradle.kts` so
+  the split stays a decision rather than a leftover.
+
+- **The deep-input gate runs on every target, not just the JVM.** It matters most where it was not
+  running: on Kotlin/Native a stack overflow is a `SIGSEGV` that kills the process — exit 139, no
+  catch, no teardown — where the JVM raises a catchable `StackOverflowError`. So the target with the
+  smallest thread stacks and the hardest failure was the one the test could not see. `DeepInputTest`
+  moved to `commonTest` and now executes on all five.
+
+  Every bound this needed was already in `commonMain`, which is why moving the test found nothing
+  new — bounding rather than catching was the only thing that could have worked there.
+
+- **A deeply nested event selector no longer takes the compiler down.** `EventSelector`'s `one` and
+  `between` are **mutually** recursive over bracket nesting in a selector string, so a pasted
+  Vega-Lite document with a few thousand `[` in a `select.on` threw `StackOverflowError` out of
+  `VegaLiteCompiler.compileJson` and `VegaLiteInput.toVega`. A selector nested past sixteen levels is
+  now taken as a literal string, which is what this parser already does with every selector it cannot
+  read.
+
+  Found by building a call graph over the compiled classes and looking for cycles — mutual recursion
+  is invisible to anything that searches for a function calling itself.
+
+- **The test JVM's stack is pinned, like its heap and its time zone.** A thread's default stack size
+  is the platform's, not the project's, so the local gate reported green for a defect CI caught.
+  Pinning it to 1 MB — HotSpot's own default on 64-bit Linux — makes the gate mean the same thing on
+  a laptop and on CI, which is what `maxHeapSize` and `TZ` beside it already do. It found a second
+  instance of the same class of bug on its first run.
+
 ### Changed
 
 - **`VegaLiteCompilation.vega` states its null contract.** An ERROR-severity diagnostic does **not**
