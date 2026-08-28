@@ -22,8 +22,78 @@ public object VegaJson {
     allowSpecialFloatingPointValues = true
   }
 
-  /** @throws VegaSpecException if [text] is not valid JSON. */
-  public fun parse(text: String): VegaValue =
+  /**
+   * How deeply JSON may nest before this refuses to parse it.
+   *
+   * **The parser recurses, and a `StackOverflowError` is not catchable everywhere.** kotlinx's
+   * lexer descends once per `{` or `[`, so a document nested a few thousand deep exhausts the
+   * thread's stack — and how deep "a few thousand" is depends on the stack the host happened to
+   * give the thread. That is not a number this engine can rely on: the same document survived on a
+   * macOS laptop and took the process down on a Linux CI runner, in the same commit.
+   *
+   * On the JVM the overflow is at least catchable; on Kotlin/Native it is not catchable at all. So
+   * this is checked **before** the parser is handed the text, by a scan that does not recurse —
+   * which is the only shape of answer that works on every target.
+   *
+   * The number is derived rather than chosen: the deepest document in this repository's own corpus
+   * of 761 specifications and references is **twelve** levels. Five hundred and twelve is forty
+   * times that, and far below where any parser this runs on gives out.
+   */
+  public const val MAX_JSON_DEPTH: Int = 512
+
+  /** @throws VegaSpecException if [text] is not valid JSON, or nests past [MAX_JSON_DEPTH]. */
+  public fun parse(text: String): VegaValue {
+    depthOf(text)?.let { depth ->
+      throw VegaSpecException(
+        VegaDiagnostic(
+          severity = DiagnosticSeverity.FATAL,
+          code = DiagnosticCodes.COMPILE_LIMIT_EXCEEDED,
+          message =
+            "This document nests more than $MAX_JSON_DEPTH levels deep (reached $depth), which is " +
+              "further than the JSON parser can descend without running out of stack. The deepest " +
+              "chart anyone draws is about a dozen.",
+        )
+      )
+    }
+    return parseChecked(text)
+  }
+
+  /**
+   * The depth at which [text] passes [MAX_JSON_DEPTH], or null when it never does.
+   *
+   * A character scan with a counter, because a function whose job is deciding whether something is
+   * too deep to recurse over must not itself recurse over it. Strings are skipped: a `{` inside one
+   * is a character, not a level, and `"\""` does not end the string it is in.
+   *
+   * Deliberately not a validator. Text that is not JSON at all reaches the parser and gets the
+   * parser's own message, which is the one a reader can act on.
+   */
+  private fun depthOf(text: String): Int? {
+    var depth = 0
+    var index = 0
+    var inString = false
+    while (index < text.length) {
+      val ch = text[index]
+      if (inString) {
+        if (ch == '\\') index++ else if (ch == '"') inString = false
+      } else {
+        when (ch) {
+          '"' -> inString = true
+          '{',
+          '[' -> {
+            depth++
+            if (depth > MAX_JSON_DEPTH) return depth
+          }
+          '}',
+          ']' -> depth--
+        }
+      }
+      index++
+    }
+    return null
+  }
+
+  private fun parseChecked(text: String): VegaValue =
     try {
       json.parseToJsonElement(text).toVegaValue()
     } catch (e: Exception) {

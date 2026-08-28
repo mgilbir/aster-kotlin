@@ -6,6 +6,25 @@ section here does not get released.
 
 ## Unreleased
 
+### Fixed
+
+- **A deeply nested document is refused before the JSON parser descends into it.** The parser
+  recurses once per `{`, so a document a few thousand levels deep exhausted the thread's stack —
+  and *how many* thousand depends on the stack the host gave that thread, which is not something an
+  engine can rely on: the same document parsed on a macOS laptop and took the process down on a
+  Linux CI runner, in the same commit. `VegaJson.MAX_JSON_DEPTH` is checked by a scan that does not
+  itself recurse, so it works on Kotlin/Native too, where a `StackOverflowError` cannot be caught at
+  all. It is 512, against a corpus whose deepest document is twelve.
+
+  This closed the last hole in "nothing throws": `SpecCompiler.compileJson`, `VegaLiteCompiler
+  .compileJson` and `VegaLiteInput.toVega` all guard the *compile*, and all three parse first.
+
+- **The test JVM's stack is pinned, like its heap and its time zone.** A thread's default stack size
+  is the platform's, not the project's, so the local gate reported green for a defect CI caught.
+  Pinning it to 1 MB — HotSpot's own default on 64-bit Linux — makes the gate mean the same thing on
+  a laptop and on CI, which is what `maxHeapSize` and `TZ` beside it already do. It found a second
+  instance of the same class of bug on its first run.
+
 ### Changed
 
 - **`VegaLiteCompilation.vega` states its null contract.** An ERROR-severity diagnostic does **not**

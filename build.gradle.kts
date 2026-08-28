@@ -346,6 +346,17 @@ subprojects {
     // the gate mean the same thing on a laptop and on CI, and 2 GB is roughly four times what
     // that fixture actually needs.
     maxHeapSize = "2g"
+    // **And the stack, for the same reason the heap is pinned.** A thread's default stack size is
+    // the platform's, not the project's: a document nested two thousand deep parsed on a macOS
+    // laptop and overflowed on a Linux CI runner, in the same commit, so the local gate said green
+    // for a defect CI caught. That is precisely the failure `maxHeapSize` above exists to prevent,
+    // one resource over.
+    //
+    // 1 MB is HotSpot's own default on 64-bit Linux, so this pins the gate to the *smaller* of the
+    // two behaviours rather than inventing a third: a recursion that survives locally now survives
+    // on CI, which is the direction that matters. `VegaJson.MAX_JSON_DEPTH` is what keeps a
+    // document from reaching the limit at all; this is what keeps the limit from moving.
+    jvmArgs("-Xss1m")
     // A `time` scale is *local*, so its output depends on the machine's zone. Pinning one makes
     // the differential references reproducible off this machine, and lets a fixture cross a
     // daylight-saving boundary deliberately — which is where local time scales actually break.
