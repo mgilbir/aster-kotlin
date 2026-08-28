@@ -4,12 +4,12 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * What the Vega-Lite compiler does with a document that is wrong, hostile, or merely unusual.
@@ -52,7 +52,7 @@ class VegaLiteBoundariesTest {
       val vega = compile(spec).vega
       assertNotNull(vega, "a rolled-over date must compile, not throw")
       val store =
-        (vega!!.fields["data"] as VegaValue.Arr).values.first {
+        (vega.fields["data"] as VegaValue.Arr).values.first {
           (it as VegaValue.Obj).fields["name"] == VegaValue.Str("p_store")
         } as VegaValue.Obj
       val row = ((store.fields["values"] as VegaValue.Arr).values.first() as VegaValue.Obj)
@@ -146,9 +146,9 @@ class VegaLiteBoundariesTest {
     // `Limits.MAX_VIEW_DEPTH`, comfortably inside `MAX_JSON_DEPTH`. So this still tests the thing
     // it was written to test.
     val deep = buildString {
-      repeat(100) { append("""{"layer":[""") }
+      repeat(80) { append("""{"layer":[""") }
       append("""{"mark":"point","encoding":{}}""")
-      repeat(100) { append("]}") }
+      repeat(80) { append("]}") }
     }
     val nested = compile(deep)
     assertNull(nested.vega)

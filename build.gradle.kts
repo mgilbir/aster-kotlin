@@ -283,6 +283,26 @@ subprojects {
         // Kotlin/Native as well as on the JVM, and that is the only way portability stops being a
         // compile-time claim. `kotlin("test")` is the assertion library that exists on all of them;
         // the JUnit 5 suites stay in `jvmTest`, where they read files and need a real framework.
+        //
+        // **Which suites belong here is a decision, not a leftover.** An audit of the 132 JVM
+        // suites found 76 that use no JVM-only API and could move — about nine hundred tests — and
+        // moving all of them would be wrong: a native test run is slow, and most of those assert
+        // chart semantics that cannot vary by target. A suite earns a place here by testing
+        // something where the JVM and Kotlin/Native can genuinely differ:
+        //
+        //  - **limits**, because an overflow is a catchable `StackOverflowError` on the JVM and a
+        //    `SIGSEGV` that kills the process on Native — `CompileBoundariesTest`,
+        //    `VegaLiteBoundariesTest`, `DeepInputTest`;
+        //  - **numbers and dates**, which go through each platform's own maths and calendar —
+        //    `JsDateTest`, `EpochDirectivesTest`, `VegaFormatRulesTest`, `NumberFormatRulesTest`,
+        //    `LocaleDatePatternTest`;
+        //  - **regular expressions and identifier grammar**, where ktecma262 sits on a different
+        //    engine underneath — `IdentifierGrammarTest`, and the pattern suites already here.
+        //
+        // Two things to know before moving one. `kotlin.test.assertNotNull` carries a contract the
+        // JUnit 5 assertion does not, so a following `!!` becomes an *error* under `-Werror`. And
+        // Kotlin/Native rejects a **comma** in a backticked function name where the JVM accepts it,
+        // so `fun \`a, b\`()` compiles on one target and not the other.
         if (name == "commonTest") {
           dependencies { implementation(kotlin("test")) }
         }

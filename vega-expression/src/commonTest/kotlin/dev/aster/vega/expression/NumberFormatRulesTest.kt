@@ -4,8 +4,8 @@ import dev.aster.vega.model.locale.DateName
 import dev.aster.vega.model.locale.DateNameContext
 import dev.aster.vega.model.locale.VegaFormatRules
 import dev.aster.vega.model.locale.VegaLocale
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /**
  * A host's numbering system reaches a **number**, and the specifier still decides its shape.

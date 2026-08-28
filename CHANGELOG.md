@@ -19,6 +19,17 @@ section here does not get released.
   This closed the last hole in "nothing throws": `SpecCompiler.compileJson`, `VegaLiteCompiler
   .compileJson` and `VegaLiteInput.toVega` all guard the *compile*, and all three parse first.
 
+- **`MAX_JSON_DEPTH` is 192, not 512, because 512 was measured against the wrong platform.** A
+  document that parses is one the compiler then walks, and through `ChartSession` on macOS that walk
+  dies at about 450 where the JVM survives 511. The parse bound has to leave room for everything
+  downstream of it on the *tightest* target. It is now sixteen times the deepest document in this
+  repository's corpus, and still high enough that a document can reach `MAX_GROUP_DEPTH` and
+  `MAX_VIEW_DEPTH` — a limit the parser refuses first is a limit nothing can ever report.
+
+  Found because the Swift gate below compiles what it parses and the Kotlin one did not: its "nested
+  JSON" shape called `parseOrNull` and stopped, so it proved the parser survived and said nothing
+  about the pipeline behind it. Both shapes now compile.
+
 - **A `sequence` transform cannot ask for more rows than the heap holds.** Its count came straight
   from three numbers a document wrote, so `{"type": "sequence", "stop": 1e9}` was an
   `OutOfMemoryError` about four seconds later — an `Error`, so not something `SpecCompiler`'s guard
@@ -35,6 +46,20 @@ section here does not get released.
   caches, and now `DeepInputTest` — had run on no machine at all for a shipped target. Named only in
   the Linux branch, because Kotlin registers the task everywhere and disables it off Linux, and a
   disabled task is the silent skip the Apple block beside it already exists to prevent.
+
+- **The Apple surface has a generative gate too.** `DeepInputTests` drives the same pathological
+  shapes through `ChartSession` — the way an app reaches them, across the Obj-C boundary, on text a
+  reader pasted. Two things can break there that cannot break in the Kotlin suites: the bridge could
+  lose a diagnostic, and `ChartSession` parses `hostConfigJson` itself on a path no Kotlin test
+  takes. It found the `MAX_JSON_DEPTH` miscalibration on its first run.
+
+- **Eight suites moved from `jvmTest` to `commonTest`.** An audit of the 132 JVM suites found 76 that
+  use no JVM-only API; moving all of them would be wrong, because a native run is slow and most
+  assert chart semantics that cannot vary by target. The eight that moved are the ones where the
+  platforms genuinely differ — the limit suites, where an overflow is catchable on the JVM and a
+  `SIGSEGV` on Native, and the number, date and identifier-grammar suites, which sit on each
+  platform's own maths, calendar and regex engine. The rule is written down in `build.gradle.kts` so
+  the split stays a decision rather than a leftover.
 
 - **The deep-input gate runs on every target, not just the JVM.** It matters most where it was not
   running: on Kotlin/Native a stack overflow is a `SIGSEGV` that kills the process — exit 139, no

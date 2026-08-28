@@ -6,10 +6,10 @@ import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.flatten
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 /**
  * What the compiler does with a specification that asks for something it cannot give.
@@ -154,12 +154,12 @@ class CompileBoundariesTest {
    * A few thousand levels was a `StackOverflowError`: an `Error` rather than an exception, caught
    * by nothing typed, and unrecoverable on Kotlin/Native.
    *
-   * **A hundred groups, not five hundred**, and the difference is the interaction between two
-   * limits that guard two different recursions. `MAX_GROUP_DEPTH` is about the *compiler* walking a
-   * mark tree, and reaching it produces a diagnostic and still draws what it can — which is what
-   * this test is about. `VegaJson.MAX_JSON_DEPTH` is about the *parser* descending, and it has to
-   * run first, so a document past it never reaches the compiler at all. A group costs about two
-   * JSON levels, so five hundred of them is roughly a thousand levels: past the parser's limit, and
+   * **Eighty groups, not five hundred**, and the difference is the interaction between two limits
+   * that guard two different recursions. `MAX_GROUP_DEPTH` is about the *compiler* walking a mark
+   * tree, and reaching it produces a diagnostic and still draws what it can — which is what this
+   * test is about. `VegaJson.MAX_JSON_DEPTH` is about the *parser* descending, and it has to run
+   * first, so a document past it never reaches the compiler at all. A group costs about two JSON
+   * levels, so five hundred of them is roughly a thousand levels: past the parser's limit, and
    * refused with `COMPILE_LIMIT_EXCEEDED` before `MAX_GROUP_DEPTH` is ever consulted. Both are
    * refusals; only one of them leaves a scene, and this asserts that one.
    *
@@ -176,7 +176,7 @@ class CompileBoundariesTest {
     val spec =
       """
       {"width": 100, "height": 100, "padding": 0, "data": [$table],
-       "marks": [${nest(100)}]}
+       "marks": [${nest(80)}]}
       """
         .trimIndent()
     val compiled = compile(spec)
@@ -222,8 +222,8 @@ class CompileBoundariesTest {
       """
         .trimIndent()
     val compiled = compile(spec)
-    assertNotNull(compiled.scene)
-    assertEquals(200, compiled.scene!!.flatten().map { it.node }.filterIsInstance<RectNode>().size)
+    val scene = assertNotNull(compiled.scene)
+    assertEquals(200, scene.flatten().map { it.node }.filterIsInstance<RectNode>().size)
   }
 
   /**
@@ -233,7 +233,7 @@ class CompileBoundariesTest {
    * `reportOnce` was in the same file, unused by any of the three per-datum reports.
    */
   @Test
-  fun `a missing scale is reported once, not once per datum`() {
+  fun `a missing scale is reported once rather than once per datum`() {
     val rows = (0 until 60).joinToString(", ") { """{"v": $it}""" }
     val spec =
       """

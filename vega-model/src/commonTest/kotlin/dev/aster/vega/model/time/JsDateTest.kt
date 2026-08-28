@@ -1,9 +1,9 @@
 package dev.aster.vega.model.time
 
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlinx.datetime.TimeZone
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Test
 
 /**
  * `new Date(year, month, …)`, checked against what V8 actually answers.

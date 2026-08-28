@@ -167,13 +167,20 @@ extension ChartSession {
   /// deliberately not a public seam. A handful of yields is enough — every task here is a compile of
   /// a two-mark chart — and the loop is bounded so a hang fails the test rather than the suite.
   func settled() async {
-    for _ in 0..<200 {
+    // **Sleeps, rather than only yielding.** A compile runs off this actor — `setSpecAsync` hops to
+    // the engine's own dispatcher — so yielding the main actor does not advance it, and a yield loop
+    // only worked for the two-mark charts it was written against. A document with a thousand nested
+    // layers takes real milliseconds, and `DeepInputTests` feeds it several.
+    //
+    // Bounded at about ten seconds, so a session that never settles fails the test rather than
+    // hanging the suite.
+    for _ in 0..<1_000 {
       if !loading {
         // One more turn, so a block that was scheduled behind the last one has run.
         await Task.yield()
         if !loading { return }
       }
-      await Task.yield()
+      try? await Task.sleep(nanoseconds: 10_000_000)
     }
   }
 }

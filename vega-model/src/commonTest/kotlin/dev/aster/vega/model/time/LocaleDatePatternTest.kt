@@ -2,8 +2,8 @@ package dev.aster.vega.model.time
 
 import dev.aster.vega.model.locale.VegaCaptions
 import dev.aster.vega.model.locale.VegaLocale
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /**
  * Reading a date's **order** off a locale's own `%x`.
@@ -79,7 +79,7 @@ class LocaleDatePatternTest {
   }
 
   @Test
-  fun `a connector is not a marker, whatever it is made of`() {
+  fun `a connector is not a marker whatever it is made of`() {
     // The two ways the marker rule could over-reach, and both are why it takes *two* conditions.
     //
     // Punctuation attached to a field is still a connector — it has no letter in it — so a trailing

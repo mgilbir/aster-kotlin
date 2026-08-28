@@ -35,11 +35,20 @@ public object VegaJson {
    * this is checked **before** the parser is handed the text, by a scan that does not recurse —
    * which is the only shape of answer that works on every target.
    *
-   * The number is derived rather than chosen: the deepest document in this repository's own corpus
-   * of 761 specifications and references is **twelve** levels. Five hundred and twelve is forty
-   * times that, and far below where any parser this runs on gives out.
+   * The number is derived rather than chosen, from three measurements that bracket it:
+   *
+   * - the deepest document in this repository's own corpus of 761 specifications and references is
+   *   **twelve** levels, so this is sixteen times any real chart;
+   * - a document that reaches `ScopeCompiler.MAX_GROUP_DEPTH` has to be *expressible*, and a group
+   *   mark costs about two JSON levels — so anything below about 130 would make that limit dead
+   *   code, refused by the parser before the compiler could report it;
+   * - and the ceiling is the platform with the least stack. It was 512, which was measured against
+   *   the JVM and is **wrong for Apple**: a document that parses is one the compiler then walks,
+   *   and through `ChartSession` on macOS that walk dies at about 450 where the JVM survives 511.
+   *   The parse bound has to leave room for everything downstream of it, on the tightest target,
+   *   not on the one the number was first tried on.
    */
-  public const val MAX_JSON_DEPTH: Int = 512
+  public const val MAX_JSON_DEPTH: Int = 192
 
   /** @throws VegaSpecException if [text] is not valid JSON, or nests past [MAX_JSON_DEPTH]. */
   public fun parse(text: String): VegaValue {

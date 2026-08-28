@@ -109,10 +109,24 @@ class DeepInputTest {
             """{"mark":"point","data":{"values":[]},"transform":[$transforms],"encoding":{}}"""
           )
         },
-      "json: nested objects" to
+      // **Compiled, not just parsed**, and that distinction is the hole this shape used to have: it
+      // called `parseOrNull` and stopped, so it proved the parser survived and said nothing about
+      // everything downstream of it. A document *under* `MAX_JSON_DEPTH` parses and is then walked
+      // by the compiler, the config merge and the Vega-Lite detector — and through `ChartSession`
+      // on macOS that walk died at about 450 while the parse bound still said 512 was fine. The
+      // bound now has to leave room for the whole pipeline, and this is what checks that it does.
+      "json: nested objects, parsed and compiled" to
         { n: Int ->
           val doc = """{"a":""".repeat(n) + "1" + "}".repeat(n)
           VegaJson.parseOrNull(doc, DiagnosticCollector())
+          compileVega(doc)
+          compileVegaLite(doc)
+        },
+      "json: nested arrays, parsed and compiled" to
+        { n: Int ->
+          val doc = "[".repeat(n) + "1" + "]".repeat(n)
+          VegaJson.parseOrNull(doc, DiagnosticCollector())
+          compileVega(doc)
         },
       "expression: nested calls" to
         { n: Int ->
