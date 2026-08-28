@@ -19,6 +19,16 @@ section here does not get released.
   This closed the last hole in "nothing throws": `SpecCompiler.compileJson`, `VegaLiteCompiler
   .compileJson` and `VegaLiteInput.toVega` all guard the *compile*, and all three parse first.
 
+- **A deeply nested event selector no longer takes the compiler down.** `EventSelector`'s `one` and
+  `between` are **mutually** recursive over bracket nesting in a selector string, so a pasted
+  Vega-Lite document with a few thousand `[` in a `select.on` threw `StackOverflowError` out of
+  `VegaLiteCompiler.compileJson` and `VegaLiteInput.toVega`. A selector nested past sixteen levels is
+  now taken as a literal string, which is what this parser already does with every selector it cannot
+  read.
+
+  Found by building a call graph over the compiled classes and looking for cycles — mutual recursion
+  is invisible to anything that searches for a function calling itself.
+
 - **The test JVM's stack is pinned, like its heap and its time zone.** A thread's default stack size
   is the platform's, not the project's, so the local gate reported green for a defect CI caught.
   Pinning it to 1 MB — HotSpot's own default on 64-bit Linux — makes the gate mean the same thing on

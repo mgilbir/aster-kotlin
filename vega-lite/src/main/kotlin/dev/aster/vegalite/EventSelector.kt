@@ -38,10 +38,29 @@ internal object EventSelector {
 
   /** Parses a selector into the streams it stands for, in the order they were written. */
   fun parse(selector: String, source: String = "view"): List<VegaValue> =
-    split(selector.trim()).map { one(it, source) }
+    split(selector.trim()).map { one(it, source, depth = 0) }
 
-  private fun one(part: String, source: String): VegaValue =
-    if (part.startsWith("[")) between(part, source) else stream(part, source)
+  /**
+   * How deeply a `[between]` clause may nest before the selector is taken literally.
+   *
+   * `one` and `between` are mutually recursive, and what drives the recursion is *bracket nesting
+   * in a string a specification wrote* — so a pasted document with five thousand `[` overflowed the
+   * stack, out of `VegaLiteCompiler.compileJson` and `VegaLiteInput.toVega`, both of which take
+   * pasted text. A `StackOverflowError` is an `Error`, so the guards on those entry points do not
+   * catch it, and on Kotlin/Native nothing could.
+   *
+   * Refusing by *falling back to the literal string* rather than by reporting, because that is
+   * already what this parser does with every selector it cannot read — an unterminated bracket, a
+   * `>` with the wrong number of operands. A selector nested past this is not a selector.
+   *
+   * Sixteen, which is eight more than the deepest thing anyone writes: `[a, b] > c` is one level
+   * and nesting a between inside a between is already unusual.
+   */
+  private const val MAX_BETWEEN_DEPTH: Int = 16
+
+  private fun one(part: String, source: String, depth: Int): VegaValue =
+    if (part.startsWith("[") && depth < MAX_BETWEEN_DEPTH) between(part, source, depth)
+    else if (part.startsWith("[")) VegaValue.Str(part) else stream(part, source)
 
   /**
    * `find`: the next unnested [end], skipping anything inside brackets or braces.
@@ -83,13 +102,13 @@ internal object EventSelector {
    * The pair in brackets are the events that open and close the window, and the stream after the
    * `>` is what is listened for while it is open.
    */
-  private fun between(s: String, source: String): VegaValue {
+  private fun between(s: String, source: String, depth: Int): VegaValue {
     val close = find(s, 1, ']', "[", "]")
     if (close >= s.length) return VegaValue.Str(s)
-    val pair = split(s.substring(1, close)).map { one(it, source) }
+    val pair = split(s.substring(1, close)).map { one(it, source, depth + 1) }
     val rest = s.substring(close + 1).trim()
     if (!rest.startsWith(">") || pair.size != 2) return VegaValue.Str(s)
-    val inner = one(rest.substring(1).trim(), source)
+    val inner = one(rest.substring(1).trim(), source, depth + 1)
     // A between selector over a stream that is itself one nests rather than merging: the inner
     // stream keeps its own window and this one wraps it.
     if ((inner as? VegaValue.Obj)?.fields?.containsKey("between") == true) {
