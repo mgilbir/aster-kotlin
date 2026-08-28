@@ -352,12 +352,17 @@ jobs:
                       skipped.append(f"  {case.get('name')}: {why}")
 
           problems = []
-          # Observed on the project's own emulator at API 37, less a margin. A shrink detector, not
-          # a target to grow.
+          # 90, 11 and 4 — one hundred and five in total, which is exactly the number of `@Test`
+          # methods in the three modules — observed identically at API 26 here, at API 36 here, and
+          # on the project's own API 37 emulator. A shrink detector, not a target to grow.
+          #
+          # The first numbers here were nearly double these, read off a `grep -o 'tests="[0-9]*"'`
+          # that matched more than the one attribute per file it looked like it was matching. Parse
+          # the XML; do not grep it.
           for module, least in (
-              ("vega-android-canvas", 150),
-              ("demo", 15),
-              ("vega-compose", 6),
+              ("vega-android-canvas", 85),
+              ("demo", 10),
+              ("vega-compose", 4),
           ):
               if per[module] < least:
                   problems.append(f"{module} ran {per[module]} instrumented tests, expected at least {least}")
