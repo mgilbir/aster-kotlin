@@ -13,10 +13,15 @@ name: Release
 # commits that, and only then tags the commit it wrote. One tag, correct for both ecosystems, and the
 # release page hangs off it.
 #
-# Three jobs, because the work has three homes:
+# Four jobs, because the work has four homes:
 #
 #   verify   Linux. The suite that does not need a Mac, and the oracles that regenerate upstream's
 #            own output and compare against it. No reason to pay macOS rates for it.
+#   instrumented
+#            Linux, with an emulator. The Android suites, which `check.sh` inside `verify` skips
+#            because a release runner has no device — so until this job existed, every release
+#            published the two Android artifacts with their tests compiled and never run. Shares one
+#            definition with `ci.yml`; see `.github/workflows/instrumented.yml`.
 #   publish  macOS. The only host that can compile every target: Apple targets need Xcode, and
 #            Kotlin/Native cross-compiles the Linux target from macOS, so one host produces the
 #            complete set. `ktecma262` 0.1.2 was built on Linux and shipped with no native variants.
@@ -119,9 +124,25 @@ jobs:
       - name: Differential tests against upstream Vega-Lite
         run: ./scripts/vega-lite-oracle.sh
 
+  # The Android suites, on a real device, before anything is published.
+  #
+  # `verify` above runs `check.sh`, which runs the instrumented tests when a device is on adb and
+  # prints `instrumented SKIPPED — no device on adb` when one is not. A release runner has no
+  # emulator, so every release this project has cut published `vega-android-canvas` and
+  # `vega-compose` having compiled their tests and never run them — and those two modules have no
+  # other tests at all. This is the job that makes the Android artifacts as checked as the rest.
+  #
+  # Alongside `verify` rather than after it: they are independent preconditions and there is no
+  # reason to make the slower one wait for the other.
+  instrumented:
+    name: Instrumented
+    uses: ./.github/workflows/instrumented.yml
+
   publish:
     name: Build and publish (macOS)
-    needs: verify
+    # **Both preconditions, not just the Linux one.** A `needs` that named only `verify` would let a
+    # red Android run publish, which is the state this job was added to end.
+    needs: [verify, instrumented]
     runs-on: macos-latest
     outputs:
       # **Whether the Gradle modules actually reached Maven Central.**
