@@ -163,8 +163,10 @@ class CompileBoundariesTest {
    * refused with `COMPILE_LIMIT_EXCEEDED` before `MAX_GROUP_DEPTH` is ever consulted. Both are
    * refusals; only one of them leaves a scene, and this asserts that one.
    *
-   * A hundred is comfortably past `MAX_GROUP_DEPTH` (64) and comfortably inside the parser's budget
-   * (about 250 groups), so it exercises the limit it means to.
+   * Eighty is past `MAX_GROUP_DEPTH` (64) and inside the parser's budget, which at `MAX_JSON_DEPTH`
+   * of 192 is about ninety-six groups — so it exercises the limit it means to. A round hundred
+   * would not: that is roughly two hundred JSON levels, so the parser would refuse it first and
+   * this would assert the wrong diagnostic for the right-looking reason.
    */
   @Test
   fun `a mark tree nested past the limit is a diagnostic rather than an overflow`() {

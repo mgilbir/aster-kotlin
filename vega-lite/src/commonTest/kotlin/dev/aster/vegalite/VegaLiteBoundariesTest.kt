@@ -142,9 +142,13 @@ class VegaLiteBoundariesTest {
     // the test passed. `VegaJson.MAX_JSON_DEPTH` is what refuses that document now, and it is
     // asserted where it belongs, in `VegaJsonDepthTest`.
     //
-    // A hundred nested layers is a hundred *view* levels and about two hundred JSON levels: past
-    // `Limits.MAX_VIEW_DEPTH`, comfortably inside `MAX_JSON_DEPTH`. So this still tests the thing
-    // it was written to test.
+    // Eighty nested layers is eighty *view* levels and about a hundred and sixty JSON levels: past
+    // `Limits.MAX_VIEW_DEPTH`, and inside `MAX_JSON_DEPTH`. So this still tests the thing it was
+    // written to test — that the *view* limit is what refuses the document, not the parser.
+    //
+    // Eighty rather than a round hundred because two JSON levels go in per layer, and a hundred
+    // would be two hundred, which is past `MAX_JSON_DEPTH` — the parser would refuse it first and
+    // this would assert the wrong diagnostic for the right-looking reason.
     val deep = buildString {
       repeat(80) { append("""{"layer":[""") }
       append("""{"mark":"point","encoding":{}}""")
