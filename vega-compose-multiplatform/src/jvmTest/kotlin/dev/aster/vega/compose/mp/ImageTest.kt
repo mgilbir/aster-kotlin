@@ -1,6 +1,7 @@
 package dev.aster.vega.compose.mp
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
@@ -295,6 +296,24 @@ class ImageTest {
     // Read inside the composition, so changing it invalidates the draw. Without something like this
     // `render()` returns the frame it already had.
     val nudge = mutableStateOf(0.0)
+
+    /**
+     * Writes the nudge and makes the write *visible* before the frame that has to see it.
+     *
+     * A `MutableState` written from this thread lands in the global snapshot, and the composition
+     * finds out through `GlobalSnapshotManager`, which schedules the notification on a coroutine
+     * rather than delivering it inline. So `render()` can compose against the previous value, skip
+     * the redraw, and leave the resolver un-asked — the assertions below then fail by one, on a
+     * loaded machine, in about one run in a thousand. It failed exactly that way on `main`.
+     *
+     * An app never hits this because its frame clock applies notifications before each frame. This
+     * test is standing in for the frame clock, so it has to do what the frame clock does. Measured:
+     * three misses in 2400 nudges without this call, none in 2400 with it.
+     */
+    fun nudgeTo(value: Double) {
+      nudge.value = value
+      Snapshot.sendApplyNotifications()
+    }
     try {
       composed.setContent {
         VegaChart(
@@ -317,7 +336,7 @@ class ImageTest {
 
       // And across frames. The nudge is what makes the redraw real; the frame after the clear,
       // below, is what proves the nudge redraws at all.
-      nudge.value = 1.0
+      nudgeTo(1.0)
       composed.render()
       assertEquals(1, asked, "still one fetch: a refusal outlives the frame")
       assertEquals(1, reported.size, "and still one report")
@@ -325,7 +344,7 @@ class ImageTest {
       // A host that has recovered asks for another go.
       assertEquals(setOf("https://example.com/missing.png"), cache.unresolvedImages)
       cache.clear()
-      nudge.value = 2.0
+      nudgeTo(2.0)
       composed.render()
       // The resolver can only be reached from a draw, so this is the proof that a nudge redraws —
       // and therefore that the frame above drew too, and asked nothing.
