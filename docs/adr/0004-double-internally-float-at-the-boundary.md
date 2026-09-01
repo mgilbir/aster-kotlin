@@ -10,7 +10,7 @@ output are all `Double`. Conversion to `Float` happens only when calling into An
 ## Why
 
 Determinism is a hard requirement: scene snapshots and SVG goldens are the project's main correctness
-signal (PROJECT_BRIEF.md 18.2, 18.3). `Float` has about 7 decimal digits of precision, so an
+signal (ADR 0008). `Float` has about 7 decimal digits of precision, so an
 accumulated chain of scale → transform → layout arithmetic can land on different values depending on
 evaluation order, and a golden diff would then report noise instead of behaviour.
 

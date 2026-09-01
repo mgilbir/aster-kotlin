@@ -58,7 +58,7 @@
         "VegaChartControllerTest"
       ],
       "tests_text": "`VegaChartControllerTest`",
-      "notes": "`VegaChartController(loader = ...)`. Until this existed the engine had a loader and no host could opt in to it, which is the same as not having one",
+      "notes": "`VegaChartController(loader =...)`. Until this existed the engine had a loader and no host could opt in to it, which is the same as not having one",
       "milestone": "4"
     },
     {
@@ -1239,7 +1239,7 @@
         "FixtureDifferentialTest"
       ],
       "tests_text": "`FixtureDifferentialTest` (`budget-forecasts`)",
-      "notes": "`encode.labels.update.x` resolved against the tick as its datum, so `{\"scale\": \"x\", \"field\": \"value\"}` moves every label to the start of its band. **`update` only**: a guide writes its own text and position into `update` on every pass, so a specification's `enter` is overwritten before anything is drawn — verified upstream, where a label given `enter: {text: ...}` still reads its tick's own text. An `enter` block naming one of those is reported as changing nothing rather than as unimplemented, because the rule is Vega's and not this engine's",
+      "notes": "`encode.labels.update.x` resolved against the tick as its datum, so `{\"scale\": \"x\", \"field\": \"value\"}` moves every label to the start of its band. **`update` only**: a guide writes its own text and position into `update` on every pass, so a specification's `enter` is overwritten before anything is drawn — verified upstream, where a label given `enter: {text:...}` still reads its tick's own text. An `enter` block naming one of those is reported as changing nothing rather than as unimplemented, because the rule is Vega's and not this engine's",
       "milestone": "5"
     },
     {
@@ -1611,7 +1611,7 @@
         "FixtureDifferentialTest"
       ],
       "tests_text": "`FixtureDifferentialTest` (`interactive-legend`)",
-      "notes": "A legend swatch's `opacity` resolved against the entry it is drawing, so `[{test: ..., value: 0.7}, {value: 0.15}]` dims the series that are not selected. `symbolOpacity` says the same thing as a constant and cannot express a rule, which is why the `encode` block wins",
+      "notes": "A legend swatch's `opacity` resolved against the entry it is drawing, so `[{test:..., value: 0.7}, {value: 0.15}]` dims the series that are not selected. `symbolOpacity` says the same thing as a constant and cannot express a rule, which is why the `encode` block wins",
       "milestone": "5"
     },
     {
@@ -1796,7 +1796,7 @@
         "FixtureDifferentialTest"
       ],
       "tests_text": "`FixtureDifferentialTest` (`config-range`)",
-      "notes": "A named range is a **key into `config.range`** before it is anything else, and only falls through to a built-in default when the configuration is silent. Substituted in the parser and re-read, as upstream does — which is what lets a theme's `category` be a `{\"scheme\": ...}` where the built-in default is a literal list of symbol names: they are the same property, and a resolver that had already decided which kind it was could not accept the other",
+      "notes": "A named range is a **key into `config.range`** before it is anything else, and only falls through to a built-in default when the configuration is silent. Substituted in the parser and re-read, as upstream does — which is what lets a theme's `category` be a `{\"scheme\":...}` where the built-in default is a literal list of symbol names: they are the same property, and a resolver that had already decided which kind it was could not accept the other",
       "milestone": "4"
     },
     {
@@ -2446,7 +2446,7 @@
         "TransformReferenceTest"
       ],
       "tests_text": "`TransformReferenceTest` (upstream vectors), `FixtureDifferentialTest` (`world-map`, `projection-families`, `force-directed`, `volcano-contours`)",
-      "notes": "`geojson`, `geopath`, `geopoint`, `geoshape`, `graticule`, `isocontour`, `heatmap`, `kde2d`, `force` and `voronoi`, with the projection families the fixtures name. They were non-goals in PROJECT_BRIEF.md 3.3 and were then built; the note that said otherwise outlived the code",
+      "notes": "`geojson`, `geopath`, `geopoint`, `geoshape`, `graticule`, `isocontour`, `heatmap`, `kde2d`, `force` and `voronoi`, with the projection families the fixtures name. They were non-goals in ADR 0011 and were then built; the note that said otherwise outlived the code",
       "milestone": "—"
     },
     {
@@ -3820,7 +3820,7 @@
         "FixtureDifferentialTest"
       ],
       "tests_text": "`FixtureDifferentialTest` (`serpentine-timeline`)",
-      "notes": "`filter`'s `expr`, `formula`'s `expr` and `cross`'s `filter` are per-row expressions rather than `{\"signal\": ...}` references, which makes it tempting to conclude they cannot be edges. Upstream's `parseExpression` says otherwise: it walks every expression's AST and lets the `scale`, `data` and `indata` visitors register what they find as operator **parameters**, so a `formula` calling `scale('x', datum.v)` waits for that scale exactly as a signal-valued parameter would",
+      "notes": "`filter`'s `expr`, `formula`'s `expr` and `cross`'s `filter` are per-row expressions rather than `{\"signal\":...}` references, which makes it tempting to conclude they cannot be edges. Upstream's `parseExpression` says otherwise: it walks every expression's AST and lets the `scale`, `data` and `indata` visitors register what they find as operator **parameters**, so a `formula` calling `scale('x', datum.v)` waits for that scale exactly as a signal-valued parameter would",
       "milestone": "5"
     },
     {
@@ -3856,7 +3856,7 @@
         "FixtureDifferentialTest"
       ],
       "tests_text": "`FixtureDifferentialTest` (`signal-transform-params`)",
-      "notes": "`{\"signal\": ...}` anywhere in a transform's parameters — which operation an aggregate computes, which field it reads, how many rows a filter keeps. Each such reference is an edge in the dependency order, so the dataset waits for the signal — and for the scale, when the expression reads one, which is how `{\"extent\": {\"signal\": \"domain('xscale')\"}}` computes a density over exactly the span an axis will show",
+      "notes": "`{\"signal\":...}` anywhere in a transform's parameters — which operation an aggregate computes, which field it reads, how many rows a filter keeps. Each such reference is an edge in the dependency order, so the dataset waits for the signal — and for the scale, when the expression reads one, which is how `{\"extent\": {\"signal\": \"domain('xscale')\"}}` computes a density over exactly the span an axis will show",
       "milestone": "5"
     },
     {
@@ -3916,7 +3916,7 @@
         "SignalCompileTest"
       ],
       "tests_text": "`SignalCompileTest`",
-      "notes": "The `[{test, ...}, {...}]` array form, for every channel kind",
+      "notes": "The `[{test,...}, {...}]` array form, for every channel kind",
       "milestone": "4"
     },
     {
@@ -3926,7 +3926,7 @@
       "status": "Not planned",
       "tests": [],
       "tests_text": "—",
-      "notes": "Explicitly forbidden (PROJECT_BRIEF.md 6.1)",
+      "notes": "Explicitly forbidden",
       "milestone": "—"
     },
     {
@@ -4005,7 +4005,7 @@
     {
       "line": 391,
       "section": "Layout",
-      "feature": "`{\"field\": {\"group\": ...}}`",
+      "feature": "`{\"field\": {\"group\":...}}`",
       "status": "**Supported**",
       "tests": [
         "FixtureDifferentialTest"
@@ -5357,7 +5357,7 @@
       "status": "**Supported**",
       "tests": [],
       "tests_text": "`DataResolver`",
-      "notes": "`\"values\": [6.3, 2.1, ...]` — a row that is not an object is wrapped as `{\"data\": value}`, upstream's `ingest`. Every transform downstream reads *fields*, so there has to be a field to read, and `data` is the name upstream gives it — which is why Vega's dot plot writes `\"field\": \"data\"` over data that appears to have no such column. Applies to a loaded document too",
+      "notes": "`\"values\": [6.3, 2.1,...]` — a row that is not an object is wrapped as `{\"data\": value}`, upstream's `ingest`. Every transform downstream reads *fields*, so there has to be a field to read, and `data` is the name upstream gives it — which is why Vega's dot plot writes `\"field\": \"data\"` over data that appears to have no such column. Applies to a loaded document too",
       "milestone": "4"
     },
     {
@@ -5396,7 +5396,7 @@
         "SignalCompileTest"
       ],
       "tests_text": "`SignalCompileTest`",
-      "notes": "A signal read through a transform's **expression** parameter — `filter`'s `expr`, `formula`'s `expr`, `cross`'s `filter`, the only three upstream declares as `type: 'expr'` — is not an edge in the graph, because those are per-row expressions rather than `{\"signal\": ...}` references. It resolves whenever the ordering happens to put the signal first, which it usually does; when it does not, the read comes back null, and null is zero to arithmetic. Vega's own radial tree example fails that way — every node placed at `originX + radius * cos(...)`, the whole diagram on the origin — so it is **reported by name** rather than left silent",
+      "notes": "A signal read through a transform's **expression** parameter — `filter`'s `expr`, `formula`'s `expr`, `cross`'s `filter`, the only three upstream declares as `type: 'expr'` — is not an edge in the graph, because those are per-row expressions rather than `{\"signal\":...}` references. It resolves whenever the ordering happens to put the signal first, which it usually does; when it does not, the read comes back null, and null is zero to arithmetic. Vega's own radial tree example fails that way — every node placed at `originX + radius * cos(...)`, the whole diagram on the origin — so it is **reported by name** rather than left silent",
       "milestone": "5"
     },
     {

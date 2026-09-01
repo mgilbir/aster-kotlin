@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Microbenchmarks. Emulator numbers are not authoritative (PROJECT_BRIEF.md 18.6): release
+# Microbenchmarks. Emulator numbers are not authoritative (ADR 0012): release
 # thresholds must be validated on physical hardware.
 set -euo pipefail
 cd "$(dirname "$0")/.."

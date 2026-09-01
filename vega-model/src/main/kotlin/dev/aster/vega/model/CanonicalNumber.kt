@@ -5,7 +5,7 @@ import dev.aster.vega.model.locale.VegaLocale
 /**
  * Canonical numeric formatting shared by snapshot serialization, SVG output and label text.
  *
- * Rules (PROJECT_BRIEF.md 4.4 and 18.2):
+ * Rules (ADR 0009 and 18.2):
  * - negative zero normalizes to `0`
  * - non-finite values serialize to explicit tokens instead of platform-specific text
  * - trailing zeros and a trailing decimal point are removed so `1.0` and `1` agree

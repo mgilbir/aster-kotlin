@@ -115,9 +115,8 @@ public object ProjectTransform : Transform {
  * `identifier`: numbers the tuples from 1.
  *
  * Upstream allocates from a view-wide counter, so ids are unique across datasets. Here they restart
- * per pipeline, which keeps a compile reproducible — the property snapshots depend on
- * (PROJECT_BRIEF.md 18.2) — at the cost of ids not being globally unique. Recorded in
- * SUPPORTED_FEATURES.md.
+ * per pipeline, which keeps a compile reproducible — the property snapshots depend on (ADR 0008) —
+ * at the cost of ids not being globally unique. Recorded in SUPPORTED_FEATURES.md.
  */
 public object IdentifierTransform : Transform {
   override val type: String = "identifier"

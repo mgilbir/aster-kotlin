@@ -23,10 +23,10 @@ import dev.aster.vega.scene.ScenePlacement
  * Public Compose API for a chart.
  *
  * This hosts the canonical [VegaChartView] through `AndroidView` rather than reimplementing drawing
- * on a Compose `DrawScope`. That is deliberate (PROJECT_BRIEF.md 6.1, `vega-compose`): both APIs
- * then share identical text metrics, rendering, hit testing and accessibility, so a chart cannot
- * look or behave differently depending on which API the app happens to use. A direct `DrawScope`
- * backend may be added later, once the Canvas backend is proven.
+ * on a Compose `DrawScope`. That is deliberate (, `vega-compose`): both APIs then share identical
+ * text metrics, rendering, hit testing and accessibility, so a chart cannot look or behave
+ * differently depending on which API the app happens to use. A direct `DrawScope` backend may be
+ * added later, once the Canvas backend is proven.
  *
  * Recomposition does not reparse or recompile anything: the [controller] owns the scene, and the
  * view is only told to re-check its revision.

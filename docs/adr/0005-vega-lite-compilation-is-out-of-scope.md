@@ -22,7 +22,7 @@ correct target and a way to be tested — compile with upstream, compile with ou
 Vega.
 
 Meanwhile the cost of deferring is low: compiling Vega-Lite is a build-time or server-side step for
-most applications, and the pipeline in PROJECT_BRIEF.md 3.1 has the native compiler as an optional
+most applications, and the pipeline in ADR 0011 has the native compiler as an optional
 stage precisely so it can be added without disturbing anything below it.
 
 ## Consequences

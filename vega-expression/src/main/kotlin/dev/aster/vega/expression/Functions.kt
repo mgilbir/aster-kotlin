@@ -65,8 +65,8 @@ public fun interface ExpressionFunction {
  * - `isValid` means "not null and not NaN", which is narrower than truthiness
  *
  * Deliberately excluded: `random` and the other stochastic functions, because a scene must be
- * reproducible (PROJECT_BRIEF.md 18.2); date and time functions, because time scales are not
- * implemented; and the selection and geo helpers, which belong to subsystems that do not exist yet.
+ * reproducible (ADR 0008); date and time functions, because time scales are not implemented; and
+ * the selection and geo helpers, which belong to subsystems that do not exist yet.
  */
 public object Functions {
 

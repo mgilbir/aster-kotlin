@@ -39,7 +39,7 @@ does not match any real font, and nothing outside tests and headless SVG export 
 - `AndroidTextEngine` owns a mutable `TextPaint` and is not thread-safe. If scene compilation moves off
   the main thread this needs an explicit answer — it is listed as pending in STATUS.md.
 - Differential tests need two tolerance classes: tight for numeric layout and structure, wider for text
-  bounds (PROJECT_BRIEF.md 18.4).
+  bounds (ADR 0008).
 
 ## Revisit if
 

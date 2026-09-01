@@ -13,8 +13,8 @@ import dev.aster.vega.scene.TextStyle
 /**
  * Text measurement backed by the platform's own text stack.
  *
- * This is the same engine the renderer draws with, so a label always lands where layout put it
- * (PROJECT_BRIEF.md 9). Measurement happens during scene compilation, never inside `onDraw`.
+ * This is the same engine the renderer draws with, so a label always lands where layout put it (ADR
+ * 0006). Measurement happens during scene compilation, never inside `onDraw`.
  *
  * A [MeasuredTextEngine], which is the point of this class being short. The layout — splitting on
  * newlines, honouring `limit` and its ellipsis, wrapping to a constraint, stacking baselines,

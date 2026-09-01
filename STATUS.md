@@ -213,7 +213,7 @@ What is **not** here, and what a chart gets instead:
 | Domain adjustment and reset-zoom | Planned. Zoom moves the view, not the scale domains |
 | Performance measured on physical hardware | Not done. The microbenchmarks run, but not on a device |
 
-Full parity was never the goal — PROJECT_BRIEF.md 3.3 rules some of it out on purpose. The brief's own
+Full parity was never the goal — ADR 0011 rules some of it out on purpose. The brief's own
 MVP definition (section 23) stands at **13 of its 15 criteria**:
 
 | MVP criterion | State |
@@ -3424,7 +3424,7 @@ extent does — or the same absence, which is what a position that was never com
 
 ## `random()` and `now()` are implemented, and the refusal is lifted
 
-Both were refused for reproducibility (PROJECT_BRIEF.md 18.2): a chart that draws a different
+Both were refused for reproducibility (ADR 0008): a chart that draws a different
 picture every run cannot be compared with anything, including itself. That reasoning was right and
 the conclusion was not. Both are ordinary non-determinism with an injection point at each end, and
 pinning both ends makes them *more* testable than most of what is already here.
@@ -4378,9 +4378,9 @@ and none is guessable:
 ## Performance observations
 
 Nothing on hardware. No measurement has been taken on a physical device, and emulator numbers are
-not authoritative (PROJECT_BRIEF.md 18.6). The benchmark module and fixtures exist
+not authoritative (ADR 0012). The benchmark module and fixtures exist
 (`benchmark/src/androidTest`, `scripts/benchmark.sh`) but have not been run on one, so the targets
-in PROJECT_BRIEF.md 19 are all unverified.
+in ADR 0012 are all unverified.
 
 **One number was taken on the JVM**, because a design decision hung on it. Before building an
 incremental dataflow so that a changed signal need not recompile everything, it was worth knowing
@@ -4832,9 +4832,14 @@ depends on them. Each has a test and a comment; this is the index.
    that the easy thing to do — and two instances configured alike measure alike, so the layouts still
    match what the surface draws.
 
-## Deviations from PROJECT_BRIEF.md
+## Toolchain and platform choices
 
-- **JDK.** The brief pins JDK 17. The build runs on the JDK available on the development machine
+Written as deviations from `PROJECT_BRIEF.md` while that document existed. It is retired now — the
+decisions it carried are in `docs/adr/` — but these entries were never *about* the brief: each is a
+live build fact with a reason a reader still needs.
+
+
+- **JDK.** The build runs on the JDK available on the development machine
   (21) and targets JVM bytecode 17 through `jvmTarget`/`sourceCompatibility` rather than a Gradle
   toolchain, so no JDK is auto-downloaded. Any JDK 17 or newer works.
 - **`compileSdk`/`targetSdk` 37, `minSdk` 26.** API 37 ships as minor-versioned platforms; the setup
@@ -4855,10 +4860,11 @@ depends on them. Each has a test and a comment; this is the index.
   therefore drives composition through `ActivityScenario` instead. Nothing there needs Compose's
   semantics tree or gesture injection, so this costs no coverage; revisit when a compatible Espresso
   release ships.
-- **Emulator system image.** The brief's example path `system-images;android-37;google_apis;arm64-v8a`
-  does not exist; the published path is `system-images;android-37.0;google_apis;arm64-v8a`.
+- **Emulator system image.** API 37 publishes no plain `system-images;android-37;…` path; the
+  minor-versioned `system-images;android-37.0;google_apis;arm64-v8a` is the real one. The same fact
+  decides the API levels the instrumented CI job can use.
 - **JUnit 5 `5.13.4`, Spotless `8.9.0`, ktfmt `0.64`, AGP `9.3.1`, Kotlin `2.4.10`, Compose BOM
-  `2026.06.01`** all exist as pinned in the brief and are used unchanged.
+  `2026.06.01`** are pinned in `gradle/libs.versions.toml` and used unchanged.
 
 ## Next three tasks
 
@@ -6263,8 +6269,8 @@ previously needed Xcode and a CI run. A trailing closure is not part of a signat
 the surface could have caught this; the order is the thing, and that is where it is now asserted.
 
 One item still needs something this environment does not have: performance on **physical hardware**
-(PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
-PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.
+(ADR 0012, criterion 13). The emulator is available and useful for behaviour, but
+ADR 0012 says emulator timings are not authoritative, and it is right.
 **TalkBack** (criterion 8) is no longer one of them. It was enabled on the emulator and the demo
 explored with it; the tree was already correct and two things it *said* were wrong, both now fixed
 and pinned by instrumented tests. What remains untested there is physical hardware and a real user,
@@ -7812,8 +7818,13 @@ recompile needs a runtime-scoping answer or a fixture, and neither is written.
 run on the dispatched sha before verify? Today the Vega-Lite scene gate's only other coverage is
 that CI happened to run, and nothing enforces it; the verify job renders the references itself now,
 which closes the hole this branch was about but not the broader question. Q14 — is PROJECT_BRIEF
-still the contract? MVP item 13 (performance on physical hardware) remains unmet and honestly
-disclosed, and the benchmark module covers a fraction of §18.6.
+still the contract? **Answered: no, and it has been retired.** It was a specification written before
+the engine existed, and most of it had been superseded by the code it specified — module
+responsibilities, interface sketches, milestones. What still bound was extracted to `docs/adr/`
+(0009 allocation and portability, 0010 export, 0011 non-goals, 0012 performance targets and the
+benchmark set) and to `CONTRIBUTING.md`'s standing constraints, and the 107 citations were repointed
+rather than dropped. MVP item 13 — performance on physical hardware — remains unmet and is now
+recorded in ADR 0012, along with why CI cannot gate it.
 
 ### What the `item-zindex` fixture found
 

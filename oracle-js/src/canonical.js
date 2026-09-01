@@ -1,8 +1,7 @@
 /**
  * Canonicalization shared by every oracle script.
  *
- * These rules must match `SceneSnapshotSerializer` on the Kotlin side exactly (PROJECT_BRIEF.md
- * 18.2): sorted keys, fixed numeric precision, normalized negative zero, explicit non-finite tokens,
+ * These rules must match `SceneSnapshotSerializer` on the Kotlin side exactly (ADR 0008): sorted keys, fixed numeric precision, normalized negative zero, explicit non-finite tokens,
  * and no generated identifiers. If the two drift apart, differential tests report formatting
  * differences instead of behavioural ones.
  */
@@ -38,7 +37,7 @@ export function canonicalJson(value, precision = DEFAULT_PRECISION) {
 
 /**
  * Normalizes SVG text for golden comparison: sorted attributes, collapsed whitespace and stripped
- * generated ids (PROJECT_BRIEF.md 18.3).
+ * generated ids (ADR 0008).
  */
 export function canonicalSvg(svg) {
   return (
@@ -54,7 +53,7 @@ export function canonicalSvg(svg) {
 
 /**
  * Reduces a Vega scenegraph to the fields the differential tests compare: mark counts, types, datum
- * identity, coordinates and bounds (PROJECT_BRIEF.md 18.4). Everything else in Vega's runtime
+ * identity, coordinates and bounds (ADR 0008). Everything else in Vega's runtime
  * scenegraph is implementation detail.
  */
 export function summarizeScene(node, precision = DEFAULT_PRECISION) {

@@ -5,8 +5,8 @@ import java.io.File
 /**
  * Golden-file comparison for canonical scene snapshots and SVG output.
  *
- * Goldens are never rewritten during a normal test run (PROJECT_BRIEF.md 18.3). Regeneration is
- * opt-in through the `vega.updateGoldens` system property, which the root build only sets when
+ * Goldens are never rewritten during a normal test run (ADR 0008). Regeneration is opt-in through
+ * the `vega.updateGoldens` system property, which the root build only sets when
  * `-PupdateGoldens=true` is passed:
  * ```
  * ./gradlew test -PupdateGoldens=true --rerun-tasks

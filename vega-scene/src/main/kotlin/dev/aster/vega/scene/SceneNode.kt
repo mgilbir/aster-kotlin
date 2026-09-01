@@ -14,7 +14,7 @@ public value class SceneNodeId(public val value: Long) {
  * Allocates node ids for one scene build.
  *
  * Ids are sequential from 1 and derive only from build order, never from identity hash codes, so
- * two builds of the same specification produce identical snapshots (PROJECT_BRIEF.md 18.2).
+ * two builds of the same specification produce identical snapshots (ADR 0008).
  */
 public class SceneNodeIdAllocator(private var next: Long = 1L) {
   public fun allocate(): SceneNodeId = SceneNodeId(next++)
@@ -76,7 +76,7 @@ public fun spokenNumber(value: Double): String =
 
 /**
  * Everything a node needs to carry for hit testing, tooltips, selection, accessibility, debugging
- * and datum lookup (PROJECT_BRIEF.md 7).
+ * and datum lookup (ADR 0001).
  */
 public data class NodeMetadata(
   val markName: String? = null,

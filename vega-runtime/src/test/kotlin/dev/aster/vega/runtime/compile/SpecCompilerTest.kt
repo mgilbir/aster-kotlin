@@ -19,9 +19,9 @@ import org.junit.jupiter.api.Test
 /**
  * Compiler behaviour, with an emphasis on the diagnostics.
  *
- * "Never silently ignore an unsupported operator" (PROJECT_BRIEF.md 3.3) is the discipline that
- * makes a partial implementation usable, so each unsupported construct has a test proving it
- * reports rather than degrades quietly.
+ * "Never silently ignore an unsupported operator" (ADR 0011) is the discipline that makes a partial
+ * implementation usable, so each unsupported construct has a test proving it reports rather than
+ * degrades quietly.
  */
 class SpecCompilerTest {
 

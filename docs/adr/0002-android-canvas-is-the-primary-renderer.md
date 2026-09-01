@@ -19,7 +19,7 @@ The alternatives all cost more than they return at this stage:
   exchange for a pipeline the platform already runs for us.
 - **OpenGL / Vulkan.** We would have to implement path tessellation, text rasterization and antialiasing
   ourselves. Justified only for scenes far larger than our targets, and profiling has not shown a need
-  (PROJECT_BRIEF.md 4.6).
+  (ADR 0009).
 - **A view per mark.** Layout, measurement and accessibility costs scale with mark count, which is
   exactly wrong for a chart with 100,000 points.
 
@@ -39,5 +39,5 @@ screen.
 ## Revisit if
 
 Profiling on physical hardware shows Canvas cannot hold 60 fps while panning a precompiled
-10,000-mark scene (PROJECT_BRIEF.md 19). Even then, the first responses are scene-level caching and
+10,000-mark scene (ADR 0012). Even then, the first responses are scene-level caching and
 culling, not a new backend.

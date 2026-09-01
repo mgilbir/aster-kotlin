@@ -4,7 +4,7 @@
  * Structure is deliberately *not* preserved. Vega nests marktypes inside group items; this engine
  * produces a flat list of scene nodes. Comparing tree shapes would therefore report a difference on
  * every fixture without saying anything about correctness. What matters, and what this captures, is
- * what PROJECT_BRIEF.md 18.4 asks for: mark count, mark types, coordinates and bounds — expressed in
+ * what ADR 0008 asks for: mark count, mark types, coordinates and bounds — expressed in
  * **absolute** coordinates so neither side's grouping choices affect the result.
  *
  * Text is reported by content and anchor rather than by glyph bounds, because font metrics legitimately

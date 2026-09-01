@@ -6,7 +6,7 @@ them through Android Canvas — no WebView, no JavaScript, no SVG DOM.
 The same scene graph exports to SVG, bitmap, PNG and PDF, and the chart is available through both a
 traditional `View` API and a Jetpack Compose API.
 
-See [PROJECT_BRIEF.md](PROJECT_BRIEF.md) for the full design, [STATUS.md](STATUS.md) for where the
+See [docs/adr/](docs/adr/) for the decisions and why they were taken, [STATUS.md](STATUS.md) for where the
 work actually stands, and [SUPPORTED_FEATURES.md](SUPPORTED_FEATURES.md) for the feature matrix.
 
 ## Current status
@@ -756,7 +756,7 @@ lifecycleScope.launch {
   drawing.
 - **Blend modes below API 29** are limited to the PorterDuff subset; anything else reports
   `VEGA_RENDER_UNSUPPORTED_BLEND_MODE`.
-- **No performance measurements on physical hardware.** The targets in PROJECT_BRIEF.md 19 are
+- **No performance measurements on physical hardware.** The targets in ADR 0012 are
   unverified; the microbenchmarks run, but not on a device.
 
 ## Development
@@ -775,7 +775,7 @@ lifecycleScope.launch {
 | Node (oracle only) | 20 or newer |
 
 Everything is pinned in `gradle/libs.versions.toml`. No alpha, beta, release-candidate, dynamic or
-unversioned dependencies. Deviations from the versions named in PROJECT_BRIEF.md are listed in
+unversioned dependencies. The pinned versions and why each is pinned are listed in
 STATUS.md.
 
 ### Setting up from a clean macOS install

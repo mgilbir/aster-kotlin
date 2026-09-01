@@ -9,8 +9,8 @@ import org.junit.jupiter.api.Test
  *
  * The specification models, expressions, dataflow, transforms, scales, signals, scene graph,
  * geometry, hit-test index, SVG generation and snapshot serialization must be plain Kotlin/JVM with
- * no Android imports (PROJECT_BRIEF.md 4.2, and a Milestone 1 acceptance criterion). A build-time
- * check is cheap; discovering the leak when someone tries to reuse the core off-Android is not.
+ * no Android imports (ADR 0009, and a Milestone 1 acceptance criterion). A build-time check is
+ * cheap; discovering the leak when someone tries to reuse the core off-Android is not.
  */
 class NoAndroidTypesTest {
 

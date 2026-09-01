@@ -987,7 +987,7 @@ public data class ParsedSpec(val spec: VegaSpec?, val diagnostics: List<VegaDiag
  * Two rules shape this class:
  * - **Nothing is silently dropped.** Every unknown mark type, scale type, channel form or property
  *   produces a diagnostic carrying its JSON path, so a partially supported specification is
- *   inspectable rather than mysteriously wrong (PROJECT_BRIEF.md 3.3, 14).
+ *   inspectable rather than mysteriously wrong (ADR 0011, CONTRIBUTING.md).
  * - **Syntax only.** The parser resolves shapes and reports gaps; it does not resolve domains,
  *   apply defaults that depend on scale type, or lay anything out. Those belong to the runtime,
  *   which has the data.

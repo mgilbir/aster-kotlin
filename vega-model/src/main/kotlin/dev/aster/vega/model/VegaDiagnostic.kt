@@ -3,8 +3,8 @@ package dev.aster.vega.model
 /**
  * Structured report for anything unsupported, invalid or approximated.
  *
- * The engine must never silently ignore an operator it does not implement (PROJECT_BRIEF.md 3.3 and
- * 14); every such case produces one of these instead.
+ * The engine must never silently ignore an operator it does not implement (ADR 0011 and 14); every
+ * such case produces one of these instead.
  */
 public data class VegaDiagnostic(
   val severity: DiagnosticSeverity,
@@ -183,7 +183,7 @@ public object DiagnosticCodes {
  * Accumulates diagnostics during a single parse, compile, render or export pass.
  *
  * Deliberately not thread-safe and not a singleton: one collector belongs to one pass, so its
- * lifetime is always visible at the call site (PROJECT_BRIEF.md 21, "avoid singleton caches whose
+ * lifetime is always visible at the call site (CONTRIBUTING.md, "avoid singleton caches whose
  * lifetime cannot be controlled").
  */
 public class DiagnosticCollector {

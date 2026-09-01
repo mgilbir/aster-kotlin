@@ -1,6 +1,6 @@
 ## Every version here is pinned to a stable release that was verified to exist in
 ## google() or mavenCentral() at bootstrap time. No alpha, beta, rc, dynamic or
-## unversioned coordinates. See README.md for deviations from PROJECT_BRIEF.md.
+## unversioned coordinates. See README.md for how the pinned versions are chosen.
 
 [versions]
 agp = "9.3.1"

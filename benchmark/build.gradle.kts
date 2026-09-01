@@ -21,7 +21,7 @@ android {
 
   buildTypes {
     debug {
-      // Benchmarks must not run against a debuggable build; see PROJECT_BRIEF.md 18.6.
+      // Benchmarks must not run against a debuggable build; see ADR 0012.
       isDefault = false
     }
     release { isDefault = true }

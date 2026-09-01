@@ -20,12 +20,12 @@ snapshot makes that structurally impossible.
 **Revisions, because diffing to decide whether to redraw is backwards.** The producer already knows it
 changed something; making the consumer rediscover that by walking the tree costs more than the redraw
 it might save. A `Long` comparison is the whole check. It also gives `requestLayout()` a clean rule:
-only when the preferred size actually changes, never for a hover (PROJECT_BRIEF.md 8.4).
+only when the preferred size actually changes, never for a hover (ADR 0002).
 
 **Sequential ids, because snapshots must be reproducible.** Identity hash codes vary per JVM run, so a
 golden containing them would be unusable. Sequential allocation from a per-build seed means the same
 inputs produce the same ids, which is what makes scene snapshots a real regression signal
-(PROJECT_BRIEF.md 18.2).
+(ADR 0008).
 
 **Stable tuple identity, because a data change should not reset the user's context.** When a dataset
 updates, a mark that still represents the same datum should keep its selection and its accessibility
@@ -33,7 +33,7 @@ focus. That only works if identity is carried by the tuple, not derived from lis
 exists for this even though the transforms that will use it are not written yet.
 
 **Interaction state outside the scene, because hovering is not a data change.** The performance target
-is explicit: a hover or selection update must not rerun the dataflow (PROJECT_BRIEF.md 19). Splitting
+is explicit: a hover or selection update must not rerun the dataflow (ADR 0012). Splitting
 `InteractionState` from `Scene` makes that the natural implementation rather than an optimization to
 remember.
 

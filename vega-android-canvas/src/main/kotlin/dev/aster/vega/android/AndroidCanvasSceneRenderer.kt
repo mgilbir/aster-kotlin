@@ -42,12 +42,12 @@ import dev.aster.vega.scene.paintOrder
 /**
  * Draws an immutable [Scene] onto an Android [Canvas].
  *
- * Contract (PROJECT_BRIEF.md 8.1): save the canvas, apply the viewport and node transforms, apply
- * clipping, draw in scene order, restore, and never mutate the scene.
+ * Contract (ADR 0002): save the canvas, apply the viewport and node transforms, apply clipping,
+ * draw in scene order, restore, and never mutate the scene.
  *
  * The renderer owns its `Paint`, `Path` and `Matrix` instances and resets them per node, so drawing
- * a frame allocates nothing per mark (PROJECT_BRIEF.md 4.5, 8.2). It is therefore **not
- * thread-safe**: one renderer belongs to one drawing surface.
+ * a frame allocates nothing per mark (ADR 0009). It is therefore **not thread-safe**: one renderer
+ * belongs to one drawing surface.
  */
 public class AndroidCanvasSceneRenderer(
   private val textEngine: AndroidTextEngine = AndroidTextEngine(),
@@ -486,7 +486,7 @@ public class AndroidCanvasSceneRenderer(
     // as data URLs and drew them all along, so the two renderers disagreed about a whole mark type.
     val bitmap = node.raster?.let { rasterBitmap(it) } ?: resolveUrl(node.url)
     if (bitmap == null) {
-      // Never silently omit a mark (PROJECT_BRIEF.md 13.3).
+      // Never silently omit a mark (ADR 0010).
       diagnostics.error(
         code = DiagnosticCodes.EXPORT_IMAGE_UNRESOLVED,
         message = "Could not resolve image '${node.url}'; nothing was drawn for this mark",
@@ -760,7 +760,7 @@ public class AndroidCanvasSceneRenderer(
       return
     }
     // Pre-Q only the PorterDuff subset exists; anything outside it is reported rather than
-    // approximated (PROJECT_BRIEF.md 3.3).
+    // approximated (ADR 0011).
     val porterDuff =
       when (mode) {
         // **Not `PorterDuff.Mode.MULTIPLY`.** Android documents that one as `[Sa * Da, Sc * Dc]`,

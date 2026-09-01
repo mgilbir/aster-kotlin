@@ -1,7 +1,7 @@
 # oracle-js
 
 Upstream Vega, pinned, used as the reference implementation for differential tests
-(PROJECT_BRIEF.md 6.1, 18.4).
+(ADR 0008).
 
 Every dependency is pinned to an exact version. Never use `latest`, a range, or an unpinned
 dependency here: the whole point of the oracle is that its output does not move under us.
@@ -27,7 +27,7 @@ node src/render.js ../test-fixtures/specs/bar.vg.json build/bar
 That writes `build/bar.scene.json` and `build/bar.svg`.
 
 Compile a Vega-Lite specification down to Vega (the native compiler is out of scope for the first
-release, PROJECT_BRIEF.md 3.1):
+release, ADR 0011):
 
 ```bash
 node src/compile-vega-lite.js input.vl.json output.vg.json

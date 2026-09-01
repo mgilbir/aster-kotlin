@@ -28,7 +28,7 @@ public enum class TextDirection {
 
 /**
  * Everything that affects text measurement. Used verbatim as the text-layout cache key, so adding a
- * field here automatically widens the cache key (PROJECT_BRIEF.md 9).
+ * field here automatically widens the cache key (ADR 0006).
  */
 public data class TextStyle(
   val fontFamily: String = "sans-serif",
@@ -160,7 +160,7 @@ public data class TextLayout(
 
 /**
  * Text measurement abstraction. Layout is part of chart layout, not just drawing, so the runtime
- * needs it before a scene exists (PROJECT_BRIEF.md 9).
+ * needs it before a scene exists (ADR 0006).
  *
  * The same implementation must be used for measuring and for drawing; mixing two engines produces
  * labels that do not sit where the layout expected.
@@ -289,7 +289,7 @@ public abstract class MeasuredTextEngine : TextEngine {
  *
  * Advance widths are a fixed fraction of the font size, so measurements are stable across machines
  * but do not match any real font. Anything comparing against on-device metrics must use the
- * documented wider text tolerances (PROJECT_BRIEF.md 18.4).
+ * documented wider text tolerances (ADR 0008).
  */
 public class MetricTextEngine(
   private val advanceRatio: Double = 0.6,

@@ -11,7 +11,7 @@
  * engines have to read the same bytes or the comparison between them means nothing.
  *
  * **File mode only.** Nothing here reaches the network — a reference has to be reproducible from a
- * checked-out tree with no connection (PROJECT_BRIEF.md 21). Data that is missing is fetched by
+ * checked-out tree with no connection (CONTRIBUTING.md). Data that is missing is fetched by
  * `scripts/oracle.sh` as a deliberate, reviewable step, never as a side effect of rendering.
  */
 

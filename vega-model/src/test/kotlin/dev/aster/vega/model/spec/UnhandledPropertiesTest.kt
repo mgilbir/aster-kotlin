@@ -10,11 +10,11 @@ import org.junit.jupiter.api.Test
 /**
  * Nothing a specification asks for is dropped without saying so.
  *
- * This is PROJECT_BRIEF.md 3.3 taken literally, and the axis is why it needs a test rather than a
- * convention: it honoured fifteen of upstream's 74 properties and ignored the other fifty-nine in
- * silence, each one added at a moment when nobody was looking at the whole list. The parsers now
- * name what they *consume* and report the remainder, so a property nobody thought about — including
- * one upstream adds after this was written — becomes a diagnostic instead of a silence.
+ * This is ADR 0011 taken literally, and the axis is why it needs a test rather than a convention:
+ * it honoured fifteen of upstream's 74 properties and ignored the other fifty-nine in silence, each
+ * one added at a moment when nobody was looking at the whole list. The parsers now name what they
+ * *consume* and report the remainder, so a property nobody thought about — including one upstream
+ * adds after this was written — becomes a diagnostic instead of a silence.
  *
  * The property lists below come from `oracle-js/node_modules/vega/build/vega-schema.json`, which is
  * upstream's own schema for the pinned version:

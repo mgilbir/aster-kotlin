@@ -63,10 +63,10 @@ public data class SvgDocument(val svg: String, val warnings: List<SvgExportWarni
 /**
  * Serializes an immutable [Scene] to SVG.
  *
- * SVG is an output format, not the runtime model (PROJECT_BRIEF.md 4.1): this class only reads the
- * scene graph. Output is canonical — attributes appear in a fixed order, numbers use
- * [SvgOptions.precision], and generated ids are sequential from document order — so golden diffs
- * reflect real rendering changes rather than serialization noise.
+ * SVG is an output format, not the runtime model (ADR 0001): this class only reads the scene graph.
+ * Output is canonical — attributes appear in a fixed order, numbers use [SvgOptions.precision], and
+ * generated ids are sequential from document order — so golden diffs reflect real rendering changes
+ * rather than serialization noise.
  */
 public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
 

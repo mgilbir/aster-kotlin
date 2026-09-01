@@ -1,7 +1,7 @@
 # Working on aster-kotlin
 
 This is how the engine gets built, as distinct from what it contains. `STATUS.md` says where the work
-is; `SUPPORTED_FEATURES.md` says what works; `PROJECT_BRIEF.md` is the specification. This file is the
+is; `SUPPORTED_FEATURES.md` says what works; `docs/adr/` records why the shape is the shape. This file is the
 method, and following it is what has kept the port honest.
 
 ## The one rule: probe upstream, never guess
@@ -155,7 +155,7 @@ background thread, so they exercise the real path a user takes.
 
 ## Nothing is silently ignored
 
-`PROJECT_BRIEF.md` §3.3 and §14. Every unsupported construct produces a diagnostic naming itself and
+[ADR 0011](docs/adr/0011-what-this-engine-does-not-do.md). Every unsupported construct produces a diagnostic naming itself and
 saying why. This is the discipline that makes a partial implementation usable instead of mysterious,
 and it is worth more than the feature you were tempted to approximate:
 
@@ -180,6 +180,30 @@ colour ramps need d3's interpolator tables and a scheme extent.
 
 `NoAndroidTypesTest` enforces both rules and permits that one file. `minSdk` is 26 because
 `kotlinx-datetime` is implemented on `java.time`.
+
+## Standing constraints
+
+These were the brief's "agent operating rules" and are cited from the code that obeys them. They are here because
+the brief was a specification written before the engine existed, and these outlived it.
+
+- **A test never touches the network.** Not a flaky-test preference: a suite that fetches is a suite
+  whose result depends on somebody else's uptime, and one that silently *skips* when offline is
+  worse. Data a test needs is fetched by an explicit act — `scripts/oracle.sh`,
+  `scripts/record-upstream-vectors.sh` — and committed or gitignored deliberately. A gate must be
+  runnable in a checked-out tree with no connection.
+- **Every dependency is pinned**, including the upstream `vega` and `vega-lite` the differential
+  corpus is generated against. An oracle that floats is not an oracle.
+- **No reflection in expression evaluation.** The language is interpreted by walking a tree; see
+  [ADR 0011](docs/adr/0011-what-this-engine-does-not-do.md).
+- **No global mutable state, and no singleton cache whose lifetime a caller cannot control.** A
+  process-wide cache is allowed where it is bounded and its key describes everything that changes
+  the answer — `CoreTextFonts` is the worked example, and getting that key wrong is how one chart
+  draws in another chart's font.
+- **Nothing is silently approximated.** A partially supported construct produces a structured
+  diagnostic; an export that cannot draw something says so. See
+  [ADR 0010](docs/adr/0010-an-export-never-silently-omits-a-mark.md).
+- **A golden is never updated to make a test pass.** Regeneration is an explicit command and the
+  diff is reviewed as a rendering change.
 
 ## Conventions
 

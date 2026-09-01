@@ -9,10 +9,10 @@ import kotlin.jvm.JvmInline
  * itself.
  *
  * Milestone 0 defined these shapes so the runtime and transforms could be written against a stable
- * one, and the operators were to arrive in Milestone 4 (PROJECT_BRIEF.md 20). They have not. There
- * is no incremental engine in this repository: every transform recomputes a whole dataset, and
- * every interaction recompiles the whole specification. Nothing outside this file's own tests
- * consumes a single declaration in it.
+ * one, and the operators were to arrive in Milestone 4. They have not. There is no incremental
+ * engine in this repository: every transform recomputes a whole dataset, and every interaction
+ * recompiles the whole specification. Nothing outside this file's own tests consumes a single
+ * declaration in it.
  *
  * That would be a harmless placeholder except for what [TupleId] says: that a tuple's identity is
  * "preserved across incremental updates so scene nodes, selections and accessibility focus survive
@@ -29,7 +29,7 @@ public value class OperatorId(public val value: Int) {
 
 /**
  * Stable identity for a data tuple, preserved across incremental updates so scene nodes, selections
- * and accessibility focus survive a data change (PROJECT_BRIEF.md 21).
+ * and accessibility focus survive a data change (CONTRIBUTING.md).
  */
 @InternalAsterVegaApi
 @JvmInline
@@ -122,7 +122,7 @@ public interface EvaluationContext {
  * A single node in the dataflow graph.
  *
  * The initial implementation may recompute an operator's entire output, but the signature keeps the
- * door open for incremental evaluation (PROJECT_BRIEF.md 10.1).
+ * door open for incremental evaluation (ADR 0007).
  */
 @InternalAsterVegaApi
 public interface DataflowOperator<I, O> {
