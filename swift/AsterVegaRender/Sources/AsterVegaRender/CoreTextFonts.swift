@@ -28,11 +28,25 @@ enum CoreTextFonts {
   ) -> CTFont {
     let key = Key(family: family, size: size, weight: weight, italic: italic)
 
-    // **Only the CoreText answer is cached, and the host's is not.** The cache is process-wide, and
-    // two charts in one app may hand in different resolvers — caching one host's face under a family
-    // name would draw the other chart with it. A resolver is expected to be a lookup in a dictionary
-    // the host already has, which is what Android's `typefaceResolver` is; a host doing something
-    // expensive there should memoise, as it would for `resolveImage`.
+    // **The host's answer is cached too, keyed on the face it returned.**
+    //
+    // It used to return here uncached, because the cache is process-wide and two charts in one app
+    // may hand in different resolvers: caching one host's face under a *family name* would draw the
+    // other chart with it. That hazard is real and the key was the cause of it. Keying on the face
+    // the resolver actually returned removes it — two resolvers answering differently occupy
+    // different entries, and two answering identically share one correctly.
+    //
+    // Without this, a host that supplies a resolver — which is what the documentation asks a host to
+    // do — rebuilt a `CTFontCreateCopyWithAttributes` copy for every advance, ascent, descent and
+    // line height, on every measured line, and again on every drawn run. `styled` is the cost, not
+    // the resolver call: a resolver is expected to be a lookup in a dictionary the host already has,
+    // which is what Android's `typefaceResolver` is. The Compose path never had this problem because
+    // `rememberTextMeasurer` holds the measurement downstream of the resolver, so the same host
+    // pattern cost a Compose host nothing and an Apple host a font copy per metric (#152).
+    //
+    // `CFEqual` and `CFHash` rather than the hash alone, so this is face *identity* and not a
+    // collision risk: a wrong hit here would draw a chart in another chart's font.
+    //
     // **Every name in the stack, in order.** This used to offer the resolver the first entry only,
     // and nothing at all when that entry was a generic — so a host that had registered `Chart Sans`
     // was never asked for it if the specification wrote `"Noto Sans, Chart Sans"`, and never asked at
@@ -40,9 +54,13 @@ enum CoreTextFonts {
     // stack, so one specification drew in different faces on different hosts (#123). `FontStack` is
     // that rule, shared, and it comes from the engine rather than being restated here.
     if let resolveFont {
-      for name in FontStack.shared.families(stack: family) {
+      for name in families(of: family) {
         if let supplied = resolveFont(name) {
-          return styled(supplied, size: size, weight: weight, italic: italic)
+          let hostKey = HostKey(base: supplied, size: size, weight: weight, italic: italic)
+          if let cached = hostCache.value(for: hostKey) { return cached }
+          let font = styled(supplied, size: size, weight: weight, italic: italic)
+          hostCache.store(font, for: hostKey)
+          return font
         }
       }
     }
@@ -91,6 +109,29 @@ enum CoreTextFonts {
     return font
   }
 
+  /// `FontStack.shared.families(stack:)`, memoised per family string.
+  ///
+  /// **This is where the time went.** `FontStack` is a Kotlin object reached across the Obj-C
+  /// bridge, and the call was made on every font lookup — so a chart paid a bridge crossing and a
+  /// `List<String>` conversion for every advance, ascent, descent and line height of every label.
+  /// Measured at 2.77us of a 3.23us call: 86 per cent of the cost of resolving a font, for a
+  /// function that is a comma split.
+  ///
+  /// Safe to memoise because it is *pure*: a string in, a list of names out, with no reference to
+  /// what the process has registered or to what a host resolver would answer. That is the whole
+  /// difference between this and the face cache below, which needs the resolver's answer in its key.
+  ///
+  /// Memoised rather than reimplemented in Swift, deliberately. The rule lives in the engine so that
+  /// every renderer splits a family list identically — one specification drew in different faces on
+  /// different hosts when it did not (#123). Paying the bridge once per distinct family keeps the
+  /// single source of truth and drops the per-metric cost.
+  private static func families(of stack: String) -> [String] {
+    if let cached = stackCache.value(for: stack) { return cached }
+    let names = FontStack.shared.families(stack: stack)
+    stackCache.store(names, for: stack)
+    return names
+  }
+
   /// The first name CoreText should be asked for, or nil where the stack names no installed face.
   ///
   /// A generic — `sans-serif`, `monospace` — answers nil here, because it names nothing for a
@@ -102,7 +143,7 @@ enum CoreTextFonts {
   /// `sans-serif` was answered there and not here. A host that registers a generic has said what its
   /// sans is, and every renderer now takes it — see `FontStack`.
   private static func firstFamily(of family: String) -> String? {
-    for name in FontStack.shared.families(stack: family) where !generic.contains(name.lowercased()) {
+    for name in families(of: family) where !generic.contains(name.lowercased()) {
       return name
     }
     return nil
@@ -136,12 +177,52 @@ enum CoreTextFonts {
     let italic: Bool
   }
 
+  /// A host-supplied face, plus the style the chart asked to see it in.
+  ///
+  /// The face rather than the family name it was found under, which is the whole point: the
+  /// process-wide cache is shared by every chart in the app, and a family name does not say which
+  /// resolver answered. `CTFont` is a `CFType`, so `CFEqual` is the exact question — two resolvers
+  /// returning the same face share an entry, two returning different faces do not, and neither
+  /// depends on the name either of them was asked for.
+  ///
+  /// [size] is here as well as inside the face because a host may hand back a face at any size and
+  /// `styled` resizes it. Two charts asking the same face for 11pt and 14pt are two entries.
+  private struct HostKey: Hashable {
+    let base: CTFont
+    let size: Double
+    let weight: Int
+    let italic: Bool
+
+    static func == (left: HostKey, right: HostKey) -> Bool {
+      left.size == right.size && left.weight == right.weight && left.italic == right.italic
+        && CFEqual(left.base, right.base)
+    }
+
+    func hash(into hasher: inout Hasher) {
+      hasher.combine(CFHash(base))
+      hasher.combine(size)
+      hasher.combine(weight)
+      hasher.combine(italic)
+    }
+  }
+
   /// Fonts are resolved once per style rather than once per label.
   ///
   /// A chart measures every tick label, every legend entry and every title, and descriptor matching is
   /// the expensive part of that — the same handful of styles over and over. A lock rather than an actor
   /// because measurement is called synchronously from Kotlin and cannot await.
-  private static let cache = Cache()
+  private static let cache = Cache<Key, CTFont>()
+
+  /// The same, for faces a host's resolver returned, keyed on the face rather than on a family name.
+  ///
+  /// A second cache and not a second kind of entry in the first, because the two keys answer
+  /// different questions — one is "what did CoreText match this family to", the other is "what did
+  /// this face, resized, come out as". Sharing a bound between them would let a chart with a
+  /// resolver evict the entries of one without a resolver, and neither cache is large.
+  private static let hostCache = Cache<HostKey, CTFont>()
+
+  /// The family-stack parse, memoised. See `families(of:)` for why this one is safe to share.
+  private static let stackCache = Cache<String, [String]>()
 
   /// `@unchecked Sendable` because every access is behind the lock; the assertion is made once, here.
   ///
@@ -150,32 +231,52 @@ enum CoreTextFonts {
   /// the part that made it unbounded in practice: a chart whose label size comes from a signal, or a
   /// legend whose swatches step through sizes, mints an entry per distinct size for as long as the
   /// app runs. Least-recently-used, so the working set of a chart being redrawn stays resident.
-  private final class Cache: @unchecked Sendable {
+  private final class Cache<K: Hashable, V>: @unchecked Sendable {
     /// Enough for every face, weight and size a handful of charts asks for at once.
-    private static let limit = 256
+    ///
+    /// An instance property rather than a `static` one because this type is generic now, and Swift
+    /// has no static storage in a generic type. Each cache carrying its own bound is the shape the
+    /// two of them want anyway.
+    private let limit = 256
 
-    private var fonts: [Key: CTFont] = [:]
-    /// Keys in least-recently-used order, oldest first.
-    private var order: [Key] = []
-    private let lock = NSLock()
-
-    func value(for key: Key) -> CTFont? {
-      lock.lock()
-      defer { lock.unlock() }
-      guard let font = fonts[key] else { return nil }
-      order.removeAll { $0 == key }
-      order.append(key)
-      return font
+    /// A cached value and when it was last wanted, for the eviction below.
+    private struct Entry {
+      let value: V
+      var used: UInt64
     }
 
-    func store(_ font: CTFont, for key: Key) {
+    private var fonts: [K: Entry] = [:]
+    /// Monotonic, so "least recently used" is a number to compare rather than a list to reorder.
+    private var clock: UInt64 = 0
+    private let lock = NSLock()
+
+    /// **A counter, not an ordered list of keys**, and the difference is measurable.
+    ///
+    /// This used to hold the keys in LRU order and do `order.removeAll { $0 == key }` on every
+    /// *hit* — a linear scan of up to `limit` keys, each one an `==`, on the path a chart takes for
+    /// every advance, ascent, descent and line height of every label. For `HostKey` each of those
+    /// comparisons is a `CFEqual` on a font. Stamping a counter instead makes a hit a dictionary
+    /// read and an integer write, and moves the only scan to eviction, which happens once per new
+    /// style rather than once per metric.
+    func value(for key: K) -> V? {
       lock.lock()
       defer { lock.unlock() }
-      fonts[key] = font
-      order.removeAll { $0 == key }
-      order.append(key)
-      while order.count > Self.limit {
-        fonts.removeValue(forKey: order.removeFirst())
+      guard let held = fonts[key]?.value else { return nil }
+      clock += 1
+      fonts[key]?.used = clock
+      return held
+    }
+
+    func store(_ value: V, for key: K) {
+      lock.lock()
+      defer { lock.unlock() }
+      clock += 1
+      fonts[key] = Entry(value: value, used: clock)
+      // One entry in, at most one out, so the scan is over `limit` and not unbounded. `min` rather
+      // than a sorted structure because it runs on a miss and a miss already built a font.
+      guard fonts.count > limit else { return }
+      if let oldest = fonts.min(by: { $0.value.used < $1.value.used })?.key {
+        fonts.removeValue(forKey: oldest)
       }
     }
   }

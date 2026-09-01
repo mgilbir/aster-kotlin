@@ -6,6 +6,36 @@ section here does not get released.
 
 ## Unreleased
 
+### Performance
+
+- **Resolving a font on Apple is about seven times cheaper, and a host's face is now cached at all.**
+  Two things, found by measuring rather than by reading.
+
+  The reported one: `CoreTextFonts` returned the host resolver's answer *before* the cache was
+  consulted, so a host that supplied a resolver — which is what the documentation asks a host to do
+  — rebuilt a `CTFontCreateCopyWithAttributes` copy for every advance, ascent, descent and line
+  height, on every measured line, and again on every drawn run. The reason it was uncached was the
+  key: a family name does not say which resolver answered, and the cache is process-wide, so two
+  charts with different resolvers would have shared an entry. Keying on the *face the resolver
+  returned* — `CFEqual`, so identity rather than a hash gamble — removes the hazard instead of
+  avoiding it. (#152)
+
+  The larger one, which the issue did not predict and the numbers did:
+  `FontStack.shared.families(stack:)` was **86 per cent** of the cost of resolving a font, at 2.77µs
+  of a 3.23µs call. It is a Kotlin object reached across the Obj-C bridge and it was called on every
+  lookup, so a chart paid a bridge crossing and a list conversion per metric for what is a comma
+  split. It is memoised per family string now — safe because it is pure, and memoised rather than
+  reimplemented in Swift so that every renderer keeps splitting a family list by the same rule
+  (#123). A 60-style working set went from 3.23µs to 0.48µs a call.
+
+  The cache's own LRU bookkeeping was also linear *per hit* — `order.removeAll { $0 == key }`, an
+  `==` per resident key, and for a face key that is a `CFEqual`. It stamps a counter now, so a hit is
+  a dictionary read and an integer write and the only scan is on eviction.
+
+  Worth recording against the issue's open question: `CTFontCreateCopyWithAttributes` costs about
+  0.95µs, so CoreText does memoise it internally. The font copy was real but it was never the
+  expensive part.
+
 ### Fixed
 
 - **A time axis keeps the day width the host's locale states.** `VegaLocale.timeTickFormats` read

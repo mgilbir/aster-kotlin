@@ -165,4 +165,58 @@ final class FontResolverTests: XCTestCase {
 
     XCTAssertEqual([], engine.unresolvedFontFamilies, "the host answered, so nothing was missed")
   }
+
+  // MARK: - Caching the host's answer (#152)
+
+  /// A host's face is resolved once per style, not once per metric.
+  ///
+  /// The host branch used to return before the cache was ever read, so a host that supplied a
+  /// resolver — which is what the documentation asks a host to do — rebuilt a
+  /// `CTFontCreateCopyWithAttributes` copy for every advance, ascent, descent and line height, on
+  /// every measured line, and again on every drawn run. Identity is the assertion because it is the
+  /// one that cannot pass by coincidence: two equal fonts would satisfy `==`, only a cache hit
+  /// returns the same object.
+  ///
+  /// A base size of 0 against a requested 15 makes the resize real, so a returned-unchanged face
+  /// could not pass this by doing nothing.
+  func testAHostsFaceIsResolvedOncePerStyle() {
+    let face = courier()
+    let first = CoreTextFonts.font(
+      family: "Cached Sans", size: 15, weight: 400, italic: false, resolveFont: { _ in face })
+    let second = CoreTextFonts.font(
+      family: "Cached Sans", size: 15, weight: 400, italic: false, resolveFont: { _ in face })
+    XCTAssertTrue(first === second, "a host's face should be styled once and reused")
+    XCTAssertEqual(CTFontGetSize(first), 15, "and still resized to what the chart asked for")
+  }
+
+  /// Two hosts answering differently get different entries, which is why the key is the *face*.
+  ///
+  /// This is the hazard the code used to avoid by not caching at all: the cache is process-wide and
+  /// a family name does not say which resolver answered, so an entry stored under `"Shared Name"`
+  /// by one chart would have been served to another chart whose resolver answers differently. Keyed
+  /// on the returned face, the two cannot collide — and they are asked for under *the same family
+  /// name* here, because that is the collision being denied.
+  func testTwoResolversAnsweringDifferentlyDoNotShareAnEntry() {
+    let courierFont = CoreTextFonts.font(
+      family: "Shared Name", size: 16, weight: 400, italic: false,
+      resolveFont: { _ in self.courier() })
+    let helvetica = CTFontCreateWithName("Helvetica" as CFString, 0, nil)
+    let helveticaFont = CoreTextFonts.font(
+      family: "Shared Name", size: 16, weight: 400, italic: false, resolveFont: { _ in helvetica })
+
+    XCTAssertEqual(CTFontCopyFamilyName(courierFont) as String, "Courier")
+    XCTAssertEqual(CTFontCopyFamilyName(helveticaFont) as String, "Helvetica")
+  }
+
+  /// The style is part of the key, so one face at two sizes is two entries rather than one wrong one.
+  func testTheSameFaceAtTwoSizesIsTwoEntries() {
+    let face = courier()
+    let small = CoreTextFonts.font(
+      family: "Sized Sans", size: 9, weight: 400, italic: false, resolveFont: { _ in face })
+    let large = CoreTextFonts.font(
+      family: "Sized Sans", size: 21, weight: 400, italic: false, resolveFont: { _ in face })
+    XCTAssertEqual(CTFontGetSize(small), 9)
+    XCTAssertEqual(CTFontGetSize(large), 21)
+    XCTAssertFalse(small === large)
+  }
 }
