@@ -160,6 +160,51 @@ class LocaleDatePatternTest {
     )
   }
 
+  /**
+   * The tick cascade takes the **day's width** off the pattern, not a hard-coded `%d`.
+   *
+   * The order was read from the locale and the width was thrown away in the same breath, so a host
+   * stating `%-d %b %Y` got `%-d` honoured by `timeUnitSpecifiers` and ignored by `timeTickFormats`
+   * — `3 mei` asked for and `03 mei` drawn, from one locale value. See #151.
+   */
+  @Test
+  fun `the day keeps the width the pattern gives it`() {
+    val unpadded = localeWith(date = "%-d %b %Y").timeTickFormats
+    assertEquals("%-d %b", unpadded["week"])
+    assertEquals("%-d %a", unpadded["day"])
+
+    // Space-padded is a third width, and it is the pattern's business which of the three it is.
+    val spaced = localeWith(date = "%e %B %Y").timeTickFormats
+    assertEquals("%e %b", spaced["week"])
+    assertEquals("%e %a", spaced["day"])
+
+    // The month **name** stays the cascade's own. A week's tick reads `21 mei`, so deriving through
+    // `withFields` would be wrong: it keeps the language's month directive and gives `%d-%m`, which
+    // is a different label rather than a wider one.
+    assertEquals("%d %b", localeWith(date = "%d-%m-%Y").timeTickFormats["week"])
+  }
+
+  /**
+   * A month-first locale agrees with d3 about the *order*, so only a differing width speaks.
+   *
+   * The padded case deriving nothing is what keeps d3's default a default instead of a value this
+   * file restates; the unpadded case is the same discard as above, on the branch that used to take
+   * no derivation at all.
+   */
+  @Test
+  fun `a month-first locale derives only when its day is a different width`() {
+    val unpadded = localeWith(date = "%b %-d, %Y", time = "%-I:%M:%S %p").timeTickFormats
+    assertEquals("%b %-d", unpadded["week"])
+    assertEquals("%a %-d", unpadded["day"])
+
+    // Padded, and therefore silent — asserted as the whole map, so an entry equal to the default
+    // would fail here rather than pass as agreement.
+    assertEquals(
+      emptyMap<String, String>(),
+      localeWith(date = "%b %d, %Y", time = "%-I:%M:%S %p").timeTickFormats,
+    )
+  }
+
   @Test
   fun `a stated override replaces derivation entirely`() {
     val stated =

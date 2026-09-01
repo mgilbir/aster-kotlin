@@ -1,6 +1,8 @@
 package dev.aster.vega.runtime.scale
 
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.locale.VegaCaptions
+import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.time.DateValues
 import dev.aster.vega.model.time.TimeInterval
 import dev.aster.vega.model.time.TimeStepper
@@ -130,6 +132,68 @@ class TimeScaleTest {
   )
   fun `a tick is labelled at its own granularity`(instant: String, expected: String) {
     assertEquals(expected, TimeTicks.label(at(instant), utc))
+  }
+
+  /**
+   * A locale writing an unpadded day gets an unpadded day **on the drawn tick**.
+   *
+   * The model half of this is `LocaleDatePatternTest`; this is the half a reader sees. The cascade
+   * reads `locale.timeTickFormats[step]` and falls back to d3's padded default, so a derivation
+   * that dropped the width was invisible until it reached a label. `3 mei` was asked for by the
+   * locale and `03 mei` was drawn. See #151.
+   */
+  @Test
+  fun `a tick keeps the day width the locale's pattern states`() {
+    // Sunday-first, which is what `%a` indexes and what `TimeInterval.WEEK` floors to.
+    val dutch =
+      VegaLocale(
+        months =
+          listOf(
+            "januari",
+            "februari",
+            "maart",
+            "april",
+            "mei",
+            "juni",
+            "juli",
+            "augustus",
+            "september",
+            "oktober",
+            "november",
+            "december",
+          ),
+        shortMonths =
+          listOf(
+            "jan",
+            "feb",
+            "mrt",
+            "apr",
+            "mei",
+            "jun",
+            "jul",
+            "aug",
+            "sep",
+            "okt",
+            "nov",
+            "dec",
+          ),
+        days =
+          listOf("zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"),
+        shortDays = listOf("zo", "ma", "di", "wo", "do", "vr", "za"),
+        periods = listOf("AM", "PM"),
+        date = "%-d %b %Y",
+        time = "%H:%M:%S",
+        captions = VegaCaptions.English,
+      )
+    // A Sunday, so the cascade takes the week entry; and a Tuesday, so it takes the day entry.
+    assertEquals("3 mei", TimeTicks.label(at("2026-05-03T00:00:00Z"), utc, dutch))
+    // Day-first, so the weekday trails the number the way the locale writes a date, which is the
+    // order this derivation has always produced — the width is what changed.
+    assertEquals("5 di", TimeTicks.label(at("2026-05-05T00:00:00Z"), utc, dutch))
+
+    // And the padded default still applies to a locale that states one, so this is a locale being
+    // honoured rather than padding being dropped everywhere.
+    assertEquals("Feb 08", TimeTicks.label(at("2026-02-08T00:00:00Z"), utc))
   }
 
   // ---- the scale ----------------------------------------------------------------

@@ -214,12 +214,36 @@ public data class VegaLocale(
       derived["minute"] = "%H:%M"
     }
     // And the month-and-day order, so a day-first language reads `21 mei` rather than `mei 21`.
-    // Only
-    // where the pattern says otherwise than d3's cascade already does, so a locale that agrees with
-    // it contributes nothing and the map stays empty.
-    if (LocaleDatePattern.monthBeforeDate(date) == false) {
-      derived["week"] = "%d %b"
-      derived["day"] = "%d %a"
+    // Only where the pattern says otherwise than d3's cascade already does, so a locale that agrees
+    // with it contributes nothing and the map stays empty.
+    //
+    // **The day comes from the pattern, width and all.** It used to be a hard-coded `%d` here,
+    // which took the field *order* off the locale and then discarded the width the same pattern
+    // stated: a host writing `%-d %b %Y` got `%-d` honoured by `timeUnitSpecifiers` and ignored
+    // here, from one locale value. `%d` and `%-d` are `03 mei` and `3 mei`. See #151, which is #97
+    // one path over.
+    //
+    // Only the day, and deliberately not [LocaleDatePattern.withFields]: a week's tick wants the
+    // month *name*, so `%d-%m-%Y` has to yield `%d %b` and not `%d-%m`. What the cascade takes from
+    // the language is the day's width; `%b` and `%a` are the cascade's own.
+    val day = LocaleDatePattern.directiveFor(date, DateField.DATE)
+    when (LocaleDatePattern.monthBeforeDate(date)) {
+      // Day-first: the order differs from d3's, so both entries are derived regardless.
+      false -> {
+        val directive = day ?: "%d"
+        derived["week"] = "$directive %b"
+        derived["day"] = "$directive %a"
+      }
+      // Month-first agrees with d3 about the order, so there is only something to say when the
+      // *width* differs. A locale writing a padded day still derives nothing, which is what keeps
+      // d3's default a default rather than a value this restates.
+      true ->
+        if (day != null && day != "%d") {
+          derived["week"] = "%b $day"
+          derived["day"] = "%a $day"
+        }
+      // A pattern naming neither field is not one an order can be read from.
+      null -> {}
     }
     return derived
   }
