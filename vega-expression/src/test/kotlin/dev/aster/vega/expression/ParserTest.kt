@@ -116,9 +116,71 @@ class ParserTest {
     assertThrows<ExpressionSyntaxException> { parse("a = 1") }
   }
 
+  /**
+   * A `/pattern/flags` literal is the same value `regexp()` builds.
+   *
+   * It used to be a syntax error, excluded before `ktecma262` existed and never revisited when it
+   * landed. Upstream's parser scans one, so an expression legal against Vega was refused here
+   * (#153).
+   */
   @Test
-  fun `a regular expression literal is rejected`() {
-    assertThrows<ExpressionSyntaxException> { parse("/ab+c/.test('x')") }
+  fun `a regular expression literal is a pattern`() {
+    val literal = parse("/ab+c/") as Node.Literal
+    val pattern = literal.value as VegaValue.Pattern
+    assertEquals("ab+c", pattern.source)
+    assertEquals("", pattern.flags)
+
+    val flagged = (parse("/ab+c/gi") as Node.Literal).value as VegaValue.Pattern
+    assertEquals("ab+c", flagged.source)
+    assertEquals("gi", flagged.flags)
+  }
+
+  /**
+   * The `/` ambiguity, which is the whole difficulty: a `/` divides after a value and opens a
+   * literal after anything else.
+   *
+   * Getting this wrong is silent in the worst direction — `a / b / c` lexed as a regular expression
+   * would turn arithmetic into a pattern and evaluate to something rather than failing.
+   */
+  @Test
+  fun `a slash divides after a value and opens a literal otherwise`() {
+    // Division, in the four shapes where the previous token ends a value.
+    for (source in listOf("a / b", "1 / 2", "'s'.length / 2", "f(x) / 2", "arr[0] / 2")) {
+      assertTrue(parse(source) is Node.Binary, "expected division for `$source`: ${parse(source)}")
+    }
+
+    // A literal, where the previous token cannot end one.
+    assertTrue((parse("replace(s, /x/, '')") as Node.Call).arguments[1] is Node.Literal)
+    assertTrue(parse("/x/") is Node.Literal)
+    val afterOperator = (parse("!/x/") as Node.Unary).operand
+    assertTrue(afterOperator is Node.Literal)
+
+    // And a regular expression is itself a value, so a `/` after one divides.
+    assertTrue(parse("/x/.source / 2") is Node.Binary)
+  }
+
+  /** A literal a delimiter cannot be found for is a syntax error, with upstream's own message. */
+  @Test
+  fun `an unterminated regular expression is a syntax error`() {
+    val missing = assertThrows<ExpressionSyntaxException> { parse("replace(s, /x, '')") }
+    assertTrue(
+      missing.message!!.contains("missing /"),
+      "expected upstream's message, got: ${missing.message}",
+    )
+    // A line terminator may not appear in a body, which is what stops one `/` swallowing a
+    // document.
+    assertThrows<ExpressionSyntaxException> { parse("replace(s, /x\ny/, '')") }
+    // `//` is not a pattern in any dialect.
+    assertThrows<ExpressionSyntaxException> { parse("replace(s, //, '')") }
+    // And a pattern the regular-expression engine refuses is refused here, not at evaluation.
+    assertThrows<ExpressionSyntaxException> { parse("replace(s, /[/, '')") }
+  }
+
+  /** A `/` inside a character class or behind a backslash is not the closing delimiter. */
+  @Test
+  fun `a delimiter inside the pattern is not the closing one`() {
+    assertEquals("a\\/b", ((parse("/a\\/b/") as Node.Literal).value as VegaValue.Pattern).source)
+    assertEquals("[/]", ((parse("/[/]/") as Node.Literal).value as VegaValue.Pattern).source)
   }
 
   @Test

@@ -4353,6 +4353,7 @@ TokenType.init(name:ordinal:)
 TokenType.number
 TokenType.operator_
 TokenType.punctuation
+TokenType.regex
 TokenType.string
 TokenType.values()
 TooltipContent

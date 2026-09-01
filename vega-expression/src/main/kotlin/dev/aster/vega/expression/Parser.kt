@@ -148,6 +148,10 @@ public class Parser(private val source: String) {
         advance()
         Node.Literal(VegaValue.Str(token.text))
       }
+      token.type == TokenType.REGEX -> {
+        advance()
+        Node.Literal(pattern(token))
+      }
       token.type == TokenType.IDENTIFIER ->
         when (token.text) {
           "true" -> {
@@ -216,6 +220,38 @@ public class Parser(private val source: String) {
       if (matchPunctuation(",")) continue
       expectPunctuation("}")
       return Node.ObjectLiteral(entries)
+    }
+  }
+
+  /**
+   * A `/pattern/flags` token, compiled to the same [VegaValue.Pattern] that `regexp()` produces.
+   *
+   * The literal and the function reach one representation deliberately: `test`, `replace` and the
+   * rest already accept a `Pattern`, and `isRegExp` already answers true for one, so a literal is a
+   * second *spelling* rather than a second kind of value. Nothing downstream needs to know which
+   * was written.
+   *
+   * **Compiled here, not in the lexer.** The pattern is validated by `ktecma262`, the engine that
+   * will run it, so an unreadable pattern is refused by the thing whose opinion counts rather than
+   * by a second grammar this file would have to keep in step with it. It is a *syntax* error
+   * because a literal is source text: `/[/` cannot be evaluated later, it can only fail to parse,
+   * and the offset points at the delimiter so a reader can see which literal.
+   *
+   * The closing delimiter is the last `/` in the token, which is unambiguous because flags are
+   * letters — see [TokenType.REGEX].
+   */
+  private fun pattern(token: Token): VegaValue.Pattern {
+    val close = token.text.lastIndexOf('/')
+    val source = token.text.substring(1, close)
+    val flags = token.text.substring(close + 1)
+    return try {
+      VegaValue.Pattern(source, flags)
+    } catch (failure: Exception) {
+      throw ExpressionSyntaxException(
+        "Invalid regular expression" + (failure.message?.let { ": $it" } ?: ""),
+        token.start,
+        this.source,
+      )
     }
   }
 
