@@ -1,0 +1,302 @@
+#!/usr/bin/env python3
+"""`SUPPORTED_FEATURES.md`, rendered from a capability source and the test results that prove it.
+
+The document is what an adopter reads before depending on any of this, and nothing checked it. It
+drifted the way an unchecked document always drifts: one row said `isDate`, `isRegExp` and `isTuple`
+"stay out with reasons" while all three were implemented, and a row seventy lines below listed
+`isRegExp()` as supported — the same file disagreeing with itself and with the code (#154). Thirty-two
+registered expression functions were named nowhere at all.
+
+So the table is generated. `docs/capabilities.json` holds what a person knows and a machine cannot
+infer — the feature, the prose about known differences, the milestone, the *intent* behind a status,
+and which tests are the evidence. The status a reader sees is then computed from whether those tests
+**actually ran and passed**, merged across every host, because that is the one part of the claim a
+test can settle.
+
+### Why intent still lives in the source
+
+Status is not a boolean a test emits. The vocabulary includes `Not planned`, `Deliberate difference`
+and `Superseded` — positions, not outcomes, and no run produces them. What a run settles is narrower
+and worth stating exactly: whether a row *claiming* support has evidence behind it. A row that says
+`Supported` and cites a test that did not run, or that failed, is the failure this exists to catch.
+
+### Why the results have to be merged
+
+No single job sees everything. macOS compiles every Apple target and runs the Swift suite; Linux runs
+`linuxX64`; the instrumented suites need an emulator and run in their own jobs. A document generated
+from one host would mark every other host's rows unproven, so `--results` takes as many directories
+as there are jobs and the union is what gets rendered.
+
+Usage:
+
+    scripts/capabilities.py --check                     # rendered doc matches the source
+    scripts/capabilities.py --write --results a b c     # regenerate from merged results
+    scripts/capabilities.py --migrate                   # one-off: build the source from the doc
+"""
+
+from __future__ import annotations
+
+import argparse
+import glob
+import json
+import pathlib
+import re
+import sys
+import xml.etree.ElementTree as ET
+from collections import defaultdict
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+DOC = ROOT / "SUPPORTED_FEATURES.md"
+SOURCE = ROOT / "docs" / "capabilities.json"
+
+# A test class as a row cites one: backticked, containing `Test`.
+CITATION = re.compile(r"`([A-Z][A-Za-z0-9]*Tests?[A-Za-z0-9]*)`")
+
+# Statuses that assert the feature works, and are therefore checkable against a run. Everything else
+# — `Not planned`, `Deliberate difference`, `Superseded`, `Not implemented` — is a position rather
+# than an outcome, and a run has nothing to say about it.
+CLAIMS_SUPPORT = ("supported", "verified", "partial", "exact", "yes")
+
+
+def claims_support(status: str) -> bool:
+    plain = status.replace("*", "").strip().lower()
+    return any(plain.startswith(word) for word in CLAIMS_SUPPORT)
+
+
+# --------------------------------------------------------------------------------------- results
+
+
+def read_results(directories: list[str]) -> dict[str, dict]:
+    """Every test class seen in any JUnit or xUnit XML under [directories], merged.
+
+    Keyed by the *simple* class name, because that is what a row cites and because the three
+    producers decorate it differently: Gradle's JVM suites give
+    `dev.aster.vega.svg.SvgRendererTest`, a Kotlin/Native suite prefixes its target
+    (`macosArm64Test.dev.…`), and the instrumented runner gives the bare package path. Merging on
+    the simple name is what lets one row's evidence come from four jobs.
+    """
+    seen: dict[str, dict] = defaultdict(lambda: {"ran": 0, "failed": 0, "skipped": 0, "hosts": set()})
+    for directory in directories:
+        base = pathlib.Path(directory)
+        for path in base.rglob("*.xml"):
+            try:
+                root = ET.parse(path).getroot()
+            except ET.ParseError:
+                continue
+            for case in root.iter("testcase"):
+                classname = case.get("classname") or ""
+                simple = classname.split(".")[-1]
+                if not simple:
+                    continue
+                entry = seen[simple]
+                entry["ran"] += 1
+                if case.find("failure") is not None or case.find("error") is not None:
+                    entry["failed"] += 1
+                if case.find("skipped") is not None:
+                    entry["skipped"] += 1
+                entry["hosts"].add(base.name)
+    return seen
+
+
+def status_of(entry: dict, results: dict[str, dict]) -> tuple[str, str]:
+    """The status a reader sees, and the evidence line under it.
+
+    Returns the declared status unchanged where the row does not claim support — there is nothing
+    for a run to settle about `Not planned`.
+    """
+    declared = entry["status"]
+    cited = entry["tests"]
+    if not claims_support(declared) or not cited:
+        return declared, ""
+
+    ran = failed = 0
+    missing = []
+    hosts: set[str] = set()
+    for name in cited:
+        found = results.get(name)
+        if not found:
+            missing.append(name)
+            continue
+        ran += found["ran"]
+        failed += found["failed"]
+        hosts |= found["hosts"]
+
+    # **Only the bad news is written into a row.** A count of the cited suites' tests would read as
+    # the weight of evidence behind this row and it is not: a row citing `FixtureDifferentialTest`
+    # for two named fixtures would claim the suite's 1181 cases, which overstates by three orders of
+    # magnitude. What a run can honestly say about a healthy row is "the evidence ran and passed",
+    # and `Supported` already says that. So a healthy row is left exactly as authored, and the
+    # generated signal is reserved for rows where the claim is not backed.
+    if failed:
+        return f"**Failing** — {failed} test(s) in the cited suites", ""
+    if missing:
+        which = ", ".join(f"`{name}`" for name in sorted(missing)[:3])
+        more = f" and {len(missing) - 3} more" if len(missing) > 3 else ""
+        return declared, f"unproven here: {which}{more} did not run"
+    return declared, ""
+
+
+# --------------------------------------------------------------------------------- doc round trip
+
+
+def split_row(line: str) -> list[str] | None:
+    """A table row's cells, splitting on `|` **only outside backticks**.
+
+    A plain `line.split("|")` is wrong here and was wrong silently. One row documents indirect scale
+    references and writes them as `` `{"signal"|"parent"|"datum"|"group"}` `` — literal pipes inside
+    a code span, which markdown renders as one cell and a naive split reads as four. That row's
+    status came out as `"parent"`, which is how it appeared in the status vocabulary at all.
+    """
+    if not line.startswith("|"):
+        return None
+    cells: list[str] = []
+    current: list[str] = []
+    in_code = False
+    for char in line[1:]:
+        if char == "`":
+            in_code = not in_code
+            current.append(char)
+        elif char == "|" and not in_code:
+            cells.append("".join(current))
+            current = []
+        else:
+            current.append(char)
+    # Whatever trails the final `|` is the line ending, not a cell.
+    return cells if len(cells) >= 2 else None
+
+
+def migrate() -> None:
+    """Build `docs/capabilities.json` out of the document, once, preserving every cell verbatim."""
+    entries = []
+    section = ""
+    for number, line in enumerate(DOC.read_text().split("\n"), 1):
+        if line.startswith("## "):
+            section = line[3:].strip()
+        cells = split_row(line)
+        if not cells or len(cells) < 5:
+            continue
+        if set("".join(cells).strip()) <= set("- "):
+            continue  # the |---|---| separator
+        if cells[1].strip().lower() == "status":
+            continue  # a header row
+        entries.append(
+            {
+                "line": number,
+                "section": section,
+                "feature": cells[0].strip(),
+                "status": cells[1].strip(),
+                "tests": sorted(set(CITATION.findall(cells[2]))),
+                "tests_text": cells[2].strip(),
+                "notes": cells[3].strip(),
+                "milestone": cells[4].strip(),
+            }
+        )
+    SOURCE.parent.mkdir(parents=True, exist_ok=True)
+    SOURCE.write_text(json.dumps({"capabilities": entries}, indent=2, ensure_ascii=False) + "\n")
+    print(f"migrated {len(entries)} capabilities into {SOURCE.relative_to(ROOT)}")
+
+
+def render(results: dict[str, dict]) -> str:
+    """The document, with every row's Status recomputed from [results].
+
+    **With no results at all, statuses are left as declared**, and that is not a shortcut — it is
+    what makes the check runnable off CI. A run this document can be generated from is the union of
+    four jobs, and no laptop has all four: without an emulator and without Linux, generating would
+    mark two hundred rows unproven and the diff would be noise about the machine rather than about
+    the code. So an empty result set checks the half that is machine-independent — that the source
+    still reproduces every row's structure and prose — and CI, which has all four, checks the rest.
+    """
+    if not results:
+        return render_with(lambda entry: (entry["status"], ""))
+    return render_with(lambda entry: status_of(entry, results))
+
+
+def render_with(status_for) -> str:
+    source = json.loads(SOURCE.read_text())
+    by_line = {entry["line"]: entry for entry in source["capabilities"]}
+    out = []
+    for number, line in enumerate(DOC.read_text().split("\n"), 1):
+        entry = by_line.get(number)
+        if entry is None:
+            out.append(line)
+            continue
+        status, evidence = status_for(entry)
+        cells = split_row(line)
+        cells[1] = f" {status} "
+        if evidence:
+            cells[1] = f" {status}<br/><sub>{evidence}</sub> "
+        out.append("|" + "|".join(cells) + "|")
+    return "\n".join(out)
+
+
+FUNCTION_SOURCES = [
+    ROOT / "vega-expression/src/main/kotlin/dev/aster/vega/expression/Functions.kt",
+    ROOT / "vega-expression/src/main/kotlin/dev/aster/vega/expression/Evaluator.kt",
+]
+REGISTRATION = re.compile(
+    r'map\.predicate\("([a-zA-Z_][a-zA-Z0-9_]*)"\)'
+    r'|map\["([a-zA-Z_][a-zA-Z0-9_]*)"\]'
+    r'|name == "([a-zA-Z_][a-zA-Z0-9_]*)"'
+)
+
+
+def undocumented_functions(text: str) -> list[str]:
+    """Expression functions the engine registers and the document never names.
+
+    The other direction of drift, and the one an adopter cannot work around: a function that ships
+    unmentioned cannot be discovered from the document at all. Thirty-two were in this state when
+    the check was written — `substring`, `isArray`, `toNumber`, `vlSelectionTest` among them, with
+    literally no occurrence in the file.
+
+    Generation alone does not catch this, because the rows are authored from a list of features
+    somebody thought of. This reads the registry instead, so the document is answerable to the code
+    and not only to itself.
+    """
+    registered = set()
+    for source in FUNCTION_SOURCES:
+        if not source.exists():
+            raise SystemExit(f"::error::{source.relative_to(ROOT)} is gone; this gate reads it")
+        for match in REGISTRATION.finditer(source.read_text()):
+            registered.add(next(group for group in match.groups() if group))
+    return sorted(name for name in registered if not re.search(rf"`{re.escape(name)}[(`]", text))
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--migrate", action="store_true")
+    parser.add_argument("--write", action="store_true")
+    parser.add_argument("--check", action="store_true")
+    parser.add_argument("--results", nargs="*", default=[])
+    args = parser.parse_args()
+
+    if args.migrate:
+        migrate()
+        return 0
+
+    results = read_results(args.results) if args.results else {}
+    rendered = render(results)
+    if args.write:
+        DOC.write_text(rendered)
+        print(f"wrote {DOC.relative_to(ROOT)} from {len(results)} test classes")
+        return 0
+    problems = []
+    if rendered != DOC.read_text():
+        problems.append(
+            "SUPPORTED_FEATURES.md is not what docs/capabilities.json renders. Edit the source and "
+            "regenerate; the document is an output."
+        )
+    for name in undocumented_functions(DOC.read_text()):
+        problems.append(
+            f"the expression function `{name}` is registered and named nowhere in "
+            "SUPPORTED_FEATURES.md, so an adopter cannot discover it."
+        )
+    for problem in problems:
+        print(f"::error::{problem}")
+    if problems:
+        return 1
+    print("SUPPORTED_FEATURES.md matches its source, and every registered function is named.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

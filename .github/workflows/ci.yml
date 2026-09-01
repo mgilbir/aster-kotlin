@@ -96,6 +96,11 @@ jobs:
         # Everything else `check.sh` gained is wanted here: on macOS it now runs the Swift suite, the
         # exported-API snapshot and the iOS demo's type-check, which used to be three separate steps
         # in this file and one that was missing from the local gate entirely.
+        env:
+          # Asks `swift-test.sh` for xUnit XML so the Apple suite's results can be merged into
+          # SUPPORTED_FEATURES.md by the `capabilities` job. macOS-only in effect; on Linux the
+          # Swift gate skips and the variable goes unread.
+          SWIFT_XUNIT_OUTPUT: ${{ runner.temp }}/swift-xunit.xml
         run: ./scripts/check.sh --fast
 
       - name: Snapshot what check.sh ran
@@ -236,13 +241,18 @@ jobs:
           PY
 
       - name: Upload test reports
-        if: failure()
+        # **Always, not only on failure.** These were a debugging aid; they are now an input.
+        # `SUPPORTED_FEATURES.md`'s status column is generated from the union of every job's
+        # results, so a green job that uploaded nothing would render its own rows as unproven —
+        # the document would be reporting on the upload rather than on the tests.
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-reports-${{ matrix.os }}
           path: |
             **/build/reports/tests/**
             **/build/test-results/**/*.xml
+            ${{ runner.temp }}/swift-xunit.xml
             build/upstream-transform-ledger.txt
           retention-days: 14
 
@@ -252,3 +262,79 @@ jobs:
   android:
     name: Instrumented
     uses: ./.github/workflows/instrumented.yml
+
+  # -------------------------------------------------------------------------------------------
+  # SUPPORTED_FEATURES.md, generated from the results of the jobs above.
+  #
+  # The document is what an adopter reads before depending on any of this, and until now nothing
+  # checked it. It drifted the way an unchecked document does: one row said `isDate`, `isRegExp` and
+  # `isTuple` "stay out with reasons" while all three were implemented, and a row seventy lines below
+  # listed `isRegExp()` as supported — the file disagreeing with itself and with the code (#154).
+  #
+  # So the status column is not written by a person any more. It is computed from whether each row's
+  # cited tests **ran and passed**, which is the one part of the claim a run can settle. A row that
+  # says `Supported` and cites a suite that did not run says so, in the document, where a reader
+  # sees it.
+  #
+  # **This job is why the results are merged rather than taken from one place.** No single job sees
+  # everything: macOS compiles every Apple target and runs the Swift suite, Linux runs `linuxX64`,
+  # and the instrumented suites need an emulator and run in their own jobs. Generating from any one
+  # of them marks every other host's rows unproven, so this waits for all four and takes the union.
+  #
+  # It commits, because a document generated from a run is only useful if the run's answer is what
+  # the repository holds. Nothing else may change in that commit — the check below is what says so.
+  capabilities:
+    name: SUPPORTED_FEATURES.md
+    needs: [check, android]
+    # `always()`, so a red suite still regenerates: a failing test should turn its rows into
+    # **Failing** in the document rather than leave the last green run's claim standing.
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Collect every job's test results
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: results
+
+      - name: Regenerate from the merged results
+        run: |
+          set -euo pipefail
+          # One directory per uploading job; the script keys on the simple class name so the three
+          # XML dialects — Gradle's JVM suites, a Kotlin/Native target's prefixed ones, and the
+          # instrumented runner's — merge into one answer per suite.
+          # An array rather than word-splitting a command substitution: an artifact directory is
+          # named after the job that uploaded it, and those names carry spaces and parentheses.
+          mapfile -t artifacts < <(find results -maxdepth 1 -mindepth 1 -type d | sort)
+          printf '  artifact: %s\n' "${artifacts[@]}"
+          python3 scripts/capabilities.py --write --results "${artifacts[@]}"
+
+      - name: Commit it if the run changed the answer
+        run: |
+          set -euo pipefail
+          if git diff --quiet SUPPORTED_FEATURES.md; then
+            echo "the document already matches this run"
+            exit 0
+          fi
+          # Nothing but the generated document may move in this commit. A generator that also
+          # rewrote source would be a workflow editing the repository behind the review, which is
+          # exactly the thing a bot commit has to be unable to do.
+          changed=$(git diff --name-only)
+          if [ "$changed" != "SUPPORTED_FEATURES.md" ]; then
+            echo "::error::regeneration touched more than the document: $changed"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add SUPPORTED_FEATURES.md
+          git commit -m "Regenerate SUPPORTED_FEATURES.md from ${GITHUB_SHA:0:8}
+
+          The status column is computed from whether each row's cited tests ran and passed,
+          merged across every job in this run. Written by the capabilities job in ci.yml."
+          git push
