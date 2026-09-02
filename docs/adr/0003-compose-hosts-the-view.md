@@ -37,7 +37,7 @@ avoid rebuilding anything on recomposition.
 The Canvas backend is proven and stable, and a measured benefit appears for a direct `DrawScope`
 backend — most plausibly Compose Multiplatform. At that point the scene graph is already
 platform-independent, so a second backend is additive. It must not ship before the Canvas backend is
-correct (PROJECT_BRIEF.md 21).
+correct (CONTRIBUTING.md).
 
 ## What happened
 

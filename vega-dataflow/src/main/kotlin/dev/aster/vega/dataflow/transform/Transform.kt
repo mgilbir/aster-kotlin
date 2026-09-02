@@ -261,7 +261,7 @@ public class TransformRegistry(transforms: List<Transform>) {
     get() = byType.keys
 
   public companion object {
-    /** The transforms the brief lists for the first release (PROJECT_BRIEF.md 3.2). */
+    /** The transforms the brief lists for the first release (ADR 0011). */
     public val Default: TransformRegistry =
       TransformRegistry(
         listOf(

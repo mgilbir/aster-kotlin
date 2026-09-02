@@ -8,8 +8,8 @@ import kotlin.jvm.JvmInline
  * fields, signal values, transform output and expression results.
  *
  * Numbers are always [Double] so that scale, transform and geometry arithmetic stays deterministic
- * across the whole pipeline (PROJECT_BRIEF.md 4.4). Conversion to `Float` happens only at the
- * Android rendering boundary.
+ * across the whole pipeline (ADR 0009). Conversion to `Float` happens only at the Android rendering
+ * boundary.
  */
 public sealed interface VegaValue {
 
@@ -235,7 +235,7 @@ public fun VegaValue.field(path: String): VegaValue {
  *
  * One deliberate divergence: upstream *throws* on an unterminated bracket or quote. A field path is
  * data, often pasted data, so the unterminated remainder becomes a literal segment instead and the
- * lookup simply misses (PROJECT_BRIEF.md 3.3).
+ * lookup simply misses (ADR 0011).
  */
 public fun parseFieldPath(path: String): List<String> {
   if (path.isEmpty()) return emptyList()

@@ -6,7 +6,7 @@
     "replays read this file and each asserts only its own entries.",
     "a new divergence fails the build, and fixing one also fails it until its entry is deleted here.",
     "Recorded rather than left red so the harness can be committed green while the work is queued;",
-    "each is written up in HANDOFF.md under 'What upstream's own tests found'."
+    "each entry's own `note` is the write-up; there is no second place to look."
   ],
   "divergences": [
     {

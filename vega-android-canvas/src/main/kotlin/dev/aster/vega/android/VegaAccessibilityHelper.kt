@@ -18,7 +18,7 @@ import kotlin.math.roundToInt
  * Exposes the chart as virtual accessibility descendants of one View.
  *
  * [ExploreByTouchHelper] exists precisely for custom views that draw many logical items, so the
- * chart gets a semantic tree without a View per mark (PROJECT_BRIEF.md 4.3, 12).
+ * chart gets a semantic tree without a View per mark (ADR 0009).
  *
  * The semantic tree is separate from the drawing tree and is capped: a dense chart exposes a
  * summary plus extrema rather than an unbounded node list.

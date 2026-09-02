@@ -111,8 +111,8 @@ public data class ChartState(
  * reads from.
  *
  * A snapshot is fully built before it is published, so drawing never observes a half-updated scene
- * (PROJECT_BRIEF.md 10.2). The controller itself does no Android work and no drawing; it holds
- * immutable state and hands it to whichever surface is rendering.
+ * (ADR 0007). The controller itself does no Android work and no drawing; it holds immutable state
+ * and hands it to whichever surface is rendering.
  *
  * [setSpec] compiles a Vega specification; [setScene] accepts a hand-authored one. Both publish the
  * same way, so a host does not care which produced the scene it is drawing.
@@ -817,7 +817,7 @@ public class VegaChartController(
    * Applies an input event.
    *
    * Hover, selection and tooltip updates only replace [InteractionState]; they never rebuild the
-   * scene, which is what keeps a hover from rerunning the dataflow (PROJECT_BRIEF.md 19).
+   * scene, which is what keeps a hover from rerunning the dataflow (ADR 0012).
    */
   public fun dispatch(event: ChartInputEvent) {
     when (event) {
@@ -1269,8 +1269,8 @@ public class VegaChartController(
    * Maps a point in surface coordinates to scene coordinates, undoing the interactive pan and zoom
    * and the host's fit-to-viewport scale.
    *
-   * This is step 1 of hit testing (PROJECT_BRIEF.md 11.2) and must invert exactly what the renderer
-   * applies: translate by the pan offset, then scale by `contentScale * viewportScale`.
+   * This is step 1 of hit testing (ADR 0007) and must invert exactly what the renderer applies:
+   * translate by the pan offset, then scale by `contentScale * viewportScale`.
    */
   private fun toSceneSpace(point: PointD): PointD {
     val interaction = _state.value.snapshot.interactionState

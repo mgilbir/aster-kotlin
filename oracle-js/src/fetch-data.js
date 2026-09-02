@@ -11,7 +11,7 @@
  *
  * It is a step of `scripts/oracle.sh` and nowhere else, on purpose. The JVM differential tests read
  * only from disk, so a fixture's data is committed alongside its reference and a green run never
- * depends on a network connection (PROJECT_BRIEF.md 21). Downloading is an explicit act whose result
+ * depends on a network connection (CONTRIBUTING.md). Downloading is an explicit act whose result
  * is reviewed, exactly like regenerating a reference.
  *
  * Nothing is re-fetched: a file already on disk is left alone, so this is a no-op offline once the

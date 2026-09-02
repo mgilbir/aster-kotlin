@@ -20,11 +20,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Microbenchmarks for the stages named in PROJECT_BRIEF.md 18.6.
+ * Microbenchmarks for the stages named in ADR 0012.
  *
- * Emulator numbers are not authoritative; release thresholds must come from a physical device
- * (PROJECT_BRIEF.md 18.6). Record fixture, device, Android version, build type and percentiles in
- * STATUS.md when a target is missed.
+ * Emulator numbers are not authoritative; release thresholds must come from a physical device (ADR
+ * 0012). Record fixture, device, Android version, build type and percentiles in STATUS.md when a
+ * target is missed.
  */
 @RunWith(AndroidJUnit4::class)
 class SceneBenchmark {

@@ -22,8 +22,7 @@ import org.junit.jupiter.params.provider.MethodSource
  * This is what the rest of the runtime is built behind. Golden tests catch regressions but cannot
  * catch a wrong reading of Vega's semantics; only upstream can, and it keeps doing so — a fixture
  * has yet to be added without finding something. The reference files are checked in and regenerated
- * explicitly by `./scripts/oracle.sh`, so this needs neither Node nor a network (PROJECT_BRIEF.md
- * 21).
+ * explicitly by `./scripts/oracle.sh`, so this needs neither Node nor a network (CONTRIBUTING.md).
  *
  * Fixtures are discovered from the directory rather than listed, so adding one is a single file and
  * forgetting its reference fails loudly rather than quietly skipping.
@@ -167,8 +166,8 @@ class FixtureDifferentialTest {
      * A fixture's `url` data, read from the checked-in copy under `test-fixtures/data`.
      *
      * A **file** loader and nothing else: these tests must run from a checked-out tree with no
-     * network (PROJECT_BRIEF.md 21), and a loader that could fall back to fetching would make a
-     * green run depend on a connection. Missing data is fetched by `scripts/oracle.sh`, which is a
+     * network (CONTRIBUTING.md), and a loader that could fall back to fetching would make a green
+     * run depend on a connection. Missing data is fetched by `scripts/oracle.sh`, which is a
      * deliberate step whose result is reviewed and committed like a reference is.
      */
     val fixtureLoader = FileDataLoader(File(repositoryRoot, "test-fixtures"))

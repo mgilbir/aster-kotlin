@@ -101,7 +101,7 @@ val PUBLISHED_CLASS_FILE_MAJOR = 61
  * exact failure this replaces.
  *
  * [directories] must not be empty and each one must contain a class, so the gate cannot pass having
- * looked at nothing (PROJECT_BRIEF.md 18).
+ * looked at nothing (ADR 0008).
  */
 abstract class CheckBytecodeLevel : DefaultTask() {
   @get:InputFiles abstract val directories: ConfigurableFileCollection
@@ -267,7 +267,7 @@ subprojects {
       }
       // `test` means `jvmTest` here. Without this alias `./gradlew test` matches **no task** in a
       // multiplatform module and reports success — which is precisely the "gate that prints passed
-      // without having run" that PROJECT_BRIEF.md 18 exists to prevent. It went green exactly once
+      // without having run" that ADR 0008 exists to prevent. It went green exactly once
       // that way, which is once more than it should have.
       if (tasks.findByName("test") == null) {
         tasks.register("test") {
@@ -464,17 +464,14 @@ subprojects {
   tasks.withType<KotlinNativeTest>().configureEach { environment("TZ", "UTC") }
 }
 
-/**
- * Explicit, opt-in golden regeneration. Normal test runs never rewrite goldens; see
- * PROJECT_BRIEF.md section 18.3.
- */
+/** Explicit, opt-in golden regeneration. Normal test runs never rewrite goldens; see ADR 0008. */
 tasks.register("updateGoldens") {
   group = "verification"
   description =
     "Regenerates scene-snapshot, SVG and draw-call goldens. Review the diff as a rendering change."
   doFirst {
     throw GradleException(
-      "Run as: ./gradlew test -PupdateGoldens=true --rerun-tasks (see PROJECT_BRIEF.md 18.3)"
+      "Run as: ./gradlew test -PupdateGoldens=true --rerun-tasks (see ADR 0008)"
     )
   }
 }

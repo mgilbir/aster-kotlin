@@ -15,7 +15,7 @@ public data class HitResult(
 
 /**
  * Tuning for hit testing. Touch input needs a larger tolerance than a mouse, and the tolerance must
- * not change a node's visual bounds (PROJECT_BRIEF.md 11.2).
+ * not change a node's visual bounds (ADR 0007).
  */
 public data class HitTestOptions(
   /** Extra radius added to thin geometry (rules, lines, unfilled paths). */
@@ -39,7 +39,7 @@ public data class HitTestOptions(
  * Small scenes are scanned linearly, which is exactly correct and fast enough. Above
  * [HitTestOptions.spatialIndexThreshold] nodes a uniform grid narrows the candidate set first; a
  * grid rather than an R-tree because chart marks are usually distributed evenly, and it is far
- * simpler to verify (PROJECT_BRIEF.md 4.6, 11.2).
+ * simpler to verify (ADR 0009, ADR 0007).
  */
 public class SceneHitIndex(
   private val scene: Scene,

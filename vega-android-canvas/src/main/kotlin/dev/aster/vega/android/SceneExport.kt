@@ -35,8 +35,8 @@ public data class BitmapExportOptions(
  * Bitmap, PNG and PDF export.
  *
  * All three go through the same [AndroidCanvasSceneRenderer] as the live view, so exported geometry
- * matches what is on screen (PROJECT_BRIEF.md 13.2, 13.3). Unsupported drawing operations surface
- * as warnings rather than silently missing marks.
+ * matches what is on screen (ADR 0010). Unsupported drawing operations surface as warnings rather
+ * than silently missing marks.
  *
  * **Pass the view's own renderer** for an export that matches the view. The default builds a fresh
  * one, and a fresh one has the default text engine — font scale 1, no host faces — and no image

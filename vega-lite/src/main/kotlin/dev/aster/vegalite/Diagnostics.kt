@@ -3,10 +3,10 @@ package dev.aster.vegalite
 /**
  * Diagnostic codes for the Vega-Lite compiler.
  *
- * Nothing here is silently ignored (PROJECT_BRIEF.md 3.3 and 14): every construct the compiler does
- * not implement produces one of these, naming itself and saying what a specification can do
- * instead. A Vega-Lite specification is short and its defaults are large, so an unimplemented
- * default is exactly the kind of omission a reader would otherwise mistake for a rendering bug.
+ * Nothing here is silently ignored (ADR 0011 and 14): every construct the compiler does not
+ * implement produces one of these, naming itself and saying what a specification can do instead. A
+ * Vega-Lite specification is short and its defaults are large, so an unimplemented default is
+ * exactly the kind of omission a reader would otherwise mistake for a rendering bug.
  */
 public object VegaLiteDiagnostics {
   public const val NOT_VEGA_LITE: String = "VEGA_LITE_NOT_A_SPECIFICATION"

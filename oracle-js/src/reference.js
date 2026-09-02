@@ -5,7 +5,7 @@
  * Usage: node src/reference.js <spec.vg.json> <output.reference.json>
  *
  * The output is checked into `test-fixtures/reference/`, so JVM tests need neither Node nor a network
- * connection (PROJECT_BRIEF.md 21). Regenerating it is an explicit act — `scripts/oracle.sh` — and the
+ * connection (CONTRIBUTING.md). Regenerating it is an explicit act — `scripts/oracle.sh` — and the
  * resulting diff has to be reviewed like a golden.
  */
 

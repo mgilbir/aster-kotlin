@@ -33,12 +33,12 @@ import kotlinx.coroutines.launch
 /**
  * The canonical Android host for a chart: one custom [View] drawing one scene through one canvas.
  *
- * There is deliberately no view, drawable, render node or accessibility view per mark
- * (PROJECT_BRIEF.md 4.3). `onDraw` consumes an already compiled snapshot and does no scene
- * compilation, JSON parsing, transform evaluation or text layout.
+ * There is deliberately no view, drawable, render node or accessibility view per mark (ADR 0009).
+ * `onDraw` consumes an already compiled snapshot and does no scene compilation, JSON parsing,
+ * transform evaluation or text layout.
  *
  * The Compose API wraps this class rather than reimplementing drawing, so both APIs share identical
- * text metrics, hit testing and accessibility (PROJECT_BRIEF.md 6.1, `vega-compose`).
+ * text metrics, hit testing and accessibility (, `vega-compose`).
  */
 public open class VegaChartView
 @JvmOverloads
@@ -546,7 +546,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 
   override fun onDraw(canvas: Canvas) {
     // Everything below reads an already-built snapshot: no scene compilation, no text layout, no
-    // JSON parsing, no large allocations (PROJECT_BRIEF.md 4.5).
+    // JSON parsing, no large allocations (ADR 0009).
     val snapshot = controller.snapshot
     val scene = snapshot.scene
     if (scene.width <= 0.0 || scene.height <= 0.0) return
@@ -860,7 +860,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
     val density = resources.displayMetrics.density
     val size = (scene.width * density).roundToInt() to (scene.height * density).roundToInt()
     // requestLayout() is only for a genuine preferred-size change, never for hover, tooltip or
-    // selection updates (PROJECT_BRIEF.md 8.4).
+    // selection updates (ADR 0002).
     if (reportedSize != size) {
       reportedSize = size
       requestLayout()

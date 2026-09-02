@@ -35,9 +35,8 @@ import dev.aster.vega.scene.spokenNumber
  * Hand-authored scenes, built without any Vega parsing.
  *
  * Milestone 1 uses these to exercise the scene graph, the Canvas renderer and the SVG serializer
- * before a specification compiler exists (PROJECT_BRIEF.md, Milestone 1). They are also the
- * fixtures the demo application renders, so a visual regression shows up in the demo and in tests
- * together.
+ * before a specification compiler exists. They are also the fixtures the demo application renders,
+ * so a visual regression shows up in the demo and in tests together.
  *
  * Every builder takes a [TextEngine] because text measurement is part of layout: passing the
  * Android engine produces the scene the device will actually draw, while [MetricTextEngine]

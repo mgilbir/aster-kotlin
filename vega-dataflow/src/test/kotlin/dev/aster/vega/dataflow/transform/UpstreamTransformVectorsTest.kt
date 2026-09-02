@@ -281,7 +281,8 @@ class UpstreamTransformVectorsTest {
       }
     // The divergences are pinned **exactly**. A new one fails the build; so does fixing one without
     // deleting its entry, which is what stops the list from quietly growing stale. Every entry is a
-    // bug to fix, not an accepted difference — see `known-divergences.json` and HANDOFF.md.
+    // bug to fix, not an accepted difference — see `known-divergences.json`, where each entry
+    // carries the write-up of what diverged and why.
     val known =
       json
         .parseToJsonElement(
@@ -301,7 +302,7 @@ class UpstreamTransformVectorsTest {
     assertEquals(
       known.sorted(),
       failures.map { it.lines().first() }.sorted(),
-      "the set of divergences from upstream changed; update known-divergences.json and HANDOFF.md",
+      "the set of divergences from upstream changed; update known-divergences.json",
     )
     assertTrue(replayed >= 60, "only $replayed vectors replayed; the harness must not shrink")
   }

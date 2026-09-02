@@ -29,7 +29,7 @@ pinDeterminism();
 
 const view = new vega.View(vega.parse(spec), {
   renderer: 'none',
-  // Tests must not hit the network (PROJECT_BRIEF.md 21).
+  // Tests must not hit the network (CONTRIBUTING.md).
   loader: fileLoader(rootsFor(specPath)),
 });
 

@@ -50,7 +50,7 @@ public data class Modifiers(
  * Platform-neutral input events.
  *
  * Android `MotionEvent` and friends are translated at the view boundary and never reach the runtime
- * (PROJECT_BRIEF.md 11.3), which is what keeps the core testable on the JVM.
+ * (ADR 0007), which is what keeps the core testable on the JVM.
  */
 public sealed interface ChartInputEvent {
   public data class PointerEntered(val point: PointD) : ChartInputEvent
@@ -143,7 +143,7 @@ public sealed interface ChartEvent {
  * Interaction state that a renderer may need but that is not part of the scene itself.
  *
  * Kept separate from [dev.aster.vega.scene.Scene] so a hover or selection change can bump the
- * snapshot revision without rebuilding the scene (PROJECT_BRIEF.md 8.4, 19).
+ * snapshot revision without rebuilding the scene (ADR 0002, ADR 0012).
  */
 public data class InteractionState(
   val hoveredNodeId: SceneNodeId? = null,

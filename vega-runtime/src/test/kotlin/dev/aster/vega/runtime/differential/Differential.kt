@@ -35,8 +35,8 @@ import kotlin.math.abs
  * The two engines nest their scene graphs differently — Vega groups items under a marktype, this
  * engine produces a flat list — so comparing tree shape would fail on every fixture while saying
  * nothing about correctness. Instead both sides emit a flat list of marks in absolute content-space
- * coordinates, and the comparison covers what PROJECT_BRIEF.md 18.4 asks for: mark count, mark
- * types, coordinates, extents and scale outputs.
+ * coordinates, and the comparison covers what ADR 0008 asks for: mark count, mark types,
+ * coordinates, extents and scale outputs.
  *
  * Coordinates are in **content space**, excluding the padding translation, so chart geometry is
  * checked independently of layout. Layout is checked separately through the surface size.
@@ -1004,12 +1004,11 @@ public object Differential {
   /**
    * Channels excluded from comparison: **none**.
    *
-   * This used to hold `font` and `fontWeight`, under the documented text-metrics exception
-   * (PROJECT_BRIEF.md 18.4, docs/adr/0006). That exception is real but it is about *measurement* —
-   * a browser and Android size glyphs differently, so the width of a label is not comparable — and
-   * these two channels are neither measured nor derived. They are the family and weight the
-   * specification asked for, and this engine either resolves them the way upstream does or it does
-   * not.
+   * This used to hold `font` and `fontWeight`, under the documented text-metrics exception (ADR
+   * 0008, docs/adr/0006). That exception is real but it is about *measurement* — a browser and
+   * Android size glyphs differently, so the width of a label is not comparable — and these two
+   * channels are neither measured nor derived. They are the family and weight the specification
+   * asked for, and this engine either resolves them the way upstream does or it does not.
    *
    * It did not. Comparing them found a `style` block's `font` leaking from a title into its
    * subtitle, and found that `fontWeight` had never been mapped into the comparison at all — it was

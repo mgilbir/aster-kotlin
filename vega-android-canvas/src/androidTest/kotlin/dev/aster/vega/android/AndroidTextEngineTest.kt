@@ -14,8 +14,8 @@ import org.junit.runner.RunWith
 
 /**
  * Text metrics come from the platform, so these assertions are about relationships (wider, taller,
- * proportional) rather than exact pixel counts — the documented policy for text tolerances
- * (PROJECT_BRIEF.md 9, 18.4).
+ * proportional) rather than exact pixel counts — the documented policy for text tolerances (ADR
+ * 0006, ADR 0008).
  */
 @RunWith(AndroidJUnit4::class)
 class AndroidTextEngineTest {

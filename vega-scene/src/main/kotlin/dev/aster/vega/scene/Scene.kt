@@ -4,7 +4,7 @@ package dev.aster.vega.scene
  * An immutable, fully compiled chart ready to be drawn, serialized or hit tested.
  *
  * Nothing in the drawing path may mutate a scene, and a scene must be complete before it is
- * published to the UI (PROJECT_BRIEF.md 4.5 and 10.2).
+ * published to the UI (ADR 0009 and 10.2).
  *
  * @param revision monotonically increasing per controller; renderers compare it to decide whether
  *   to invalidate.

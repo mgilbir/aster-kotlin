@@ -8,10 +8,9 @@ import dev.aster.vega.model.canonicalNumberString
 /**
  * Canonical JSON serialization of a scene, for snapshot tests and debugging.
  *
- * Guarantees (PROJECT_BRIEF.md 18.2): keys are emitted in a fixed order, node order follows paint
- * order, numbers use a fixed precision, `-0.0` is normalized, ids come from build order, and
- * nothing platform- or time-dependent appears. A change to this output must be reviewed as a
- * rendering change.
+ * Guarantees (ADR 0008): keys are emitted in a fixed order, node order follows paint order, numbers
+ * use a fixed precision, `-0.0` is normalized, ids come from build order, and nothing platform- or
+ * time-dependent appears. A change to this output must be reviewed as a rendering change.
  *
  * Hand-written rather than `kotlinx.serialization` because the ordering and numeric-formatting
  * guarantees are the whole point, and a schema-driven encoder would hide them.

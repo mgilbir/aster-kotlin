@@ -79,8 +79,8 @@ class ImageMarkInstrumentedTest {
 
   /**
    * An image that cannot be resolved leaves a gap **and says so**. A chart that quietly drops a
-   * mark is the failure mode PROJECT_BRIEF.md 13.3 exists to prevent, and it is invisible on screen
-   * by definition.
+   * mark is the failure mode ADR 0010 exists to prevent, and it is invisible on screen by
+   * definition.
    */
   @Test
   fun anUnresolvedImageIsReportedRatherThanSilentlyMissing() {

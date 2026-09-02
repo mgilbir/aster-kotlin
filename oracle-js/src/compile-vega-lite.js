@@ -2,7 +2,7 @@
 /**
  * Compiles a Vega-Lite specification to Vega with the upstream compiler.
  *
- * Native Vega-Lite compilation is out of scope for the first release (PROJECT_BRIEF.md 3.1), so
+ * Native Vega-Lite compilation is out of scope for the first release (ADR 0011), so
  * Vega-Lite fixtures are compiled here and the Kotlin runtime consumes the resulting Vega JSON.
  *
  * Usage: node src/compile-vega-lite.js <input.vl.json> <output.vg.json>
