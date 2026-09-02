@@ -25,6 +25,17 @@ section here does not get released.
 
 ### Changed
 
+- **A release verifies on macOS as well as Linux.** `release.yml`'s `verify` job ran on Linux only,
+  where `check.sh` skips both Apple gates — `swift` needs a Mac and `ios-ui` needs a simulator — and
+  the `publish` job that builds the XCFramework and writes `Package.swift` runs no suite of its own.
+  So a release shipped the Swift package having run none of its 158 tests and none of the three UI
+  tests that are the only end-to-end check of VoiceOver. 0.5.0 went out that way. `verify` is a
+  two-host matrix now, the same shape `ci.yml` uses; the oracles and the release preconditions stay
+  on the Linux leg, being questions asked once per release rather than once per host.
+
+  The same hole as the instrumented suites, which `verify` also skipped for want of a device and
+  which now have their own job.
+
 - **The iOS demo's UI tests run in the gate.** Three tests, and the only place VoiceOver is checked
   end to end: every bar is its own labelled element, the axes are described, and activating an
   element selects the mark it stands for. `check.sh` gains an `ios-ui` gate, skipped with a reason
