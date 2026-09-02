@@ -6,6 +6,43 @@ section here does not get released.
 
 ## Unreleased
 
+### Changed
+
+- **`ktecma262` 0.3.0, and six things this repository was writing out itself are now its.** The
+  library answered five capability requests (ktecma262#5 to #9) that came out of the
+  regular-expression literal work, and adopting them removes about 190 lines of hand-transcribed
+  ECMA-262:
+
+  - **Whitespace and line terminators.** `isEcmaWhiteSpace` was `internal` and there was no
+    *LineTerminator* predicate, so both tables were written out here — nine code points and a
+    category check. Both are public now.
+  - **Regular-expression literals.** `scanRegExpLiteral` finds a literal's delimiters, which is the
+    escape and character-class tracking the library's own pattern parser already does. Forty-five
+    lines to eight.
+  - **String escapes.** `decodeEscapeSequence` owns `\xHH`, `\u{…}`, *LineContinuation* and the
+    `\0`-only-if-no-digit rule. Sixty-seven lines to eight, with a new test pinning the awkward
+    cases so the swap is shown to change nothing a specification can see.
+  - **`new Date(...)`.** `makeFullYear`, `makeDay`, `makeTime`, `makeDate` and `timeClip` replace the
+    transcription of the same. What stays is `LocalTZA` — turning a *local* time value into an
+    instant needs a time-zone database, which the library rightly does not carry.
+  - **`ToInt32`/`ToUint32`.** The modulo-2^32 wrap is the library's; the coercion in front of it is
+    this value model's.
+
+- **A numeric literal is read by ECMA-262's rules rather than the platform's.** `parseNumber` used
+  Kotlin's `toDoubleOrNull` and `toLongOrNull(16)`, which disagree with JavaScript in both
+  directions: the hex path overflowed to null past 64 bits, so `0xFFFFFFFFFFFFFFFFFF` — an ordinary
+  double in a browser, at 4.72e21 — was a **syntax error**, and hex literals are exactly what colour
+  arithmetic is written with. Octal did not lex at all. Kotlin also accepts `1d`, `1f` and `0x1p3`,
+  none of which is a JavaScript number. (#155)
+
+- **`DateValues.parseIso` deliberately stays.** `parseDateTimeString` was added for it and was
+  measured against it before deciding: where both parse they agree exactly, but the strict grammar
+  answers `NaN` for four shapes a real engine accepts and this repository's own vectors contain —
+  an offset written `-0500` without its colon, a space instead of `T`, and two or nine fractional
+  digits instead of three. `Date.parse` is allowed an implementation-defined fallback and every
+  browser has one. Swapping would turn four accepted inputs into a datum silently leaving the domain.
+
+
 ### Added
 
 - **Regular-expression literals.** `/pattern/flags` lexes to the same `VegaValue.Pattern` that

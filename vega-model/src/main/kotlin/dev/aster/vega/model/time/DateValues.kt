@@ -57,6 +57,23 @@ public object DateValues {
    * string — and *not* how it reads one that carries a time, which is local. Reproducing that split
    * matters: it is the difference between a bar landing on the first of the month and the last of
    * the previous one.
+   *
+   * **Deliberately not `ktecma262`'s `parseDateTimeString`**, which was added in 0.3.0 for this
+   * (ktecma262#7) and was measured against this before deciding. It implements the *Date Time
+   * String Format* exactly, and this is deliberately looser, because `Date.parse` is allowed an
+   * implementation-defined fallback and every browser has one. Where both parse they agree exactly;
+   * the four shapes that differ are all ones a real engine accepts and the grammar does not:
+   *
+   * |input                     |strict|here                                                      |
+   * |--------------------------|------|----------------------------------------------------------|
+   * |`2026-03-14T09:30:20.25Z` |NaN   |parsed — the grammar wants exactly three fractional digits|
+   * |`2026-03-14T09:30:00-0500`|NaN   |parsed — the grammar wants `±HH:MM` with the colon        |
+   * |`2026-03-14 09:30:00`     |NaN   |parsed — a space where the grammar wants `T`              |
+   * |`…09:30:00.123456789Z`    |NaN   |parsed — nine fractional digits                           |
+   *
+   * The offset without a colon is not hypothetical: it is in this repository's own time-scale
+   * vectors, read off d3. Swapping to the strict parser would turn four accepted inputs into
+   * `null`, which for a chart means a datum that silently leaves the domain.
    */
   public fun parseIso(text: String, local: TimeZone = TimeZone.currentSystemDefault()): Double? {
     val match = ISO.matchEntire(text.trim()) ?: return null

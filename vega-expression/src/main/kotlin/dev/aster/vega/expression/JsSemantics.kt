@@ -6,7 +6,8 @@ import dev.aster.vega.model.isNullish
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.time.TimeFormat
 import io.github.mgilbir.ecma262.number.toEcmaDouble
-import kotlin.math.truncate
+import io.github.mgilbir.ecma262.number.toEcmaInt32
+import io.github.mgilbir.ecma262.number.toEcmaUint32
 import kotlinx.datetime.TimeZone
 
 /**
@@ -265,19 +266,18 @@ public object JsSemantics {
    *
    * The truncation **wraps** modulo 2^32; it does not saturate. `toLong()` saturates at ±2^63, so
    * every value above that came out as -1 and `1e20 | 0` answered -1 where JavaScript answers
-   * 1661992960. Going through the mathematical modulo first is what the specification says and is
-   *             exact for every double, because a double above 2^53 is already a whole number.
+   * 1661992960. That modulo is `ktecma262`'s now — it was the last of the arithmetic written out
+   *             here, and the coercion in front of it is the part that is this value model's.
    */
-  public fun toInt32(value: VegaValue): Int = toUint32(value).toInt()
+  public fun toInt32(value: VegaValue): Int = toNumber(value).toEcmaInt32()
 
-  /** `ToUint32`, needed for the unsigned right shift. The same modulo, left unsigned. */
-  public fun toUint32(value: VegaValue): Long {
-    val number = toNumber(value)
-    if (!number.isFinite()) return 0L
-    return truncate(number).mod(TWO_TO_THE_32).toLong()
-  }
-
-  private const val TWO_TO_THE_32: Double = 4294967296.0
+  /**
+   * `ToUint32`, needed for the unsigned right shift. The same modulo, left unsigned.
+   *
+   * `Long` rather than `UInt` because callers do signed arithmetic on it and this is a public
+   * surface; `toEcmaUint32` answers a `UInt`, so the widening is here.
+   */
+  public fun toUint32(value: VegaValue): Long = toNumber(value).toEcmaUint32().toLong()
 
   /**
    * `Date.prototype.toString`, which is what `String(date)` and `date + ''` produce.

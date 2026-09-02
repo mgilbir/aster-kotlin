@@ -31,6 +31,56 @@ class ParserTest {
     assertEquals(Node.Literal(VegaValue.Str("é")), parse("'\\u00e9'"))
   }
 
+  /**
+   * The escape table's awkward corners, which `ktecma262` owns now.
+   *
+   * Written when the decoding moved from this repository to `decodeEscapeSequence` (ktecma262#8).
+   * The three cases above pass either way; these are the ones where two implementations could
+   * plausibly disagree, so they are what says the swap changed nothing a specification can see.
+   */
+  /**
+   * A numeric literal is read by ECMA-262's rules, not the platform's.
+   *
+   * `parseNumber` used Kotlin's `toDoubleOrNull` and `toLongOrNull(16)`, which disagree with
+   * JavaScript both ways (#155): the hex path overflowed to null past 64 bits, so a literal a
+   * browser reads as an ordinary double was a **syntax error**; and Kotlin accepts `1d` and `1f`,
+   * which are not JavaScript numbers at all. `toEcmaDouble` is the specification's own conversion.
+   */
+  @Test
+  fun `a numeric literal follows ECMA-262 and not the platform`() {
+    // Wider than 64 bits. This was `Invalid hex literal`.
+    assertEquals(
+      Node.Literal(VegaValue.Num(4.722366482869645E21)),
+      parse("0xFFFFFFFFFFFFFFFFFF"),
+    )
+    // Octal, which the lexer did not even tokenise as one number.
+    assertEquals(Node.Literal(VegaValue.Num(15.0)), parse("0o17"))
+    // Still the ordinary cases.
+    assertEquals(Node.Literal(VegaValue.Num(255.0)), parse("0xFF"))
+    assertEquals(Node.Literal(VegaValue.Num(5.0)), parse("0b101"))
+    assertEquals(Node.Literal(VegaValue.Num(1.5e3)), parse("1.5e3"))
+    // And a literal that is not a JavaScript number stays a syntax error rather than a silent NaN.
+    assertThrows<ExpressionSyntaxException> { parse("0x1p3") }
+  }
+
+  @Test
+  fun `the awkward escapes decode the same`() {
+    // `\xHH`, two hex digits and no more.
+    assertEquals(Node.Literal(VegaValue.Str("A")), parse("'\\x41'"))
+    // `\u{…}` for a supplementary code point, which has to come back as a surrogate pair — one
+    // code point, two chars.
+    val emoji = (parse("'\\u{1F600}'") as Node.Literal).value as VegaValue.Str
+    assertEquals(2, emoji.value.length, "a supplementary code point is a surrogate pair")
+    assertEquals(0x1F600, emoji.value.codePointAt(0))
+    // `\0` is a NUL.
+    assertEquals(Node.Literal(VegaValue.Str("\u0000")), parse("'\\0'"))
+    // *LineContinuation*: the backslash and the terminator both vanish, and `\r\n` is one.
+    assertEquals(Node.Literal(VegaValue.Str("ab")), parse("'a\\\nb'"))
+    assertEquals(Node.Literal(VegaValue.Str("ab")), parse("'a\\\r\nb'"))
+    // An identity escape keeps the character.
+    assertEquals(Node.Literal(VegaValue.Str("q")), parse("'\\q'"))
+  }
+
   @Test
   fun `member access chains left to right`() {
     val node = parse("datum.a.b")
