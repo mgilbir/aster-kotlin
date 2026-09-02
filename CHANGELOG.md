@@ -4,6 +4,22 @@ Notable changes, newest first. The release workflow reads the section for the
 version it is publishing and uses it as the release notes, so a version without a
 section here does not get released.
 
+## Unreleased
+
+### Fixed
+
+- **A time axis keeps the day width the host's locale states.** `VegaLocale.timeTickFormats` read
+  the field *order* off the locale's `date` pattern and then wrote the day back as a hard-coded
+  `%d`, discarding the width the same pattern gave it. A host supplying `%-d %b %Y` had `%-d`
+  honoured by `timeUnitSpecifiers` and ignored here, from one locale value: `3 mei` asked for and
+  `03 mei` drawn. A month-first locale was affected too, by falling through to d3's padded default
+  rather than by deriving anything.
+
+  Only the day comes from the pattern, and deliberately not through `withFields`: a week's tick
+  wants the month *name*, so `%d-%m-%Y` has to yield `%d %b` and not `%d-%m` — that would be a
+  different label rather than a wider one. A month-first locale writing a padded day still derives
+  nothing, which is what keeps d3's default a default. (#151, the same discard as #97 one path over.)
+
 ## 0.5.0
 
 ### Changed

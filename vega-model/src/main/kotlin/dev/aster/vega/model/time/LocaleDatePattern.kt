@@ -98,6 +98,21 @@ internal object LocaleDatePattern {
    */
   fun fieldOrder(pattern: String): List<DateField>? = parse(pattern)?.map { it.field }?.distinct()
 
+  /**
+   * The directive [pattern] writes [field] with — `%-d`, `%d`, `%e` — or null where it omits it.
+   *
+   * The **directive alone**, with no separator and no marker: this exists for a caller composing a
+   * format out of one of the language's own field widths and directives of its own, where
+   * [withFields] would be wrong because it keeps the language's other fields too.
+   *
+   * That is the tick cascade. A week's ticks read `21 mei`, so the format wants the *month name*
+   * `%b` rather than whatever the language writes a month with — `%d-%m-%Y` through [withFields]
+   * gives `%d-%m`, which is a different label, not a wider one. What the cascade needs from the
+   * language is the day's width, and this is the smallest thing that answers it. See #151.
+   */
+  fun directiveFor(pattern: String, field: DateField): String? =
+    parse(pattern)?.firstOrNull { it.field == field }?.directive
+
   /** Whether [pattern] writes the month before the day of the month. */
   fun monthBeforeDate(pattern: String): Boolean? {
     val pieces = parse(pattern) ?: return null
