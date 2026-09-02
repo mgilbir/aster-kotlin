@@ -1,15 +1,17 @@
 package dev.aster.vega.model.time
 
+import io.github.mgilbir.ecma262.date.EcmaTimeZone
+import io.github.mgilbir.ecma262.date.makeDate
+import io.github.mgilbir.ecma262.date.makeDay
+import io.github.mgilbir.ecma262.date.makeFullYear
+import io.github.mgilbir.ecma262.date.makeTime
+import io.github.mgilbir.ecma262.date.timeClip
 import kotlin.math.abs
-import kotlin.math.floor
 import kotlin.math.truncate
-import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.LocalTime
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * `new Date(year, month, …)`, as ECMA-262 defines it.
@@ -82,69 +84,46 @@ public object JsDate {
     millis: Double = 0.0,
     zone: TimeZone,
   ): Double {
-    if (
-      !year.isFinite() ||
-        !month.isFinite() ||
-        !date.isFinite() ||
-        !hours.isFinite() ||
-        !minutes.isFinite() ||
-        !seconds.isFinite() ||
-        !millis.isFinite()
-    ) {
-      return Double.NaN
+    // ECMA-262's own decomposition, from `ktecma262`. All of it was written out here — the
+    // two-digit year rule, `MakeDay`'s reduction of a month into a year and a month-of-year,
+    // `MakeTime` kept in milliseconds so an out-of-range hour becomes a day offset, `MakeDate`,
+    // and `TimeClip` — and each carries NaN and range rules that are easy to get subtly wrong.
+    // Asked for as ktecma262#7 and answered in 0.3.0.
+    //
+    // What stays here is what the library deliberately leaves to a caller: turning a *local* time
+    // value into an instant needs a time-zone database, and a specification-compliant regular
+    // expression engine has no business carrying one. That is `LocalTZA`, below.
+    val localTimeValue =
+      makeDate(
+        makeDay(makeFullYear(truncate(year)), month, date),
+        makeTime(hours, minutes, seconds, millis),
+      )
+    // `UTC(t) = t - LocalTZA(t)`. The offset is the one in force at that **local wall clock**,
+    // which is why it cannot be read at the resulting instant: the two differ by an hour on one
+    // side of every daylight-saving transition.
+    val offsetMinutes = KotlinxZone(zone).offsetMinutesAtLocalTime(localTimeValue)
+    return timeClip(localTimeValue - offsetMinutes * 60_000.0)
+  }
+
+  /**
+   * `LocalTZA` over a `kotlinx-datetime` zone.
+   *
+   * `ktecma262` takes an [EcmaTimeZone] rather than depending on a time-zone database, which is the
+   * right split: the calendar arithmetic is the specification's and the zone data is the
+   * platform's.
+   *
+   * The argument is a **local** time value — milliseconds read as a wall clock rather than as an
+   * instant — so it is decomposed as UTC fields first and those fields are then asked what they
+   * mean in [zone].
+   */
+  private class KotlinxZone(private val zone: TimeZone) : EcmaTimeZone {
+    override fun offsetMinutesAtLocalTime(localTimeValue: Double): Int {
+      if (!localTimeValue.isFinite() || abs(localTimeValue) > MAX_TIME_VALUE) return 0
+      val wallClock =
+        Instant.fromEpochMilliseconds(localTimeValue.toLong()).toLocalDateTime(TimeZone.UTC)
+      val actual = wallClock.toInstant(zone).toEpochMilliseconds()
+      return ((localTimeValue.toLong() - actual) / 60_000L).toInt()
     }
-
-    // Step 8 of the constructor: `0 ≤ ToIntegerOrInfinity(y) ≤ 99` means 1900 + y. Note it is the
-    // *truncated* year that is tested, so `new Date(99.9, …)` is 1999 as well.
-    val truncatedYear = truncate(year)
-    val calendarYear =
-      if (truncatedYear >= 0.0 && truncatedYear <= 99.0) 1900.0 + truncatedYear else truncatedYear
-
-    // `MakeDay`: the month is reduced into a year and a month-of-year, both of which may have
-    // travelled a long way from what was written.
-    val wholeMonths = truncate(month)
-    val yearOfMonth = calendarYear + floor(wholeMonths / 12.0)
-    if (yearOfMonth < MIN_YEAR || yearOfMonth > MAX_YEAR) return Double.NaN
-    val monthOfYear = wholeMonths - floor(wholeMonths / 12.0) * 12.0
-
-    // `MakeTime`, kept in milliseconds so an out-of-range hour becomes a day offset rather than an
-    // illegal `LocalTime` — which is the whole rollover rule for the time half.
-    val timeOfDay =
-      truncate(hours) * 3_600_000.0 +
-        truncate(minutes) * 60_000.0 +
-        truncate(seconds) * 1000.0 +
-        truncate(millis)
-    if (!timeOfDay.isFinite()) return Double.NaN
-
-    // A date is one-based, so `date - 1` is the offset from the first of the month; the time's own
-    // overflow is added to it, and what is left is a time inside one day.
-    val dayOffset = truncate(date) - 1.0 + floor(timeOfDay / MS_PER_DAY)
-    if (abs(dayOffset) > MAX_DAY_OFFSET) return Double.NaN
-    val millisOfDay = timeOfDay - floor(timeOfDay / MS_PER_DAY) * MS_PER_DAY
-
-    val firstOfMonth =
-      try {
-        LocalDate(yearOfMonth.toInt(), monthOfYear.toInt() + 1, 1)
-      } catch (_: IllegalArgumentException) {
-        return Double.NaN
-      }
-    val day =
-      try {
-        firstOfMonth.plus(dayOffset.toLong(), DateTimeUnit.DAY)
-      } catch (_: IllegalArgumentException) {
-        return Double.NaN
-      } catch (_: ArithmeticException) {
-        return Double.NaN
-      }
-
-    val clock = LocalDateTime(day, LocalTime.fromMillisecondOfDay(millisOfDay.toInt()))
-    val instant =
-      try {
-        clock.toInstant(zone)
-      } catch (_: IllegalArgumentException) {
-        return Double.NaN
-      }
-    return clip(instant.toEpochMilliseconds().toDouble())
   }
 
   /**

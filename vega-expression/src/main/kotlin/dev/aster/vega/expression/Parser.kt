@@ -1,6 +1,7 @@
 package dev.aster.vega.expression
 
 import dev.aster.vega.model.VegaValue
+import io.github.mgilbir.ecma262.number.toEcmaDouble
 
 /**
  * Recursive-descent parser with a precedence table, for Vega's expression language.
@@ -255,19 +256,25 @@ public class Parser(private val source: String) {
     }
   }
 
+  /**
+   * A numeric literal, read by ECMA-262's rules rather than by the platform's.
+   *
+   * This used Kotlin's `toDoubleOrNull` and `toLongOrNull(16)`, and the two disagree with
+   * JavaScript in both directions (#155). `toLongOrNull(16)` overflows to null past 64 bits, so
+   * `0xFFFFFFFFFFFFFFFFFF` — an ordinary double in a browser, at 4.72e21 — was a **syntax error**
+   * here, and hex literals are exactly what colour arithmetic is written with. In the other
+   * direction Kotlin accepts `1d`, `1f` and `0x1p3`, none of which is a JavaScript number.
+   *
+   * `toEcmaDouble` is the specification's `StringNumericLiteral`, so `0o17` is 15 and the wide hex
+   * literal is the double a browser gives. A literal it cannot read answers `NaN`, which stays a
+   * syntax error here rather than becoming a silent `NaN` in a chart.
+   */
   private fun parseNumber(token: Token): Double {
-    val text = token.text
-    return when {
-      text.startsWith("0x") || text.startsWith("0X") ->
-        text.substring(2).toLongOrNull(16)?.toDouble()
-          ?: throw ExpressionSyntaxException("Invalid hex literal '$text'", token.start, source)
-      text.startsWith("0b") || text.startsWith("0B") ->
-        text.substring(2).toLongOrNull(2)?.toDouble()
-          ?: throw ExpressionSyntaxException("Invalid binary literal '$text'", token.start, source)
-      else ->
-        text.toDoubleOrNull()
-          ?: throw ExpressionSyntaxException("Invalid number '$text'", token.start, source)
+    val value = token.text.toEcmaDouble()
+    if (value.isNaN()) {
+      throw ExpressionSyntaxException("Invalid number '${token.text}'", token.start, source)
     }
+    return value
   }
 
   // ---- token helpers --------------------------------------------------------

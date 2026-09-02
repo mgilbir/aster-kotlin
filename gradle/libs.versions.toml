@@ -16,7 +16,7 @@ coroutines = "1.10.2"
 kotlinx-datetime = "0.8.0"
 ## An ECMA-262 regular expression engine in common Kotlin. A pattern in a specification is
 ## JavaScript's, and Kotlin's `Regex` is the platform's — see VegaValue.Pattern.
-ktecma262 = "0.2.0"
+ktecma262 = "0.3.0"
 androidx-core = "1.17.0"
 androidx-customview = "1.2.0"
 androidx-appcompat = "1.7.1"

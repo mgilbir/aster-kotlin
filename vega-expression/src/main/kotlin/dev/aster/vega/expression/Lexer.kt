@@ -1,6 +1,10 @@
 package dev.aster.vega.expression
 
+import io.github.mgilbir.ecma262.lexer.decodeEscapeSequence
+import io.github.mgilbir.ecma262.lexer.scanRegExpLiteral
 import io.github.mgilbir.ecma262.text.isEcmaIdentifierName
+import io.github.mgilbir.ecma262.text.isEcmaLineTerminator
+import io.github.mgilbir.ecma262.text.isEcmaWhiteSpace
 
 /** A lexical token, with its source offset so a parse error can point at the right character. */
 public data class Token(val type: TokenType, val text: String, val start: Int) {
@@ -103,50 +107,29 @@ public class Lexer(private val source: String) {
   }
 
   /**
-   * JavaScript's *WhiteSpace* and *LineTerminator*, which are not Kotlin's.
+   * JavaScript's *WhiteSpace* **and** *LineTerminator* — two productions, one question here, since
+   * everything between two tokens is skipped whichever it is.
    *
-   * The one that matters in practice is the **no-break space**. `Char.isWhitespace` excludes U+00A0
-   * on purpose — it is not a separator when you are breaking text into words — and JavaScript's
-   * grammar includes it, so an expression copied out of a rendered web page failed with `Unexpected
-   * character ' '` and no way to see what the character was. U+FEFF is the other one worth naming:
-   * it is what a UTF-8 byte-order mark decodes to, so a specification saved with one had an
-   * unlexable first token.
+   * Both tables come from `ktecma262`. They were written out here — nine code points and a category
+   * check — because `isEcmaWhiteSpace` was `internal` and no *LineTerminator* predicate existed.
+   * Both were asked for (ktecma262#5) and both arrived in 0.3.0, so this is the library's answer
+   * rather than a second copy of a specification table kept in step by hand.
+   *
+   * The two that motivated writing it out are still worth naming: U+00A0, which `Char.isWhitespace`
+   * excludes on purpose and JavaScript's grammar includes — an expression copied out of a rendered
+   * web page failed on it — and U+FEFF, which is what a byte-order mark decodes to, so a
+   * specification saved with one had an unlexable first token.
    */
-  private fun isJsWhitespace(ch: Char): Boolean =
-    when (ch) {
-      '\u0009',
-      '\u000B',
-      '\u000C',
-      '\u00A0',
-      '\uFEFF',
-      '\n',
-      '\r',
-      '\u2028',
-      '\u2029' -> true
-      else -> ch.category == CharCategory.SPACE_SEPARATOR
-    }
-
-  /**
-   * ECMA-262's *LineTerminator*, which a regular-expression literal may not contain.
-   *
-   * A subset of [isJsWhitespace] and named separately because the two answer different questions:
-   * whitespace between tokens is skipped, a line terminator inside a literal ends the literal's
-   * chance of being one. Without it an unterminated `/` swallows the rest of the source and the
-   * complaint arrives with an offset nowhere near the mistake.
-   *
-   * **Written here rather than taken from `ktecma262`**, which is where it belongs: that library
-   * holds the *WhiteSpace* table but `isEcmaWhiteSpace` is `internal`, and it has no
-   * *LineTerminator* predicate at all, though `isEcmaIdentifierName` beside them is public and this
-   * file uses it. Asked for as ktecma262#5. Four code points, so the copy is small — but it is a
-   * copy of a spec table that library already holds, which is the reason to say so.
-   */
-  private fun isJsLineTerminator(ch: Char): Boolean =
-    ch == '\n' || ch == '\r' || ch == '\u2028' || ch == '\u2029'
+  private fun isJsWhitespace(ch: Char): Boolean = isEcmaWhiteSpace(ch) || isEcmaLineTerminator(ch)
 
   private fun number(start: Int): Token {
-    // Hex and binary literals are legal JavaScript and appear in colour arithmetic.
+    // Hex, octal and binary literals are legal JavaScript; hex is what colour arithmetic is
+    // written with. `o` was missing, so `0o17` lexed as `0` followed by an identifier and failed
+    // to parse where a browser reads 15 (#155).
     if (
-      source[index] == '0' && index + 1 < source.length && source[index + 1].lowercaseChar() in "xb"
+      source[index] == '0' &&
+        index + 1 < source.length &&
+        source[index + 1].lowercaseChar() in "xob"
     ) {
       index += 2
       while (index < source.length && (source[index].isLetterOrDigit())) index++
@@ -208,64 +191,34 @@ public class Lexer(private val source: String) {
   }
 
   /**
-   * `/pattern/flags`, scanned to its closing delimiter.
+   * `/pattern/flags`, scanned by `ktecma262`.
    *
-   * Three things make the closing `/` hard to find, and all three are ECMA-262's:
-   * - `\` escapes the character after it, so `/a\/b/` has one delimiter at each end and a literal
-   *   slash in the middle.
-   * - `[…]` is a character class, and a `/` inside one is literal: `/[/]/` is a pattern matching a
-   *   slash, not an empty pattern followed by junk.
-   * - a line terminator may not appear in the body at all, which is what stops an unterminated
-   *   literal from swallowing the rest of a document.
+   * Finding the closing delimiter is not a substring search. A backslash escapes the next
+   * character, so `/a\/b/` has a literal slash between its delimiters; `[...]` is a character class
+   * and a `/` inside one is literal, so `/[/]/` matches a slash; and a *LineTerminator* may not
+   * appear in the body at all, which is what stops an unterminated literal swallowing the rest of a
+   * document.
    *
-   * The pattern itself is *not* validated here. That is `ktecma262`'s job and it happens in
-   * [Parser], so a bad pattern is reported by the engine that will run it rather than by a second
-   * opinion this file would have to keep in step.
+   * Those are the same three facts `ktecma262`'s regular-expression parser already tracks while
+   * parsing a pattern, so deriving them here was deriving a subset of it. Asked for as ktecma262#6
+   * and answered in 0.3.0 by [scanRegExpLiteral], which takes a source and an offset and returns
+   * the pattern, the flags, and where the literal ended.
+   *
+   * What stays here is the part that is this *language's* rather than ECMA-262's: whether a `/` at
+   * this offset opens a literal at all, which depends on the token before it. See
+   * [regexCanStartHere].
+   *
+   * The pattern is still not validated here — `VegaValue.Pattern` compiles it through `RegExp`, so
+   * an unreadable one is refused by the engine that would have run it.
    */
   private fun regex(start: Int): Token {
-    index++ // opening delimiter
-    var inClass = false
-    while (true) {
-      if (index >= source.length) {
-        // Upstream's parser has this message verbatim, and it is the accurate one: the body is
-        // fine, the delimiter is missing.
-        throw ExpressionSyntaxException("Invalid regular expression: missing /", start, source)
-      }
-      val c = source[index]
-      when {
-        isJsLineTerminator(c) ->
-          throw ExpressionSyntaxException("Invalid regular expression: missing /", start, source)
-        c == '\\' -> {
-          index++
-          if (index >= source.length || isJsLineTerminator(source[index])) {
-            throw ExpressionSyntaxException("Invalid regular expression: missing /", start, source)
-          }
-          index++
-        }
-        c == '[' -> {
-          inClass = true
-          index++
-        }
-        c == ']' -> {
-          inClass = false
-          index++
-        }
-        c == '/' && !inClass -> {
-          // An empty body is `//`, which is not a pattern in any dialect. Named here rather than
-          // left to the regular-expression engine, whose complaint about an empty source reads as
-          // an engine limitation instead of a typo.
-          if (index == start + 1) {
-            throw ExpressionSyntaxException("Invalid regular expression: empty", start, source)
-          }
-          index++
-          // Flags are letters and there is no separator, so they run to the first character that is
-          // not one. Which letters are legal is `ktecma262`'s question, asked in `Parser`.
-          while (index < source.length && source[index].isLetter()) index++
-          return Token(TokenType.REGEX, source.substring(start, index), start)
-        }
-        else -> index++
-      }
-    }
+    val scan =
+      scanRegExpLiteral(source, start)
+        // Upstream's own parser carries this message, and it is the accurate one: the body scanned
+        // fine, the delimiter that would have closed it is not there.
+        ?: throw ExpressionSyntaxException("Invalid regular expression: missing /", start, source)
+    index = scan.end
+    return Token(TokenType.REGEX, source.substring(start, scan.end), start)
   }
 
   private fun string(start: Int, quote: Char): Token {
@@ -297,96 +250,26 @@ public class Lexer(private val source: String) {
   }
 
   /**
-   * One escape sequence, appended to [text], with [index] left after it.
+   * One escape sequence, decoded by `ktecma262`.
    *
-   * Three of JavaScript's forms were missing and each of them **silently produced the wrong text**,
-   * because the fallback is the identity: `'\x41'` came out as `"x41"` rather than `"A"`,
-   * `'\u{1F600}'` as `"u{1F600}"`, and a backslash at the end of a line — a *line continuation*,
-   * which is how a long pattern is written across two lines — put the newline into the string.
-   * Nothing reported any of it, so a label was simply wrong.
+   * `\n`, `\t`, `\xHH`, `\uHHHH`, `\u{...}`, identity escapes, and *LineContinuation* — where the
+   * backslash and the line terminator both vanish and a CRLF counts as one. None of that is
+   * guessable from the character after the backslash without the table, and two rules are easy to
+   * get subtly wrong: `\0` is a NUL only when no digit follows it, and `\u{...}` may name a
+   * supplementary code point that has to become a surrogate pair.
    *
-   * A whole code point, not a character, because `\u{...}` above U+FFFF is a surrogate pair.
+   * That table lived here. It is ECMA-262 §12.9.4 and belongs beside the identifier and whitespace
+   * tables the same library already owns — asked for as ktecma262#8, answered in 0.3.0 by
+   * [decodeEscapeSequence].
    */
   private fun appendEscape(text: StringBuilder) {
-    when (val c = source[index]) {
-      'n' -> {
-        text.append('\n')
-        index++
-      }
-      't' -> {
-        text.append('\t')
-        index++
-      }
-      'r' -> {
-        text.append('\r')
-        index++
-      }
-      'b' -> {
-        text.append('\b')
-        index++
-      }
-      'f' -> {
-        text.append('\u000C')
-        index++
-      }
-      'v' -> {
-        text.append('\u000B')
-        index++
-      }
-      '0' -> {
-        text.append('\u0000')
-        index++
-      }
-      // A *LineContinuation*: the backslash and the line terminator both vanish. `\r\n` is one
-      // terminator, not two.
-      '\n',
-      '\u2028',
-      '\u2029' -> index++
-      '\r' -> {
-        index++
-        if (index < source.length && source[index] == '\n') index++
-      }
-      'x' -> {
-        val code = hexAt(index + 1, 2) ?: throw invalidEscape("x", index, 2)
-        text.append(code.toChar())
-        index += 3
-      }
-      'u' -> {
-        if (index + 1 < source.length && source[index + 1] == '{') {
-          val close = source.indexOf('}', index + 2)
-          val digits = if (close < 0) null else source.substring(index + 2, close)
-          val code = digits?.takeIf { it.isNotEmpty() }?.toIntOrNull(16)
-          if (code == null || code > 0x10FFFF) {
-            throw ExpressionSyntaxException("Invalid unicode escape", index, source)
-          }
-          text.appendCodePointCompat(code)
-          index = close + 1
-        } else {
-          // \uXXXX; the four hex digits follow, so consume them here.
-          val code = hexAt(index + 1, 4) ?: throw invalidEscape("u", index, 4)
-          text.append(code.toChar())
-          index += 5
-        }
-      }
-      else -> {
-        text.append(c)
-        index++
-      }
-    }
+    // The library wants the backslash's own offset; `index` is sitting on the character after it.
+    val decoded =
+      decodeEscapeSequence(source, index - 1)
+        ?: throw ExpressionSyntaxException("Invalid escape", index, source)
+    text.append(decoded.text)
+    index = decoded.end
   }
-
-  /** [count] hexadecimal digits starting at [from], or null when they are not all there. */
-  private fun hexAt(from: Int, count: Int): Int? {
-    if (from + count > source.length) return null
-    return source.substring(from, from + count).toIntOrNull(16)
-  }
-
-  private fun invalidEscape(marker: String, at: Int, digits: Int) =
-    ExpressionSyntaxException(
-      "Invalid escape '\\$marker': it takes $digits hexadecimal digits",
-      at,
-      source,
-    )
 
   private fun isIdentifierStart(ch: Char): Boolean = IdentifierChars.isStart(ch)
 
@@ -496,20 +379,5 @@ private object IdentifierChars {
       partKnown[at] = true
     }
     return partValue[at]
-  }
-}
-
-/**
- * `StringBuilder.appendCodePoint`, which the common standard library does not have.
- *
- * A code point above U+FFFF is a surrogate pair, and `\u{1F600}` is how a specification writes one.
- */
-private fun StringBuilder.appendCodePointCompat(code: Int) {
-  if (code <= 0xFFFF) {
-    append(code.toChar())
-  } else {
-    val shifted = code - 0x10000
-    append((0xD800 + (shifted shr 10)).toChar())
-    append((0xDC00 + (shifted and 0x3FF)).toChar())
   }
 }
