@@ -6,6 +6,29 @@ section here does not get released.
 
 ## Unreleased
 
+### Added
+
+- **Regular-expression literals.** `/pattern/flags` lexes to the same `VegaValue.Pattern` that
+  `regexp()` builds, so `replace(datum.label, / #\d+$/, '')` — legal against upstream, whose parser
+  carries `Invalid regular expression: missing /` in its own message table — is an expression this
+  engine reads rather than refuses. They were excluded before `ktecma262` existed, on the argument
+  that there was no engine to hand a pattern to, and the exclusion outlived the argument. (#153)
+
+  The `/` ambiguity is resolved the way JavaScript resolves it, by the **preceding token**: a `/`
+  divides when what came before it could end an expression and opens a literal when it could not.
+  That rule is complete here because the language has no *word* operators — no `typeof`, no `in`,
+  no statements — so an identifier is always a value and always means division.
+
+  The literal is scanned to its delimiter and no further: escapes and character classes are
+  honoured, because `/a\/b/` and `/[/]/` both contain a `/` that is not the end, and a line
+  terminator in the body is refused so an unterminated literal cannot swallow the rest of a
+  document. The **pattern** is not validated here — `ktecma262` compiles it, so `/x/q` comes back
+  as `invalid regular expression flag 'q'` from the engine that would have run it rather than from
+  a second grammar kept in step by hand.
+
+  `TokenType` gains a `REGEX` entry, which is additive but will make an exhaustive `when` over it
+  in consumer code incomplete.
+
 ### Performance
 
 - **Resolving a font on Apple is about seven times cheaper, and a host's face is now cached at all.**

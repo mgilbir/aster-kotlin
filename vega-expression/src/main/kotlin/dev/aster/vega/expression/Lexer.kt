@@ -11,6 +11,15 @@ public enum class TokenType {
   NUMBER,
   STRING,
   IDENTIFIER,
+  /**
+   * A regular-expression literal, `/pattern/flags`.
+   *
+   * [Token.text] is the **whole literal**, delimiters and flags included, rather than the pattern
+   * alone: `Token` is a public data class and a second payload field would widen it for every token
+   * type to serve one. The closing delimiter is the last `/` in the text — flags are letters — so
+   * the split is unambiguous, and `Parser` does it.
+   */
+  REGEX,
   OPERATOR,
   PUNCTUATION,
   END,
@@ -28,10 +37,17 @@ public class ExpressionSyntaxException(
  * The language is a JavaScript expression subset: literals, identifiers, member access, calls, and
  * the usual unary, binary, logical, bitwise and conditional operators. There are no statements, no
  * assignment, and no function definitions — which is what makes evaluating it without `eval` or
- * code generation tractable (PROJECT_BRIEF.md 6.1).
+ * code generation tractable.
  *
- * Deliberately not implemented: regular-expression literals and template strings. Both are reported
- * as syntax errors rather than mis-tokenized.
+ * **Regular-expression literals are lexed**, into the same `VegaValue.Pattern` that `regexp()`
+ * produces. They were excluded once, on the argument that there was no engine to hand a pattern to;
+ * `ktecma262` is that engine and the exclusion outlived it. Upstream's own parser scans them — its
+ * message table carries `Invalid regular expression: missing /` — so an expression written against
+ * Vega, `replace(datum.label, / #\d+$/, '')`, is one this engine now reads rather than refuses.
+ * See #153.
+ *
+ * Deliberately not implemented: template strings, which are reported as syntax errors rather than
+ * mis-tokenized.
  */
 public class Lexer(private val source: String) {
 
@@ -46,7 +62,23 @@ public class Lexer(private val source: String) {
     }
   }
 
+  /**
+   * The token before the one being read, which is the only thing that says what a `/` means.
+   *
+   * `a / b` divides and `replace(s, /x/, '')` does not, and no amount of looking at the `/` itself
+   * tells them apart — JavaScript resolves it by what came *before*. So the lexer carries one token
+   * of history. [tokenize] is the only caller of [next], so this is a linear scan's worth of state
+   * rather than lookahead.
+   */
+  private var previous: Token? = null
+
   private fun next(): Token {
+    val token = read()
+    previous = token
+    return token
+  }
+
+  private fun read(): Token {
     skipWhitespace()
     if (index >= source.length) return Token(TokenType.END, "", index)
 
@@ -56,6 +88,7 @@ public class Lexer(private val source: String) {
       ch.isDigit() || (ch == '.' && index + 1 < source.length && source[index + 1].isDigit()) ->
         number(start)
       ch == '"' || ch == '\'' -> string(start, ch)
+      ch == '/' && regexCanStartHere() -> regex(start)
       isIdentifierStart(ch) -> identifier(start)
       ch in PUNCTUATION -> {
         index++
@@ -93,6 +126,23 @@ public class Lexer(private val source: String) {
       else -> ch.category == CharCategory.SPACE_SEPARATOR
     }
 
+  /**
+   * ECMA-262's *LineTerminator*, which a regular-expression literal may not contain.
+   *
+   * A subset of [isJsWhitespace] and named separately because the two answer different questions:
+   * whitespace between tokens is skipped, a line terminator inside a literal ends the literal's
+   * chance of being one. Without it an unterminated `/` swallows the rest of the source and the
+   * complaint arrives with an offset nowhere near the mistake.
+   *
+   * **Written here rather than taken from `ktecma262`**, which is where it belongs: that library
+   * holds the *WhiteSpace* table but `isEcmaWhiteSpace` is `internal`, and it has no
+   * *LineTerminator* predicate at all, though `isEcmaIdentifierName` beside them is public and this
+   * file uses it. Asked for as ktecma262#5. Four code points, so the copy is small — but it is a
+   * copy of a spec table that library already holds, which is the reason to say so.
+   */
+  private fun isJsLineTerminator(ch: Char): Boolean =
+    ch == '\n' || ch == '\r' || ch == '\u2028' || ch == '\u2029'
+
   private fun number(start: Int): Token {
     // Hex and binary literals are legal JavaScript and appear in colour arithmetic.
     if (
@@ -124,6 +174,98 @@ public class Lexer(private val source: String) {
       }
     }
     return Token(TokenType.NUMBER, source.substring(start, index), start)
+  }
+
+  /**
+   * Whether a `/` at [index] opens a regular-expression literal rather than dividing.
+   *
+   * The rule is JavaScript's and it is about the **previous token**: a `/` divides when what came
+   * before it could end an expression, and starts a literal when it could not. `a / b` divides
+   * because `a` is a value; `replace(s, /x/, '')` does not, because a comma cannot end one.
+   *
+   * The whole rule fits here because this language has no *word* operators. In JavaScript `typeof`
+   * and `in` and `return` are identifiers that cannot end an expression, so `typeof /re/` needs a
+   * keyword list to get right. Vega's expression language has no statements and no word operators —
+   * `PUNCTUATION` is `()[]{},:.` and everything else is symbols — so an identifier here is always a
+   * value and always means division.
+   *
+   * A regular expression can itself be divided (`/a/.source / 2` via the member, or `/a/ / 2`
+   * literally), so [TokenType.REGEX] ends an expression like any other value.
+   */
+  private fun regexCanStartHere(): Boolean {
+    val before = previous ?: return true // Nothing before it: the expression starts here.
+    return when (before.type) {
+      TokenType.NUMBER,
+      TokenType.STRING,
+      TokenType.IDENTIFIER,
+      TokenType.REGEX -> false
+      // A closing bracket ends a value; an opening one, a comma, a colon or a dot does not.
+      TokenType.PUNCTUATION -> before.text !in CLOSERS
+      // Every operator here is prefix or infix, so a value has to follow it.
+      TokenType.OPERATOR -> true
+      TokenType.END -> true
+    }
+  }
+
+  /**
+   * `/pattern/flags`, scanned to its closing delimiter.
+   *
+   * Three things make the closing `/` hard to find, and all three are ECMA-262's:
+   * - `\` escapes the character after it, so `/a\/b/` has one delimiter at each end and a literal
+   *   slash in the middle.
+   * - `[…]` is a character class, and a `/` inside one is literal: `/[/]/` is a pattern matching a
+   *   slash, not an empty pattern followed by junk.
+   * - a line terminator may not appear in the body at all, which is what stops an unterminated
+   *   literal from swallowing the rest of a document.
+   *
+   * The pattern itself is *not* validated here. That is `ktecma262`'s job and it happens in
+   * [Parser], so a bad pattern is reported by the engine that will run it rather than by a second
+   * opinion this file would have to keep in step.
+   */
+  private fun regex(start: Int): Token {
+    index++ // opening delimiter
+    var inClass = false
+    while (true) {
+      if (index >= source.length) {
+        // Upstream's parser has this message verbatim, and it is the accurate one: the body is
+        // fine, the delimiter is missing.
+        throw ExpressionSyntaxException("Invalid regular expression: missing /", start, source)
+      }
+      val c = source[index]
+      when {
+        isJsLineTerminator(c) ->
+          throw ExpressionSyntaxException("Invalid regular expression: missing /", start, source)
+        c == '\\' -> {
+          index++
+          if (index >= source.length || isJsLineTerminator(source[index])) {
+            throw ExpressionSyntaxException("Invalid regular expression: missing /", start, source)
+          }
+          index++
+        }
+        c == '[' -> {
+          inClass = true
+          index++
+        }
+        c == ']' -> {
+          inClass = false
+          index++
+        }
+        c == '/' && !inClass -> {
+          // An empty body is `//`, which is not a pattern in any dialect. Named here rather than
+          // left to the regular-expression engine, whose complaint about an empty source reads as
+          // an engine limitation instead of a typo.
+          if (index == start + 1) {
+            throw ExpressionSyntaxException("Invalid regular expression: empty", start, source)
+          }
+          index++
+          // Flags are letters and there is no separator, so they run to the first character that is
+          // not one. Which letters are legal is `ktecma262`'s question, asked in `Parser`.
+          while (index < source.length && source[index].isLetter()) index++
+          return Token(TokenType.REGEX, source.substring(start, index), start)
+        }
+        else -> index++
+      }
+    }
   }
 
   private fun string(start: Int, quote: Char): Token {
@@ -270,6 +412,15 @@ public class Lexer(private val source: String) {
 
   private companion object {
     val PUNCTUATION = "()[]{},:.".toSet()
+
+    /**
+     * The punctuation that can *end* a value, which is what decides a following `/`.
+     *
+     * `)` and `]` and `}` close a call, an index or an array, and an object literal — all of which
+     * produce a value, so a `/` after one divides. Every other member of [PUNCTUATION] opens
+     * something or separates two things, and a value has to follow it.
+     */
+    val CLOSERS = setOf(")", "]", "}")
 
     /** Ordered longest-first; membership and order both matter. */
     val OPERATORS =

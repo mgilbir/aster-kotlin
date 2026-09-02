@@ -443,6 +443,7 @@ public final class dev/aster/vega/expression/TokenType : java/lang/Enum {
 	public static final field NUMBER Ldev/aster/vega/expression/TokenType;
 	public static final field OPERATOR Ldev/aster/vega/expression/TokenType;
 	public static final field PUNCTUATION Ldev/aster/vega/expression/TokenType;
+	public static final field REGEX Ldev/aster/vega/expression/TokenType;
 	public static final field STRING Ldev/aster/vega/expression/TokenType;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/expression/TokenType;

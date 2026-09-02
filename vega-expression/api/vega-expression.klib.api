@@ -12,6 +12,7 @@ final enum class dev.aster.vega.expression/TokenType : kotlin/Enum<dev.aster.veg
     enum entry NUMBER // dev.aster.vega.expression/TokenType.NUMBER|null[0]
     enum entry OPERATOR // dev.aster.vega.expression/TokenType.OPERATOR|null[0]
     enum entry PUNCTUATION // dev.aster.vega.expression/TokenType.PUNCTUATION|null[0]
+    enum entry REGEX // dev.aster.vega.expression/TokenType.REGEX|null[0]
     enum entry STRING // dev.aster.vega.expression/TokenType.STRING|null[0]
 
     final val entries // dev.aster.vega.expression/TokenType.entries|#static{}entries[0]
