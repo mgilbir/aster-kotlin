@@ -15,8 +15,10 @@ name: Release
 #
 # Four jobs, because the work has four homes:
 #
-#   verify   Linux. The suite that does not need a Mac, and the oracles that regenerate upstream's
-#            own output and compare against it. No reason to pay macOS rates for it.
+#   verify   Linux **and** macOS. It was Linux alone, and that skipped every Apple gate: `swift` is
+#            macOS-only and `ios-ui` needs a simulator, so a release shipped the Swift package having
+#            run none of its tests. The oracles and the release preconditions stay on the Linux leg —
+#            asked once per release, not once per host.
 #   instrumented
 #            Linux, with an emulator. The Android suites, which `check.sh` inside `verify` skips
 #            because a release runner has no device — so until this job existed, every release
@@ -34,9 +36,23 @@ permissions:
 
 jobs:
   verify:
-    name: Verify (Linux)
-    runs-on: ubuntu-latest
+    name: Verify (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
 
+    # **Both hosts, because a release publishes both halves.** This job was Linux-only, and
+    # `check.sh` on Linux skips the two gates that cover everything Apple: `swift` is macOS-only and
+    # `ios-ui` needs a simulator runtime. `publish` below builds the XCFramework and writes
+    # `Package.swift`, so a release was shipping the Swift package having run none of its 158 tests
+    # and none of the three UI tests that are the only end-to-end check of VoiceOver. 0.5.0 went out
+    # that way.
+    #
+    # The same hole as the instrumented suites, which `verify` also skipped for want of a device and
+    # which now have their own job. The oracles and the release-specific preconditions stay on Linux;
+    # everything else runs on both, which is what `ci.yml` already does.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -55,6 +71,8 @@ jobs:
         uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
 
       - name: Check this version has not been released
+        # Linux only: asked once per release, not once per host.
+        if: matrix.os == 'ubuntu-latest'
         # The version in the build file is the one thing that names a release, so the guard is that
         # its tag does not exist yet. Re-running for a version already tagged would publish nothing
         # to Central — a version there is immutable — and would leave a second tag pointing at a
@@ -73,6 +91,8 @@ jobs:
           echo "Releasing $version; v$version does not exist yet."
 
       - name: Check the changelog has a section for this version
+        # Linux only: asked once per release, not once per host.
+        if: matrix.os == 'ubuntu-latest'
         # Fails here rather than after publishing, when the release notes are the only thing left and
         # the artifacts are already immutable.
         run: |
@@ -117,11 +137,15 @@ jobs:
         run: ./scripts/check.sh --fast
 
       - name: Differential tests against upstream Vega
+        # Linux only; the macOS leg runs `check.sh --fast`, which leaves the oracles to this host.
+        if: matrix.os == 'ubuntu-latest'
         # Regenerates upstream's own scenes with the pinned Vega and compares. The point of the
         # project, so it gates the release.
         run: ./scripts/oracle.sh
 
       - name: Differential tests against upstream Vega-Lite
+        # Linux only; the macOS leg runs `check.sh --fast`, which leaves the oracles to this host.
+        if: matrix.os == 'ubuntu-latest'
         run: ./scripts/vega-lite-oracle.sh
 
   # The Android suites, on a real device, before anything is published.
