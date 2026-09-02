@@ -253,6 +253,7 @@ jobs:
             **/build/reports/tests/**
             **/build/test-results/**/*.xml
             ${{ runner.temp }}/swift-xunit.xml
+            build/ios-ui-tests/ios-ui-tests.xml
             build/upstream-transform-ledger.txt
           retention-days: 14
 

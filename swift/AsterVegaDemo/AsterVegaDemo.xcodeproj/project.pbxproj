@@ -67,7 +67,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		A50000000000000000000041 /* Frameworks */ = {
+		A50000000000000000000050 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -180,8 +180,8 @@
 			buildConfigurationList = A50000000000000000000043 /* Build configuration list for PBXNativeTarget "AsterVegaDemoUITests" */;
 			buildPhases = (
 				A50000000000000000000040 /* Sources */,
-				A50000000000000000000041 /* Frameworks */,
-				A50000000000000000000042 /* Resources */,
+				A50000000000000000000050 /* Frameworks */,
+				A50000000000000000000051 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -250,7 +250,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		A50000000000000000000042 /* Resources */ = {
+		A50000000000000000000051 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
