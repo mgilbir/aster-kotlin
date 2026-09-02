@@ -416,17 +416,27 @@ public struct VegaChartView: View {
       ZStack(alignment: .topLeading) {
         ForEach(accessibleElements, id: \.offset) { entry in
           let scale = placement?.scale ?? 1
+          // At least a point in each direction: a rule or a zero-height mark would otherwise have a
+          // frame a reader cannot land on.
+          let width = max(entry.element.bounds.width * scale, 1)
+          let height = max(entry.element.bounds.height * scale, 1)
           Rectangle()
             .fill(Color.clear)
-            // At least a point in each direction: a rule or a zero-height mark would otherwise have a
-            // frame a reader cannot land on.
-            .frame(
-              width: max(entry.element.bounds.width * scale, 1),
-              height: max(entry.element.bounds.height * scale, 1)
-            )
-            .offset(
-              x: entry.element.bounds.left * scale + Double(placement?.left ?? 0),
-              y: entry.element.bounds.top * scale + Double(placement?.top ?? 0)
+            .frame(width: width, height: height)
+            // **`.position`, not `.offset`.** An offset is a *render* transform: it moves what is
+            // drawn and leaves the view where layout put it, and an accessibility frame comes from
+            // layout. So every element reported the same origin — the ZStack's `.topLeading` — with
+            // only its size varying, and all forty-eight touch targets sat stacked on the first
+            // mark. Touch exploration is most of what makes a chart explorable, and it was landing
+            // every tap on the y-axis.
+            //
+            // It survived because the two tests that could see it were the ones nothing ran: the
+            // suite asserting activation lived in an Xcode project too damaged for `xcodebuild` to
+            // open. `.position` places the centre and is layout, so what a reader touches is what
+            // is drawn.
+            .position(
+              x: entry.element.bounds.left * scale + Double(placement?.left ?? 0) + width / 2,
+              y: entry.element.bounds.top * scale + Double(placement?.top ?? 0) + height / 2
             )
             .accessibilityElement()
             .accessibilityLabel(entry.element.label)

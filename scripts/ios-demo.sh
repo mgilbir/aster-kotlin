@@ -80,11 +80,61 @@ if [ "$MODE" = "--test" ]; then
   fi
 
   echo "==> Running the UI tests on $DEVICE_NAME"
+  # `set -e` is on, so the exit code is captured rather than allowed to end the script: the JUnit
+  # XML below has to be written for a *failing* run too, or a red suite renders in
+  # SUPPORTED_FEATURES.md as "unproven" instead of "failing" — which reads as a missing gate rather
+  # than a broken one.
+  # **Cleared first.** `xcodebuild` refuses to write a result bundle over an existing one — "Existing
+  # file at -resultBundlePath" — so leaving the previous run's bundle in place makes the gate fail on
+  # every second invocation, which is exactly how this was found.
+  rm -rf build/ios-ui-tests
+  mkdir -p build/ios-ui-tests
+
+  set +e
   xcodebuild -project "$PROJECT" -scheme AsterVegaDemo \
     -destination "platform=iOS Simulator,name=$DEVICE_NAME" \
     -derivedDataPath build/ios-demo \
+    -resultBundlePath build/ios-ui-tests/result.xcresult \
     test
-  exit 0
+  TEST_STATUS=$?
+  set -e
+
+  # **JUnit XML, so the feature table can count these.** `xcodebuild` writes an `.xcresult` and
+  # nothing else; `scripts/capabilities.py` merges JUnit and xUnit XML across every CI job and keys
+  # on the suite's simple class name. Without this the three tests run, pass, and the row citing
+  # them still generates as unproven — a gate whose result reaches nothing.
+  echo "==> Writing JUnit XML for the capability table"
+  xcrun xcresulttool get test-results tests \
+    --path build/ios-ui-tests/result.xcresult --compact > build/ios-ui-tests/tests.json
+  python3 - build/ios-ui-tests/tests.json build/ios-ui-tests/ios-ui-tests.xml <<'PYEOF'
+import json, sys, xml.etree.ElementTree as ET
+
+source, target = sys.argv[1], sys.argv[2]
+nodes = json.load(open(source)).get("testNodes") or []
+cases = []
+
+def walk(items, suite=None):
+    for node in items or []:
+        kind, name = node.get("nodeType"), node.get("name") or ""
+        if kind == "Test Suite":
+            suite = name
+        elif kind == "Test Case":
+            cases.append((suite or "UITests", name.removesuffix("()"), node.get("result")))
+        walk(node.get("children"), suite)
+
+walk(nodes)
+root = ET.Element("testsuite", name="AsterVegaDemoUITests", tests=str(len(cases)))
+failures = 0
+for suite, name, result in cases:
+    case = ET.SubElement(root, "testcase", classname=f"AsterVegaDemoUITests.{suite}", name=name)
+    if result != "Passed":
+        failures += 1
+        ET.SubElement(case, "failure", message=str(result))
+root.set("failures", str(failures))
+ET.ElementTree(root).write(target, encoding="utf-8", xml_declaration=True)
+print(f"    {len(cases)} case(s), {failures} failing -> {target}")
+PYEOF
+  exit $TEST_STATUS
 fi
 
 if [ "$MODE" = "--device-build" ]; then

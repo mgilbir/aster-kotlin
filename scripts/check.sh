@@ -191,6 +191,9 @@ Gates, and what each needs:
                       every host's.
   swift               macOS. The Swift suite, the exported-API snapshot, and the iOS demo's
                       type-check. Not runnable on any other host.
+  ios-ui              macOS with an iOS simulator runtime. The demo's UI tests, which are the only
+                      place VoiceOver is checked end to end: labelled elements, described axes, and
+                      activation selecting a mark.
   instrumented        a device or emulator on adb. scripts/emulator.sh --headless starts one.
   oracle              node. Regenerates upstream Vega's own scenes and compares. Slow; --fast
                       skips it.
@@ -324,6 +327,31 @@ run_gate "capabilities" python3 ./scripts/capabilities.py --check
 # ---------------------------------------------------------------------------------------------
 if [ "$(uname -s)" = "Darwin" ]; then
   run_gate "swift" ./scripts/swift-test.sh
+
+  # ---------------------------------------------------------------------------------------------
+  # 6b. The iOS demo's UI tests, which are the only place VoiceOver is checked end to end.
+  #
+  # The accessibility *rules* live in the core and are tested there; whether SwiftUI actually
+  # exposes them to a reader can only be asked of a running app. Three tests: every bar is its own
+  # labelled element, the axes are described, and activating an element selects the mark it stands
+  # for.
+  #
+  # **They ran nowhere until now, and that cost a real defect.** The row in
+  # `SUPPORTED_FEATURES.md` claiming a SwiftUI chart view cited them as evidence, the generated
+  # status column said "unproven here", and the reason was worse than a missing gate: the Xcode
+  # project had two duplicated object ids and `xcodebuild` refused to open it at all. Behind that,
+  # the accessibility overlay positioned its elements with `.offset` — a render transform, which
+  # leaves the accessibility frame where layout put it — so all forty-eight touch targets were
+  # stacked on the first mark and every tap landed on the y-axis.
+  #
+  # Needs a simulator *runtime*, which not every Mac has; `--check` inside the swift gate is what
+  # runs without one. Skipped rather than failed where it is absent, and said so.
+  # ---------------------------------------------------------------------------------------------
+  if [ "$(xcrun simctl list runtimes 2>/dev/null | grep -c "iOS")" -gt 0 ]; then
+    run_gate "ios-ui" ./scripts/ios-demo.sh --test
+  else
+    skip_gate "ios-ui" "no iOS simulator runtime; install with: xcodebuild -downloadPlatform iOS"
+  fi
 else
   skip_gate "swift" "this host is $(uname -s); the Swift package needs a Mac"
 fi

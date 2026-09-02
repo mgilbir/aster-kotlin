@@ -20,6 +20,23 @@ final class AccessibilityUITests: XCTestCase {
     return app
   }
 
+  /// Waits for the chart to be on screen, without asserting on its **size**.
+  ///
+  /// This used to wait for the whole status line — `"377 × 228 points, 48 marks"` — and that made
+  /// the precondition of all three tests depend on a SwiftUI layout metric. It went stale: on iOS
+  /// 26.5 the same chart reports `378 × 230`, one point wider and two taller, so every test failed
+  /// on "the chart appeared" having never reached the accessibility labels it exists to check.
+  ///
+  /// The mark count is the engine's answer and is stable across devices; the point size is the
+  /// device's. Matching on the count says "the chart rendered" without pinning anything a phone
+  /// model can change.
+  private func waitForChart(_ app: XCUIApplication, marks: Int) -> Bool {
+    let status = app.staticTexts.matching(
+      NSPredicate(format: "label ENDSWITH %@", "points, \(marks) marks")
+    )
+    return status.firstMatch.waitForExistence(timeout: 60)
+  }
+
   /// Every bar is its own element, labelled with the datum a reader wants to hear.
   ///
   /// The `bar` fixture is eight months, and the engine joins each mark's label to its value — so the labels
@@ -28,7 +45,7 @@ final class AccessibilityUITests: XCTestCase {
   func testEveryBarIsItsOwnElementLabelledWithItsDatum() {
     let app = launch(chart: "bar")
     XCTAssertTrue(
-      app.staticTexts["377 × 228 points, 48 marks"].waitForExistence(timeout: 30),
+      waitForChart(app, marks: 48),
       "the chart appeared"
     )
 
@@ -49,7 +66,7 @@ final class AccessibilityUITests: XCTestCase {
   func testTheAxesAreDescribed() {
     let app = launch(chart: "bar")
     XCTAssertTrue(
-      app.staticTexts["377 × 228 points, 48 marks"].waitForExistence(timeout: 30),
+      waitForChart(app, marks: 48),
       "the chart appeared"
     )
 
@@ -67,7 +84,7 @@ final class AccessibilityUITests: XCTestCase {
   func testAnElementCanBeActivatedToSelectItsMark() {
     let app = launch(chart: "bar")
     XCTAssertTrue(
-      app.staticTexts["377 × 228 points, 48 marks"].waitForExistence(timeout: 30),
+      waitForChart(app, marks: 48),
       "the chart appeared"
     )
     // Before: the screen says a tap has not happened.

@@ -6,7 +6,31 @@ section here does not get released.
 
 ## Unreleased
 
+### Fixed
+
+- **Every mark's VoiceOver touch target was stacked on the first one.** The Apple accessibility
+  overlay positioned its elements with SwiftUI's `.offset`, which is a *render* transform: it moves
+  what is drawn and leaves the view where layout put it, and an accessibility frame comes from
+  layout. So all forty-eight elements of a bar chart reported the same origin with only their size
+  varying, and touch exploration — most of what makes a chart explorable to a reader using VoiceOver
+  — landed every tap on the y-axis. `.position` places the centre and is layout, so what a reader
+  touches is now what is drawn.
+
+  It survived because the two tests that could see it ran nowhere. The row in
+  `SUPPORTED_FEATURES.md` claiming a SwiftUI chart view cited `AccessibilityUITests` as evidence and
+  the generated status column said so — "unproven here" — and behind that the Xcode project had two
+  duplicated object ids and `xcodebuild` refused to open it at all: *The project is damaged and
+  cannot be opened*. Two objects each claimed one id, a file reference sharing with a build phase,
+  so Xcode resolved one and called a group method on the other.
+
 ### Changed
+
+- **The iOS demo's UI tests run in the gate.** Three tests, and the only place VoiceOver is checked
+  end to end: every bar is its own labelled element, the axes are described, and activating an
+  element selects the mark it stands for. `check.sh` gains an `ios-ui` gate, skipped with a reason
+  on a Mac with no simulator runtime, and `ios-demo.sh --test` now writes JUnit XML — because
+  `xcodebuild` emits only an `.xcresult`, and a gate whose result reaches nothing would have left
+  the row citing it generating as unproven for ever.
 
 - **`ktecma262` 0.3.0, and six things this repository was writing out itself are now its.** The
   library answered five capability requests (ktecma262#5 to #9) that came out of the
