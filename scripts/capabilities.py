@@ -212,6 +212,14 @@ def render(results: dict[str, dict]) -> str:
 
 
 def render_with(status_for) -> str:
+    """The document, rebuilt from the source row by row.
+
+    **Every cell is written from the source, not just the status.** The first version replaced the
+    status cell and passed the rest of the line through, which meant the document could drift from
+    `docs/capabilities.json` in the prose — the 297KB that is the whole reason a source exists — and
+    the check would report a match. Calling that "the document is an output" was overstating it by
+    four columns out of five. Rebuilding the row is what makes the claim true.
+    """
     source = json.loads(SOURCE.read_text())
     by_line = {entry["line"]: entry for entry in source["capabilities"]}
     out = []
@@ -221,11 +229,20 @@ def render_with(status_for) -> str:
             out.append(line)
             continue
         status, evidence = status_for(entry)
-        cells = split_row(line)
-        cells[1] = f" {status} "
-        if evidence:
-            cells[1] = f" {status}<br/><sub>{evidence}</sub> "
-        out.append("|" + "|".join(cells) + "|")
+        decorated = f"{status}<br/><sub>{evidence}</sub>" if evidence else status
+        out.append(
+            "| "
+            + " | ".join(
+                [
+                    entry["feature"],
+                    decorated,
+                    entry["tests_text"],
+                    entry["notes"],
+                    entry["milestone"],
+                ]
+            )
+            + " |"
+        )
     return "\n".join(out)
 
 
@@ -261,6 +278,26 @@ def undocumented_functions(text: str) -> list[str]:
     return sorted(name for name in registered if not re.search(rf"`{re.escape(name)}[(`]", text))
 
 
+GENERATED_EVIDENCE = re.compile(r"<br/><sub>[^<]*</sub>")
+
+
+def without_evidence(text: str) -> str:
+    """The document with the generated status decoration removed.
+
+    **This is what makes the offline check possible at all, and it was missing.** CI renders the
+    status from merged results and writes an `unproven here: …` note under any row whose evidence
+    did not run. The offline check renders with statuses as declared and writes no note — so the
+    committed document could never equal what `--check` produced, and the `capabilities` gate went
+    red on `main` the moment CI committed its first regeneration.
+
+    Stripping the note from both sides is the fix rather than teaching `--check` to guess at
+    results: what the offline half is *for* is the machine-independent claim — that the source still
+    reproduces every row's structure, prose and declared status. Whether a suite ran on some host is
+    precisely the part a laptop cannot know, and comparing it here is what made the gate wrong.
+    """
+    return GENERATED_EVIDENCE.sub("", text)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--migrate", action="store_true")
@@ -280,7 +317,11 @@ def main() -> int:
         print(f"wrote {DOC.relative_to(ROOT)} from {len(results)} test classes")
         return 0
     problems = []
-    if rendered != DOC.read_text():
+    committed = DOC.read_text()
+    # With no results, the run-dependent decoration is not comparable; see `without_evidence`.
+    if not results:
+        rendered, committed = without_evidence(rendered), without_evidence(committed)
+    if rendered != committed:
         problems.append(
             "SUPPORTED_FEATURES.md is not what docs/capabilities.json renders. Edit the source and "
             "regenerate; the document is an output."
