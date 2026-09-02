@@ -185,6 +185,10 @@ Gates, and what each needs:
                       to one host cannot pass as agreement.
   changelog           always. A branch that moves an API snapshot has to say so in CHANGELOG.md,
                       or mark the commit [api-snapshot-only].
+  capabilities        always. SUPPORTED_FEATURES.md still renders from docs/capabilities.json, and
+                      every registered expression function is named in it. The status column is
+                      generated from merged test results in CI, which is the only place that has
+                      every host's.
   swift               macOS. The Swift suite, the exported-API snapshot, and the iOS demo's
                       type-check. Not runnable on any other host.
   instrumented        a device or emulator on adb. scripts/emulator.sh --headless starts one.
@@ -292,6 +296,25 @@ run_gate "host-conformance" python3 ./scripts/host-conformance.py
 # would have shipped unmentioned, and rewriting a pull request description is what caught it.
 # ---------------------------------------------------------------------------------------------
 run_gate "changelog" python3 ./scripts/changelog-gate.py
+
+# ---------------------------------------------------------------------------------------------
+# 5b. SUPPORTED_FEATURES.md is answerable to the code and to the tests.
+#
+# The document is what an adopter reads before depending on any of this, and nothing checked it. It
+# drifted the way an unchecked document does: one row said `isDate`, `isRegExp` and `isTuple` "stay
+# out with reasons" while all three were implemented, and a row seventy lines below listed
+# `isRegExp()` as supported — the file disagreeing with itself *and* with the code (#154).
+# Thirty-two registered expression functions were named nowhere in it at all.
+#
+# **Two halves, and only one of them runs here.** The half that is machine-independent runs
+# everywhere: the capability source still reproduces every row, and every function the engine
+# registers is named. The other half — a row claiming support whose cited tests did not run or did
+# not pass — needs the union of four CI jobs, because no single host runs the emulator, `linuxX64`
+# and the Swift suite. So the *status* column is generated in CI and checked there, and this gate
+# deliberately does not attempt it: generating from one laptop would mark two hundred rows unproven
+# and the diff would be about the machine rather than about the code.
+# ---------------------------------------------------------------------------------------------
+run_gate "capabilities" python3 ./scripts/capabilities.py --check
 
 # ---------------------------------------------------------------------------------------------
 # 6. The Swift gate: the suite, the exported-API snapshot, and the iOS demo's type-check.

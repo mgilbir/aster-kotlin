@@ -61,7 +61,17 @@ if [ -f "$HEADER" ]; then
   fi
 fi
 
-swift test "$@"
+# **`--parallel`, and it is not for speed.** `--xunit-output` writes the *swift-testing* results on
+# its own, and this suite is XCTest — so without `--parallel` the file it produces holds zero cases
+# and the Apple half of `SUPPORTED_FEATURES.md` would generate as unproven for ever. With it, the
+# XCTest cases land in the named file and `scripts/capabilities.py` can merge them with Gradle's and
+# the emulator's. `SWIFT_XUNIT_OUTPUT` is where CI asks for them; a local run does not need them and
+# does not pay for the file.
+if [ -n "${SWIFT_XUNIT_OUTPUT:-}" ]; then
+  swift test --parallel --xunit-output "$SWIFT_XUNIT_OUTPUT" "$@"
+else
+  swift test "$@"
+fi
 
 # The demo app, type-checked for both iOS slices.
 #
