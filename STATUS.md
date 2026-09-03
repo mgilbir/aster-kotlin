@@ -2684,7 +2684,7 @@ the whole time.
   A specification's `url` resolves locally first and then from `https://vega.github.io/vega/`, so the
   examples' datasets work whether or not they are bundled — verified both ways on the simulator:
   `parallel-coordinates` drew all 406 cars from the bundled `data/cars.json`, and a pasted specification
-  reading `data/population.json`, which is *not* bundled, fetched it from Vega's site and drew it.
+  reading a population dataset that is *not* bundled, fetched it from Vega's site and drew it.
   `VegaDataLoader` is in the renderer package so the app and its tests share one policy, and that policy
   is the interesting half: one allowed prefix, `..` refused rather than normalised, absolute paths
   refused. `DataLoader` denies by default because a `url` in a pasted specification asks this process to
@@ -4834,7 +4834,7 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Toolchain and platform choices
 
-Written as deviations from `PROJECT_BRIEF.md` while that document existed. It is retired now — the
+Written as deviations from the design brief while that document existed. It is retired now — the
 decisions it carried are in `docs/adr/` — but these entries were never *about* the brief: each is a
 live build fact with a reason a reader still needs.
 
@@ -4880,7 +4880,7 @@ live build fact with a reason a reader still needs.
    What this does **not** do is make an animation verifiable. The differential harness compares the
    scene upstream reaches after `runAsync`, and for a specification with a timer `runAsync` never
    returns — so a ticking chart has no reference to be compared against, whatever the engine does
-   with it. The note in HANDOFF.md on `donut-chart-labelled` is still the interesting case: its timer
+   with it. `donut-chart-labelled` is still the interesting case: its timer
    is a bounded loop rather than an animation, and running such a loop to convergence at *compile*
    time would need no clock and would be comparable.
 
@@ -4888,7 +4888,7 @@ live build fact with a reason a reader still needs.
    across twenty of Vega's 93 examples use it, which is every pan, zoom and brush in the gallery. And
    an **`encode` handler** now overlays a named block on the event's own item, which needed the event
    functions — `item()`, `x()`, `y()`, `xy()` — that were missing under it; `x()` alone is forty uses
-   across the corpus. What is left needs a *scheduler*, and the note in HANDOFF.md on
+   across the corpus. What is left needs a *scheduler*, and the case of
    `donut-chart-labelled` argues that the commonest use of a timer is a bounded loop that can be run
    to convergence at compile time instead — which is now the same machinery the signal cascade uses.
 
@@ -7817,7 +7817,7 @@ recompile needs a runtime-scoping answer or a fixture, and neither is written.
 **Q10 and Q14 are for the maintainer.** Q10 — should the release workflow require a green `ci.yml`
 run on the dispatched sha before verify? Today the Vega-Lite scene gate's only other coverage is
 that CI happened to run, and nothing enforces it; the verify job renders the references itself now,
-which closes the hole this branch was about but not the broader question. Q14 — is PROJECT_BRIEF
+which closes the hole this branch was about but not the broader question. Q14 — is the design brief
 still the contract? **Answered: no, and it has been retired.** It was a specification written before
 the engine existed, and most of it had been superseded by the code it specified — module
 responsibilities, interface sketches, milestones. What still bound was extracted to `docs/adr/`

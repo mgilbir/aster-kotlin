@@ -2,7 +2,7 @@
 
 Status: accepted (2026-09-01)
 
-Recorded from `PROJECT_BRIEF.md` §13 when that document was retired.
+Recorded from the retired design brief, §13 which this replaces.
 
 ## Decision
 

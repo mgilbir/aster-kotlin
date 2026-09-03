@@ -117,15 +117,24 @@ class DocumentedNumbersTest {
     for (name in DOCUMENTS) {
       val file = File(repositoryRoot, name)
       assertTrue(file.isFile, "missing documentation file: $name")
-      file.readText().lineSequence().forEachIndexed { index, line ->
-        pattern.findAll(line).forEach { match ->
-          found++
-          assertEquals(
-            expected,
-            match.groupValues[1].toInt(),
-            "$name:${index + 1} states \"${match.value}\"",
-          )
-        }
+      // **The whole text, with runs of whitespace flattened — not line by line.**
+      //
+      // A line-based scan silently misses any claim that wraps, and this repository hard-wraps its
+      // prose at about a hundred columns, so wrapping is the normal case rather than the exception.
+      // `README.md` ended a line with "193" and began the next with "Vega differential fixtures",
+      // and the gate that exists to catch exactly that number being wrong never saw it: the corpus
+      // had grown to 195 two fixtures earlier. Three other claims were invisible the same way.
+      //
+      // The offset is reported instead of a line number, which is the cost of flattening and is
+      // worth it: a claim nobody checks is worse than a claim whose location takes a grep.
+      val flattened = file.readText().replace(Regex("""\s+"""), " ")
+      pattern.findAll(flattened).forEach { match ->
+        found++
+        assertEquals(
+          expected,
+          match.groupValues[1].toInt(),
+          "$name states \"${match.value}\" at offset ${match.range.first}",
+        )
       }
     }
     assertTrue(

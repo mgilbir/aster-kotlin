@@ -3,7 +3,7 @@
 One file per decision, numbered in the order they were taken. A record states the decision, why it
 was taken, what it costs, and what would make us revisit it.
 
-**0009 to 0012 were recorded when `PROJECT_BRIEF.md` was retired.** That document was a
+**0009 to 0012 were recorded when the design brief was retired.** That document was a
 specification written before the engine existed, and most of it had been superseded by the code it
 specified — module responsibilities, interface sketches, milestones. What still *bound* was
 extracted here, and its 107 citations across the tree were repointed rather than dropped. Its
