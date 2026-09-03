@@ -796,12 +796,13 @@
       "line": 94,
       "section": "Vega-Lite",
       "feature": "A colour ramp over instants",
-      "status": "**Partial**",
+      "status": "**Supported**",
       "tests": [
-        "VegaLiteFixtureTest"
+        "VegaLiteFixtureTest",
+        "TemporalColorScaleTest"
       ],
-      "tests_text": "`VegaLiteFixtureTest`",
-      "notes": "`isContinuousToContinuous` includes the two time scales, so a temporal colour scale is a **gradient** legend and not a row of square swatches, and its labels take the configured date format outright — `omitTimeFormatConfig` is true for an axis and false for a legend. It compiles exactly as upstream compiles it; the **runtime** cannot yet build a time scale whose range is a colour scheme",
+      "tests_text": "`VegaLiteFixtureTest`, `TemporalColorScaleTest`",
+      "notes": "`isContinuousToContinuous` includes the two time scales, so a temporal colour scale is a **gradient** legend and not a row of square swatches, and its labels take the configured date format outright — `omitTimeFormatConfig` is true for an axis and false for a legend. It compiles exactly as upstream compiles it, and the runtime draws it: `ScaleResolver` routes `time` and `utc` to `buildSequentialColor` the moment the range holds colours, exactly as it routes `linear`. This row said the runtime could not, which was true once and left behind by the code with nothing checking it.",
       "milestone": "—"
     },
     {
@@ -2687,12 +2688,13 @@
       "line": 275,
       "section": "Expressions",
       "feature": "`geopath`",
-      "status": "Partial",
+      "status": "**Supported**",
       "tests": [
+        "GeoPathProjectionTest",
         "FixtureDifferentialTest"
       ],
-      "tests_text": "`FixtureDifferentialTest` (`volcano-contours`, `contour-plot`)",
-      "notes": "GeoJSON written out as an SVG path, with **no projection** — which is what upstream falls back to, and what d3 then does is pass the coordinates through unchanged: no spherical clipping, no adaptive resampling, no antimeridian cutting. Right for a contour over a raster grid, whose coordinates are already in chart units. A `projection` parameter is refused and says why",
+      "tests_text": "`GeoPathProjectionTest`, `FixtureDifferentialTest` (`volcano-contours`, `contour-plot`, `airport-connections`)",
+      "notes": "GeoJSON written out as an SVG path, **through a projection** when one is named and with the coordinates passed through unchanged when none is — which is d3's own fallback, and what makes `geopath` right for a contour over a raster grid whose coordinates are already in chart units. A projection named but never declared is reported rather than quietly drawn unprojected. This row said a `projection` parameter was *refused*, which would tell an adopter this engine cannot draw a map; it is applied, and checked against d3-geo's arithmetic worked by hand rather than read off the output.",
       "milestone": "6"
     },
     {
@@ -5493,12 +5495,12 @@
       "line": 517,
       "section": "Interaction",
       "feature": "Tooltip content and anchor",
-      "status": "Partial",
+      "status": "Superseded",
       "tests": [
-        "VegaChartControllerTest"
+        "TooltipContentTest"
       ],
-      "tests_text": "`VegaChartControllerTest`",
-      "notes": "Content comes from node metadata; no tooltip rendering yet",
+      "tests_text": "`TooltipContentTest`",
+      "notes": "Superseded by the two **Tooltips** rows below, which describe what this one said was missing: `TooltipContent` turns the dataflow's value into rows and a line of text in the chart's own locale, `interactionState.tooltipAnchor` says where to put it, and `VegaChartView` draws one. This row said \"no tooltip rendering yet\" while two rows in the same file said the opposite — the file disagreeing with itself, which is the failure the generated status column exists to catch and could not, because a status is checked against a run and prose is not.",
       "milestone": "6"
     },
     {
@@ -5517,12 +5519,12 @@
       "line": 519,
       "section": "Interaction",
       "feature": "Interval selection",
-      "status": "Partial",
+      "status": "**Supported**",
       "tests": [
-        "HitTestTest"
+        "IntervalSelectionTest"
       ],
-      "tests_text": "`HitTestTest` (`nodesIntersecting`)",
-      "notes": "No drag-to-select gesture yet",
+      "tests_text": "`IntervalSelectionTest`",
+      "notes": "Press, move, release, through the controller and into the signals a brush is built from — including the backwards drag, where a reader pulls right to left and the extent has to come out in order. This row said \"no drag-to-select gesture yet\", which was a line left from the original roadmap sitting above the rows that describe the dispatch, the event-selector language and the signal handlers; a brush is made of those three and all three had been supported for some time. There is no `interval` primitive here and upstream has none either: a brush in Vega is a rect mark whose corners are signals.",
       "milestone": "6"
     },
     {
