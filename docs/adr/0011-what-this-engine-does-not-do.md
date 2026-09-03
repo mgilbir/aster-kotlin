@@ -2,7 +2,7 @@
 
 Status: accepted (2026-09-01)
 
-Recorded from `PROJECT_BRIEF.md` §3.1 and §3.3 when that document was retired. The list is the most
+Recorded from the retired design brief, §3.1 and §3.3 which this replaces. The list is the most
 cited thing in that file, which is the reason it survives it.
 
 ## Decision

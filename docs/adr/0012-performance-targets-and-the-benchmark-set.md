@@ -2,7 +2,7 @@
 
 Status: accepted (2026-09-01)
 
-Recorded from `PROJECT_BRIEF.md` §18.6 and §19 when that document was retired. These are the two
+Recorded from the retired design brief, §18.6 and §19 which this replaces. These are the two
 sections whose *content* would have been lost rather than merely their provenance: the benchmark
 scenes and the required measurements are a list, and a citation to a deleted list is nothing.
 

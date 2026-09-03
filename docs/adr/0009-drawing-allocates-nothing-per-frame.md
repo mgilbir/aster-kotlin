@@ -2,7 +2,7 @@
 
 Status: accepted (2026-09-01)
 
-Recorded from `PROJECT_BRIEF.md` §4.2–4.6 and §8.2 when that document was retired. The rules were
+Recorded from the retired design brief, §4.2–4.6 and §8.2 which this replaces. The rules were
 already being followed and cited from thirty-odd files; this is where they now live.
 
 ## Decision

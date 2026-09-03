@@ -41,6 +41,7 @@ import glob
 import json
 import pathlib
 import re
+import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from collections import defaultdict
@@ -339,6 +340,61 @@ def render_coverage() -> str | None:
     lines += ["", f"**{consumed} of {total}** across the kinds measured.", ""]
     return "\n".join(lines)
 
+DOC_REFERENCE = re.compile(
+    r"`([A-Za-z0-9_./-]+\.(?:md|kt|kts|json|sh|py|swift|toml|yml))`"
+    r"|\]\(([A-Za-z0-9_./-]+\.md)\)"
+    r"|(?<![`/\w])([A-Z][A-Za-z0-9_-]*\.md)(?![`\w])"
+)
+
+
+def dangling_references() -> list[str]:
+    """Files the documentation names that exist nowhere in the repository.
+
+    `PROJECT_BRIEF.md` was deleted and six documents went on naming it, including four of the very
+    records written to replace it. `STATUS.md` kept a live pointer — "the note in HANDOFF.md on
+    `donut-chart-labelled` is still the interesting case" — to a file that had gone, and named a
+    fixture that was never bundled.
+
+    Resolution is by **basename anywhere in the tree**, deliberately. Prose says `Dataflow.kt` and
+    `check.sh` without a path all the time and that is fine; what is not fine is naming something a
+    reader will go looking for and not find. Narrowing the check to that is what keeps it quiet
+    enough to stay on.
+    """
+    tracked = subprocess.run(
+        ["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True
+    ).stdout.split()
+    names = {pathlib.PurePath(path).name for path in tracked}
+    # **Only the documents that describe the present.**
+    #
+    # A record of the past may name what was there at the time, and rewriting it to erase a since
+    # deleted file would falsify it: `docs/audits/codebase-audit-2026-08-27.md` audited `HANDOFF.md`
+    # and saying so is the record's whole value. `CHANGELOG.md` and `STATUS.md` are the same kind of
+    # thing — a release history and a running log — and their mentions are narrative, not pointers.
+    #
+    # What must not dangle is a document a reader consults to find out how things *are*. Those are
+    # the ones below.
+    documents = [ROOT / name for name in ("README.md", "CONTRIBUTING.md", "SUPPORTED_FEATURES.md",
+                                          "THIRD-PARTY-NOTICES.md")]
+    documents += sorted((ROOT / "docs" / "adr").rglob("*.md"))
+    documents += [ROOT / "docs" / "upstream-coverage.md"]
+    problems = []
+    for document in documents:
+        if not document.exists():
+            continue
+        seen = set()
+        for match in DOC_REFERENCE.finditer(document.read_text()):
+            reference = next(g for g in match.groups() if g)
+            if reference in tracked or pathlib.PurePath(reference).name in names:
+                continue
+            if reference in seen:
+                continue
+            seen.add(reference)
+            problems.append(
+                f"{document.relative_to(ROOT)} names `{reference}`, which is not in this "
+                "repository. Reword it or restore the file: a reader who goes looking finds nothing."
+            )
+    return problems
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -385,6 +441,8 @@ def main() -> int:
             "SUPPORTED_FEATURES.md is not what docs/capabilities.json renders. Edit the source and "
             "regenerate; the document is an output."
         )
+    problems.extend(dangling_references())
+
     for name in undocumented_functions(DOC.read_text()):
         problems.append(
             f"the expression function `{name}` is registered and named nowhere in "
