@@ -51,6 +51,7 @@ DOC = ROOT / "SUPPORTED_FEATURES.md"
 SOURCE = ROOT / "docs" / "capabilities.json"
 COVERAGE_INPUT = ROOT / "vega-model" / "build" / "upstream-coverage.json"
 VEGA_LITE_COVERAGE_INPUT = ROOT / "vega-lite" / "build" / "vega-lite-coverage.json"
+CONFIG_COVERAGE_INPUT = ROOT / "vega-model" / "build" / "config-coverage.json"
 COVERAGE_DOC = ROOT / "docs" / "upstream-coverage.md"
 
 # A test class as a row cites one: backticked, containing `Test`.
@@ -404,6 +405,30 @@ def render_coverage() -> str | None:
             missing = ", ".join(f"`{p}`" for p in k["refused"]) or "—"
             lines.append(f"| `{k['kind']}` | {k['accepted']} | {k['upstream']} | {missing} |")
         lines += ["", f"**{vl_accepted} of {vl_total}** across the kinds measured.", ""]
+
+    # And the `config` blocks, whose inventory comes from upstream's default configuration rather
+    # than from a schema: Vega's schema does not describe `config` at all.
+    if CONFIG_COVERAGE_INPUT.exists():
+        cfg = json.loads(CONFIG_COVERAGE_INPUT.read_text())
+        unread = ", ".join(f"`{b}`" for b in cfg["reported"]) or "—"
+        lines += [
+            "## Vega `config` block coverage",
+            "",
+            "Generated from what `UpstreamConfigCoverageTest` measured. The inventory is the",
+            "top-level keys of upstream's own default configuration, since Vega's schema does not",
+            "describe `config`.",
+            "",
+            "This says the block *name* is read rather than reported as unimplemented. Whether every",
+            "property inside a block is honoured is `ConfigTest`'s question, answered against",
+            "upstream's own vectors.",
+            "",
+            "| Kind | Read | Upstream | Reported as unimplemented |",
+            "| --- | --- | --- | --- |",
+            f"| `config` | {cfg['read']} | {cfg['upstream']} | {unread} |",
+            "",
+            f"**{cfg['read']} of {cfg['upstream']}** blocks read.",
+            "",
+        ]
     return "\n".join(lines)
 
 def unpinned_limits(

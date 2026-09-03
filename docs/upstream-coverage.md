@@ -40,3 +40,19 @@ every fixture.
 | `transform` | 19 | 19 | — |
 
 **77 of 77** across the kinds measured.
+
+## Vega `config` block coverage
+
+Generated from what `UpstreamConfigCoverageTest` measured. The inventory is the
+top-level keys of upstream's own default configuration, since Vega's schema does not
+describe `config`.
+
+This says the block *name* is read rather than reported as unimplemented. Whether every
+property inside a block is honoured is `ConfigTest`'s question, answered against
+upstream's own vectors.
+
+| Kind | Read | Upstream | Reported as unimplemented |
+| --- | --- | --- | --- |
+| `config` | 25 | 25 | — |
+
+**25 of 25** blocks read.

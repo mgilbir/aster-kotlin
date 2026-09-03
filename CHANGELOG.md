@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Added
 
+- **`config` block coverage is measured too: 25 of 25.** Vega's schema does not describe `config` at
+  all, so the inventory comes from the top-level keys of upstream's own default configuration, which
+  is what a specification may write. That is a cruder source than a schema, so the scrape is guarded
+  — a shape change that made it find nothing would otherwise report perfect coverage of nothing.
+
+  This measures whether the block *name* is read, which is exactly what the row claimed was untrue
+  of `config.range`, `config.group` and `config.projection`. Whether every property inside a block
+  is honoured stays `ConfigTest`'s question, against upstream's own precedence vectors.
+
 - **Vega-Lite coverage is measured, not described.** Six rows said `Partial` and then a paragraph of
   prose, which is safe — anything outside the subset is refused by name — but not checkable, and an
   unmeasured claim is the one that goes stale. `UpstreamVegaLiteCoverageTest` asks the compiler
