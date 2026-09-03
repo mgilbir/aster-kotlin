@@ -6282,12 +6282,16 @@
       "section": "Rendering details",
       "feature": "Blend modes",
       "status": "Partial",
-      "tests": [],
-      "tests_text": "`encode-channels` fixture, SVG output",
-      "notes": "All sixteen CSS `mix-blend-mode` values are carried and all sixteen reach exported SVG. On an Android canvas the eleven above `lighten` need API 29's `BlendMode`; below that `PorterDuff` has only five, and anything outside them reports `VEGA_RENDER_UNSUPPORTED_BLEND_MODE` rather than being swapped for whichever mode looks closest",
+      "tests": [
+        "SvgRendererTest",
+        "AndroidBlendModeTableTest"
+      ],
+      "tests_text": "`SvgRendererTest`, `AndroidBlendModeTableTest` (on a device), `encode-channels` fixture",
+      "notes": "All sixteen CSS `mix-blend-mode` values are carried and all sixteen reach exported SVG. On an Android canvas, four have a true `PorterDuff` equivalent — screen, overlay, darken, lighten — and `normal` needs none, so below API 29 the remaining **eleven** report `VEGA_RENDER_UNSUPPORTED_BLEND_MODE` rather than being swapped for whichever mode looks closest. **`multiply` is among them on purpose**, which this row used to misdescribe as \"the eleven above `lighten`\": Android's `PorterDuff.MULTIPLY` is documented as modulate, and the two agree only where the destination is opaque — over the transparent background a chart has by default, modulate makes the mark vanish. So the most-used blend mode is refused rather than drawn wrong.",
       "milestone": "1",
       "limit": {
-        "scope": "The limitation is a branch on `Build.VERSION.SDK_INT` below 29, and this repository's test matrix cannot reach it: the emulator runs API 37 and there is no Robolectric to fake a lower one. `minSdk` is 26, so the devices it applies to are real. The supported half — all sixteen modes reaching exported SVG — is covered by `SvgRendererTest`."
+        "test": "AndroidBlendModeTableTest.elevenModesAreRefusedRatherThanApproximated",
+        "claim": "Below API 29 only four of the sixteen CSS blend modes have a `PorterDuff` equivalent; the other eleven, `multiply` included, are reported rather than approximated."
       }
     },
     {

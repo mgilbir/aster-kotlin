@@ -760,26 +760,10 @@ public class AndroidCanvasSceneRenderer(
       return
     }
     // Pre-Q only the PorterDuff subset exists; anything outside it is reported rather than
-    // approximated (ADR 0011).
-    val porterDuff =
-      when (mode) {
-        // **Not `PorterDuff.Mode.MULTIPLY`.** Android documents that one as `[Sa * Da, Sc * Dc]`,
-        // which is *modulate* and not CSS `multiply`: the two agree only where the destination is
-        // fully opaque, and where it is transparent modulate produces transparent while CSS
-        // multiply produces the source unchanged. So a `"blend": "multiply"` mark drawn over an
-        // empty part of the chart — the ordinary case, since a chart's background is transparent
-        // unless the specification paints one — simply vanished below API 29, on the one mode that
-        // is by far the most used. Reported now, which is what the comment below already promised
-        // and what this file does for the other eleven.
-        SceneBlendMode.SCREEN -> PorterDuff.Mode.SCREEN
-        SceneBlendMode.OVERLAY -> PorterDuff.Mode.OVERLAY
-        SceneBlendMode.DARKEN -> PorterDuff.Mode.DARKEN
-        SceneBlendMode.LIGHTEN -> PorterDuff.Mode.LIGHTEN
-        SceneBlendMode.NORMAL -> null
-        // `PorterDuff` stops at the four above. The rest are reported below rather than swapped for
-        // whichever mode looks closest.
-        else -> null
-      }
+    // approximated (ADR 0011). The table is [porterDuffFor], which is where it can be tested: this
+    // branch needs a device below API 29 and the emulator runs far above it, but what the row in
+    // `SUPPORTED_FEATURES.md` claims is the *table*, and a table is testable anywhere.
+    val porterDuff = porterDuffFor(mode)
     if (porterDuff == null) {
       diagnostics.warn(
         code = DiagnosticCodes.RENDER_UNSUPPORTED_BLEND_MODE,
@@ -790,6 +774,34 @@ public class AndroidCanvasSceneRenderer(
       paint.xfermode = PorterDuffXfermode(porterDuff)
     }
   }
+
+  /**
+   * The `PorterDuff` equivalent of a CSS blend mode, or null where there is none.
+   *
+   * Four of the sixteen, and the omission that matters is **`MULTIPLY`**. Android documents its own
+   * as `[Sa * Da, Sc * Dc]`, which is *modulate* rather than CSS `multiply`: the two agree only
+   * where the destination is fully opaque, and where it is transparent modulate produces
+   * transparent while CSS multiply produces the source unchanged. So a `"blend": "multiply"` mark
+   * drawn over an empty part of a chart — the ordinary case, since a chart's background is
+   * transparent unless the specification paints one — simply vanished. It is refused rather than
+   * approximated, like the other ten.
+   *
+   * `NORMAL` never reaches here: [applyBlendMode] clears the transfer mode and returns before the
+   * API check, so it is available on every device.
+   *
+   * Internal so `AndroidBlendModeTableTest` can hold it: the *branch* that calls it needs a device
+   * below API 29, which this project's test matrix has no way to run, but the table is what the
+   * documented limitation is about.
+   */
+  internal fun porterDuffFor(mode: SceneBlendMode): PorterDuff.Mode? =
+    when (mode) {
+      SceneBlendMode.SCREEN -> PorterDuff.Mode.SCREEN
+      SceneBlendMode.OVERLAY -> PorterDuff.Mode.OVERLAY
+      SceneBlendMode.DARKEN -> PorterDuff.Mode.DARKEN
+      SceneBlendMode.LIGHTEN -> PorterDuff.Mode.LIGHTEN
+      // See the note above: `PorterDuff` stops at the four, and `MULTIPLY` is not the CSS one.
+      else -> null
+    }
 
   public companion object {
     /**

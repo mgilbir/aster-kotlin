@@ -110,6 +110,25 @@ section here does not get released.
 
 ### Changed
 
+- **The blend-mode row is pinned to a test rather than to scope.** It recorded that below API 29 the
+  modes `PorterDuff` cannot express are reported rather than approximated, and stood on *scope*
+  because the branch is gated on `Build.VERSION.SDK_INT` and this project has no way to run below
+  29 — the emulator is far above it and there is no Robolectric.
+
+  But the branch is not the claim; the **table** is, and a table is testable anywhere.
+  `porterDuffFor` is now a pure function of the mode and `AndroidBlendModeTableTest` holds it on
+  whatever device runs the suite. That leaves one scope entry in the whole document.
+
+  Two things the row had wrong. It said "the eleven above `lighten`", and `multiply` is *below*
+  lighten and is also refused — deliberately, and it is the one that matters most: Android's
+  `PorterDuff.MULTIPLY` is modulate, which agrees with CSS `multiply` only where the destination is
+  opaque, so over the transparent background a chart has by default it makes the mark vanish. The
+  count of eleven was right; the description was not.
+
+  `internal` is JVM-public, so the extracted function appears in the Android API snapshot under a
+  mangled name. Recorded rather than worked around: the snapshot exists to make surface changes
+  visible, and this is one.
+
 - **A settled decision is no longer filed beside a gap.** 22 rows claim a limitation; 10 of them are
   decisions nobody should try to close — reproducing upstream's rotated-path bounds would put every
   hit target in the wrong place, implementing `labelBound` as documented would make this engine
