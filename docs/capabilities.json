@@ -101,12 +101,17 @@
       "feature": "Compiled Vega JSON",
       "status": "Partial",
       "tests": [
-        "FixtureDifferentialTest",
-        "SpecCompilerTest"
+        "SpecCompilerTest",
+        "SubsetIsReportedTest",
+        "FixtureDifferentialTest"
       ],
-      "tests_text": "`SpecCompilerTest`, `FixtureDifferentialTest`",
+      "tests_text": "`SpecCompilerTest`, `SubsetIsReportedTest`, `FixtureDifferentialTest`",
       "notes": "Parses and compiles the subset below, including signals, expressions, all 51 of upstream's 51 documented data transforms, nested group scopes, group `layout`, legends and titles. Loaded through `VegaChartController.setSpec`, or `setSpecAsync` to compile off the calling thread",
-      "milestone": "3"
+      "milestone": "3",
+      "limit": {
+        "test": "SubsetIsReportedTest.a mark type outside the subset is reported by name",
+        "claim": "The implemented subset is documented below; anything outside it is reported by name rather than approximated, which is what makes 'partial' safe to say (ADR 0011)."
+      }
     },
     {
       "line": 27,
@@ -119,7 +124,11 @@
       ],
       "tests_text": "`VegaLiteFixtureTest`, `VegaLiteFixtureDifferentialTest`",
       "notes": "`VegaLiteCompiler` compiles Vega-Lite to Vega in Kotlin, and the emitted specification is compared **property by property** against upstream's own compiler on every fixture — not only the picture it draws, because Vega-Lite's whole value is in the defaults it supplies and each of those is one property of the output. A single view, a `layer` of views, or a grid of them faceted by `row` and `column`; see the Vega-Lite section below for the channels and marks, and for what is reported instead of approximated",
-      "milestone": "—"
+      "milestone": "—",
+      "limit": {
+        "test": "SubsetIsRefusedTest.a mark outside the subset is refused by name",
+        "claim": "The implemented subset is documented in the Vega-Lite section; anything outside it is refused by name rather than approximated."
+      }
     },
     {
       "line": 28,
@@ -153,11 +162,16 @@
       "status": "**Partial**",
       "tests": [
         "ConfigTest",
+        "SubsetIsReportedTest",
         "FixtureDifferentialTest"
       ],
-      "tests_text": "`ConfigTest` (upstream vectors), `FixtureDifferentialTest` (`config-theme`, `config-marks`)",
-      "notes": "The guide blocks: `axis` with its `axisX`/`axisY`, `axisTop`/`axisBottom`/`axisLeft`/`axisRight` and `axisBand` variants, `legend`, the `guide-label` and `guide-title` styles, and `background`/`padding`/`autosize`. Precedence runs style → axis → dimension → side → band → the guide's own properties, verified by setting one property at every level and seeing which drew. A `style` block names its properties the way a **mark** does, so `fill` becomes `labelColor` on the way through — without that the form every Vega-Lite theme uses would set nothing. Also the mark blocks: `config.mark`, the per-mark-type blocks, and named `config.style` blocks a mark opts into through its own `style` property. `config.mark` sits **below** the engine's built-in per-type defaults and `config.{marktype}` sits above them, because upstream's default configuration is itself written into those per-type blocks — so `config.mark.fill` never recolours a rect and `config.rect.fill` does. `config.range`, `config.group` and `config.projection` are reported by name",
-      "milestone": "6"
+      "tests_text": "`ConfigTest` (upstream vectors), `SubsetIsReportedTest`, `FixtureDifferentialTest` (`config-theme`, `config-marks`)",
+      "notes": "The guide blocks: `axis` with its `axisX`/`axisY`, `axisTop`/`axisBottom`/`axisLeft`/`axisRight` and `axisBand` variants, `legend`, the `guide-label` and `guide-title` styles, and `background`/`padding`/`autosize`. Precedence runs style → axis → dimension → side → band → the guide's own properties, verified by setting one property at every level and seeing which drew. A `style` block names its properties the way a **mark** does, so `fill` becomes `labelColor` on the way through — without that the form every Vega-Lite theme uses would set nothing. Also the mark blocks: `config.mark`, the per-mark-type blocks, and named `config.style` blocks a mark opts into through its own `style` property. `config.mark` sits **below** the engine's built-in per-type defaults and `config.{marktype}` sits above them, because upstream's default configuration is itself written into those per-type blocks — so `config.mark.fill` never recolours a rect and `config.rect.fill` does. `config.range`, `config.group` and `config.projection` are **honoured** — a named range reaches an ordinary scale, a group block paints the frame, and a projection block supplies the defaults a declared projection leaves out. This row listed all three as reported by name, which stopped being true with nothing checking. What is still reported by name is a block this engine does not implement at all",
+      "milestone": "6",
+      "limit": {
+        "test": "SubsetIsReportedTest.a config block outside the subset is reported by name",
+        "claim": "A config block this engine does not implement is reported by name, so a theme setting it is told rather than quietly getting the engine's own defaults."
+      }
     },
     {
       "line": 31,
@@ -609,7 +623,11 @@
       ],
       "tests_text": "`VegaLiteFixtureTest` (`transforms`, `reshape`, `impute-area`, `bin-and-stack-transforms`)",
       "notes": "`calculate`, `filter`, `aggregate` — whose `groupby` is a **set**, a column named twice being grouped by once, unlike a `joinaggregate`, which Vega takes as written — `bin` and `stack`, which are the same nodes their channel-written counterparts produce with everything stated rather than derived (`makeFromTransform`, where only the `as` has a rule of its own: one name becomes the pair of edges), `joinaggregate`, `window`, `fold` and `flatten` — both of which always write their output names, filling in `key`/`value` and each field's own, since those names are what everything downstream groups and scales by — `pivot`, `sample`, `extent`, `quantile`, `density`, `regression` and `loess`, and `impute` — as a transform of its own, naming its field, key and grouping, or on a position channel, either way taking a `keyvals` written as a **sequence**, and either way three transforms rather than one where the method is not `value`: Vega's `impute` fills a gap with a *constant* and nothing else, so the gap is filled with null, a `window` averages over the frame (which belongs to the window), and a formula writes the result back over the nulls, which becomes a `sequence(...)` signal — the *other* position is its key and a path mark's series fields are its grouping, so one series' gaps are filled from its own rows; a method other than `value` becomes a `window` beside it written back over the nulls,. A `filter` takes an expression or a **predicate object** — `equal`, `lt`/`lte`/`gt`/`gte`, `range`, `oneOf`, `valid`, over `and`/`or`/`not` — compiled to the expression upstream chose rather than an equivalent of it — including the two rules a **date** brings with it: a month or quarter written as a *number* is one-based to the reader and zero-based to `datetime()`, where one written as a *name* has already been resolved and must not be shifted again; and a **binned** time unit needs no bucketing on the way into the comparison, the column already holding the bucket — and a predicate also settles the *type* of the column it compares, which a CSV would not otherwise know. `lookup` joins a second table: its data stands *beside* the view's source rather than below it — a join reads a second table, it does not derive from the first — and is named in the same sequence. Both grammars say `fields` and mean different things, which is the one thing to get right: Vega's `fields` are the rows' own columns to match on and its `values` are what to bring across, where Vega-Lite's `lookup` is the first and `from.fields` the second. A lookup naming a **parameter** rather than a dataset joins against the rows that selection has picked: the selection is materialised as a table of its own — a filter on it hung off the view's main output, `materializeSelections` — and with no `from.fields` the whole matched row is nested under a name, which for a parameter lookup falls back to the parameter's own. Only the selections a lookup actually names are materialised, an output nobody reads still costing a dataset name; and the join's `from` is corrected after the flow has been walked and named, since the dataset that output node turns out to be is not known before then",
-      "milestone": "—"
+      "milestone": "—",
+      "limit": {
+        "test": "SubsetIsRefusedTest.a transform outside the subset is refused by name",
+        "claim": "The transforms listed are what compile; one outside the set is refused by name rather than dropped."
+      }
     },
     {
       "line": 79,
@@ -760,12 +778,13 @@
       "line": 91,
       "section": "Vega-Lite",
       "feature": "A binned field on a discrete scale",
-      "status": "**Partial**",
+      "status": "**Supported**",
       "tests": [
-        "VegaLiteFixtureTest"
+        "VegaLiteFixtureTest",
+        "BinnedDiscreteDescriptionTest"
       ],
-      "tests_text": "`VegaLiteFixtureTest`, gallery sweep",
-      "notes": "`binRequiresRange`: an ordinal channel has no numbers left to derive labels from, so the bin writes them out into a `_range` column, and the scale's domain, the mark's position and the aggregate's grouping all read it. The domain sorts by the bin's own **start**, labels not sorting into numeric order. The spoken *description* still reads the bin's range where upstream reads the raw column — one difference, on the accessibility text alone",
+      "tests_text": "`VegaLiteFixtureTest`, `BinnedDiscreteDescriptionTest`, gallery sweep",
+      "notes": "`binRequiresRange`: an ordinal channel has no numbers left to derive labels from, so the bin writes them out into a `_range` column, and the scale's domain, the mark's position and the aggregate's grouping all read it. The domain sorts by the bin's own **start**, labels not sorting into numeric order. The spoken description reads the **raw** column, as upstream's does — the geometry follows `_range` and the text follows the field the specification named, which is the right split: a reader hears the datum while the axis beside them shows its bucket. This row recorded that difference as outstanding; it is not, and a difference in what a screen reader says is exactly the kind no picture comparison would have caught.",
       "milestone": "—"
     },
     {
@@ -869,11 +888,12 @@
       "line": 100,
       "section": "Vega-Lite",
       "feature": "`params`",
-      "status": "**Partial**",
+      "status": "**Supported**",
       "tests": [
-        "VegaLiteFixtureTest"
+        "VegaLiteFixtureTest",
+        "SubsetIsRefusedTest"
       ],
-      "tests_text": "`VegaLiteFixtureTest` (`params`)",
+      "tests_text": "`VegaLiteFixtureTest` (`params`), `SubsetIsRefusedTest`",
       "notes": "A **variable** parameter is a Vega signal and little else: a `value`, an `expr` computing it from the others, and a `bind` describing the input that sets it — `assembleParameterSignals`, emitted after the layout's own signals since a parameter may read a size. `{\"value\": {\"expr\": …}}` on a channel is **not a literal**: the expression becomes a `signal` in the same value ref, so a `datum` written that way still passes through its scale. A **selection** parameter — one carrying `select` — compiles too, as its own row below",
       "milestone": "—"
     },
@@ -1028,12 +1048,13 @@
       "line": 113,
       "section": "Vega-Lite",
       "feature": "Conditional encodings (`condition`)",
-      "status": "**Partial**",
+      "status": "**Supported**",
       "tests": [
-        "VegaLiteFixtureTest"
+        "VegaLiteFixtureTest",
+        "SubsetIsRefusedTest"
       ],
-      "tests_text": "`VegaLiteFixtureTest` (`conditional-test`, `conditional-colour`)",
-      "notes": "A production rule *ends* in the mark's own value: `color(model, {filled})` hands it to `nonPosition` as the `defaultValue`, and a rule with no unconditional arm drew every mark the condition did not catch in Vega's default rather than the chart's. A condition on a **`test`** compiles: the channel becomes a Vega production rule, an array of `{test, …}` entries tried in order with the unconditional one last, and each entry is built by the same reference builder as the unconditional part — so a condition may name a value, a `datum` or a field just as freely. The test itself is a `filter`'s grammar, an expression or a field predicate, through the same compiler, which is what keeps `oneOf` spelled `indexof(…) !== -1` in one place. A condition naming a `param` is refused *by itself*, leaving the rest of the definition standing",
+      "tests_text": "`VegaLiteFixtureTest` (`conditional-test`, `conditional-colour`), `SubsetIsRefusedTest`",
+      "notes": "A production rule *ends* in the mark's own value: `color(model, {filled})` hands it to `nonPosition` as the `defaultValue`, and a rule with no unconditional arm drew every mark the condition did not catch in Vega's default rather than the chart's. A condition on a **`test`** compiles: the channel becomes a Vega production rule, an array of `{test, …}` entries tried in order with the unconditional one last, and each entry is built by the same reference builder as the unconditional part — so a condition may name a value, a `datum` or a field just as freely. The test itself is a `filter`'s grammar, an expression or a field predicate, through the same compiler, which is what keeps `oneOf` spelled `indexof(…) !== -1` in one place. A condition naming a **`param`** compiles too, into the production rule upstream emits — `!length(data(\"…_store\")) || vlSelectionIdTest(\"…_store\", datum)` with the unconditional arm last. This row said it was refused, which had stopped being true and sat next to a `Selection parameters` row calling both kinds supported",
       "milestone": "—"
     },
     {
@@ -1090,11 +1111,16 @@
       "feature": "Surface size",
       "status": "**Partial**",
       "tests": [
-        "VegaLiteFixtureDifferentialTest"
+        "VegaLiteFixtureDifferentialTest",
+        "SurfaceSizeShortfallTest"
       ],
-      "tests_text": "`VegaLiteFixtureDifferentialTest`",
+      "tests_text": "`VegaLiteFixtureDifferentialTest`, `SurfaceSizeShortfallTest`",
       "notes": "Every mark lands exactly where upstream puts it; the surface around them still comes out between half a unit and a unit small in each direction. Since nothing drawn has moved, the shortfall is in a guide *extent* — the one input the mark comparison cannot see, because text bounds are excluded by design (docs/adr/0006). The test asserts the shape of the difference rather than tolerating it silently",
-      "milestone": "—"
+      "milestone": "—",
+      "limit": {
+        "test": "SurfaceSizeShortfallTest.the surface is between nothing and a unit small in each direction",
+        "claim": "Every mark lands where upstream puts it; the surface around them comes out up to a unit small in each direction, the shortfall being in a guide extent the mark comparison cannot see because text bounds are excluded by design (ADR 0006). Measured across all 566 dimensions of the corpus: the worst is exactly one unit."
+      }
     },
     {
       "line": 124,
@@ -1250,11 +1276,16 @@
       "status": "**Partial**",
       "tests": [
         "AxisStyleTest",
+        "SubsetIsReportedTest",
         "FixtureDifferentialTest"
       ],
-      "tests_text": "`AxisStyleTest`, `FixtureDifferentialTest` (`barley-trellis`)",
-      "notes": "An axis's `grid`, `ticks`, `domain`, `labels` and `title` blocks, and a legend's `symbols`, `labels` and `title`, folded into the properties they are another spelling of — `encode.grid.enter.strokeDash` **is** `gridDash` upstream, which builds each part from an encode block and extends it with the specification's. Folding rather than overlaying is what makes the block participate in *measurement*: a legend symbol resized through `encode` moves every label beside it. Only constants fold; a `signal`, a `field` or a conditional needs the guide's own datum, which does not exist until the guide is laid out, and each is reported by name along with any part or channel with no property behind it",
-      "milestone": "5"
+      "tests_text": "`AxisStyleTest`, `SubsetIsReportedTest`, `FixtureDifferentialTest` (`barley-trellis`)",
+      "notes": "An axis's `grid`, `ticks`, `domain`, `labels` and `title` blocks, and a legend's `symbols`, `labels` and `title`, folded into the properties they are another spelling of — `encode.grid.enter.strokeDash` **is** `gridDash` upstream, which builds each part from an encode block and extends it with the specification's. Folding rather than overlaying is what makes the block participate in *measurement*: a legend symbol resized through `encode` moves every label beside it. A constant folds and so does a **signal** — a grid bound to one draws at its value — which this row denied. A `field` or a conditional still needs the guide's own datum, which does not exist until the guide is laid out, and each is reported by name along with any part or channel with no property behind it",
+      "milestone": "5",
+      "limit": {
+        "test": "SubsetIsReportedTest.a guide encode channel that is not a constant is reported by name",
+        "claim": "A `field` or a conditional in a guide encode needs the guide's own datum, which does not exist until the guide is laid out, so each is reported by name. A signal is honoured."
+      }
     },
     {
       "line": 137,
