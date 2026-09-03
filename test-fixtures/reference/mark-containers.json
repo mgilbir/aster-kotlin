@@ -14448,6 +14448,38 @@
   "hidden": false
  },
  {
+  "fixture": "path-scaled-stroke",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "path-scaled-stroke",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
+  "label": "The default miter join, which carries the largest allowance: miterLimit/2 stroke widths past a vertex. `plain` is unscaled, so it holds the case that must not move.",
+  "hidden": false
+ },
+ {
+  "fixture": "path-scaled-stroke",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
+  "label": "A square cap reaches sqrt(2)/2 of the width past the end of a diagonal, and a round join takes no miter allowance at all — two different allowances under the same scaling.",
+  "hidden": false
+ },
+ {
+  "fixture": "path-scaled-stroke",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
+  "label": "A miter limit below the default changes the allowance rather than merely scaling it, so it separates 'divided by the scale' from 'divided by anything that happens to be 4'.",
+  "hidden": false
+ },
+ {
   "fixture": "pi-monte-carlo",
   "kind": "group",
   "role": "graphics-object",

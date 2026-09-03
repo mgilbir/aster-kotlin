@@ -133,4 +133,39 @@ class MarkContainerTest {
     assertTrue(compared > 300, "expected the whole corpus, compared only $compared")
     assertEquals("", mismatches.joinToString("\n\n"))
   }
+
+  /**
+   * Every fixture in the corpus is **in** the reference, so a new one cannot be skipped in silence.
+   *
+   * The loop above walks the *reference* and asks this engine for a matching answer, so a fixture
+   * the reference has never heard of is not compared — it is not reported either, because there is
+   * nothing to disagree with. That is how two fixtures landed with no container announcements
+   * checked at all: their references were built by running `oracle-js/src/reference.js` directly,
+   * which writes the scene comparison and nothing else, where `scripts/oracle.sh` also harvests the
+   * captions and the containers. The row floor above could not see it, counting rows rather than
+   * fixtures: 2,234 is comfortably over 300 whether a fixture is missing or not.
+   *
+   * Every fixture produces at least one container — a chart has marks, and each mark is announced —
+   * so absence means the harvest was not run rather than that there was nothing to say.
+   * `guide-captions.json` gets no such check on purpose: a fixture with no axis, legend or title
+   * genuinely has no caption, and 55 of them do not.
+   */
+  @Test
+  fun `every fixture in the corpus was harvested`() {
+    val corpus =
+      File(repositoryRoot, "test-fixtures/specs")
+        .listFiles { file -> file.name.endsWith(".vg.json") }
+        .orEmpty()
+        .map { it.name.removeSuffix(".vg.json") }
+        .sorted()
+    assertTrue(corpus.isNotEmpty(), "no fixtures found, so this test checks nothing")
+    val harvested = expectations().map { it.first }.toSet()
+    val missing = corpus.filterNot { it in harvested }
+    assertEquals(
+      emptyList<String>(),
+      missing,
+      "these fixtures are in the corpus and not in mark-containers.json, so their container " +
+        "announcements are compared against nothing. Regenerate with ./scripts/oracle.sh",
+    )
+  }
 }
