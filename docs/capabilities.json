@@ -2434,10 +2434,16 @@
       "section": "Data transforms",
       "feature": "Pulse propagation / incremental evaluation",
       "status": "Deliberate difference",
-      "tests": [],
-      "tests_text": "—",
+      "tests": [
+        "RecompileNotPulseTest"
+      ],
+      "tests_text": "`RecompileNotPulseTest`",
       "notes": "Transforms recompute a whole dataset and a changed signal recompiles the whole specification. That is a **measured** decision rather than a missing feature: compiling each of 55 fixtures 200 times on a warm JIT put the heaviest (`axis-values`) at 366 microseconds and the median at 112, against a 16,600 microsecond frame at 60fps. Even allowing an order of magnitude for ART, a cold cache and a phone's CPU, a full recompile fits inside a frame — so an incremental dataflow buys nothing an interaction can feel. The `DataflowOperator` contract exists if that ever stops being true; the caveats on the number are in STATUS.md, Performance observations.",
-      "milestone": "4"
+      "milestone": "4",
+      "limit": {
+        "test": "RecompileNotPulseTest.a changed signal rebuilds every node rather than patching",
+        "claim": "There is no incremental dataflow: a changed signal recompiles the whole specification and every scene node is rebuilt. Measured rather than assumed — the heaviest of 55 fixtures recompiles in 366 microseconds against a 16,600 microsecond frame — and a loose ceiling guards the decision against a hundredfold regression."
+      }
     },
     {
       "line": 246,
@@ -5956,10 +5962,17 @@
       "section": "Differential testing against upstream Vega",
       "feature": "Curved mark extents",
       "status": "Known difference",
-      "tests": [],
-      "tests_text": "`Differential`",
-      "notes": "Upstream measures an arc exactly, from its centre and radii, because its renderer emits a true circular arc. This scene graph has only cubics — every backend it draws on takes them — so an arc's bounds are the bounds of the curves actually painted. An arc is split into eighth-turn segments rather than the usual quarter, which takes the error to roughly a millionth of the radius; at a quarter turn it was large enough to fail a comparison on a 72-unit donut. A trail's semicircular caps are measured the same way, and a chart containing either gets the same allowance on its overall size",
-      "milestone": "—"
+      "tests": [
+        "CurvedExtentLimitTest",
+        "Differential"
+      ],
+      "tests_text": "`CurvedExtentLimitTest`, `Differential`",
+      "notes": "Upstream measures an arc exactly, from its centre and radii, because its renderer emits a true circular arc. This scene graph has only cubics — every backend it draws on takes them — so an arc's bounds are those of the curve actually painted, and a partial arc measures fractionally **wide**: a cubic's extent comes from control points that sit outside the arc they bend towards. A **whole** circle is exact, since eighth-turn segments put an endpoint at three, six, nine and twelve o'clock. The eighth turn is what keeps the difference near a millionth of the radius; at a quarter turn it was large enough to fail a comparison on a 72-unit donut. A trail's semicircular caps are measured the same way, and a chart containing either gets the same allowance on its overall size.",
+      "milestone": "—",
+      "limit": {
+        "test": "CurvedExtentLimitTest.a partial arc measures fractionally wider than the true circle",
+        "claim": "An arc's bounds come from the cubics that were painted rather than from its centre and radii, so a partial arc measures a millionth of the radius wide. A whole circle is exact, because eighth-turn segments put an endpoint on each axis."
+      }
     },
     {
       "line": 563,
@@ -6028,10 +6041,17 @@
       "section": "Differential testing against upstream Vega",
       "feature": "Nested scale outputs",
       "status": "Not compared",
-      "tests": [],
-      "tests_text": "`Differential`",
+      "tests": [
+        "NestedScaleScopeTest",
+        "Differential"
+      ],
+      "tests_text": "`NestedScaleScopeTest`, `Differential`",
       "notes": "The reference records only top-level scales, because a faceted group resolves its scales once per cell and there is no single scale of that name to compare. The cells' geometry is compared in full, which is what those scales produce",
-      "milestone": "5"
+      "milestone": "5",
+      "limit": {
+        "test": "NestedScaleScopeTest.a reference records the top-level scales and no nested ones",
+        "claim": "The reference records only top-level scales, because a faceted group resolves its scales once per cell and there is no single scale of that name to compare. The cells' geometry is compared in full, which is what those scales produce."
+      }
     },
     {
       "line": 570,
@@ -6093,10 +6113,17 @@
       "section": "Differential testing against upstream Vega",
       "feature": "Text baseline placement",
       "status": "Known difference",
-      "tests": [],
-      "tests_text": "—",
-      "notes": "Upstream positions glyphs by its own approximation, `round(0.79 × fontSize)` for a top baseline; this engine asks the platform, through SVG's `dominant-baseline` or Android's font metrics. They differ by up to a unit at common sizes. Deliberate (docs/adr/0006): real metrics are the better answer for something being read, and the harness excludes glyph bounds for exactly this reason",
-      "milestone": "—"
+      "tests": [
+        "TextBaselineFromMetricsTest",
+        "AndroidTextEngineTest"
+      ],
+      "tests_text": "`TextBaselineFromMetricsTest`, `AndroidTextEngineTest` (on a device)",
+      "notes": "Upstream positions glyphs by its own approximation, `round(0.79 x fontSize)` for a top baseline. `MetricTextEngine` — the fallback, and what the fixture corpus is measured with — uses `0.8 x fontSize` unrounded, so the two agree at some sizes by coincidence and part company at others by under a unit. A **platform** engine reads the font's own metrics, which is where the difference the row is about actually lives. Deliberate (docs/adr/0006): real metrics are the better answer for something being read, and the harness excludes glyph bounds for exactly this reason. This row previously said the SVG renderer used `dominant-baseline`; it deliberately does not, folding the offset into `y` instead, because `dominant-baseline` is per line and would drop a multi-line block half a line height below every canvas renderer.",
+      "milestone": "—",
+      "limit": {
+        "test": "TextBaselineFromMetricsTest.the fallback stays within a unit of upstream's approximation",
+        "claim": "The baseline is not upstream's number: the fallback engine differs from `round(0.79 x fontSize)` at some sizes, and a platform engine reads real font metrics. The difference is under a unit at the sizes a chart uses."
+      }
     },
     {
       "line": 576,
@@ -6211,7 +6238,10 @@
       "tests": [],
       "tests_text": "`encode-channels` fixture, SVG output",
       "notes": "All sixteen CSS `mix-blend-mode` values are carried and all sixteen reach exported SVG. On an Android canvas the eleven above `lighten` need API 29's `BlendMode`; below that `PorterDuff` has only five, and anything outside them reports `VEGA_RENDER_UNSUPPORTED_BLEND_MODE` rather than being swapped for whichever mode looks closest",
-      "milestone": "1"
+      "milestone": "1",
+      "limit": {
+        "scope": "The limitation is a branch on `Build.VERSION.SDK_INT` below 29, and this repository's test matrix cannot reach it: the emulator runs API 37 and there is no Robolectric to fake a lower one. `minSdk` is 26, so the devices it applies to are real. The supported half — all sixteen modes reaching exported SVG — is covered by `SvgRendererTest`."
+      }
     },
     {
       "line": 591,
@@ -6334,10 +6364,16 @@
       "section": "Rendering details",
       "feature": "HTML labels, CSS parsing",
       "status": "Not planned",
-      "tests": [],
-      "tests_text": "—",
-      "notes": "—",
-      "milestone": "—"
+      "tests": [
+        "DocumentedRenderingLimitsTest"
+      ],
+      "tests_text": "`DocumentedRenderingLimitsTest`",
+      "notes": "A label is drawn as the characters it was given: nothing parses markup or CSS out of a text mark. That is the right answer as well as an absent feature — a label comes from *data*, and interpreting data as markup is how an injection works.",
+      "milestone": "—",
+      "limit": {
+        "test": "DocumentedRenderingLimitsTest.a label containing markup is drawn as characters",
+        "claim": "Markup in a label is drawn literally rather than interpreted; there is no HTML or CSS layer."
+      }
     },
     {
       "line": 606,
@@ -6519,10 +6555,16 @@
       "section": "Accessibility",
       "feature": "Domain adjustment and reset-zoom actions",
       "status": "Planned",
-      "tests": [],
-      "tests_text": "—",
+      "tests": [
+        "DocumentedRenderingLimitsTest"
+      ],
+      "tests_text": "`DocumentedRenderingLimitsTest`",
       "notes": "—",
-      "milestone": "7"
+      "milestone": "7",
+      "limit": {
+        "test": "DocumentedRenderingLimitsTest.no accessibility action offers to adjust a domain or reset a zoom",
+        "claim": "A chart that pans and zooms offers no accessible way to do either: the accessibility tree exposes activation and nothing else."
+      }
     },
     {
       "line": 626,
@@ -6606,7 +6648,10 @@
       "tests": [],
       "tests_text": "—",
       "notes": "—",
-      "milestone": "—"
+      "milestone": "—",
+      "limit": {
+        "scope": "A statement of what the project does not build, not of how any code behaves. There is no WebView, no JavaScript runtime, no NDK renderer and no GPU backend to assert anything about; the nearest testable neighbour is that no evaluator is reachable from an expression, which `ForbiddenFunctionsTest` already holds."
+      }
     }
   ]
 }
