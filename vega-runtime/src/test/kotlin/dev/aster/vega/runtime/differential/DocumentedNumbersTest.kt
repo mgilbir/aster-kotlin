@@ -109,6 +109,27 @@ class DocumentedNumbersTest {
   }
 
   /**
+   * The accepted-difference count the documentation quotes is the one in the file.
+   *
+   * This is the number that went stale exactly as the prose beside it did. `known-divergences.json`
+   * held eighteen entries once; the ones that were bugs were fixed and their entries deleted, which
+   * is the mechanism working. Two rows went on saying "the last **five** are pinned" and
+   * "**thirteen** signatures pinned" for as long as nobody counted — a claim about a file that is
+   * *in the repository*, checkable in a second, and unchecked for months.
+   *
+   * The phrase is required to exist, like every other documented number here: a count nobody can
+   * find is a count nobody checks.
+   */
+  @Test
+  fun `the documented divergence count is what the file holds`() {
+    val file = File(repositoryRoot, "test-fixtures/upstream-vectors/known-divergences.json")
+    assertTrue(file.isFile, "missing ${file.path}")
+    val entries =
+      (VegaJson.parse(file.readText()) as VegaValue.Obj).fields["divergences"] as VegaValue.Arr
+    assertCount(Regex("""(\d+) accepted differences? from upstream"""), entries.values.size)
+  }
+
+  /**
    * Asserts every occurrence of [pattern] across the documentation names [expected], and that there
    * is at least one.
    */

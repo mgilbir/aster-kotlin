@@ -110,6 +110,31 @@ section here does not get released.
 
 ### Changed
 
+- **A settled decision is no longer filed beside a gap.** 22 rows claim a limitation; 10 of them are
+  decisions nobody should try to close — reproducing upstream's rotated-path bounds would put every
+  hit target in the wrong place, implementing `labelBound` as documented would make this engine
+  differ from upstream on every chart that sets it, and a reachable `eval` would be arbitrary code
+  execution in a host process. `limit.permanent` marks those, with the reason, and the counts are
+  printed on every run, so the open list is 12 rather than 22.
+
+  The flag changes what is *reported* and never what is required: a settled row still needs a test,
+  because the decision has to keep being true. Making it skip the pin check fails the self-test.
+
+- **`known-divergences.json` no longer calls its entries bugs.** The header said "every entry is a
+  BUG TO FIX", and when it was written that was true: eighteen were recorded, and the ones that were
+  bugs were fixed. What is left is four differences that survived review twice. The exact-set
+  assertion is unchanged, and still cuts both ways — an accepted difference that quietly becomes
+  agreement is as much a surprise as a new one.
+
+### Fixed
+
+- **Two rows quoted divergence counts that were years out of date**, claiming "the last five are
+  pinned" and "thirteen signatures pinned" against a file holding four. The entries had been deleted
+  as the bugs were fixed, which is the mechanism working; the prose beside it was not derived from
+  anything. `DocumentedNumbersTest` now checks the count against the file, so a row cannot quote a
+  stale one — a claim about a file *in this repository*, checkable in a second, and unchecked for
+  months.
+
 - Two tests that borrowed `wordcloud` as their example of an unimplemented transform now use an
   invented name. With every documented transform implemented, a test about "a transform this engine
   does not have" can no longer borrow a real one; what it guards is a misspelling, or something

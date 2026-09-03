@@ -405,9 +405,18 @@ def unpinned_limits(
     test because the row states what the project does not build — a WebView backend, an NDK
     renderer. It carries a reason and is listed on every run, because an escape hatch nobody counts
     becomes the default answer.
+
+    **`limit.permanent` separates a gap from a decision.** Both kinds of row claim a limitation and
+    both need a test, so both are checked the same way; what differs is whether anyone should ever
+    try to close it. Reproducing upstream's rotated-path bounds would put every hit target in the
+    wrong place, implementing `labelBound` as documented would make this engine differ from upstream
+    on every chart that sets it, and a reachable `eval` would be arbitrary code execution in a host
+    process. Those are settled, and a list that files them beside real gaps invites somebody to
+    "finish" them. The count of each is printed, so the open list is the honest one.
     """
     problems: list[str] = []
     scoped: list[str] = []
+    permanent = 0
     if entries is None:
         entries = json.loads(SOURCE.read_text())["capabilities"]
     for entry in entries:
@@ -423,6 +432,8 @@ def unpinned_limits(
                 '`"limit": {"scope": "…"}` where there is no code path to test.'
             )
             continue
+        if limit.get("permanent"):
+            permanent += 1
         if limit.get("scope"):
             scoped.append(f"{where}: {limit['scope']}")
             continue
@@ -445,6 +456,11 @@ def unpinned_limits(
                 f"{where} pins its limitation to `{citation}`, and `{class_name}` ran without a "
                 f"method called `{method}`. It was renamed or removed; the row is now unpinned."
             )
+    if permanent:
+        print(
+            f"{permanent} limitation(s) are settled decisions rather than gaps, and are not work "
+            "waiting to be done."
+        )
     if scoped:
         print(f"{len(scoped)} limitation(s) stand on scope rather than a test:")
         for line in sorted(scoped):
@@ -562,6 +578,13 @@ def selftest() -> int:
     check("trailing dot reason", "not `ClassName.the method`" in empty_method[0], True)
     # Scope is accepted and counted.
     check("scope", unpinned_limits(ran, [row(limit={"scope": "no code path"})]), [])
+    # `permanent` marks a settled decision. It changes what is *reported*, never what is required:
+    # such a row still needs a test, because the decision has to keep being true.
+    check("permanent still needs a pin", len(unpinned_limits(ran, [row(limit={"permanent": True})])), 1)
+    check("permanent with a pin",
+          unpinned_limits(ran, [row(limit={"permanent": True, "test": "T.the gap holds"})]), [])
+    check("permanent with a bad pin",
+          len(unpinned_limits(ran, [row(limit={"permanent": True, "test": "T.gone"})])), 1)
     # A row that claims no limitation needs no pin.
     check("supported row", unpinned_limits(ran, [row(status="**Supported**")]), [])
     # With no results at all the offline half still holds: a missing pin is still a missing pin,
