@@ -317,7 +317,15 @@ run_gate "changelog" python3 ./scripts/changelog-gate.py
 # deliberately does not attempt it: generating from one laptop would mark two hundred rows unproven
 # and the diff would be about the machine rather than about the code.
 # ---------------------------------------------------------------------------------------------
-run_gate "capabilities" python3 ./scripts/capabilities.py --check
+capabilities_gate() {
+  # The rule about claimed limitations lands one stack ahead of its enforcement, so that the rows can
+  # be pinned a group at a time without a red gate sitting on `main`. It is checked from the day it
+  # arrives rather than the day it is switched on, because an unwired rule that nothing exercises is
+  # the very thing it exists to prevent.
+  python3 ./scripts/capabilities.py --selftest
+  python3 ./scripts/capabilities.py --check
+}
+run_gate "capabilities" capabilities_gate
 
 # ---------------------------------------------------------------------------------------------
 # 6. The Swift gate: the suite, the exported-API snapshot, and the iOS demo's type-check.

@@ -60,10 +60,35 @@ CITATION = re.compile(r"`([A-Z][A-Za-z0-9]*Tests?[A-Za-z0-9]*)`")
 # than an outcome, and a run has nothing to say about it.
 CLAIMS_SUPPORT = ("supported", "verified", "partial", "exact", "yes")
 
+# Statuses that assert the feature works **completely**, and therefore claim no limitation. Note
+# `partial` is missing from this list where it is present in the one above: a `Partial` row makes
+# both claims at once, and the two halves are checked by different things.
+CLAIMS_EVERYTHING = ("supported", "verified", "exact", "yes", "superseded")
+
 
 def claims_support(status: str) -> bool:
     plain = status.replace("*", "").strip().lower()
     return any(plain.startswith(word) for word in CLAIMS_SUPPORT)
+
+
+def claims_limit(status: str) -> bool:
+    """Whether [status] tells a reader that something does **not** work.
+
+    The half of a row that nothing used to check, and the half that rots. A run settles whether a
+    row claiming support has evidence; nothing settled whether a row claiming a *limitation* still
+    had one, so ten rows went on describing gaps the code had closed — `Interval selection` said
+    "no drag-to-select gesture yet" while a drag brush ran end to end, `A colour ramp over instants`
+    said the runtime could not build a temporal colour scale while `ScaleResolver` routed exactly
+    that to `buildSequentialColor`, and `Tooltip content and anchor` said "no tooltip rendering yet"
+    against two other rows in the same file saying `VegaChartView` draws one.
+
+    Each of those understated the engine, which is the direction nobody reports: an adopter reads a
+    limitation and builds around it, and no bug is ever filed for a feature that works.
+    """
+    plain = status.replace("*", "").strip().lower()
+    if not plain or plain[0].isdigit():
+        return False
+    return not any(plain.startswith(word) for word in CLAIMS_EVERYTHING)
 
 
 # --------------------------------------------------------------------------------------- results
@@ -78,7 +103,9 @@ def read_results(directories: list[str]) -> dict[str, dict]:
     (`macosArm64Test.dev.…`), and the instrumented runner gives the bare package path. Merging on
     the simple name is what lets one row's evidence come from four jobs.
     """
-    seen: dict[str, dict] = defaultdict(lambda: {"ran": 0, "failed": 0, "skipped": 0, "hosts": set()})
+    seen: dict[str, dict] = defaultdict(
+        lambda: {"ran": 0, "failed": 0, "skipped": 0, "hosts": set(), "methods": set()}
+    )
     for directory in directories:
         base = pathlib.Path(directory)
         for path in base.rglob("*.xml"):
@@ -98,7 +125,17 @@ def read_results(directories: list[str]) -> dict[str, dict]:
                 if case.find("skipped") is not None:
                     entry["skipped"] += 1
                 entry["hosts"].add(base.name)
+                entry["methods"].add(method_name(case.get("name") or ""))
     return seen
+
+
+# What each producer hangs off a method name: `()`, then a target in brackets for a Kotlin/Native or
+# multiplatform suite — `a drag selects nothing()[jvm]`. Stripped so one citation matches every host.
+METHOD_DECORATION = re.compile(r"\(\)(\[[^\]]*\])?$")
+
+
+def method_name(raw: str) -> str:
+    return METHOD_DECORATION.sub("", raw.strip()).strip()
 
 
 def status_of(entry: dict, results: dict[str, dict]) -> tuple[str, str]:
@@ -340,6 +377,85 @@ def render_coverage() -> str | None:
     lines += ["", f"**{consumed} of {total}** across the kinds measured.", ""]
     return "\n".join(lines)
 
+def unpinned_limits(
+    results: dict[str, dict],
+    entries: list[dict] | None = None,
+) -> list[str]:
+    """Rows that tell a reader something does not work, without a test that says so.
+
+    **Not yet wired into [main].** It is switched on at the top of the stack that pins the existing
+    rows, because a gate that lands red is a gate somebody turns off. Until then this is callable
+    and tested, and every row it would flag is being worked through one group at a time.
+
+
+    **The rule.** A row claiming a limitation names a `limit.test` — one test method, as
+    `ClassName.the method's own name` — whose job is to *assert the limitation*. Not to demonstrate
+    the feature: to fail the day the gap closes. `Interval selection` claiming no drag-to-select
+    gesture has to be backed by a test that drags and finds nothing, so that implementing the drag
+    turns the suite red and whoever implemented it has to come back here and say so.
+
+    That is the same shape as every other gate in this repository, and it is here for the same
+    reason: the status column has been derived from a run since #154, and the *prose beside it* has
+    not, so the prose is where the drift went. Ten rows were found describing gaps the code had
+    closed, every one of them understating what the engine does.
+
+    **Two things checked, and the second needs a run.** That the row names a test at all — which
+    holds offline, so the shape of the source is checkable without building anything. And that the
+    method actually ran, which is what stops a citation pointing at a method somebody renamed.
+    A method that *failed* is not reported here: the ordinary test run already fails on it, and it
+    failing is precisely the signal this exists to produce.
+
+    **The escape hatch, deliberately narrow.** `limit.scope` stands where there is no behaviour to
+    test because the row states what the project does not build — a WebView backend, an NDK
+    renderer. It carries a reason and is listed on every run, because an escape hatch nobody counts
+    becomes the default answer.
+    """
+    problems: list[str] = []
+    scoped: list[str] = []
+    if entries is None:
+        entries = json.loads(SOURCE.read_text())["capabilities"]
+    for entry in entries:
+        if not claims_limit(entry["status"]):
+            continue
+        where = f"{entry['section']} / {entry['feature']}"
+        limit = entry.get("limit")
+        if not limit:
+            problems.append(
+                f"{where} is `{entry['status']}` but pins its limitation to nothing. Add "
+                '`"limit": {"test": "SomeTest.the method", "claim": "…"}` naming a test that '
+                "asserts what does not work, so closing the gap turns the suite red — or "
+                '`"limit": {"scope": "…"}` where there is no code path to test.'
+            )
+            continue
+        if limit.get("scope"):
+            scoped.append(f"{where}: {limit['scope']}")
+            continue
+        citation = limit.get("test", "")
+        class_name, dot, method = citation.partition(".")
+        if not dot or not method.strip():
+            problems.append(
+                f"{where} pins its limitation to `{citation}`, which is not `ClassName.the method`. "
+                "A class alone does not say which assertion holds the limitation."
+            )
+            continue
+        found = results.get(class_name)
+        if results and not found:
+            problems.append(
+                f"{where} pins its limitation to `{citation}`, and `{class_name}` ran nowhere in "
+                "this run, so nothing checked that the limitation is still real."
+            )
+        elif found and method not in found["methods"]:
+            problems.append(
+                f"{where} pins its limitation to `{citation}`, and `{class_name}` ran without a "
+                f"method called `{method}`. It was renamed or removed; the row is now unpinned."
+            )
+    if scoped:
+        print(f"{len(scoped)} limitation(s) stand on scope rather than a test:")
+        for line in sorted(scoped):
+            print(f"  {line}")
+    return problems
+
+
 DOC_REFERENCE = re.compile(
     r"`([A-Za-z0-9_./-]+\.(?:md|kt|kts|json|sh|py|swift|toml|yml))`"
     r"|\]\(([A-Za-z0-9_./-]+\.md)\)"
@@ -396,13 +512,92 @@ def dangling_references() -> list[str]:
     return problems
 
 
+def selftest() -> int:
+    """Exercises the limitation rule on constructed rows, before it is wired into anything.
+
+    The rule exists to stop a claimed limitation going unchecked, and it lands one stack ahead of
+    the enforcement so the rows can be pinned a group at a time without a red gate sitting on
+    `main`. That gap is exactly where a rule quietly stops working, so it is checked from the day it
+    arrives rather than the day it is switched on — the thing this whole mechanism is about is a
+    gate that cannot fail, and an unwired, untested rule is one.
+
+    Constructed rows rather than the real source, so this says what the rule *does* and not what the
+    document currently happens to contain.
+    """
+    failures: list[str] = []
+
+    def check(what: str, got, want) -> None:
+        if got != want:
+            failures.append(f"{what}: expected {want!r}, got {got!r}")
+
+    # Which statuses claim a limitation at all. The vocabulary is open — a row may say
+    # `**Supported**, with a scheduler` — so this is a prefix rule and the boundary cases matter.
+    for status in ("Partial", "**Partial**", "Not planned", "Not implemented", "Planned",
+                   "Known difference", "Deliberate difference", "Not compared",
+                   "Consumed, deliberately inert", "Partial — **not verified against upstream**"):
+        check(f"claims_limit({status!r})", claims_limit(status), True)
+    for status in ("Supported", "**Supported**", "**Verified**", "**Exact**", "**Yes**",
+                   "Superseded", "**Supported**, with a scheduler", "**188**, past the target",
+                   "26"):
+        check(f"claims_limit({status!r})", claims_limit(status), False)
+
+    row = lambda **kw: {"section": "S", "feature": "F", "status": "Partial", **kw}
+    ran = {"T": {"ran": 1, "failed": 0, "skipped": 0, "hosts": {"jvm"}, "methods": {"the gap holds"}}}
+
+    # No pin at all.
+    check("unpinned", len(unpinned_limits({}, [row()])), 1)
+    # A pin naming a method that ran.
+    check("pinned and run",
+          unpinned_limits(ran, [row(limit={"test": "T.the gap holds"})]), [])
+    # A pin naming a class that ran without that method — renamed or removed.
+    check("method renamed",
+          len(unpinned_limits(ran, [row(limit={"test": "T.a method nobody wrote"})])), 1)
+    # A pin naming a class that ran nowhere.
+    check("class absent",
+          len(unpinned_limits(ran, [row(limit={"test": "Absent.the gap holds"})])), 1)
+    # A class with no method is not a pin: it does not say which assertion holds the limitation.
+    # The *message* is asserted, not just the count — treating it as a renamed method would report
+    # one problem too, and would send a reader looking for a method rather than writing a citation.
+    class_only = unpinned_limits(ran, [row(limit={"test": "T"})])
+    check("class only count", len(class_only), 1)
+    check("class only reason", "not `ClassName.the method`" in class_only[0], True)
+    empty_method = unpinned_limits(ran, [row(limit={"test": "T."})])
+    check("trailing dot", len(empty_method), 1)
+    check("trailing dot reason", "not `ClassName.the method`" in empty_method[0], True)
+    # Scope is accepted and counted.
+    check("scope", unpinned_limits(ran, [row(limit={"scope": "no code path"})]), [])
+    # A row that claims no limitation needs no pin.
+    check("supported row", unpinned_limits(ran, [row(status="**Supported**")]), [])
+    # With no results at all the offline half still holds: a missing pin is still a missing pin,
+    # and a present one is not judged against a run that did not happen.
+    check("offline, unpinned", len(unpinned_limits({}, [row()])), 1)
+    check("offline, pinned", unpinned_limits({}, [row(limit={"test": "T.the gap holds"})]), [])
+
+    # The decoration each producer hangs off a method name.
+    check("method_name jvm", method_name("the gap holds()[jvm]"), "the gap holds")
+    check("method_name native", method_name("the gap holds()[macosArm64]"), "the gap holds")
+    check("method_name bare", method_name("the gap holds()"), "the gap holds")
+    check("method_name plain", method_name("the gap holds"), "the gap holds")
+
+    for problem in failures:
+        print(f"::error::selftest: {problem}")
+    if failures:
+        return 1
+    print("capabilities.py: the limitation rule behaves as documented")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--migrate", action="store_true")
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--selftest", action="store_true")
     parser.add_argument("--results", nargs="*", default=[])
     args = parser.parse_args()
+
+    if args.selftest:
+        return selftest()
 
     if args.migrate:
         migrate()

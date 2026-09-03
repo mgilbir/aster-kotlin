@@ -8,6 +8,21 @@ section here does not get released.
 
 ### Added
 
+- **A documented limitation now has to be pinned to a test.** `SUPPORTED_FEATURES.md` has had its
+  status column generated from a run since #154, and the prose beside it has not — which is where
+  the drift went. A row can claim a gap that no longer exists and nothing fails, because a run has
+  nothing to say about a claim nobody made testable.
+
+  `scripts/capabilities.py` gains the rule: a row whose status is not one of the fully-supported
+  kinds must carry a `limit`, naming either a test method that **asserts** the limitation — one that
+  goes red the day the gap closes — or a `scope` reason where there is no code path to test, listed
+  on every run so the escape hatch stays visible and rare.
+
+  It lands one stack ahead of its enforcement so the existing rows can be pinned a group at a time
+  without a red gate on `main`, and `--selftest` exercises it from the day it arrives: an unwired
+  rule that nothing checks is the very thing it exists to prevent. Four mutations were run against
+  that self-test and each was caught.
+
 - **API:** `WordcloudTransform` joins the transform registry in `:vega-dataflow`. Additive.
 
 - **The `wordcloud` transform**, which completes upstream's 51 documented data transforms.
