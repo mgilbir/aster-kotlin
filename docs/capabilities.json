@@ -4367,12 +4367,13 @@
       "line": 418,
       "section": "Layout",
       "feature": "Discrete (banded) legends",
-      "status": "Partial",
+      "status": "**Supported**",
       "tests": [
-        "LegendTest"
+        "BandedLegendTest",
+        "FixtureDifferentialTest"
       ],
-      "tests_text": "`LegendTest`",
-      "notes": "The right colours against the right cut points, drawn as ordinary symbol swatches. Upstream draws a **stacked colour bar** instead — `legend-band` rects of `gradientLength / buckets` each, bottom upwards, with labels at the boundaries between them — so this is not the same picture and says so. Label precision is taken from the cut points themselves rather than from a tick step, since quartiles land wherever the data puts them and `2.5` beside a `5` must not print as `2`",
+      "tests_text": "`BandedLegendTest`, `FixtureDifferentialTest` (`legend-discretizing`, `county-unemployment`, `map-with-tooltip`)",
+      "notes": "Upstream's **stacked colour bar**: `legend-band` rects of `gradientLength / buckets` each, stacked bottom upwards, with labels at the boundaries between them. Three fixtures compare it against upstream mark for mark, their references carrying the same `legend-band` role. Label precision comes from the cut points themselves rather than from a tick step, since quartiles land wherever the data puts them and `2.5` beside a `5` must not print as `2`. This row said the picture was a row of ordinary symbol swatches and therefore not upstream's; it stopped being so and nothing was checking.",
       "milestone": "6"
     },
     {
@@ -5080,7 +5081,11 @@
       ],
       "tests_text": "`FixtureDifferentialTest` (`axis-label-bound`)",
       "notes": "Upstream culls **nothing**: it applies the test as `boundRectangle.encloses(item.bounds)` inside `Overlap`, which runs *before* the label bounds exist, so every item still holds a cleared `Bounds` that any rectangle trivially encloses. Established by experiment — a label overflowing by 68 survives `labelBound: false`, `true` and `40` alike. Implementing the documented behaviour would make this engine differ from upstream on every chart that sets it",
-      "milestone": "5"
+      "milestone": "5",
+      "limit": {
+        "test": "AxisLabelBoundInertTest.labelBound culls nothing, whatever it is set to",
+        "claim": "Upstream culls nothing: it applies the test inside `Overlap`, which runs before the label bounds exist, so every item holds a cleared `Bounds` that any rectangle encloses. Implementing the documented behaviour would make this engine differ from upstream on every chart that sets it."
+      }
     },
     {
       "line": 477,
@@ -5418,13 +5423,14 @@
     {
       "line": 504,
       "section": "Layout",
-      "feature": "A transform reading a signal it cannot see",
-      "status": "Partial",
+      "feature": "A signal read through a transform expression",
+      "status": "**Supported**",
       "tests": [
+        "TransformSignalOrderingTest",
         "SignalCompileTest"
       ],
-      "tests_text": "`SignalCompileTest`",
-      "notes": "A signal read through a transform's **expression** parameter — `filter`'s `expr`, `formula`'s `expr`, `cross`'s `filter`, the only three upstream declares as `type: 'expr'` — is not an edge in the graph, because those are per-row expressions rather than `{\"signal\":...}` references. It resolves whenever the ordering happens to put the signal first, which it usually does; when it does not, the read comes back null, and null is zero to arithmetic. Vega's own radial tree example fails that way — every node placed at `originX + radius * cos(...)`, the whole diagram on the origin — so it is **reported by name** rather than left silent",
+      "tests_text": "`TransformSignalOrderingTest`, `SignalCompileTest`",
+      "notes": "`filter`'s `expr`, `formula`'s `expr` and `cross`'s `filter` — the three upstream declares as `type: 'expr'` — are edges in the dependency graph like any `{\"signal\": …}` reference, so a signal they read is resolved first whatever order the document declares things in. What remains is a genuine **cycle**, where the signal's own value depends on the dataset whose transform reads it; that is reported by name, saying which way round it resolved, and the chart still draws. This row said the ordering was luck and that a losing read came back null — it disagreed with `DataflowOrder.collectTransformExpressions`, whose own title is \"which are edges after all\".",
       "milestone": "5"
     },
     {
@@ -5806,11 +5812,16 @@
       "feature": "Keyboard focus navigation",
       "status": "Partial",
       "tests": [
+        "KeyboardTraversalLimitTest",
         "VegaChartViewTest"
       ],
-      "tests_text": "`VegaChartViewTest`",
-      "notes": "Key events are translated; traversal semantics come with accessibility work",
-      "milestone": "7"
+      "tests_text": "`KeyboardTraversalLimitTest`, `VegaChartViewTest`",
+      "notes": "A host turns a platform key into a `ChartInputEvent.Key` and the controller takes it — `VegaChartView.onKeyDown` on Android, `ChartSession.press(_:)` on Apple. Nothing then moves: `fireSignalHandlers` maps only the pointer family, so a key fires no `keydown` handler and moves no focus between marks. That is deliberate rather than unfinished — claiming a key the chart does nothing with is a **focus trap**, where TAB never leaves the chart and, on a television where the d-pad is the keyboard, the arrows let a reader in and not out. Traversal semantics come with the accessibility work.",
+      "milestone": "7",
+      "limit": {
+        "test": "KeyboardTraversalLimitTest.no key moves focus between marks",
+        "claim": "A key press reaches the controller and moves no focus and fires no handler; traversal semantics are not implemented."
+      }
     },
     {
       "line": 546,
