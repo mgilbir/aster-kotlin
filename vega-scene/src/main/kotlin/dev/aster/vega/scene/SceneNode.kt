@@ -506,14 +506,45 @@ public data class PathNode(
   val blendMode: SceneBlendMode = SceneBlendMode.NORMAL,
 ) : SceneNode {
 
+  /**
+   * Local bounds, with the stroke allowance **pre-divided by this node's own scale**.
+   *
+   * A miter join can extend past `halfWidth`, and a square cap past it too; see
+   * [Stroke.boundsExpansion]. The subtlety is *where* that allowance is measured.
+   *
+   * Upstream renders the path through the transform and only then expands — `pathRender(context,
+   * cache, x, y, sx, sy)` fills the bounds, and `boundStroke` widens what came out. So the
+   * allowance is in **screen** space, and a stroke two units wide reaches two units past the
+   * outline however much the outline was scaled: `scaleX` stretches the shape, not the pen.
+   *
+   * These bounds are local and get mapped afterwards, so expanding by the full allowance here would
+   * hand it to the transform to multiply. With `scaleX: 8` and a two-unit miter-joined stroke that
+   * is a 32-unit margin where upstream has 4 — a stroked path measured **108 units wide where
+   * upstream says 52**. Dividing first is what puts it back: `4 / 8` locally becomes 4 after the
+   * scale, on every side.
+   *
+   * A node with no scaling divides by one and nothing moves, which is every path in the fixture
+   * corpus — the case exists and nothing was covering it.
+   *
+   * **Rotation is the honest limit.** Rotated *and* non-uniformly scaled, there is no single local
+   * expansion that maps to an even margin, because the stretch then depends on direction. This
+   * takes the basis lengths, which is exact for scaling without skew and approximate beyond it —
+   * and the mapping of a rotated rectangle is already an over-estimate here for the same reason.
+   */
   override val bounds: RectD by
     lazy(LazyThreadSafetyMode.NONE) {
       if (absent) return@lazy RectD(0.0, 0.0, 0.0, 0.0)
       val base = path.bounds
-      // A miter join can extend past halfWidth, and a square cap past it too; see
-      // `Stroke.boundsExpansion`.
       val expansion = stroke.wideningAt(opacity)?.boundsExpansion(miter = true) ?: 0.0
-      (if (expansion > 0.0) base.expand(expansion) else base).normalized()
+      if (expansion <= 0.0) return@lazy base.normalized()
+      val sx = transform.scaleX
+      val sy = transform.scaleY
+      // A degenerate scale collapses the shape to nothing; there is no margin to divide, and
+      // dividing would be by zero.
+      if (sx <= 0.0 || sy <= 0.0 || !sx.isFinite() || !sy.isFinite()) {
+        return@lazy base.expand(expansion).normalized()
+      }
+      base.expand(expansion / sx, expansion / sy).normalized()
     }
 }
 
