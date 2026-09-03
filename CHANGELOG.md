@@ -6,6 +6,33 @@ section here does not get released.
 
 ## Unreleased
 
+### Changed
+
+- **Upstream property coverage is measured, not written down.** `UpstreamPropertyCoverageTest` asks
+  the parser about every property upstream's own schema documents — one property at a time, five
+  candidate values each — and `docs/upstream-coverage.md` is generated from the answer. The result:
+  **247 of 247** consumed across axis (79), legend (72), `encodeEntry` (69), projection (14) and
+  mark (13).
+
+  It exists because the prose was wrong by fifty in the flattering direction's opposite:
+  `SUPPORTED_FEATURES.md` said the axis had "forty-odd properties this engine does not honour" when
+  the number is zero. Five more rows said `timeParse`, the date functions, `scale`/`invert`/
+  `gradient`, the colour constructors and the scale domain overrides were "not implemented" while
+  every one of them works — each citing a reason that had stopped being true, "needs time scales
+  first" and "a scale registry the evaluator cannot reach yet". Those six rows are corrected.
+
+  What the measurement claims is narrow and stated in the file: whether a property *name* is
+  recognised for some plausible value. Whether it is honoured *correctly* is the differential
+  corpus's question, and that already answers it by comparing whole scenes.
+
+  Two ways this nearly reported fiction, both caught before landing. Reading the `*_CONSUMED` sets
+  gave "30 axis properties missing", because `AXIS_CONSUMED` is `setOf(…) + guideStyleKeys(…)` and a
+  reader who stops at the first bracket undercounts by sixty. Then probing with one value per
+  property gave "19 missing", because consumption is type-sensitive and `"labelColor": 1` is not
+  recognised where `"labelColor": "red"` is. A test that asserts an invented property *is* counted
+  is what keeps the numbers from being vacuous — and it earned that place immediately, by catching
+  that the mark probe emitted `"marks"` twice and measured everything against an empty array.
+
 ### Fixed
 
 - **Every mark's VoiceOver touch target was stacked on the first one.** The Apple accessibility

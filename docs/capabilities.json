@@ -1942,12 +1942,12 @@
       "line": 198,
       "section": "Scales",
       "feature": "`domainRaw`, `domainImplicit`, `bins`",
-      "status": "Not implemented",
+      "status": "**Supported**",
       "tests": [
         "UnhandledPropertiesTest"
       ],
       "tests_text": "`UnhandledPropertiesTest`",
-      "notes": "Three of upstream's 23 scale properties, each reported by name",
+      "notes": "All three are honoured. `domainRaw` short-circuits the rest of the domain resolution in `ScaleResolver` and suspends `nice`, which is what an interactive zoom publishes its exact interval through; `CompileBoundariesTest` pins it. `UnhandledPropertiesTest` asserts that none of upstream's 23 scale properties is reported as unhandled — these three were the last to arrive and are named there so one that stopped being honoured would show up. This row was written before any of that landed.",
       "milestone": "6"
     },
     {
@@ -2591,12 +2591,12 @@
       "line": 267,
       "section": "Expressions",
       "feature": "`timeParse`, `utcParse`",
-      "status": "Not implemented",
+      "status": "**Supported**",
       "tests": [
         "ExpressionReferenceTest"
       ],
       "tests_text": "`ExpressionReferenceTest`",
-      "notes": "Parsing against a format string needs a `strptime`; an ISO 8601 string works through `toDate`. Reported by name",
+      "notes": "Both parse against a d3 format string and answer a `Timestamp`; `toDate` still reads an ISO 8601 string. This row said \"not implemented — parsing against a format string needs a `strptime`\" for five releases after the parsing landed.",
       "milestone": "6"
     },
     {
@@ -2615,20 +2615,20 @@
       "line": 269,
       "section": "Expressions",
       "feature": "Date and time functions",
-      "status": "Not implemented",
+      "status": "**Supported**",
       "tests": [],
       "tests_text": "—",
-      "notes": "Reported by name with a reason; needs time scales first",
+      "notes": "`datetime`, `utc`, `timeOffset`, `timeSequence`, `monthFormat` and the abbreviated formatters all evaluate. The row said \"needs time scales first\", which stopped being true when time scales landed and was never revisited.",
       "milestone": "5"
     },
     {
       "line": 270,
       "section": "Expressions",
       "feature": "`scale`, `invert`, `gradient`",
-      "status": "Not implemented",
+      "status": "**Supported**",
       "tests": [],
       "tests_text": "—",
-      "notes": "Need a scale registry the evaluator cannot reach yet",
+      "notes": "All three are registered in `Evaluator`, which reaches the compiled scales. The row said they \"need a scale registry the evaluator cannot reach yet\" — written before that registry existed.",
       "milestone": "6"
     },
     {
@@ -3771,12 +3771,12 @@
       "line": 366,
       "section": "Expressions",
       "feature": "The colour constructors, and the geo and selection helpers",
-      "status": "Not implemented",
+      "status": "**Supported**",
       "tests": [
         "ParserTest"
       ],
       "tests_text": "`ParserTest`",
-      "notes": "`rgb`, `hsl`, `lab` and `hcl` build a colour *object* an expression can then read components off, which is a different thing from `luminance` reading a string. The geo and selection helpers belong to subsystems that do not exist yet. All reported by name with a reason",
+      "notes": "`rgb`, `hsl`, `lab` and `hcl` build colours an expression can read components off, and the geo helpers — `geoArea`, `geoBounds`, `geoCentroid`, `geoScale`, `geoShape` — and the `vlSelection*` family are registered. The row said these \"belong to subsystems that do not exist yet\".",
       "milestone": "—"
     },
     {
@@ -4082,13 +4082,13 @@
       "line": 397,
       "section": "Layout",
       "feature": "Other axis properties",
-      "status": "Not implemented",
+      "status": "**Supported**",
       "tests": [
         "AxisStyleTest",
         "UnhandledPropertiesTest"
       ],
       "tests_text": "`AxisStyleTest`, `UnhandledPropertiesTest`",
-      "notes": "Upstream's axis takes 74 properties. The forty-odd this engine does not honour — `labelBound`, `labelFlush`, `tickMinStep`, `tickBand`, `tickExtra`, `minExtent`, `titleAngle`, the `*Cap` and `*DashOffset` family and the rest — are each reported by name with what will be drawn instead",
+      "notes": "Every one of the 79 properties upstream's schema documents for an axis is consumed, and the same for a legend's 72 — measured by `UpstreamPropertyCoverageTest` and published in `docs/upstream-coverage.md`. This row said \"the forty-odd this engine does not honour\", which was true when written and is now zero.",
       "milestone": "6"
     },
     {
