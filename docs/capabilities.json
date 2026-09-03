@@ -2430,10 +2430,10 @@
       "line": 245,
       "section": "Data transforms",
       "feature": "Pulse propagation / incremental evaluation",
-      "status": "Not implemented",
+      "status": "Deliberate difference",
       "tests": [],
       "tests_text": "—",
-      "notes": "Transforms currently recompute a whole dataset. The `DataflowOperator` contract exists; there is no incremental engine behind it",
+      "notes": "Transforms recompute a whole dataset and a changed signal recompiles the whole specification. That is a **measured** decision rather than a missing feature: compiling each of 55 fixtures 200 times on a warm JIT put the heaviest (`axis-values`) at 366 microseconds and the median at 112, against a 16,600 microsecond frame at 60fps. Even allowing an order of magnitude for ART, a cold cache and a phone's CPU, a full recompile fits inside a frame — so an incremental dataflow buys nothing an interaction can feel. The `DataflowOperator` contract exists if that ever stops being true; the caveats on the number are in STATUS.md, Performance observations.",
       "milestone": "4"
     },
     {
@@ -5241,12 +5241,12 @@
       "line": 492,
       "section": "Layout",
       "feature": "Legend entry limits",
-      "status": "Not implemented",
+      "status": "**Supported**",
       "tests": [
         "LegendTest"
       ],
       "tests_text": "`LegendTest`",
-      "notes": "`symbolLimit` and `encode` overrides are reported by name. `labelOverlap` is implemented — see Label collision handling",
+      "notes": "`symbolLimit` is honoured with upstream's own arithmetic: it keeps `limit - 1` entries and spends the last slot on a summary — a limit of 3 over six entries draws `a`, `b` and `…4 entries` — and the summary's swatch takes the *next* value's size, so a size legend's summary row is drawn at the size of the first thing it stands for. A limit the entries already fit inside does nothing. `encode` overrides are still reported by name. `labelOverlap` is implemented — see Label collision handling. This row said the whole feature was not implemented, which stopped being true when `LegendBuilder.limited` landed.",
       "milestone": "6"
     },
     {
