@@ -11,7 +11,7 @@ work actually stands, and [SUPPORTED_FEATURES.md](SUPPORTED_FEATURES.md) for the
 
 ## Current status
 
-A Vega or a Vega-Lite specification compiles end to end and draws. Expressions and signals, 49 of
+A Vega or a Vega-Lite specification compiles end to end and draws. Expressions and signals, 50 of
 upstream's 51 documented data transforms, the 16 scale types it models, all 12 of Vega's mark types,
 axes, legends and titles, group layout and autosize, and event handlers that recompile the chart.
 `VegaChartController.setSpec` takes a specification and compiles it; `setSpecAsync` does it off the
@@ -20,7 +20,7 @@ calling thread.
 It is checked against upstream rather than against itself. `./scripts/oracle.sh` renders every fixture
 with the pinned `vega@6.3.1` and compares the resulting scene mark by mark and scale by scale;
 `./scripts/vega-lite-oracle.sh` compiles every Vega-Lite fixture with the pinned `vega-lite@6.4.3` and
-compares the emitted Vega **property by property**, then draws both and compares those scenes too. 195
+compares the emitted Vega **property by property**, then draws both and compares those scenes too. 196
 Vega differential fixtures and 283 Vega-Lite fixtures are committed together with their references, and
 [`test-fixtures/INDEX.md`](test-fixtures/INDEX.md) is the generated index of what each one covers.
 
@@ -66,7 +66,7 @@ Compiles from a Vega specification, verified against upstream:
   `symbol`, `text` and `trail`, with Vega's channel pairs, band offsets and all seventeen
   interpolation methods
 - axes, legends and titles, including label overlap removal, truncation and the `config` cascade
-- 49 of upstream's 51 documented data transforms, the two exceptions being `wordcloud` and `contour`
+- 50 of upstream's 51 documented data transforms, the one exception being `wordcloud`
 - expressions and signals, event handlers, and the `autosize` and group `layout` rules
 
 Reported by name rather than approximated: `wordcloud` and `contour`, the expression functions that
@@ -741,9 +741,12 @@ lifecycleScope.launch {
 - **No incremental dataflow.** A transform recomputes its whole dataset; the `DataflowOperator`
   contract exists with no pulse propagation behind it. Correct, and slower than upstream on a large
   table.
-- **`wordcloud` and `contour`** are the two documented data transforms that are not implemented. An
-  unimplemented transform stops that dataset's pipeline and says so, rather than passing rows on that
-  later stages were not meant to see.
+- **`wordcloud`** is the one documented data transform that is not implemented. Its collision
+  detection rasterises each word through a canvas 2D context and reads the pixels back as a mask,
+  and no common-code path here rasterises glyphs; the placement itself is reproducible, since Vega
+  injects a seedable generator rather than `Math.random`. An unimplemented transform stops that
+  dataset's pipeline and says so, rather than passing rows on that later stages were not meant to
+  see.
 - **No locale is built in.** The engine generates English and en-US **unless the host supplies a
   locale** — `VegaLocale`, whose fields are d3's own locale definitions, given to `SpecCompiler` or
   `VegaChartController` beside the text engine. Nothing ships a language: common Kotlin cannot reach a

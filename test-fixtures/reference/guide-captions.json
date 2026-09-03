@@ -705,6 +705,16 @@
   "caption": "Y-axis for a linear scale with values from 4 to 19"
  },
  {
+  "fixture": "contour-legacy",
+  "kind": "axis",
+  "caption": "X-axis titled 'Horsepower' for a linear scale with values from 0 to 240"
+ },
+ {
+  "fixture": "contour-legacy",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Miles_per_Gallon' for a linear scale with values from 0 to 50"
+ },
+ {
   "fixture": "contour-plot",
   "kind": "axis",
   "caption": "X-axis titled 'Horsepower' for a linear scale with values from 0 to 240"

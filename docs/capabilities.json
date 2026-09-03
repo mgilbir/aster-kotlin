@@ -105,7 +105,7 @@
         "SpecCompilerTest"
       ],
       "tests_text": "`SpecCompilerTest`, `FixtureDifferentialTest`",
-      "notes": "Parses and compiles the subset below, including signals, expressions, 49 of upstream's 51 documented data transforms, nested group scopes, group `layout`, legends and titles. Loaded through `VegaChartController.setSpec`, or `setSpecAsync` to compile off the calling thread",
+      "notes": "Parses and compiles the subset below, including signals, expressions, 50 of upstream's 51 documented data transforms, nested group scopes, group `layout`, legends and titles. Loaded through `VegaChartController.setSpec`, or `setSpecAsync` to compile off the calling thread",
       "milestone": "3"
     },
     {
@@ -2393,13 +2393,13 @@
     {
       "line": 242,
       "section": "Data transforms",
-      "feature": "`wordcloud` and `contour`",
+      "feature": "`wordcloud`",
       "status": "Not implemented",
       "tests": [
         "TransformReferenceTest"
       ],
       "tests_text": "`TransformReferenceTest`",
-      "notes": "The two of upstream's 51 documented data transforms that are not here. An unimplemented transform stops the pipeline and reports it, so later stages never run on data they were not meant to see",
+      "notes": "The one of upstream's 51 documented data transforms that is not here yet. `contour` was the other and now is not — it is a composition of `kde2d` and `isocontour`, both of which were already exact against upstream, so all it needed was the composition and the one decision inside it (`zero` follows whether the grid was given or estimated). What `wordcloud` needs is different in kind: its collision detection rasterises each word through a canvas 2D context and reads `getImageData` back for a per-pixel mask, and no common-code path rasterises glyphs. The placement itself is reproducible — Vega injects `vega-statistics`'s seedable generator rather than `Math.random`, and `RandomSource` already reproduces it bit-for-bit under the shared seed of 42. An unimplemented transform stops the pipeline and reports itself, so a specification asking for one is told rather than quietly drawn wrong.",
       "milestone": "4+"
     },
     {

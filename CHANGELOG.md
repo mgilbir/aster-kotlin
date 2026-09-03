@@ -6,6 +6,31 @@ section here does not get released.
 
 ## Unreleased
 
+### Added
+
+- **API:** `ContourTransform` joins the transform registry in `:vega-dataflow`. Additive; nothing
+  else in the surface moved.
+
+- **The `contour` transform**, leaving `wordcloud` as the one of upstream's 51 documented data
+  transforms that is not implemented. `contour` estimates a kernel density over point data and
+  traces its level sets in one operator — superseded upstream by `kde2d` + `isocontour`, never
+  removed, and still the spelling every specification written before that uses.
+
+  It is a composition rather than an algorithm: `kde2d` already estimated the density and
+  `MarchingSquares` already traced the isolines, both exact against upstream, so what was new is the
+  wiring and the two decisions inside it. `zero` follows *which way in* was taken — folded into the
+  extent for a grid given as `values`, not for one estimated, because a density estimate approaches
+  zero at its edges and including it would put the lowest contour at a height nothing reaches. And
+  the estimate is built with `counts: true`, which is upstream's `density2D()(values, true)` and the
+  opposite of `kde2d`'s own default.
+
+  That second one nearly escaped, which is worth recording. The flag scales the whole grid by a
+  constant, and the thresholds come from that same grid's extent — so every contour lands in exactly
+  the same place either way, with the same vertices, and a colour scale over `value` takes its domain
+  from the same data and produces the same colours. The `contour-legacy` fixture compares 450 marks
+  against upstream and passes with it wrong. `ContourTest` compares the level values themselves
+  against upstream's, and they were out by a factor of 2.5.
+
 ### Changed
 
 - **Upstream property coverage is measured, not written down.** `UpstreamPropertyCoverageTest` asks

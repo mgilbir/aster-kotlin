@@ -186,6 +186,13 @@ public final class dev/aster/vega/dataflow/transform/CollectTransform : dev/aste
 	public fun getType ()Ljava/lang/String;
 }
 
+public final class dev/aster/vega/dataflow/transform/ContourTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/ContourTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
 public final class dev/aster/vega/dataflow/transform/CountPatternTransform : dev/aster/vega/dataflow/transform/Transform {
 	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/CountPatternTransform;
 	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;

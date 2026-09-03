@@ -411,31 +411,13 @@ public object IsocontourTransform : Transform {
    * `start + step` up to but **not including** `stop` — so ten levels are ten interior contours,
    * not ten boundaries.
    */
-  private fun quantize(values: List<Double>, params: VegaValue.Obj): List<Double> {
-    val count = params.number("levels")?.toInt() ?: 10
-    val nice = params.boolean("nice") ?: false
-    val zero = params.boolean("zero") ?: true
-    val usable = values.filter { !it.isNaN() }
-    if (usable.isEmpty()) return emptyList()
-    val start = if (zero) minOf(usable.min(), 0.0) else usable.min()
-    val stop = usable.max()
-    val step =
-      if (nice) {
-        niceStep(start, stop, count)
-      } else {
-        (stop - start) / (count + 1)
-      }
-    if (step <= 0.0 || !step.isFinite()) return emptyList()
-    val result = mutableListOf<Double>()
-    var at = start + step
-    var guard = 0
-    while (at < stop && guard < 10_000) {
-      result.add(at)
-      guard++
-      at = start + step * (guard + 1)
-    }
-    return result
-  }
+  private fun quantize(values: List<Double>, params: VegaValue.Obj): List<Double> =
+    quantizeLevels(
+      values,
+      count = params.number("levels")?.toInt() ?: 10,
+      nice = params.boolean("nice") ?: false,
+      zero = params.boolean("zero") ?: true,
+    )
 
   /**
    * `scale` and `translate`, applied to every coordinate.
@@ -496,6 +478,42 @@ public object IsocontourTransform : Transform {
     }
     return JsSemantics.toNumber(value).takeIf { !it.isNaN() }
   }
+}
+
+/**
+ * Upstream's `quantize`: the threshold levels a grid is cut at when none were written down.
+ *
+ * The step is `span / (count + 1)` unless [nice], and the levels run from `start + step` up to but
+ * **not including** `stop` — so ten levels are ten interior contours, not ten boundaries.
+ *
+ * Shared between `isocontour` and `contour` because upstream shares it, and the two differ only in
+ * what they hand it: `isocontour` reads `levels` and defaults [zero] to true, while `contour` reads
+ * `count` and sets [zero] to whether the grid was **given** rather than estimated. That second
+ * difference is not a detail — a density estimate is already non-negative and has values
+ * arbitrarily close to zero, so folding zero into the extent of one would put the lowest contour at
+ * a height nothing reaches.
+ */
+internal fun quantizeLevels(
+  values: List<Double>,
+  count: Int,
+  nice: Boolean,
+  zero: Boolean,
+): List<Double> {
+  val usable = values.filter { !it.isNaN() }
+  if (usable.isEmpty()) return emptyList()
+  val start = if (zero) minOf(usable.min(), 0.0) else usable.min()
+  val stop = usable.max()
+  val step = if (nice) niceStep(start, stop, count) else (stop - start) / (count + 1)
+  if (step <= 0.0 || !step.isFinite()) return emptyList()
+  val result = mutableListOf<Double>()
+  var at = start + step
+  var guard = 0
+  while (at < stop && guard < 10_000) {
+    result.add(at)
+    guard++
+    at = start + step * (guard + 1)
+  }
+  return result
 }
 
 /** d3's `tickStep`, for `isocontour`'s `nice` levels. */
