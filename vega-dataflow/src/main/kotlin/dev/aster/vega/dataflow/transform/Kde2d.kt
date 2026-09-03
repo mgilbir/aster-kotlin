@@ -104,7 +104,7 @@ public object Kde2dTransform : Transform {
     }
   }
 
-  private fun reportMissing(
+  internal fun reportMissing(
     context: TransformContext,
     name: String,
     input: List<VegaValue>,
@@ -118,7 +118,7 @@ public object Kde2dTransform : Transform {
   }
 
   /** A `{"expr": ...}` evaluated per row, or a plain field name. */
-  private fun accessor(
+  internal fun accessor(
     value: VegaValue?,
     context: TransformContext,
   ): ((VegaValue) -> Double)? {
@@ -157,7 +157,7 @@ public object Kde2dTransform : Transform {
    * in the second. Reading the buffers the other way round gives a picture that is blurred and is
    * not this blur.
    */
-  private fun density(
+  internal fun density(
     rows: List<VegaValue>,
     xs: (VegaValue) -> Double,
     ys: (VegaValue) -> Double,

@@ -105,7 +105,7 @@
         "SpecCompilerTest"
       ],
       "tests_text": "`SpecCompilerTest`, `FixtureDifferentialTest`",
-      "notes": "Parses and compiles the subset below, including signals, expressions, 49 of upstream's 51 documented data transforms, nested group scopes, group `layout`, legends and titles. Loaded through `VegaChartController.setSpec`, or `setSpecAsync` to compile off the calling thread",
+      "notes": "Parses and compiles the subset below, including signals, expressions, all 51 of upstream's 51 documented data transforms, nested group scopes, group `layout`, legends and titles. Loaded through `VegaChartController.setSpec`, or `setSpecAsync` to compile off the calling thread",
       "milestone": "3"
     },
     {
@@ -2393,13 +2393,15 @@
     {
       "line": 242,
       "section": "Data transforms",
-      "feature": "`wordcloud` and `contour`",
-      "status": "Not implemented",
+      "feature": "`wordcloud`",
+      "status": "**Supported**, with a looser collision test",
       "tests": [
+        "CloudLayoutTest",
+        "WordcloudTest",
         "TransformReferenceTest"
       ],
-      "tests_text": "`TransformReferenceTest`",
-      "notes": "The two of upstream's 51 documented data transforms that are not here. An unimplemented transform stops the pipeline and reports it, so later stages never run on data they were not meant to see",
+      "tests_text": "`CloudLayoutTest`, `WordcloudTest`, `TransformReferenceTest`",
+      "notes": "All 51 of upstream's documented data transforms are now implemented; this was the last one. The layout is upstream's, ported: the sort, the archimedean and rectangular spirals, the board bitmap, the bitmask collision test, the bounding-box compaction rule, the blank-row trimming, and the order the random draws come off the generator. **Checked to the pixel**: `oracle-js/src/record-wordcloud.mjs` runs upstream's own `cloudSprite` against the pinned `vega@6.3.1` and records each word's glyph mask together with where upstream then placed it; `CloudLayoutTest` hands those masks back and requires all eighteen words at exactly upstream's coordinates. Every word's position depends on the board the words before it left, so one wrong bit moves all seventeen after it — it passes completely or fails obviously. The **difference** is the mask itself: upstream reads it back from a canvas, and nothing in common Kotlin rasterises glyphs, nor should it, since a font is the host's. A host that can rasterise supplies masks through `CloudSprites` and gets upstream's packing; everything else measures each word and treats it as a filled rectangle — same words, same sizes, same order, more air between them. Upstream's compaction rule is skipped in that case because it cannot be satisfied by solid boxes: it requires a word to *overlap* the bounds of what is already placed while missing its ink, which measured one word placed of ten before the rule was made conditional. Deterministic where upstream is not, since the generator is the chart's seeded `RandomStream`.",
       "milestone": "4+"
     },
     {
@@ -2430,10 +2432,10 @@
       "line": 245,
       "section": "Data transforms",
       "feature": "Pulse propagation / incremental evaluation",
-      "status": "Not implemented",
+      "status": "Deliberate difference",
       "tests": [],
       "tests_text": "—",
-      "notes": "Transforms currently recompute a whole dataset. The `DataflowOperator` contract exists; there is no incremental engine behind it",
+      "notes": "Transforms recompute a whole dataset and a changed signal recompiles the whole specification. That is a **measured** decision rather than a missing feature: compiling each of 55 fixtures 200 times on a warm JIT put the heaviest (`axis-values`) at 366 microseconds and the median at 112, against a 16,600 microsecond frame at 60fps. Even allowing an order of magnitude for ART, a cold cache and a phone's CPU, a full recompile fits inside a frame — so an incremental dataflow buys nothing an interaction can feel. The `DataflowOperator` contract exists if that ever stops being true; the caveats on the number are in STATUS.md, Performance observations.",
       "milestone": "4"
     },
     {
@@ -5241,12 +5243,12 @@
       "line": 492,
       "section": "Layout",
       "feature": "Legend entry limits",
-      "status": "Not implemented",
+      "status": "**Supported**",
       "tests": [
         "LegendTest"
       ],
       "tests_text": "`LegendTest`",
-      "notes": "`symbolLimit` and `encode` overrides are reported by name. `labelOverlap` is implemented — see Label collision handling",
+      "notes": "`symbolLimit` is honoured with upstream's own arithmetic: it keeps `limit - 1` entries and spends the last slot on a summary — a limit of 3 over six entries draws `a`, `b` and `…4 entries` — and the summary's swatch takes the *next* value's size, so a size legend's summary row is drawn at the size of the first thing it stands for. A limit the entries already fit inside does nothing. `encode` overrides are still reported by name. `labelOverlap` is implemented — see Label collision handling. This row said the whole feature was not implemented, which stopped being true when `LegendBuilder.limited` landed.",
       "milestone": "6"
     },
     {
@@ -5617,12 +5619,12 @@
       "line": 527,
       "section": "Interaction",
       "feature": "A handler sourced on a **scale**",
-      "status": "Not implemented",
+      "status": "**Supported**",
       "tests": [
-        "UnhandledPropertiesTest"
+        "ScaleSourcedHandlerTest"
       ],
-      "tests_text": "`UnhandledPropertiesTest`",
-      "notes": "`{\"events\": {\"scale\": \"x\"}}` fires when the scale is rebuilt, which upstream knows because a scale is an operator in its dataflow. Here a changed signal recompiles the whole specification, so every scale is rebuilt every time and nothing says which of them *moved* — firing on all of them would run the handler when nothing about the scale had changed. Reported by name, and it is the rarest source there is: not one of the 93 published examples uses it",
+      "tests_text": "`ScaleSourcedHandlerTest`",
+      "notes": "`{\"events\": {\"scale\": \"x\"}}` fires when the scale is rebuilt. Upstream knows which one that is because a scale is an operator in its dataflow; here a changed signal recompiles the whole specification, so every scale is rebuilt every time and firing on all of them would run the handler when nothing about the scale had changed. So \"rebuilt\" is answered as **\"resolves differently\"** — each watched scale is asked to map a fixed set of probes and the answers are compared against the previous compile's, which needs no incremental dataflow and gets the case the refusal was about: a recompile that rebuilds every scale and moves none of them fires nothing. A handler that moves the scale it watches is a cycle, reported and stopped at the round bound the signal cascade uses. A specification with no scale source fingerprints nothing, which is nearly all of them: not one of the 93 published examples uses this source",
       "milestone": "6"
     },
     {

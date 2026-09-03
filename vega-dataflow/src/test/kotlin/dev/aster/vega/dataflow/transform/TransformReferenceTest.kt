@@ -714,9 +714,15 @@ class TransformReferenceTest {
     val output =
       run(
         """[{"type": "formula", "expr": "1", "as": "one"},
-            {"type": "wordcloud", "text": "c"},
+            {"type": "aTransformUpstreamHasNeverHad", "text": "c"},
             {"type": "filter", "expr": "false"}]"""
       )
+    // An **invented** name rather than a real transform that happens to be missing, which is what
+    // this used to use: `wordcloud` stood here until it was implemented, and every one of
+    // upstream's 51 is now in the registry. A test whose subject is "a transform this engine does
+    // not have" cannot depend on there being one — the case it guards is a specification naming
+    // something misspelled, or something upstream adds after this version.
+    //
     // The formula ran; the filter after the unknown transform did not.
     assertTrue(output.contains(""""one":1"""), output)
     assertTrue(output.contains(""""c":"a""""), output)
@@ -724,7 +730,7 @@ class TransformReferenceTest {
       context.diagnostics.diagnostics.first {
         it.code == DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED
       }
-    assertTrue(diagnostic.message.contains("wordcloud"), diagnostic.message)
+    assertTrue(diagnostic.message.contains("aTransformUpstreamHasNeverHad"), diagnostic.message)
   }
 
   @Test
@@ -787,7 +793,7 @@ class TransformReferenceTest {
     VegaValue.Obj(linkedMapOf("g" to VegaValue.Str(group), "v" to VegaValue.Num(value)))
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus thirty-seven more`() {
+  fun `the registry covers the transforms the brief lists, plus thirty-nine more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -814,9 +820,12 @@ class TransformReferenceTest {
     // and `linkpath` are what turns a laid-out tree into the edges drawn between its nodes.
     // `crossfilter` and `resolvefilter` are the pair an interactive cross-filter is built from:
     // one records which range query each row fails, the other keeps the rows every dimension but
-    // its own admits. `isocontour`, `geopath`, `kde2d` and `heatmap` are the raster family: a
-    // density estimated over a grid, marching squares over that grid, the GeoJSON it produces
-    // written out as an outline, and the grid itself painted as an image. `force` is the one
+    // its own admits. `isocontour`, `contour`, `geopath`, `kde2d` and `heatmap` are the raster
+    // family: a density estimated over a grid, marching squares over that grid, the GeoJSON it
+    // produces written out as an outline, and the grid itself painted as an image. `contour` is
+    // the estimate and the level sets in one operator — superseded upstream by `kde2d` +
+    // `isocontour`, never removed, and still what every specification written before that spells.
+    // `force` is the one
     // transform that is a simulation rather than a calculation: it places the nodes of a graph by
     // running d3-force to a standstill. `geoshape` and `graticule` are the map pair: a GeoJSON
     // feature drawn through a projection, the grid of meridians and parallels under it, and a
@@ -858,6 +867,8 @@ class TransformReferenceTest {
         "crossfilter" +
         "resolvefilter" +
         "isocontour" +
+        "contour" +
+        "wordcloud" +
         "geopath" +
         "kde2d" +
         "heatmap" +

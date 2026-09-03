@@ -303,6 +303,8 @@ public class TransformRegistry(transforms: List<Transform>) {
           CrossFilterTransform,
           ResolveFilterTransform,
           IsocontourTransform,
+          ContourTransform,
+          WordcloudTransform,
           GeoPathTransform,
           Kde2dTransform,
           HeatmapTransform,

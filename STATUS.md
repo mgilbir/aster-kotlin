@@ -23,11 +23,11 @@ compares the counts in this file against the code and the corpus and fails when 
 ## Current milestone
 
 Milestones 0, 1 and 2 complete. **Milestones 3, 4 and 5 in progress**: Vega specifications compile
-end to end — expressions, signals, 49 of upstream's 51 documented data transforms, every scale
+end to end — expressions, signals, all 51 of upstream's 51 documented data transforms, every scale
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-195 Vega differential fixtures and 283 Vega-Lite fixtures pass, every one of them matching upstream
+197 Vega differential fixtures and 283 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -194,12 +194,12 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 195 Vega differential fixtures and 283 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 197 Vega differential fixtures and 283 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
 | Expressions | The language is complete, and every one of upstream's 119 functions is implemented or resolved against the scope; `Functions.knownUnsupported` is empty and `ExpressionReferenceTest` carries upstream's own list, so one added upstream shows up as a failure |
-| Transforms | 49 of upstream's 51 documented data transforms, exact against upstream's own outputs |
+| Transforms | All 51 of upstream's 51 documented data transforms, exact against upstream's own outputs |
 | Interaction | Event streams including `between`, signal updates, and the handlers a specification declares. Pan and zoom are a view transform |
 | Accessibility | One semantic tree in common code, consumed by the Android View and the Swift renderer; guide captions ported from upstream's own `aria.js` and checked against it |
 
@@ -221,12 +221,12 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 | 1. Compiled Vega JSON loads without JavaScript | **Yes** — `VegaChartController.setSpec` compiles it, and the demos render bundled and pasted specifications on device |
 | 2. Bar, line, area, scatter, stacked bar render natively | **Yes** — all five, and small multiples of them |
 | 3. Axes, legends, labels and titles supported | **Yes** — all four |
-| 4. Basic transforms and scales execute in Kotlin | **Yes** — the 16 scale types it models, and 49 of upstream's 51 documented data transforms |
+| 4. Basic transforms and scales execute in Kotlin | **Yes** — the 16 scale types it models, and all 51 of upstream's 51 documented data transforms |
 | 5. Tap, hover, tooltip, selection, pan, zoom | Yes |
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests, and every renderer now exposes the tree: the Android View, the Swift one and Compose Multiplatform. Not verified on physical hardware or with a real user |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 195 Vega differential fixtures |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 197 Vega differential fixtures |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |

@@ -144,13 +144,18 @@ class SpecCompilerTest {
     val withTransform =
       minimalBar.replace(
         """"values": [{"c": "a", "v": 1}, {"c": "b", "v": 2}]""",
-        """"values": [{"c": "a", "v": 1}], "transform": [{"type": "wordcloud", "text": "c"}]""",
+        """"values": [{"c": "a", "v": 1}],
+            "transform": [{"type": "aTransformUpstreamHasNeverHad", "text": "c"}]""",
       )
+    // An **invented** type, not a real one that happens to be missing. `wordcloud` stood here until
+    // it was implemented, and all 51 of upstream's documented transforms are now in the registry —
+    // so a test about "a transform this engine does not have" can no longer borrow one. What it
+    // guards is a misspelling, or something upstream adds after the version this is pinned to.
     val diagnostic =
       compile(withTransform).diagnostics.first {
         it.code == DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED
       }
-    assertTrue(diagnostic.message.contains("wordcloud"), diagnostic.message)
+    assertTrue(diagnostic.message.contains("aTransformUpstreamHasNeverHad"), diagnostic.message)
   }
 
   @Test

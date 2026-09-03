@@ -6,7 +6,91 @@ section here does not get released.
 
 ## Unreleased
 
+### Added
+
+- **API:** `WordcloudTransform` joins the transform registry in `:vega-dataflow`. Additive.
+
+- **The `wordcloud` transform**, which completes upstream's 51 documented data transforms.
+
+  The layout is upstream's, ported: the sort, the archimedean and rectangular spirals, the board
+  bitmap, the bitmask collision test, the bounding-box compaction rule, the blank-row trimming, and
+  the order the random draws come off the generator.
+
+  **It is checked to the pixel.** The reason this transform stayed unimplemented was that upstream
+  decides collisions by rasterising each word through a canvas and reading `getImageData` back, and
+  nothing in common Kotlin rasterises glyphs. That is a reason not to *reproduce* the mask; it is
+  not a reason the layout cannot be verified. So the mask is recorded as an **input**:
+  `oracle-js/src/record-wordcloud.mjs` runs upstream's own `cloudSprite` against the pinned
+  `vega@6.3.1`, writes out each word's bits and where upstream then placed it, and `CloudLayoutTest`
+  hands those bits back and requires all eighteen words at exactly upstream's coordinates. Every
+  word's position depends on the board the words before it left, so one wrong bit moves all
+  seventeen after it: it passes completely or fails obviously.
+
+  Three deliberate mutations were checked against it and each was caught — resetting upstream's
+  cumulative `seen` flag per row, assigning `last` before reading it in the sprite-shifting loop
+  (JavaScript evaluates `(last << msx) | ((last = ...) >>> sx)` left to right, so the read comes
+  first), and swapping the order of the two random draws.
+
+  **What differs, and it is the mask alone.** A host that can rasterise supplies masks through
+  `CloudSprites` and gets upstream's own packing. Everything else measures each word and treats it
+  as a filled rectangle: same words, same sizes, same order, more air between them. Upstream's
+  compaction rule — a word must *overlap* the bounds of what is already placed — is skipped in that
+  case, because solid boxes cannot satisfy it and being asked to overlap while missing the ink is a
+  contradiction. Measured before that was made conditional: one word placed of ten.
+
+  Deterministic where upstream is not, since the generator is the chart's seeded `RandomStream`
+  rather than `Math.random` — which is also what makes a word cloud comparable with anything.
+
+- **API:** `ContourTransform` joins the transform registry in `:vega-dataflow`. Additive; nothing
+  else in the surface moved.
+
+- **The `contour` transform**, leaving `wordcloud` as the one of upstream's 51 documented data
+  transforms that is not implemented. `contour` estimates a kernel density over point data and
+  traces its level sets in one operator — superseded upstream by `kde2d` + `isocontour`, never
+  removed, and still the spelling every specification written before that uses.
+
+  It is a composition rather than an algorithm: `kde2d` already estimated the density and
+  `MarchingSquares` already traced the isolines, both exact against upstream, so what was new is the
+  wiring and the two decisions inside it. `zero` follows *which way in* was taken — folded into the
+  extent for a grid given as `values`, not for one estimated, because a density estimate approaches
+  zero at its edges and including it would put the lowest contour at a height nothing reaches. And
+  the estimate is built with `counts: true`, which is upstream's `density2D()(values, true)` and the
+  opposite of `kde2d`'s own default.
+
+  That second one nearly escaped, which is worth recording. The flag scales the whole grid by a
+  constant, and the thresholds come from that same grid's extent — so every contour lands in exactly
+  the same place either way, with the same vertices, and a colour scale over `value` takes its domain
+  from the same data and produces the same colours. The `contour-legacy` fixture compares 450 marks
+  against upstream and passes with it wrong. `ContourTest` compares the level values themselves
+  against upstream's, and they were out by a factor of 2.5.
+
+- **Regular-expression literals.** `/pattern/flags` lexes to the same `VegaValue.Pattern` that
+  `regexp()` builds, so `replace(datum.label, / #\d+$/, '')` — legal against upstream, whose parser
+  carries `Invalid regular expression: missing /` in its own message table — is an expression this
+  engine reads rather than refuses. They were excluded before `ktecma262` existed, on the argument
+  that there was no engine to hand a pattern to, and the exclusion outlived the argument. (#153)
+
+  The `/` ambiguity is resolved the way JavaScript resolves it, by the **preceding token**: a `/`
+  divides when what came before it could end an expression and opens a literal when it could not.
+  That rule is complete here because the language has no *word* operators — no `typeof`, no `in`,
+  no statements — so an identifier is always a value and always means division.
+
+  The literal is scanned to its delimiter and no further: escapes and character classes are
+  honoured, because `/a\/b/` and `/[/]/` both contain a `/` that is not the end, and a line
+  terminator in the body is refused so an unterminated literal cannot swallow the rest of a
+  document. The **pattern** is not validated here — `ktecma262` compiles it, so `/x/q` comes back
+  as `invalid regular expression flag 'q'` from the engine that would have run it rather than from
+  a second grammar kept in step by hand.
+
+  `TokenType` gains a `REGEX` entry, which is additive but will make an exhaustive `when` over it
+  in consumer code incomplete.
+
 ### Changed
+
+- Two tests that borrowed `wordcloud` as their example of an unimplemented transform now use an
+  invented name. With every documented transform implemented, a test about "a transform this engine
+  does not have" can no longer borrow a real one; what it guards is a misspelling, or something
+  upstream adds after the pinned version.
 
 - **Upstream property coverage is measured, not written down.** `UpstreamPropertyCoverageTest` asks
   the parser about every property upstream's own schema documents — one property at a time, five
@@ -32,25 +116,6 @@ section here does not get released.
   recognised where `"labelColor": "red"` is. A test that asserts an invented property *is* counted
   is what keeps the numbers from being vacuous — and it earned that place immediately, by catching
   that the mark probe emitted `"marks"` twice and measured everything against an empty array.
-
-### Fixed
-
-- **Every mark's VoiceOver touch target was stacked on the first one.** The Apple accessibility
-  overlay positioned its elements with SwiftUI's `.offset`, which is a *render* transform: it moves
-  what is drawn and leaves the view where layout put it, and an accessibility frame comes from
-  layout. So all forty-eight elements of a bar chart reported the same origin with only their size
-  varying, and touch exploration — most of what makes a chart explorable to a reader using VoiceOver
-  — landed every tap on the y-axis. `.position` places the centre and is layout, so what a reader
-  touches is now what is drawn.
-
-  It survived because the two tests that could see it ran nowhere. The row in
-  `SUPPORTED_FEATURES.md` claiming a SwiftUI chart view cited `AccessibilityUITests` as evidence and
-  the generated status column said so — "unproven here" — and behind that the Xcode project had two
-  duplicated object ids and `xcodebuild` refused to open it at all: *The project is damaged and
-  cannot be opened*. Two objects each claimed one id, a file reference sharing with a build phase,
-  so Xcode resolved one and called a group method on the other.
-
-### Changed
 
 - **A release verifies on macOS as well as Linux.** `release.yml`'s `verify` job ran on Linux only,
   where `check.sh` skips both Apple gates — `swift` needs a Mac and `ios-ui` needs a simulator — and
@@ -104,30 +169,6 @@ section here does not get released.
   digits instead of three. `Date.parse` is allowed an implementation-defined fallback and every
   browser has one. Swapping would turn four accepted inputs into a datum silently leaving the domain.
 
-
-### Added
-
-- **Regular-expression literals.** `/pattern/flags` lexes to the same `VegaValue.Pattern` that
-  `regexp()` builds, so `replace(datum.label, / #\d+$/, '')` — legal against upstream, whose parser
-  carries `Invalid regular expression: missing /` in its own message table — is an expression this
-  engine reads rather than refuses. They were excluded before `ktecma262` existed, on the argument
-  that there was no engine to hand a pattern to, and the exclusion outlived the argument. (#153)
-
-  The `/` ambiguity is resolved the way JavaScript resolves it, by the **preceding token**: a `/`
-  divides when what came before it could end an expression and opens a literal when it could not.
-  That rule is complete here because the language has no *word* operators — no `typeof`, no `in`,
-  no statements — so an identifier is always a value and always means division.
-
-  The literal is scanned to its delimiter and no further: escapes and character classes are
-  honoured, because `/a\/b/` and `/[/]/` both contain a `/` that is not the end, and a line
-  terminator in the body is refused so an unterminated literal cannot swallow the rest of a
-  document. The **pattern** is not validated here — `ktecma262` compiles it, so `/x/q` comes back
-  as `invalid regular expression flag 'q'` from the engine that would have run it rather than from
-  a second grammar kept in step by hand.
-
-  `TokenType` gains a `REGEX` entry, which is additive but will make an exhaustive `when` over it
-  in consumer code incomplete.
-
 ### Performance
 
 - **Resolving a font on Apple is about seven times cheaper, and a host's face is now cached at all.**
@@ -159,6 +200,44 @@ section here does not get released.
   expensive part.
 
 ### Fixed
+
+- **A stroked `path` mark under `scaleX`/`scaleY` measured twice too wide.** The stroke allowance —
+  half the width, or `miterLimit/2` widths where a miter join can run past a vertex — was added to
+  the path's bounds in the mark's **own** coordinates, and the node's transform then multiplied it.
+  With `scaleX: 8` and a two-unit stroke that is a 32-unit margin where upstream has 4: a path
+  measured 108 units wide where upstream says 52.
+
+  Upstream renders the path *through* the transform and expands afterwards, so the allowance is in
+  screen space — `scaleX` stretches the shape, not the pen. The expansion is now divided by the
+  node's own scale so that the transform puts it back, which is exact for scaling without skew and
+  leaves every unscaled path where it was.
+
+  **Nothing in the corpus covered it.** Of 195 fixtures, not one both scaled and stroked a path, so
+  `path-scaled-stroke` was written to catch it — five outlines across three marks, covering the
+  miter allowance, a square cap and a round join, a non-uniform scale, and a miter limit below the
+  default so that "divided by the scale" is separated from "divided by whatever happens to be 4".
+
+- **A mitre limit was never actually compared against upstream.** The differential harness recorded
+  `strokeMiterLimit` as a *string*, beside the cap and the join; upstream's `normalize.js` records
+  it through `styleValue`, which leaves a number a number. `compareMark` looks a channel up on the
+  side upstream put it, so every mitre limit read as "absent" here and the difference was announced
+  for a channel no fixture had ever set. The first fixture to set one reported five marks at once.
+  It now goes on the numeric side, for paths, symbols, rects, groups and rules alike.
+
+- **Every mark's VoiceOver touch target was stacked on the first one.** The Apple accessibility
+  overlay positioned its elements with SwiftUI's `.offset`, which is a *render* transform: it moves
+  what is drawn and leaves the view where layout put it, and an accessibility frame comes from
+  layout. So all forty-eight elements of a bar chart reported the same origin with only their size
+  varying, and touch exploration — most of what makes a chart explorable to a reader using VoiceOver
+  — landed every tap on the y-axis. `.position` places the centre and is layout, so what a reader
+  touches is now what is drawn.
+
+  It survived because the two tests that could see it ran nowhere. The row in
+  `SUPPORTED_FEATURES.md` claiming a SwiftUI chart view cited `AccessibilityUITests` as evidence and
+  the generated status column said so — "unproven here" — and behind that the Xcode project had two
+  duplicated object ids and `xcodebuild` refused to open it at all: *The project is damaged and
+  cannot be opened*. Two objects each claimed one id, a file reference sharing with a build phase,
+  so Xcode resolved one and called a group method on the other.
 
 - **A time axis keeps the day width the host's locale states.** `VegaLocale.timeTickFormats` read
   the field *order* off the locale's `date` pattern and then wrote the day back as a hard-coded

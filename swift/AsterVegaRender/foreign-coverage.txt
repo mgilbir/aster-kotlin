@@ -1,5 +1,5 @@
-# 77 public members have no direct foreign counterpart:
-#    50 engine internals, marked @InternalAsterVegaApi
+# 79 public members have no direct foreign counterpart:
+#    52 engine internals, marked @InternalAsterVegaApi
 #    27 reachable through a Foreign* accessor instead
 #     0 unexplained  <- the number this gate is about
 #
@@ -8,6 +8,7 @@ BandScale.getBins                          reachable: ForeignScale.bins
 BinOrdinalScale.extentAt                         reachable: ForeignScale.bucketLow / bucketHigh
 BinOrdinalScale.legendFraction                   reachable: ForeignScale.legendFraction
 CollectTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+ContourTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
 CountPatternTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
 CrossTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
 DensityTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
@@ -80,3 +81,4 @@ TreeTransform.getPublishesSignal               internal: @InternalAsterVegaApi, 
 TreemapTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
 VoronoiTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
 WindowTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds
+WordcloudTransform.getPublishesSignal               internal: @InternalAsterVegaApi, dataflow plumbing a host never builds

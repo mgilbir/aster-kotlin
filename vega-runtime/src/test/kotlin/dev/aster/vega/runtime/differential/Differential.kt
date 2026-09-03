@@ -271,7 +271,7 @@ public object Differential {
         "y2" to b.y,
         "strokeWidth" to node.stroke.width,
         "strokeOpacity" to node.stroke.opacity,
-      )
+      ) + (miterLimitOf(node.stroke)?.let { mapOf("strokeMiterLimit" to it) } ?: emptyMap())
     val strings = LinkedHashMap<String, String>()
     solidColour(node.stroke.paint)?.let { strings["stroke"] = it.toCssHex() }
     dashOf(node.stroke)?.let { strings["strokeDash"] = it }
@@ -301,10 +301,22 @@ public object Differential {
   private fun strokeDetails(stroke: Stroke, into: MutableMap<String, String>) {
     if (stroke.cap != StrokeCap.BUTT) into["strokeCap"] = stroke.cap.name.lowercase()
     if (stroke.join != StrokeJoin.MITER) into["strokeJoin"] = stroke.join.name.lowercase()
-    if (stroke.miterLimit != Stroke.DEFAULT_MITER_LIMIT) {
-      into["strokeMiterLimit"] = fmt(stroke.miterLimit)
-    }
   }
+
+  /**
+   * The mitre limit, as a **number**, which is the side of the comparison it has to be on.
+   *
+   * It used to be written into the string map beside the cap and the join, and it was therefore
+   * never compared at all: `compareMark` looks a channel up in `actual.numbers` when upstream
+   * recorded it there, and `normalize.js` records this one through `styleValue`, which leaves a
+   * number a number. So every mitre limit read as "absent" on this side and the difference was
+   * announced for a channel nobody had ever set — no fixture carried a non-default limit until one
+   * did, and then five marks reported it at once.
+   *
+   * Null at the default, which is what upstream leaves off an item that never set it.
+   */
+  private fun miterLimitOf(stroke: Stroke): Double? =
+    stroke.miterLimit.takeIf { it != Stroke.DEFAULT_MITER_LIMIT }
 
   private fun dashOf(stroke: Stroke): String? =
     stroke.dashArray
@@ -626,6 +638,7 @@ public object Differential {
     stroke?.let {
       result["strokeWidth"] = it.width
       result["strokeOpacity"] = it.opacity
+      miterLimitOf(it)?.let { limit -> result["strokeMiterLimit"] = limit }
     }
     return result
   }

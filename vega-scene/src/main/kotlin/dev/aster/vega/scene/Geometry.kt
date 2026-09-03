@@ -76,6 +76,18 @@ public data class RectD(val left: Double, val top: Double, val right: Double, va
   public fun expand(amount: Double): RectD =
     if (isEmpty) this else RectD(left - amount, top - amount, right + amount, bottom + amount)
 
+  /**
+   * Expands by a different amount along each axis.
+   *
+   * For a stroke allowance that has to survive a **non-uniform** transform: upstream measures a
+   * stroke in the space it is drawn in, so a shape scaled twice as wide as it is tall needs half as
+   * much local room horizontally as vertically to come out with the same margin on every side. See
+   * `PathNode.bounds`.
+   */
+  internal fun expand(horizontal: Double, vertical: Double): RectD =
+    if (isEmpty) this
+    else RectD(left - horizontal, top - vertical, right + horizontal, bottom + vertical)
+
   public fun translate(dx: Double, dy: Double): RectD =
     if (isEmpty) this else RectD(left + dx, top + dy, right + dx, bottom + dy)
 
@@ -159,6 +171,20 @@ public data class Transform2D(
 
   public val determinant: Double
     get() = a * d - b * c
+
+  /**
+   * How much this transform stretches a horizontal unit, and a vertical one.
+   *
+   * The length each basis vector comes out as, so a rotation reports 1 and a `scale(8, 2)` reports
+   * 8 and 2. Rotation mixed with non-uniform scale has no single answer — the stretch then depends
+   * on direction — and this reports the basis lengths, which is the standard reading and is exact
+   * for the case it exists for: a scale with no skew.
+   */
+  internal val scaleX: Double
+    get() = kotlin.math.hypot(a, b)
+
+  internal val scaleY: Double
+    get() = kotlin.math.hypot(c, d)
 
   /** Returns `null` for a singular transform; callers must not silently treat that as identity. */
   public fun invert(): Transform2D? {

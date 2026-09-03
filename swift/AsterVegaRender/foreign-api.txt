@@ -708,6 +708,11 @@ ConditionalRule.production
 ConditionalRule.test
 ConfigMergeKt
 ConfigMergeKt.mergeConfig(configs:)
+ContourTransform
+ContourTransform.apply(input:params:context:)
+ContourTransform.init()
+ContourTransform.shared
+ContourTransform.type
 Corners
 Corners.Companion
 Corners.Companion.init()
@@ -4752,3 +4757,8 @@ WindowTransform.apply(input:params:context:)
 WindowTransform.init()
 WindowTransform.shared
 WindowTransform.type
+WordcloudTransform
+WordcloudTransform.apply(input:params:context:)
+WordcloudTransform.init()
+WordcloudTransform.shared
+WordcloudTransform.type
