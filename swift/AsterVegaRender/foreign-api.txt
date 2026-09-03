@@ -4757,3 +4757,8 @@ WindowTransform.apply(input:params:context:)
 WindowTransform.init()
 WindowTransform.shared
 WindowTransform.type
+WordcloudTransform
+WordcloudTransform.apply(input:params:context:)
+WordcloudTransform.init()
+WordcloudTransform.shared
+WordcloudTransform.type

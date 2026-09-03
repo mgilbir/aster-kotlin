@@ -304,6 +304,7 @@ public class TransformRegistry(transforms: List<Transform>) {
           ResolveFilterTransform,
           IsocontourTransform,
           ContourTransform,
+          WordcloudTransform,
           GeoPathTransform,
           Kde2dTransform,
           HeatmapTransform,

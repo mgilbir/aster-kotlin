@@ -23,7 +23,7 @@ compares the counts in this file against the code and the corpus and fails when 
 ## Current milestone
 
 Milestones 0, 1 and 2 complete. **Milestones 3, 4 and 5 in progress**: Vega specifications compile
-end to end — expressions, signals, 50 of upstream's 51 documented data transforms, every scale
+end to end — expressions, signals, all 51 of upstream's 51 documented data transforms, every scale
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
@@ -199,7 +199,7 @@ covers the whole path from a specification to a drawn scene:
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
 | Expressions | The language is complete, and every one of upstream's 119 functions is implemented or resolved against the scope; `Functions.knownUnsupported` is empty and `ExpressionReferenceTest` carries upstream's own list, so one added upstream shows up as a failure |
-| Transforms | 50 of upstream's 51 documented data transforms, exact against upstream's own outputs |
+| Transforms | All 51 of upstream's 51 documented data transforms, exact against upstream's own outputs |
 | Interaction | Event streams including `between`, signal updates, and the handlers a specification declares. Pan and zoom are a view transform |
 | Accessibility | One semantic tree in common code, consumed by the Android View and the Swift renderer; guide captions ported from upstream's own `aria.js` and checked against it |
 
@@ -221,7 +221,7 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 | 1. Compiled Vega JSON loads without JavaScript | **Yes** — `VegaChartController.setSpec` compiles it, and the demos render bundled and pasted specifications on device |
 | 2. Bar, line, area, scatter, stacked bar render natively | **Yes** — all five, and small multiples of them |
 | 3. Axes, legends, labels and titles supported | **Yes** — all four |
-| 4. Basic transforms and scales execute in Kotlin | **Yes** — the 16 scale types it models, and 50 of upstream's 51 documented data transforms |
+| 4. Basic transforms and scales execute in Kotlin | **Yes** — the 16 scale types it models, and all 51 of upstream's 51 documented data transforms |
 | 5. Tap, hover, tooltip, selection, pan, zoom | Yes |
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |

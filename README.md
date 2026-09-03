@@ -11,7 +11,7 @@ work actually stands, and [SUPPORTED_FEATURES.md](SUPPORTED_FEATURES.md) for the
 
 ## Current status
 
-A Vega or a Vega-Lite specification compiles end to end and draws. Expressions and signals, 50 of
+A Vega or a Vega-Lite specification compiles end to end and draws. Expressions and signals, all 51 of
 upstream's 51 documented data transforms, the 16 scale types it models, all 12 of Vega's mark types,
 axes, legends and titles, group layout and autosize, and event handlers that recompile the chart.
 `VegaChartController.setSpec` takes a specification and compiles it; `setSpecAsync` does it off the
@@ -66,7 +66,7 @@ Compiles from a Vega specification, verified against upstream:
   `symbol`, `text` and `trail`, with Vega's channel pairs, band offsets and all seventeen
   interpolation methods
 - axes, legends and titles, including label overlap removal, truncation and the `config` cascade
-- 50 of upstream's 51 documented data transforms, the one exception being `wordcloud`
+- All 51 of upstream's 51 documented data transforms
 - expressions and signals, event handlers, and the `autosize` and group `layout` rules
 
 Reported by name rather than approximated: `wordcloud` and `contour`, the expression functions that
@@ -741,12 +741,12 @@ lifecycleScope.launch {
 - **No incremental dataflow.** A transform recomputes its whole dataset; the `DataflowOperator`
   contract exists with no pulse propagation behind it. Correct, and slower than upstream on a large
   table.
-- **`wordcloud`** is the one documented data transform that is not implemented. Its collision
-  detection rasterises each word through a canvas 2D context and reads the pixels back as a mask,
-  and no common-code path here rasterises glyphs; the placement itself is reproducible, since Vega
-  injects a seedable generator rather than `Math.random`. An unimplemented transform stops that
-  dataset's pipeline and says so, rather than passing rows on that later stages were not meant to
-  see.
+- **`wordcloud` collision detection is looser without a host rasteriser.** Upstream compares
+  per-pixel glyph masks read back from a canvas, which lets a short word tuck under a tall one.
+  Nothing in common Kotlin rasterises glyphs, so a host that can supplies the masks through
+  `CloudSprites` and gets upstream's own packing; everything else measures each word and treats it
+  as a filled rectangle. Same words, same sizes, same order, more space between them. The layout
+  itself is upstream's, checked against upstream's recorded sprites to the pixel.
 - **No locale is built in.** The engine generates English and en-US **unless the host supplies a
   locale** — `VegaLocale`, whose fields are d3's own locale definitions, given to `SpecCompiler` or
   `VegaChartController` beside the text engine. Nothing ships a language: common Kotlin cannot reach a

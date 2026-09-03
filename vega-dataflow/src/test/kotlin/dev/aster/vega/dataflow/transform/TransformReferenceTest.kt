@@ -714,9 +714,15 @@ class TransformReferenceTest {
     val output =
       run(
         """[{"type": "formula", "expr": "1", "as": "one"},
-            {"type": "wordcloud", "text": "c"},
+            {"type": "aTransformUpstreamHasNeverHad", "text": "c"},
             {"type": "filter", "expr": "false"}]"""
       )
+    // An **invented** name rather than a real transform that happens to be missing, which is what
+    // this used to use: `wordcloud` stood here until it was implemented, and every one of
+    // upstream's 51 is now in the registry. A test whose subject is "a transform this engine does
+    // not have" cannot depend on there being one — the case it guards is a specification naming
+    // something misspelled, or something upstream adds after this version.
+    //
     // The formula ran; the filter after the unknown transform did not.
     assertTrue(output.contains(""""one":1"""), output)
     assertTrue(output.contains(""""c":"a""""), output)
@@ -724,7 +730,7 @@ class TransformReferenceTest {
       context.diagnostics.diagnostics.first {
         it.code == DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED
       }
-    assertTrue(diagnostic.message.contains("wordcloud"), diagnostic.message)
+    assertTrue(diagnostic.message.contains("aTransformUpstreamHasNeverHad"), diagnostic.message)
   }
 
   @Test
@@ -787,7 +793,7 @@ class TransformReferenceTest {
     VegaValue.Obj(linkedMapOf("g" to VegaValue.Str(group), "v" to VegaValue.Num(value)))
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus thirty-eight more`() {
+  fun `the registry covers the transforms the brief lists, plus thirty-nine more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -862,6 +868,7 @@ class TransformReferenceTest {
         "resolvefilter" +
         "isocontour" +
         "contour" +
+        "wordcloud" +
         "geopath" +
         "kde2d" +
         "heatmap" +

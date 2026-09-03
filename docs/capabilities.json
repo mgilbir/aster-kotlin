@@ -105,7 +105,7 @@
         "SpecCompilerTest"
       ],
       "tests_text": "`SpecCompilerTest`, `FixtureDifferentialTest`",
-      "notes": "Parses and compiles the subset below, including signals, expressions, 50 of upstream's 51 documented data transforms, nested group scopes, group `layout`, legends and titles. Loaded through `VegaChartController.setSpec`, or `setSpecAsync` to compile off the calling thread",
+      "notes": "Parses and compiles the subset below, including signals, expressions, all 51 of upstream's 51 documented data transforms, nested group scopes, group `layout`, legends and titles. Loaded through `VegaChartController.setSpec`, or `setSpecAsync` to compile off the calling thread",
       "milestone": "3"
     },
     {
@@ -2394,12 +2394,14 @@
       "line": 242,
       "section": "Data transforms",
       "feature": "`wordcloud`",
-      "status": "Not implemented",
+      "status": "**Supported**, with a looser collision test",
       "tests": [
+        "CloudLayoutTest",
+        "WordcloudTest",
         "TransformReferenceTest"
       ],
-      "tests_text": "`TransformReferenceTest`",
-      "notes": "The one of upstream's 51 documented data transforms that is not here yet. `contour` was the other and now is not — it is a composition of `kde2d` and `isocontour`, both of which were already exact against upstream, so all it needed was the composition and the one decision inside it (`zero` follows whether the grid was given or estimated). What `wordcloud` needs is different in kind: its collision detection rasterises each word through a canvas 2D context and reads `getImageData` back for a per-pixel mask, and no common-code path rasterises glyphs. The placement itself is reproducible — Vega injects `vega-statistics`'s seedable generator rather than `Math.random`, and `RandomSource` already reproduces it bit-for-bit under the shared seed of 42. An unimplemented transform stops the pipeline and reports itself, so a specification asking for one is told rather than quietly drawn wrong.",
+      "tests_text": "`CloudLayoutTest`, `WordcloudTest`, `TransformReferenceTest`",
+      "notes": "All 51 of upstream's documented data transforms are now implemented; this was the last one. The layout is upstream's, ported: the sort, the archimedean and rectangular spirals, the board bitmap, the bitmask collision test, the bounding-box compaction rule, the blank-row trimming, and the order the random draws come off the generator. **Checked to the pixel**: `oracle-js/src/record-wordcloud.mjs` runs upstream's own `cloudSprite` against the pinned `vega@6.3.1` and records each word's glyph mask together with where upstream then placed it; `CloudLayoutTest` hands those masks back and requires all eighteen words at exactly upstream's coordinates. Every word's position depends on the board the words before it left, so one wrong bit moves all seventeen after it — it passes completely or fails obviously. The **difference** is the mask itself: upstream reads it back from a canvas, and nothing in common Kotlin rasterises glyphs, nor should it, since a font is the host's. A host that can rasterise supplies masks through `CloudSprites` and gets upstream's packing; everything else measures each word and treats it as a filled rectangle — same words, same sizes, same order, more air between them. Upstream's compaction rule is skipped in that case because it cannot be satisfied by solid boxes: it requires a word to *overlap* the bounds of what is already placed while missing its ink, which measured one word placed of ten before the rule was made conditional. Deterministic where upstream is not, since the generator is the chart's seeded `RandomStream`.",
       "milestone": "4+"
     },
     {

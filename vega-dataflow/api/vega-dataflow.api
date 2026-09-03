@@ -645,3 +645,10 @@ public final class dev/aster/vega/dataflow/transform/WindowTransform : dev/aster
 	public fun getType ()Ljava/lang/String;
 }
 
+public final class dev/aster/vega/dataflow/transform/WordcloudTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/WordcloudTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+

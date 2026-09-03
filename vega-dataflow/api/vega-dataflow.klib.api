@@ -684,6 +684,13 @@ final object dev.aster.vega.dataflow.transform/WindowTransform : dev.aster.vega.
     final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/WindowTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
 }
 
+final object dev.aster.vega.dataflow.transform/WordcloudTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/WordcloudTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/WordcloudTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/WordcloudTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/WordcloudTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
 final object dev.aster.vega.dataflow/DataflowScheduler { // dev.aster.vega.dataflow/DataflowScheduler|null[0]
     final fun topologicalOrder(kotlin.collections/List<dev.aster.vega.dataflow/DataflowOperator<*, *>>): kotlin.collections/List<dev.aster.vega.dataflow/OperatorId> // dev.aster.vega.dataflow/DataflowScheduler.topologicalOrder|topologicalOrder(kotlin.collections.List<dev.aster.vega.dataflow.DataflowOperator<*,*>>){}[0]
 }

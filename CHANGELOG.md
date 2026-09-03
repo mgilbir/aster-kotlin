@@ -8,6 +8,48 @@ section here does not get released.
 
 ### Added
 
+- **API:** `WordcloudTransform` joins the transform registry in `:vega-dataflow`. Additive.
+
+- **The `wordcloud` transform**, which completes upstream's 51 documented data transforms.
+
+  The layout is upstream's, ported: the sort, the archimedean and rectangular spirals, the board
+  bitmap, the bitmask collision test, the bounding-box compaction rule, the blank-row trimming, and
+  the order the random draws come off the generator.
+
+  **It is checked to the pixel.** The reason this transform stayed unimplemented was that upstream
+  decides collisions by rasterising each word through a canvas and reading `getImageData` back, and
+  nothing in common Kotlin rasterises glyphs. That is a reason not to *reproduce* the mask; it is
+  not a reason the layout cannot be verified. So the mask is recorded as an **input**:
+  `oracle-js/src/record-wordcloud.mjs` runs upstream's own `cloudSprite` against the pinned
+  `vega@6.3.1`, writes out each word's bits and where upstream then placed it, and `CloudLayoutTest`
+  hands those bits back and requires all eighteen words at exactly upstream's coordinates. Every
+  word's position depends on the board the words before it left, so one wrong bit moves all
+  seventeen after it: it passes completely or fails obviously.
+
+  Three deliberate mutations were checked against it and each was caught — resetting upstream's
+  cumulative `seen` flag per row, assigning `last` before reading it in the sprite-shifting loop
+  (JavaScript evaluates `(last << msx) | ((last = ...) >>> sx)` left to right, so the read comes
+  first), and swapping the order of the two random draws.
+
+  **What differs, and it is the mask alone.** A host that can rasterise supplies masks through
+  `CloudSprites` and gets upstream's own packing. Everything else measures each word and treats it
+  as a filled rectangle: same words, same sizes, same order, more air between them. Upstream's
+  compaction rule — a word must *overlap* the bounds of what is already placed — is skipped in that
+  case, because solid boxes cannot satisfy it and being asked to overlap while missing the ink is a
+  contradiction. Measured before that was made conditional: one word placed of ten.
+
+  Deterministic where upstream is not, since the generator is the chart's seeded `RandomStream`
+  rather than `Math.random` — which is also what makes a word cloud comparable with anything.
+
+### Changed
+
+- Two tests that borrowed `wordcloud` as their example of an unimplemented transform now use an
+  invented name. With every documented transform implemented, a test about "a transform this engine
+  does not have" can no longer borrow a real one; what it guards is a misspelling, or something
+  upstream adds after the pinned version.
+
+### Added
+
 - **API:** `ContourTransform` joins the transform registry in `:vega-dataflow`. Additive; nothing
   else in the surface moved.
 
