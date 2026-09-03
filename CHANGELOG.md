@@ -8,6 +8,29 @@ section here does not get released.
 
 ### Added
 
+- **The three vocabularies a specification names by a single word are measured: 146 of 146.** A
+  projection type, a time unit and an expression function are each reached by writing a word
+  upstream defines, and none of the three is in Vega's schema. That made them the last place a gap
+  could sit without anything going red: every other gate runs documented → code and asks whether a
+  row's claim still holds, so a feature upstream has and this engine does not has no row to be
+  wrong, no citation to dangle and no number to drift. Absence is what nobody reviews.
+
+  `UpstreamSurfaceCoverageTest` runs the other way, upstream → code, deriving each inventory from
+  the pinned install — `vega-projection`'s own table, the schema's `timeunitTransform` enum, and
+  `vega-functions`' `functionContext` together with the `expressionFunction` calls beneath it — and
+  then asking this engine for each name. The answer is 17 projections, 11 time units and 118
+  functions, all accepted, with a ceiling of zero refused; `docs/upstream-coverage.md` carries the
+  numbers beside the other three probes.
+
+  Two things the writing of it found. Taking only the object literal reported sixteen of upstream's
+  functions missing that are all implemented — the twenty view-dependent ones, `scale`, `data`, the
+  `vlSelection` family, are registered by a second mechanism because each also declares a visitor,
+  and a specification cannot tell the two apart. And probing each name with no arguments reported
+  those same sixteen missing again for a different reason: the evaluator dispatches on name *and*
+  argument count, so a zero-argument call to `geoShape` falls past its own branch. Each inventory
+  therefore carries a guard on its own size, because a scrape that stopped matching would report
+  perfect coverage of nothing.
+
 - **`config` block coverage is measured too: 25 of 25.** Vega's schema does not describe `config` at
   all, so the inventory comes from the top-level keys of upstream's own default configuration, which
   is what a specification may write. That is a cruder source than a schema, so the scrape is guarded
@@ -177,6 +200,18 @@ section here does not get released.
   agreement is as much a surprise as a new one.
 
 ### Fixed
+
+- **A projection type this engine does not build is now reported instead of quietly not applying.**
+  Found by the coverage probe above, on its first run, and silent in the worst available way: all
+  ten sites that build a projection fall back to the identity stream when the type is unknown, so a
+  misspelt `"type"` drew the geometry in raw degrees — a couple of hundred units across, in the
+  corner, at a plausible enough size to read as a projection that looks wrong rather than one that
+  was never applied.
+
+  `VEGA_PROJECTION_UNSUPPORTED_TYPE` is warned once, at the compiler, which is the only place that
+  still knows the projection's name; the chart still draws, since the rest of it is unaffected.
+  Distinct from the existing code for a projection *named but never declared*: that one says the
+  reference dangles, this one says the block is there and its type is not a word this engine knows.
 
 - **A signal handler declared inside a group mark never fires, and now says so.**
   `VegaChartController.publish` builds its event bindings from the specification's *top-level*

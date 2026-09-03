@@ -79,6 +79,20 @@ public object DiagnosticCodes {
   public const val EXPRESSION_CONTAINER_SIZE_UNANSWERED: String =
     "VEGA_EXPRESSION_CONTAINER_SIZE_UNANSWERED"
 
+  /**
+   * A `projections` block names a projection type this engine does not build.
+   *
+   * Silent until a coverage gate went looking for it, and silent in the worst possible way: every
+   * site that builds a projection falls back to the identity stream, so a misspelt `type` draws the
+   * map in raw degrees — a shape a couple of hundred units wide, in the corner, at a plausible
+   * enough size that it reads as a projection that simply looks wrong rather than as one that was
+   * never applied.
+   *
+   * Distinct from the code a *named but undeclared* projection reports. That one says the reference
+   * is dangling; this one says the block is there and its type is not a word this engine knows.
+   */
+  public const val PROJECTION_UNSUPPORTED_TYPE: String = "VEGA_PROJECTION_UNSUPPORTED_TYPE"
+
   public const val SCALE_UNSUPPORTED_TYPE: String = "VEGA_SCALE_UNSUPPORTED_TYPE"
   public const val SCALE_INVALID_DOMAIN: String = "VEGA_SCALE_INVALID_DOMAIN"
 

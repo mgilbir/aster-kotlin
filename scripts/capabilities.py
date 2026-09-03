@@ -52,6 +52,7 @@ SOURCE = ROOT / "docs" / "capabilities.json"
 COVERAGE_INPUT = ROOT / "vega-model" / "build" / "upstream-coverage.json"
 VEGA_LITE_COVERAGE_INPUT = ROOT / "vega-lite" / "build" / "vega-lite-coverage.json"
 CONFIG_COVERAGE_INPUT = ROOT / "vega-model" / "build" / "config-coverage.json"
+SURFACE_COVERAGE_INPUT = ROOT / "vega-runtime" / "build" / "surface-coverage"
 COVERAGE_DOC = ROOT / "docs" / "upstream-coverage.md"
 
 # A test class as a row cites one: backticked, containing `Test`.
@@ -429,6 +430,45 @@ def render_coverage() -> str | None:
             f"**{cfg['read']} of {cfg['upstream']}** blocks read.",
             "",
         ]
+
+    # The three vocabularies a specification names by a single word: a projection type, a time unit,
+    # an expression function. None of these is in Vega's schema, so each inventory comes from
+    # upstream's own source — see `UpstreamSurfaceCoverageTest` for where, and why it is scraped
+    # rather than written down.
+    surfaces = [
+        json.loads(f.read_text())
+        for f in sorted(SURFACE_COVERAGE_INPUT.glob("*.json"))
+    ]
+    if surfaces:
+        names = {
+            "projection": ("Projection type", "`vega-projection`'s own table"),
+            "timeUnit": ("Time unit", "the schema's `timeunitTransform` enum"),
+            "expressionFunction": (
+                "Expression function",
+                "`vega-functions`' `functionContext` and its `expressionFunction` calls",
+            ),
+        }
+        lines += [
+            "## Named-vocabulary coverage",
+            "",
+            "Generated from what `UpstreamSurfaceCoverageTest` measured. These are the surfaces a",
+            "specification reaches by naming a word upstream defines, which is the one shape of gap",
+            "the other probes cannot see: there is no row to be wrong and no citation to dangle, so",
+            "a word upstream has and this engine does not would simply be absent.",
+            "",
+            "| Kind | Accepted | Upstream | Inventory from | Refused |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+        for s_ in surfaces:
+            label, source = names.get(s_["kind"], (s_["kind"], "—"))
+            refused = ", ".join(f"`{r}`" for r in s_["refused"]) or "—"
+            lines.append(
+                f"| {label} | {s_['accepted']} | {s_['upstream']} | {source} | {refused} |"
+            )
+        total = sum(s_["upstream"] for s_ in surfaces)
+        ok = sum(s_["accepted"] for s_ in surfaces)
+        lines += ["", f"**{ok} of {total}** names accepted.", ""]
+
     return "\n".join(lines)
 
 def unpinned_limits(

@@ -903,6 +903,7 @@ DiagnosticCodes.PARSE_MISSING_PROPERTY
 DiagnosticCodes.PARSE_NOTHING_TO_DRAW
 DiagnosticCodes.PARSE_UNKNOWN_MARK
 DiagnosticCodes.PARSE_UNKNOWN_PROPERTY
+DiagnosticCodes.PROJECTION_UNSUPPORTED_TYPE
 DiagnosticCodes.RENDER_UNSUPPORTED_BLEND_MODE
 DiagnosticCodes.RENDER_UNSUPPORTED_NODE
 DiagnosticCodes.SCALE_INVALID_DOMAIN
@@ -3252,6 +3253,7 @@ ProjectionDefinition.fitExtent
 ProjectionDefinition.fitSize
 ProjectionDefinition.hash()
 ProjectionDefinition.init(name:type:scale:translate:center:rotate:angle:precision:reflectX:reflectY:clipExtent:clipAngle:parallels:pointRadius:fit:fitExtent:fitSize:)
+ProjectionDefinition.isBuildable
 ProjectionDefinition.isEqual(_:)
 ProjectionDefinition.name
 ProjectionDefinition.parallels

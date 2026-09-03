@@ -56,3 +56,18 @@ upstream's own vectors.
 | `config` | 25 | 25 | — |
 
 **25 of 25** blocks read.
+
+## Named-vocabulary coverage
+
+Generated from what `UpstreamSurfaceCoverageTest` measured. These are the surfaces a
+specification reaches by naming a word upstream defines, which is the one shape of gap
+the other probes cannot see: there is no row to be wrong and no citation to dangle, so
+a word upstream has and this engine does not would simply be absent.
+
+| Kind | Accepted | Upstream | Inventory from | Refused |
+| --- | --- | --- | --- | --- |
+| Expression function | 118 | 118 | `vega-functions`' `functionContext` and its `expressionFunction` calls | — |
+| Projection type | 17 | 17 | `vega-projection`'s own table | — |
+| Time unit | 11 | 11 | the schema's `timeunitTransform` enum | — |
+
+**146 of 146** names accepted.
