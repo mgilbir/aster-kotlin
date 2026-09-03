@@ -380,15 +380,18 @@ class UnhandledPropertiesTest {
   }
 
   /**
-   * A handler fired by a **scale** being rebuilt says so, and one fired by a signal says nothing.
+   * Neither a scale-sourced handler nor a signal-sourced one is warned about.
    *
-   * The pair matters more than either half. A recompile rebuilds every scale, so nothing here knows
-   * which one *moved* and the scale form cannot be honoured — it is reported. The signal form is
-   * honoured, and a diagnostic on it would send a reader looking for a gap that was closed.
+   * The scale form used to be reported as untracked, on the argument that a recompile rebuilds
+   * every scale so nothing knew which one *moved*. `VegaChartController` now answers that by
+   * comparing how each scale resolves across a recompile, so the warning would send a reader
+   * looking for a gap that has been closed — which is the same reason the signal form never had
+   * one. `ScaleSourcedHandlerTest` is where the behaviour itself is checked.
    */
   @Test
-  fun `a handler sourced on a scale is reported and one sourced on a signal is not`() {
-    val scaled =
+  fun `neither a scale-sourced handler nor a signal-sourced one is reported`() {
+    assertEquals(
+      emptyList<String>(),
       diagnostics(
           spec(
             """"scales": [{"name": "s", "type": "linear", "domain": [0, 1], "range": "width"}],
@@ -396,8 +399,8 @@ class UnhandledPropertiesTest {
                  "on": [{"events": {"scale": "s"}, "update": "1"}]}]"""
           )
         )
-        .single { it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY }
-    assertTrue("does not track" in scaled.message, scaled.message)
+        .map { it.message },
+    )
 
     assertEquals(
       emptyList<String>(),

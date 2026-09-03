@@ -29,6 +29,7 @@ import dev.aster.vega.runtime.interaction.SignalUpdater
 import dev.aster.vega.runtime.load.CachingDataLoader
 import dev.aster.vega.runtime.load.DataLoader
 import dev.aster.vega.runtime.load.DenyLoader
+import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.HitTestOptions
 import dev.aster.vega.scene.MetricTextEngine
 import dev.aster.vega.scene.PointD
@@ -592,6 +593,15 @@ public class VegaChartController(
   /** The text of the loaded specification, so a fired handler can recompile it. */
   private var loadedSpecJson: String? = null
 
+  /**
+   * How each top-level scale resolved at the last publish, so the next one can tell which moved.
+   *
+   * The whole of what a scale-sourced handler needs, and the reason it is a fingerprint rather than
+   * the scales themselves: keeping the previous `CompiledSpec` alive would hold its scene too, and
+   * a scene is the largest thing this class owns. See [scaleCascade].
+   */
+  private var scaleFingerprints: Map<String, String> = emptyMap()
+
   // The same locale-bound function table the compiler uses, so a handler's own `timeFormat` writes
   // the same month name the axis does.
   private val expressions =
@@ -712,6 +722,11 @@ public class VegaChartController(
 
   private fun publish(compiled: CompiledSpec): CompiledSpec {
     lastCompiled = compiled
+    // Before anything else, and on **every** path that publishes a compile — including the first
+    // one. A scale-sourced handler asks whether a scale moved, and the answer is only meaningful
+    // against a baseline; recording it only where a handler fires would compare the second compile
+    // against nothing and fire on the whole specification.
+    scaleFingerprints = fingerprintScales(compiled)
     val bindings =
       compiled.spec?.signals.orEmpty().flatMap { signal ->
         signal.on.map { HandlerBinding(signal.name, it) }
@@ -932,9 +947,40 @@ public class VegaChartController(
     // observations).
     val json = loadedSpecJson ?: return
     val generation = nextRequest()
+    // Captured before the recompile replaces it: this is the "before" a scale-sourced handler is
+    // asking about.
+    var before = scaleFingerprints
     val compiled = compileNow(compiler, json, signals.overrides, signals.itemEncodes)
     if (!isCurrent(generation)) return
     publish(compiled)
+    // **Then the scales.** A handler sourced on a scale fires here and not in [cascade]: "did this
+    // scale move" is a question only a completed recompile can answer. Each round changes a signal,
+    // which is another recompile, which can move a further scale.
+    var latest = compiled
+    var round = 0
+    while (true) {
+      val fired = scaleCascade(latest, before)
+      if (fired.isEmpty()) break
+      if (++round > MAX_CASCADE_ROUNDS) {
+        report(
+          VegaDiagnostic(
+            code = DiagnosticCodes.SIGNAL_CYCLE,
+            severity = DiagnosticSeverity.WARNING,
+            message =
+              "Signals '${fired.sorted().joinToString("', '")}' are still changing after " +
+                "$MAX_CASCADE_ROUNDS rounds of scale-driven handlers, so a signal and a scale are " +
+                "moving each other; their last values are kept",
+          )
+        )
+        break
+      }
+      before = scaleFingerprints
+      val next = nextRequest()
+      val recompiled = compileNow(compiler, json, signals.overrides, signals.itemEncodes)
+      if (!isCurrent(next)) return
+      publish(recompiled)
+      latest = recompiled
+    }
     // The overlays that were fresh have now been applied once; from here on the mark's own `update`
     // takes back the channels it sets, which is what ageing them expresses.
     signals.ageItemEncodes()
@@ -1008,6 +1054,80 @@ public class VegaChartController(
     }
     return emptyList()
   }
+
+  /**
+   * Fires the handlers whose source is a **scale**, for the scales a recompile actually moved.
+   *
+   * `{"events": {"scale": "x"}}` fires when the scale is rebuilt. Upstream knows which one that is
+   * because a scale is an operator in its dataflow and only re-runs when an input changed. Here a
+   * changed signal recompiles the whole specification, so *every* scale is rebuilt every time —
+   * which is why this used to be reported and refused: firing on all of them would run the handler
+   * when nothing about the scale had changed, and a handler that fires spuriously is worse than one
+   * that does not fire.
+   *
+   * So "rebuilt" is answered as "resolves differently", by comparing the scale against the one the
+   * previous compile produced. That is closer to upstream than firing always, and it needs no
+   * incremental dataflow — which the measurement said this engine does not want, a full recompile
+   * of the heaviest fixture costing 366 microseconds against a 16,600 microsecond frame.
+   *
+   * A fired handler can change a signal, which recompiles, which can move another scale; the round
+   * bound is [MAX_CASCADE_ROUNDS], the same one the signal cascade uses and for the same reason.
+   */
+  private fun scaleCascade(compiled: CompiledSpec, previous: Map<String, String>): Set<String> {
+    val moved =
+      scaleFingerprints
+        .filterKeys { it in previous }
+        .filter { (name, print) -> previous.getValue(name) != print }
+        .keys
+    if (moved.isEmpty()) return emptySet()
+    val due =
+      compiled.spec?.signals.orEmpty().flatMap { signal ->
+        signal.on
+          .filter { handler -> handler.scaleSources.any { it in moved } }
+          .map {
+            FiredHandler(signal.name, it)
+          }
+      }
+    if (due.isEmpty()) return emptySet()
+    return signals.apply(due, compiled.signals)
+  }
+
+  /**
+   * How each of [compiled]'s scales resolves, or nothing at all where no handler is asking.
+   *
+   * The guard is not an optimisation so much as a statement of cost: a scale source is the rarest
+   * source there is — not one of Vega's ninety-three published examples uses it — so the
+   * overwhelming majority of charts must pay nothing for it, and here they pay one `isEmpty` per
+   * publish.
+   */
+  private fun fingerprintScales(compiled: CompiledSpec): Map<String, String> {
+    val watched =
+      compiled.spec?.signals.orEmpty().flatMapTo(mutableSetOf()) { signal ->
+        signal.on.flatMap { it.scaleSources }
+      }
+    if (watched.isEmpty()) return emptyMap()
+    return compiled.scales
+      .filterKeys { it in watched }
+      .mapValues { (_, scale) ->
+        scale.movementFingerprint()
+      }
+  }
+
+  /**
+   * A value that changes when the scale would map things differently, and not otherwise.
+   *
+   * Sampled rather than structural, deliberately. The scale classes expose their resolved state
+   * unevenly — some take `domain` and `range` as constructor properties, some derive them — so an
+   * exhaustive `when` over the sealed hierarchy would read half of them through a different door
+   * and would need editing every time a scale type is added. Every `VegaScale` can do one thing:
+   * map a value. So this asks it to.
+   *
+   * What the sampling can miss is two scales differing only outside the probes, which would leave a
+   * handler unfired. That is exactly today's behaviour for *every* scale, so the failure mode is no
+   * worse than the one being replaced — where firing wrongly would have been.
+   */
+  private fun VegaScale.movementFingerprint(): String =
+    FINGERPRINT_PROBES.joinToString("|") { probe -> scale(probe).toString() }
 
   /**
    * Starts a repeating run for every timer stream in the specification, and stops the last lot.
@@ -1354,6 +1474,27 @@ public class VegaChartController(
      * that no honest specification meets it.
      */
     private const val MAX_CASCADE_ROUNDS = 64
+
+    /**
+     * The values a scale is asked to map, to tell whether it moved.
+     *
+     * Numbers spanning what a chart's domains take, plus two strings, plus a date-shaped instant. A
+     * band scale answers on names and a linear one on numbers, so a probe set covering only one
+     * kind would call half the scales unchanged for ever — and an unchanged scale fires nothing,
+     * which is the failure that would be silent.
+     */
+    private val FINGERPRINT_PROBES: List<VegaValue> =
+      listOf(
+        VegaValue.Num(0.0),
+        VegaValue.Num(0.5),
+        VegaValue.Num(1.0),
+        VegaValue.Num(-1.0),
+        VegaValue.Num(100.0),
+        VegaValue.Num(1e6),
+        VegaValue.Num(1.7e12),
+        VegaValue.Str("a"),
+        VegaValue.Str("z"),
+      )
 
     /** Creates a controller for a hand-authored scene. */
     public fun fromScene(scene: Scene): VegaChartController = VegaChartController(scene)

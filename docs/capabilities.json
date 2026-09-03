@@ -5617,12 +5617,12 @@
       "line": 527,
       "section": "Interaction",
       "feature": "A handler sourced on a **scale**",
-      "status": "Not implemented",
+      "status": "**Supported**",
       "tests": [
-        "UnhandledPropertiesTest"
+        "ScaleSourcedHandlerTest"
       ],
-      "tests_text": "`UnhandledPropertiesTest`",
-      "notes": "`{\"events\": {\"scale\": \"x\"}}` fires when the scale is rebuilt, which upstream knows because a scale is an operator in its dataflow. Here a changed signal recompiles the whole specification, so every scale is rebuilt every time and nothing says which of them *moved* — firing on all of them would run the handler when nothing about the scale had changed. Reported by name, and it is the rarest source there is: not one of the 93 published examples uses it",
+      "tests_text": "`ScaleSourcedHandlerTest`",
+      "notes": "`{\"events\": {\"scale\": \"x\"}}` fires when the scale is rebuilt. Upstream knows which one that is because a scale is an operator in its dataflow; here a changed signal recompiles the whole specification, so every scale is rebuilt every time and firing on all of them would run the handler when nothing about the scale had changed. So \"rebuilt\" is answered as **\"resolves differently\"** — each watched scale is asked to map a fixed set of probes and the answers are compared against the previous compile's, which needs no incremental dataflow and gets the case the refusal was about: a recompile that rebuilds every scale and moves none of them fires nothing. A handler that moves the scale it watches is a cycle, reported and stopped at the round bound the signal cascade uses. A specification with no scale source fingerprints nothing, which is nearly all of them: not one of the 93 published examples uses this source",
       "milestone": "6"
     },
     {
