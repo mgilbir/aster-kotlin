@@ -201,6 +201,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A new fixture's container announcements were compared against nothing.** `MarkContainerTest`
+  walks the harvested reference and asks this engine for a matching answer, so a fixture the
+  reference has never heard of is not compared — and not reported either, since there is nothing to
+  disagree with. Two fixtures landed that way, because their references were built by running
+  `oracle-js/src/reference.js` directly, which writes the scene comparison and nothing else, where
+  `scripts/oracle.sh` also harvests the captions and the containers. The existing floor could not
+  see it: it counts rows rather than fixtures, and 2,234 is comfortably over 300 either way.
+
+  The harvest is now complete, and a second test requires every fixture in the corpus to appear in
+  it. `guide-captions.json` deliberately gets no such check — a fixture with no axis, legend or
+  title genuinely has no caption, and 55 of them do not.
+
 - **A stroked `path` mark under `scaleX`/`scaleY` measured twice too wide.** The stroke allowance —
   half the width, or `miterLimit/2` widths where a miter join can run past a vertex — was added to
   the path's bounds in the mark's **own** coordinates, and the node's transform then multiplied it.

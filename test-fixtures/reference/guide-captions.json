@@ -1575,6 +1575,11 @@
   "caption": "Y-axis for a linear scale with values from 0 to 100"
  },
  {
+  "fixture": "path-scaled-stroke",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 5 values: square, wide, spike, line, plain"
+ },
+ {
   "fixture": "pi-monte-carlo",
   "kind": "axis",
   "caption": "X-axis for a linear scale with values from 0.0 to 1.0"
