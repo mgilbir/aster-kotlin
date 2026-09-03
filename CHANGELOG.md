@@ -147,6 +147,22 @@ section here does not get released.
 
 ### Fixed
 
+- **A signal handler declared inside a group mark never fires, and now says so.**
+  `VegaChartController.publish` builds its event bindings from the specification's *top-level*
+  signals, so a signal declared inside a group carries its `on` handlers into a compile nothing
+  dispatches to. The handler was unreachable in silence, which is what ADR 0011 exists to forbid.
+
+  Found by settling two audit questions that turned out to be one fixture. Vega's own
+  `overview-plus-detail` declares `brush`, `anchor`, `xdown`, `delta` and `detailDomain` inside its
+  `overview` group, so **brushing the overview does not move the detail panel at all**. The audit had
+  recorded that first as a scale bug (C4, `buildTime` ignoring `domainRaw`) and then as a
+  `push: "outer"` question (Q6). Both were real; neither was the reason it does not work.
+
+  Reported rather than fixed here, because the value is the harder half: signal overrides are keyed
+  by name in one flat map, so a group signal's value has nowhere to live across the
+  whole-specification recompile a fired handler triggers. The diagnostic names the count and the
+  workaround; dispatching into group scopes is its own piece of work.
+
 - **Two rows quoted divergence counts that were years out of date**, claiming "the last five are
   pinned" and "thirteen signatures pinned" against a file holding four. The entries had been deleted
   as the bugs were fixed, which is the mechanism working; the prose beside it was not derived from
