@@ -20,3 +20,23 @@ that, by comparing whole scenes against upstream.
 | `encodeEntry` | 69 | 69 | — |
 
 **247 of 247** across the kinds measured.
+
+## Vega-Lite construct coverage
+
+Generated from what `UpstreamVegaLiteCoverageTest` measured, against the Vega-Lite
+schema in the pinned install: the channels of `FacetedEncoding`, the `Mark` enum plus
+the three composite marks, and the nineteen members of the `Transform` union. Nothing
+is hand-listed, so a version bump that adds a channel adds it here.
+
+**Breadth, not depth.** This says the compiler accepts the construct rather than
+refusing it by name. Whether it emits the Vega upstream emits is
+`VegaLiteFixtureTest`'s question, and that one is answered property by property on
+every fixture.
+
+| Kind | Accepted | Upstream | Refused |
+| --- | --- | --- | --- |
+| `channel` | 41 | 41 | — |
+| `mark` | 17 | 17 | — |
+| `transform` | 19 | 19 | — |
+
+**77 of 77** across the kinds measured.

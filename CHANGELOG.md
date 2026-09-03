@@ -8,6 +8,28 @@ section here does not get released.
 
 ### Added
 
+- **Vega-Lite coverage is measured, not described.** Six rows said `Partial` and then a paragraph of
+  prose, which is safe — anything outside the subset is refused by name — but not checkable, and an
+  unmeasured claim is the one that goes stale. `UpstreamVegaLiteCoverageTest` asks the compiler
+  instead, deriving the inventory from the Vega-Lite schema in the pinned install: the channels of
+  `FacetedEncoding`, the `Mark` enum plus the three composite marks, and the nineteen members of the
+  `Transform` union. Nothing is hand-listed, so a version bump that adds a channel adds it here.
+
+  The answer is **77 of 77** — all 41 channels, all 17 marks, all 19 transforms — and the ceiling is
+  now zero refused, so a schema bump that adds something this compiler will not take fails rather
+  than being absorbed into the word "partial". `docs/upstream-coverage.md` carries it beside the
+  Vega numbers.
+
+  Breadth, not depth: this says a construct is accepted rather than refused. Whether it emits the
+  Vega upstream emits is `VegaLiteFixtureTest`'s question, answered property by property on every
+  fixture. The rows say so in those words.
+
+  Two runs of the probe reported four refused channels before it was trusted, both times because
+  the probe's own specification was malformed — the `*Error` channels only mean anything on an
+  `errorbar`, and an `errorbar` needs a continuous position of its own. That is the third time a
+  coverage probe here has measured its own input; it is why the guard asserting an invented channel
+  *is* counted comes with it.
+
 - **A documented limitation now has to be pinned to a test.** `SUPPORTED_FEATURES.md` has had its
   status column generated from a run since #154, and the prose beside it has not — which is where
   the drift went. A row can claim a gap that no longer exists and nothing fails, because a run has

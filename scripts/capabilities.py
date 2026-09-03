@@ -50,6 +50,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 DOC = ROOT / "SUPPORTED_FEATURES.md"
 SOURCE = ROOT / "docs" / "capabilities.json"
 COVERAGE_INPUT = ROOT / "vega-model" / "build" / "upstream-coverage.json"
+VEGA_LITE_COVERAGE_INPUT = ROOT / "vega-lite" / "build" / "vega-lite-coverage.json"
 COVERAGE_DOC = ROOT / "docs" / "upstream-coverage.md"
 
 # A test class as a row cites one: backticked, containing `Test`.
@@ -375,6 +376,34 @@ def render_coverage() -> str | None:
         missing = ", ".join(f"`{p}`" for p in k["unconsumed"]) or "—"
         lines.append(f"| `{k['kind']}` | {k['consumed']} | {k['upstream']} | {missing} |")
     lines += ["", f"**{consumed} of {total}** across the kinds measured.", ""]
+
+    # The Vega-Lite half, when it has been measured. Same idea, different question: over there the
+    # unit is a *property* of a guide, here it is a whole construct — a channel, a mark, a
+    # transform — because that is what a Vega-Lite row says it supports a subset of.
+    if VEGA_LITE_COVERAGE_INPUT.exists():
+        vl = json.loads(VEGA_LITE_COVERAGE_INPUT.read_text())["kinds"]
+        vl_total = sum(k["upstream"] for k in vl)
+        vl_accepted = sum(k["accepted"] for k in vl)
+        lines += [
+            "## Vega-Lite construct coverage",
+            "",
+            "Generated from what `UpstreamVegaLiteCoverageTest` measured, against the Vega-Lite",
+            "schema in the pinned install: the channels of `FacetedEncoding`, the `Mark` enum plus",
+            "the three composite marks, and the nineteen members of the `Transform` union. Nothing",
+            "is hand-listed, so a version bump that adds a channel adds it here.",
+            "",
+            "**Breadth, not depth.** This says the compiler accepts the construct rather than",
+            "refusing it by name. Whether it emits the Vega upstream emits is",
+            "`VegaLiteFixtureTest`'s question, and that one is answered property by property on",
+            "every fixture.",
+            "",
+            "| Kind | Accepted | Upstream | Refused |",
+            "| --- | --- | --- | --- |",
+        ]
+        for k in vl:
+            missing = ", ".join(f"`{p}`" for p in k["refused"]) or "—"
+            lines.append(f"| `{k['kind']}` | {k['accepted']} | {k['upstream']} | {missing} |")
+        lines += ["", f"**{vl_accepted} of {vl_total}** across the kinds measured.", ""]
     return "\n".join(lines)
 
 def unpinned_limits(
