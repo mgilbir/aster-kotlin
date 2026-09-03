@@ -2514,7 +2514,11 @@
       ],
       "tests_text": "`ExpressionFidelityTest`",
       "notes": "ECMA-262 21.4.4.41's form — `Thu Jan 01 1970 01:00:00 GMT+0100`, English, in the **host's** zone rather than the chart's configured one, which is what a browser prints. The specification permits an implementation to append a parenthesised zone name after the offset and V8 appends one; producing it needs CLDR data that is not available on every Kotlin/Native target, so it is omitted and everything before it agrees",
-      "milestone": "6"
+      "milestone": "6",
+      "limit": {
+        "test": "DateToStringLimitTest.the optional parenthesised zone name is omitted",
+        "claim": "ECMA-262 21.4.4.41 permits an implementation to append a parenthesised zone name after the offset and V8 appends one; producing it needs CLDR data not available on every Kotlin/Native target, so it is omitted."
+      }
     },
     {
       "line": 261,
@@ -2807,7 +2811,11 @@
       ],
       "tests_text": "`BitmapTest` (upstream vectors for the bit algebra and the pixel scaler), visual inspection of `labeled-scatter-plot`",
       "notes": "Places a text mark's items beside the marks they annotate and drops the ones that would collide. Everything is upstream's — the eight anchors and their two-bit arithmetic, the diagonal offsets scaled by `1/sqrt(2)`, the one-pixel-wide trial that avoids measuring a label that cannot fit, the bit-vector occupancy bitmap and its pixel scaler — **except the one step that decides what is occupied**. Upstream draws the avoided marks into a `<canvas>` and reads the alpha back; there is none under Node and its own transform throws there, so there is no reference to compare against. The occupancy is computed from the marks' geometry instead: a pixel is taken as occupied when the shape overlaps its square. The two answers agree except on pixels a shape barely grazes, and one pixel is enough to move a label to a different anchor or to drop one a crowded chart would otherwise fit — so **every use of the transform reports this**, and it is the only place in the engine that carries such a warning",
-      "milestone": "6"
+      "milestone": "6",
+      "limit": {
+        "test": "LabelOccupancyLimitTest.every use reports that the occupancy is geometric rather than rasterised",
+        "claim": "The occupancy bitmap is computed from the avoided marks' geometry rather than from a canvas raster, because there is no canvas under Node and upstream's own transform fails in the same place — so there is no reference to compare against. Every use of the transform reports it."
+      }
     },
     {
       "line": 285,
@@ -3006,7 +3014,11 @@
       "tests": [],
       "tests_text": "`encode-channels-tail` fixture (which leaves the rotation out), STATUS.md",
       "notes": "Upstream's renderer rotates the outline about the item's own `(x, y)`; its *bounds* code rotates the already-placed points about the **origin**, because the context it measures with defines no `translate` or `rotate`. For a square at `(250, 40)` scaled by `(2, 0.5)` and turned 20 degrees it reports a top-left 70 units below the shape it drew. This engine reports the box it painted. Reproducing the quirk would make chart size agree under `autosize: pad` and would put every hit target for such a mark in the wrong place",
-      "milestone": "3"
+      "milestone": "3",
+      "limit": {
+        "test": "RotatedScaledPathBoundsTest.the bounds are the painted extent and no larger",
+        "claim": "Upstream's bounds code rotates the already-placed points about the origin, reporting a box far from the shape it drew. This engine reports the box it painted, because reproducing the quirk would put every hit target for such a mark in the wrong place."
+      }
     },
     {
       "line": 302,
@@ -3128,7 +3140,11 @@
       ],
       "tests_text": "`FixtureDifferentialTest` (`airport-connections`)",
       "notes": "Upstream's items are property bags, so a mark encoding `strokeWidth` and no `stroke` carries a width and paints no outline — its own SVG renderer emits neither attribute. A scene node here holds what a renderer needs, so it holds no stroke at all. The comparison accepts that one equivalence and nothing wider: a reference carrying a stroke *colour* still demands a stroke of that width",
-      "milestone": "6"
+      "milestone": "6",
+      "limit": {
+        "test": "StrokeWidthWithoutStrokeTest.a width with no colour leaves the node with no stroke",
+        "claim": "A scene node holds what a renderer needs, and a stroke with no colour paints nothing, so there is no stroke to hold a width on. The comparison accepts that one equivalence and nothing wider."
+      }
     },
     {
       "line": 312,
@@ -3617,7 +3633,11 @@
       ],
       "tests_text": "`UpstreamTimeVectorsTest`, `oracle-js/src/record-upstream-tests.mjs`",
       "notes": "Upstream has ~3,700 assertions over ~30 packages. They are **recorded, not transcribed**: their test files are run against the installed 6.3.1 with the package's exports wrapped, and every call — arguments and upstream's actual answer — becomes a vector in `test-fixtures/upstream-vectors/`. The vectors are **not committed**: `scripts/record-upstream-vectors.sh` rebuilds them byte-identically from the pinned version, so the repository carries the recipe rather than 5 MB of derived data, and the replays skip *loudly* when they are absent. Their assertions are never read, which matters twice: several are deliberately loose (`t.ok(x > 0)`) where a port needs the exact value, and on a version upgrade the diff is *data* rather than a hand-edit across Kotlin files. Imports are rewritten by AST (`acorn`) — the regex version missed `import * as vega`, the form 55 files use. **15,220 vectors** recorded so far — the jump came from wrapping a **returned function**: d3's interpolators, its scales and a regression's `predict` are built and then called, so recording only the construction recorded `{$: 'function'}` and nothing else. Each call on the returned function is now a vector carrying the arguments it was built with. The largest are `d3-array` (1,538) and `d3-time` (1,047) — most of the *arithmetic* this engine ports is d3's, and d3 tests it far more thoroughly than a chart-level fixture can — then `vega-transforms` (548), `vega-time` (460), `d3-interpolate` (253), `d3-color` (216), `vega-scenegraph` (190) and `vega-expression` (149). d3 needed five accommodations, all in the same recorder: mocha's globally-injected `it` rather than an imported `tape`, `../src/index.js` rather than `../index.js`, one repository per package tagged from the installed version, each package's **own timezone** (d3-time's suite runs in `America/Los_Angeles`, recorded into the vector file so a replay knows), and a replaced `Date` **constructor**, since pinning `Date.now` leaves `new Date()` moving. The transform packages needed a second seam: they export operator *classes* driven through a dataflow, so nothing crosses the export boundary with plain arguments, and the recorder hooks `prototype.transform(_, pulse)` instead — parameters, tuples in, tuples out, and the operator's own value. Four things had to be right there: a comparator carries `fields` like an accessor does (and `orders`, which is how they are told apart), a single `facet` tuple can be 52 MB, an operator is **stateful** so only its first call is replayable, and an `expr` recorded as an accessor was a JavaScript function whose arithmetic is gone. The Kotlin side is an adapter per package with a **coverage floor**, so a harness cannot shrink into a pass: 281 of 460 time vectors replay, and the unmapped ones are named in the output. It has found **six** gaps so far, none of them visible to the 178 differential fixtures: an override of `null` in `timeUnitSpecifier` *removes* an entry rather than falling back, which a `Map<String, String>` could not express; `window` ignores peer rows, so `rank`/`dense_rank`/`percent_rank` are computed as if every row were unique; `timeunit` with `inferUnits` picks day where upstream picks month; `impute` does not set `_impute` on a row it invented, and misses one combination; `aggregate` ignores `cross`; and `bin` ignores `interval: false`. The last five are pinned **exactly** in `known-divergences.json` — a new divergence fails the build, and so does fixing one without deleting its entry",
-      "milestone": "6"
+      "milestone": "6",
+      "limit": {
+        "test": "UpstreamTransformVectorsTest.upstream's own transform vectors replay against these transforms",
+        "claim": "Coverage is partial and the divergences it has found are pinned exactly in `known-divergences.json` — a new one fails the build, and so does fixing one without deleting its entry. Each is a bug to fix rather than an accepted difference."
+      }
     },
     {
       "line": 353,
@@ -3931,7 +3951,11 @@
       "tests": [],
       "tests_text": "—",
       "notes": "Explicitly forbidden",
-      "milestone": "—"
+      "milestone": "—",
+      "limit": {
+        "test": "ForbiddenFunctionsTest.naming a host object reaches nothing",
+        "claim": "No general evaluator is reachable: a call to `eval` and its family is refused by a closed function registry, and a bare name like `globalThis` resolves to nothing rather than to a host object. A specification is data somebody else wrote, so this is a security boundary rather than a missing feature."
+      }
     },
     {
       "line": 381,
