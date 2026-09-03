@@ -18,10 +18,18 @@ section here does not get released.
   goes red the day the gap closes — or a `scope` reason where there is no code path to test, listed
   on every run so the escape hatch stays visible and rare.
 
-  It lands one stack ahead of its enforcement so the existing rows can be pinned a group at a time
-  without a red gate on `main`, and `--selftest` exercises it from the day it arrives: an unwired
-  rule that nothing checks is the very thing it exists to prevent. Four mutations were run against
-  that self-test and each was caught.
+  It landed one stack ahead of its enforcement so the existing rows could be pinned a group at a
+  time without a red gate on `main`, and `--selftest` exercised it from the day it arrived: an
+  unwired rule that nothing checks is the very thing it exists to prevent. Four mutations were run
+  against that self-test and each was caught.
+
+  **Now enforced.** All 27 rows that claimed a limitation are pinned — 25 to a test that asserts
+  it, 2 to a scope reason that says precisely why no code path exists. Applying the rule found
+  **fourteen** claims that were false, every one of them understating the engine: interval
+  selection, tooltip rendering, temporal colour ramps, `geopath` projections, banded legends,
+  transform signal ordering, `config.range`, `config.group`, `config.projection`, signals in guide
+  encode blocks, param-valued conditions, the description of a binned discrete field, `params`, and
+  the direction of the curved-extent difference.
 
 - **API:** `WordcloudTransform` joins the transform registry in `:vega-dataflow`. Additive.
 

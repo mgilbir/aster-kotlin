@@ -318,10 +318,9 @@ run_gate "changelog" python3 ./scripts/changelog-gate.py
 # and the diff would be about the machine rather than about the code.
 # ---------------------------------------------------------------------------------------------
 capabilities_gate() {
-  # The rule about claimed limitations lands one stack ahead of its enforcement, so that the rows can
-  # be pinned a group at a time without a red gate sitting on `main`. It is checked from the day it
-  # arrives rather than the day it is switched on, because an unwired rule that nothing exercises is
-  # the very thing it exists to prevent.
+  # Two halves. `--selftest` exercises the limitation rule itself on constructed rows, because a rule
+  # that nothing checks is the very thing it exists to prevent. `--check` then applies it to the
+  # document: every row claiming a limitation names a test that asserts it, or a scope reason.
   python3 ./scripts/capabilities.py --selftest
   python3 ./scripts/capabilities.py --check
 }

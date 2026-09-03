@@ -383,10 +383,6 @@ def unpinned_limits(
 ) -> list[str]:
     """Rows that tell a reader something does not work, without a test that says so.
 
-    **Not yet wired into [main].** It is switched on at the top of the stack that pins the existing
-    rows, because a gate that lands red is a gate somebody turns off. Until then this is callable
-    and tested, and every row it would flag is being worked through one group at a time.
-
 
     **The rule.** A row claiming a limitation names a `limit.test` — one test method, as
     `ClassName.the method's own name` — whose job is to *assert the limitation*. Not to demonstrate
@@ -637,6 +633,7 @@ def main() -> int:
             "regenerate; the document is an output."
         )
     problems.extend(dangling_references())
+    problems.extend(unpinned_limits(results))
 
     for name in undocumented_functions(DOC.read_text()):
         problems.append(
