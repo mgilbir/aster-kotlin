@@ -4,13 +4,6 @@ import dev.aster.vega.fixtures.VegaHeadlessTextEngine
 import dev.aster.vega.loader.FileDataLoader
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.runtime.compile.SpecCompiler
-import dev.aster.vega.runtime.scale.BandScale
-import dev.aster.vega.runtime.scale.LinearScale
-import dev.aster.vega.runtime.scale.OrdinalScale
-import dev.aster.vega.runtime.scale.PointScale
-import dev.aster.vega.runtime.scale.SequentialColorScale
-import dev.aster.vega.runtime.scale.TimeScale
-import dev.aster.vega.runtime.scale.TransformedScale
 import java.io.File
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -18,23 +11,32 @@ import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 
 /**
- * How many of the corpus's scales `compareScales` actually looks at — counted, not assumed.
+ * Every scale the corpus records is compared against upstream — all 466 of them.
  *
- * `FixtureDifferentialTest` runs a test called "scale domains, ranges, bandwidth and ticks match
- * upstream", and for a third of the scales in the corpus it used to check **nothing**: the
- * comparison's `when (scale)` named `linear`, `band` and `point` and fell to `else -> Unit`. 152 of
- * 466 recorded scales went past it — 64 ordinal, 41 sequential-colour, 16 time, and the log, pow,
- * symlog, quantile, quantize, threshold, bin-ordinal and identity families behind them.
+ * `FixtureDifferentialTest` runs a case called "scale domains, ranges, bandwidth and ticks match
+ * upstream", and for a third of the corpus it used to check **nothing**. `compareScales`'s `when
+ * (scale)` named `linear`, `band` and `point` and ended `else -> Unit`, so 152 of 466 scales fell
+ * past it: 64 ordinal, 41 sequential-colour, 16 time, and the log, pow, symlog, quantile, quantize,
+ * threshold, bin-ordinal and identity families behind them.
  *
- * That is the shape of failure this repository keeps finding: a gate naming a target it does not
- * execute. The continuous families are compared now, and this exists so the rest cannot go quiet
- * again — a scale kind that is not compared has to be **named here**, and the number has to be
- * argued down rather than drifting up.
+ * **The guarantee is now the compiler's, not this test's.** Every kind is named, so the `when` is
+ * exhaustive and the `else` is gone — a scale family added to the sealed hierarchy without a branch
+ * is a build error. That is worth more than any count, and it is why this class asserts the total
+ * rather than policing a list of exemptions the way its first version did.
  *
- * Enabling the continuous ones found two genuine differences immediately, both fixed rather than
- * tolerated: a time domain that kept fractional milliseconds where upstream's `Date` truncates, and
- * a twelve-hour local axis that added twelve absolute hours across a daylight-saving change where
- * upstream steps eleven real ones.
+ * What the count still buys is the other direction: a *fixture* whose scale silently stops being
+ * recorded, or an engine that stops building one, would leave the comparison passing over less than
+ * it used to. So the number has a floor.
+ *
+ * Enabling the skipped families found four differences, every one of them worth having:
+ * - a time domain that kept fractional milliseconds where upstream's `Date` truncates;
+ * - a twelve-hour local axis that stepped twelve *absolute* hours across a daylight-saving change
+ *   where upstream steps eleven real ones;
+ * - an ordinal domain read as declared rather than as **grown**, which is what upstream records;
+ * - a sequential colour scale's range, where the two engines hold genuinely different objects — the
+ *   interpolator's endpoints against every stop of the scheme — and which is therefore the one
+ *   thing deliberately left out, with the reasoning in `compareScales` rather than behind a widened
+ *   tolerance.
  */
 class ScaleComparisonCoverageTest {
 
@@ -43,116 +45,61 @@ class ScaleComparisonCoverageTest {
   private val loader = FileDataLoader(File(root, "test-fixtures"))
 
   /**
-   * The scale kinds `compareScales` still walks past, with why.
-   *
-   * Each needs facts the reference does not record in a comparable form, which is a different
-   * problem from the one just fixed — the continuous families were skipped while their domain,
-   * range and ticks sat in the reference all along.
+   * Every recorded scale in the corpus, and whether this engine built one to compare it against.
    */
-  private val NOT_COMPARED =
-    mapOf(
-      "BinOrdinalScale" to "bucket boundaries, recorded as a domain of a different shape",
-      "QuantileScale" to "bucket boundaries derived from the data rather than declared",
-      "QuantizeScale" to "bucket boundaries derived from the domain",
-      "ThresholdScale" to "explicit cuts, with one more range value than domain",
-      "IdentityScale" to "maps nothing, so there is nothing to compare",
-    )
-
-  private class Counted(val compared: Int, val skipped: Map<String, Int>)
-
-  private fun count(): Counted {
-    var compared = 0
-    val skipped = sortedMapOf<String, Int>()
+  private fun counted(): Pair<Int, List<String>> {
+    var recorded = 0
+    val absent = mutableListOf<String>()
     val specs = File(root, "test-fixtures/specs").listFiles { f -> f.name.endsWith(".vg.json") }
     for (file in specs.orEmpty().sortedBy { it.name }) {
       val name = file.name.removeSuffix(".vg.json")
       val reference = File(root, "test-fixtures/reference/$name.reference.json")
       if (!reference.isFile) continue
-      val recorded = Differential.readReference(reference).scales
+      val scales = Differential.readReference(reference).scales
       val compiled =
         SpecCompiler(VegaHeadlessTextEngine(), loader, locale = VegaLocale.EnglishUS)
           .compileJson(file.readText())
-      for ((scaleName, _) in recorded) {
-        val scale = compiled.scales[scaleName] ?: continue
-        val handled =
-          scale is LinearScale ||
-            scale is TimeScale ||
-            scale is TransformedScale ||
-            scale is BandScale ||
-            scale is PointScale ||
-            scale is OrdinalScale ||
-            scale is SequentialColorScale
-        if (handled) compared++
-        else {
-          val kind = scale::class.simpleName ?: "?"
-          skipped[kind] = (skipped[kind] ?: 0) + 1
-        }
+      for ((scaleName, _) in scales) {
+        recorded++
+        if (compiled.scales[scaleName] == null) absent += "$name/$scaleName"
       }
     }
-    return Counted(compared, skipped)
+    return recorded to absent
   }
 
   /**
-   * Every kind that is skipped is one this class names, with a reason.
+   * Every scale upstream recorded, this engine built — so every one reaches a comparison.
    *
-   * The assertion that keeps the gap honest: a scale family added later, or one that quietly stops
-   * matching its branch, shows up here as an unexplained kind rather than as silence.
+   * With the `when` exhaustive, building the scale is the only remaining way for one to go
+   * uncompared: `compareScales` skips a name it cannot find. This is that check.
    */
   @Test
-  fun `every uncompared scale kind is named and explained`() {
-    val counted = count()
-    assumeTrue(counted.compared > 100, "the corpus is not built; only ${counted.compared} compared")
+  fun `every recorded scale has one to compare it against`() {
+    val (recorded, absent) = counted()
+    assumeTrue(recorded > 100, "the corpus is not built; only $recorded scales recorded")
     assertEquals(
-      emptySet<String>(),
-      counted.skipped.keys - NOT_COMPARED.keys,
-      "a scale kind is being walked past that this class does not name. Either compare it or say " +
-        "here why it cannot be compared",
+      emptyList<String>(),
+      absent,
+      "upstream recorded these scales and this engine built none of that name, so the comparison " +
+        "passes over them in silence",
     )
   }
 
   /**
-   * And the continuous families really are compared, which is what the fix was.
+   * And the total has a floor, so the corpus cannot quietly shrink.
    *
-   * Without this the test above would pass just as well if `compareScales` went back to naming only
-   * `linear`: the skipped kinds would grow, and every one of them is already excused by name.
+   * 466 at the time of writing. A floor rather than an equality, because a new fixture may add
+   * scales; what it may not do is take the number down, which is what a fixture losing its scales
+   * or a recorder losing a key would look like.
    */
   @Test
-  fun `the continuous families are compared`() {
-    val counted = count()
-    assumeTrue(counted.compared > 100, "the corpus is not built")
-    for (kind in
-      listOf(
-        "TimeScale",
-        "LogScale",
-        "PowScale",
-        "SymlogScale",
-        "OrdinalScale",
-        "SequentialColorScale",
-      )) {
-      assertTrue(
-        kind !in counted.skipped,
-        "$kind is being walked past again; the continuous families were the point of this change",
-      )
-    }
-    // 314 before any of this, 343 with the continuous families, 448 with the ordinal and
-    // sequential-colour ones. A floor rather than an equality, because a new fixture may add scales
-    // of either sort; it may not take the number *down*.
+  fun `the number of compared scales does not fall`() {
+    val (recorded, _) = counted()
+    assumeTrue(recorded > 100, "the corpus is not built")
     assertTrue(
-      counted.compared >= 445,
-      "only ${counted.compared} scales are compared, down from 448; a family has stopped matching",
+      recorded >= 460,
+      "only $recorded scales are recorded, down from 466; a fixture or the recorder has lost some",
     )
-  }
-
-  /** What is left, printed, so the number is visible in a log rather than only in a diff. */
-  @Test
-  fun `the remaining gap is reported`() {
-    val counted = count()
-    assumeTrue(counted.compared > 100, "the corpus is not built")
-    val total = counted.compared + counted.skipped.values.sum()
-    println(
-      "scale comparison: ${counted.compared} of $total compared; " +
-        counted.skipped.entries.joinToString(", ") { "${it.key}=${it.value}" }
-    )
-    assertTrue(counted.skipped.values.sum() > 0, "nothing is skipped, so this class is obsolete")
+    println("scale comparison: $recorded of $recorded recorded scales compared")
   }
 }

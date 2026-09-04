@@ -5,10 +5,15 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
 import dev.aster.vega.runtime.scale.BandScale
+import dev.aster.vega.runtime.scale.BinOrdinalScale
+import dev.aster.vega.runtime.scale.IdentityScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.OrdinalScale
 import dev.aster.vega.runtime.scale.PointScale
+import dev.aster.vega.runtime.scale.QuantileScale
+import dev.aster.vega.runtime.scale.QuantizeScale
 import dev.aster.vega.runtime.scale.SequentialColorScale
+import dev.aster.vega.runtime.scale.ThresholdScale
 import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
@@ -1004,6 +1009,13 @@ public object Differential {
         differences.add(Difference("scale $name", "present", "absent"))
         continue
       }
+      // **No `else`**, and that is the point. This `when` used to end `else -> Unit`, and a third
+      // of the corpus's scales fell into it — compared not at all, under a test called "scale
+      // domains, ranges, bandwidth and ticks match upstream". Every kind is named now, so the
+      // *compiler* refuses a scale family nobody compared: adding one to the sealed hierarchy
+      // without a branch here is a build error rather than a silence. That is a stronger guarantee
+      // than the coverage test that was written to watch the gap, and it is why that test now
+      // asserts the total rather than policing a list of exemptions.
       when (scale) {
         // Every continuous position scale, not only `linear`. The `when` used to name `linear`,
         // `band` and `point` and fall to `else -> Unit`, so a third of the scales in the corpus
@@ -1135,7 +1147,93 @@ public object Differential {
             )
           }
         }
-        else -> Unit
+        // The four **discretizing** families and `identity`. Each records a numeric domain and a
+        // range in the reference — the same two facts every other branch compares — so the reason
+        // this class used to give for skipping them, that their boundaries were "recorded in a
+        // different shape", was a guess and wrong. What differs is only which property holds the
+        // domain: a quantile scale's is its sample of the data, a threshold scale's is its cuts.
+        is BinOrdinalScale -> {
+          compareNumberList(
+            "scale $name domain",
+            reference.domain,
+            scale.domain,
+            tolerance,
+            differences,
+          )
+          compareRangeValues(
+            name,
+            reference.range,
+            scale.rangeValues.map { it.asString() },
+            differences,
+          )
+        }
+        is QuantizeScale -> {
+          compareNumberList(
+            "scale $name domain",
+            reference.domain,
+            scale.domain,
+            tolerance,
+            differences,
+          )
+          compareRangeValues(
+            name,
+            reference.range,
+            scale.rangeValues.map { it.asString() },
+            differences,
+          )
+          // No ticks: a quantize scale has no tick generator of its own here, and upstream's
+          // recorded ones are the linear ticks of its domain, which the axis beside it already
+          // compares.
+        }
+        // A quantile scale's domain is the **data** it was given, which upstream records in full
+        // and this engine keeps as `sampleDomain`.
+        is QuantileScale -> {
+          compareNumberList(
+            "scale $name domain",
+            reference.domain,
+            scale.sampleDomain,
+            tolerance,
+            differences,
+          )
+          compareRangeValues(
+            name,
+            reference.range,
+            scale.rangeValues.map { it.asString() },
+            differences,
+          )
+        }
+        // A threshold scale's domain is its **cuts**, one fewer than its range.
+        is ThresholdScale -> {
+          compareNumberList(
+            "scale $name domain",
+            reference.domain,
+            scale.thresholds,
+            tolerance,
+            differences,
+          )
+          compareRangeValues(
+            name,
+            reference.range,
+            scale.rangeValues.map { it.asString() },
+            differences,
+          )
+        }
+        is IdentityScale -> {
+          compareNumberList(
+            "scale $name domain",
+            reference.domain,
+            scale.domain,
+            tolerance,
+            differences,
+          )
+          compareNumberList(
+            "scale $name range",
+            reference.range,
+            scale.range,
+            tolerance,
+            differences,
+          )
+        }
       }
     }
     return differences

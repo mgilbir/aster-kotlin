@@ -439,10 +439,20 @@ section here does not get released.
   `viridis`, 64 for `turbo` — which is a difference of representation rather than of behaviour, and
   the colour the scale actually produces is compared wherever it is used.
 
-  `ScaleComparisonCoverageTest` keeps the rest from going quiet again: a scale kind that is not
-  compared has to be **named there with a reason**, so a family added later, or one that stops
-  matching its branch, shows up as an unexplained kind rather than as silence. What is left is **18 scales across five
-  kinds** — the four discretizing families' bucket boundaries, and `identity`, which maps nothing.
+  The four discretizing families and `identity` closed the rest, taking it to **466 of 466** — and
+  the reason this class had given for skipping them, that their boundaries were "recorded in a
+  different shape", turned out to be a guess and wrong: each records a plain numeric domain and a
+  range, the same two facts every other branch compares. What differs is only which property holds
+  the domain — a quantile scale's is its sample of the data, a threshold scale's its cuts.
+
+  **With every kind named, the `when` is exhaustive and the `else` is gone.** The guarantee is the
+  compiler's now rather than a test's: a scale family added to the sealed hierarchy without a branch
+  is a build error, not a silence. `ScaleComparisonCoverageTest` was written to watch the gap and
+  now asserts the total instead, because policing a list of exemptions is worth less than a type
+  that admits none.
+
+  All 152 scales that had never been compared agree with upstream, once the four differences above
+  were fixed.
 
 - **The Vega-Lite surface was half a unit to a unit small on every chart, and the stated reason was
   wrong.** The row explained it as a guide extent the mark comparison could not see, "because text
