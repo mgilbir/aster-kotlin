@@ -172,7 +172,7 @@ public class SignalUpdater(
     private val delegate: ExpressionScope,
     private val pending: Map<String, VegaValue>,
     private val entry: FiredHandler,
-  ) : ExpressionScope {
+  ) : ExpressionScope by delegate {
 
     private val event = entry.event?.asValue() ?: VegaValue.Null
 

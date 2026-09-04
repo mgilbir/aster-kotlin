@@ -252,6 +252,27 @@ section here does not get released.
 
 ### Fixed
 
+- **No scale function worked inside a signal handler, and nothing said so.** `invert`, `scale`,
+  `domain`, `range`, `bandwidth`, `bandspace`, the whole geo family, `treePath` and `treeAncestors`
+  all answered null in a handler's `update` — and null is zero to arithmetic.
+  `{"events": "click", "update": "invert('x', x())"}` is how every pan and zoom in Vega's gallery is
+  written, so this is not an edge: it affected top-level handlers as much as any other.
+
+  `SignalUpdater.HandlerScope` and `EventDispatcher.EventScope` each wrap the chart's scope to add
+  one thing — the values an earlier handler in the batch has set, and `event` — and each implemented
+  `ExpressionScope` by hand, naming `datum`, `signal`, `dataset` and the item hooks. Everything they
+  did not name took the interface's default, which is `VegaValue.Null`. Both now delegate with `by`,
+  which is what `DataResolver`'s own wrapper already did.
+
+  The filter case is the worse half and has its own test: a filter that cannot be evaluated
+  *suppresses* the event, so there is no wrong value to notice — the chart simply stops responding.
+
+  `indata` survived, and that is the point rather than a footnote: its default is written in terms of
+  `dataset()`, which these wrappers happened to override. Which members broke was decided by which
+  ones each wrapper's author thought to name, and nothing recorded that choice — a defaulted member
+  added to the interface tomorrow would have been null here again. A hand-written wrapper around an
+  interface with defaulted members is a silent hole by construction.
+
 - **`foreign-api.sh --accept` needed running twice, and left the Apple gate red in between.** The
   coverage list is computed *from* the API snapshot — `foreign-coverage.py` answers "which public
   Kotlin members have no foreign counterpart" by reading `foreign-api.txt`, the recorded file rather

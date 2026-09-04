@@ -460,7 +460,7 @@ public class EventDispatcher(
 
   /** The specification's own scope, with `event` added on top. */
   private class EventScope(private val delegate: ExpressionScope, private val event: VegaValue) :
-    ExpressionScope {
+    ExpressionScope by delegate {
     override val datum: VegaValue
       get() = delegate.datum
 
