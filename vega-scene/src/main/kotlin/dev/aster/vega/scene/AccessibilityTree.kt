@@ -54,6 +54,23 @@ public data class AccessibleElement(
    * whose `NodeMetadata.role` is `mark`, so a tap on it reaches the dataflow.
    */
   public val activatable: Boolean = false,
+  /**
+   * The scale a reader can **adjust** from this element, when it is an adjustable one.
+   *
+   * Set on an axis drawn for a continuous scale. A host announces such an element with its
+   * platform's adjustable primitive — `UIAccessibilityTraitAdjustable` and its increment and
+   * decrement on Apple, the scroll-forward and scroll-backward actions on Android — and calls
+   * `VegaChartController.adjustScaleDomain` with this name. The controller answers whether anything
+   * moved, so a host knows whether to announce a change; at the end of the range nothing does.
+   *
+   * Distinct from the chart-level zoom in [ChartAction]: that magnifies the drawing and leaves
+   * every scale where the specification put it, so the axis a reader hears never changes. This
+   * changes the interval the data is drawn against, so the ticks and the labels change with it —
+   * which is the thing a reader exploring a crowded region actually needs.
+   *
+   * Null on everything else, which is almost every element.
+   */
+  public val adjustableScale: String? = null,
 )
 
 /**
@@ -126,6 +143,7 @@ public object AccessibilityTree {
         role = descriptor.role,
         roleDescription = descriptor.roleDescription,
         activatable = placed.node.metadata.role == "mark",
+        adjustableScale = descriptor.adjustableScale,
       )
     }
 

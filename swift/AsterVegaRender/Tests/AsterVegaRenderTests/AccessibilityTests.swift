@@ -213,4 +213,54 @@ final class AccessibilityTests: XCTestCase {
 
     XCTAssertTrue(ChartGestures.none.isEmpty)
   }
+
+  /// An **adjustable axis** crosses the boundary: the element names the scale, and the session moves it.
+  ///
+  /// `VegaChartView` gives such an element `.accessibilityAdjustableAction`, which is what makes VoiceOver
+  /// offer the swipe up and down that every adjustable control on the platform uses. This is the half that
+  /// can be asserted without a view hierarchy: that the element says which scale, and that asking the
+  /// session to adjust it actually changes what the axis draws.
+  ///
+  /// Distinct from a zoom, which magnifies the drawing and leaves every scale where the specification put
+  /// it — so the labels a reader hears never change however far in they go.
+  @MainActor
+  func testAContinuousAxisIsAdjustableAndTheSessionMovesIt() async throws {
+    // Its own specification, because `bars` draws no axes at all and an adjustable axis needs one.
+    let axed = """
+      {"$schema": "https://vega.github.io/schema/vega/v6.json",
+       "width": 200, "height": 100, "padding": 0,
+       "data": [{"name": "t", "values": [{"c": "a", "v": 30}, {"c": "b", "v": 80}]}],
+       "scales": [
+         {"name": "x", "type": "band", "domain": {"data": "t", "field": "c"}, "range": "width"},
+         {"name": "y", "type": "linear", "domain": [0, 100], "range": "height"}],
+       "axes": [{"orient": "bottom", "scale": "x"}, {"orient": "left", "scale": "y"}],
+       "marks": [{"type": "rect", "from": {"data": "t"},
+         "encode": {"enter": {
+           "x": {"scale": "x", "field": "c"}, "width": {"scale": "x", "band": 1},
+           "y": {"scale": "y", "field": "v"}, "y2": {"scale": "y", "value": 0}}}}]}
+      """
+    let elements = AccessibilityTree.shared.elements(
+      scene: try scene(axed),
+      selectedNodeIds: [],
+      captions: VegaCaptionsCompanion.shared.English,
+      maxExposedMarks: AccessibilityTree.shared.MAX_EXPOSED_MARKS)
+
+    let adjustable = elements.compactMap { $0.adjustableScale }
+    XCTAssertEqual(
+      adjustable, ["y"],
+      "the wrong axes offered themselves for adjustment: a band axis frames a list of values, "
+        + "with nothing between them to narrow towards")
+
+    let session = ChartSession()
+    session.load(specification: axed)
+    // A compile is queued rather than immediate, and there is nothing to adjust until it lands.
+    await session.settle()
+    XCTAssertTrue(
+      session.adjustScaleDomain(scale: "y", narrow: true),
+      "the session did not narrow the axis the element named")
+    XCTAssertTrue(session.resetScaleDomains(), "and offered no way back")
+    XCTAssertFalse(
+      session.resetScaleDomains(),
+      "a chart already back at rest reported a change it did not make")
+  }
 }

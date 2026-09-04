@@ -455,6 +455,9 @@ public struct VegaChartView: View {
             // which tells a reader they can activate an axis caption and then does nothing when they
             // try; `activatable` is the engine's own answer to which elements are marks.
             .accessibilityAddTraits(traits(for: entry.element))
+            // An **adjustable axis**: swipe up and down on it to narrow and widen the interval
+            // the data is drawn against.
+            .modifier(AdjustableAxis(scale: entry.element.adjustableScale, session: session))
             // `.default` rather than an unnamed action: without the kind this registers a *custom* action,
             // which a reader has to go looking for and which an activation does not invoke.
             .accessibilityAction(.default) {
@@ -496,6 +499,10 @@ public struct VegaChartView: View {
     if activatable(element) { _ = traits.insert(.isButton) }
     if element.selected { _ = traits.insert(.isSelected) }
     if element.isSummary { _ = traits.insert(.isSummaryElement) }
+    // No adjustable trait here, and not an omission: SwiftUI has no public
+    // `AccessibilityTraits.isAdjustable`, and confers it from `.accessibilityAdjustableAction`
+    // itself. `AdjustableAxis` applies that modifier — and applies it only where there is a session
+    // to adjust into, which is the same promise `activatable` keeps for `.isButton`.
     return traits
   }
 
@@ -722,5 +729,36 @@ public struct ChartPlacement: Sendable, Equatable {
   /// exists to keep a host out of.
   public func scenePoint(of location: CGPoint) -> Point {
     Point(x: Double(location.x - left), y: Double(location.y - top))
+  }
+}
+
+/// The adjustable behaviour of an axis, applied only where there is something behind it.
+///
+/// A `ViewModifier` rather than a conditional modifier chain, because SwiftUI confers the adjustable
+/// trait from `.accessibilityAdjustableAction` itself — there is no public `isAdjustable` to insert —
+/// so "not adjustable" has to mean *not applying the modifier*. Applying it unconditionally would
+/// have VoiceOver offer the swipe on a chart with no session and do nothing when a reader used it,
+/// which is the promise-with-nothing-behind-it that `VegaChartView.activatable(_:)` exists to avoid.
+///
+/// Distinct from the chart's zoom actions: those magnify the drawing and leave every scale where the
+/// specification put it, so the ticks a reader hears never change however far in they go. This
+/// changes the domain, so the axis is recomputed and the chart says something new.
+@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
+private struct AdjustableAxis: ViewModifier {
+  /// The scale to adjust, or `nil` where this element is not an adjustable axis.
+  let scale: String?
+  let session: ChartSession?
+
+  func body(content: Content) -> some View {
+    if let scale, let session {
+      content.accessibilityAdjustableAction { direction in
+        // `.increment` narrows, matching the direction that reveals more detail. The session says
+        // whether anything moved; at the end of the range nothing has, and there is nothing to
+        // announce.
+        _ = session.adjustScaleDomain(scale: scale, narrow: direction == .increment)
+      }
+    } else {
+      content
+    }
   }
 }

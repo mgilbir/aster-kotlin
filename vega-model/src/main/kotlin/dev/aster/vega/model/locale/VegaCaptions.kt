@@ -94,6 +94,20 @@ public interface VegaCaptions {
 
   public fun resetZoomAction(): String = "Reset zoom"
 
+  /**
+   * And undoing an **axis** adjustment, which is a different thing from undoing a zoom.
+   *
+   * A zoom magnifies the drawing; adjusting an axis changes the interval the data is drawn against,
+   * so the ticks and the labels change with it. A reader who has done both needs to be able to undo
+   * both, and a single "reset" that did the two at once would undo work they did not ask to lose.
+   *
+   * There is no *narrow* or *widen* caption to go with it, deliberately: those are not actions but
+   * the increment and decrement of an adjustable element, and both platforms name those themselves
+   * — a reader hears "swipe up or down to adjust" in their own language, from the system, and a
+   * caption here would be a second name for the same gesture.
+   */
+  public fun resetAxesAction(): String = "Reset the axes"
+
   public companion object {
     /** Upstream's wording, and the default. */
     public val English: VegaCaptions = EnglishCaptions

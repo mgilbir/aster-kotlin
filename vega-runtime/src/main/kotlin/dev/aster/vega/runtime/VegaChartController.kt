@@ -32,6 +32,8 @@ import dev.aster.vega.runtime.interaction.SignalUpdater
 import dev.aster.vega.runtime.load.CachingDataLoader
 import dev.aster.vega.runtime.load.DataLoader
 import dev.aster.vega.runtime.load.DenyLoader
+import dev.aster.vega.runtime.scale.InvertibleScale
+import dev.aster.vega.runtime.scale.PositionScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.AccessibilityTree
 import dev.aster.vega.scene.AccessibleElement
@@ -387,8 +389,30 @@ public class VegaChartController(
    * A tick recompiles, and a recompile used to start the timers again — which cancelled the ones
    * mid-flight, reset the `elapsed` every handler reads, and dropped the ticks that were between
    * the two. They are left alone unless the specification's timers have actually changed.
+   *
+   * The scope path is part of it: two cells of a faceted group declare the same signal name at the
+   * same throttle and are two timers, so a key that named only the signal would collapse them and
+   * leave one cell ticking for both.
    */
-  private var timerKeys: List<Pair<String, Double>> = emptyList()
+  private var timerKeys: List<Triple<String, String, Double>> = emptyList()
+
+  /**
+   * Domains a reader has adjusted from an axis, by scale name, and how far from where they started.
+   *
+   * The interval reaches the scale through `domainRaw`, which is upstream's own door for a control
+   * choosing an exact interval, so `zero`, `nice` and the `domain*` limits are all short-circuited
+   * and the axis is recomputed against what the reader picked — ticks, labels and every mark placed
+   * through the scale.
+   *
+   * The factor beside it is only for the limits. Each step is computed from the scale as it stands,
+   * so the interval is always the one on screen narrowed once more; the factor is what says when to
+   * stop offering another step, the way [MIN_ZOOM] and [MAX_ZOOM] do for the viewport.
+   *
+   * Empty for every chart nobody has adjusted, which is almost all of them.
+   */
+  private var pinnedDomains: Map<String, List<Double>> = emptyMap()
+
+  private var domainFactors: Map<String, Double> = emptyMap()
 
   /**
    * Serializes the two `…Async` entry points against each other. **Not every compile** — see
@@ -700,7 +724,14 @@ public class VegaChartController(
   ): CompiledSpec {
     val concurrent = compilesRunning.fetchAndIncrement() > 0
     try {
-      val compiled = compiler.compileJsonInScopes(json, overrides, itemEncodes, scopedOverrides)
+      val compiled =
+        compiler.compileJsonWithDomains(
+          json,
+          overrides,
+          itemEncodes,
+          scopedOverrides,
+          pinnedDomains,
+        )
       if (!concurrent) return compiled
       return compiled.copy(
         diagnostics =
@@ -821,7 +852,7 @@ public class VegaChartController(
     // schedule — and those went into a collector nobody read. They are published with the
     // compiler's
     // own, since a listener that was refused is exactly the kind of thing a host needs told.
-    startTimers(compiled)
+    startTimers(compiled, bindings)
     vegaEvents =
       if (bindings.isEmpty()) {
         null
@@ -1323,27 +1354,40 @@ public class VegaChartController(
    * Restarted on every publish because the handlers come from the compile; a specification that no
    * longer has a timer stops ticking, which is the behaviour a host reloading a chart expects.
    */
-  private fun startTimers(compiled: CompiledSpec) {
+  private fun startTimers(compiled: CompiledSpec, all: List<HandlerBinding>) {
     val scheduler = this.scheduler
     if (stopped || scheduler == null) {
       stopTimers()
       return
     }
-    val bindings =
-      compiled.spec?.signals.orEmpty().flatMap { signal ->
-        signal.on.flatMap { handler ->
-          handler.streams
-            .filter { it.source == EventStream.SOURCE_TIMER }
-            .map { stream -> HandlerBinding(signal.name, handler) to stream }
-        }
-      }
-    val keys = bindings.map { (binding, stream) -> binding.signalName to (stream.throttle ?: 0.0) }
+    // **From the same bindings the dispatcher gets**, which is the whole of the fix here. This read
+    // `spec.signals` — the top level only — while `bindingsOf` beside it walks the group marks, so
+    // a `{"type": "timer"}` declared inside a group was bound to the dispatcher and then never
+    // dispatched to: nothing produces a timer event except this, and this had not been told. An
+    // animation inside a trellis cell simply stood still, with no diagnostic.
+    //
+    // A timer is the one stream in a group that is **not** scope-filtered, and upstream says so by
+    // construction: `parseStream` builds it as `scope.event(Timer, throttle)` and then replaces the
+    // stream object with `{between, filter}`, dropping `source`, so the `inScope(event.item)` it
+    // appends to every other scope-sourced stream is not appended to this one. It has no item to be
+    // in scope of. What makes it the group's is only which scope its update reads and writes, and
+    // that is [HandlerBinding.scopePath] — already correct, and already one binding per facet cell.
+    val timers = all.flatMap { binding ->
+      binding.handler.streams
+        .filter { it.source == EventStream.SOURCE_TIMER }
+        .map { stream -> binding to stream }
+    }
+    // The scope is part of the key: two cells of a facet declare the same signal name at the same
+    // throttle and are two timers, not one.
+    val keys = timers.map { (binding, stream) ->
+      Triple(binding.scopePath, binding.signalName, stream.throttle ?: 0.0)
+    }
     if (keys == timerKeys) return
     stopTimers()
     timerKeys = keys
-    if (bindings.isEmpty()) return
+    if (timers.isEmpty()) return
     val started = clock()
-    timerTasks = bindings.map { (binding, stream) ->
+    timerTasks = timers.map { (binding, stream) ->
       val interval = (stream.throttle ?: 0.0).coerceAtLeast(1.0)
       scheduler.schedule(interval.toLong(), repeating = true) {
         val compiledNow = lastCompiled ?: return@schedule
@@ -1362,8 +1406,17 @@ public class VegaChartController(
         val changed =
           LinkedHashSet(
             signals.apply(
-              listOf(FiredHandler(binding.signalName, binding.handler, event)),
+              listOf(
+                FiredHandler(
+                  binding.signalName,
+                  binding.handler,
+                  event,
+                  scopePath = binding.scopePath,
+                  writePath = binding.writePath,
+                )
+              ),
               compiledNow.signals,
+              compiledNow.groupScopes,
             )
           )
         applyFired(changed, compiledNow)
@@ -1686,6 +1739,13 @@ public class VegaChartController(
       if (state.viewportScale != 1.0 || state.viewportOffset != dev.aster.vega.scene.VectorD.Zero) {
         actions += ChartAction(ChartActionKind.RESET_ZOOM, locale.captions.resetZoomAction())
       }
+      // Only once an axis has actually been adjusted, by the same rule as the reset above: an
+      // action that would do nothing is worse than one that was never offered. There is no narrow
+      // or widen beside it — those are the increment and decrement of the axis itself, which is why
+      // this list does not grow with the number of axes.
+      if (pinnedDomains.isNotEmpty()) {
+        actions += ChartAction(ChartActionKind.RESET_DOMAINS, locale.captions.resetAxesAction())
+      }
       return actions
     }
 
@@ -1704,6 +1764,9 @@ public class VegaChartController(
     if (accessibilityActions.none { it.kind == action }) return false
     val before = _state.value.snapshot.interactionState
     when (action) {
+      // Not measured by the viewport below, because it does not move it: this recompiles, and what
+      // changed is the scales. It answers for itself.
+      ChartActionKind.RESET_DOMAINS -> return resetScaleDomains()
       ChartActionKind.RESET_ZOOM -> resetViewport()
       ChartActionKind.ZOOM_IN,
       ChartActionKind.ZOOM_OUT -> {
@@ -1718,6 +1781,81 @@ public class VegaChartController(
       }
     }
     return _state.value.snapshot.interactionState != before
+  }
+
+  /**
+   * Narrows or widens the interval [scale] draws its data against, and says whether it moved.
+   *
+   * What an **adjustable axis** does: a host announces an axis element carrying
+   * [dev.aster.vega.scene.AccessibleElement.adjustableScale] with its platform's adjustable
+   * primitive — `UIAccessibilityTraitAdjustable` and its increment and decrement on Apple, the
+   * scroll actions on Android — and calls this. `false` means nothing happened, so the host knows
+   * not to announce a change; announcing one that did not happen is how a reader loses track of
+   * where they are.
+   *
+   * **Not a zoom.** A zoom magnifies the drawing and leaves every scale where the specification put
+   * it, so the axis a reader hears never changes, and a reader exploring a crowded region gets
+   * bigger pixels and the same labels. This changes the domain, so the ticks and the labels are
+   * recomputed and the chart says something new.
+   *
+   * **Stepped in range space, then inverted**, rather than interpolated between the domain's ends.
+   * That is the difference between a step that is right for a linear scale and one that is right
+   * for every scale: narrowing a **log** axis about its arithmetic midpoint is not a log step at
+   * all, and widening one that way walks the low end towards zero and off the scale. Moving the
+   * *positions* and asking the scale what they mean gives a geometric step on a log axis, a
+   * calendar-correct one on a time axis, and cannot produce a domain the scale could not have had —
+   * inverting any finite position of a log scale is a positive number.
+   *
+   * Each step is taken from the scale **as it stands**, so it is always "the interval on screen,
+   * once more". [domainFactors] only decides when to stop.
+   */
+  public fun adjustScaleDomain(scale: String, narrow: Boolean): Boolean {
+    val compiled = lastCompiled ?: return false
+    val built = compiled.scales[scale] ?: return false
+    if (built !is InvertibleScale || built !is PositionScale) return false
+    val range = built.range
+    if (range.size < 2) return false
+
+    val factor = domainFactors[scale] ?: 1.0
+    val next = if (narrow) factor / DOMAIN_STEP else factor * DOMAIN_STEP
+    // At the end of the range, and it is the *offered* end: a host asking for a step past it gets
+    // `false` and announces nothing, which is what an adjustable element at its limit should do.
+    if (next < MIN_DOMAIN_FACTOR || next > MAX_DOMAIN_FACTOR) return false
+
+    val low = range.first()
+    val high = range.last()
+    val middle = (low + high) / 2.0
+    val half = (high - low) / 2.0 * (if (narrow) 1.0 / DOMAIN_STEP else DOMAIN_STEP)
+    val ends = listOf(built.invert(middle - half), built.invert(middle + half)).sorted()
+    if (ends.any { !it.isFinite() } || ends[0] == ends[1]) return false
+
+    pinnedDomains = pinnedDomains + (scale to ends)
+    domainFactors = domainFactors + (scale to next)
+    return recompileForDomains()
+  }
+
+  /**
+   * Puts every adjusted axis back to the domain the specification computed.
+   *
+   * The way back, and it belongs to the chart rather than to any one axis: a reader who has
+   * narrowed two of them is not standing on either any more. Separate from [resetViewport] because
+   * the two are different work, and one reset for both would undo what nobody asked to lose.
+   */
+  public fun resetScaleDomains(): Boolean {
+    if (pinnedDomains.isEmpty()) return false
+    pinnedDomains = emptyMap()
+    domainFactors = emptyMap()
+    return recompileForDomains()
+  }
+
+  private fun recompileForDomains(): Boolean {
+    val json = loadedSpecJson ?: return false
+    val generation = nextRequest()
+    val compiled =
+      compileNow(compiler, json, signals.overrides, signals.itemEncodes, signals.scopedOverrides)
+    if (!isCurrent(generation)) return false
+    publish(compiled)
+    return true
   }
 
   public fun resetViewport() {
@@ -1818,6 +1956,26 @@ public class VegaChartController(
 
     public const val MIN_ZOOM: Double = 0.1
     public const val MAX_ZOOM: Double = 50.0
+
+    /**
+     * How much one increment narrows or widens an adjustable axis.
+     *
+     * The same quarter as [ZOOM_STEP], and for the same reason: large enough to be worth a swipe,
+     * small enough that a reader can stop where they meant to. A reader adjusting an axis is
+     * usually hunting for a value, and a step that overshoots it is a step they have to undo.
+     */
+    public const val DOMAIN_STEP: Double = 1.25
+
+    /**
+     * How far from the specification's own domain an axis may be adjusted, in either direction.
+     *
+     * [MIN_ZOOM] and [MAX_ZOOM]'s counterpart, and symmetric where those are not: a reader who has
+     * narrowed an axis a long way has to be able to get back out the way they came, one step at a
+     * time, without the widening end running out first.
+     */
+    public const val MIN_DOMAIN_FACTOR: Double = 1.0 / 50.0
+
+    public const val MAX_DOMAIN_FACTOR: Double = 50.0
 
     /**
      * How many rounds of signal-driven handlers to run before calling it a cycle.

@@ -186,6 +186,24 @@ public enum class ChartActionKind {
   ZOOM_IN,
   ZOOM_OUT,
   RESET_ZOOM,
+  /**
+   * Puts every axis a reader adjusted back to the domain the specification computed.
+   *
+   * A chart action rather than a per-axis one, and there is no `NARROW`/`WIDEN` beside it, because
+   * adjusting an axis is **not** an action: it is the increment and decrement of an adjustable
+   * element, reached from the axis itself through
+   * [dev.aster.vega.scene.AccessibleElement.adjustableScale]. Making them actions would put one
+   * pair per axis in this list — eight entries on a two-axis chart — and a reader rotoring through
+   * eight custom actions on every chart is worse served than one who swipes on the axis they are
+   * standing on.
+   *
+   * Undoing is the part that has nowhere else to live: a reader who has narrowed two axes is not
+   * standing on either of them any more, so the way back belongs to the chart. Separate from
+   * [RESET_ZOOM] because the two are different work — one magnifies the drawing, the other changes
+   * the interval the data is drawn against — and a single reset would undo work nobody asked to
+   * lose.
+   */
+  RESET_DOMAINS,
 }
 
 /**

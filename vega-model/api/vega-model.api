@@ -343,6 +343,7 @@ public abstract interface class dev/aster/vega/model/locale/VegaCaptions {
 	public abstract fun legend (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;)Ljava/lang/String;
 	public abstract fun markContainerRole (Ljava/lang/String;)Ljava/lang/String;
 	public abstract fun markRole (Ljava/lang/String;)Ljava/lang/String;
+	public fun resetAxesAction ()Ljava/lang/String;
 	public fun resetZoomAction ()Ljava/lang/String;
 	public fun zoomInAction ()Ljava/lang/String;
 	public fun zoomOutAction ()Ljava/lang/String;
@@ -353,6 +354,7 @@ public final class dev/aster/vega/model/locale/VegaCaptions$Companion {
 }
 
 public final class dev/aster/vega/model/locale/VegaCaptions$DefaultImpls {
+	public static fun resetAxesAction (Ldev/aster/vega/model/locale/VegaCaptions;)Ljava/lang/String;
 	public static fun resetZoomAction (Ldev/aster/vega/model/locale/VegaCaptions;)Ljava/lang/String;
 	public static fun zoomInAction (Ldev/aster/vega/model/locale/VegaCaptions;)Ljava/lang/String;
 	public static fun zoomOutAction (Ldev/aster/vega/model/locale/VegaCaptions;)Ljava/lang/String;

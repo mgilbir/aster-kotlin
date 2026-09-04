@@ -715,6 +715,48 @@ public final class ChartSession {
     }
   }
 
+  /// Narrows or widens the interval an axis draws its data against, and says whether it moved.
+  ///
+  /// What an **adjustable axis** does. `VegaChartView` gives an axis element carrying
+  /// ``AccessibleElement/adjustableScale`` the `.isAdjustable` trait, so VoiceOver offers the swipe
+  /// up and down that every adjustable control on the platform uses, and routes them here.
+  ///
+  /// Not a zoom. ``zoom(by:at:phase:)`` magnifies the drawing and leaves every scale exactly as the
+  /// specification built it, so the ticks a reader hears never change however far in they go. This
+  /// changes the domain, so the axis is recomputed and the chart says something new — which is what a
+  /// reader exploring a crowded region actually needs.
+  ///
+  /// `false` means nothing happened, at the end of the range or for a scale that is not adjustable, so
+  /// a caller knows not to announce a change. Announcing one that did not happen is how a reader loses
+  /// track of where they are.
+  ///
+  /// Synchronous rather than queued behind ``serialised(_:)``, because VoiceOver needs the answer
+  /// before it decides what to say.
+  @discardableResult
+  public func adjustScaleDomain(scale: String, narrow: Bool) -> Bool {
+    let moved = controller.adjustScaleDomain(scale: scale, narrow: narrow)
+    if moved {
+      refreshControls()
+      publish()
+    }
+    return moved
+  }
+
+  /// Puts every axis a reader adjusted back to the domain the specification computed.
+  ///
+  /// The way back, and it belongs to the chart rather than to any one axis: a reader who has narrowed
+  /// two of them is not standing on either any more. Separate from resetting the zoom, because the two
+  /// are different work and one reset for both would undo what nobody asked to lose.
+  @discardableResult
+  public func resetScaleDomains() -> Bool {
+    let moved = controller.resetScaleDomains()
+    if moved {
+      refreshControls()
+      publish()
+    }
+    return moved
+  }
+
   /// A pointer moving without touching — a trackpad or a mouse on iPad, and nothing on a phone.
   ///
   /// Wired anyway rather than dismissed as "iOS has no hover": a chart whose tooltips only work on one

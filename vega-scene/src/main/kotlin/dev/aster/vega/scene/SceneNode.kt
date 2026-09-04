@@ -58,6 +58,27 @@ public data class AccessibilityDescriptor(
    * derived label would otherwise make every mark look as though it did.
    */
   val derived: Boolean = false,
+  /**
+   * The scale this element lets a reader **adjust**, when it is one.
+   *
+   * Set on an axis drawn for a **continuous** scale, and on nothing else. Both platforms have a
+   * primitive for "a thing whose value you change in place" — `UIAccessibilityTraitAdjustable` with
+   * increment and decrement, `AccessibilityNodeInfo`'s scroll actions — and an axis is the natural
+   * home for it: a reader narrows the range the data is drawn against and the ticks, the labels and
+   * every mark placed through the scale are recomputed against it.
+   *
+   * Distinct from a viewport zoom, which magnifies the drawing and leaves the scale exactly where
+   * the specification put it, so the axis a reader hears never changes.
+   *
+   * Null for a band, point or ordinal axis: there is no interval to narrow, only a list of values.
+   * Null for a legend, whose scale is a colour or a size rather than a position — narrowing one
+   * would change which colours appear without changing what a reader can reach.
+   *
+   * `NodeMetadata.markName` happens to carry the same string on an axis node, and this is not that:
+   * a host would have to know the convention that a guide's "mark name" is its scale, and that a
+   * *discrete* axis carries one too. This says the thing itself.
+   */
+  val adjustableScale: String? = null,
 )
 
 /**
