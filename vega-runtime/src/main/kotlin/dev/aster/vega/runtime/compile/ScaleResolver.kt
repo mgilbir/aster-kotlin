@@ -49,6 +49,7 @@ import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.math.pow
 import kotlin.math.sign
+import kotlin.math.truncate
 import kotlinx.datetime.TimeZone
 
 /** The chart's plotting size, which named ranges like `"width"` resolve against. */
@@ -732,7 +733,13 @@ public class ScaleResolver(
       }
     return TimeScale(
       spec.name,
-      niced,
+      // Whole milliseconds, because upstream's time domain is a pair of `Date`s and a `Date` holds
+      // an integer: `new Date(x)` truncates through `TimeClip`. So a `padding` that lands between
+      // two milliseconds is quantised there and was not here — upstream records 1779154036363
+      // where this produced 1779154036363.6365. Invisible in a drawing, and a genuine difference in
+      // the scale's own output, which is exactly the kind the differential exists to catch. It went
+      // unnoticed because a time scale's domain was never compared at all.
+      niced.map { truncate(it) },
       oriented(range, reversed(spec)),
       zone,
       spec.clamp,

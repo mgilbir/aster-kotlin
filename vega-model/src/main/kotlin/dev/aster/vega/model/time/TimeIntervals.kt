@@ -181,9 +181,15 @@ public class TimeStepper(
     val amount = step.toLong() * count
     return when (interval) {
       TimeInterval.MILLISECOND -> millis(at.plus(amount, DateTimeUnit.MILLISECOND))
-      TimeInterval.SECOND -> millis(at.plus(amount, DateTimeUnit.SECOND))
-      TimeInterval.MINUTE -> millis(at.plus(amount, DateTimeUnit.MINUTE))
-      TimeInterval.HOUR -> millis(at.plus(amount, DateTimeUnit.HOUR))
+      TimeInterval.SECOND ->
+        if (step == 1) millis(at.plus(amount, DateTimeUnit.SECOND))
+        else steppedSubDay(millis, count, DateTimeUnit.SECOND) { it.second }
+      TimeInterval.MINUTE ->
+        if (step == 1) millis(at.plus(amount, DateTimeUnit.MINUTE))
+        else steppedSubDay(millis, count, DateTimeUnit.MINUTE) { it.minute }
+      TimeInterval.HOUR ->
+        if (step == 1) millis(at.plus(amount, DateTimeUnit.HOUR))
+        else steppedSubDay(millis, count, DateTimeUnit.HOUR) { it.hour }
       TimeInterval.DAY ->
         if (step == 1) millis(at.plus(amount, DateTimeUnit.DAY, zone))
         else steppedDays(millis, count)
@@ -324,6 +330,43 @@ public class TimeStepper(
     return millis(LocalDateTime(date, at.time).toInstant(zone))
   }
 
+  /**
+   * The next sub-day boundary that passes the step's test, walked one unit at a time.
+   *
+   * This comment used to say sub-day steps did not need d3's filtered offset, because "the tick
+   * table only ever uses hour steps that divide 24 and minute steps that divide 60" — so adding
+   * `step` units always lands back on the grid. That holds in **UTC**, where the grid repeats every
+   * day, and fails in a zone with daylight saving: twelve absolute hours after local midnight is
+   * local 13:00 on the day the clocks go forward, which is not a multiple of twelve, and every tick
+   * after it is off the grid.
+   *
+   * d3 gets this right by construction — `interval.every(n)` is a *filter* on the local field, and
+   * its `range` walks the base unit and keeps what passes — so a twelve-hour local axis steps
+   * eleven real hours across the change. Which is what upstream does and this did not: the
+   * `local-time-dst` fixture produced eight ticks where upstream produces nine, and nothing caught
+   * it because a time scale's ticks were never compared.
+   */
+  private fun steppedSubDay(
+    millis: Double,
+    count: Int,
+    unit: DateTimeUnit.TimeBased,
+    field: (LocalDateTime) -> Int,
+  ): Double {
+    if (count == 0) return millis
+    val direction = if (count > 0) 1L else -1L
+    var at = instant(millis)
+    repeat(abs(count)) {
+      // Bounded: a step that divides its field's range finds the next boundary within `step` units,
+      // and one that does not still wraps at the field's end. The cap is a hang guard, not a rule.
+      var walked = 0
+      do {
+        at = at.plus(direction, unit)
+        walked++
+      } while (field(at.toLocalDateTime(zone)) % step != 0 && walked <= MAX_SUB_DAY_WALK)
+    }
+    return millis(at)
+  }
+
   /** How far a date sits past the step's grid: zero exactly on a selected day. */
   private fun dayPhase(date: LocalDate): Int =
     if (epochDays) (date.toEpochDays().mod(step.toLong())).toInt() else (date.day - 1) % step
@@ -337,6 +380,15 @@ public class TimeStepper(
     if (days == 0) this else this.plus(-days, DateTimeUnit.DAY)
 
   private companion object {
+    /**
+     * How far [steppedSubDay] will walk looking for the next boundary on the grid.
+     *
+     * Sixty covers every field: an hour step wraps within 24, a minute or second step within 60. A
+     * hang guard rather than a rule — reaching it means the step divides nothing, and stopping with
+     * a tick slightly off the grid beats an axis that never returns.
+     */
+    private const val MAX_SUB_DAY_WALK: Int = 60
+
     /** A ceiling on how many ticks one axis can produce, so a degenerate domain cannot hang. */
     const val MAX_TICKS = 10_000
   }

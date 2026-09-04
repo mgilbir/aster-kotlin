@@ -5,8 +5,17 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
 import dev.aster.vega.runtime.scale.BandScale
+import dev.aster.vega.runtime.scale.BinOrdinalScale
+import dev.aster.vega.runtime.scale.IdentityScale
 import dev.aster.vega.runtime.scale.LinearScale
+import dev.aster.vega.runtime.scale.OrdinalScale
 import dev.aster.vega.runtime.scale.PointScale
+import dev.aster.vega.runtime.scale.QuantileScale
+import dev.aster.vega.runtime.scale.QuantizeScale
+import dev.aster.vega.runtime.scale.SequentialColorScale
+import dev.aster.vega.runtime.scale.ThresholdScale
+import dev.aster.vega.runtime.scale.TimeScale
+import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.FontStyle
 import dev.aster.vega.scene.GroupNode
@@ -51,6 +60,17 @@ public object Differential {
    * Tight tolerance for geometry: enough for double arithmetic order, far below a visible pixel.
    */
   public const val GEOMETRY_TOLERANCE: Double = 1e-6
+
+  /**
+   * How close two colours have to be, as a fraction of a channel.
+   *
+   * Half of one 8-bit step. Upstream records a colour as text — hex for a scheme it was given,
+   * `rgb(r, g, b)` for one an interpolator produced — and both forms quantise to whole bytes on the
+   * way out, so two engines agreeing exactly still differ by up to half a step once one of them has
+   * been through a string. Tighter than that compares the spelling; looser admits a colour a reader
+   * could tell apart.
+   */
+  public const val COLOR_TOLERANCE: Double = 0.5 / 255.0
 
   /**
    * Tolerance for the extent of a mark built from curves.
@@ -917,6 +937,66 @@ public object Differential {
     (channel == "strokeWidth" || channel == "strokeOpacity") &&
       !expected.strings.containsKey("stroke")
 
+  /**
+   * A continuous scale's three comparable facts, shared by every family that has them.
+   *
+   * One function rather than a branch apiece, because the last time these were written out
+   * per-scale only `linear` got written: the others fell through to `else -> Unit` and went
+   * unchecked for as long as the harness has existed.
+   */
+  private fun compareContinuous(
+    name: String,
+    reference: ScaleReference,
+    domain: List<Double>,
+    range: List<Double>,
+    ticks: List<Double>,
+    tolerance: Double,
+    differences: MutableList<Difference>,
+  ) {
+    compareNumberList("scale $name domain", reference.domain, domain, tolerance, differences)
+    compareNumberList("scale $name range", reference.range, range, tolerance, differences)
+    reference.ticks?.let { wanted ->
+      compareNumberList("scale $name ticks", wanted.map { fmt(it) }, ticks, tolerance, differences)
+    }
+  }
+
+  /**
+   * A scale range whose entries may be colours, compared as **colours** rather than as text.
+   *
+   * The formats genuinely differ and neither side is wrong: upstream records an ordinal scheme in
+   * the hex it was defined in — `#1f77b4` — and an interpolated endpoint in the `rgb(255, 255,
+   * 204)` its interpolator returns. Comparing the strings would report a difference between two
+   * spellings of the same colour, so both sides are parsed and compared by component, and anything
+   * that is not a colour falls back to exact text.
+   */
+  private fun compareRangeValues(
+    name: String,
+    expected: List<String>,
+    actual: List<String>,
+    out: MutableList<Difference>,
+  ) {
+    if (expected.size != actual.size) {
+      out.add(
+        Difference("scale $name range size", expected.size.toString(), actual.size.toString())
+      )
+      return
+    }
+    expected.zip(actual).forEachIndexed { index, (e, a) ->
+      val theirs = SceneColor.parse(e)
+      val ours = SceneColor.parse(a)
+      val same =
+        if (theirs != null && ours != null) {
+          abs(theirs.red - ours.red) <= COLOR_TOLERANCE &&
+            abs(theirs.green - ours.green) <= COLOR_TOLERANCE &&
+            abs(theirs.blue - ours.blue) <= COLOR_TOLERANCE &&
+            abs(theirs.alpha - ours.alpha) <= COLOR_TOLERANCE
+        } else {
+          e == a
+        }
+      if (!same) out.add(Difference("scale $name range[$index]", e, a))
+    }
+  }
+
   public fun compareScales(
     expected: Map<String, ScaleReference>,
     actual: Map<String, VegaScale>,
@@ -929,32 +1009,49 @@ public object Differential {
         differences.add(Difference("scale $name", "present", "absent"))
         continue
       }
+      // **No `else`**, and that is the point. This `when` used to end `else -> Unit`, and a third
+      // of the corpus's scales fell into it — compared not at all, under a test called "scale
+      // domains, ranges, bandwidth and ticks match upstream". Every kind is named now, so the
+      // *compiler* refuses a scale family nobody compared: adding one to the sealed hierarchy
+      // without a branch here is a build error rather than a silence. That is a stronger guarantee
+      // than the coverage test that was written to watch the gap, and it is why that test now
+      // asserts the total rather than policing a list of exemptions.
       when (scale) {
-        is LinearScale -> {
-          compareNumberList(
-            "scale $name domain",
-            reference.domain,
+        // Every continuous position scale, not only `linear`. The `when` used to name `linear`,
+        // `band` and `point` and fall to `else -> Unit`, so a third of the scales in the corpus
+        // were compared *not at all* — no domain, no range, no ticks — under a test called "scale
+        // domains, ranges, bandwidth and ticks match upstream". `log`, `pow`, `symlog` and `time`
+        // all carry the same three facts as `linear` and are read the same way.
+        is LinearScale ->
+          compareContinuous(
+            name,
+            reference,
             scale.domain,
-            tolerance,
-            differences,
-          )
-          compareNumberList(
-            "scale $name range",
-            reference.range,
             scale.range,
+            scale.ticks(),
             tolerance,
             differences,
           )
-          reference.ticks?.let { wanted ->
-            compareNumberList(
-              "scale $name ticks",
-              wanted.map { fmt(it) },
-              scale.ticks(),
-              tolerance,
-              differences,
-            )
-          }
-        }
+        is TimeScale ->
+          compareContinuous(
+            name,
+            reference,
+            scale.domain,
+            scale.range,
+            scale.ticks(),
+            tolerance,
+            differences,
+          )
+        is TransformedScale ->
+          compareContinuous(
+            name,
+            reference,
+            scale.domain,
+            scale.range,
+            scale.ticks(),
+            tolerance,
+            differences,
+          )
         is BandScale -> {
           if (reference.domain != scale.domain) {
             differences.add(
@@ -993,7 +1090,150 @@ public object Differential {
             differences,
           )
         }
-        else -> Unit
+        // An **ordinal** scale: a discrete domain and whatever the range holds, which for the
+        // commonest case is a colour scheme. Recorded in full rather than only the entries the
+        // chart happens to use, which is what makes it worth comparing directly — a scheme that
+        // wrapped one colour early, or a domain in the wrong order, moves colours the mark
+        // comparison only notices where a mark exists.
+        is OrdinalScale -> {
+          // `effectiveDomain`, not `domain`: an ordinal scale whose `domainImplicit` is set grows
+          // its domain as values arrive, and upstream records the grown one — four entries where
+          // the specification declared two. Reading the declared list reported
+          // `[alpha, beta, gamma, delta]` against `[alpha, beta]` on `scale-domain-implicit`, which
+          // is the comparison looking at the wrong property rather than the engine losing values:
+          // the marks in that fixture have always matched.
+          if (reference.domain != scale.effectiveDomain) {
+            differences.add(
+              Difference(
+                "scale $name domain",
+                reference.domain.toString(),
+                scale.effectiveDomain.toString(),
+              )
+            )
+          }
+          compareRangeValues(
+            name,
+            reference.range,
+            scale.rangeValues.map { it.asString() },
+            differences,
+          )
+        }
+        // A **sequential colour** scale: its numeric domain and its ticks, and deliberately not its
+        // range.
+        //
+        // The two sides do not hold the same object there, and neither is wrong. Upstream's
+        // `scale.range()` answers the *interpolator's* endpoints — two colours for `viridis` —
+        // while
+        // this engine keeps every stop of the scheme it was built from, which is 31 for `viridis`
+        // and 64 for `turbo`. Comparing them reported "expected 2, got 31" on seventeen fixtures,
+        // which is a difference of representation rather than of behaviour: the colour the scale
+        // actually *produces* is compared wherever it is used, by the mark comparison, and its
+        // interpolation directly by the `colour-ramps` and `colour-interpolation` fixtures.
+        is SequentialColorScale -> {
+          compareNumberList(
+            "scale $name domain",
+            reference.domain,
+            scale.domain,
+            tolerance,
+            differences,
+          )
+          reference.ticks?.let { wanted ->
+            compareNumberList(
+              "scale $name ticks",
+              wanted.map { fmt(it) },
+              scale.ticks(),
+              tolerance,
+              differences,
+            )
+          }
+        }
+        // The four **discretizing** families and `identity`. Each records a numeric domain and a
+        // range in the reference — the same two facts every other branch compares — so the reason
+        // this class used to give for skipping them, that their boundaries were "recorded in a
+        // different shape", was a guess and wrong. What differs is only which property holds the
+        // domain: a quantile scale's is its sample of the data, a threshold scale's is its cuts.
+        is BinOrdinalScale -> {
+          compareNumberList(
+            "scale $name domain",
+            reference.domain,
+            scale.domain,
+            tolerance,
+            differences,
+          )
+          compareRangeValues(
+            name,
+            reference.range,
+            scale.rangeValues.map { it.asString() },
+            differences,
+          )
+        }
+        is QuantizeScale -> {
+          compareNumberList(
+            "scale $name domain",
+            reference.domain,
+            scale.domain,
+            tolerance,
+            differences,
+          )
+          compareRangeValues(
+            name,
+            reference.range,
+            scale.rangeValues.map { it.asString() },
+            differences,
+          )
+          // No ticks: a quantize scale has no tick generator of its own here, and upstream's
+          // recorded ones are the linear ticks of its domain, which the axis beside it already
+          // compares.
+        }
+        // A quantile scale's domain is the **data** it was given, which upstream records in full
+        // and this engine keeps as `sampleDomain`.
+        is QuantileScale -> {
+          compareNumberList(
+            "scale $name domain",
+            reference.domain,
+            scale.sampleDomain,
+            tolerance,
+            differences,
+          )
+          compareRangeValues(
+            name,
+            reference.range,
+            scale.rangeValues.map { it.asString() },
+            differences,
+          )
+        }
+        // A threshold scale's domain is its **cuts**, one fewer than its range.
+        is ThresholdScale -> {
+          compareNumberList(
+            "scale $name domain",
+            reference.domain,
+            scale.thresholds,
+            tolerance,
+            differences,
+          )
+          compareRangeValues(
+            name,
+            reference.range,
+            scale.rangeValues.map { it.asString() },
+            differences,
+          )
+        }
+        is IdentityScale -> {
+          compareNumberList(
+            "scale $name domain",
+            reference.domain,
+            scale.domain,
+            tolerance,
+            differences,
+          )
+          compareNumberList(
+            "scale $name range",
+            reference.range,
+            scale.range,
+            tolerance,
+            differences,
+          )
+        }
       }
     }
     return differences

@@ -607,7 +607,11 @@ function scaleEntry(scale, precision) {
     entry.step = canonicalNumber(scale.step(), precision);
   }
   if (typeof scale.ticks === 'function') {
-    entry.ticks = scale.ticks().map((t) => canonicalNumber(t, precision));
+    // `scaleValue`, not `canonicalNumber`: a time scale's ticks are `Date` objects, and
+    // `canonicalNumber` hands one back untouched — so every time scale in the corpus recorded
+    // `ticks: [{}, {}, ...]` and its ticks were compared against nothing. The domains were already
+    // read this way, which is why they came out as epoch millis and the ticks beside them did not.
+    entry.ticks = scale.ticks().map((t) => scaleValue(t, precision));
   }
   return entry;
 }
