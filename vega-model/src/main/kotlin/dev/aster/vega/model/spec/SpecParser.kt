@@ -607,6 +607,43 @@ private fun textEncodeMap(prefix: String): Map<String, String> =
 private val GUIDE_ITEM_CHANNELS =
   setOf("tooltip", "cursor", "zindex", "aria", "description", "href")
 
+/**
+ * Guide encode channels a **builder** resolves per item, so a non-constant form is honoured.
+ *
+ * Distinct from [RESOLVED_GUIDE_CHANNELS], which skips the fold entirely. These still fold when
+ * they are constant — the fold is what makes an encode participate in *measurement*, so removing it
+ * would change the size of an axis whose ticks were thickened through one — and are merely not
+ * *reported* when they are a `field` or a conditional, because the builder reads the raw block
+ * again per tick and applies them.
+ *
+ * The parser used to warn that every one of these "was ignored", which was false in the direction
+ * that costs a reader most: told their chart would not work when it already did. `AxisBuilder`'s
+ * `strokeFor` has resolved the stroke family per item since it was written, and `labelStyleFor` now
+ * does the same for a label's weight and size.
+ *
+ * Every entry is proved against upstream by the `guide-encode-datum` fixture. Nothing is listed
+ * here that a fixture does not exercise — a channel claimed by reasoning is a channel nobody has
+ * checked.
+ */
+private val DATUM_RESOLVED_GUIDE_CHANNELS =
+  setOf(
+    // A label's own text, colour and type, from its tick's value.
+    "labels.text",
+    "labels.fill",
+    "labels.fontWeight",
+    "labels.fontSize",
+    // The stroke family on each of the three line parts, through `strokeFor`.
+    "grid.stroke",
+    "grid.strokeWidth",
+    "grid.strokeDash",
+    "grid.strokeDashOffset",
+    "grid.strokeOpacity",
+    "ticks.stroke",
+    "ticks.strokeWidth",
+    "ticks.strokeCap",
+    "domain.strokeWidth",
+  )
+
 private val RESOLVED_GUIDE_CHANNELS =
   setOf(
     // An axis label's position, which no property can say.
@@ -2497,6 +2534,10 @@ public class SpecParser {
             // `encode.symbols.update.shape` from one is still named.
             (value as? VegaValue.Obj)?.fields?.get("signal") != null &&
               property in SIGNAL_CAPABLE_GUIDE_PROPERTIES -> folded[property] = value
+            // Honoured per item by the builder, so there is nothing to report — see
+            // [DATUM_RESOLVED_GUIDE_CHANNELS]. It deliberately does **not** skip the fold above:
+            // a constant still folds, because that is what makes the encode measure.
+            constant == null && "$part.$channel" in DATUM_RESOLVED_GUIDE_CHANNELS -> Unit
             constant == null ->
               diagnostics.warn(
                 DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,

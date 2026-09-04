@@ -8,6 +8,33 @@ section here does not get released.
 
 ### Added
 
+- **A `field` or a conditional in a guide `encode` is honoured, and the warning that said otherwise
+  is gone.** The row claimed they could not be, because "the guide's own datum does not exist until
+  the guide is laid out". That is wrong about the ordering: an axis label's datum is
+  `{index, tickIndex, value, label}`, every field of it known when the ticks are computed — probed
+  against upstream before anything was changed.
+
+  Worse, three of the five channels the parser warned about **already worked**. `AxisBuilder`'s
+  `strokeFor` has resolved the stroke family per tick since it was written, and the parser reports
+  without folding, so it left the raw block in place for the builder to read. The warnings said
+  those channels "were ignored" while the engine drew them correctly — false in the direction that
+  costs a reader most, telling them their chart would not work when it already did.
+
+  What was genuinely missing was a label's own **fill, weight and size**: `labelStyle` was resolved
+  once for the axis rather than per tick, so a conditional colour fell back to the default for every
+  label. `labelStyleFor` fixes that, and the label's fill is now read per tick like the lines'
+  strokes.
+
+  `guide-encode-datum` is a new fixture and it is what makes the claim checkable rather than
+  reasoned: a label coloured and bolded from its tick's value, a gridline blackened and thickened at
+  one tick, a dash pattern and an opacity that vary per tick, a tick capped differently at the last,
+  a domain width from a `field`. Every channel now listed as datum-resolved is exercised there —
+  nothing is claimed that a fixture does not prove.
+
+  A channel with **no** per-item path, such as a label's `angle`, genuinely is dropped and is still
+  reported. `SubsetIsReportedTest` now asserts both halves, on `angle` for the report and on the
+  five per-item channels for the silence, so the two cannot drift into agreeing.
+
 - **A scale declared inside a named group is compared against upstream.** The row read
   `Not compared`, on the grounds that "a faceted group resolves its scales once per cell and there
   is no single scale of that name to compare". That reason is sound and it covers only *faceted*

@@ -9376,6 +9376,22 @@
   "hidden": false
  },
  {
+  "fixture": "guide-encode-datum",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "guide-encode-datum",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "guide-encode-geometry",
   "kind": "group",
   "role": "graphics-object",

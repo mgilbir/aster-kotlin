@@ -1,6 +1,7 @@
 package dev.aster.vega.runtime
 
 import dev.aster.vega.runtime.compile.SpecCompiler
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -86,7 +87,7 @@ class SubsetIsReportedTest {
    * not exist until the guide is laid out, and each is reported.
    */
   @Test
-  fun `a guide encode channel that is not a constant is reported by name`() {
+  fun `a guide encode channel the builders cannot resolve is reported by name`() {
     fun axis(encode: String) =
       """
       {"width": 80, "height": 60, "padding": 0,
@@ -98,20 +99,64 @@ class SubsetIsReportedTest {
       """
         .trimIndent()
 
-    assertTrue(
-      reports(axis("""{"grid": {"update": {"stroke": {"field": "value"}}}}"""), "'stroke'"),
-      "a field-valued guide encode was dropped in silence",
-    )
+    // A channel **no** builder reads per item. `labels.angle` is folded into `labelAngle` or it is
+    // nothing: there is no per-tick path for it, so a conditional really is dropped and really is
+    // reported. This used to be asserted of `grid.stroke`, which was wrong — `strokeFor` had been
+    // resolving that per tick since it was written, and the warning told a reader their chart would
+    // not work when it already did.
     assertTrue(
       reports(
         axis(
-          """{"grid": {"update": {"stroke": [{"test": "true", "value": "#ff0000"},
-                                             {"value": "#0000ff"}]}}}"""
+          """{"labels": {"update": {"angle": [{"test": "true", "value": 45}, {"value": 0}]}}}"""
         ),
-        "'stroke'",
+        "'angle'",
       ),
-      "a conditional guide encode was dropped in silence",
+      "a conditional on a channel with no per-item path was dropped in silence",
     )
+    assertTrue(
+      reports(axis("""{"labels": {"update": {"angle": {"field": "value"}}}}"""), "'angle'"),
+      "a field-valued channel with no per-item path was dropped in silence",
+    )
+  }
+
+  /**
+   * And the channels the builders **do** resolve per item are not reported, because they work.
+   *
+   * The other half, and the one this class had backwards. `guide-encode-datum` proves each of them
+   * against upstream — a label coloured from its tick's value, a gridline thickened at one tick, a
+   * tick capped differently at the last — so a warning about them would be false. Kept beside the
+   * assertion above so the two cannot drift into agreeing.
+   */
+  @Test
+  fun `a guide encode channel the builders resolve per item is not reported`() {
+    fun axis(encode: String) =
+      """
+      {"width": 80, "height": 60, "padding": 0,
+       "data": [{"name": "t", "values": [{"c": "a"}]}],
+       "scales": [{"name": "x", "type": "band",
+                   "domain": {"data": "t", "field": "c"}, "range": "width"}],
+       "axes": [{"scale": "x", "orient": "bottom", "grid": true, "encode": $encode}],
+       "marks": []}
+      """
+        .trimIndent()
+
+    for ((part, channel) in
+      listOf(
+        "labels" to "fill",
+        "labels" to "fontWeight",
+        "grid" to "stroke",
+        "grid" to "strokeWidth",
+        "ticks" to "strokeWidth",
+      )) {
+      val conditional =
+        axis(
+          """{"$part": {"update": {"$channel": [{"test": "datum.value > 0", "value": 2}, {"value": 1}]}}}"""
+        )
+      assertFalse(
+        reports(conditional, "'$channel'"),
+        "$part.$channel is resolved per item and was reported as ignored anyway",
+      )
+    }
   }
 
   /**
