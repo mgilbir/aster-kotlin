@@ -37,6 +37,7 @@ import dev.aster.vega.scene.NodeMetadata
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.SceneNode
+import dev.aster.vega.scene.SceneNodeId
 import dev.aster.vega.scene.SceneNodeIdAllocator
 import dev.aster.vega.scene.TextEngine
 import dev.aster.vega.scene.Transform2D
@@ -203,6 +204,31 @@ internal class ScopeCompiler(
    * and until it had them a scale declared inside a group was never compared at all.
    */
   val groupScales: MutableMap<String, Map<String, VegaScale>> = LinkedHashMap()
+
+  /**
+   * The scene node each group cell was drawn as, by the same path.
+   *
+   * What a `scope`-sourced handler needs: "is this event inside that group" is upstream's
+   * `inScope(event.item)`, which walks the hit item's ancestors looking for the group's own item —
+   * so what the controller matches against is a node **id**. Recorded here rather than found by
+   * walking the scene afterwards, because a walk would have to *re-derive* the path from mark names
+   * and the scene holds group nodes for axes and legends too — pairing the two by shape is the kind
+   * of inference that has been wrong every time it was tried in this harness.
+   */
+  val groupNodes: MutableMap<String, SceneNodeId> = LinkedHashMap()
+
+  /**
+   * The datum each group cell was drawn for, by the same path.
+   *
+   * A faceted cell's datum is what says **which** cell it is: the `groupby` values that made it,
+   * beside `count` and whatever `facet.aggregate` measured. The differential pairs a faceted
+   * group's recorded scales with this engine's by that key rather than by position, because
+   * upstream hands out its subcontexts in an array and pairing by index mis-pairs the moment either
+   * side reorders — and a comparison against the wrong cell is worse than none.
+   *
+   * `VegaValue.EmptyObject` for a group drawn once, which has no facet key and needs none.
+   */
+  val groupDatums: MutableMap<String, VegaValue> = LinkedHashMap()
 
   /**
    * A scope's scene nodes, and how far the drawing they make up reaches.
@@ -736,6 +762,7 @@ internal class ScopeCompiler(
         // A handler needs both at once: `invert('xOverview', brush)` is a scale lookup and a signal
         // read in one expression, and `xOverview` is the group's own.
         groupScopes[here] = sized.signals.withScales(sized.scales, diagnostics)
+        groupDatums[here] = partitions[index].datum
         // The group's **own** scales, not the enclosing scope's it also sees: what upstream records
         // for a subcontext is what that subcontext defined, and comparing inherited ones would
         // compare the top level twice.
@@ -749,20 +776,40 @@ internal class ScopeCompiler(
           inner[index] = RectD.Empty
           return@encodeGroup emptyList()
         }
+        // The cell's contents compile under the **cell's** path, not the group's. Without this, a
+        // group nested inside a faceted one records `cell/inner` from every cell — the same key,
+        // last cell winning — so both cells shared one scope: a press in the first fired nothing at
+        // all, and a press in the second moved a signal the first cell's marks were also drawn
+        // from. Pushed only where `cellPath` appended one, so the two agree by construction and a
+        // group drawn once still records no `[0]` nobody needs.
+        val cellSegment = if (partitions.size > 1) "cells[$index]" else null
+        cellSegment?.let { path.addLast(it) }
         val scoped =
-          compile(
-            spec.marks,
-            spec.axes,
-            spec.legends,
-            spec.title,
-            spec.layout,
-            sized,
-            PlotSize(extent.width, extent.height),
-            origin,
-          )
+          try {
+            compile(
+              spec.marks,
+              spec.axes,
+              spec.legends,
+              spec.title,
+              spec.layout,
+              sized,
+              PlotSize(extent.width, extent.height),
+              origin,
+            )
+          } finally {
+            cellSegment?.let { path.removeLast() }
+          }
         inner[index] = scoped.bounds
         scoped.nodes
       }
+
+    // The node each cell was drawn as, paired with the path recorded for that same cell a few lines
+    // up. By index, and safe to be: the correspondence is *constructed* here — `encodeGroup` maps
+    // over `partitions` in order and returns one node per partition — rather than inferred from
+    // anything about the nodes. Taken before the sort below, which reorders the items.
+    nodes.forEachIndexed { index, node ->
+      groupNodes[cellPath(partitions.size, index)] = node.id
+    }
 
     // `sort` orders the *items*, not the data, so it happens after encoding: its fields name
     // encoded

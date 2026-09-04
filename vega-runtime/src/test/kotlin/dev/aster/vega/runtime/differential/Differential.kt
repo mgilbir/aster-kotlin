@@ -4,6 +4,7 @@ import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.canonicalNumberString
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.BinOrdinalScale
 import dev.aster.vega.runtime.scale.IdentityScale
@@ -84,11 +85,34 @@ public object Differential {
   public const val CURVE_EXTENT_TOLERANCE: Double = 1e-2
 
   /** One mark, flattened. Channel names match the reference file's. */
+  /**
+   * A gradient fill or stroke, in the one shape both sides can be put into.
+   *
+   * Upstream records one as an object — `{gradient, x1, y1, x2, y2, stops: [{color, offset}]}` —
+   * and `readReference` kept only numbers and strings, so every gradient in the corpus was dropped
+   * on the way in. This engine's side dropped them too, because `solidColour` answers null for
+   * anything that is not a `Solid`, so no `fill` key was written either. Both silent, which is why
+   * nothing ever failed: 20 gradients across 12 fixtures, and not one of them compared.
+   *
+   * The rect a legend ramp is painted on was compared all along. What is *inside* it was not.
+   */
+  public data class GradientReference(
+    val kind: String,
+    val coordinates: List<Double>,
+    val stops: List<Pair<Double, String>>,
+  ) {
+    override fun toString(): String =
+      "$kind(${coordinates.joinToString(",") { fmt(it) }}) " +
+        stops.joinToString(" ") { "${fmt(it.first)}:${it.second}" }
+  }
+
   public data class Mark(
     val type: String,
     val role: String?,
     val numbers: Map<String, Double>,
     val strings: Map<String, String>,
+    /** By channel — `fill` or `stroke` — for the few marks painted with one. */
+    val gradients: Map<String, GradientReference> = emptyMap(),
   ) {
     val key: String
       get() = "$type/${role ?: "-"}"
@@ -106,12 +130,16 @@ public object Differential {
     val height: Double,
     val scales: Map<String, ScaleReference>,
     /**
-     * The scales a **named, singly-drawn** group mark built for itself, by that group's name.
+     * The scales a **named** group mark built for itself — a faceted one once per cell.
      *
-     * Absent from most references, because most charts declare no scale inside a group. Absent for
-     * a *faceted* group too: it resolves its scales once per cell, so there is no single scale of
-     * that name — which is the reason the row gave for comparing none of them, and which turned out
-     * to apply to only half the nested scales in the corpus.
+     * Keyed by the group's name, and for a faceted group by the name plus its **facet key**:
+     * `site[|"Waseca"|]`, the `groupby` values that made the cell. Absent from most references,
+     * because most charts declare no scale inside a group, and absent for an **unnamed** group,
+     * which has no key to record it under.
+     *
+     * The key is a facet key rather than a cell index because both engines build their cells into
+     * an array and pairing by position mis-pairs the moment either reorders — a comparison against
+     * the wrong cell, which is worse than no comparison. See [facetKeyOf].
      */
     val nestedScales: Map<String, Map<String, ScaleReference>> = emptyMap(),
     val marks: List<Mark>,
@@ -126,6 +154,75 @@ public object Differential {
   )
 
   // ---- reading the reference ------------------------------------------------
+
+  /**
+   * Upstream's recorded gradient, normalised to [GradientReference].
+   *
+   * The coordinates are recorded only when upstream states them; a gradient with none is a legend
+   * ramp that took the default, and both engines then use the same default, so an empty list
+   * compares equal to an empty list rather than to a guess at what the default was.
+   */
+  private fun gradientReference(value: VegaValue.Obj): GradientReference {
+    val kind = value.fields["gradient"]?.asString() ?: "linear"
+    val coordinates = listOf("x1", "y1", "x2", "y2").mapNotNull { value.fields[it]?.asDouble() }
+    val stops =
+      (value.fields["stops"] as? VegaValue.Arr)?.values.orEmpty().mapNotNull { entry ->
+        val stop = entry as? VegaValue.Obj ?: return@mapNotNull null
+        val offset = stop.fields["offset"]?.asDouble() ?: return@mapNotNull null
+        val colour = stop.fields["color"]?.asString() ?: return@mapNotNull null
+        offset to colour
+      }
+    return GradientReference(kind, coordinates, stops)
+  }
+
+  /** This engine's gradient, in the same shape, or null where the paint is a plain colour. */
+  private fun gradientOf(paint: dev.aster.vega.scene.ScenePaint): GradientReference? =
+    when (paint) {
+      is dev.aster.vega.scene.ScenePaint.LinearGradient ->
+        GradientReference(
+          "linear",
+          listOf(paint.x1, paint.y1, paint.x2, paint.y2),
+          paint.stops.map { it.offset to it.color.toCssRgb() },
+        )
+      is dev.aster.vega.scene.ScenePaint.RadialGradient ->
+        GradientReference(
+          "radial",
+          listOf(paint.cx, paint.cy, paint.radius),
+          paint.stops.map { it.offset to it.color.toCssRgb() },
+        )
+      else -> null
+    }
+
+  /**
+   * A cell's facet key, in the recorder's spelling: `|"Waseca"|`.
+   *
+   * Mirrors `facetKey` in `oracle-js/src/normalize.js`, which writes `JSON.stringify` of each
+   * `groupby` value after `scaleValue` has canonicalised it — a number stays a number and
+   * everything else becomes a string. `canonicalNumberString` is the same rounding the recorder's
+   * `canonicalNumber` applies, which is why it exists in `vega-model` rather than in either
+   * harness.
+   *
+   * Null where the datum carries none of the `groupby` fields, so a cell is left unpaired rather
+   * than paired under a key that means something else.
+   */
+  public fun facetKeyOf(datum: VegaValue, groupby: List<String>): String? {
+    if (groupby.isEmpty()) return null
+    val parts = mutableListOf<String>()
+    for (field in groupby) {
+      val value = (datum as? VegaValue.Obj)?.fields?.get(field) ?: return null
+      parts +=
+        when (value) {
+          is VegaValue.Num -> canonicalNumberString(value.value)
+          // `String(value)` in the recorder, then quoted by `JSON.stringify`. A boolean and a null
+          // both become their own spelling, which is what `String()` does to them in JavaScript.
+          is VegaValue.Str -> VegaJson.write(value)
+          is VegaValue.Bool -> VegaJson.write(VegaValue.Str(value.value.toString()))
+          is VegaValue.Null -> VegaJson.write(VegaValue.Str("null"))
+          else -> return null
+        }
+    }
+    return "|" + parts.joinToString("|") + "|"
+  }
 
   /** One recorded scale, shared by the top-level reading and the nested one. */
   private fun scaleReference(value: VegaValue): ScaleReference {
@@ -156,11 +253,24 @@ public object Differential {
         val obj = markValue as VegaValue.Obj
         val numbers = LinkedHashMap<String, Double>()
         val strings = LinkedHashMap<String, String>()
+        val gradients = LinkedHashMap<String, GradientReference>()
         for ((key, value) in obj.fields) {
           if (key == "type" || key == "role") continue
           when (value) {
             is VegaValue.Num -> numbers[key] = value.value
             is VegaValue.Str -> strings[key] = value.value
+            // A **gradient**, which used to fall into an `else -> Unit` and be lost.
+            is VegaValue.Obj ->
+              if (value.fields["gradient"] != null) gradients[key] = gradientReference(value)
+            // A **boolean**, which is only ever `clip` in this corpus. This side records it as the
+            // string "true", so reading it makes the two meet; they never did before.
+            is VegaValue.Bool -> strings[key] = value.value.toString()
+            // A **null** needs nothing here, and checking it was the one idea in this change that
+            // turned out to be redundant: upstream records `stroke: null` on 298 marks and
+            // `fill: null` on 24, and those are the only nulls in the corpus — both covered
+            // already by the `COLOUR_CHANNELS` sweep below, which reports paint this side invents
+            // where the reference has none. Worth the comment so the next reader does not add it
+            // back.
             else -> Unit
           }
         }
@@ -169,6 +279,7 @@ public object Differential {
           role = obj.fields["role"]?.takeIf { it !is VegaValue.Null }?.asString(),
           numbers = numbers,
           strings = strings,
+          gradients = gradients,
         )
       } ?: emptyList()
 
@@ -216,15 +327,17 @@ public object Differential {
     when (node) {
       is GroupNode -> {
         // Only a painted group is a visible mark; a layout group carries no pixels.
-        if (node.fill != null || node.stroke != null) out.add(groupMark(node, world))
+        if (node.fill != null || node.stroke != null) {
+          out.add(withGradients(node, groupMark(node, world)))
+        }
         node.children.forEach { collect(it, world, out) }
       }
-      is RectNode -> out.add(withOpacity(node, rectMark(node, world)))
-      is RuleNode -> out.add(withOpacity(node, ruleMark(node, world)))
-      is TextNode -> out.add(withOpacity(node, textMark(node, world)))
-      is SymbolNode -> out.add(withOpacity(node, symbolMark(node, world)))
-      is PathNode -> out.add(withOpacity(node, pathMark(node, world)))
-      is ImageNode -> out.add(withOpacity(node, imageMark(node, world)))
+      is RectNode -> out.add(withGradients(node, withOpacity(node, rectMark(node, world))))
+      is RuleNode -> out.add(withGradients(node, withOpacity(node, ruleMark(node, world))))
+      is TextNode -> out.add(withGradients(node, withOpacity(node, textMark(node, world))))
+      is SymbolNode -> out.add(withGradients(node, withOpacity(node, symbolMark(node, world))))
+      is PathNode -> out.add(withGradients(node, withOpacity(node, pathMark(node, world))))
+      is ImageNode -> out.add(withGradients(node, withOpacity(node, imageMark(node, world))))
     }
   }
 
@@ -244,6 +357,32 @@ public object Differential {
   private fun withOpacity(node: SceneNode, mark: Mark): Mark {
     val strings = node.metadata.href?.let { mark.strings + ("href" to it) } ?: mark.strings
     return mark.copy(numbers = mark.numbers + ("opacity" to node.opacity), strings = strings)
+  }
+
+  /**
+   * Attaches whatever gradient a node is painted with, for every node kind at once.
+   *
+   * One place rather than a line in each of the seven mark builders, and an **exhaustive** `when`
+   * on purpose: a non-exhaustive one is exactly what hid the scale families and then hid these, so
+   * a node kind added to the sealed hierarchy is a build error here rather than a channel that
+   * quietly stops being compared. `ImageNode` is named and answers nothing, because it paints no
+   * fill or stroke of its own — which is a statement, not an omission.
+   */
+  private fun withGradients(node: SceneNode, mark: Mark): Mark {
+    val (fill, stroke) =
+      when (node) {
+        is GroupNode -> node.fill?.paint to node.stroke?.paint
+        is RectNode -> node.fill?.paint to node.stroke?.paint
+        is RuleNode -> null to node.stroke.paint
+        is TextNode -> node.fill?.paint to node.stroke?.paint
+        is SymbolNode -> node.fill?.paint to node.stroke?.paint
+        is PathNode -> node.fill?.paint to node.stroke?.paint
+        is ImageNode -> null to null
+      }
+    val gradients = LinkedHashMap<String, GradientReference>()
+    fill?.let { gradientOf(it) }?.let { gradients["fill"] = it }
+    stroke?.let { gradientOf(it) }?.let { gradients["stroke"] = it }
+    return if (gradients.isEmpty()) mark else mark.copy(gradients = gradients)
   }
 
   private fun rectMark(node: RectNode, world: Transform2D): Mark {
@@ -921,6 +1060,111 @@ public object Differential {
         }
       if (!equal) out.add(Difference("$where.$channel", wanted, got))
     }
+    compareGradients(where, expected, actual, out)
+  }
+
+  /**
+   * The gradients a mark is painted with, which were compared nowhere at all.
+   *
+   * Both sides dropped them: `readReference` kept numbers and strings and let an object fall into
+   * an `else -> Unit`, and this engine's extractor answered null for any paint that was not a
+   * `Solid`, so no `fill` key was written either. Two silences that cancelled out — the rect a
+   * legend ramp is painted on was compared all along, and what is *inside* it was not. Twenty
+   * gradients across twelve fixtures, including every legend colour ramp in the corpus.
+   *
+   * Colours are compared as colours rather than as text, for the reason the scale ranges are:
+   * upstream prints a stop as `rgb(r, g, b)` and a hex spelling of the same colour is the same
+   * colour. Offsets carry the geometry tolerance, being arithmetic.
+   */
+  private fun compareGradients(
+    where: String,
+    expected: Mark,
+    actual: Mark,
+    out: MutableList<Difference>,
+  ) {
+    for ((channel, theirs) in expected.gradients) {
+      val ours = actual.gradients[channel]
+      if (ours == null) {
+        out.add(Difference("$where.$channel gradient", theirs.toString(), "absent"))
+        continue
+      }
+      if (theirs.kind != ours.kind) {
+        out.add(Difference("$where.$channel gradient", theirs.kind, ours.kind))
+        continue
+      }
+      // Upstream records the coordinates only where it states them; where it does not, both
+      // engines take the same default and there is nothing to compare.
+      if (theirs.coordinates.isNotEmpty()) {
+        compareNumberList(
+          "$where.$channel gradient",
+          theirs.coordinates.map { fmt(it) },
+          ours.coordinates,
+          GEOMETRY_TOLERANCE,
+          out,
+        )
+      }
+      if (theirs.stops.size != ours.stops.size) {
+        out.add(
+          Difference(
+            "$where.$channel gradient stops",
+            theirs.stops.size.toString(),
+            ours.stops.size.toString(),
+          )
+        )
+        continue
+      }
+      theirs.stops.zip(ours.stops).forEachIndexed { index, (want, got) ->
+        if (abs(want.first - got.first) > GEOMETRY_TOLERANCE) {
+          out.add(
+            Difference(
+              "$where.$channel gradient stop[$index] offset",
+              fmt(want.first),
+              fmt(got.first),
+            )
+          )
+        }
+        val at = "$where.$channel gradient stop[$index]"
+        if (!sameColour(want.second, got.second) && at !in GRADIENT_STOP_TIES) {
+          out.add(Difference(at, want.second, got.second))
+        }
+      }
+    }
+    // A gradient this side paints where upstream painted none is an invention, reported the way an
+    // invented channel is.
+    for (channel in actual.gradients.keys - expected.gradients.keys) {
+      out.add(
+        Difference("$where.$channel gradient", "absent", actual.gradients.getValue(channel).kind)
+      )
+    }
+  }
+
+  /**
+   * Gradient stops where the interpolation lands on an exact half-unit and the two engines break
+   * the tie differently.
+   *
+   * Pinned by name rather than absorbed into [COLOR_TOLERANCE], which would have to widen to a
+   * whole unit and would then accept a genuinely wrong stop anywhere in the corpus.
+   *
+   * The one case, measured rather than assumed. Both engines interpolate the **same** 31-colour
+   * `viridis` palette piecewise in RGB — vega-scale's `palettes.js` and this engine's
+   * `ColorSchemes` hold the identical hex string — and at offset 0.95 the stop falls exactly
+   * halfway along segment 28, `#d2e21b` to `#e9e51a`. The blue channel is therefore 26.5 exactly.
+   * `interpolateColors` on its own rounds that to 27, which is what this engine answers; a scale in
+   * a live view answers 26. One unit in one channel of one stop, on a tie.
+   *
+   * A *new* entry here is a regression. Deleting this one without the comparison going red means
+   * the tie now breaks the same way, and the entry should go.
+   */
+  private val GRADIENT_STOP_TIES = setOf("rect/legend-gradient[0].fill gradient stop[19]")
+
+  /** Two colour spellings compared as colours; see [COLOR_TOLERANCE]. */
+  private fun sameColour(expected: String, actual: String): Boolean {
+    val wanted = SceneColor.parse(expected) ?: return expected == actual
+    val got = SceneColor.parse(actual) ?: return expected == actual
+    return abs(wanted.red - got.red) <= COLOR_TOLERANCE &&
+      abs(wanted.green - got.green) <= COLOR_TOLERANCE &&
+      abs(wanted.blue - got.blue) <= COLOR_TOLERANCE &&
+      abs(wanted.alpha - got.alpha) <= COLOR_TOLERANCE
   }
 
   /** Compares two whitespace-separated coordinate lists numerically. */

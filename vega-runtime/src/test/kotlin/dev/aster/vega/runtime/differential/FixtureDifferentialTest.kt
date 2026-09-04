@@ -5,6 +5,7 @@ package dev.aster.vega.runtime.differential
 import dev.aster.vega.fixtures.VegaHeadlessTextEngine
 import dev.aster.vega.loader.FileDataLoader
 import dev.aster.vega.model.DiagnosticSeverity
+import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.runtime.compile.CompiledSpec
 import dev.aster.vega.runtime.compile.SpecCompiler
@@ -91,18 +92,25 @@ class FixtureDifferentialTest {
   }
 
   /**
-   * And the scales a **group mark** built for itself, which were never compared.
+   * And the scales a **group mark** built for itself, a faceted one once per cell.
    *
    * The row read `Not compared`, on the grounds that "a faceted group resolves its scales once per
-   * cell and there is no single scale of that name to compare". That is true of a faceted group and
-   * of nothing else, and half the nested scales in this corpus belong to a group drawn once — the
-   * detail and overview panels of `overview-plus-detail`, the three histograms of
-   * `crossfilter-flights`, the two cells of `qq-plot`. Each of those has exactly one scale of its
-   * name, recorded by `normalizeNestedScales` under the group's own name.
+   * cell and there is no single scale of that name to compare". Half of that was answered first: a
+   * group drawn **once** has exactly one scale of its name, and half the nested scales in this
+   * corpus are of that kind — the detail and overview panels of `overview-plus-detail`, the three
+   * histograms of `crossfilter-flights`.
    *
-   * Keyed by name rather than by position, deliberately: upstream hands out subcontexts in an array
-   * and pairing them by index would mis-pair the moment a mark was added, which is the failure mode
-   * that made node ids unusable for comparison here.
+   * The rest is answered here, and the premise turned out to be about the *key* rather than about
+   * the data. Upstream keeps one `subcontext` entry per cell, each holding that cell's own resolved
+   * scales; what was missing was a name to record them under. It is the group's name plus the
+   * cell's **facet key** — the `groupby` values that made it — on both sides, so a cell only one
+   * engine built shows up as a missing key rather than as a comparison against the wrong cell.
+   *
+   * A key rather than a position, deliberately: upstream hands out subcontexts in an array and this
+   * engine builds its cells in partition order, and pairing those by index would mis-pair the
+   * moment either side reordered. That is the failure mode that made node ids unusable here too.
+   *
+   * An **unnamed** group is still not recorded, for the reason it always was: there is no key.
    */
   @ParameterizedTest(name = "{0}")
   @MethodSource("fixtures")
@@ -116,9 +124,11 @@ class FixtureDifferentialTest {
     // unnamed cases is `NestedScaleCoverageTest`'s assertion, where it can be made once instead of
     // once per fixture.
     val differences = mutableListOf<String>()
+    val byFacetKey = facetKeyed(compiled)
     for ((group, scales) in reference.nestedScales) {
       val ours =
-        compiled.groupScales[group]
+        byFacetKey[group]
+          ?: compiled.groupScales[group]
           ?: run {
             differences += "group '$group' built no scales here; upstream has ${scales.keys}"
             continue
@@ -129,6 +139,42 @@ class FixtureDifferentialTest {
       differences.isEmpty(),
       "$name nested scale differences:\n${differences.joinToString("\n")}",
     )
+  }
+
+  /**
+   * This engine's per-cell scales, under the same `name[|key|]` the recorder writes.
+   *
+   * The compiler keys a cell by its path — `site/cells[3]` — which is the right key for dispatching
+   * a handler and the wrong one for comparing against another engine's array. So the facet key is
+   * rebuilt here from the cell's own datum, which is the thing both engines agree the cell *is*.
+   *
+   * A group whose `from.facet` names a `field` rather than a `groupby` is left out: that is
+   * pre-faceted data, one cell per *row*, and there is no grouping value to key by.
+   */
+  private fun facetKeyed(
+    compiled: dev.aster.vega.runtime.compile.CompiledSpec
+  ): Map<String, Map<String, dev.aster.vega.runtime.scale.VegaScale>> {
+    val groupby = mutableMapOf<String, List<String>>()
+    fun walk(marks: List<dev.aster.vega.model.spec.MarkSpec>) {
+      for (mark in marks) {
+        if (mark.type != dev.aster.vega.model.spec.MarkType.GROUP) continue
+        val facet = mark.from?.facet
+        if (mark.name != null && facet != null && facet.groupby.isNotEmpty()) {
+          groupby[mark.name!!] = facet.groupby
+        }
+        walk(mark.marks)
+      }
+    }
+    walk(compiled.spec?.marks.orEmpty())
+    if (groupby.isEmpty()) return emptyMap()
+    val out = mutableMapOf<String, Map<String, dev.aster.vega.runtime.scale.VegaScale>>()
+    for ((path, scales) in compiled.groupScales) {
+      val name = path.substringBefore("/cells[").substringAfterLast('/')
+      val fields = groupby[name] ?: continue
+      val key = Differential.facetKeyOf(compiled.groupDatums[path] ?: VegaValue.Null, fields)
+      if (key != null) out["$name[$key]"] = scales
+    }
+    return out
   }
 
   /** True when a mark whose outline is approximated by cubics could be setting the surface size. */

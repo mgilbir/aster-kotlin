@@ -559,21 +559,32 @@ function scaleValue(value, precision) {
 
 /** Scale outputs, compared exactly: they are pure arithmetic with no rendering in the way. */
 /**
- * The scales a **named group mark** built for itself, by that group's name.
+ * The scales a **named group mark** built for itself — a faceted one once per cell.
  *
  * `view.scale(name)` reaches only the top level, so a scale declared inside a group was recorded
  * nowhere and the row said it could not be: "a faceted group resolves its scales once per cell and
- * there is no single scale of that name to compare". True of a faceted group, and not of the others
- * — half the nested scales in the corpus belong to a group drawn **once**, and those have exactly
- * one scale each.
+ * there is no single scale of that name to compare". The first half of that was answered by keying
+ * a singly-drawn group by its name. This is the second half, and the premise turns out to be about
+ * the *key* rather than about the data: upstream keeps one `subcontext` entry per cell, each with
+ * that cell's own resolved scales, and what was missing was a name to record them under.
  *
- * So a group's scales are recorded when its name identifies **exactly one** subcontext. A faceted
- * group has one per cell and is skipped for the reason the row actually gives; an unnamed group has
- * no key to record it under. `subcontext[i].group.mark.name` is what makes the distinction
- * available: it is the group's own name, so the key matches the engine's own path for it rather
- * than a positional index, which would silently mis-pair the moment a mark was added.
+ * The name is the group's plus its **facet key** — the `groupby` values that made the cell, read
+ * off the cell's own datum and written `site[|"Waseca"|]`. Not the cell's index: upstream hands out
+ * subcontexts in an array and the engine builds its cells in partition order, and pairing those by
+ * position would silently mis-pair the moment either side reordered. The facet key is what both
+ * engines agree the cell *is*, so a cell that only one of them built is a missing key rather than a
+ * comparison against the wrong cell.
+ *
+ * Only the `groupby` values go into it, not the whole datum: a facet's datum also carries `count`
+ * and whatever `facet.aggregate` measured, and keying on a measurement would turn a disagreement
+ * about that measurement into a pair that silently does not match — the comparison going quiet at
+ * exactly the moment it has something to say. Those are compared as the cell's geometry instead.
+ *
+ * An **unnamed** group is still not recorded, for the reason it always was: there is no key. Its
+ * cells' geometry is compared in full, which is what those scales produce.
  */
-export function normalizeNestedScales(view, precision = DEFAULT_PRECISION) {
+export function normalizeNestedScales(view, spec, precision = DEFAULT_PRECISION) {
+  const groupbyOf = facetGroupbyByName(spec);
   const subs = (view._runtime && view._runtime.subcontext) || [];
   const byName = new Map();
   for (const sub of subs) {
@@ -584,16 +595,71 @@ export function normalizeNestedScales(view, precision = DEFAULT_PRECISION) {
   }
   const result = {};
   for (const [name, group] of byName) {
-    if (group.length !== 1) continue; // faceted: one scope per cell, no single scale to compare
-    const scales = {};
-    for (const [scaleName, node] of Object.entries(group[0].scales)) {
-      const scale = node && node.value;
-      if (!scale || typeof scale.domain !== 'function') continue;
-      scales[scaleName] = scaleEntry(scale, precision);
+    const groupby = groupbyOf.get(name);
+    if (group.length === 1 && !groupby) {
+      const scales = scalesOf(group[0], precision);
+      if (Object.keys(scales).length) result[name] = scales;
+      continue;
     }
-    if (Object.keys(scales).length) result[name] = scales;
+    // Several subcontexts under one name and no facet to key them by: a name reused across group
+    // marks, which nothing here can tell apart. Left out rather than guessed at.
+    if (!groupby) continue;
+    for (const sub of group) {
+      const key = facetKey(sub.group && sub.group.datum, groupby);
+      if (key === null) continue;
+      const scales = scalesOf(sub, precision);
+      if (Object.keys(scales).length) result[`${name}[${key}]`] = scales;
+    }
   }
   return result;
+}
+
+/** The `groupby` fields of every **named** faceted group mark in a specification, by name. */
+function facetGroupbyByName(spec) {
+  const out = new Map();
+  const walk = (marks) => {
+    for (const mark of marks || []) {
+      if (mark && mark.type === 'group') {
+        const facet = mark.from && mark.from.facet;
+        // `facet.field` is pre-faceted data — one cell per *row*, with no groupby to key by.
+        if (mark.name && facet && facet.groupby != null) {
+          out.set(mark.name, [].concat(facet.groupby));
+        }
+        walk(mark.marks);
+      }
+    }
+  };
+  walk(spec && spec.marks);
+  return out;
+}
+
+/**
+ * A cell's facet key: its `groupby` values, in the order the facet named them.
+ *
+ * `null` where the datum does not carry one of them, so the cell is left out rather than recorded
+ * under a key that means something else. Bracketed and separated by `|` because a value may itself
+ * contain any character; `JSON.stringify` quotes and escapes, so `["a|b"]` and `["a", "b"]` are
+ * different keys.
+ */
+function facetKey(datum, groupby) {
+  if (!datum || typeof datum !== 'object') return null;
+  const parts = [];
+  for (const field of groupby) {
+    if (!(field in datum)) return null;
+    parts.push(JSON.stringify(scaleValue(datum[field], DEFAULT_PRECISION)));
+  }
+  return '|' + parts.join('|') + '|';
+}
+
+/** One subcontext's scales, in the recorded shape. */
+function scalesOf(sub, precision) {
+  const scales = {};
+  for (const [scaleName, node] of Object.entries(sub.scales || {})) {
+    const scale = node && node.value;
+    if (!scale || typeof scale.domain !== 'function') continue;
+    scales[scaleName] = scaleEntry(scale, precision);
+  }
+  return scales;
 }
 
 /** One scale's comparable facts, shared by the top-level and nested recordings. */

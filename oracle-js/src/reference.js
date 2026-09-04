@@ -47,7 +47,7 @@ const reference = {
   // Only when there is something to record, so the 199 committed references do not all gain an
   // empty key. Most charts declare no scale inside a group.
   ...(() => {
-    const nested = normalizeNestedScales(view);
+    const nested = normalizeNestedScales(view, spec);
     return Object.keys(nested).length ? { nestedScales: nested } : {};
   })(),
   ...normalizeScene(view.scenegraph().root),

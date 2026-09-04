@@ -6002,6 +6002,140 @@
       "y2": 690.5
     }
   ],
+  "nestedScales": {
+    "site[|\"Crookston\"|]": {
+      "yscale": {
+        "bandwidth": 0,
+        "domain": [
+          "Trebi",
+          "Wisconsin No. 38",
+          "No. 457",
+          "Glabron",
+          "Peatland",
+          "Velvet",
+          "No. 475",
+          "Manchuria",
+          "No. 462",
+          "Svansota"
+        ],
+        "range": [
+          0,
+          100
+        ],
+        "step": 9
+      }
+    },
+    "site[|\"Duluth\"|]": {
+      "yscale": {
+        "bandwidth": 0,
+        "domain": [
+          "Trebi",
+          "Wisconsin No. 38",
+          "No. 457",
+          "Glabron",
+          "Peatland",
+          "Velvet",
+          "No. 475",
+          "Manchuria",
+          "No. 462",
+          "Svansota"
+        ],
+        "range": [
+          0,
+          100
+        ],
+        "step": 9
+      }
+    },
+    "site[|\"Grand Rapids\"|]": {
+      "yscale": {
+        "bandwidth": 0,
+        "domain": [
+          "Trebi",
+          "Wisconsin No. 38",
+          "No. 457",
+          "Glabron",
+          "Peatland",
+          "Velvet",
+          "No. 475",
+          "Manchuria",
+          "No. 462",
+          "Svansota"
+        ],
+        "range": [
+          0,
+          100
+        ],
+        "step": 9
+      }
+    },
+    "site[|\"Morris\"|]": {
+      "yscale": {
+        "bandwidth": 0,
+        "domain": [
+          "Trebi",
+          "Wisconsin No. 38",
+          "No. 457",
+          "Glabron",
+          "Peatland",
+          "Velvet",
+          "No. 475",
+          "Manchuria",
+          "No. 462",
+          "Svansota"
+        ],
+        "range": [
+          0,
+          100
+        ],
+        "step": 9
+      }
+    },
+    "site[|\"University Farm\"|]": {
+      "yscale": {
+        "bandwidth": 0,
+        "domain": [
+          "Trebi",
+          "Wisconsin No. 38",
+          "No. 457",
+          "Glabron",
+          "Peatland",
+          "Velvet",
+          "No. 475",
+          "Manchuria",
+          "No. 462",
+          "Svansota"
+        ],
+        "range": [
+          0,
+          100
+        ],
+        "step": 9
+      }
+    },
+    "site[|\"Waseca\"|]": {
+      "yscale": {
+        "bandwidth": 0,
+        "domain": [
+          "Trebi",
+          "Wisconsin No. 38",
+          "No. 457",
+          "Glabron",
+          "Peatland",
+          "Velvet",
+          "No. 475",
+          "Manchuria",
+          "No. 462",
+          "Svansota"
+        ],
+        "range": [
+          0,
+          100
+        ],
+        "step": 9
+      }
+    }
+  },
   "scales": {
     "cscale": {
       "domain": [

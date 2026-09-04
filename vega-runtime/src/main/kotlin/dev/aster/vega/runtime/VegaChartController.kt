@@ -35,6 +35,7 @@ import dev.aster.vega.runtime.load.DenyLoader
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.AccessibilityTree
 import dev.aster.vega.scene.AccessibleElement
+import dev.aster.vega.scene.HitResult
 import dev.aster.vega.scene.HitTestOptions
 import dev.aster.vega.scene.MetricTextEngine
 import dev.aster.vega.scene.PointD
@@ -737,8 +738,14 @@ public class VegaChartController(
    *
    * The **declaration** comes from the specification and the **instances** from
    * [CompiledSpec.groupScopes], which is what says how many times a group was drawn. A group drawn
-   * once is bound at its own path; a faceted one has a scope per cell, and which cell an event
-   * landed in is not a question this can answer yet — see [groupHandlerLimit].
+   * once is bound at its own path; a **faceted** one is bound once per cell, at each cell's path,
+   * so a chart of small multiples gets one live copy of its handler per multiple.
+   *
+   * That is upstream's shape and not a convenience: a faceted group's signals are per-cell — each
+   * cell has its own `brush`, its own `hover` — and binding one handler for the whole group would
+   * make every cell share one, so brushing one small multiple would move the brush in all of them.
+   * [scopesAt] is what keeps them apart: each binding fires only for an event whose item is inside
+   * that cell.
    */
   private fun bindingsOf(
     compiled: CompiledSpec,
@@ -750,40 +757,52 @@ public class VegaChartController(
         .flatMap { signal -> signal.on.map { HandlerBinding(signal.name, it) } }
         .toMutableList()
 
-    fun walk(marks: List<MarkSpec>, prefix: String) {
+    // The walk carries the **concrete** scopes of the enclosing group, not its path in the
+    // specification: a group inside a faceted one is a different scope in each cell — `cell/
+    // cells[0]/inner` and `cell/cells[1]/inner` — and a single spec-shaped prefix names neither.
+    fun walk(marks: List<MarkSpec>, prefixes: List<String>) {
       marks.forEachIndexed { index, mark ->
         if (mark.type != MarkType.GROUP) return@forEachIndexed
-        val here = (if (prefix.isEmpty()) "" else "$prefix/") + (mark.name ?: "[$index]")
-        // Only where exactly one scope was recorded under this path. A faceted group records one
-        // per cell and an event would have to say which cell it was in.
+        // Every scope this group was drawn as, under every scope its parent was drawn as, paired
+        // with the parent that produced it — which is where a `push: "outer"` writes. Its own path
+        // where it was drawn once, and one `.../cells[n]` per cell where it was faceted;
+        // `cellPath` is the compiler's, and this is its only reader, so both shapes are asked for.
+        // The `cells[n]` match is anchored so a *nested* group's scope is not mistaken for a cell
+        // of this one.
+        val instances = prefixes.flatMap { prefix ->
+          val here = (if (prefix.isEmpty()) "" else "$prefix/") + (mark.name ?: "[$index]")
+          val cells = Regex(Regex.escape(here) + """/cells\[\d+]""")
+          if (here in compiled.groupScopes) listOf(here to prefix)
+          else compiled.groupScopes.keys.filter { cells.matches(it) }.map { it to prefix }
+        }
         val handlers = mark.signals.sumOf { it.on.size }
-        if (here in compiled.groupScopes) {
+        for ((scopePath, prefix) in instances) {
           for (signal in mark.signals) {
             // A `push: "outer"` handler reads *here* and writes *there*: its update sees the
             // group's own signals and scales — `invert('xOverview', brush)` is both at once — and
             // the value it produces belongs to the enclosing scope's signal of that name. That is
             // the whole of how a group hands a value back out.
-            val writes = if (signal.pushesOuter) prefix else here
+            val writes = if (signal.pushesOuter) prefix else scopePath
             for (handler in signal.on) {
-              bindings += HandlerBinding(signal.name, handler, here, writePath = writes)
+              bindings += HandlerBinding(signal.name, handler, scopePath, writePath = writes)
             }
           }
-        } else if (handlers > 0) {
-          // A faceted group resolves one scope per cell, so `here` names no single scope and the
-          // event would have to say which cell it landed in — which nothing here can answer yet.
-          // Reported rather than silently unbound, which is what this whole change is about.
+        }
+        if (instances.isEmpty() && handlers > 0) {
+          // A group that declares handlers and was drawn as no scope at all — the compile failed
+          // before it, or its facet produced no cells. Reported rather than silently unbound, which
+          // is what this whole change is about.
           diagnostics.warn(
             DiagnosticCodes.INTERACTION_UNSUPPORTED,
-            "Group '${mark.name ?: here}' is drawn once per facet and declares $handlers signal " +
-              "handler(s); this engine dispatches to a group drawn once, and cannot yet tell which " +
-              "cell an event landed in, so these do not fire",
+            "Group '${mark.name ?: "[$index]"}' declares $handlers signal handler(s) and was not " +
+              "drawn, so there is no scope to dispatch them in and they do not fire",
             operator = mark.name,
           )
         }
-        walk(mark.marks, here)
+        walk(mark.marks, instances.map { it.first })
       }
     }
-    walk(spec.marks, "")
+    walk(spec.marks, listOf(""))
     return bindings
   }
 
@@ -953,7 +972,8 @@ public class VegaChartController(
       }
     val point = pointOf(event)
     val scenePoint = point?.let { toSceneSpace(it) }
-    val hit = scenePoint?.let { hitIndex.hitTest(it) }?.node
+    val hitResult = scenePoint?.let { hitIndex.hitTest(it) }
+    val hit = hitResult?.node
     // What `x()`, `y()` and `xy()` answer: the point with the chart's padding and autosize origin
     // taken off, which the root group carries as its own translation — upstream's `offset(view)`.
     val origin = _state.value.snapshot.scene.root.transform
@@ -974,6 +994,7 @@ public class VegaChartController(
             rootX = rootPoint.x,
             rootY = rootPoint.y,
             properties = (event as? ChartInputEvent.Key)?.let { keyProperties(it) } ?: emptyMap(),
+            scopes = scopesAt(compiled, hitResult),
           )
         )
       // A stream carrying a `debounce` is *held* rather than applied: it fires after a quiet
@@ -987,6 +1008,35 @@ public class VegaChartController(
       }
     }
     applyFired(changed, compiled)
+  }
+
+  /**
+   * Which group scopes an event is **in**, by the paths the compiler recorded them under.
+   *
+   * The answer every `scope`-sourced handler needs, and the reason those used to be refused: a
+   * handler declared in a group listens on that group's own item, so `{"events": "mousedown"}`
+   * inside one means "a mousedown anywhere in this group", and the dispatcher has neither the scene
+   * nor the point in world space.
+   *
+   * **Ancestry of the item that was hit, not geometry.** Upstream compiles `inScope(event.item)`
+   * into every scope-sourced stream, and its `inScope` walks `item.mark.group` upwards looking for
+   * the scope's own group item. Containment of the group's rectangle is a different question and
+   * gives a different answer twice over: a press on the group's background where it has no fill is
+   * inside the rectangle and hits no item, so upstream does *not* fire; and a mark that overflows
+   * an unclipped group is outside the rectangle and still upstream's descendant, so it does. The
+   * hit index already carries the chain — `HitResult.ancestors` — so this is the cheaper reading as
+   * well as the faithful one, and it drops a whole-scene walk from every pointer event.
+   *
+   * The chain is matched against the **id the compiler recorded for that cell**, not against mark
+   * names: the scene holds group nodes for axes and legends too, and pairing them to scopes by
+   * shape is the inference that has been wrong every time it was tried here.
+   */
+  private fun scopesAt(compiled: CompiledSpec, hit: HitResult?): Set<String> {
+    if (hit == null || compiled.groupNodes.isEmpty()) return emptySet()
+    val chain = HashSet<SceneNodeId>(hit.ancestors.size + 1)
+    chain += hit.node.id
+    for (ancestor in hit.ancestors) chain += ancestor.id
+    return compiled.groupNodes.filterValues { it in chain }.keys
   }
 
   /**

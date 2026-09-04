@@ -1,6 +1,9 @@
+@file:OptIn(InternalAsterVegaApi::class)
+
 package dev.aster.vega.runtime
 
 import dev.aster.vega.loader.FileDataLoader
+import dev.aster.vega.model.InternalAsterVegaApi
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.RectNode
@@ -12,23 +15,19 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
- * The two shapes of group-scoped handler that still do not fire, each reported by name.
+ * Every shape of group-scoped handler fires, and this class is what is left of the list that did
+ * not.
  *
- * This class used to say that **no** handler declared inside a group fires — which was true, and is
- * the thing `GroupScopedHandlerFiresTest` now closes for a group drawn once whose selector names a
- * mark. What is left is narrower, and neither case may go quiet: a reader whose brush does nothing
- * has to be told which of the two it is.
+ * It began by saying that **no** handler declared inside a group fires, which was true. Then only a
+ * bare `scope` selector did not, then only a faceted group's. All three are closed, and the tests
+ * that pinned each limit were rewritten into the case they had been refusing rather than deleted —
+ * a reader who comes here after finding an old note deserves to land on the answer.
  *
- * **A bare `scope` selector.** A handler declared in a group defaults to source `scope` — upstream
- * attaches the listener to that group's own item — so `{"events": "mousedown"}` inside a group
- * means "a mousedown anywhere in this group". Where the selector names a mark, the mark name does
- * the narrowing and the two are the same listener; where it names none, narrowing it needs scene
- * containment that nothing here answers yet. Refused at registration rather than widened to the
- * whole view, because widening it would fire a group's handler on every event in the chart — the
- * loud wrong answer where this is the quiet one (ADR 0011).
- *
- * **A faceted group.** One scope per cell, so which cell the event landed in is part of the
- * question, and it is not asked yet.
+ * The two halves live elsewhere and are worth reading together: `ScopeSourcedHandlerTest` covers a
+ * bare selector in a group drawn once, and `FacetedScopeHandlerTest` covers a group drawn once per
+ * cell. What kept both refused for so long is the case those classes assert hardest — a group's
+ * handler must *not* fire for an event in a sibling group or a neighbouring cell, and widening it
+ * to the whole view would have done exactly that.
  */
 class GroupScopedHandlerTest {
 
@@ -117,31 +116,40 @@ class GroupScopedHandlerTest {
     )
   }
 
+  /**
+   * A bare `scope` selector fires now, for an event inside its own group.
+   *
+   * This class used to hold the opposite, and the diagnostic it checked told the author to write
+   * `@markname:mousedown` instead. `ScopeSourcedHandlerTest` covers the behaviour in full — most
+   * importantly that it does *not* fire for an event in a sibling group, which is what made the
+   * refusal the right answer while the question went unanswered.
+   */
   @Test
-  fun `a bare scope selector does not fire, and says which mark to name`() {
+  fun `a bare scope selector fires and is no longer reported`() {
     val controller = VegaChartController()
     controller.setSpec(bareSelectorInAGroup)
     press(controller)
     assertEquals(
-      listOf("#0000ff"),
+      listOf("#ff0000"),
       fills(controller),
-      "a bare scope selector fired, so it was widened to the whole view",
+      "a bare scope selector did not fire for a press inside its own group",
     )
-    val reported = controller.state.value.diagnostics.map { it.message }
     assertTrue(
-      reported.any { "@markname:" in it && "'hit'" in it },
-      "a bare scope selector was dropped without saying what to write instead: $reported",
+      controller.state.value.diagnostics.none { "@markname:" in it.message },
+      "a bare scope selector is still being refused",
     )
   }
 
   /**
-   * A faceted group's handlers do not fire, and the reason names the group.
+   * A faceted group's handlers fire, one live copy per cell, and nothing is reported.
    *
-   * Distinct from the case above and reported differently, because the remedy is different: there
-   * is nothing the author can rewrite here.
+   * This asserted the opposite: there was no remedy the author could write, so the group was named
+   * in a diagnostic instead. `FacetedScopeHandlerTest` is where the behaviour is checked in full —
+   * that each cell fires alone, and that naming the mark does not widen it back across the facet.
+   * Kept here, inverted, so the shape this class was built around still has a case in it.
    */
   @Test
-  fun `a faceted group's handlers are reported rather than silently unbound`() {
+  fun `a faceted group's handlers are bound, one scope per cell`() {
     val controller = VegaChartController()
     controller.setSpec(
       """
@@ -161,10 +169,14 @@ class GroupScopedHandlerTest {
       """
         .trimIndent()
     )
-    val reported = controller.state.value.diagnostics.map { it.message }
+    assertEquals(
+      listOf("cell/cells[0]", "cell/cells[1]"),
+      controller.lastCompiled!!.groupScopes.keys.filter { it.startsWith("cell/") },
+      "a faceted group did not record one scope per cell",
+    )
     assertTrue(
-      reported.any { "once per facet" in it && "cell" in it },
-      "a faceted group's handlers were left unbound in silence: $reported",
+      controller.state.value.diagnostics.none { "do not fire" in it.message },
+      "a faceted group's handlers are still reported as unbound",
     )
   }
 
