@@ -439,6 +439,26 @@ section here does not get released.
 
 ### Fixed
 
+- **A channel this engine leaves out because it is the default no longer reads as a difference.**
+  Upstream records a `strokeCap` or a `strokeJoin` whenever the specification **set** one, even to
+  the default; this engine records one only when it *differs* from the default. Those two rules
+  agree on every chart except one that explicitly writes the default — and there the comparison
+  announced a difference neither engine was wrong about.
+
+  Found while widening the `guide-encode-datum` fixture: a guide encode setting `strokeCap` to
+  `butt` had upstream writing it and this side silent. The first response was to change the fixture
+  to use non-default values on both branches, which made the failure go away without recording
+  anything — so the fixture is back on the explicit-default case and the comparison now resolves an
+  absent cap to `butt` and an absent join to `miter`, because that is what the absence means.
+
+  The `strokeDetails` comment claimed the recording rule matched upstream's — "which is what
+  upstream leaves absent" — and it does not. That is corrected rather than left to mislead the next
+  reader.
+
+  Deliberately a two-entry table. A channel added to it stops being compared wherever upstream
+  states the default and this omits it, which is right for a cap and would be wrong for anything
+  whose absence means "nothing was drawn".
+
 - **A third of the corpus's scales were compared not at all, under a test that said they were.**
   `compareScales`'s `when (scale)` named `linear`, `band` and `point` and fell to `else -> Unit`, so
   152 of 466 recorded scales went straight past it — no domain, no range, no ticks — while
