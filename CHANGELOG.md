@@ -8,6 +8,31 @@ section here does not get released.
 
 ### Added
 
+- **The `label` transform is compared against upstream, which the row said was impossible.** It had
+  read `Partial — not verified against upstream` since it was written, because `vega-label`
+  rasterises the avoided marks through a canvas, `vega-canvas` answers null under Node, and
+  upstream's own transform throws there: "so there is no reference to compare against".
+
+  There is. `oracle-js/src/record-label.mjs` installs `canvas` for the run — the same trick
+  `record-wordcloud.mjs` uses, and for the same reason it must stay out of `package.json` — and
+  upstream places labels perfectly well. Six scenarios turn one knob each: four anchors and eight,
+  a crowd that forces drops, the same crowd without avoiding the base mark, an offset wide enough to
+  push labels off the surface, and marks large enough to fill the bitmap.
+
+  **The text widths are recorded too, and that is what makes the answer mean anything.** Canvas
+  changes upstream's measurement, and a label's width decides whether it fits, which decides its
+  anchor and whether it is dropped at all — so replaying the placements without also handing over
+  the widths compares typefaces and calls the result "occupancy". Measured that way first, the two
+  engines disagreed on 6 of 48 drops and 9 of 40 anchors; measured with upstream's own widths, on
+  **0 of 48 drops and 1 of 46 anchors**.
+
+  That one is pinned by name rather than tolerated as a count, the way `known-divergences.json` pins
+  the transform replays: in a crowd with the base mark not avoided, one label takes its second
+  choice of anchor where upstream takes its third. A new disagreement fails the build, and so does
+  fixing this one without deleting its entry. The transform still reports on every use that its
+  occupancy is geometric, because a crowded chart can still differ — but the row now says by how
+  much instead of saying it cannot be known.
+
 - **`push: "outer"` is honoured: a signal declared in a group can write the enclosing scope's.** It
   is how a group hands a value back out, and Vega's `overview-plus-detail` uses it to move the
   detail panel from a brush on the overview. This repository's own Vega-Lite compiler emits it for a

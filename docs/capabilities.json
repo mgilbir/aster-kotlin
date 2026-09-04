@@ -2849,16 +2849,17 @@
       "line": 284,
       "section": "Expressions",
       "feature": "`label`",
-      "status": "Partial — **not verified against upstream**",
+      "status": "**Supported**, with one measured divergence",
       "tests": [
-        "BitmapTest"
+        "BitmapTest",
+        "LabelAgainstUpstreamTest"
       ],
-      "tests_text": "`BitmapTest` (upstream vectors for the bit algebra and the pixel scaler), visual inspection of `labeled-scatter-plot`",
-      "notes": "Places a text mark's items beside the marks they annotate and drops the ones that would collide. Everything is upstream's — the eight anchors and their two-bit arithmetic, the diagonal offsets scaled by `1/sqrt(2)`, the one-pixel-wide trial that avoids measuring a label that cannot fit, the bit-vector occupancy bitmap and its pixel scaler — **except the one step that decides what is occupied**. Upstream draws the avoided marks into a `<canvas>` and reads the alpha back; there is none under Node and its own transform throws there, so there is no reference to compare against. The occupancy is computed from the marks' geometry instead: a pixel is taken as occupied when the shape overlaps its square. The two answers agree except on pixels a shape barely grazes, and one pixel is enough to move a label to a different anchor or to drop one a crowded chart would otherwise fit — so **every use of the transform reports this**, and it is the only place in the engine that carries such a warning",
+      "tests_text": "`BitmapTest` (upstream vectors for the bit algebra and the pixel scaler), `LabelAgainstUpstreamTest` (upstream's own placements, recorded with a canvas)",
+      "notes": "Places a text mark's items beside the marks they annotate and drops the ones that would collide. Everything is upstream's — the eight anchors and their two-bit arithmetic, the diagonal offsets scaled by `1/sqrt(2)`, the one-pixel-wide trial that avoids measuring a label that cannot fit, the bit-vector occupancy bitmap and its pixel scaler — **except the one step that decides what is occupied**. Upstream draws the avoided marks into a `<canvas>` and reads the alpha back, which `vega-canvas` refuses under Node — so this row said, for as long as it existed, that there was no reference to compare against. There is: `oracle-js/src/record-label.mjs` installs `canvas` for the run, the way the wordcloud recorder does, and upstream places labels perfectly well. The occupancy here is computed from the marks' geometry instead — a pixel is occupied when the shape overlaps its square — and is measured against upstream's own placements **using upstream's own text widths**, so a difference in fonts is not mistaken for a difference in occupancy. They agree on every one of 48 drop decisions and on 45 of 46 anchors. The single divergence is pinned by name rather than tolerated as a count: in a crowd with the base mark not avoided, one label takes its second choice of anchor where upstream takes its third. That is the “pixels a shape barely grazes” case, now a number instead of a caveat — and **every use of the transform still reports** that the occupancy is geometric, because a crowded chart can still differ",
       "milestone": "6",
       "limit": {
         "test": "LabelOccupancyLimitTest.every use reports that the occupancy is geometric rather than rasterised",
-        "claim": "The occupancy bitmap is computed from the avoided marks' geometry rather than from a canvas raster, because there is no canvas under Node and upstream's own transform fails in the same place — so there is no reference to compare against. Every use of the transform reports it."
+        "claim": "The occupancy bitmap is computed from the avoided marks' geometry rather than from a canvas raster. Measured against upstream's own placements, recorded with a canvas and replayed with upstream's text widths: every drop agrees and 45 of 46 anchors agree, with the one divergence pinned by name. Every use of the transform reports it."
       }
     },
     {
