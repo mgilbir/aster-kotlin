@@ -195,6 +195,16 @@ internal class ScopeCompiler(
   val groupScopes: MutableMap<String, SignalScope> = LinkedHashMap()
 
   /**
+   * The scales each group mark built for itself, by the same path.
+   *
+   * Beside [groupScopes] rather than read out of it: a [SignalScope] keeps its scales private,
+   * because an expression asks it questions rather than reading its table. The differential harness
+   * needs the objects themselves — a domain, a range, a bandwidth — to compare against upstream's,
+   * and until it had them a scale declared inside a group was never compared at all.
+   */
+  val groupScales: MutableMap<String, Map<String, VegaScale>> = LinkedHashMap()
+
+  /**
    * A scope's scene nodes, and how far the drawing they make up reaches.
    *
    * @param cellReach set only for a group mark's cells, which a `layout` needs in order to grid
@@ -726,6 +736,11 @@ internal class ScopeCompiler(
         // A handler needs both at once: `invert('xOverview', brush)` is a scale lookup and a signal
         // read in one expression, and `xOverview` is the group's own.
         groupScopes[here] = sized.signals.withScales(sized.scales, diagnostics)
+        // The group's **own** scales, not the enclosing scope's it also sees: what upstream records
+        // for a subcontext is what that subcontext defined, and comparing inherited ones would
+        // compare the top level twice.
+        groupScales[here] =
+          spec.scales.mapNotNull { s -> sized.scales[s.name]?.let { s.name to it } }.toMap()
         // An **empty** facet cell draws nothing at all — not even its gridlines. Vega instantiates
         // a faceted group's subflow only for keys that rows arrived under, so a cell `cross`
         // invented to keep the grid rectangular is a group with no contents, which is visibly

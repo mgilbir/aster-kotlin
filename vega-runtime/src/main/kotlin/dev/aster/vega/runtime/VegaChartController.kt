@@ -941,6 +941,14 @@ public class VegaChartController(
         is ChartInputEvent.PointerEntered -> listOf("pointerover", "mouseover")
         is ChartInputEvent.PointerExited -> listOf("pointerout", "mouseout")
         is ChartInputEvent.Tap -> listOf("click")
+        // `keydown` is one of the events upstream's own handler binds on the **view** element —
+        // `vega-scenegraph`'s `Events` list has it beside `pointerdown` — so it is a view stream
+        // here too, and a specification writing `{"events": "keydown"}` is asking for something
+        // this engine can actually deliver. `keyup` and `keypress` are on that list as well and
+        // are *not* produced: a host reports one `ChartInputEvent.Key` per press with no phase,
+        // so there is nothing to tell a release from a repeat. They are refused by name at
+        // registration rather than left to never match.
+        is ChartInputEvent.Key -> listOf("keydown")
         else -> return
       }
     val point = pointOf(event)
@@ -965,6 +973,7 @@ public class VegaChartController(
             y = point?.y ?: 0.0,
             rootX = rootPoint.x,
             rootY = rootPoint.y,
+            properties = (event as? ChartInputEvent.Key)?.let { keyProperties(it) } ?: emptyMap(),
           )
         )
       // A stream carrying a `debounce` is *held* rather than applied: it fires after a quiet
@@ -981,7 +990,42 @@ public class VegaChartController(
   }
 
   /**
-   * Holds a handler until its stream has been quiet for as long as it asked for.
+   * What `event.key` and its neighbours answer, in the browser's own vocabulary.
+   *
+   * A specification reads `event.key` because that is what a `KeyboardEvent` carries, so these are
+   * the DOM's names and numbers rather than this engine's enum — `ArrowRight` and 39, not
+   * `ARROW_RIGHT`. A chart written for the web has to keep working, and a reader of the
+   * specification should not have to learn a second set of names.
+   *
+   * `keyCode` is deprecated in the DOM and still carried, because a specification written any time
+   * in the last fifteen years may read it and no substitute reaches the same charts.
+   */
+  private fun keyProperties(event: ChartInputEvent.Key): Map<String, VegaValue> {
+    val (name, code) =
+      when (event.key) {
+        ChartKey.ARROW_LEFT -> "ArrowLeft" to 37
+        ChartKey.ARROW_UP -> "ArrowUp" to 38
+        ChartKey.ARROW_RIGHT -> "ArrowRight" to 39
+        ChartKey.ARROW_DOWN -> "ArrowDown" to 40
+        ChartKey.ENTER -> "Enter" to 13
+        ChartKey.SPACE -> " " to 32
+        ChartKey.ESCAPE -> "Escape" to 27
+        ChartKey.TAB -> "Tab" to 9
+        ChartKey.HOME -> "Home" to 36
+        ChartKey.END -> "End" to 35
+      }
+    return mapOf(
+      "key" to VegaValue.Str(name),
+      "keyCode" to VegaValue.Num(code.toDouble()),
+      "shiftKey" to VegaValue.Bool(event.modifiers.shift),
+      "ctrlKey" to VegaValue.Bool(event.modifiers.control),
+      "altKey" to VegaValue.Bool(event.modifiers.alt),
+      "metaKey" to VegaValue.Bool(event.modifiers.meta),
+    )
+  }
+
+  /**
+   * Holds a handler until its stream has been quiet for as long as it opened for.
    *
    * Keyed by the signal it sets *and* the delay, so two debounced handlers on one signal wait
    * independently while a second event on the same one replaces the first — which is the whole

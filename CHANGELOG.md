@@ -8,6 +8,54 @@ section here does not get released.
 
 ### Added
 
+- **A scale declared inside a named group is compared against upstream.** The row read
+  `Not compared`, on the grounds that "a faceted group resolves its scales once per cell and there
+  is no single scale of that name to compare". That reason is sound and it covers only *faceted*
+  groups — half the nested scales in the corpus belong to a group drawn **once**, and each of those
+  has exactly one scale of its name. They were excluded by a reason that did not apply to them.
+
+  `normalizeNestedScales` reads them from upstream's own `subcontext`, keyed by
+  `subcontext[i].group.mark.name`, and records a group's scales when its name identifies exactly one
+  subcontext. `FixtureDifferentialTest` then checks their domain, range, bandwidth and ticks the way
+  it checks a top-level scale's. Five scales across two fixtures now compare where none did: the
+  detail and overview panels of `overview-plus-detail` and the three histograms of
+  `crossfilter-flights`. All five match.
+
+  Keyed by **name** rather than by upstream's subcontext index, deliberately: pairing by position
+  would mis-pair the moment a mark was added, which is the same reason node ids are unusable for
+  comparison in this harness. The nested scales go into a key of their own rather than beside the
+  top-level ones, so a group's `yscale` cannot come to shadow the chart's.
+
+  `NestedScaleScopeTest` becomes `NestedScaleCoverageTest` and now says which of the three shapes
+  each group in the corpus falls into — named and singly drawn, faceted, or unnamed — rather than
+  asserting that none of them is compared. Only 2 of the 199 committed references changed, because
+  the key is emitted only when there is something in it.
+
+- **A `{"events": "keydown"}` handler fires.** `fireSignalHandlers` mapped only the pointer family,
+  so a specification writing one got a chart that compiled, drew and never updated from the
+  keyboard — and a signal that never updates looks exactly like one whose expression is wrong.
+
+  It is a **view** stream rather than a `window:` one, which is what makes it deliverable at all:
+  upstream's own `Events` list in `vega-scenegraph` binds `keydown` on the view element beside
+  `pointerdown`, so this is not the window family this engine reports it cannot dispatch.
+
+  `event.key` answers in the **DOM's** vocabulary rather than this engine's enum — `ArrowRight`, not
+  `ARROW_RIGHT` — because that is what a `KeyboardEvent` carries and what every specification
+  written for the web already reads. `keyCode` comes with it, deprecated in the DOM and still worth
+  carrying since a chart written any time in the last fifteen years may read it, along with the four
+  modifier flags so a handler can tell a plain arrow from a shifted one. A `filter` on the stream
+  works, which is the idiom a specification actually uses to pick out one key.
+
+  `keyup` and `keypress` are on upstream's list too and are **refused by name**: a host reports one
+  `ChartInputEvent.Key` per press with no phase, so nothing here distinguishes a release from a
+  repeat. Producing a `keyup` for a press would be worse than producing none, and the diagnostic
+  names the selector that does work.
+
+  With this, `KeyboardTraversalLimitTest` is gone rather than narrowed again — every limitation it
+  held is closed, traversal in the previous change and this one now. Its one remaining assertion was
+  a guard rather than a claim, that a key touches no hover and no viewport, and it moves to
+  `KeyboardTraversalTest`. The keyboard row loses its limitation entirely.
+
 - **A chart that pans and zooms offers an accessible way to do both.** The row read `Planned` — "the
   accessibility tree exposes activation and nothing else" — so a reader could reach every bar in a
   chart and never the view they were drawn in. Panning and zooming were gestures and only gestures.

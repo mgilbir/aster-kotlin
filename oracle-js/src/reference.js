@@ -15,7 +15,7 @@ import { fileLoader, rootsFor } from './file-loader.js';
 import * as vega from 'vega';
 import { pinDeterminism } from './determinism.js';
 import { canonicalJson, canonicalNumber } from './canonical.js';
-import { normalizeScales, normalizeScene } from './normalize.js';
+import { normalizeNestedScales, normalizeScales, normalizeScene } from './normalize.js';
 
 const [specPath, outputPath] = process.argv.slice(2);
 
@@ -44,6 +44,12 @@ const reference = {
   // padding — not width/height plus padding, because axis labels hang outside the plotting area.
   size: surfaceSize(view),
   scales: normalizeScales(view, scaleNames),
+  // Only when there is something to record, so the 199 committed references do not all gain an
+  // empty key. Most charts declare no scale inside a group.
+  ...(() => {
+    const nested = normalizeNestedScales(view);
+    return Object.keys(nested).length ? { nestedScales: nested } : {};
+  })(),
   ...normalizeScene(view.scenegraph().root),
 };
 
