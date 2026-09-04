@@ -6,7 +6,9 @@ import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.LinearScale
+import dev.aster.vega.runtime.scale.OrdinalScale
 import dev.aster.vega.runtime.scale.PointScale
+import dev.aster.vega.runtime.scale.SequentialColorScale
 import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
@@ -53,6 +55,17 @@ public object Differential {
    * Tight tolerance for geometry: enough for double arithmetic order, far below a visible pixel.
    */
   public const val GEOMETRY_TOLERANCE: Double = 1e-6
+
+  /**
+   * How close two colours have to be, as a fraction of a channel.
+   *
+   * Half of one 8-bit step. Upstream records a colour as text — hex for a scheme it was given,
+   * `rgb(r, g, b)` for one an interpolator produced — and both forms quantise to whole bytes on the
+   * way out, so two engines agreeing exactly still differ by up to half a step once one of them has
+   * been through a string. Tighter than that compares the spelling; looser admits a colour a reader
+   * could tell apart.
+   */
+  public const val COLOR_TOLERANCE: Double = 0.5 / 255.0
 
   /**
    * Tolerance for the extent of a mark built from curves.
@@ -942,6 +955,43 @@ public object Differential {
     }
   }
 
+  /**
+   * A scale range whose entries may be colours, compared as **colours** rather than as text.
+   *
+   * The formats genuinely differ and neither side is wrong: upstream records an ordinal scheme in
+   * the hex it was defined in — `#1f77b4` — and an interpolated endpoint in the `rgb(255, 255,
+   * 204)` its interpolator returns. Comparing the strings would report a difference between two
+   * spellings of the same colour, so both sides are parsed and compared by component, and anything
+   * that is not a colour falls back to exact text.
+   */
+  private fun compareRangeValues(
+    name: String,
+    expected: List<String>,
+    actual: List<String>,
+    out: MutableList<Difference>,
+  ) {
+    if (expected.size != actual.size) {
+      out.add(
+        Difference("scale $name range size", expected.size.toString(), actual.size.toString())
+      )
+      return
+    }
+    expected.zip(actual).forEachIndexed { index, (e, a) ->
+      val theirs = SceneColor.parse(e)
+      val ours = SceneColor.parse(a)
+      val same =
+        if (theirs != null && ours != null) {
+          abs(theirs.red - ours.red) <= COLOR_TOLERANCE &&
+            abs(theirs.green - ours.green) <= COLOR_TOLERANCE &&
+            abs(theirs.blue - ours.blue) <= COLOR_TOLERANCE &&
+            abs(theirs.alpha - ours.alpha) <= COLOR_TOLERANCE
+        } else {
+          e == a
+        }
+      if (!same) out.add(Difference("scale $name range[$index]", e, a))
+    }
+  }
+
   public fun compareScales(
     expected: Map<String, ScaleReference>,
     actual: Map<String, VegaScale>,
@@ -1027,6 +1077,63 @@ public object Differential {
             tolerance,
             differences,
           )
+        }
+        // An **ordinal** scale: a discrete domain and whatever the range holds, which for the
+        // commonest case is a colour scheme. Recorded in full rather than only the entries the
+        // chart happens to use, which is what makes it worth comparing directly — a scheme that
+        // wrapped one colour early, or a domain in the wrong order, moves colours the mark
+        // comparison only notices where a mark exists.
+        is OrdinalScale -> {
+          // `effectiveDomain`, not `domain`: an ordinal scale whose `domainImplicit` is set grows
+          // its domain as values arrive, and upstream records the grown one — four entries where
+          // the specification declared two. Reading the declared list reported
+          // `[alpha, beta, gamma, delta]` against `[alpha, beta]` on `scale-domain-implicit`, which
+          // is the comparison looking at the wrong property rather than the engine losing values:
+          // the marks in that fixture have always matched.
+          if (reference.domain != scale.effectiveDomain) {
+            differences.add(
+              Difference(
+                "scale $name domain",
+                reference.domain.toString(),
+                scale.effectiveDomain.toString(),
+              )
+            )
+          }
+          compareRangeValues(
+            name,
+            reference.range,
+            scale.rangeValues.map { it.asString() },
+            differences,
+          )
+        }
+        // A **sequential colour** scale: its numeric domain and its ticks, and deliberately not its
+        // range.
+        //
+        // The two sides do not hold the same object there, and neither is wrong. Upstream's
+        // `scale.range()` answers the *interpolator's* endpoints — two colours for `viridis` —
+        // while
+        // this engine keeps every stop of the scheme it was built from, which is 31 for `viridis`
+        // and 64 for `turbo`. Comparing them reported "expected 2, got 31" on seventeen fixtures,
+        // which is a difference of representation rather than of behaviour: the colour the scale
+        // actually *produces* is compared wherever it is used, by the mark comparison, and its
+        // interpolation directly by the `colour-ramps` and `colour-interpolation` fixtures.
+        is SequentialColorScale -> {
+          compareNumberList(
+            "scale $name domain",
+            reference.domain,
+            scale.domain,
+            tolerance,
+            differences,
+          )
+          reference.ticks?.let { wanted ->
+            compareNumberList(
+              "scale $name ticks",
+              wanted.map { fmt(it) },
+              scale.ticks(),
+              tolerance,
+              differences,
+            )
+          }
         }
         else -> Unit
       }

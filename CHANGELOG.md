@@ -425,11 +425,24 @@ section here does not get released.
     after it is off the grid. The `local-time-dst` fixture produced eight ticks where upstream
     produces nine.
 
+  The ordinal and sequential-colour families followed, taking it to **448 of 466**. An ordinal
+  scale's domain and range compare directly — a scheme that wrapped a colour early, or a domain in
+  the wrong order, moves colours the mark comparison only notices where a mark happens to exist —
+  and colours are compared as *colours* rather than as text, because upstream records a scheme in
+  the hex it was given and an interpolated endpoint in the `rgb(r, g, b)` its interpolator returns.
+
+  Two things that surfaced there. An ordinal scale's **grown** domain is what upstream records, so
+  the comparison reads `effectiveDomain` rather than the declared list; reading the wrong one
+  reported four values against two on `scale-domain-implicit`, where the marks had always matched.
+  And a sequential colour scale's **range** is deliberately not compared: upstream's `scale.range()`
+  answers the interpolator's two endpoints where this engine keeps every stop of the scheme — 31 for
+  `viridis`, 64 for `turbo` — which is a difference of representation rather than of behaviour, and
+  the colour the scale actually produces is compared wherever it is used.
+
   `ScaleComparisonCoverageTest` keeps the rest from going quiet again: a scale kind that is not
   compared has to be **named there with a reason**, so a family added later, or one that stops
-  matching its branch, shows up as an unexplained kind rather than as silence. What is left is 123
-  scales across seven kinds whose facts the reference does not record in a comparable form —
-  ordinal and sequential-colour ranges, and the four discretizing families' bucket boundaries.
+  matching its branch, shows up as an unexplained kind rather than as silence. What is left is **18 scales across five
+  kinds** — the four discretizing families' bucket boundaries, and `identity`, which maps nothing.
 
 - **The Vega-Lite surface was half a unit to a unit small on every chart, and the stated reason was
   wrong.** The row explained it as a guide extent the mark comparison could not see, "because text

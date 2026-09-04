@@ -6,7 +6,9 @@ import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.runtime.compile.SpecCompiler
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.LinearScale
+import dev.aster.vega.runtime.scale.OrdinalScale
 import dev.aster.vega.runtime.scale.PointScale
+import dev.aster.vega.runtime.scale.SequentialColorScale
 import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.runtime.scale.TransformedScale
 import java.io.File
@@ -49,8 +51,6 @@ class ScaleComparisonCoverageTest {
    */
   private val NOT_COMPARED =
     mapOf(
-      "OrdinalScale" to "a discrete domain mapped to arbitrary values; the range is colours",
-      "SequentialColorScale" to "the range is an interpolator, not a pair of numbers",
       "BinOrdinalScale" to "bucket boundaries, recorded as a domain of a different shape",
       "QuantileScale" to "bucket boundaries derived from the data rather than declared",
       "QuantizeScale" to "bucket boundaries derived from the domain",
@@ -79,7 +79,9 @@ class ScaleComparisonCoverageTest {
             scale is TimeScale ||
             scale is TransformedScale ||
             scale is BandScale ||
-            scale is PointScale
+            scale is PointScale ||
+            scale is OrdinalScale ||
+            scale is SequentialColorScale
         if (handled) compared++
         else {
           val kind = scale::class.simpleName ?: "?"
@@ -118,17 +120,26 @@ class ScaleComparisonCoverageTest {
   fun `the continuous families are compared`() {
     val counted = count()
     assumeTrue(counted.compared > 100, "the corpus is not built")
-    for (kind in listOf("TimeScale", "LogScale", "PowScale", "SymlogScale")) {
+    for (kind in
+      listOf(
+        "TimeScale",
+        "LogScale",
+        "PowScale",
+        "SymlogScale",
+        "OrdinalScale",
+        "SequentialColorScale",
+      )) {
       assertTrue(
         kind !in counted.skipped,
         "$kind is being walked past again; the continuous families were the point of this change",
       )
     }
-    // The count that was 314 before the fix and is 343 after it. A floor rather than an equality,
-    // because a new fixture may add scales of either sort; it may not take the number *down*.
+    // 314 before any of this, 343 with the continuous families, 448 with the ordinal and
+    // sequential-colour ones. A floor rather than an equality, because a new fixture may add scales
+    // of either sort; it may not take the number *down*.
     assertTrue(
-      counted.compared >= 340,
-      "only ${counted.compared} scales are compared, down from 343; a family has stopped matching",
+      counted.compared >= 445,
+      "only ${counted.compared} scales are compared, down from 448; a family has stopped matching",
     )
   }
 
