@@ -147,98 +147,12 @@ jobs:
         run: ./gradlew centralBundle verifyCentralBundle --no-configuration-cache
 
       - name: Say how many tests actually ran
-        # A green run that quietly skipped a suite is worse than a red one, and nothing in Gradle's
-        # output distinguishes them: it prints a test count only for tasks that *fail*. The first run
-        # of this workflow reported two numbers, both from failures, and said nothing whatsoever about
-        # the other eleven test tasks. So the counts are summed from the JUnit XML here.
-        #
-        # Two assertions, and the per-module one is the one that bites. A whole-suite floor would not
-        # have caught what actually happened: vega-runtime — 2787 tests, holding both differential
-        # gates — did not run at all, because the build stopped at the first failing module. Naming
-        # the modules is what makes "the suite ran" checkable rather than plausible.
+        # The rule lives in `scripts/test-counts.py` so this and `scripts/check.sh` run the *same*
+        # one. It was a heredoc here, and that was a hole rather than a detail: `check.sh` is the
+        # pre-landing gate, so a rule only CI knows is a rule that lands broken. It cost three red
+        # runs on `main` before anybody looked at the workflow.
         if: always()
-        run: |
-          set -euo pipefail
-          python3 - "${{ runner.os }}" /tmp/check-test-results <<'PY'
-          import glob, sys, xml.etree.ElementTree as ET
-          from collections import Counter
-
-          host, root = sys.argv[1], sys.argv[2]
-          total = skipped = failed = 0
-          per, per_skip = Counter(), Counter()
-          for path in glob.glob(f"{root}/*/build/test-results/**/*.xml", recursive=True):
-              try:
-                  suite = ET.parse(path).getroot()
-              except ET.ParseError:
-                  continue
-              tests = int(suite.get("tests", 0))
-              total += tests
-              skipped += int(suite.get("skipped", 0))
-              failed += int(suite.get("failures", 0)) + int(suite.get("errors", 0))
-              module = path[len(root) :].lstrip("/").split("/")[0]
-              per[module] += tests
-              per_skip[module] += int(suite.get("skipped", 0))
-
-          print(f"{total} tests, {skipped} skipped, {failed} failed")
-          for module in sorted(per):
-              print(f"  {module:34}{per[module]:6} tests, {per_skip[module]:4} skipped")
-
-          # Which classes skipped, and why. Reading this out of the log is the difference between
-          # "some tests skipped" and "the Vega-Lite scene gate is not running".
-          if skipped:
-              where, why = Counter(), {}
-              for path in glob.glob(f"{root}/*/build/test-results/**/*.xml", recursive=True):
-                  try:
-                      suite = ET.parse(path).getroot()
-                  except ET.ParseError:
-                      continue
-                  for case in suite.iter("testcase"):
-                      for skip in case.iter("skipped"):
-                          name = case.get("classname", "?").rsplit(".", 1)[-1]
-                          where[name] += 1
-                          why.setdefault(name, (skip.get("message") or "").strip()[:160])
-              print("skipped by class:")
-              for name, count in where.most_common():
-                  print(f"  {name} ({count}): {why[name]}")
-
-          problems = []
-
-          # Every host runs the JVM suites, so every host owes these. The counts are what this
-          # workflow observed, less a margin; they are a shrink detector, not a target to grow.
-          for module, least in (
-              ("vega-runtime", 2500),
-              ("vega-lite", 800),
-              ("vega-expression", 440),
-              ("vega-dataflow", 210),
-              ("vega-scene", 170),
-              ("vega-model", 70),
-              ("vega-svg", 25),
-              ("vega-loader", 9),
-              ("vega-compose-multiplatform", 20),
-          ):
-              if per[module] < least:
-                  problems.append(f"{module} ran {per[module]} tests, expected at least {least}")
-
-          # macOS additionally runs the commonTest suites on Kotlin/Native.
-          if host == "macOS":
-              native = sum(
-                  int(ET.parse(p).getroot().get("tests", 0))
-                  for p in glob.glob(f"{root}/*/build/test-results/*Arm64Test/**/*.xml", recursive=True)
-              )
-              if native < 20:
-                  problems.append(f"only {native} tests ran on Kotlin/Native, expected at least 20")
-
-          # The replays guard their own size internally (`replayed >= 60`, `>= 9750`), so a skip here
-          # means a suite decided its fixtures were absent. Two are legitimately conditional.
-          if skipped > 10:
-              problems.append(f"{skipped} tests skipped; suites are assuming themselves away")
-
-          for problem in problems:
-              print(f"::error::{problem}")
-          if problems:
-              sys.exit(1)
-          print(f"{total} tests ran on {host}, {skipped} skipped, every expected module present.")
-          PY
+        run: python3 scripts/test-counts.py "${{ runner.os }}" /tmp/check-test-results --ci
 
       - name: Upload test reports
         # **Always, not only on failure.** These were a debugging aid; they are now an input.

@@ -439,6 +439,19 @@ section here does not get released.
 
 ### Fixed
 
+- **`check.sh` now runs the test-count gate CI had, which it did not.** The rule lived in a heredoc
+  inside the workflow, and that was a hole rather than a detail: `check.sh` is what somebody runs
+  before landing, so a rule only CI knows is a rule that lands broken.
+
+  It did. A nested-scale comparison that skipped 195 of 198 fixtures passed all twelve gates here
+  and failed CI's count step — twice, on two separate merges to `main` — before anybody read the
+  workflow. Three red runs for a rule that was never available to the person who could have acted
+  on it.
+
+  `scripts/test-counts.py` holds it now and both callers use it, so the thresholds cannot drift: the
+  per-module floors, the Kotlin/Native floor on macOS, and the ceiling of ten skips. Verified by
+  putting the skipping assumption back, where the new gate exits 1 and names the class that did it.
+
 - **The nested-scale comparison skipped 195 of the 198 fixtures, and CI was right to refuse it.** It
   guarded itself with `assumeTrue(reference.nestedScales.isNotEmpty())`, so every fixture with no
   scale inside a group reported a *skip* rather than a pass — and the workflow's "Say how many tests

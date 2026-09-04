@@ -258,6 +258,17 @@ gradle_gate() {
 }
 run_gate "gradle" gradle_gate
 
+# **How many tests actually ran**, which is the gate CI had and this did not.
+#
+# `check.sh` is what somebody runs before landing, so a rule only the workflow knows is a rule that
+# lands broken — and it did: a nested-scale comparison that skipped 195 of 198 fixtures passed all
+# twelve gates here and failed CI's count step twice before the workflow was read. Same script, same
+# thresholds, so the two cannot drift.
+counts_gate() {
+  python3 scripts/test-counts.py "$(uname -s | sed 's/Darwin/macOS/')" .
+}
+run_gate "test-counts" counts_gate
+
 # ---------------------------------------------------------------------------------------------
 # 2. The Android artifacts' exported surface.
 #
