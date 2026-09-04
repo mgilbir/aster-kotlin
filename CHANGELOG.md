@@ -391,6 +391,17 @@ section here does not get released.
 
 ### Changed
 
+- **The Android blend-mode limitation is filed as a settled floor rather than as pending work.** All
+  sixteen CSS blend modes reach an Android canvas on API 29 and above, through `BlendMode`; below it
+  `PorterDuff` has four of them and no arrangement of it produces the rest. With `minSdk` at 26
+  there is nothing to implement on API 26 to 28 — closing this would mean raising `minSdk`, which is
+  a product decision.
+
+  `limit.permanent` exists so the open list is the honest one, and a platform floor sitting beside
+  real gaps invites somebody to "finish" it. Nothing about the behaviour changes: the eleven modes
+  are still reported rather than approximated, and `multiply` is still among them because Android's
+  is modulate and vanishes over the transparent background a chart has by default.
+
 - **The blend-mode row is pinned to a test rather than to scope.** It recorded that below API 29 the
   modes `PorterDuff` cannot express are reported rather than approximated, and stood on *scope*
   because the branch is gated on `Build.VERSION.SDK_INT` and this project has no way to run below

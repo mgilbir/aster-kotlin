@@ -6288,7 +6288,9 @@
       "milestone": "1",
       "limit": {
         "test": "AndroidBlendModeTableTest.elevenModesAreRefusedRatherThanApproximated",
-        "claim": "Below API 29 only four of the sixteen CSS blend modes have a `PorterDuff` equivalent; the other eleven, `multiply` included, are reported rather than approximated."
+        "claim": "All sixteen CSS blend modes reach an Android canvas on API 29 and above, through `BlendMode`. Below it only four have a `PorterDuff` equivalent — `multiply` is not among them, because Android's is modulate and vanishes over a transparent background — and the other eleven are reported rather than approximated.",
+        "permanent": true,
+        "permanentReason": "A floor of the platform rather than a gap in this engine. `BlendMode` arrives in API 29 and `minSdk` is 26, so on API 26 to 28 there is nothing to implement: `PorterDuff` has four of the sixteen and no arrangement of it produces the rest. Closing this would mean raising `minSdk`, which is a product decision and not work waiting to be done — filing it beside real gaps invites somebody to try."
       }
     },
     {
