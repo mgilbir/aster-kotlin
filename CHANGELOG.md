@@ -439,6 +439,16 @@ section here does not get released.
 
 ### Fixed
 
+- **The nested-scale comparison skipped 195 of the 198 fixtures, and CI was right to refuse it.** It
+  guarded itself with `assumeTrue(reference.nestedScales.isNotEmpty())`, so every fixture with no
+  scale inside a group reported a *skip* rather than a pass — and the workflow's "Say how many tests
+  actually ran" step fails above ten, because a suite that assumes itself out of existence is the
+  vacuous-test failure this repository keeps finding.
+
+  A fixture with nothing to compare now passes over an empty set, which is what it is. That the
+  corpus really does exercise the named, faceted and unnamed cases is `NestedScaleCoverageTest`'s
+  assertion, where it is made once rather than once per fixture. The suite reports **zero** skips.
+
 - **A channel this engine leaves out because it is the default no longer reads as a difference.**
   Upstream records a `strokeCap` or a `strokeJoin` whenever the specification **set** one, even to
   the default; this engine records one only when it *differs* from the default. Those two rules
