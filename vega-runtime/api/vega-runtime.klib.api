@@ -7,6 +7,7 @@
 
 // Library unique name: <io.github.mgilbir.astervega:vega-runtime>
 final enum class dev.aster.vega.runtime/ChartActionKind : kotlin/Enum<dev.aster.vega.runtime/ChartActionKind> { // dev.aster.vega.runtime/ChartActionKind|null[0]
+    enum entry RESET_DOMAINS // dev.aster.vega.runtime/ChartActionKind.RESET_DOMAINS|null[0]
     enum entry RESET_ZOOM // dev.aster.vega.runtime/ChartActionKind.RESET_ZOOM|null[0]
     enum entry ZOOM_IN // dev.aster.vega.runtime/ChartActionKind.ZOOM_IN|null[0]
     enum entry ZOOM_OUT // dev.aster.vega.runtime/ChartActionKind.ZOOM_OUT|null[0]
@@ -588,7 +589,7 @@ final class dev.aster.vega.runtime.compile/PlotSize { // dev.aster.vega.runtime.
 }
 
 final class dev.aster.vega.runtime.compile/ScaleResolver { // dev.aster.vega.runtime.compile/ScaleResolver|null[0]
-    constructor <init>(kotlin.collections/Map<kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>>, dev.aster.vega.runtime.compile/PlotSize, dev.aster.vega.model/DiagnosticCollector, dev.aster.vega.runtime.compile/NumberResolver, kotlinx.datetime/TimeZone? = ...) // dev.aster.vega.runtime.compile/ScaleResolver.<init>|<init>(kotlin.collections.Map<kotlin.String,kotlin.collections.List<dev.aster.vega.model.VegaValue>>;dev.aster.vega.runtime.compile.PlotSize;dev.aster.vega.model.DiagnosticCollector;dev.aster.vega.runtime.compile.NumberResolver;kotlinx.datetime.TimeZone?){}[0]
+    constructor <init>(kotlin.collections/Map<kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>>, dev.aster.vega.runtime.compile/PlotSize, dev.aster.vega.model/DiagnosticCollector, dev.aster.vega.runtime.compile/NumberResolver, kotlinx.datetime/TimeZone? = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/List<kotlin/Double>> = ...) // dev.aster.vega.runtime.compile/ScaleResolver.<init>|<init>(kotlin.collections.Map<kotlin.String,kotlin.collections.List<dev.aster.vega.model.VegaValue>>;dev.aster.vega.runtime.compile.PlotSize;dev.aster.vega.model.DiagnosticCollector;dev.aster.vega.runtime.compile.NumberResolver;kotlinx.datetime.TimeZone?;kotlin.collections.Map<kotlin.String,kotlin.collections.List<kotlin.Double>>){}[0]
 
     final fun resolve(kotlin.collections/List<dev.aster.vega.model.spec/ScaleSpec>): kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.scale/VegaScale> // dev.aster.vega.runtime.compile/ScaleResolver.resolve|resolve(kotlin.collections.List<dev.aster.vega.model.spec.ScaleSpec>){}[0]
 }
@@ -649,6 +650,7 @@ final class dev.aster.vega.runtime.compile/SpecCompiler { // dev.aster.vega.runt
     final fun compile(dev.aster.vega.model.spec/VegaSpec, kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ..., kotlin.collections/Map<dev.aster.vega.scene/SceneNodeId, dev.aster.vega.runtime.compile/ItemEncode> = ...): dev.aster.vega.runtime.compile/CompiledSpec // dev.aster.vega.runtime.compile/SpecCompiler.compile|compile(dev.aster.vega.model.spec.VegaSpec;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<dev.aster.vega.scene.SceneNodeId,dev.aster.vega.runtime.compile.ItemEncode>){}[0]
     final fun compileJson(kotlin/String, kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ..., kotlin.collections/Map<dev.aster.vega.scene/SceneNodeId, dev.aster.vega.runtime.compile/ItemEncode> = ...): dev.aster.vega.runtime.compile/CompiledSpec // dev.aster.vega.runtime.compile/SpecCompiler.compileJson|compileJson(kotlin.String;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<dev.aster.vega.scene.SceneNodeId,dev.aster.vega.runtime.compile.ItemEncode>){}[0]
     final fun compileJsonInScopes(kotlin/String, kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue>, kotlin.collections/Map<dev.aster.vega.scene/SceneNodeId, dev.aster.vega.runtime.compile/ItemEncode>, kotlin.collections/Map<kotlin/String, kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue>>): dev.aster.vega.runtime.compile/CompiledSpec // dev.aster.vega.runtime.compile/SpecCompiler.compileJsonInScopes|compileJsonInScopes(kotlin.String;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<dev.aster.vega.scene.SceneNodeId,dev.aster.vega.runtime.compile.ItemEncode>;kotlin.collections.Map<kotlin.String,kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>>){}[0]
+    final fun compileJsonWithDomains(kotlin/String, kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue>, kotlin.collections/Map<dev.aster.vega.scene/SceneNodeId, dev.aster.vega.runtime.compile/ItemEncode>, kotlin.collections/Map<kotlin/String, kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue>>, kotlin.collections/Map<kotlin/String, kotlin.collections/List<kotlin/Double>>): dev.aster.vega.runtime.compile/CompiledSpec // dev.aster.vega.runtime.compile/SpecCompiler.compileJsonWithDomains|compileJsonWithDomains(kotlin.String;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<dev.aster.vega.scene.SceneNodeId,dev.aster.vega.runtime.compile.ItemEncode>;kotlin.collections.Map<kotlin.String,kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>>;kotlin.collections.Map<kotlin.String,kotlin.collections.List<kotlin.Double>>){}[0]
 
     final object Companion { // dev.aster.vega.runtime.compile/SpecCompiler.Companion|null[0]
         final const val DEFAULT_HEIGHT // dev.aster.vega.runtime.compile/SpecCompiler.Companion.DEFAULT_HEIGHT|{}DEFAULT_HEIGHT[0]
@@ -1368,11 +1370,13 @@ final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runti
     final var lastCompiled // dev.aster.vega.runtime/VegaChartController.lastCompiled|{}lastCompiled[0]
         final fun <get-lastCompiled>(): dev.aster.vega.runtime.compile/CompiledSpec? // dev.aster.vega.runtime/VegaChartController.lastCompiled.<get-lastCompiled>|<get-lastCompiled>(){}[0]
 
+    final fun adjustScaleDomain(kotlin/String, kotlin/Boolean): kotlin/Boolean // dev.aster.vega.runtime/VegaChartController.adjustScaleDomain|adjustScaleDomain(kotlin.String;kotlin.Boolean){}[0]
     final fun clearDiagnostics() // dev.aster.vega.runtime/VegaChartController.clearDiagnostics|clearDiagnostics(){}[0]
     final fun dispatch(dev.aster.vega.runtime/ChartInputEvent) // dev.aster.vega.runtime/VegaChartController.dispatch|dispatch(dev.aster.vega.runtime.ChartInputEvent){}[0]
     final fun handleKey(dev.aster.vega.runtime/ChartKey, dev.aster.vega.runtime/Modifiers = ...): kotlin/Boolean // dev.aster.vega.runtime/VegaChartController.handleKey|handleKey(dev.aster.vega.runtime.ChartKey;dev.aster.vega.runtime.Modifiers){}[0]
     final fun perform(dev.aster.vega.runtime/ChartActionKind): kotlin/Boolean // dev.aster.vega.runtime/VegaChartController.perform|perform(dev.aster.vega.runtime.ChartActionKind){}[0]
     final fun report(dev.aster.vega.model/VegaDiagnostic) // dev.aster.vega.runtime/VegaChartController.report|report(dev.aster.vega.model.VegaDiagnostic){}[0]
+    final fun resetScaleDomains(): kotlin/Boolean // dev.aster.vega.runtime/VegaChartController.resetScaleDomains|resetScaleDomains(){}[0]
     final fun resetViewport() // dev.aster.vega.runtime/VegaChartController.resetViewport|resetViewport(){}[0]
     final fun setData(kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>) // dev.aster.vega.runtime/VegaChartController.setData|setData(kotlin.String;kotlin.collections.List<dev.aster.vega.model.VegaValue>){}[0]
     final fun setHitTestOptions(dev.aster.vega.scene/HitTestOptions) // dev.aster.vega.runtime/VegaChartController.setHitTestOptions|setHitTestOptions(dev.aster.vega.scene.HitTestOptions){}[0]
@@ -1386,8 +1390,14 @@ final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runti
     final suspend fun setSpecAsync(kotlin/String, kotlinx.coroutines/CoroutineDispatcher = ...): dev.aster.vega.runtime.compile/CompiledSpec // dev.aster.vega.runtime/VegaChartController.setSpecAsync|setSpecAsync(kotlin.String;kotlinx.coroutines.CoroutineDispatcher){}[0]
 
     final object Companion { // dev.aster.vega.runtime/VegaChartController.Companion|null[0]
+        final const val DOMAIN_STEP // dev.aster.vega.runtime/VegaChartController.Companion.DOMAIN_STEP|{}DOMAIN_STEP[0]
+            final fun <get-DOMAIN_STEP>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.DOMAIN_STEP.<get-DOMAIN_STEP>|<get-DOMAIN_STEP>(){}[0]
+        final const val MAX_DOMAIN_FACTOR // dev.aster.vega.runtime/VegaChartController.Companion.MAX_DOMAIN_FACTOR|{}MAX_DOMAIN_FACTOR[0]
+            final fun <get-MAX_DOMAIN_FACTOR>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.MAX_DOMAIN_FACTOR.<get-MAX_DOMAIN_FACTOR>|<get-MAX_DOMAIN_FACTOR>(){}[0]
         final const val MAX_ZOOM // dev.aster.vega.runtime/VegaChartController.Companion.MAX_ZOOM|{}MAX_ZOOM[0]
             final fun <get-MAX_ZOOM>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.MAX_ZOOM.<get-MAX_ZOOM>|<get-MAX_ZOOM>(){}[0]
+        final const val MIN_DOMAIN_FACTOR // dev.aster.vega.runtime/VegaChartController.Companion.MIN_DOMAIN_FACTOR|{}MIN_DOMAIN_FACTOR[0]
+            final fun <get-MIN_DOMAIN_FACTOR>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.MIN_DOMAIN_FACTOR.<get-MIN_DOMAIN_FACTOR>|<get-MIN_DOMAIN_FACTOR>(){}[0]
         final const val MIN_ZOOM // dev.aster.vega.runtime/VegaChartController.Companion.MIN_ZOOM|{}MIN_ZOOM[0]
             final fun <get-MIN_ZOOM>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.MIN_ZOOM.<get-MIN_ZOOM>|<get-MIN_ZOOM>(){}[0]
         final const val ZOOM_STEP // dev.aster.vega.runtime/VegaChartController.Companion.ZOOM_STEP|{}ZOOM_STEP[0]

@@ -1,10 +1,11 @@
 AccessibilityDescriptor
+AccessibilityDescriptor.adjustableScale
 AccessibilityDescriptor.derived
 AccessibilityDescriptor.description()
-AccessibilityDescriptor.doCopy(label:value:role:roleDescription:focusable:traversalIndex:derived:)
+AccessibilityDescriptor.doCopy(label:value:role:roleDescription:focusable:traversalIndex:derived:adjustableScale:)
 AccessibilityDescriptor.focusable
 AccessibilityDescriptor.hash()
-AccessibilityDescriptor.init(label:value:role:roleDescription:focusable:traversalIndex:derived:)
+AccessibilityDescriptor.init(label:value:role:roleDescription:focusable:traversalIndex:derived:adjustableScale:)
 AccessibilityDescriptor.isEqual(_:)
 AccessibilityDescriptor.label
 AccessibilityDescriptor.role
@@ -18,11 +19,12 @@ AccessibilityTree.init()
 AccessibilityTree.shared
 AccessibleElement
 AccessibleElement.activatable
+AccessibleElement.adjustableScale
 AccessibleElement.bounds
 AccessibleElement.description()
-AccessibleElement.doCopy(label:bounds:nodeId:selected:isSummary:role:roleDescription:activatable:)
+AccessibleElement.doCopy(label:bounds:nodeId:selected:isSummary:role:roleDescription:activatable:adjustableScale:)
 AccessibleElement.hash()
-AccessibleElement.init(label:bounds:nodeId:selected:isSummary:role:roleDescription:activatable:)
+AccessibleElement.init(label:bounds:nodeId:selected:isSummary:role:roleDescription:activatable:adjustableScale:)
 AccessibleElement.isEqual(_:)
 AccessibleElement.isSummary
 AccessibleElement.label
@@ -401,6 +403,7 @@ ChartAction.label
 ChartActionKind
 ChartActionKind.entries
 ChartActionKind.init(name:ordinal:)
+ChartActionKind.resetDomains
 ChartActionKind.resetZoom
 ChartActionKind.values()
 ChartActionKind.zoomIn
@@ -3505,7 +3508,7 @@ SampleTransform.init()
 SampleTransform.shared
 SampleTransform.type
 ScaleResolver
-ScaleResolver.init(datasets:size:diagnostics:numbers:timeZone:)
+ScaleResolver.init(datasets:size:diagnostics:numbers:timeZone:pinnedDomains:)
 ScaleResolver.resolve(specs:)
 ScaleSpec
 ScaleSpec.align
@@ -3938,6 +3941,7 @@ SpecCompiler.companion
 SpecCompiler.compile(spec:signalOverrides:itemEncodes:)
 SpecCompiler.compileJson(json:signalOverrides:itemEncodes:)
 SpecCompiler.compileJsonInScopes(json:signalOverrides:itemEncodes:scopedOverrides:)
+SpecCompiler.compileJsonWithDomains(json:signalOverrides:itemEncodes:scopedOverrides:pinnedDomains:)
 SpecCompiler.init(textEngine:loader:randomSeed:clock:locale:hostConfig:containerSize:hostData:timeZone:)
 SpecParser
 SpecParser.init()
@@ -4557,6 +4561,7 @@ VegaCaptions.identityDomain()
 VegaCaptions.legend(kind:title:channels:domain:)
 VegaCaptions.markContainerRole(markType:)
 VegaCaptions.markRole(markType:)
+VegaCaptions.resetAxesAction()
 VegaCaptions.resetZoomAction()
 VegaCaptions.zoomInAction()
 VegaCaptions.zoomOutAction()
@@ -4566,7 +4571,10 @@ VegaCaptionsCompanion.init()
 VegaCaptionsCompanion.shared
 VegaChartController
 VegaChartController.Companion
+VegaChartController.Companion.DOMAIN_STEP
+VegaChartController.Companion.MAX_DOMAIN_FACTOR
 VegaChartController.Companion.MAX_ZOOM
+VegaChartController.Companion.MIN_DOMAIN_FACTOR
 VegaChartController.Companion.MIN_ZOOM
 VegaChartController.Companion.ZOOM_STEP
 VegaChartController.Companion.fromScene(scene:)
@@ -4574,6 +4582,7 @@ VegaChartController.Companion.fromSpec(json:textEngine:)
 VegaChartController.Companion.init()
 VegaChartController.Companion.shared
 VegaChartController.accessibilityActions
+VegaChartController.adjustScaleDomain(scale:narrow:)
 VegaChartController.clearDiagnostics()
 VegaChartController.companion
 VegaChartController.containerSize
@@ -4588,6 +4597,7 @@ VegaChartController.inputs
 VegaChartController.lastCompiled
 VegaChartController.perform(action:)
 VegaChartController.report(diagnostic:)
+VegaChartController.resetScaleDomains()
 VegaChartController.resetViewport()
 VegaChartController.setContainerSizeAsync(size:completionHandler:)
 VegaChartController.setContainerSizeAsync(size:dispatcher:completionHandler:)

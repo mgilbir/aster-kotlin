@@ -6,6 +6,41 @@ section here does not get released.
 
 ## Unreleased
 
+### Added
+
+- **A reader can adjust the interval an axis draws its data against.** The row said they could not:
+  the accessibility actions move the **viewport** — the visual transform a pinch applies — and leave
+  every scale exactly as the specification built it, so someone exploring a crowded region got
+  bigger pixels and the same labels. A zoom does not change what an axis says.
+
+  An axis drawn for a **continuous** scale now carries `AccessibleElement.adjustableScale`, and a
+  host announces it with its platform's adjustable primitive — `.accessibilityAdjustableAction` on
+  Apple, the scroll actions on Android. A swipe up and down narrows and widens the domain, and the
+  ticks, the labels and every mark placed through the scale are recomputed against it.
+  `VegaChartController.adjustScaleDomain` answers whether anything moved, so a host knows not to
+  announce a change at the end of the range.
+
+  **An adjustable element rather than a pair of actions**, deliberately. `Narrow x` and `Widen x` as
+  chart actions would grow that flat list with the number of axes — eight entries on a two-axis
+  chart, against three — and a reader rotoring through eight custom actions on every chart is worse
+  served than one who swipes on the axis they are already standing on. Only the way *back* is an
+  action, `RESET_DOMAINS`, since a reader who has adjusted two axes is not standing on either of
+  them; it is separate from the zoom reset, because one reset for both would undo work nobody asked
+  to lose.
+
+  The interval reaches the scale through **`domainRaw`**, which is upstream's own door for a control
+  choosing an exact interval: it short-circuits `zero`, `nice` and the three `domain*` limits, so
+  nothing rounds it outwards. A specification's own `domainRaw` still wins — a chart whose detail
+  panel is driven by a brush has already said what decides that scale.
+
+  The step is taken in **range** space and inverted, rather than interpolated between the domain's
+  ends. That is the difference between a step that is right for a linear scale and one that is right
+  for every scale: it is geometric on a log axis and calendar-correct on a time axis, and it cannot
+  produce a domain the scale could not have had — inverting any finite position of a log scale is a
+  positive number, where widening about the arithmetic midpoint walks the low end to zero and off
+  the scale. A band or point axis is not adjustable: it frames a list of values with nothing between
+  them to narrow towards.
+
 ### Fixed
 
 - **A timer stream declared inside a group mark ticks.** It never did, and said nothing about it.

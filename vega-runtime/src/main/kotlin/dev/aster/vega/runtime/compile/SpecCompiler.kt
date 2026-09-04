@@ -340,11 +340,42 @@ public class SpecCompiler(
     compileJsonUnguarded(json, signalOverrides, itemEncodes, scopedOverrides)
   }
 
+  /**
+   * The same, with domains a control **outside the specification** has chosen, by scale name.
+   *
+   * What an adjustable axis needs: a reader narrows the domain and the axis has to be recomputed
+   * against it — ticks, labels and every mark placed through the scale. A viewport zoom cannot do
+   * that, because it magnifies the drawing and leaves the scale where it was.
+   *
+   * The interval reaches the scale through `domainRaw`, which is upstream's own door for exactly
+   * this: it short-circuits `zero`, `nice` and the three `domain*` limits, so the interval a
+   * control picked is the interval the scale gets. A specification's own `domainRaw` still wins — a
+   * chart whose detail panel is driven by a brush has already said what decides that scale.
+   *
+   * Only the **top-level** scales, which are the ones a top-level axis is drawn for. A group's
+   * scale of the same name is a different scale in each cell and is left alone.
+   *
+   * A fifth differently named function, for the reason written above [compileJsonInScopes]: a
+   * defaulted parameter or an overload would be one Obj-C selector and would break every Swift
+   * caller of the shorter form.
+   */
+  @InternalAsterVegaApi
+  public fun compileJsonWithDomains(
+    json: String,
+    signalOverrides: Map<String, VegaValue>,
+    itemEncodes: Map<SceneNodeId, ItemEncode>,
+    scopedOverrides: Map<String, Map<String, VegaValue>>,
+    pinnedDomains: Map<String, List<Double>>,
+  ): CompiledSpec = guarded {
+    compileJsonUnguarded(json, signalOverrides, itemEncodes, scopedOverrides, pinnedDomains)
+  }
+
   private fun compileJsonUnguarded(
     json: String,
     signalOverrides: Map<String, VegaValue> = emptyMap(),
     itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
     scopedOverrides: Map<String, Map<String, VegaValue>> = emptyMap(),
+    pinnedDomains: Map<String, List<Double>> = emptyMap(),
   ): CompiledSpec {
     val parser = SpecParser()
     val parsed =
@@ -368,7 +399,8 @@ public class SpecCompiler(
     val spec =
       parsed.spec
         ?: return CompiledSpec(null, emptyMap(), EMPTY_SIGNALS, diagnostics = parsed.diagnostics)
-    val compiled = compileUnguarded(spec, signalOverrides, itemEncodes, scopedOverrides)
+    val compiled =
+      compileUnguarded(spec, signalOverrides, itemEncodes, scopedOverrides, pinnedDomains)
     // Parse diagnostics come first so a reader sees problems in specification order.
     return compiled.copy(diagnostics = parsed.diagnostics + compiled.diagnostics)
   }
@@ -430,6 +462,7 @@ public class SpecCompiler(
     signalOverrides: Map<String, VegaValue> = emptyMap(),
     itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
     scopedOverrides: Map<String, Map<String, VegaValue>> = emptyMap(),
+    pinnedDomains: Map<String, List<Double>> = emptyMap(),
   ): CompiledSpec {
     // `fit` shrinks the plotting area so the *whole drawing* comes out the declared size, which
     // cannot be known until the drawing has been measured. Upstream measures, sets the `width` and
@@ -448,6 +481,7 @@ public class SpecCompiler(
             null,
             itemEncodes,
             scopedOverrides,
+            pinnedDomains,
           )
         )
       } else {
@@ -460,6 +494,7 @@ public class SpecCompiler(
         fit,
         itemEncodes,
         scopedOverrides,
+        pinnedDomains,
       )
       .compiled
   }
@@ -499,6 +534,7 @@ public class SpecCompiler(
     fit: Overflow?,
     itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
     scopedOverrides: Map<String, Map<String, VegaValue>> = emptyMap(),
+    pinnedDomains: Map<String, List<Double>> = emptyMap(),
   ): Pass {
     val ids = SceneNodeIdAllocator()
 
@@ -726,6 +762,7 @@ public class SpecCompiler(
                   diagnostics,
                   NumberResolver(expressions, scope, diagnostics),
                   timeZone,
+                  pinnedDomains,
                 )
                 .resolve(listOf(it))
             )

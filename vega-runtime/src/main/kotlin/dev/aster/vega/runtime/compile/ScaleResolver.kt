@@ -74,6 +74,21 @@ public class ScaleResolver(
   private val numbers: NumberResolver,
   /** What a `time` scale's local zone is; null is the device's own. See `SpecCompiler.timeZone`. */
   private val timeZone: TimeZone? = null,
+  /**
+   * Domains a **control outside the specification** has chosen, by scale name.
+   *
+   * Applied exactly where a `domainRaw` is: it short-circuits `zero`, `nice`, `domainMin`,
+   * `domainMax` and `domainMid`, so the interval a control picked is the interval the scale gets
+   * and nothing rounds it outwards. That is not a convenience — it is what `domainRaw` is *for*
+   * upstream, and the reason an interactive zoom works there at all.
+   *
+   * A specification's own `domainRaw` wins, because it is the document speaking about itself: a
+   * chart whose detail panel is driven by a brush has already said what decides that scale, and a
+   * reader's adjustment must not silently take it over.
+   *
+   * Empty for every compile except one a reader has adjusted, which is almost all of them.
+   */
+  private val pinnedDomains: Map<String, List<Double>> = emptyMap(),
 ) {
 
   public fun resolve(specs: List<ScaleSpec>): Map<String, VegaScale> {
@@ -562,7 +577,11 @@ public class ScaleResolver(
    * domain".
    */
   private fun rawDomain(spec: ScaleSpec): List<Double>? {
-    val raw = spec.domainRaw ?: return null
+    val raw =
+      spec.domainRaw
+        // A pinned domain reaches the scale by the same door and for the same reason. Second, not
+        // first: a specification that states its own `domainRaw` has said what decides this scale.
+        ?: return pinnedDomains[spec.name]?.takeIf { it.size >= 2 }
     // A raw domain that resolves to **nothing** is not an empty domain, it is no override at all:
     // `{"signal": "brush[\"Horsepower\"]"}` is null until a reader drags something, and a chart
     // that reported an error before its first interaction would be a chart that never drew. Asked

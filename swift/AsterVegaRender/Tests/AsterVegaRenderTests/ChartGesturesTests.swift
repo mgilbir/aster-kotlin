@@ -56,7 +56,8 @@ final class ChartGesturesTests: XCTestCase {
       isSummary: false,
       role: "mark",
       roleDescription: nil,
-      activatable: true)
+      activatable: true,
+      adjustableScale: nil)
     let withGestures = VegaChartView(scene: scene(), session: ChartSession(), gestures: .none)
 
     XCTAssertTrue(

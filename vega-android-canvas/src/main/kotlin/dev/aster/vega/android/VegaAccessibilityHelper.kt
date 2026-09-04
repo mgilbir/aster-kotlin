@@ -38,6 +38,14 @@ internal class VegaAccessibilityHelper(private val view: VegaChartView) :
      * `aria-roledescription`, which TalkBack reads after the label as the kind of thing this is.
      */
     val roleDescription: String?,
+    /**
+     * The scale this element lets a reader adjust, when it is an adjustable axis.
+     *
+     * Android has no `Adjustable` trait, so this becomes the pair of **scroll** actions, which is
+     * how the platform's own sliders and pickers are driven from TalkBack: swipe up and down while
+     * the element has focus. Forward narrows, matching the direction that reveals more detail.
+     */
+    val adjustableScale: String?,
   )
 
   private var cachedRevision = Long.MIN_VALUE
@@ -53,7 +61,9 @@ internal class VegaAccessibilityHelper(private val view: VegaChartView) :
    * frame when it draws focus, so a mark that only moved needs no invalidation.
    */
   fun semanticIdentity(): List<Any?> =
-    nodes().map { listOf(it.id, it.label, it.selected, it.activatable, it.roleDescription) }
+    nodes().map {
+      listOf(it.id, it.label, it.selected, it.activatable, it.roleDescription, it.adjustableScale)
+    }
 
   /** Drops the cached semantic tree; the next query rebuilds it from the current snapshot. */
   fun invalidateSemanticTree() {
@@ -95,6 +105,7 @@ internal class VegaAccessibilityHelper(private val view: VegaChartView) :
           selected = element.selected,
           activatable = element.activatable,
           roleDescription = element.roleDescription,
+          adjustableScale = element.adjustableScale,
         )
       }
   }
@@ -144,6 +155,18 @@ internal class VegaAccessibilityHelper(private val view: VegaChartView) :
     if (virtual.activatable && virtual.node != null) {
       node.addAction(AccessibilityNodeInfoCompat.ACTION_CLICK)
     }
+    // An **adjustable axis**: swipe up and down to narrow and widen the interval it draws its data
+    // against. Android has no `Adjustable` trait, so this is the pair of scroll actions, which is
+    // what TalkBack maps those swipes onto and how the platform's own sliders are driven.
+    //
+    // Offered on the element whatever the axis's current state, and refused by the controller at
+    // the end of the range — a node's actions are read once when focus lands on it, so withdrawing
+    // one at the limit would need the tree re-read to put it back, and a reader would hear the
+    // chart re-announce itself on every step.
+    if (virtual.adjustableScale != null) {
+      node.addAction(AccessibilityNodeInfoCompat.ACTION_SCROLL_FORWARD)
+      node.addAction(AccessibilityNodeInfoCompat.ACTION_SCROLL_BACKWARD)
+    }
   }
 
   override fun onPerformActionForVirtualView(
@@ -151,8 +174,31 @@ internal class VegaAccessibilityHelper(private val view: VegaChartView) :
     action: Int,
     arguments: Bundle?,
   ): Boolean {
-    if (action != AccessibilityNodeInfo.ACTION_CLICK) return false
     val virtual = nodes().firstOrNull { it.id == virtualViewId } ?: return false
+    val scale = virtual.adjustableScale
+    if (
+      scale != null &&
+        (action == AccessibilityNodeInfo.ACTION_SCROLL_FORWARD ||
+          action == AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)
+    ) {
+      // The controller answers whether anything moved, and `false` here is what stops TalkBack
+      // announcing a change that did not happen — which is how a reader loses track of where they
+      // are.
+      if (
+        !view.controller.adjustScaleDomain(
+          scale,
+          narrow = action == AccessibilityNodeInfo.ACTION_SCROLL_FORWARD,
+        )
+      ) {
+        return false
+      }
+      view.invalidateIfStale()
+      // The domain changed, so the ticks and the labels did: the tree a reader explores is a
+      // different tree now and has to be re-read.
+      invalidateSemanticTree()
+      return true
+    }
+    if (action != AccessibilityNodeInfo.ACTION_CLICK) return false
     val bounds = virtual.bounds
     // **Out of scene space first.** `virtual.bounds` is in scene coordinates, and
     // `VegaChartController.dispatch` expects the space a finger arrives in: placement-relative

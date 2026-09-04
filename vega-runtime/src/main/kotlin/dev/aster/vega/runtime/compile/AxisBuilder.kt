@@ -557,6 +557,11 @@ public class AxisBuilder(
                       // Upstream's `AriaGuides`: a reader hears "axis" and then the caption.
                       roleDescription = "axis",
                       focusable = true,
+                      // A **continuous** axis is adjustable: it frames an interval, and narrowing
+                      // an interval is a thing a reader can be given. A band or point axis frames a
+                      // list of values with nothing between them to narrow towards.
+                      adjustableScale =
+                        spec.scale.takeIf { name -> scaleTypes[name]?.isContinuous == true },
                     )
                   }
               },

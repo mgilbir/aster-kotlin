@@ -247,6 +247,7 @@ abstract interface dev.aster.vega.model.locale/VegaCaptions { // dev.aster.vega.
     abstract fun legend(kotlin/String, kotlin/String?, kotlin.collections/List<kotlin/String>, kotlin/String): kotlin/String // dev.aster.vega.model.locale/VegaCaptions.legend|legend(kotlin.String;kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.String){}[0]
     abstract fun markContainerRole(kotlin/String): kotlin/String // dev.aster.vega.model.locale/VegaCaptions.markContainerRole|markContainerRole(kotlin.String){}[0]
     abstract fun markRole(kotlin/String): kotlin/String // dev.aster.vega.model.locale/VegaCaptions.markRole|markRole(kotlin.String){}[0]
+    open fun resetAxesAction(): kotlin/String // dev.aster.vega.model.locale/VegaCaptions.resetAxesAction|resetAxesAction(){}[0]
     open fun resetZoomAction(): kotlin/String // dev.aster.vega.model.locale/VegaCaptions.resetZoomAction|resetZoomAction(){}[0]
     open fun zoomInAction(): kotlin/String // dev.aster.vega.model.locale/VegaCaptions.zoomInAction|zoomInAction(){}[0]
     open fun zoomOutAction(): kotlin/String // dev.aster.vega.model.locale/VegaCaptions.zoomOutAction|zoomOutAction(){}[0]

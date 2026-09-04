@@ -34,6 +34,7 @@ ChartSession.TouchOutcome  ::  enum TouchOutcome
 ChartSession.TouchOutcome.nothing(x:y:)  ::  case nothing(x: Double, y: Double)
 ChartSession.TouchOutcome.selected(count:)  ::  case selected(count: Int)
 ChartSession.TouchOutcome.tooltip(_:)  ::  case tooltip(String)
+ChartSession.adjustScaleDomain(scale:narrow:)  ::  @discardableResult @MainActor func adjustScaleDomain(scale: String, narrow: Bool) -> Bool
 ChartSession.canReset  ::  @MainActor var canReset: Bool { get }
 ChartSession.containerSize  ::  @MainActor var containerSize: SizeD? { get set }
 ChartSession.controls  ::  @MainActor var controls: [SignalInput] { get set }
@@ -52,6 +53,7 @@ ChartSession.longPress(at:)  ::  @MainActor func longPress(at point: Point)
 ChartSession.pan(by:phase:)  ::  @MainActor func pan(by delta: Point, phase: GesturePhase)
 ChartSession.place(contentScale:viewport:)  ::  @MainActor func place(contentScale: Double, viewport: Rect)
 ChartSession.press(_:modifiers:)  ::  @MainActor func press(_ key: ChartKey, modifiers: Modifiers = Modifiers.Companion.shared.None)
+ChartSession.resetScaleDomains()  ::  @discardableResult @MainActor func resetScaleDomains() -> Bool
 ChartSession.resetViewport()  ::  @MainActor func resetViewport()
 ChartSession.resolveFont  ::  @MainActor let resolveFont: ((String) -> CTFont?)?
 ChartSession.scene  ::  @MainActor var scene: AsterVega.Scene? { get set }

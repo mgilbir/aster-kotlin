@@ -175,16 +175,19 @@ class AccessibilityActionsTest {
   }
 
   /**
-   * What is **not** offered: adjusting a scale's own domain.
+   * These actions move the **viewport** and change no scale, which is still worth pinning.
    *
-   * Worth pinning, because "zoom" and "adjust the domain" are easy to conflate and are not the same
-   * thing. These actions move the **viewport** — the same visual transform a pinch applies — and
-   * leave every scale exactly as the specification built it. An adjustable *domain*, where a reader
-   * widens the range the data is drawn against and the axis ticks change with it, is a different
-   * feature and is not here.
+   * "Zoom" and "adjust the domain" are easy to conflate and are not the same thing. A zoom is the
+   * visual transform a pinch applies and leaves every scale exactly as the specification built it,
+   * so the ticks a reader hears never change however far in they go.
    *
-   * So the row says zoom, not domain, and this is what keeps it saying that: the day a domain
-   * action arrives, this goes red and the row is rewritten.
+   * A domain **is** adjustable now — `AdjustableAxisTest` — and deliberately not from here. It
+   * belongs to the axis, as the increment and decrement of an adjustable element, because a pair of
+   * actions per axis would grow this list with the number of axes: eight entries on a two-axis
+   * chart, against the three below. The one thing that did land here is the way *back*, since a
+   * reader who has adjusted two axes is not standing on either of them.
+   *
+   * So no action here narrows or widens anything, and this is what keeps it that way.
    */
   @Test
   fun `no action adjusts a scale's domain`() {
@@ -194,14 +197,14 @@ class AccessibilityActionsTest {
     assertEquals(
       before,
       controller.lastCompiled!!.scales["x"],
-      "an accessibility action changed a scale, so the domain is adjustable now and the row " +
-        "should say so",
+      "an accessibility action changed a scale; adjusting a domain belongs to the axis element",
     )
     assertTrue(
       controller.accessibilityActions.none {
-        "domain" in it.label.lowercase() || "range" in it.label.lowercase()
+        "narrow" in it.label.lowercase() || "widen" in it.label.lowercase()
       },
-      "an action names a domain: ${controller.accessibilityActions.map { it.label }}",
+      "an action narrows or widens a scale, so this list now grows with the number of axes: " +
+        "${controller.accessibilityActions.map { it.label }}",
     )
   }
 
