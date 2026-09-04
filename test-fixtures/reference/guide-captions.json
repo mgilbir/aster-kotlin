@@ -1030,6 +1030,16 @@
   "caption": "Symbol legend titled 'swatches' for fill color with 2 values: a, b"
  },
  {
+  "fixture": "guide-encode-datum",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 8"
+ },
+ {
+  "fixture": "guide-encode-datum",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: a, b, c"
+ },
+ {
   "fixture": "guide-encode-geometry",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 4 values: a, b, c, d"

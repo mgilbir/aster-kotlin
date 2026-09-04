@@ -20,7 +20,7 @@ calling thread.
 It is checked against upstream rather than against itself. `./scripts/oracle.sh` renders every fixture
 with the pinned `vega@6.3.1` and compares the resulting scene mark by mark and scale by scale;
 `./scripts/vega-lite-oracle.sh` compiles every Vega-Lite fixture with the pinned `vega-lite@6.4.3` and
-compares the emitted Vega **property by property**, then draws both and compares those scenes too. 197
+compares the emitted Vega **property by property**, then draws both and compares those scenes too. 198
 Vega differential fixtures and 283 Vega-Lite fixtures are committed together with their references, and
 [`test-fixtures/INDEX.md`](test-fixtures/INDEX.md) is the generated index of what each one covers.
 

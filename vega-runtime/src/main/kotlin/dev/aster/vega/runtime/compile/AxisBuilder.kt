@@ -31,6 +31,7 @@ import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.runtime.scale.formatTickLabel
 import dev.aster.vega.scene.AccessibilityDescriptor
+import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.NodeMetadata
 import dev.aster.vega.scene.RectD
@@ -45,6 +46,7 @@ import dev.aster.vega.scene.TextBaseline
 import dev.aster.vega.scene.TextEngine
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.TextRun
+import dev.aster.vega.scene.TextStyle
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.transformedBounds
 import kotlin.math.floor
@@ -343,7 +345,9 @@ public class AxisBuilder(
         val run =
           TextRun(
             text = labelText(spec, tick) ?: tick.label,
-            style = labelStyle,
+            // The same per-tick reading for the weight, which upstream lets a `datum` conditional
+            // set — a calendar bolds the first week of each month, an axis its zero line.
+            style = labelStyleFor(spec, tick, labelStyle),
             // The labels' own `encode` comes first: an angle supplied by a signal cannot be
             // compared at compile time, so Vega-Lite writes the *comparison* into the encode and
             // leaves the axis property off. Reading only the property left the labels at the
@@ -411,7 +415,20 @@ public class AxisBuilder(
             // The angle alone: upstream leaves the alignment and baseline where the orientation put
             // them, so a turned label pivots about its anchor rather than being re-hung from it.
             angleDegrees = labelAngle,
-            fill = GuideStyle.fill(spec.labelStyle, AxisDefaults.labelColor),
+            // Per tick, not once: a label's own `encode` may colour it from its **datum** —
+            // `[{"test": "datum.value >= 4", "value": "#d62728"}, ...]` — which no axis property
+            // can say, because the rule is about the tick rather than the axis. The line parts
+            // already resolved their encode per item through `strokeFor`; the labels resolved only
+            // their text and position, so a conditional `fill` fell back to the default colour for
+            // every tick and nothing said so.
+            fill =
+              labelString(spec, "fill", tick)
+                ?.let { SceneColor.parse(it) }
+                ?.let {
+                  ScenePaint.Solid(it)
+                }
+                ?.let { Fill(paint = it) }
+                ?: GuideStyle.fill(spec.labelStyle, AxisDefaults.labelColor),
             // A label's own `encode` may hide it on a rule the axis has no property for — a
             // calendar shows the month name on the first week of each month and blanks the rest.
             // It still measures: upstream bounds a text item from its geometry whatever its
@@ -964,6 +981,25 @@ public class AxisBuilder(
     val encoder = channels ?: return null
     val entry = spec.encode["title"]?.update?.get(channel) ?: return null
     return encoder.channelNumber(entry, VegaValue.EmptyObject)?.takeIf { it.isFinite() }
+  }
+
+  /**
+   * The label's text style with this tick's own `encode` applied over it.
+   *
+   * The weight and the size only, which are the two a `datum` conditional actually sets — a
+   * calendar bolds the first week of each month, an axis emphasises its zero. The family and the
+   * slant are left to the style the axis resolved once: nothing in the corpus varies them per tick,
+   * and a channel that is never exercised is a channel whose behaviour nobody has checked.
+   */
+  private fun labelStyleFor(spec: AxisSpec, tick: Tick, base: TextStyle): TextStyle {
+    if (spec.encode["labels"]?.update.isNullOrEmpty()) return base
+    val weight = labelString(spec, "fontWeight", tick)?.takeIf { it.isNotEmpty() }
+    val size = labelChannel(spec, "fontSize", tick)
+    if (weight == null && size == null) return base
+    return base.copy(
+      fontWeight = weight?.let { FontWeights.of(it) } ?: base.fontWeight,
+      fontSize = size ?: base.fontSize,
+    )
   }
 
   private fun labelString(spec: AxisSpec, channel: String, tick: Tick): String? {
