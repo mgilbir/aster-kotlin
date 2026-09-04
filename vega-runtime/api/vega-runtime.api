@@ -497,6 +497,8 @@ public final class dev/aster/vega/runtime/VegaChartController {
 	public final fun getSnapshot ()Ldev/aster/vega/runtime/ChartSnapshot;
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getTooltipContent ()Ldev/aster/vega/runtime/TooltipContent;
+	public final fun handleKey (Ldev/aster/vega/runtime/ChartKey;Ldev/aster/vega/runtime/Modifiers;)Z
+	public static synthetic fun handleKey$default (Ldev/aster/vega/runtime/VegaChartController;Ldev/aster/vega/runtime/ChartKey;Ldev/aster/vega/runtime/Modifiers;ILjava/lang/Object;)Z
 	public final fun report (Ldev/aster/vega/model/VegaDiagnostic;)V
 	public final fun resetViewport ()V
 	public final fun setContainerSize (Ldev/aster/vega/scene/SizeD;)V

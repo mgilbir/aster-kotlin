@@ -4557,6 +4557,7 @@ VegaChartController.contentScale
 VegaChartController.diagnostics
 VegaChartController.dispatch(event:)
 VegaChartController.events
+VegaChartController.handleKey(key:modifiers:)
 VegaChartController.hostData
 VegaChartController.init(initialScene:textEngine:clock:loader:scheduler:locale:hostConfig:containerSize:hostData:timeZone:)
 VegaChartController.inputs

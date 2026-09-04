@@ -1328,6 +1328,7 @@ final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runti
 
     final fun clearDiagnostics() // dev.aster.vega.runtime/VegaChartController.clearDiagnostics|clearDiagnostics(){}[0]
     final fun dispatch(dev.aster.vega.runtime/ChartInputEvent) // dev.aster.vega.runtime/VegaChartController.dispatch|dispatch(dev.aster.vega.runtime.ChartInputEvent){}[0]
+    final fun handleKey(dev.aster.vega.runtime/ChartKey, dev.aster.vega.runtime/Modifiers = ...): kotlin/Boolean // dev.aster.vega.runtime/VegaChartController.handleKey|handleKey(dev.aster.vega.runtime.ChartKey;dev.aster.vega.runtime.Modifiers){}[0]
     final fun report(dev.aster.vega.model/VegaDiagnostic) // dev.aster.vega.runtime/VegaChartController.report|report(dev.aster.vega.model.VegaDiagnostic){}[0]
     final fun resetViewport() // dev.aster.vega.runtime/VegaChartController.resetViewport|resetViewport(){}[0]
     final fun setData(kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>) // dev.aster.vega.runtime/VegaChartController.setData|setData(kotlin.String;kotlin.collections.List<dev.aster.vega.model.VegaValue>){}[0]

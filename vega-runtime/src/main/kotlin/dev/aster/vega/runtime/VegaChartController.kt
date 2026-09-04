@@ -33,6 +33,8 @@ import dev.aster.vega.runtime.load.CachingDataLoader
 import dev.aster.vega.runtime.load.DataLoader
 import dev.aster.vega.runtime.load.DenyLoader
 import dev.aster.vega.runtime.scale.VegaScale
+import dev.aster.vega.scene.AccessibilityTree
+import dev.aster.vega.scene.AccessibleElement
 import dev.aster.vega.scene.HitTestOptions
 import dev.aster.vega.scene.MetricTextEngine
 import dev.aster.vega.scene.PointD
@@ -42,6 +44,7 @@ import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeId
 import dev.aster.vega.scene.SizeD
 import dev.aster.vega.scene.TextEngine
+import dev.aster.vega.scene.flatten
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -907,9 +910,9 @@ public class VegaChartController(
       is ChartInputEvent.LongPress -> handleLongPress(event.point)
       is ChartInputEvent.Pan -> handlePan(event)
       is ChartInputEvent.Zoom -> handleZoom(event)
+      is ChartInputEvent.Key -> handleKey(event.key, event.modifiers)
       is ChartInputEvent.PointerDown,
       is ChartInputEvent.PointerUp,
-      is ChartInputEvent.Key,
       is ChartInputEvent.Resized -> Unit // No built-in behaviour; a signal handler may still fire.
     }
     fireSignalHandlers(event)
@@ -1338,6 +1341,107 @@ public class VegaChartController(
     emit(ChartEvent.MarkHovered(node?.id, node?.metadata?.markName, datumOf(node)))
     emit(ChartEvent.TooltipChanged(node?.metadata?.tooltip, point))
   }
+
+  /**
+   * Moves focus between marks with the keyboard, and says whether the key was **consumed**.
+   *
+   * The return value is the whole reason this is a method of its own rather than a return type on
+   * [dispatch]: a host that cannot tell whether the chart used a key has no way to avoid a **focus
+   * trap**, where TAB never leaves the chart and, on a television where the d-pad is the keyboard,
+   * the four arrows let a reader in and not out. Declining to claim keys was the previous answer to
+   * that, and it was the right one while nothing moved.
+   *
+   * So the rule is that a key is consumed **only when it actually did something**:
+   *
+   * - **TAB is never consumed**, whatever the state. It is how a reader leaves, and no traversal
+   *   worth having is worth trapping them for.
+   * - An **arrow** at the end of the order is not consumed either, so focus continues outward
+   *   rather than stopping dead. This is what makes a d-pad usable: pressing right past the last
+   *   mark leaves the chart the way it would leave any other widget.
+   * - `ENTER` and `SPACE` activate the focused element, and are consumed only when there is one and
+   *   it is activatable — an axis caption is not.
+   * - `ESCAPE` clears the focus and the selection, and is consumed only when there was something to
+   *   clear, so a reader can press it twice to dismiss the sheet the chart sits in.
+   *
+   * The order is the accessibility tree's, not the drawing's: a reader moves through a chart the
+   * way it reads. That is the same order and the same policy a screen reader gets, including the
+   * summary that stands in for the marks of a dense chart — so keyboard and screen reader cannot
+   * disagree about what is in the chart.
+   */
+  public fun handleKey(key: ChartKey, modifiers: Modifiers = Modifiers.None): Boolean {
+    // Never, under any state. See above.
+    if (key == ChartKey.TAB) return false
+
+    val snapshot = _state.value.snapshot
+    val elements =
+      AccessibilityTree.elements(snapshot.scene, snapshot.interactionState.selection.nodeIds)
+        .filter { it.nodeId != null }
+    if (elements.isEmpty()) return false
+
+    val current = snapshot.interactionState
+    val at = elements.indexOfFirst { it.nodeId == current.focusedNodeId }
+
+    fun focus(index: Int): Boolean {
+      val target = elements.getOrNull(index) ?: return false
+      if (target.nodeId == current.focusedNodeId) return false
+      publishInteraction(current.copy(focusedNodeId = target.nodeId))
+      return true
+    }
+
+    return when (key) {
+      // A chart with nothing focused takes the first element from either direction, which is what
+      // makes arriving at it by keyboard work at all.
+      ChartKey.ARROW_RIGHT,
+      ChartKey.ARROW_DOWN -> if (at < 0) focus(0) else focus(at + 1)
+      ChartKey.ARROW_LEFT,
+      ChartKey.ARROW_UP -> if (at < 0) focus(elements.lastIndex) else focus(at - 1)
+      ChartKey.HOME -> focus(0)
+      ChartKey.END -> focus(elements.lastIndex)
+      ChartKey.ENTER,
+      ChartKey.SPACE -> activateFocused(elements, at)
+      ChartKey.ESCAPE -> {
+        if (current.focusedNodeId == null && current.selection.isEmpty) {
+          false
+        } else {
+          publishInteraction(current.copy(focusedNodeId = null, selection = ChartSelection.Empty))
+          emit(ChartEvent.SelectionChanged(ChartSelection.Empty))
+          true
+        }
+      }
+      ChartKey.TAB -> false
+    }
+  }
+
+  /**
+   * `ENTER` on a focused mark, which reaches the dataflow exactly where a tap does.
+   *
+   * Deliberately the same path and the same events: a reader activating a bar by keyboard and one
+   * tapping it must leave the chart in the same state, or a specification that reacts to a click
+   * reacts to only half its audience.
+   */
+  private fun activateFocused(elements: List<AccessibleElement>, at: Int): Boolean {
+    val element = elements.getOrNull(at) ?: return false
+    // An axis caption is focusable and not activatable: offering an activation that does nothing is
+    // the thing `AccessibleElement.activatable` was added to stop.
+    if (!element.activatable) return false
+    val id = element.nodeId ?: return false
+    val node = nodeById(id) ?: return false
+    val current = _state.value.snapshot.interactionState
+    val selection =
+      ChartSelection(
+        nodeIds = setOf(id),
+        datumIds = node.metadata.datumId?.let { setOf(it) } ?: emptySet(),
+      )
+    publishInteraction(current.copy(selection = selection, focusedNodeId = id))
+    val centre = PointD(element.bounds.centerX, element.bounds.centerY)
+    emit(ChartEvent.MarkClicked(id, node.metadata.markName, datumOf(node), centre))
+    emit(ChartEvent.SelectionChanged(selection))
+    return true
+  }
+
+  /** The scene node an accessibility element came from. */
+  private fun nodeById(id: SceneNodeId): SceneNode? =
+    _state.value.snapshot.scene.flatten().firstOrNull { it.node.id == id }?.node
 
   private fun handleTap(point: PointD) {
     // A touch screen has no pointer to hover with, so a tap is also how a `hover` block and a

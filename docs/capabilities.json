@@ -5863,17 +5863,18 @@
       "line": 540,
       "section": "Interaction",
       "feature": "Keyboard focus navigation",
-      "status": "Partial",
+      "status": "**Supported**; a `keydown` handler still does not fire",
       "tests": [
+        "KeyboardTraversalTest",
         "KeyboardTraversalLimitTest",
         "VegaChartViewTest"
       ],
-      "tests_text": "`KeyboardTraversalLimitTest`, `VegaChartViewTest`",
-      "notes": "A host turns a platform key into a `ChartInputEvent.Key` and the controller takes it — `VegaChartView.onKeyDown` on Android, `ChartSession.press(_:)` on Apple. Nothing then moves: `fireSignalHandlers` maps only the pointer family, so a key fires no `keydown` handler and moves no focus between marks. That is deliberate rather than unfinished — claiming a key the chart does nothing with is a **focus trap**, where TAB never leaves the chart and, on a television where the d-pad is the keyboard, the arrows let a reader in and not out. Traversal semantics come with the accessibility work.",
+      "tests_text": "`KeyboardTraversalTest`, `KeyboardTraversalLimitTest`, `VegaChartViewTest`",
+      "notes": "A host turns a platform key into a `ChartInputEvent.Key` and the controller takes it — `VegaChartView.onKeyDown` on Android, `ChartSession.press(_:)` on Apple. Arrows walk the marks, `HOME`/`END` reach the ends, `ENTER`/`SPACE` activate down the same path a tap takes — the same selection and the same events, so a specification reacting to a click reaches both halves of its audience — and `ESCAPE` clears. The order is the accessibility tree's, so a keyboard reader and a screen reader cannot disagree about what is in the chart. `handleKey` returns whether the key was **consumed**, and that is the design rather than a detail: a host that cannot tell has no way to avoid a **focus trap**, so TAB is never consumed in any state, an arrow at the end of the order is not consumed either — a d-pad carries on out of the chart the way it would leave any other widget — and `ESCAPE` is declined once there is nothing left to clear. What a key still does not do is fire a signal handler: `fireSignalHandlers` maps only the pointer family, so a `{\\\"events\\\": \\\"keydown\\\"}` handler compiles, draws and never updates.",
       "milestone": "7",
       "limit": {
-        "test": "KeyboardTraversalLimitTest.no key moves focus between marks",
-        "claim": "A key press reaches the controller and moves no focus and fires no handler; traversal semantics are not implemented."
+        "test": "KeyboardTraversalLimitTest.a keydown handler does not fire",
+        "claim": "A key moves focus through the accessibility tree and activates a mark, and still fires no signal handler: `fireSignalHandlers` maps only the pointer family, so a `keydown` handler never updates."
       }
     },
     {

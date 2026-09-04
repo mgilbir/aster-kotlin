@@ -8,6 +8,30 @@ section here does not get released.
 
 ### Added
 
+- **Keyboard traversal: arrows walk the marks, `ENTER` activates one, `ESCAPE` clears.** The order is
+  the accessibility tree's, not the drawing's, so a keyboard reader and a screen reader cannot
+  disagree about what is in a chart or what order it is in — including the summary that stands in
+  for the marks of a dense one. `ENTER` and `SPACE` go down the same path a tap takes and emit the
+  same events, because a specification that reacts to a click has to reach both halves of its
+  audience.
+
+  **`handleKey` returns whether the key was consumed, and that is the design rather than a detail.**
+  A host that cannot tell has no way to avoid a **focus trap**, which is why this row said for so
+  long that declining every key was deliberate. So a key is consumed only when it actually did
+  something: TAB is never consumed in any state, an arrow at the end of the order is not consumed
+  either — a d-pad carries on out of the chart the way it would leave any other widget — and
+  `ESCAPE` is declined once there is nothing left to clear, so a reader can press it twice to
+  dismiss the sheet the chart sits in. It is a method of its own rather than a return type added to
+  `dispatch`, which would have broken every Swift caller.
+
+  `KeyboardTraversalLimitTest` is rewritten rather than deleted, and the reason is worth recording:
+  its old assertions used a chart whose rects carry no `description`, and a mark with no description
+  is not focusable — so there was nothing for a key to move focus *between*, and the class would
+  have gone on passing after traversal arrived while claiming traversal did not exist. It now uses
+  described marks and opens with a test whose only job is to prove they are focusable. What it still
+  holds is the narrower truth: a key fires no signal handler, so a `{"events": "keydown"}` handler
+  compiles, draws and never updates.
+
 - **The `label` transform is compared against upstream, which the row said was impossible.** It had
   read `Partial — not verified against upstream` since it was written, because `vega-label`
   rasterises the avoided marks through a canvas, `vega-canvas` answers null under Node, and
