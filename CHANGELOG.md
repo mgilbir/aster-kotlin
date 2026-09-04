@@ -439,6 +439,36 @@ section here does not get released.
 
 ### Fixed
 
+- **Gradient fills were compared nowhere at all — 20 of them, across 12 fixtures.** Two silences
+  that cancelled out: `readReference` kept numbers and strings and let an object fall into an
+  `else -> Unit`, and this engine's extractor answered null for any paint that was not a `Solid`, so
+  no `fill` key was written either. The rect a legend ramp is painted on was compared all along;
+  what is *inside* it was not. Every legend colour ramp in the corpus was in that blind spot.
+
+  Both sides now produce the same shape — kind, coordinates, and stops as offset-and-colour — and
+  the comparison checks all three. Colours are compared as **colours**, since upstream prints a stop
+  as `rgb(r, g, b)` and a hex spelling of the same colour is the same colour. Extraction goes
+  through one **exhaustive** `when` over the node kinds, so a node type added later is a build error
+  rather than a channel that quietly stops being compared — which is precisely how this and the
+  scale families were lost.
+
+  Eighteen of the twenty match exactly. The two that differ do so by one unit in one channel of one
+  stop, and it is a tie: both engines interpolate the *same* 31-colour `viridis` palette piecewise
+  in RGB — vega-scale's `palettes.js` and this engine's `ColorSchemes` hold the identical hex string
+  — and at offset 0.95 the stop falls exactly halfway along one segment, making the blue channel
+  26.5 exactly. `interpolateColors` alone rounds that to 27, which is this engine's answer; a scale
+  in a live view answers 26. Pinned by name rather than absorbed into the colour tolerance, which
+  would have to widen to a whole unit and would then accept a genuinely wrong stop anywhere.
+
+  A **boolean** channel is read too, which is only ever `clip` here: upstream recorded it and this
+  side recorded the string, and they had never met.
+
+  Mutation-checked: dropping a stop fails 24 fixture tests.
+
+  One idea in this change was redundant and is recorded as such rather than kept: upstream's
+  explicit `stroke: null` and `fill: null` looked unasserted, and are not — the `COLOUR_CHANNELS`
+  sweep already reports paint this side invents where the reference has none.
+
 - **`check.sh` covers the publication checks too, which were the last two CI had and it did not.**
   `verifyPublishedVariants` catches a declared target with no publication behind it, and
   `verifyCentralBundle` a publication missing from the bundle — both far cheaper on an ordinary run
