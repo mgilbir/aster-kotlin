@@ -116,6 +116,14 @@ public data class CompiledSpec(
    * outside has asked to read a group's signals. It crosses to a host the day something does.
    */
   @InternalAsterVegaApi val groupScopes: Map<String, SignalScope> = emptyMap(),
+  /**
+   * The scales each group mark declared for itself, by the same path as [groupScopes].
+   *
+   * Separate because a [SignalScope] keeps its scales private — an expression asks it questions
+   * rather than reading its table — and the differential harness needs the objects to compare a
+   * domain, a range and a bandwidth against upstream's.
+   */
+  @InternalAsterVegaApi val groupScales: Map<String, Map<String, VegaScale>> = emptyMap(),
 ) {
   public val isUsable: Boolean
     get() = scene != null
@@ -831,6 +839,7 @@ public class SpecCompiler(
         scales = scales,
         signals = signals,
         groupScopes = scopeCompiler.groupScopes.toMap(),
+        groupScales = scopeCompiler.groupScales.toMap(),
         diagnostics = diagnostics.diagnostics,
         spec = spec,
         hoverVariants = scopeCompiler.hoverVariants.toMap(),

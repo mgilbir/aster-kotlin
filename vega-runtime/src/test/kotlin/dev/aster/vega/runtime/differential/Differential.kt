@@ -85,6 +85,15 @@ public object Differential {
     val width: Double,
     val height: Double,
     val scales: Map<String, ScaleReference>,
+    /**
+     * The scales a **named, singly-drawn** group mark built for itself, by that group's name.
+     *
+     * Absent from most references, because most charts declare no scale inside a group. Absent for
+     * a *faceted* group too: it resolves its scales once per cell, so there is no single scale of
+     * that name — which is the reason the row gave for comparing none of them, and which turned out
+     * to apply to only half the nested scales in the corpus.
+     */
+    val nestedScales: Map<String, Map<String, ScaleReference>> = emptyMap(),
     val marks: List<Mark>,
   )
 
@@ -98,6 +107,19 @@ public object Differential {
 
   // ---- reading the reference ------------------------------------------------
 
+  /** One recorded scale, shared by the top-level reading and the nested one. */
+  private fun scaleReference(value: VegaValue): ScaleReference {
+    val obj = value as VegaValue.Obj
+    return ScaleReference(
+      domain =
+        (obj.fields["domain"] as? VegaValue.Arr)?.values?.map { it.asString() } ?: emptyList(),
+      range = (obj.fields["range"] as? VegaValue.Arr)?.values?.map { it.asString() } ?: emptyList(),
+      bandwidth = obj.fields["bandwidth"]?.asDouble(),
+      step = obj.fields["step"]?.asDouble(),
+      ticks = (obj.fields["ticks"] as? VegaValue.Arr)?.values?.map { it.asDouble() },
+    )
+  }
+
   public fun readReference(file: File): Reference {
     require(file.isFile) {
       "Missing reference file ${file.path}. Regenerate it with ./scripts/oracle.sh"
@@ -106,16 +128,7 @@ public object Differential {
     val size = root.fields["size"] as VegaValue.Obj
     val scales =
       (root.fields["scales"] as? VegaValue.Obj)?.fields?.mapValues { (_, value) ->
-        val obj = value as VegaValue.Obj
-        ScaleReference(
-          domain =
-            (obj.fields["domain"] as? VegaValue.Arr)?.values?.map { it.asString() } ?: emptyList(),
-          range =
-            (obj.fields["range"] as? VegaValue.Arr)?.values?.map { it.asString() } ?: emptyList(),
-          bandwidth = obj.fields["bandwidth"]?.asDouble(),
-          step = obj.fields["step"]?.asDouble(),
-          ticks = (obj.fields["ticks"] as? VegaValue.Arr)?.values?.map { it.asDouble() },
-        )
+        scaleReference(value)
       } ?: emptyMap()
 
     val marks =
@@ -144,6 +157,10 @@ public object Differential {
       width = (size.fields["width"] ?: VegaValue.Num(0.0)).asDouble(),
       height = (size.fields["height"] ?: VegaValue.Num(0.0)).asDouble(),
       scales = scales,
+      nestedScales =
+        (root.fields["nestedScales"] as? VegaValue.Obj)?.fields?.mapValues { (_, group) ->
+          (group as VegaValue.Obj).fields.mapValues { (_, value) -> scaleReference(value) }
+        } ?: emptyMap(),
       marks = marks,
     )
   }

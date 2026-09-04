@@ -558,6 +558,60 @@ function scaleValue(value, precision) {
 }
 
 /** Scale outputs, compared exactly: they are pure arithmetic with no rendering in the way. */
+/**
+ * The scales a **named group mark** built for itself, by that group's name.
+ *
+ * `view.scale(name)` reaches only the top level, so a scale declared inside a group was recorded
+ * nowhere and the row said it could not be: "a faceted group resolves its scales once per cell and
+ * there is no single scale of that name to compare". True of a faceted group, and not of the others
+ * — half the nested scales in the corpus belong to a group drawn **once**, and those have exactly
+ * one scale each.
+ *
+ * So a group's scales are recorded when its name identifies **exactly one** subcontext. A faceted
+ * group has one per cell and is skipped for the reason the row actually gives; an unnamed group has
+ * no key to record it under. `subcontext[i].group.mark.name` is what makes the distinction
+ * available: it is the group's own name, so the key matches the engine's own path for it rather
+ * than a positional index, which would silently mis-pair the moment a mark was added.
+ */
+export function normalizeNestedScales(view, precision = DEFAULT_PRECISION) {
+  const subs = (view._runtime && view._runtime.subcontext) || [];
+  const byName = new Map();
+  for (const sub of subs) {
+    const name = sub.group && sub.group.mark && sub.group.mark.name;
+    if (!name || !sub.scales) continue;
+    if (!byName.has(name)) byName.set(name, []);
+    byName.get(name).push(sub);
+  }
+  const result = {};
+  for (const [name, group] of byName) {
+    if (group.length !== 1) continue; // faceted: one scope per cell, no single scale to compare
+    const scales = {};
+    for (const [scaleName, node] of Object.entries(group[0].scales)) {
+      const scale = node && node.value;
+      if (!scale || typeof scale.domain !== 'function') continue;
+      scales[scaleName] = scaleEntry(scale, precision);
+    }
+    if (Object.keys(scales).length) result[name] = scales;
+  }
+  return result;
+}
+
+/** One scale's comparable facts, shared by the top-level and nested recordings. */
+function scaleEntry(scale, precision) {
+  const entry = {
+    domain: scale.domain().map((d) => scaleValue(d, precision)),
+    range: scale.range().map((r) => scaleValue(r, precision)),
+  };
+  if (typeof scale.bandwidth === 'function') {
+    entry.bandwidth = canonicalNumber(scale.bandwidth(), precision);
+    entry.step = canonicalNumber(scale.step(), precision);
+  }
+  if (typeof scale.ticks === 'function') {
+    entry.ticks = scale.ticks().map((t) => canonicalNumber(t, precision));
+  }
+  return entry;
+}
+
 export function normalizeScales(view, names, precision = DEFAULT_PRECISION) {
   const result = {};
   for (const name of names) {
@@ -568,18 +622,7 @@ export function normalizeScales(view, names, precision = DEFAULT_PRECISION) {
       continue;
     }
     if (!scale) continue;
-    const entry = {
-      domain: scale.domain().map((d) => scaleValue(d, precision)),
-      range: scale.range().map((r) => scaleValue(r, precision)),
-    };
-    if (typeof scale.bandwidth === 'function') {
-      entry.bandwidth = canonicalNumber(scale.bandwidth(), precision);
-      entry.step = canonicalNumber(scale.step(), precision);
-    }
-    if (typeof scale.ticks === 'function') {
-      entry.ticks = scale.ticks().map((t) => canonicalNumber(t, precision));
-    }
-    result[name] = entry;
+    result[name] = scaleEntry(scale, precision);
   }
   return result;
 }

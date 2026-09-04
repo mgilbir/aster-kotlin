@@ -6082,18 +6082,18 @@
       "line": 569,
       "section": "Differential testing against upstream Vega",
       "feature": "Nested scale outputs",
-      "status": "Not compared",
-      "tests": [
-        "NestedScaleScopeTest",
-        "Differential"
-      ],
-      "tests_text": "`NestedScaleScopeTest`, `Differential`",
-      "notes": "The reference records only top-level scales, because a faceted group resolves its scales once per cell and there is no single scale of that name to compare. The cells' geometry is compared in full, which is what those scales produce",
-      "milestone": "5",
+      "status": "**Compared** for a named group drawn once; a faceted group's are not",
       "limit": {
-        "test": "NestedScaleScopeTest.a reference records the top-level scales and no nested ones",
-        "claim": "The reference records only top-level scales, because a faceted group resolves its scales once per cell and there is no single scale of that name to compare. The cells' geometry is compared in full, which is what those scales produce."
-      }
+        "test": "NestedScaleCoverageTest.a faceted group's scales are not recorded",
+        "claim": "A faceted group resolves its scales once per cell, so there is no single scale of that name to compare; its cells' geometry is compared in full instead. A named group drawn once is compared like any other scale."
+      },
+      "tests": [
+        "FixtureDifferentialTest",
+        "NestedScaleCoverageTest"
+      ],
+      "tests_text": "`FixtureDifferentialTest`, `NestedScaleCoverageTest`",
+      "notes": "A scale declared inside a **named group drawn once** is recorded and compared like any other: `normalizeNestedScales` reads it from upstream's own subcontext, keyed by the group's name, and the differential checks its domain, range, bandwidth and ticks. That covers the detail and overview panels of `overview-plus-detail` and the three histograms of `crossfilter-flights`. The row previously compared none of them, on the grounds that a faceted group resolves its scales once per cell so there is no single scale of that name — sound, and true of only *half* the nested scales in the corpus. A **faceted** group's are still not recorded for exactly that reason, and an **unnamed** group's are not either, because there is no key to record them under; `NestedScaleCoverageTest` says which case each group in the corpus falls into, so neither side can drift. Keyed by name rather than by upstream's subcontext index deliberately: pairing by position would mis-pair the moment a mark was added. For a faceted group the cells' geometry is still compared in full, which is what those scales produce — a wrong per-cell domain moves every mark in the cell",
+      "milestone": "5"
     },
     {
       "line": 570,

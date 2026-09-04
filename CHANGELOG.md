@@ -8,6 +8,29 @@ section here does not get released.
 
 ### Added
 
+- **A scale declared inside a named group is compared against upstream.** The row read
+  `Not compared`, on the grounds that "a faceted group resolves its scales once per cell and there
+  is no single scale of that name to compare". That reason is sound and it covers only *faceted*
+  groups — half the nested scales in the corpus belong to a group drawn **once**, and each of those
+  has exactly one scale of its name. They were excluded by a reason that did not apply to them.
+
+  `normalizeNestedScales` reads them from upstream's own `subcontext`, keyed by
+  `subcontext[i].group.mark.name`, and records a group's scales when its name identifies exactly one
+  subcontext. `FixtureDifferentialTest` then checks their domain, range, bandwidth and ticks the way
+  it checks a top-level scale's. Five scales across two fixtures now compare where none did: the
+  detail and overview panels of `overview-plus-detail` and the three histograms of
+  `crossfilter-flights`. All five match.
+
+  Keyed by **name** rather than by upstream's subcontext index, deliberately: pairing by position
+  would mis-pair the moment a mark was added, which is the same reason node ids are unusable for
+  comparison in this harness. The nested scales go into a key of their own rather than beside the
+  top-level ones, so a group's `yscale` cannot come to shadow the chart's.
+
+  `NestedScaleScopeTest` becomes `NestedScaleCoverageTest` and now says which of the three shapes
+  each group in the corpus falls into — named and singly drawn, faceted, or unnamed — rather than
+  asserting that none of them is compared. Only 2 of the 199 committed references changed, because
+  the key is emitted only when there is something in it.
+
 - **A `{"events": "keydown"}` handler fires.** `fireSignalHandlers` mapped only the pointer family,
   so a specification writing one got a chart that compiled, drew and never updated from the
   keyboard — and a signal that never updates looks exactly like one whose expression is wrong.

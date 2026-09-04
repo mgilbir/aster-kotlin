@@ -1,3 +1,5 @@
+@file:OptIn(dev.aster.vega.model.InternalAsterVegaApi::class)
+
 package dev.aster.vega.runtime.differential
 
 import dev.aster.vega.fixtures.VegaHeadlessTextEngine
@@ -11,6 +13,7 @@ import dev.aster.vega.scene.flatten
 import java.io.File
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
@@ -86,6 +89,41 @@ class FixtureDifferentialTest {
     val (reference, compiled) = compile(name)
     val differences = Differential.compareScales(reference.scales, compiled.scales)
     assertTrue(differences.isEmpty(), "$name scale differences:\n${differences.joinToString("\n")}")
+  }
+
+  /**
+   * And the scales a **group mark** built for itself, which were never compared.
+   *
+   * The row read `Not compared`, on the grounds that "a faceted group resolves its scales once per
+   * cell and there is no single scale of that name to compare". That is true of a faceted group and
+   * of nothing else, and half the nested scales in this corpus belong to a group drawn once — the
+   * detail and overview panels of `overview-plus-detail`, the three histograms of
+   * `crossfilter-flights`, the two cells of `qq-plot`. Each of those has exactly one scale of its
+   * name, recorded by `normalizeNestedScales` under the group's own name.
+   *
+   * Keyed by name rather than by position, deliberately: upstream hands out subcontexts in an array
+   * and pairing them by index would mis-pair the moment a mark was added, which is the failure mode
+   * that made node ids unusable for comparison here.
+   */
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("fixtures")
+  fun `a group mark's own scales match upstream`(name: String) {
+    val (reference, compiled) = compile(name)
+    assumeTrue(reference.nestedScales.isNotEmpty(), "$name declares no scale inside a group")
+    val differences = mutableListOf<String>()
+    for ((group, scales) in reference.nestedScales) {
+      val ours =
+        compiled.groupScales[group]
+          ?: run {
+            differences += "group '$group' built no scales here; upstream has ${scales.keys}"
+            continue
+          }
+      differences += Differential.compareScales(scales, ours).map { "group '$group': $it" }
+    }
+    assertTrue(
+      differences.isEmpty(),
+      "$name nested scale differences:\n${differences.joinToString("\n")}",
+    )
   }
 
   /** True when a mark whose outline is approximated by cubics could be setting the surface size. */
