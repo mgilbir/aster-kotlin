@@ -439,6 +439,19 @@ section here does not get released.
 
 ### Fixed
 
+- **`check.sh` covers the publication checks too, which were the last two CI had and it did not.**
+  `verifyPublishedVariants` catches a declared target with no publication behind it, and
+  `verifyCentralBundle` a publication missing from the bundle — both far cheaper on an ordinary run
+  than on the one run that uploads it, which is why CI already had them.
+
+  Found by listing the workflow's steps against this script's gates rather than waiting for the next
+  red run: the same gap that cost three of them, in two more places. Both pass on `main` today and
+  both take seconds, so there was never a reason for them to be CI-only.
+
+  macOS only, and skipped by name elsewhere: Kotlin creates no publication for a target the host
+  cannot compile, so on Linux they are *expected* to fail and say nothing useful. `check.sh` is now
+  fourteen gates and there is no step in the workflow it does not run.
+
 - **`check.sh` now runs the test-count gate CI had, which it did not.** The rule lived in a heredoc
   inside the workflow, and that was a hole rather than a detail: `check.sh` is what somebody runs
   before landing, so a rule only CI knows is a rule that lands broken.

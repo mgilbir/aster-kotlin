@@ -269,6 +269,25 @@ counts_gate() {
 }
 run_gate "test-counts" counts_gate
 
+# **The publication**, which is the other pair of checks CI had and this did not.
+#
+# Same reasoning as `test-counts` and found the same way: `check.sh` is the pre-landing gate, so a
+# rule only the workflow knows is a rule that lands broken. `verifyPublishedVariants` catches a
+# declared target with no publication behind it and `verifyCentralBundle` a publication missing from
+# the bundle — both far cheaper on an ordinary run than on the one run that uploads it.
+#
+# macOS only, and deliberately: Kotlin creates no publication for a target the host cannot compile,
+# so on Linux these are *expected* to fail and say nothing useful.
+publication_gate() {
+  ./gradlew verifyPublishedVariants
+  ./gradlew centralBundle verifyCentralBundle --no-configuration-cache
+}
+if [ "$(uname -s)" = "Darwin" ]; then
+  run_gate "publication" publication_gate
+else
+  skip_gate "publication" "this host is $(uname -s); Kotlin publishes no macOS or iOS variant here"
+fi
+
 # ---------------------------------------------------------------------------------------------
 # 2. The Android artifacts' exported surface.
 #
