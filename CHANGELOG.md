@@ -353,6 +353,27 @@ section here does not get released.
 
 ### Fixed
 
+- **The Vega-Lite surface was half a unit to a unit small on every chart, and the stated reason was
+  wrong.** The row explained it as a guide extent the mark comparison could not see, "because text
+  bounds are excluded by design". It was not that.
+
+  Every shortfall was exactly 0.5 or 1.0 and never anything between, across all 193 affected
+  fixtures — the signature of a half-pixel rather than of accumulated measurement. `strokedFrame`
+  unioned the frame's own stroked rectangle into the measured reach, where upstream takes the union
+  of the frame's extent and its children's and expands **that** by half the stroke. So
+  `min(-46, -0.5)` left an edge at -46 where upstream has -46.5, and since every Vega-Lite chart
+  carries a `cell` style with a one-unit border, every one of them was short.
+
+  Checked edge by edge against upstream on a minimal chart before changing anything: -46 to -46.5,
+  306.74 to 307.24, -6.74 to -7.24, 332 to 332.5 — all four exact under the union-then-expand model
+  and none of them under the old one.
+
+  The worst difference across all 566 dimensions of the corpus is now **0.0002**, which is the
+  arc-approximation allowance rather than anything about the frame. `SurfaceSizeShortfallTest` is
+  renamed to `SurfaceSizeTest` and now holds the equality in **both** directions, because the
+  failure it guards against has changed: an over-expansion making every surface a unit too large
+  would have satisfied "at most a unit small" just as well.
+
 - **The foreign-coverage list is computed from the API that is actually there, not from the recorded
   snapshot.** The other half of the ordering fix above, and the half that bites in *check* mode:
   asking "which public members have no foreign counterpart" against last commit's boundary reports

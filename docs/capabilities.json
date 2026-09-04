@@ -1112,18 +1112,14 @@
       "line": 118,
       "section": "Vega-Lite",
       "feature": "Surface size",
-      "status": "**Partial**",
+      "status": "**Exact**",
       "tests": [
         "VegaLiteFixtureDifferentialTest",
-        "SurfaceSizeShortfallTest"
+        "SurfaceSizeTest"
       ],
-      "tests_text": "`VegaLiteFixtureDifferentialTest`, `SurfaceSizeShortfallTest`",
-      "notes": "Every mark lands exactly where upstream puts it; the surface around them still comes out between half a unit and a unit small in each direction. Since nothing drawn has moved, the shortfall is in a guide *extent* — the one input the mark comparison cannot see, because text bounds are excluded by design (docs/adr/0006). The test asserts the shape of the difference rather than tolerating it silently",
-      "milestone": "—",
-      "limit": {
-        "test": "SurfaceSizeShortfallTest.the surface is between nothing and a unit small in each direction",
-        "claim": "Every mark lands where upstream puts it; the surface around them comes out up to a unit small in each direction, the shortfall being in a guide extent the mark comparison cannot see because text bounds are excluded by design (ADR 0006). Measured across all 566 dimensions of the corpus: the worst is exactly one unit."
-      }
+      "tests_text": "`VegaLiteFixtureDifferentialTest`, `SurfaceSizeTest`",
+      "notes": "Every mark lands exactly where upstream puts it and so does the surface around them: the worst difference across all 566 dimensions of the corpus is 0.0002, which is the arc-approximation allowance rather than anything about the frame. It used to be between half a unit and a unit **small**, explained here as a guide extent the mark comparison could not see. It was not that. Every shortfall was exactly 0.5 or 1.0 and never anything between — the signature of a half-pixel rather than of accumulated measurement — and the cause was `strokedFrame` unioning the frame's own stroked rectangle into the reach where upstream takes the union of the frame's extent and its children's and expands *that* by half the stroke. `min(-46, -0.5)` leaves an edge at -46 where upstream has -46.5, and every Vega-Lite chart carries a `cell` style with a one-unit border, so every one of them was short. The test now holds the equality in **both** directions, because an over-expansion would have satisfied the old \\\"at most a unit small\\\" just as well",
+      "milestone": "—"
     },
     {
       "line": 124,

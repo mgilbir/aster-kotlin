@@ -1019,11 +1019,19 @@ public class SpecCompiler(
     val stroke = content.stroke ?: return reach
     if (content.size == null) return reach
     val half = stroke.width / 2.0
+    // Union **then** expand, which is upstream's own order and not the same as unioning the frame's
+    // stroked rectangle in. A group's bounds there are the union of its own extent and its
+    // children's, and *that* is widened by half the stroke — so a label hanging 46 units to the
+    // left
+    // puts the frame's edge at -46.5, where taking `min(-46, -0.5)` leaves it at -46 and the
+    // surface
+    // comes out half a unit short. Checked edge by edge against upstream on a minimal chart: -46 to
+    // -46.5, 306.74 to 307.24, -6.74 to -7.24, 332 to 332.5.
     return RectD(
-      left = minOf(reach.left, -half),
-      top = minOf(reach.top, -half),
-      right = maxOf(reach.right, plot.width + half),
-      bottom = maxOf(reach.bottom, plot.height + half),
+      left = minOf(reach.left, 0.0) - half,
+      top = minOf(reach.top, 0.0) - half,
+      right = maxOf(reach.right, plot.width) + half,
+      bottom = maxOf(reach.bottom, plot.height) + half,
     )
   }
 
