@@ -702,13 +702,14 @@ ColorSpaces.toLab(color:)
 CompiledSpec
 CompiledSpec.description()
 CompiledSpec.diagnostics
-CompiledSpec.doCopy(scene:scales:signals:diagnostics:spec:hoverVariants:readsContainerSize:groupScopes:groupScales:groupNodes:)
+CompiledSpec.doCopy(scene:scales:signals:diagnostics:spec:hoverVariants:readsContainerSize:groupScopes:groupScales:groupNodes:groupDatums:)
+CompiledSpec.groupDatums
 CompiledSpec.groupNodes
 CompiledSpec.groupScales
 CompiledSpec.groupScopes
 CompiledSpec.hash()
 CompiledSpec.hoverVariants
-CompiledSpec.init(scene:scales:signals:diagnostics:spec:hoverVariants:readsContainerSize:groupScopes:groupScales:groupNodes:)
+CompiledSpec.init(scene:scales:signals:diagnostics:spec:hoverVariants:readsContainerSize:groupScopes:groupScales:groupNodes:groupDatums:)
 CompiledSpec.isEqual(_:)
 CompiledSpec.isUsable
 CompiledSpec.readsContainerSize

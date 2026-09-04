@@ -133,6 +133,15 @@ public data class CompiledSpec(
    * group nodes for axes and legends too and pairing those to scopes by shape is guesswork.
    */
   @InternalAsterVegaApi val groupNodes: Map<String, SceneNodeId> = emptyMap(),
+  /**
+   * The datum each group cell was drawn for, by the same path as [groupScopes].
+   *
+   * A faceted cell's datum carries the `groupby` values that made it, which is what says *which*
+   * cell it is. The differential pairs a faceted group's scales with upstream's by that key rather
+   * than by position, since both engines build their cells into an array and pairing by index
+   * mis-pairs the moment either reorders.
+   */
+  @InternalAsterVegaApi val groupDatums: Map<String, VegaValue> = emptyMap(),
 ) {
   public val isUsable: Boolean
     get() = scene != null
@@ -850,6 +859,7 @@ public class SpecCompiler(
         groupScopes = scopeCompiler.groupScopes.toMap(),
         groupScales = scopeCompiler.groupScales.toMap(),
         groupNodes = scopeCompiler.groupNodes.toMap(),
+        groupDatums = scopeCompiler.groupDatums.toMap(),
         diagnostics = diagnostics.diagnostics,
         spec = spec,
         hoverVariants = scopeCompiler.hoverVariants.toMap(),

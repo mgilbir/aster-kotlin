@@ -4,6 +4,7 @@ import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.canonicalNumberString
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.BinOrdinalScale
 import dev.aster.vega.runtime.scale.IdentityScale
@@ -129,12 +130,16 @@ public object Differential {
     val height: Double,
     val scales: Map<String, ScaleReference>,
     /**
-     * The scales a **named, singly-drawn** group mark built for itself, by that group's name.
+     * The scales a **named** group mark built for itself — a faceted one once per cell.
      *
-     * Absent from most references, because most charts declare no scale inside a group. Absent for
-     * a *faceted* group too: it resolves its scales once per cell, so there is no single scale of
-     * that name — which is the reason the row gave for comparing none of them, and which turned out
-     * to apply to only half the nested scales in the corpus.
+     * Keyed by the group's name, and for a faceted group by the name plus its **facet key**:
+     * `site[|"Waseca"|]`, the `groupby` values that made the cell. Absent from most references,
+     * because most charts declare no scale inside a group, and absent for an **unnamed** group,
+     * which has no key to record it under.
+     *
+     * The key is a facet key rather than a cell index because both engines build their cells into
+     * an array and pairing by position mis-pairs the moment either reorders — a comparison against
+     * the wrong cell, which is worse than no comparison. See [facetKeyOf].
      */
     val nestedScales: Map<String, Map<String, ScaleReference>> = emptyMap(),
     val marks: List<Mark>,
@@ -187,6 +192,37 @@ public object Differential {
         )
       else -> null
     }
+
+  /**
+   * A cell's facet key, in the recorder's spelling: `|"Waseca"|`.
+   *
+   * Mirrors `facetKey` in `oracle-js/src/normalize.js`, which writes `JSON.stringify` of each
+   * `groupby` value after `scaleValue` has canonicalised it — a number stays a number and
+   * everything else becomes a string. `canonicalNumberString` is the same rounding the recorder's
+   * `canonicalNumber` applies, which is why it exists in `vega-model` rather than in either
+   * harness.
+   *
+   * Null where the datum carries none of the `groupby` fields, so a cell is left unpaired rather
+   * than paired under a key that means something else.
+   */
+  public fun facetKeyOf(datum: VegaValue, groupby: List<String>): String? {
+    if (groupby.isEmpty()) return null
+    val parts = mutableListOf<String>()
+    for (field in groupby) {
+      val value = (datum as? VegaValue.Obj)?.fields?.get(field) ?: return null
+      parts +=
+        when (value) {
+          is VegaValue.Num -> canonicalNumberString(value.value)
+          // `String(value)` in the recorder, then quoted by `JSON.stringify`. A boolean and a null
+          // both become their own spelling, which is what `String()` does to them in JavaScript.
+          is VegaValue.Str -> VegaJson.write(value)
+          is VegaValue.Bool -> VegaJson.write(VegaValue.Str(value.value.toString()))
+          is VegaValue.Null -> VegaJson.write(VegaValue.Str("null"))
+          else -> return null
+        }
+    }
+    return "|" + parts.joinToString("|") + "|"
+  }
 
   /** One recorded scale, shared by the top-level reading and the nested one. */
   private fun scaleReference(value: VegaValue): ScaleReference {

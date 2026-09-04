@@ -218,6 +218,19 @@ internal class ScopeCompiler(
   val groupNodes: MutableMap<String, SceneNodeId> = LinkedHashMap()
 
   /**
+   * The datum each group cell was drawn for, by the same path.
+   *
+   * A faceted cell's datum is what says **which** cell it is: the `groupby` values that made it,
+   * beside `count` and whatever `facet.aggregate` measured. The differential pairs a faceted
+   * group's recorded scales with this engine's by that key rather than by position, because
+   * upstream hands out its subcontexts in an array and pairing by index mis-pairs the moment either
+   * side reorders — and a comparison against the wrong cell is worse than none.
+   *
+   * `VegaValue.EmptyObject` for a group drawn once, which has no facet key and needs none.
+   */
+  val groupDatums: MutableMap<String, VegaValue> = LinkedHashMap()
+
+  /**
    * A scope's scene nodes, and how far the drawing they make up reaches.
    *
    * @param cellReach set only for a group mark's cells, which a `layout` needs in order to grid
@@ -749,6 +762,7 @@ internal class ScopeCompiler(
         // A handler needs both at once: `invert('xOverview', brush)` is a scale lookup and a signal
         // read in one expression, and `xOverview` is the group's own.
         groupScopes[here] = sized.signals.withScales(sized.scales, diagnostics)
+        groupDatums[here] = partitions[index].datum
         // The group's **own** scales, not the enclosing scope's it also sees: what upstream records
         // for a subcontext is what that subcontext defined, and comparing inherited ones would
         // compare the top level twice.

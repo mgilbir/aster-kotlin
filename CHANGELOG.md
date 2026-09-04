@@ -8,6 +8,30 @@ section here does not get released.
 
 ### Added
 
+- **A faceted group's own scales are compared against upstream, one cell at a time.** The row said
+  they could not be: "a faceted group resolves its scales once per cell, so there is no single scale
+  of that name to compare". That reason has now been read too wide twice. It first came down for a
+  group drawn **once** — half the nested scales in the corpus. This is the rest of it, and the
+  premise turns out to be about the **key** rather than about the data: upstream keeps one
+  `subcontext` entry per cell, each holding that cell's own resolved scales, and "no single scale of
+  that name" only means there is no single *name*. There is one per cell.
+
+  It is the group's name plus the cell's **facet key** — `site[|"Waseca"|]`, the `groupby` values
+  that made it — written the same way on both sides. Nine more cells over `barley-trellis` and
+  `facet-trellis`, and every one matched upstream exactly on the first run.
+
+  A facet key rather than a cell index, deliberately: both engines build their cells into an array
+  and pairing by position mis-pairs the moment either reorders, which is a comparison against the
+  wrong cell and worse than none. And only the `groupby` values go into it — a facet's datum also
+  carries `count` and whatever `facet.aggregate` measured, and keying on a measurement would turn a
+  disagreement about that measurement into a pair that silently does not match, the comparison going
+  quiet at exactly the moment it has something to say.
+
+  What is left is an **unnamed** group, for the reason it always was: there is no key to record it
+  under. `NestedScaleCoverageTest` now pins that instead, and asks for every cell rather than merely
+  for the group — one key would satisfy "recorded" while still letting one cell stand in for all of
+  them, which is what the old reason was right to refuse.
+
 - **A signal handler declared inside a group fires for events in that group, and in no other —
   including a faceted group, once per cell.** Two shapes were refused by name: a **bare `scope`
   selector**, which named no mark and so had nothing to narrow it, and a **faceted group**, whose
