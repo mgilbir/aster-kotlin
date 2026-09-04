@@ -51,14 +51,41 @@ if [ "$MODE" = "--selftest" ]; then
   echo "$VICTIM" >> "$SNAPSHOT"
 
   "$0" --accept > /dev/null || { echo "--selftest: the accept itself failed" >&2; exit 1; }
-  if "$0" > /dev/null 2>&1; then
-    echo "==> foreign-api.sh: one --accept settles the snapshot and the coverage list"
-    exit 0
+  if ! "$0" > /dev/null 2>&1; then
+    echo "foreign-api.sh: a check straight after --accept still reports a difference." >&2
+    echo "The coverage list is computed from the API snapshot, so the snapshot must be" >&2
+    echo "written first. Using '$VICTIM' as the member that just started crossing." >&2
+    exit 1
   fi
-  echo "foreign-api.sh: a check straight after --accept still reports a difference." >&2
-  echo "The coverage list is computed from the API snapshot, so the snapshot must be" >&2
-  echo "written first. Using '$VICTIM' as the member that just started crossing." >&2
-  exit 1
+  cp "$SAVED_API" "$SNAPSHOT"; cp "$SAVED_COVERAGE" "$COVERAGE"
+
+  # And the other half: a **check** against a snapshot the boundary has outgrown reports the API
+  # diff, which is the real signal, rather than a coverage list full of members that cross
+  # perfectly well.
+  #
+  # Taking a genuinely exported member out of the snapshot is the same input as one that has just
+  # been added to the Kotlin side. Computing coverage from the snapshot then calls it a hole and
+  # exits before the API diff is ever printed -- which is what a property added to `SignalSpec`
+  # did, reporting `SignalSpec.getPush` as unreachable while the header exported it.
+  REMOVED="$(grep -m1 -E '^[A-Za-z]+\.[a-z][A-Za-z]*$' "$SNAPSHOT" || true)"
+  [ -n "$REMOVED" ] || { echo "--selftest found no member to remove" >&2; exit 1; }
+  grep -vxF "$REMOVED" "$SNAPSHOT" > "$SNAPSHOT.tmp" && mv "$SNAPSHOT.tmp" "$SNAPSHOT"
+
+  REPORT="$("$0" 2>&1 || true)"
+  if ! printf '%s' "$REPORT" | grep -q "The API exported to foreign hosts has changed"; then
+    echo "foreign-api.sh: a snapshot the boundary has outgrown did not report the API diff." >&2
+    echo "Removed '$REMOVED' to stand for a member that has just started crossing." >&2
+    exit 1
+  fi
+  if printf '%s' "$REPORT" | grep -q "no reason is recorded"; then
+    echo "foreign-api.sh: '$REMOVED' was reported as not reaching a foreign host, but the header" >&2
+    echo "exports it. The coverage list is being computed from the snapshot rather than from the" >&2
+    echo "API that is actually there." >&2
+    exit 1
+  fi
+
+  echo "==> foreign-api.sh: one --accept settles both files, and a check reports the API diff"
+  exit 0
 fi
 
 # **Always**, not only when the header is missing. A header left over from another commit makes this
@@ -177,7 +204,10 @@ if [ "$MODE" = "--accept" ]; then
   echo "==> Recorded $(wc -l < "$SNAPSHOT" | tr -d ' ') exported symbols in $SNAPSHOT"
 fi
 
-python3 scripts/foreign-coverage.py > "$COVERAGE_NOW"
+# Against the header just extracted, not the recorded snapshot. In accept mode the snapshot has
+# already been rewritten from it a few lines up, so the two agree; in check mode they do not, and
+# reading the snapshot would report every newly exported member as a hole that does not cross.
+python3 scripts/foreign-coverage.py "$CURRENT" > "$COVERAGE_NOW"
 
 if [ "$MODE" = "--accept" ]; then
   cp "$COVERAGE_NOW" "$COVERAGE"

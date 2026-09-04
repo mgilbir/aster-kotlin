@@ -281,6 +281,25 @@ section here does not get released.
 
 ### Fixed
 
+- **The foreign-coverage list is computed from the API that is actually there, not from the recorded
+  snapshot.** The other half of the ordering fix above, and the half that bites in *check* mode:
+  asking "which public members have no foreign counterpart" against last commit's boundary reports
+  every newly exported member as a hole.
+
+  Not hypothetical — adding a `push` property to `SignalSpec` reported `SignalSpec.getPush` as
+  unreachable while the header exported it perfectly well, and the real signal, the API diff, is
+  printed second and so never reached. It cost a detour into why a property was not being exported
+  when it was.
+
+  `foreign-coverage.py` now takes the API list to read as an argument, and `foreign-api.sh` passes
+  the header it just extracted. In accept mode the snapshot has already been rewritten from that
+  header, so the two agree; in check mode they did not.
+
+  `--selftest` grew a second case for it: taking a genuinely exported member *out* of the snapshot is
+  the same input as one that has just been added on the Kotlin side, and the check has to answer with
+  the API diff rather than with a coverage list full of members that cross perfectly well. Verified
+  by putting the old behaviour back, where it fails.
+
 - **`invert('name', [lo, hi])` answered null for every scale.** The range form — the one every brush
   in Vega's gallery is written with — reached `asDouble()`, came back NaN, and the whole call
   produced nothing. Null reads as zero to the arithmetic downstream, so a brushed detail panel got
