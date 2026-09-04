@@ -332,9 +332,26 @@ public object Differential {
    *
    * A round-capped rule is longer than a butt-capped one by its own width, and a mitre limit
    * decides whether a spike on a zig-zag comes to a point or is cut flat. Both were compared past
-   * for as long as the comparison looked only at position, colour, width and opacity. Recorded only
-   * when they differ from the default, which is what upstream leaves absent.
+   * for as long as the comparison looked only at position, colour, width and opacity.
+   *
+   * Recorded only when they differ from the default. That is *not* the same rule upstream follows —
+   * it records a cap whenever the specification set one, even to the default — so the two are
+   * reconciled by [IMPLIED_BY_ABSENCE] rather than by recording a cap on every rule in the corpus.
    */
+  /**
+   * What this side means by leaving a channel out.
+   *
+   * Only where the absence is a *value* rather than an omission. A cap this engine does not record
+   * is butt and a join it does not record is mitre, because [strokeDetails] drops them exactly when
+   * they hold those values — so comparing upstream's explicit `butt` against this side's silence is
+   * comparing two spellings of the same thing.
+   *
+   * Deliberately short. A channel added here stops being compared where upstream states the default
+   * and this omits it, which is right for a cap and would be wrong for anything whose absence means
+   * "nothing was drawn".
+   */
+  private val IMPLIED_BY_ABSENCE = mapOf("strokeCap" to "butt", "strokeJoin" to "miter")
+
   private fun strokeDetails(stroke: Stroke, into: MutableMap<String, String>) {
     if (stroke.cap != StrokeCap.BUTT) into["strokeCap"] = stroke.cap.name.lowercase()
     if (stroke.join != StrokeJoin.MITER) into["strokeJoin"] = stroke.join.name.lowercase()
@@ -874,7 +891,13 @@ public object Differential {
         }
         continue
       }
-      val got = actual.strings[channel]
+      // A channel this side leaves absent **because it is the default** is not a difference: the
+      // absence means that value. Upstream records a cap or a join whenever the specification set
+      // one, even to the default, where this records one only when it differs — so the two agree
+      // except where a specification explicitly writes the default, and there they disagreed for a
+      // reason neither engine was wrong about. Found on a guide encode setting `strokeCap` to
+      // `butt`: upstream wrote it, this left it out, and the comparison called that a difference.
+      val got = actual.strings[channel] ?: IMPLIED_BY_ABSENCE[channel]
       if (got == null) {
         out.add(Difference("$where.$channel", wanted, "absent"))
         continue
