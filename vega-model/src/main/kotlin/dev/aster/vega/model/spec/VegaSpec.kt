@@ -144,10 +144,26 @@ public data class SignalSpec(
    * a host draws from.
    */
   val bind: SignalBind? = null,
+  /**
+   * `push` — that this definition writes an **enclosing** scope's signal rather than declaring one.
+   *
+   * Only `"outer"` means anything to Vega, and it is how a group hands a value back out: the signal
+   * is not a new one in the group at all, it is the outer signal, and a handler written here reads
+   * the group's own scope and writes outward. Vega's `overview-plus-detail` pushes its
+   * `detailDomain` that way, which is how brushing the overview moves the detail panel; this
+   * repository's own Vega-Lite compiler emits it for a faceted selection.
+   *
+   * Null for a signal that declares one of its own, which is nearly all of them.
+   */
+  val push: String? = null,
 ) {
   /** The expression that produces this signal's value for a static render, if any. */
   public val expression: String?
     get() = update ?: init
+
+  /** Whether this definition writes the enclosing scope's signal instead of declaring its own. */
+  public val pushesOuter: Boolean
+    get() = push == "outer"
 }
 
 /**

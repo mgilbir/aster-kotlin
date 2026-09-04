@@ -78,6 +78,7 @@ vega-android-canvas  public final class dev.aster.vega.android.AndroidCanvasScen
     public dev.aster.vega.android.AndroidCanvasSceneRenderer();
     public dev.aster.vega.android.AndroidCanvasSceneRenderer(dev.aster.vega.android.AndroidTextEngine, dev.aster.vega.android.AndroidImageResolver, kotlin.jvm.functions.Function1, int, kotlin.jvm.internal.DefaultConstructorMarker);
     public dev.aster.vega.android.AndroidCanvasSceneRenderer(dev.aster.vega.android.AndroidTextEngine, dev.aster.vega.android.AndroidImageResolver, kotlin.jvm.functions.Function1<? super java.lang.String, kotlin.Unit>);
+    public final android.graphics.PorterDuff$Mode porterDuffFor$vega_android_canvas(dev.aster.vega.scene.SceneBlendMode);
     public final java.util.List<dev.aster.vega.model.VegaDiagnostic> getLastDiagnostics();
     public final void clearImageCache();
     public final void render(dev.aster.vega.scene.Scene, android.graphics.Canvas, android.graphics.RectF, float);

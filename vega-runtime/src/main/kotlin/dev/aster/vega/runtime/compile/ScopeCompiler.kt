@@ -137,6 +137,15 @@ internal class ScopeCompiler(
    * What **local** time means in this compile; null is the device's own zone. See `SpecCompiler`.
    */
   private val timeZone: TimeZone? = null,
+  /**
+   * Signals a handler has set **inside a group**, by that group's path.
+   *
+   * The counterpart of the top level's `pinned`, and the second half of why a handler declared in a
+   * group never fired: `nest` resolved a group's signals with no pinned values at all, so a value a
+   * handler set had nowhere to live across the recompile the firing triggers. Empty for a
+   * specification nobody has interacted with, which is every first compile.
+   */
+  private val scopedOverrides: Map<String, Map<String, VegaValue>> = emptyMap(),
 ) {
 
   /**
@@ -152,6 +161,38 @@ internal class ScopeCompiler(
    * corpus is three, and Vega-Lite's own concat-of-facet-of-layer output reaches five.
    */
   private var depth: Int = 0
+
+  /**
+   * Where the group being compiled sits, as the path from the root.
+   *
+   * Pushed and popped around [groupContents] the way [depth] is, and for the same reason: a group
+   * is compiled recursively and there is no parameter to thread that would not have to be threaded
+   * through every guide and layout call between here and there.
+   *
+   * A segment is the group's own `name` when it has one, because that is what a specification
+   * addresses it by — `@overview:pointerdown` names the mark, so a scope keyed the same way is the
+   * one a handler can be attributed to. An unnamed group falls back to its index among its
+   * siblings, which is stable across a recompile because specification order is.
+   */
+  private val path = ArrayDeque<String>()
+
+  /**
+   * What each group mark's scope resolved to, by that path.
+   *
+   * A group's signals and scales have always been resolved — [nest] does it, and the cell is drawn
+   * from them — and then discarded, because nothing above could name them. So a signal declared
+   * inside a group had a value that no host could read and no handler could write, which is the
+   * first half of why a handler declared in a group never fires.
+   *
+   * This is that value, kept. A [SignalScope] rather than a bare map because it is already an
+   * expression scope holding the signals, the datasets *and* the scales in force at that point,
+   * which is exactly what evaluating one of those handlers will need: `invert('xOverview', brush)`
+   * is a scale lookup and a signal read in the same expression, and both are the group's own.
+   *
+   * A faceted group resolves its scope once per cell, so those are recorded per cell — `cells[0]`,
+   * `cells[1]` — and a group drawn once records one entry under its bare path.
+   */
+  val groupScopes: MutableMap<String, SignalScope> = LinkedHashMap()
 
   /**
    * A scope's scene nodes, and how far the drawing they make up reaches.
@@ -297,7 +338,7 @@ internal class ScopeCompiler(
       }
       fun expose(rows: List<VegaValue>) = exposeItems(encoder.items(mark, rows))
       if (mark.type == MarkType.GROUP) {
-        val group = group(mark, scope, encoder)
+        val group = group(mark, scope, encoder, mark.name ?: "[$index]")
         expose(group.datums)
         if (layout != null) {
           // A trellis's cells and headers are group marks like any other and are announced the same
@@ -618,7 +659,12 @@ internal class ScopeCompiler(
    * so asking the finished [GroupNode] how big it is would quietly reintroduce the half-pixel crisp
    * offset that everything outside the cell is careful to exclude.
    */
-  private fun group(spec: MarkSpec, outer: CompileScope, encoder: MarkEncoder): BuiltGroup {
+  private fun group(
+    spec: MarkSpec,
+    outer: CompileScope,
+    encoder: MarkEncoder,
+    segment: String,
+  ): BuiltGroup {
     if (depth >= MAX_GROUP_DEPTH) {
       diagnostics.error(
         DiagnosticCodes.COMPILE_LIMIT_EXCEEDED,
@@ -629,9 +675,11 @@ internal class ScopeCompiler(
       return BuiltGroup(ScopeContent(emptyList(), RectD.Empty), emptyList())
     }
     depth++
+    path.addLast(segment)
     try {
       return groupContents(spec, outer, encoder)
     } finally {
+      path.removeLast()
       depth--
     }
   }
@@ -650,7 +698,8 @@ internal class ScopeCompiler(
         // a `"width"` range inside one is the cell's width. Vega gives every group scope its own
         // size signals; this is that, for the case a specification actually writes — a cell sized
         // `{"signal": "child_width"}`, which no group-level signal declaration would reveal.
-        val nested = nest(spec, partitions[index], outer)
+        val here = cellPath(partitions.size, index)
+        val nested = nest(spec, partitions[index], outer, here)
         val sized =
           if (encodesSize(spec)) {
             CompileScope(
@@ -667,6 +716,16 @@ internal class ScopeCompiler(
           } else {
             nested
           }
+        // Recorded here rather than beside `nest`, because `sized` is the scope the cell is
+        // actually compiled with: a group that encodes its own width redefines `width` for
+        // everything inside it, and a handler reading `width` has to read the same one its marks
+        // did.
+        //
+        // `withScales` because a group's own scales are built *after* its signals — they are built
+        // from them — so the scope the signals were resolved in holds only the enclosing scales.
+        // A handler needs both at once: `invert('xOverview', brush)` is a scale lookup and a signal
+        // read in one expression, and `xOverview` is the group's own.
+        groupScopes[here] = sized.signals.withScales(sized.scales, diagnostics)
         // An **empty** facet cell draws nothing at all — not even its gridlines. Vega instantiates
         // a faceted group's subflow only for keys that rows arrived under, so a cell `cross`
         // invented to keep the grid rectangular is a group with no contents, which is visibly
@@ -1244,7 +1303,12 @@ internal class ScopeCompiler(
    * Order matters and mirrors the top level: data first, then signals, then scales, because a scale
    * reads data and a scale property may be a signal.
    */
-  private fun nest(spec: MarkSpec, partition: Partition, outer: CompileScope): CompileScope {
+  private fun nest(
+    spec: MarkSpec,
+    partition: Partition,
+    outer: CompileScope,
+    here: String,
+  ): CompileScope {
     // `parent` is the group's datum, not the group item: upstream's subscope binds the tuple, so
     // `parent.width` is undefined even though `parent.cat` works. Verified against upstream.
     val signalValues = LinkedHashMap(outer.signals.values)
@@ -1281,9 +1345,17 @@ internal class ScopeCompiler(
     val signals =
       SignalResolver(diagnostics, expressions, random, clock)
         .resolve(
-          spec.signals,
+          // A `push: "outer"` signal is **not** one of this group's: it names the enclosing scope's
+          // signal, so resolving it here would shadow the outer value with a fresh one and the
+          // group's own marks would read the shadow. Upstream treats the definition as a reference
+          // to the outer signal, and the value already reaches here through `signalValues`.
+          spec.signals.filterNot { it.pushesOuter },
           datasets,
           signalValues,
+          // What a handler in this group has set, which is what makes one able to fire at all: the
+          // whole specification is compiled again on every change, so a value with nowhere to be
+          // pinned is a value that lasts until the next compile and no longer.
+          pinned = scopedOverrides[here].orEmpty(),
           enclosingScales = outer.scales,
           pendingScales = spec.scales.mapTo(mutableSetOf()) { it.name },
         )
@@ -1308,6 +1380,17 @@ internal class ScopeCompiler(
       outer.scaleTypes + spec.scales.associate { it.name to it.type },
       outer.projections + ProjectionResolver(numbers, diagnostics).resolve(spec.projections),
     )
+  }
+
+  /**
+   * This cell's path: the group's own, with the cell's index only when there is more than one.
+   *
+   * A group drawn once is the overwhelming majority and reads better without a `[0]` nobody needs,
+   * while a faceted group genuinely has one scope per cell and they must not overwrite each other.
+   */
+  private fun cellPath(cells: Int, index: Int): String {
+    val here = path.joinToString("/")
+    return if (cells > 1) "$here/cells[$index]" else here
   }
 
   /** Whether a group mark states its own `width` or `height` in any of its encode blocks. */

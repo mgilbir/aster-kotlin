@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalAtomicApi::class)
+@file:OptIn(ExperimentalAtomicApi::class, InternalAsterVegaApi::class)
 
 package dev.aster.vega.runtime
 
@@ -11,11 +11,14 @@ import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.DiagnosticSeverity
+import dev.aster.vega.model.InternalAsterVegaApi
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.spec.EventConfig
 import dev.aster.vega.model.spec.EventStream
+import dev.aster.vega.model.spec.MarkSpec
+import dev.aster.vega.model.spec.MarkType
 import dev.aster.vega.runtime.compile.CompiledSpec
 import dev.aster.vega.runtime.compile.ItemEncode
 import dev.aster.vega.runtime.compile.SpecCompiler
@@ -242,7 +245,8 @@ public class VegaChartController(
       compiler = newCompiler(containerSize, value)
       val json = loadedSpecJson ?: return
       val generation = nextRequest()
-      val compiled = compileNow(compiler, json, signals.overrides, signals.itemEncodes)
+      val compiled =
+        compileNow(compiler, json, signals.overrides, signals.itemEncodes, signals.scopedOverrides)
       if (isCurrent(generation)) publish(compiled)
     }
 
@@ -688,10 +692,11 @@ public class VegaChartController(
     json: String,
     overrides: Map<String, VegaValue> = emptyMap(),
     itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
+    scopedOverrides: Map<String, Map<String, VegaValue>> = emptyMap(),
   ): CompiledSpec {
     val concurrent = compilesRunning.fetchAndIncrement() > 0
     try {
-      val compiled = compiler.compileJson(json, overrides, itemEncodes)
+      val compiled = compiler.compileJsonInScopes(json, overrides, itemEncodes, scopedOverrides)
       if (!concurrent) return compiled
       return compiled.copy(
         diagnostics =
@@ -720,6 +725,65 @@ public class VegaChartController(
   /** Whether [generation] is still the newest request, and so still worth publishing. */
   private fun isCurrent(generation: Long): Boolean = newestRequest.load() == generation
 
+  /**
+   * Every handler in the specification, including those declared inside a group mark.
+   *
+   * `publish` used to read `spec.signals` — the top level only — so a handler declared in a group
+   * carried its streams into a compile that nothing ever dispatched to. Vega's own
+   * `overview-plus-detail` is that shape, and brushing its overview changed nothing at all.
+   *
+   * The **declaration** comes from the specification and the **instances** from
+   * [CompiledSpec.groupScopes], which is what says how many times a group was drawn. A group drawn
+   * once is bound at its own path; a faceted one has a scope per cell, and which cell an event
+   * landed in is not a question this can answer yet — see [groupHandlerLimit].
+   */
+  private fun bindingsOf(
+    compiled: CompiledSpec,
+    diagnostics: DiagnosticCollector,
+  ): List<HandlerBinding> {
+    val spec = compiled.spec ?: return emptyList()
+    val bindings =
+      spec.signals
+        .flatMap { signal -> signal.on.map { HandlerBinding(signal.name, it) } }
+        .toMutableList()
+
+    fun walk(marks: List<MarkSpec>, prefix: String) {
+      marks.forEachIndexed { index, mark ->
+        if (mark.type != MarkType.GROUP) return@forEachIndexed
+        val here = (if (prefix.isEmpty()) "" else "$prefix/") + (mark.name ?: "[$index]")
+        // Only where exactly one scope was recorded under this path. A faceted group records one
+        // per cell and an event would have to say which cell it was in.
+        val handlers = mark.signals.sumOf { it.on.size }
+        if (here in compiled.groupScopes) {
+          for (signal in mark.signals) {
+            // A `push: "outer"` handler reads *here* and writes *there*: its update sees the
+            // group's own signals and scales — `invert('xOverview', brush)` is both at once — and
+            // the value it produces belongs to the enclosing scope's signal of that name. That is
+            // the whole of how a group hands a value back out.
+            val writes = if (signal.pushesOuter) prefix else here
+            for (handler in signal.on) {
+              bindings += HandlerBinding(signal.name, handler, here, writePath = writes)
+            }
+          }
+        } else if (handlers > 0) {
+          // A faceted group resolves one scope per cell, so `here` names no single scope and the
+          // event would have to say which cell it landed in — which nothing here can answer yet.
+          // Reported rather than silently unbound, which is what this whole change is about.
+          diagnostics.warn(
+            DiagnosticCodes.INTERACTION_UNSUPPORTED,
+            "Group '${mark.name ?: here}' is drawn once per facet and declares $handlers signal " +
+              "handler(s); this engine dispatches to a group drawn once, and cannot yet tell which " +
+              "cell an event landed in, so these do not fire",
+            operator = mark.name,
+          )
+        }
+        walk(mark.marks, here)
+      }
+    }
+    walk(spec.marks, "")
+    return bindings
+  }
+
   private fun publish(compiled: CompiledSpec): CompiledSpec {
     lastCompiled = compiled
     // Before anything else, and on **every** path that publishes a compile — including the first
@@ -727,15 +791,14 @@ public class VegaChartController(
     // against a baseline; recording it only where a handler fires would compare the second compile
     // against nothing and fire on the whole specification.
     scaleFingerprints = fingerprintScales(compiled)
-    val bindings =
-      compiled.spec?.signals.orEmpty().flatMap { signal ->
-        signal.on.map { HandlerBinding(signal.name, it) }
-      }
+    // Built before the collector below is read, because a group whose handlers cannot be bound is
+    // reported here rather than at the compiler: it is a property of dispatch, not of the document.
+    val listenerDiagnostics = DiagnosticCollector()
+    val bindings = bindingsOf(compiled, listenerDiagnostics)
     // The dispatcher reports as it registers — a stream a policy blocked, a debounce nothing can
     // schedule — and those went into a collector nobody read. They are published with the
     // compiler's
     // own, since a listener that was refused is exactly the kind of thing a host needs told.
-    val listenerDiagnostics = DiagnosticCollector()
     startTimers(compiled)
     vegaEvents =
       if (bindings.isEmpty()) {
@@ -749,6 +812,7 @@ public class VegaChartController(
           // The embedder's event policy, refused at the listener rather than at the event.
           compiled.spec?.events ?: EventConfig(),
           deferrable = scheduler != null,
+          scopes = compiled.groupScopes,
         )
       }
     val diagnostics = compiled.diagnostics + listenerDiagnostics.diagnostics
@@ -906,7 +970,9 @@ public class VegaChartController(
       // scheduler in hand nothing is deferred and the dispatcher says so instead.
       val (deferred, immediate) = fired.partition { it.deferByMillis != null }
       for (entry in deferred) defer(entry)
-      if (immediate.isNotEmpty()) changed += signals.apply(immediate, compiled.signals)
+      if (immediate.isNotEmpty()) {
+        changed += signals.apply(immediate, compiled.signals, compiled.groupScopes)
+      }
     }
     applyFired(changed, compiled)
   }
@@ -950,7 +1016,8 @@ public class VegaChartController(
     // Captured before the recompile replaces it: this is the "before" a scale-sourced handler is
     // asking about.
     var before = scaleFingerprints
-    val compiled = compileNow(compiler, json, signals.overrides, signals.itemEncodes)
+    val compiled =
+      compileNow(compiler, json, signals.overrides, signals.itemEncodes, signals.scopedOverrides)
     if (!isCurrent(generation)) return
     publish(compiled)
     // **Then the scales.** A handler sourced on a scale fires here and not in [cascade]: "did this
@@ -1021,9 +1088,13 @@ public class VegaChartController(
     changed: MutableSet<String>,
     compiled: CompiledSpec,
   ): List<VegaDiagnostic> {
+    // Every scope, not only the top level: `detailDomain` in Vega's `overview-plus-detail` is
+    // sourced on `{"signal": "brush"}`, and `brush` is the group's own. Reusing the same walk as
+    // the event bindings is what keeps the two from disagreeing about which handlers exist; the
+    // diagnostics it can raise were already raised by `publish`, so they are dropped here.
     val bindings =
-      compiled.spec?.signals.orEmpty().flatMap { signal ->
-        signal.on.filter { it.signalSources.isNotEmpty() }.map { HandlerBinding(signal.name, it) }
+      bindingsOf(compiled, DiagnosticCollector()).filter {
+        it.handler.signalSources.isNotEmpty()
       }
     if (bindings.isEmpty()) return emptyList()
     var frontier: Set<String> = changed.toSet()
@@ -1041,15 +1112,30 @@ public class VegaChartController(
           )
         )
       }
+      // A source is a bare name written in the scope that declared the handler, and the frontier
+      // holds qualified ones. So a handler in a group matches its *own* scope's signal first and
+      // an enclosing one after — which is the ordinary shadowing rule, applied to what changed.
       val due =
         bindings
-          .filter { binding -> binding.handler.signalSources.any { it in frontier } }
-          .map { FiredHandler(it.signalName, it.handler) }
+          .filter { binding ->
+            binding.handler.signalSources.any { source ->
+              (binding.scopePath.isNotEmpty() && "${binding.scopePath}/$source" in frontier) ||
+                source in frontier
+            }
+          }
+          .map {
+            FiredHandler(
+              it.signalName,
+              it.handler,
+              scopePath = it.scopePath,
+              writePath = it.writePath,
+            )
+          }
       if (due.isEmpty()) return emptyList()
       // Read against the overrides accumulated so far, which is what makes a chain see the value
       // the
       // round before it produced rather than the one the last compile resolved.
-      frontier = signals.apply(due, compiled.signals)
+      frontier = signals.apply(due, compiled.signals, compiled.groupScopes)
       changed += frontier
     }
     return emptyList()

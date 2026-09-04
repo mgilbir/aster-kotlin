@@ -1,3 +1,5 @@
+@file:OptIn(InternalAsterVegaApi::class)
+
 package dev.aster.vega.runtime.interaction
 
 import dev.aster.vega.expression.ExpressionCompiler
@@ -7,6 +9,7 @@ import dev.aster.vega.expression.ExpressionScope
 import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
+import dev.aster.vega.model.InternalAsterVegaApi
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.isNullish
 import dev.aster.vega.model.spec.EventConfig
@@ -97,10 +100,43 @@ public data class FiredHandler(
    * without one.
    */
   val deferByMillis: Double? = null,
+  /**
+   * The group this handler was declared in, as a path, or `""` for the specification's top level.
+   *
+   * Carried rather than derived because the two namespaces are separate: a group may declare a
+   * `brush` while the chart declares another, and they are different signals with different values.
+   * The paths are `CompiledSpec.groupScopes`' paths.
+   */
+  @InternalAsterVegaApi val scopePath: String = "",
+  /**
+   * The scope whose signal this handler **writes**, when that is not the one it reads.
+   *
+   * Only a `push: "outer"` definition differs: it reads the group's own scope and writes the
+   * enclosing one. Null everywhere else, meaning "the scope it was declared in".
+   */
+  @InternalAsterVegaApi val writePath: String? = null,
 )
 
 /** One `on` handler, bound to the signal it sets. */
-public data class HandlerBinding(val signalName: String, val handler: SignalHandler)
+public data class HandlerBinding(
+  val signalName: String,
+  val handler: SignalHandler,
+  /**
+   * The group this handler was declared in, as a path, or `""` for the specification's top level.
+   *
+   * Carried rather than derived because the two namespaces are separate: a group may declare a
+   * `brush` while the chart declares another, and they are different signals with different values.
+   * The paths are `CompiledSpec.groupScopes`' paths.
+   */
+  @InternalAsterVegaApi val scopePath: String = "",
+  /**
+   * The scope whose signal this handler **writes**, when that is not the one it reads.
+   *
+   * Only a `push: "outer"` definition differs: it reads the group's own scope and writes the
+   * enclosing one. Null everywhere else, meaning "the scope it was declared in".
+   */
+  @InternalAsterVegaApi val writePath: String? = null,
+)
 
 /**
  * Matches arriving events against the streams a specification registered.
@@ -146,12 +182,30 @@ public class EventDispatcher(
    * cannot do.
    */
   private val deferrable: Boolean = false,
+  /**
+   * The scope inside each group mark, by path, for a handler declared in one.
+   *
+   * Only the *filters* are evaluated here — the update expression is applied by `SignalUpdater`,
+   * which is handed the same scope — but a filter is where a suppressed event would be hardest to
+   * notice, since nothing fires and nothing is reported.
+   */
+  private val scopes: Map<String, ExpressionScope> = emptyMap(),
 ) {
 
   /** One stream being watched, with whatever state it needs between events. */
   private class Watch(
     val stream: EventStream,
     val binding: HandlerBinding?,
+    /**
+     * The scope whose signals this stream's **filters** read.
+     *
+     * Carried on the watch rather than taken from [binding], because a gate watch has no binding
+     * and still belongs to one: `[@overview:pointerdown, window:pointerup]` is registered from a
+     * handler declared inside the overview group, and a filter on either half reads that group's
+     * signals. Leaving it at the top level would read a group's own signal as null and suppress the
+     * event, which is the quiet failure this whole change is about.
+     */
+    val scopePath: String = "",
     /** Streams whose gate this one opens, and those whose gate it closes. */
     val opens: MutableList<Gate> = mutableListOf(),
     val closes: MutableList<Gate> = mutableListOf(),
@@ -192,12 +246,27 @@ public class EventDispatcher(
       )
       return
     }
-    val watch = Watch(stream, binding)
+    // A `scope` stream that names no mark asks for "any event inside this group", and which group
+    // an event landed in is a question of scene containment that nothing here answers yet. Refused
+    // by name rather than widened to the whole view, which would fire a group's handler on every
+    // event in the chart — the loud wrong answer where this is the quiet one (ADR 0011).
+    if (stream.source == EventStream.SOURCE_SCOPE && stream.markName == null) {
+      diagnostics.warn(
+        DiagnosticCodes.INTERACTION_UNSUPPORTED,
+        "Signal '${binding.signalName}' is declared inside a group and its handler listens to " +
+          "'${stream.type}' anywhere in that group; this engine dispatches a group's handlers by " +
+          "the mark they name, so write '@markname:${stream.type}' to say which. The handler is " +
+          "not dispatched",
+        operator = binding.signalName,
+      )
+      return
+    }
+    val watch = Watch(stream, binding, binding.scopePath)
     if (stream.between.size == 2) {
       val gate = Gate()
       gateOf[watch] = gate
-      gateWatches += Watch(stream.between[0], null, opens = mutableListOf(gate))
-      gateWatches += Watch(stream.between[1], null, closes = mutableListOf(gate))
+      gateWatches += Watch(stream.between[0], null, binding.scopePath, opens = mutableListOf(gate))
+      gateWatches += Watch(stream.between[1], null, binding.scopePath, closes = mutableListOf(gate))
     }
     if (stream.source == EventStream.SOURCE_TIMER && deferrable) {
       // Someone else has the clock; the controller starts it and this stream is not dispatched from
@@ -248,9 +317,22 @@ public class EventDispatcher(
   }
 
   /** @return the handlers this event fired, in registration order. */
+  /**
+   * A `scope` stream's source for matching: `view`, since the narrowing is the mark name's job.
+   *
+   * Only reached for a stream that names a mark — [register] refuses a bare one — so this never
+   * widens a group's listener to the whole chart.
+   */
+  private fun sourceOf(stream: EventStream): String =
+    if (stream.source == EventStream.SOURCE_SCOPE) EventStream.SOURCE_VIEW else stream.source
+
+  /** The scope a stream's filters read: its group's, or the chart's for a top-level handler. */
+  private fun scopeFor(path: String): ExpressionScope =
+    if (path.isEmpty()) scope else scopes[path] ?: scope
+
   public fun dispatch(event: InputEvent): List<FiredHandler> {
     for (gateWatch in gateWatches) {
-      if (!matches(gateWatch.stream, event)) continue
+      if (!matches(gateWatch.stream, event, scopeFor(gateWatch.scopePath))) continue
       for (gate in gateWatch.opens) gate.open = true
       for (gate in gateWatch.closes) gate.open = false
     }
@@ -258,7 +340,7 @@ public class EventDispatcher(
     val fired = mutableListOf<FiredHandler>()
     for (watch in watches) {
       val binding = watch.binding ?: continue
-      if (!matches(watch.stream, event)) continue
+      if (!matches(watch.stream, event, scopeFor(watch.scopePath))) continue
       if (gateOf[watch]?.open == false) continue
       val throttle = watch.stream.throttle
       val since = watch.lastFired
@@ -271,6 +353,10 @@ public class EventDispatcher(
           event,
           // Held rather than applied when the stream asked to be, and the caller can wait.
           deferByMillis = if (deferrable) watch.stream.debounce else null,
+          // Carried through so the value lands in the scope that declared the signal rather than
+          // in the chart's, which for a same-named signal is a different one.
+          scopePath = binding.scopePath,
+          writePath = binding.writePath,
         )
       // `!` on the type: this stream consumed the event, so nothing after it sees it.
       if (watch.stream.consume) break
@@ -337,16 +423,25 @@ public class EventDispatcher(
       else -> "selector"
     }
 
-  private fun matches(stream: EventStream, event: InputEvent): Boolean {
+  private fun matches(
+    stream: EventStream,
+    event: InputEvent,
+    scope: ExpressionScope = this.scope,
+  ): Boolean {
     if (stream.type != null && stream.type != event.type) return false
-    if (stream.source != event.source) return false
+    // A stream declared inside a group has source `scope` rather than `view`: upstream attaches the
+    // listener to that group's own item rather than to the whole view. Where the selector *names a
+    // mark* the two are the same listener — naming the mark is what narrows it — so the source is
+    // compared as `view` and the mark name does the scoping. A **bare** one is refused at
+    // registration, because narrowing it to the group needs an answer this does not have.
+    if (sourceOf(stream) != event.source) return false
     // `*` matches any mark, but still requires that the event landed on one.
     if (stream.markType != null) {
       if (event.markType == null) return false
       if (stream.markType != "*" && stream.markType != event.markType) return false
     }
     if (stream.markName != null && stream.markName != event.markName) return false
-    return stream.filters.all { passes(it, event) }
+    return stream.filters.all { passes(it, event, scope) }
   }
 
   /**
@@ -355,7 +450,7 @@ public class EventDispatcher(
    * The alternative — treating a broken filter as absent — would fire the handler on every event of
    * that type, which is the loudest possible failure. Not firing is quieter and is reported.
    */
-  private fun passes(filter: String, event: InputEvent): Boolean {
+  private fun passes(filter: String, event: InputEvent, scope: ExpressionScope): Boolean {
     val compiled = expressions.compile(filter)
     if (compiled !is ExpressionResult.Compiled) {
       diagnostics.error(
@@ -380,7 +475,7 @@ public class EventDispatcher(
 
   /** The specification's own scope, with `event` added on top. */
   private class EventScope(private val delegate: ExpressionScope, private val event: VegaValue) :
-    ExpressionScope {
+    ExpressionScope by delegate {
     override val datum: VegaValue
       get() = delegate.datum
 

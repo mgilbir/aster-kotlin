@@ -567,8 +567,8 @@ public final class dev/aster/vega/runtime/compile/AxisDefaults {
 }
 
 public final class dev/aster/vega/runtime/compile/CompiledSpec {
-	public fun <init> (Ldev/aster/vega/scene/Scene;Ljava/util/Map;Ldev/aster/vega/runtime/compile/SignalScope;Ljava/util/List;Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/Map;Z)V
-	public synthetic fun <init> (Ldev/aster/vega/scene/Scene;Ljava/util/Map;Ldev/aster/vega/runtime/compile/SignalScope;Ljava/util/List;Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/Map;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ldev/aster/vega/scene/Scene;Ljava/util/Map;Ldev/aster/vega/runtime/compile/SignalScope;Ljava/util/List;Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/Map;ZLjava/util/Map;)V
+	public synthetic fun <init> (Ldev/aster/vega/scene/Scene;Ljava/util/Map;Ldev/aster/vega/runtime/compile/SignalScope;Ljava/util/List;Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/Map;ZLjava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ldev/aster/vega/scene/Scene;
 	public final fun component2 ()Ljava/util/Map;
 	public final fun component3 ()Ldev/aster/vega/runtime/compile/SignalScope;
@@ -576,10 +576,12 @@ public final class dev/aster/vega/runtime/compile/CompiledSpec {
 	public final fun component5 ()Ldev/aster/vega/model/spec/VegaSpec;
 	public final fun component6 ()Ljava/util/Map;
 	public final fun component7 ()Z
-	public final fun copy (Ldev/aster/vega/scene/Scene;Ljava/util/Map;Ldev/aster/vega/runtime/compile/SignalScope;Ljava/util/List;Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/Map;Z)Ldev/aster/vega/runtime/compile/CompiledSpec;
-	public static synthetic fun copy$default (Ldev/aster/vega/runtime/compile/CompiledSpec;Ldev/aster/vega/scene/Scene;Ljava/util/Map;Ldev/aster/vega/runtime/compile/SignalScope;Ljava/util/List;Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/Map;ZILjava/lang/Object;)Ldev/aster/vega/runtime/compile/CompiledSpec;
+	public final fun component8 ()Ljava/util/Map;
+	public final fun copy (Ldev/aster/vega/scene/Scene;Ljava/util/Map;Ldev/aster/vega/runtime/compile/SignalScope;Ljava/util/List;Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/Map;ZLjava/util/Map;)Ldev/aster/vega/runtime/compile/CompiledSpec;
+	public static synthetic fun copy$default (Ldev/aster/vega/runtime/compile/CompiledSpec;Ldev/aster/vega/scene/Scene;Ljava/util/Map;Ldev/aster/vega/runtime/compile/SignalScope;Ljava/util/List;Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/Map;ZLjava/util/Map;ILjava/lang/Object;)Ldev/aster/vega/runtime/compile/CompiledSpec;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDiagnostics ()Ljava/util/List;
+	public final fun getGroupScopes ()Ljava/util/Map;
 	public final fun getHoverVariants ()Ljava/util/Map;
 	public final fun getReadsContainerSize ()Z
 	public final fun getScales ()Ljava/util/Map;
@@ -770,6 +772,7 @@ public final class dev/aster/vega/runtime/compile/SpecCompiler {
 	public static synthetic fun compile$default (Ldev/aster/vega/runtime/compile/SpecCompiler;Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Ldev/aster/vega/runtime/compile/CompiledSpec;
 	public final fun compileJson (Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;)Ldev/aster/vega/runtime/compile/CompiledSpec;
 	public static synthetic fun compileJson$default (Ldev/aster/vega/runtime/compile/SpecCompiler;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Ldev/aster/vega/runtime/compile/CompiledSpec;
+	public final fun compileJsonInScopes (Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;)Ldev/aster/vega/runtime/compile/CompiledSpec;
 }
 
 public final class dev/aster/vega/runtime/compile/SpecCompiler$Companion {
@@ -794,38 +797,47 @@ public final class dev/aster/vega/runtime/interaction/CoroutineScheduler : dev/a
 }
 
 public final class dev/aster/vega/runtime/interaction/EventDispatcher {
-	public fun <init> (Ljava/util/List;Ldev/aster/vega/expression/ExpressionCompiler;Ldev/aster/vega/model/DiagnosticCollector;Ldev/aster/vega/expression/ExpressionScope;Ldev/aster/vega/model/spec/EventConfig;Z)V
-	public synthetic fun <init> (Ljava/util/List;Ldev/aster/vega/expression/ExpressionCompiler;Ldev/aster/vega/model/DiagnosticCollector;Ldev/aster/vega/expression/ExpressionScope;Ldev/aster/vega/model/spec/EventConfig;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Ldev/aster/vega/expression/ExpressionCompiler;Ldev/aster/vega/model/DiagnosticCollector;Ldev/aster/vega/expression/ExpressionScope;Ldev/aster/vega/model/spec/EventConfig;ZLjava/util/Map;)V
+	public synthetic fun <init> (Ljava/util/List;Ldev/aster/vega/expression/ExpressionCompiler;Ldev/aster/vega/model/DiagnosticCollector;Ldev/aster/vega/expression/ExpressionScope;Ldev/aster/vega/model/spec/EventConfig;ZLjava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun dispatch (Ldev/aster/vega/runtime/interaction/InputEvent;)Ljava/util/List;
 }
 
 public final class dev/aster/vega/runtime/interaction/FiredHandler {
-	public fun <init> (Ljava/lang/String;Ldev/aster/vega/model/spec/SignalHandler;Ldev/aster/vega/runtime/interaction/InputEvent;Ljava/lang/Double;)V
-	public synthetic fun <init> (Ljava/lang/String;Ldev/aster/vega/model/spec/SignalHandler;Ldev/aster/vega/runtime/interaction/InputEvent;Ljava/lang/Double;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ldev/aster/vega/model/spec/SignalHandler;Ldev/aster/vega/runtime/interaction/InputEvent;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ldev/aster/vega/model/spec/SignalHandler;Ldev/aster/vega/runtime/interaction/InputEvent;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ldev/aster/vega/model/spec/SignalHandler;
 	public final fun component3 ()Ldev/aster/vega/runtime/interaction/InputEvent;
 	public final fun component4 ()Ljava/lang/Double;
-	public final fun copy (Ljava/lang/String;Ldev/aster/vega/model/spec/SignalHandler;Ldev/aster/vega/runtime/interaction/InputEvent;Ljava/lang/Double;)Ldev/aster/vega/runtime/interaction/FiredHandler;
-	public static synthetic fun copy$default (Ldev/aster/vega/runtime/interaction/FiredHandler;Ljava/lang/String;Ldev/aster/vega/model/spec/SignalHandler;Ldev/aster/vega/runtime/interaction/InputEvent;Ljava/lang/Double;ILjava/lang/Object;)Ldev/aster/vega/runtime/interaction/FiredHandler;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ldev/aster/vega/model/spec/SignalHandler;Ldev/aster/vega/runtime/interaction/InputEvent;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/String;)Ldev/aster/vega/runtime/interaction/FiredHandler;
+	public static synthetic fun copy$default (Ldev/aster/vega/runtime/interaction/FiredHandler;Ljava/lang/String;Ldev/aster/vega/model/spec/SignalHandler;Ldev/aster/vega/runtime/interaction/InputEvent;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/runtime/interaction/FiredHandler;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDeferByMillis ()Ljava/lang/Double;
 	public final fun getEvent ()Ldev/aster/vega/runtime/interaction/InputEvent;
 	public final fun getHandler ()Ldev/aster/vega/model/spec/SignalHandler;
+	public final fun getScopePath ()Ljava/lang/String;
 	public final fun getSignalName ()Ljava/lang/String;
+	public final fun getWritePath ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class dev/aster/vega/runtime/interaction/HandlerBinding {
-	public fun <init> (Ljava/lang/String;Ldev/aster/vega/model/spec/SignalHandler;)V
+	public fun <init> (Ljava/lang/String;Ldev/aster/vega/model/spec/SignalHandler;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ldev/aster/vega/model/spec/SignalHandler;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ldev/aster/vega/model/spec/SignalHandler;
-	public final fun copy (Ljava/lang/String;Ldev/aster/vega/model/spec/SignalHandler;)Ldev/aster/vega/runtime/interaction/HandlerBinding;
-	public static synthetic fun copy$default (Ldev/aster/vega/runtime/interaction/HandlerBinding;Ljava/lang/String;Ldev/aster/vega/model/spec/SignalHandler;ILjava/lang/Object;)Ldev/aster/vega/runtime/interaction/HandlerBinding;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ldev/aster/vega/model/spec/SignalHandler;Ljava/lang/String;Ljava/lang/String;)Ldev/aster/vega/runtime/interaction/HandlerBinding;
+	public static synthetic fun copy$default (Ldev/aster/vega/runtime/interaction/HandlerBinding;Ljava/lang/String;Ldev/aster/vega/model/spec/SignalHandler;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/runtime/interaction/HandlerBinding;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getHandler ()Ldev/aster/vega/model/spec/SignalHandler;
+	public final fun getScopePath ()Ljava/lang/String;
 	public final fun getSignalName ()Ljava/lang/String;
+	public final fun getWritePath ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -875,9 +887,11 @@ public abstract interface class dev/aster/vega/runtime/interaction/Scheduler {
 public final class dev/aster/vega/runtime/interaction/SignalUpdater {
 	public fun <init> (Ldev/aster/vega/expression/ExpressionCompiler;Ldev/aster/vega/model/DiagnosticCollector;)V
 	public final fun ageItemEncodes ()V
-	public final fun apply (Ljava/util/List;Ldev/aster/vega/expression/ExpressionScope;)Ljava/util/Set;
+	public final fun apply (Ljava/util/List;Ldev/aster/vega/expression/ExpressionScope;Ljava/util/Map;)Ljava/util/Set;
+	public static synthetic fun apply$default (Ldev/aster/vega/runtime/interaction/SignalUpdater;Ljava/util/List;Ldev/aster/vega/expression/ExpressionScope;Ljava/util/Map;ILjava/lang/Object;)Ljava/util/Set;
 	public final fun getItemEncodes ()Ljava/util/Map;
 	public final fun getOverrides ()Ljava/util/Map;
+	public final fun getScopedOverrides ()Ljava/util/Map;
 	public final fun reset ()V
 	public final fun set (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)V
 }
@@ -1120,6 +1134,7 @@ public final class dev/aster/vega/runtime/scale/PointScale : dev/aster/vega/runt
 	public final fun getRound ()Z
 	public final fun getStep ()D
 	public final fun invert (D)Ljava/lang/String;
+	public final fun invertRange (DD)Ljava/util/List;
 	public fun position (Ldev/aster/vega/model/VegaValue;)D
 	public fun scale (Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
 	public final fun ticks ()Ljava/util/List;

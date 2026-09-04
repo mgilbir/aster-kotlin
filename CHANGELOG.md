@@ -8,6 +8,140 @@ section here does not get released.
 
 ### Added
 
+- **`push: "outer"` is honoured: a signal declared in a group can write the enclosing scope's.** It
+  is how a group hands a value back out, and Vega's `overview-plus-detail` uses it to move the
+  detail panel from a brush on the overview. This repository's own Vega-Lite compiler emits it for a
+  faceted selection, so it was a signal written by one half of the project and dropped by the other.
+
+  The definition is **not** a signal of the group's at all — it names the outer one — so it is
+  excluded from the group's own resolution. Resolving it there would make a fresh local copy, the
+  group's marks would read the shadow, and the outer signal would sit at its declared value however
+  hard the group was brushed, which is exactly what the old parse-time warning described.
+
+  A handler on it therefore **reads inside and writes outside**: its update sees the group's own
+  signals and scales, and the value it produces belongs to the enclosing scope. Both halves are
+  asserted, because each fails silently on its own — reading outward evaluates
+  `invert('xOverview', brush)` against a scale and a signal that are not there, and writing inward
+  leaves the outer signal untouched. The signal cascade crosses the boundary too, since a pushed
+  handler is usually sourced on `{"signal": ...}` naming one of the group's own.
+
+  A `push` value that is not `outer` is reported rather than taken as `outer`: nothing defines one,
+  and guessing which scope was meant is worse than saying nobody knows. Only `react` is left on the
+  list of signal properties this engine cannot act on.
+
+  **On `overview-plus-detail` specifically**, this does not finish the chart, and the test says so
+  rather than implying otherwise. Pressing the overview sets `brush` to a degenerate pair and every
+  handler that widens it — the drag and the pan alike — is sourced on `window:pointermove`. This
+  engine draws on a canvas rather than in a page, so nothing dispatches a window event and it
+  reports that; `span(brush)` is therefore zero and `detailDomain` is correctly null. The fixture
+  brushes as far as the engine can take it, and the step that remains is the window stream rather
+  than anything about group scopes.
+
+- **A signal handler declared inside a group mark fires.** It never did, and Vega's own
+  `overview-plus-detail` is exactly that shape — `brush`, `anchor`, `xdown` and `delta` all live
+  inside its `overview` group — so brushing the overview changed nothing at all.
+
+  Three things stopped it, and the third was the surprise. `publish` built its bindings from the
+  top level only, so no binding existed. `ScopeCompiler.nest` resolved a group's signals with no
+  pinned values, so a value a handler set had nowhere to live across the recompile that firing
+  triggers — every change recompiles the whole specification here, so an unpinned value lasts until
+  the next compile and no longer. And a handler declared in a group has source `scope` rather than
+  `view`, because upstream attaches the listener to that group's own item; nothing mapped that, so
+  the stream could never match an arriving event.
+
+  Signals and their overrides are kept in **separate stores per scope** rather than one map keyed by
+  a qualified name, because the namespaces are genuinely separate: a group may declare a `brush`
+  while the chart declares another, and upstream gives each its own. Flattening them is how a
+  group's brush would come to move the chart's. The update expression is evaluated in the group's
+  own scope, signals and scales together, since `invert('xOverview', brush)` is both at once.
+
+  Two shapes still do not fire, each now reported by name rather than left quiet. A **bare** `scope`
+  selector — `{"events": "mousedown"}` inside a group — means "anywhere in this group", and
+  narrowing it needs scene containment nothing here answers yet; it is refused with the selector to
+  write instead, rather than widened to the whole view, which would fire a group's handler on every
+  event in the chart. And a **faceted** group has one scope per cell, so which cell the event landed
+  in is part of the question; that is reported against the group by name, since there is nothing the
+  author can rewrite.
+
+  The blanket parse-time warning that said group handlers never fire is gone, replaced by these two,
+  which say what actually does not work.
+
+- **What a group mark's scope resolved to is kept, under `CompiledSpec.groupScopes`.** A group's
+  signals and scales have always been resolved — `ScopeCompiler.nest` does it, and the cell is drawn
+  from them — and were then dropped, because nothing above could name them. That is the first half
+  of why a signal handler declared inside a group never fires: there is no scope to evaluate it in,
+  and nowhere for its result to go. Vega's own `overview-plus-detail` is exactly this shape, and
+  brushing its overview changed nothing at all.
+
+  Keyed by the group's `name`, since that is what a specification addresses it by — `@overview:
+  pointerdown` names the mark — falling back to its index among its siblings when it has none. A
+  faceted group records one scope per cell, `cell/cells[0]` and so on, because it genuinely resolves
+  one per cell; collapsing those into a single entry is what would later make a brush in one cell
+  write another's signal.
+
+  The value is a `SignalScope`, which is already an expression scope carrying signals, datasets
+  *and* scales. That matters for what comes next: `detailDomain`'s update is
+  `invert('xOverview', brush)` — a scale lookup and a signal read in one expression, both of them
+  the group's own — so a scope holding only the signals would evaluate half of it. The group's own
+  scales are built *from* its signals and therefore after them, so they are joined back on with
+  `withScales` at the point the cell is compiled.
+
+  Nothing drawn changes; dispatch is the second half and comes next.
+
+- **The three vocabularies a specification names by a single word are measured: 146 of 146.** A
+  projection type, a time unit and an expression function are each reached by writing a word
+  upstream defines, and none of the three is in Vega's schema. That made them the last place a gap
+  could sit without anything going red: every other gate runs documented → code and asks whether a
+  row's claim still holds, so a feature upstream has and this engine does not has no row to be
+  wrong, no citation to dangle and no number to drift. Absence is what nobody reviews.
+
+  `UpstreamSurfaceCoverageTest` runs the other way, upstream → code, deriving each inventory from
+  the pinned install — `vega-projection`'s own table, the schema's `timeunitTransform` enum, and
+  `vega-functions`' `functionContext` together with the `expressionFunction` calls beneath it — and
+  then asking this engine for each name. The answer is 17 projections, 11 time units and 118
+  functions, all accepted, with a ceiling of zero refused; `docs/upstream-coverage.md` carries the
+  numbers beside the other three probes.
+
+  Two things the writing of it found. Taking only the object literal reported sixteen of upstream's
+  functions missing that are all implemented — the twenty view-dependent ones, `scale`, `data`, the
+  `vlSelection` family, are registered by a second mechanism because each also declares a visitor,
+  and a specification cannot tell the two apart. And probing each name with no arguments reported
+  those same sixteen missing again for a different reason: the evaluator dispatches on name *and*
+  argument count, so a zero-argument call to `geoShape` falls past its own branch. Each inventory
+  therefore carries a guard on its own size, because a scrape that stopped matching would report
+  perfect coverage of nothing.
+
+- **`config` block coverage is measured too: 25 of 25.** Vega's schema does not describe `config` at
+  all, so the inventory comes from the top-level keys of upstream's own default configuration, which
+  is what a specification may write. That is a cruder source than a schema, so the scrape is guarded
+  — a shape change that made it find nothing would otherwise report perfect coverage of nothing.
+
+  This measures whether the block *name* is read, which is exactly what the row claimed was untrue
+  of `config.range`, `config.group` and `config.projection`. Whether every property inside a block
+  is honoured stays `ConfigTest`'s question, against upstream's own precedence vectors.
+
+- **Vega-Lite coverage is measured, not described.** Six rows said `Partial` and then a paragraph of
+  prose, which is safe — anything outside the subset is refused by name — but not checkable, and an
+  unmeasured claim is the one that goes stale. `UpstreamVegaLiteCoverageTest` asks the compiler
+  instead, deriving the inventory from the Vega-Lite schema in the pinned install: the channels of
+  `FacetedEncoding`, the `Mark` enum plus the three composite marks, and the nineteen members of the
+  `Transform` union. Nothing is hand-listed, so a version bump that adds a channel adds it here.
+
+  The answer is **77 of 77** — all 41 channels, all 17 marks, all 19 transforms — and the ceiling is
+  now zero refused, so a schema bump that adds something this compiler will not take fails rather
+  than being absorbed into the word "partial". `docs/upstream-coverage.md` carries it beside the
+  Vega numbers.
+
+  Breadth, not depth: this says a construct is accepted rather than refused. Whether it emits the
+  Vega upstream emits is `VegaLiteFixtureTest`'s question, answered property by property on every
+  fixture. The rows say so in those words.
+
+  Two runs of the probe reported four refused channels before it was trusted, both times because
+  the probe's own specification was malformed — the `*Error` channels only mean anything on an
+  `errorbar`, and an `errorbar` needs a continuous position of its own. That is the third time a
+  coverage probe here has measured its own input; it is why the guard asserting an invented channel
+  *is* counted comes with it.
+
 - **A documented limitation now has to be pinned to a test.** `SUPPORTED_FEATURES.md` has had its
   status column generated from a run since #154, and the prose beside it has not — which is where
   the drift went. A row can claim a gap that no longer exists and nothing fails, because a run has
@@ -109,6 +243,152 @@ section here does not get released.
   in consumer code incomplete.
 
 ### Changed
+
+- **The blend-mode row is pinned to a test rather than to scope.** It recorded that below API 29 the
+  modes `PorterDuff` cannot express are reported rather than approximated, and stood on *scope*
+  because the branch is gated on `Build.VERSION.SDK_INT` and this project has no way to run below
+  29 — the emulator is far above it and there is no Robolectric.
+
+  But the branch is not the claim; the **table** is, and a table is testable anywhere.
+  `porterDuffFor` is now a pure function of the mode and `AndroidBlendModeTableTest` holds it on
+  whatever device runs the suite. That leaves one scope entry in the whole document.
+
+  Two things the row had wrong. It said "the eleven above `lighten`", and `multiply` is *below*
+  lighten and is also refused — deliberately, and it is the one that matters most: Android's
+  `PorterDuff.MULTIPLY` is modulate, which agrees with CSS `multiply` only where the destination is
+  opaque, so over the transparent background a chart has by default it makes the mark vanish. The
+  count of eleven was right; the description was not.
+
+  `internal` is JVM-public, so the extracted function appears in the Android API snapshot under a
+  mangled name. Recorded rather than worked around: the snapshot exists to make surface changes
+  visible, and this is one.
+
+- **A settled decision is no longer filed beside a gap.** 22 rows claim a limitation; 10 of them are
+  decisions nobody should try to close — reproducing upstream's rotated-path bounds would put every
+  hit target in the wrong place, implementing `labelBound` as documented would make this engine
+  differ from upstream on every chart that sets it, and a reachable `eval` would be arbitrary code
+  execution in a host process. `limit.permanent` marks those, with the reason, and the counts are
+  printed on every run, so the open list is 12 rather than 22.
+
+  The flag changes what is *reported* and never what is required: a settled row still needs a test,
+  because the decision has to keep being true. Making it skip the pin check fails the self-test.
+
+- **`known-divergences.json` no longer calls its entries bugs.** The header said "every entry is a
+  BUG TO FIX", and when it was written that was true: eighteen were recorded, and the ones that were
+  bugs were fixed. What is left is four differences that survived review twice. The exact-set
+  assertion is unchanged, and still cuts both ways — an accepted difference that quietly becomes
+  agreement is as much a surprise as a new one.
+
+### Fixed
+
+- **The foreign-coverage list is computed from the API that is actually there, not from the recorded
+  snapshot.** The other half of the ordering fix above, and the half that bites in *check* mode:
+  asking "which public members have no foreign counterpart" against last commit's boundary reports
+  every newly exported member as a hole.
+
+  Not hypothetical — adding a `push` property to `SignalSpec` reported `SignalSpec.getPush` as
+  unreachable while the header exported it perfectly well, and the real signal, the API diff, is
+  printed second and so never reached. It cost a detour into why a property was not being exported
+  when it was.
+
+  `foreign-coverage.py` now takes the API list to read as an argument, and `foreign-api.sh` passes
+  the header it just extracted. In accept mode the snapshot has already been rewritten from that
+  header, so the two agree; in check mode they did not.
+
+  `--selftest` grew a second case for it: taking a genuinely exported member *out* of the snapshot is
+  the same input as one that has just been added on the Kotlin side, and the check has to answer with
+  the API diff rather than with a coverage list full of members that cross perfectly well. Verified
+  by putting the old behaviour back, where it fails.
+
+- **`invert('name', [lo, hi])` answered null for every scale.** The range form — the one every brush
+  in Vega's gallery is written with — reached `asDouble()`, came back NaN, and the whole call
+  produced nothing. Null reads as zero to the arithmetic downstream, so a brushed detail panel got
+  the domain `[0, 0]` rather than staying where it was.
+
+  The band and point scales already had `invertRange`, matched to upstream and tested through
+  `invert(position)`. Nothing had ever called it with two ends.
+
+  Every case is upstream's own answer, read from 6.3.1 rather than derived, including the ones that
+  look like mistakes and are not: a range written high-to-low gives the same answer as low-to-high,
+  because upstream orders the **range inputs** rather than the results — so on a scale whose range
+  runs backwards the answer descends, `[9, 4]`. A one-element array answers a pair with a hole in it
+  rather than refusing, and a range reaching outside the scale extrapolates rather than clamping.
+  A band whose range runs backwards answers the values at the other end, `["b", "c"]`.
+
+- **No scale function worked inside a signal handler, and nothing said so.** `invert`, `scale`,
+  `domain`, `range`, `bandwidth`, `bandspace`, the whole geo family, `treePath` and `treeAncestors`
+  all answered null in a handler's `update` — and null is zero to arithmetic.
+  `{"events": "click", "update": "invert('x', x())"}` is how every pan and zoom in Vega's gallery is
+  written, so this is not an edge: it affected top-level handlers as much as any other.
+
+  `SignalUpdater.HandlerScope` and `EventDispatcher.EventScope` each wrap the chart's scope to add
+  one thing — the values an earlier handler in the batch has set, and `event` — and each implemented
+  `ExpressionScope` by hand, naming `datum`, `signal`, `dataset` and the item hooks. Everything they
+  did not name took the interface's default, which is `VegaValue.Null`. Both now delegate with `by`,
+  which is what `DataResolver`'s own wrapper already did.
+
+  The filter case is the worse half and has its own test: a filter that cannot be evaluated
+  *suppresses* the event, so there is no wrong value to notice — the chart simply stops responding.
+
+  `indata` survived, and that is the point rather than a footnote: its default is written in terms of
+  `dataset()`, which these wrappers happened to override. Which members broke was decided by which
+  ones each wrapper's author thought to name, and nothing recorded that choice — a defaulted member
+  added to the interface tomorrow would have been null here again. A hand-written wrapper around an
+  interface with defaulted members is a silent hole by construction.
+
+- **`foreign-api.sh --accept` needed running twice, and left the Apple gate red in between.** The
+  coverage list is computed *from* the API snapshot — `foreign-coverage.py` answers "which public
+  Kotlin members have no foreign counterpart" by reading `foreign-api.txt`, the recorded file rather
+  than the header just extracted — and the two were written in the other order. So accepting asked
+  the question against the *previous* commit's boundary: a member that had just started crossing was
+  recorded as one that does not, the next check recomputed against the now-updated snapshot, found
+  it crossing, and reported a difference nobody had introduced.
+
+  Both members added to the boundary this week hit it, and the second time it was misread as a stale
+  framework rather than as an ordering — which is the more expensive failure, because the remedy for
+  a stale artefact is to relink and the remedy for this is to accept again, and neither explains the
+  other. The snapshot is now written first.
+
+  `scripts/foreign-api.sh --selftest` holds the property, and the Apple gate runs it beside the
+  check it guards. It reproduces the bug without touching any Kotlin: telling the snapshot that a
+  member crosses which does not is the same input as one that genuinely just started crossing, and
+  the check after the accept has to come back clean. Verified by putting the old ordering back,
+  where it fails.
+
+- **A projection type this engine does not build is now reported instead of quietly not applying.**
+  Found by the coverage probe above, on its first run, and silent in the worst available way: all
+  ten sites that build a projection fall back to the identity stream when the type is unknown, so a
+  misspelt `"type"` drew the geometry in raw degrees — a couple of hundred units across, in the
+  corner, at a plausible enough size to read as a projection that looks wrong rather than one that
+  was never applied.
+
+  `VEGA_PROJECTION_UNSUPPORTED_TYPE` is warned once, at the compiler, which is the only place that
+  still knows the projection's name; the chart still draws, since the rest of it is unaffected.
+  Distinct from the existing code for a projection *named but never declared*: that one says the
+  reference dangles, this one says the block is there and its type is not a word this engine knows.
+
+- **A signal handler declared inside a group mark never fires, and now says so.**
+  `VegaChartController.publish` builds its event bindings from the specification's *top-level*
+  signals, so a signal declared inside a group carries its `on` handlers into a compile nothing
+  dispatches to. The handler was unreachable in silence, which is what ADR 0011 exists to forbid.
+
+  Found by settling two audit questions that turned out to be one fixture. Vega's own
+  `overview-plus-detail` declares `brush`, `anchor`, `xdown`, `delta` and `detailDomain` inside its
+  `overview` group, so **brushing the overview does not move the detail panel at all**. The audit had
+  recorded that first as a scale bug (C4, `buildTime` ignoring `domainRaw`) and then as a
+  `push: "outer"` question (Q6). Both were real; neither was the reason it does not work.
+
+  Reported rather than fixed here, because the value is the harder half: signal overrides are keyed
+  by name in one flat map, so a group signal's value has nowhere to live across the
+  whole-specification recompile a fired handler triggers. The diagnostic names the count and the
+  workaround; dispatching into group scopes is its own piece of work.
+
+- **Two rows quoted divergence counts that were years out of date**, claiming "the last five are
+  pinned" and "thirteen signatures pinned" against a file holding four. The entries had been deleted
+  as the bugs were fixed, which is the mechanism working; the prose beside it was not derived from
+  anything. `DocumentedNumbersTest` now checks the count against the file, so a row cannot quote a
+  stale one — a claim about a file *in this repository*, checkable in a second, and unchecked for
+  months.
 
 - Two tests that borrowed `wordcloud` as their example of an unimplemented transform now use an
   invented name. With every documented transform implemented, a test about "a transform this engine

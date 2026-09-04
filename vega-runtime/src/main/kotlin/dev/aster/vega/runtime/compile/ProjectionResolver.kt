@@ -1,7 +1,11 @@
+@file:OptIn(InternalAsterVegaApi::class)
+
 package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.dataflow.transform.ProjectionDefinition
+import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
+import dev.aster.vega.model.InternalAsterVegaApi
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
@@ -31,30 +35,44 @@ internal class ProjectionResolver(
     // Upstream's own default, applied when a projection names no type at all.
     val type =
       spec.typeSignal?.let { numbers.resolveText(it, spec.name) } ?: spec.type ?: "mercator"
-    return ProjectionDefinition(
-      name = spec.name,
-      type = type,
-      scale = number(spec.scale, spec.name),
-      translate = numberList(spec.translate, spec.name),
-      center = numberList(spec.center, spec.name),
-      rotate = numberList(spec.rotate, spec.name),
-      angle = number(spec.angle, spec.name),
-      precision = number(spec.precision, spec.name),
-      // Upstream reads these as booleans; a signal delivering 0 or 1 reads the same way.
-      reflectX = number(spec.reflectX, spec.name)?.let { it != 0.0 } ?: false,
-      reflectY = number(spec.reflectY, spec.name)?.let { it != 0.0 } ?: false,
-      clipExtent = flatten(spec.clipExtent, spec.name),
-      clipAngle = number(spec.clipAngle, spec.name),
-      parallels = numberList(spec.parallels, spec.name),
-      pointRadius = number(spec.pointRadius, spec.name),
-      // `fit` is the one projection property that is *data*: `{"signal": "data('states')"}`, a
-      // whole dataset of features. It is resolved here, in the scope that declared it, for the
-      // same reason every other signal is — and it is why a fitted projection cannot be built
-      // until the data it fits has loaded.
-      fit = spec.fit?.let { geometry(it, spec.name) },
-      fitExtent = flatten(spec.extent, spec.name),
-      fitSize = numberList(spec.size, spec.name),
-    )
+    val definition =
+      ProjectionDefinition(
+        name = spec.name,
+        type = type,
+        scale = number(spec.scale, spec.name),
+        translate = numberList(spec.translate, spec.name),
+        center = numberList(spec.center, spec.name),
+        rotate = numberList(spec.rotate, spec.name),
+        angle = number(spec.angle, spec.name),
+        precision = number(spec.precision, spec.name),
+        // Upstream reads these as booleans; a signal delivering 0 or 1 reads the same way.
+        reflectX = number(spec.reflectX, spec.name)?.let { it != 0.0 } ?: false,
+        reflectY = number(spec.reflectY, spec.name)?.let { it != 0.0 } ?: false,
+        clipExtent = flatten(spec.clipExtent, spec.name),
+        clipAngle = number(spec.clipAngle, spec.name),
+        parallels = numberList(spec.parallels, spec.name),
+        pointRadius = number(spec.pointRadius, spec.name),
+        // `fit` is the one projection property that is *data*: `{"signal": "data('states')"}`, a
+        // whole dataset of features. It is resolved here, in the scope that declared it, for the
+        // same reason every other signal is — and it is why a fitted projection cannot be built
+        // until the data it fits has loaded.
+        fit = spec.fit?.let { geometry(it, spec.name) },
+        fitExtent = flatten(spec.extent, spec.name),
+        fitSize = numberList(spec.size, spec.name),
+      )
+    // A type nobody builds is reported here rather than at each of the ten sites that build one,
+    // because every one of those falls back to the identity stream and cannot tell a projection
+    // this engine does not have from one the specification never asked for. Warned, not refused:
+    // the rest of the chart is unaffected and drawing it beats abandoning it.
+    if (!definition.isBuildable) {
+      diagnostics.warn(
+        DiagnosticCodes.PROJECTION_UNSUPPORTED_TYPE,
+        "Projection '${spec.name}' has type '$type', which this engine does not build; its " +
+          "geometry is drawn in raw degrees instead of being projected",
+        operator = spec.name,
+      )
+    }
+    return definition
   }
 
   /**

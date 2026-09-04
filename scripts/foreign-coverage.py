@@ -6,8 +6,15 @@ unnoticed: a type can cross while the part of it worth reading stays behind, and
 Both boundary defects found by adopters were that shape — `SceneNodeId` inside an optional, and
 `VegaValue.Obj.fields` behind a value class.
 
-Run by `scripts/foreign-api.sh`. A change here is not forbidden, it is *shown*: a new line means a
-member stopped crossing, and the question is whether a host wanted it.
+Run by `scripts/foreign-api.sh`, which passes the API list to read as the first argument. It
+defaults to the recorded snapshot, which is right when nothing has changed and wrong the moment
+something has: computing "what does not cross" from last commit's boundary reports every newly
+exported member as a hole. That is not hypothetical -- adding a property to `SignalSpec` reported
+`SignalSpec.getPush` as unreachable while the header exported it perfectly well, and the real
+signal, the API diff, is printed second and never reached.
+
+A change here is not forbidden, it is *shown*: a new line means a member stopped crossing, and the
+question is whether a host wanted it.
 
 Everything currently listed is engine-internal — `getPublishesSignal` on each transform, the
 discretizing scales' legend arithmetic, the expression evaluator's scope, and one AST accessor —
@@ -31,7 +38,8 @@ for api in pathlib.Path(".").glob("vega-*/api/*.api"):
                 kotlin[cls].add(g.group(1))
 
 objc, present, bare = collections.defaultdict(set), set(), set()
-for line in pathlib.Path("swift/AsterVegaRender/foreign-api.txt").read_text().splitlines():
+api = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "swift/AsterVegaRender/foreign-api.txt")
+for line in api.read_text().splitlines():
     line = line.strip()
     if not line: continue
     # A **top-level extension function** is credited to the type it extends, because Kotlin/Native
@@ -88,6 +96,8 @@ REASONS = {
     "intersect": "internal: @InternalAsterVegaApi, the expression evaluator's scope",
     "intersectLasso": "internal: @InternalAsterVegaApi, the expression evaluator's scope",
     "getExpr": "internal: the compiled expression's own AST",
+    "getScopePath": "internal: @InternalAsterVegaApi, which group scope a handler belongs to",
+    "getScopedOverrides": "internal: @InternalAsterVegaApi, group-scoped signal values for the next compile",
     "getBins": "reachable: ForeignScale.bins",
     "extentAt": "reachable: ForeignScale.bucketLow / bucketHigh",
     "legendFraction": "reachable: ForeignScale.legendFraction",

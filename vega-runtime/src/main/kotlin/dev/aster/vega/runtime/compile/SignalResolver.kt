@@ -247,6 +247,15 @@ public class SignalScope(
       return VegaValue.Arr(listOf(VegaValue.Num(place[0]), VegaValue.Num(place[1])))
     }
     val scale = resolveScale(name, "invert") ?: return VegaValue.Null
+    // `invert(name, [lo, hi])` — the **range** form, which upstream dispatches to `invertRange`
+    // and this did not: an array reached `asDouble()`, came back NaN, and the whole call answered
+    // null. Every brush in Vega's gallery is written `invert('x', brush)` with a pair, so the
+    // idiom produced nothing at all — and null reads as zero to the arithmetic downstream.
+    //
+    // The band and point scales already had `invertRange`; nothing ever called it.
+    (value as? VegaValue.Arr)?.let { pair ->
+      return invertRangeOf(scale, name, pair.values)
+    }
     // A **band** has an inverse after all — not a number but a *value*: the band a position falls
     // in. `scaleBand.invert` is what a chart animated by a clock reads its frame from, walking the
     // range a step at a time and asking which value each step lands on.
@@ -286,6 +295,49 @@ public class SignalScope(
     val position = value.asDouble()
     if (position.isNaN()) return VegaValue.Null
     return VegaValue.Num(scale.invert(position))
+  }
+
+  /**
+   * `invert(name, [lo, hi])`, matched to upstream's `invertRange` on each family of scale.
+   *
+   * Upstream orders the **range** inputs rather than the answers, which matters for a scale whose
+   * range runs backwards: `invert('x', [120, 20])` and `invert('x', [20, 120])` are the same call,
+   * and on a reversed scale both answer a descending pair. Verified against 6.3.1, along with the
+   * cases that look like mistakes and are not — a short array answers `[value, NaN]` rather than
+   * refusing, and a range reaching outside the scale extrapolates rather than clamping.
+   */
+  private fun invertRangeOf(scale: VegaScale, name: String, values: List<VegaValue>): VegaValue {
+    // A discrete scale answers with the *values* whose bands the stretch covers, which may be one,
+    // several or none — not a pair.
+    if (scale is BandScale || scale is PointScale) {
+      val from = values.getOrNull(0)?.asDouble() ?: Double.NaN
+      val to = values.getOrNull(1)?.asDouble() ?: from
+      val covered =
+        when (scale) {
+          is BandScale -> scale.invertRange(from, to)
+          is PointScale -> scale.invertRange(from, to)
+        }
+      return covered?.let { VegaValue.Arr(it.map { entry -> VegaValue.Str(entry) }) }
+        ?: VegaValue.Undefined
+    }
+    if (scale !is InvertibleScale) {
+      diagnostics?.error(
+        DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+        "invert() needs a continuous scale; '$name' cannot be inverted",
+        operator = name,
+      )
+      return VegaValue.Null
+    }
+    // Upstream's own order: the two *range* positions are sorted, then each is inverted. A missing
+    // or unreadable endpoint inverts to NaN rather than failing the call, which is what lets
+    // `invert('x', [40])` answer a pair with a hole in it.
+    val first = values.getOrNull(0)?.asDouble() ?: Double.NaN
+    val second = values.getOrNull(1)?.asDouble() ?: Double.NaN
+    val low = if (second < first) second else first
+    val high = if (second < first) first else second
+    fun at(position: Double) =
+      if (position.isNaN()) VegaValue.Null else VegaValue.Num(scale.invert(position))
+    return VegaValue.Arr(listOf(at(low), at(high)))
   }
 
   override fun scaleDomain(name: String): VegaValue {

@@ -20,3 +20,54 @@ that, by comparing whole scenes against upstream.
 | `encodeEntry` | 69 | 69 | — |
 
 **247 of 247** across the kinds measured.
+
+## Vega-Lite construct coverage
+
+Generated from what `UpstreamVegaLiteCoverageTest` measured, against the Vega-Lite
+schema in the pinned install: the channels of `FacetedEncoding`, the `Mark` enum plus
+the three composite marks, and the nineteen members of the `Transform` union. Nothing
+is hand-listed, so a version bump that adds a channel adds it here.
+
+**Breadth, not depth.** This says the compiler accepts the construct rather than
+refusing it by name. Whether it emits the Vega upstream emits is
+`VegaLiteFixtureTest`'s question, and that one is answered property by property on
+every fixture.
+
+| Kind | Accepted | Upstream | Refused |
+| --- | --- | --- | --- |
+| `channel` | 41 | 41 | — |
+| `mark` | 17 | 17 | — |
+| `transform` | 19 | 19 | — |
+
+**77 of 77** across the kinds measured.
+
+## Vega `config` block coverage
+
+Generated from what `UpstreamConfigCoverageTest` measured. The inventory is the
+top-level keys of upstream's own default configuration, since Vega's schema does not
+describe `config`.
+
+This says the block *name* is read rather than reported as unimplemented. Whether every
+property inside a block is honoured is `ConfigTest`'s question, answered against
+upstream's own vectors.
+
+| Kind | Read | Upstream | Reported as unimplemented |
+| --- | --- | --- | --- |
+| `config` | 25 | 25 | — |
+
+**25 of 25** blocks read.
+
+## Named-vocabulary coverage
+
+Generated from what `UpstreamSurfaceCoverageTest` measured. These are the surfaces a
+specification reaches by naming a word upstream defines, which is the one shape of gap
+the other probes cannot see: there is no row to be wrong and no citation to dangle, so
+a word upstream has and this engine does not would simply be absent.
+
+| Kind | Accepted | Upstream | Inventory from | Refused |
+| --- | --- | --- | --- | --- |
+| Expression function | 118 | 118 | `vega-functions`' `functionContext` and its `expressionFunction` calls | — |
+| Projection type | 17 | 17 | `vega-projection`'s own table | — |
+| Time unit | 11 | 11 | the schema's `timeunitTransform` enum | — |
+
+**146 of 146** names accepted.

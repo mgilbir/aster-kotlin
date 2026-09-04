@@ -50,6 +50,9 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 DOC = ROOT / "SUPPORTED_FEATURES.md"
 SOURCE = ROOT / "docs" / "capabilities.json"
 COVERAGE_INPUT = ROOT / "vega-model" / "build" / "upstream-coverage.json"
+VEGA_LITE_COVERAGE_INPUT = ROOT / "vega-lite" / "build" / "vega-lite-coverage.json"
+CONFIG_COVERAGE_INPUT = ROOT / "vega-model" / "build" / "config-coverage.json"
+SURFACE_COVERAGE_INPUT = ROOT / "vega-runtime" / "build" / "surface-coverage"
 COVERAGE_DOC = ROOT / "docs" / "upstream-coverage.md"
 
 # A test class as a row cites one: backticked, containing `Test`.
@@ -375,6 +378,97 @@ def render_coverage() -> str | None:
         missing = ", ".join(f"`{p}`" for p in k["unconsumed"]) or "—"
         lines.append(f"| `{k['kind']}` | {k['consumed']} | {k['upstream']} | {missing} |")
     lines += ["", f"**{consumed} of {total}** across the kinds measured.", ""]
+
+    # The Vega-Lite half, when it has been measured. Same idea, different question: over there the
+    # unit is a *property* of a guide, here it is a whole construct — a channel, a mark, a
+    # transform — because that is what a Vega-Lite row says it supports a subset of.
+    if VEGA_LITE_COVERAGE_INPUT.exists():
+        vl = json.loads(VEGA_LITE_COVERAGE_INPUT.read_text())["kinds"]
+        vl_total = sum(k["upstream"] for k in vl)
+        vl_accepted = sum(k["accepted"] for k in vl)
+        lines += [
+            "## Vega-Lite construct coverage",
+            "",
+            "Generated from what `UpstreamVegaLiteCoverageTest` measured, against the Vega-Lite",
+            "schema in the pinned install: the channels of `FacetedEncoding`, the `Mark` enum plus",
+            "the three composite marks, and the nineteen members of the `Transform` union. Nothing",
+            "is hand-listed, so a version bump that adds a channel adds it here.",
+            "",
+            "**Breadth, not depth.** This says the compiler accepts the construct rather than",
+            "refusing it by name. Whether it emits the Vega upstream emits is",
+            "`VegaLiteFixtureTest`'s question, and that one is answered property by property on",
+            "every fixture.",
+            "",
+            "| Kind | Accepted | Upstream | Refused |",
+            "| --- | --- | --- | --- |",
+        ]
+        for k in vl:
+            missing = ", ".join(f"`{p}`" for p in k["refused"]) or "—"
+            lines.append(f"| `{k['kind']}` | {k['accepted']} | {k['upstream']} | {missing} |")
+        lines += ["", f"**{vl_accepted} of {vl_total}** across the kinds measured.", ""]
+
+    # And the `config` blocks, whose inventory comes from upstream's default configuration rather
+    # than from a schema: Vega's schema does not describe `config` at all.
+    if CONFIG_COVERAGE_INPUT.exists():
+        cfg = json.loads(CONFIG_COVERAGE_INPUT.read_text())
+        unread = ", ".join(f"`{b}`" for b in cfg["reported"]) or "—"
+        lines += [
+            "## Vega `config` block coverage",
+            "",
+            "Generated from what `UpstreamConfigCoverageTest` measured. The inventory is the",
+            "top-level keys of upstream's own default configuration, since Vega's schema does not",
+            "describe `config`.",
+            "",
+            "This says the block *name* is read rather than reported as unimplemented. Whether every",
+            "property inside a block is honoured is `ConfigTest`'s question, answered against",
+            "upstream's own vectors.",
+            "",
+            "| Kind | Read | Upstream | Reported as unimplemented |",
+            "| --- | --- | --- | --- |",
+            f"| `config` | {cfg['read']} | {cfg['upstream']} | {unread} |",
+            "",
+            f"**{cfg['read']} of {cfg['upstream']}** blocks read.",
+            "",
+        ]
+
+    # The three vocabularies a specification names by a single word: a projection type, a time unit,
+    # an expression function. None of these is in Vega's schema, so each inventory comes from
+    # upstream's own source — see `UpstreamSurfaceCoverageTest` for where, and why it is scraped
+    # rather than written down.
+    surfaces = [
+        json.loads(f.read_text())
+        for f in sorted(SURFACE_COVERAGE_INPUT.glob("*.json"))
+    ]
+    if surfaces:
+        names = {
+            "projection": ("Projection type", "`vega-projection`'s own table"),
+            "timeUnit": ("Time unit", "the schema's `timeunitTransform` enum"),
+            "expressionFunction": (
+                "Expression function",
+                "`vega-functions`' `functionContext` and its `expressionFunction` calls",
+            ),
+        }
+        lines += [
+            "## Named-vocabulary coverage",
+            "",
+            "Generated from what `UpstreamSurfaceCoverageTest` measured. These are the surfaces a",
+            "specification reaches by naming a word upstream defines, which is the one shape of gap",
+            "the other probes cannot see: there is no row to be wrong and no citation to dangle, so",
+            "a word upstream has and this engine does not would simply be absent.",
+            "",
+            "| Kind | Accepted | Upstream | Inventory from | Refused |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+        for s_ in surfaces:
+            label, source = names.get(s_["kind"], (s_["kind"], "—"))
+            refused = ", ".join(f"`{r}`" for r in s_["refused"]) or "—"
+            lines.append(
+                f"| {label} | {s_['accepted']} | {s_['upstream']} | {source} | {refused} |"
+            )
+        total = sum(s_["upstream"] for s_ in surfaces)
+        ok = sum(s_["accepted"] for s_ in surfaces)
+        lines += ["", f"**{ok} of {total}** names accepted.", ""]
+
     return "\n".join(lines)
 
 def unpinned_limits(
@@ -405,9 +499,18 @@ def unpinned_limits(
     test because the row states what the project does not build — a WebView backend, an NDK
     renderer. It carries a reason and is listed on every run, because an escape hatch nobody counts
     becomes the default answer.
+
+    **`limit.permanent` separates a gap from a decision.** Both kinds of row claim a limitation and
+    both need a test, so both are checked the same way; what differs is whether anyone should ever
+    try to close it. Reproducing upstream's rotated-path bounds would put every hit target in the
+    wrong place, implementing `labelBound` as documented would make this engine differ from upstream
+    on every chart that sets it, and a reachable `eval` would be arbitrary code execution in a host
+    process. Those are settled, and a list that files them beside real gaps invites somebody to
+    "finish" them. The count of each is printed, so the open list is the honest one.
     """
     problems: list[str] = []
     scoped: list[str] = []
+    permanent = 0
     if entries is None:
         entries = json.loads(SOURCE.read_text())["capabilities"]
     for entry in entries:
@@ -423,6 +526,8 @@ def unpinned_limits(
                 '`"limit": {"scope": "…"}` where there is no code path to test.'
             )
             continue
+        if limit.get("permanent"):
+            permanent += 1
         if limit.get("scope"):
             scoped.append(f"{where}: {limit['scope']}")
             continue
@@ -445,6 +550,11 @@ def unpinned_limits(
                 f"{where} pins its limitation to `{citation}`, and `{class_name}` ran without a "
                 f"method called `{method}`. It was renamed or removed; the row is now unpinned."
             )
+    if permanent:
+        print(
+            f"{permanent} limitation(s) are settled decisions rather than gaps, and are not work "
+            "waiting to be done."
+        )
     if scoped:
         print(f"{len(scoped)} limitation(s) stand on scope rather than a test:")
         for line in sorted(scoped):
@@ -562,6 +672,13 @@ def selftest() -> int:
     check("trailing dot reason", "not `ClassName.the method`" in empty_method[0], True)
     # Scope is accepted and counted.
     check("scope", unpinned_limits(ran, [row(limit={"scope": "no code path"})]), [])
+    # `permanent` marks a settled decision. It changes what is *reported*, never what is required:
+    # such a row still needs a test, because the decision has to keep being true.
+    check("permanent still needs a pin", len(unpinned_limits(ran, [row(limit={"permanent": True})])), 1)
+    check("permanent with a pin",
+          unpinned_limits(ran, [row(limit={"permanent": True, "test": "T.the gap holds"})]), [])
+    check("permanent with a bad pin",
+          len(unpinned_limits(ran, [row(limit={"permanent": True, "test": "T.gone"})])), 1)
     # A row that claims no limitation needs no pin.
     check("supported row", unpinned_limits(ran, [row(status="**Supported**")]), [])
     # With no results at all the offline half still holds: a missing pin is still a missing pin,

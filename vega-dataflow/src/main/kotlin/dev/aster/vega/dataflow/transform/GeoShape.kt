@@ -58,7 +58,23 @@ public data class ProjectionDefinition(
   val fitExtent: List<Double> = emptyList(),
   /** `[width, height]` — the same thing anchored at the origin. */
   val fitSize: List<Double> = emptyList(),
-)
+) {
+  /**
+   * Whether [type] names a projection this engine builds.
+   *
+   * The question [build] answers with a null, asked without building anything, so that the one
+   * place able to report it — the compiler, which has somewhere to put a diagnostic — can ask.
+   * Deliberately asks the *builders* rather than a written-out list: a list would be a second thing
+   * to keep in step, and a name that is in one place and not the other is the exact failure this
+   * guards against.
+   *
+   * A member rather than a top-level function so that no new type crosses to Apple: a file-level
+   * function would export as a `GeoShapeKt` class of its own, and this type already crosses.
+   */
+  @InternalAsterVegaApi
+  public val isBuildable: Boolean
+    get() = Projections.byName(type) != null || Projections.compositeByName(type) != null
+}
 
 /** Builds the projection a definition describes, or null for a type this engine does not have. */
 internal fun ProjectionDefinition.build(): GeoProjector? {

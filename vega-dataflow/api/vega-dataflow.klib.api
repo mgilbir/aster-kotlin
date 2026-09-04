@@ -129,6 +129,8 @@ final class dev.aster.vega.dataflow.transform/ProjectionDefinition { // dev.aste
         final fun <get-fitExtent>(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.dataflow.transform/ProjectionDefinition.fitExtent.<get-fitExtent>|<get-fitExtent>(){}[0]
     final val fitSize // dev.aster.vega.dataflow.transform/ProjectionDefinition.fitSize|{}fitSize[0]
         final fun <get-fitSize>(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.dataflow.transform/ProjectionDefinition.fitSize.<get-fitSize>|<get-fitSize>(){}[0]
+    final val isBuildable // dev.aster.vega.dataflow.transform/ProjectionDefinition.isBuildable|{}isBuildable[0]
+        final fun <get-isBuildable>(): kotlin/Boolean // dev.aster.vega.dataflow.transform/ProjectionDefinition.isBuildable.<get-isBuildable>|<get-isBuildable>(){}[0]
     final val name // dev.aster.vega.dataflow.transform/ProjectionDefinition.name|{}name[0]
         final fun <get-name>(): kotlin/String // dev.aster.vega.dataflow.transform/ProjectionDefinition.name.<get-name>|<get-name>(){}[0]
     final val parallels // dev.aster.vega.dataflow.transform/ProjectionDefinition.parallels|{}parallels[0]

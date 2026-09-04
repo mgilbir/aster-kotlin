@@ -1,37 +1,48 @@
 {
-  "_comment": [
-    "Divergences between these transforms and upstream, found by replaying Vega's own test vectors.",
-    "Every entry is a BUG TO FIX, not an accepted difference. The test asserts this set EXACTLY:",
-    "Each entry names its `kind` (transform or parser) and its `subject`, because three different",
-    "replays read this file and each asserts only its own entries.",
-    "a new divergence fails the build, and fixing one also fails it until its entry is deleted here.",
-    "Recorded rather than left red so the harness can be committed green while the work is queued;",
-    "each entry's own `note` is the write-up; there is no second place to look."
-  ],
-  "divergences": [
-    {
-      "signature": "color(\"rgba(0,0,0,0)\")",
-      "note": "A fully transparent colour. d3 **blanks the channels** — `rgba(r, g, b, a)` sets `r = g = b = NaN` for `a <= 0` — where this engine keeps the zeros it parsed. The note here used to say nothing downstream reads them, and that was **wrong**: d3's interpolators are built around those NaNs, holding the other endpoint's channel constant, so `red -> transparent` stays red and fades. Reading zeros faded it through black instead. That is fixed at the interpolator — a transparent endpoint now contributes only its opacity — so what remains is genuinely representational: the parsed value carries 0,0,0 rather than NaN,NaN,NaN, and nothing now reaches it. Kept rather than propagated, because NaN channels would have to be defended everywhere they could travel.",
-      "kind": "parser",
-      "subject": "SceneColor.parse"
-    },
-    {
-      "signature": "pathParse(\"l.5.5.3.3\")",
-      "note": "A path that begins with a **drawing** command rather than a move. Upstream's parser emits two lines from the origin; this one refuses the string, which is what the SVG grammar requires and what a browser does with it — so upstream's canvas renderer draws two lines where its own SVG renderer draws nothing. Reviewed again rather than inherited: the choice is between matching upstream's canvas and matching every browser, the two disagree, and no specification a chart is built from starts a path this way. Pinned so that changing sides stays a decision.",
-      "kind": "parser",
-      "subject": "SvgPath.parse"
-    },
-    {
-      "signature": "scaleThreshold.domain([\"10\",\"2\"]).range([0,1,2]).(call)([\"12\"])",
-      "kind": "scale",
-      "subject": "ThresholdScale",
-      "note": "A threshold scale whose cut points are **strings**. d3 bisects them with JavaScript's `<`, which is lexicographic — `\"12\" < \"2\"` — so `\"12\"` lands in the first bucket; this engine's `ThresholdScale` holds `Double` cut points and puts 12 above both. Reviewed again: supporting it means carrying `VegaValue` thresholds and JavaScript comparison through the scale and its legend, for a specification that writes a numeric cut point as a quoted string. Still not worth it, and still pinned so the day one appears there is a note explaining why the answer is odd."
-    },
-    {
-      "signature": "hsl(\"hsla(120,20%,10%,0)\")",
-      "kind": "parser",
-      "subject": "ColorSpaces.toHsl",
-      "note": "The same transparent-channel difference as `color(\"rgba(0,0,0,0)\")` above, seen through a conversion: d3 blanks a fully transparent colour's channels to NaN, so reading it back as HSL gives NaN for all three, where this engine converts the zeros it parsed. Listed separately because it is a second entry point rather than a second cause — the interpolators, which are what actually reach these channels, already match upstream by treating a transparent endpoint as contributing only its opacity."
-    }
-  ]
+ "_comment": [
+  "Where this engine answers differently from upstream, found by replaying Vega's and d3's own",
+  "test vectors. Each entry is an **accepted difference with a reason**, not a queued bug.",
+  "",
+  "It used to say every entry was a bug to fix, and when it did that was true: eighteen were",
+  "recorded and the ones that were bugs were fixed — see `Fix all five transform bugs upstream's",
+  "own tests found`, `Give luminance and contrast d3's stricter acceptance`, `Give a grey no hue`.",
+  "What is left is what survived review twice, so the header was describing the file's history",
+  "rather than its contents. A list that calls settled decisions 'bugs' is a list nobody reads.",
+  "",
+  "The assertion is unchanged and is the point: each replay asserts its own entries EXACTLY, so a",
+  "new divergence fails the build and so does making one agree without deleting its entry here.",
+  "That cuts both ways on purpose — an accepted difference that quietly becomes agreement is as",
+  "much a surprise as a new one. Each entry names its `kind` and `subject` because several replays",
+  "read this file and each asserts only its own.",
+  "",
+  "`note` is the whole write-up; there is no second place to look. The count is checked against the",
+  "documentation by `DocumentedNumbersTest`, so a row quoting it cannot go stale — which is how the",
+  "prose came to claim thirteen and five long after the file held four."
+ ],
+ "divergences": [
+  {
+   "signature": "color(\"rgba(0,0,0,0)\")",
+   "note": "A fully transparent colour. d3 **blanks the channels** — `rgba(r, g, b, a)` sets `r = g = b = NaN` for `a <= 0` — where this engine keeps the zeros it parsed. The note here used to say nothing downstream reads them, and that was **wrong**: d3's interpolators are built around those NaNs, holding the other endpoint's channel constant, so `red -> transparent` stays red and fades. Reading zeros faded it through black instead. That is fixed at the interpolator — a transparent endpoint now contributes only its opacity — so what remains is genuinely representational: the parsed value carries 0,0,0 rather than NaN,NaN,NaN, and nothing now reaches it. Kept rather than propagated, because NaN channels would have to be defended everywhere they could travel.",
+   "kind": "parser",
+   "subject": "SceneColor.parse"
+  },
+  {
+   "signature": "pathParse(\"l.5.5.3.3\")",
+   "note": "A path that begins with a **drawing** command rather than a move. Upstream's parser emits two lines from the origin; this one refuses the string, which is what the SVG grammar requires and what a browser does with it — so upstream's canvas renderer draws two lines where its own SVG renderer draws nothing. Reviewed again rather than inherited: the choice is between matching upstream's canvas and matching every browser, the two disagree, and no specification a chart is built from starts a path this way. Pinned so that changing sides stays a decision.",
+   "kind": "parser",
+   "subject": "SvgPath.parse"
+  },
+  {
+   "signature": "scaleThreshold.domain([\"10\",\"2\"]).range([0,1,2]).(call)([\"12\"])",
+   "kind": "scale",
+   "subject": "ThresholdScale",
+   "note": "A threshold scale whose cut points are **strings**. d3 bisects them with JavaScript's `<`, which is lexicographic — `\"12\" < \"2\"` — so `\"12\"` lands in the first bucket; this engine's `ThresholdScale` holds `Double` cut points and puts 12 above both. Reviewed again: supporting it means carrying `VegaValue` thresholds and JavaScript comparison through the scale and its legend, for a specification that writes a numeric cut point as a quoted string. Still not worth it, and still pinned so the day one appears there is a note explaining why the answer is odd."
+  },
+  {
+   "signature": "hsl(\"hsla(120,20%,10%,0)\")",
+   "kind": "parser",
+   "subject": "ColorSpaces.toHsl",
+   "note": "The same transparent-channel difference as `color(\"rgba(0,0,0,0)\")` above, seen through a conversion: d3 blanks a fully transparent colour's channels to NaN, so reading it back as HSL gives NaN for all three, where this engine converts the zeros it parsed. Listed separately because it is a second entry point rather than a second cause — the interpolators, which are what actually reach these channels, already match upstream by treating a transparent endpoint as contributing only its opacity."
+  }
+ ]
 }

@@ -469,10 +469,12 @@ final class dev.aster.vega.runtime.compile/AxisBuilder { // dev.aster.vega.runti
 }
 
 final class dev.aster.vega.runtime.compile/CompiledSpec { // dev.aster.vega.runtime.compile/CompiledSpec|null[0]
-    constructor <init>(dev.aster.vega.scene/Scene?, kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.scale/VegaScale>, dev.aster.vega.runtime.compile/SignalScope, kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic>, dev.aster.vega.model.spec/VegaSpec? = ..., kotlin.collections/Map<dev.aster.vega.scene/SceneNodeId, dev.aster.vega.scene/SceneNode> = ..., kotlin/Boolean = ...) // dev.aster.vega.runtime.compile/CompiledSpec.<init>|<init>(dev.aster.vega.scene.Scene?;kotlin.collections.Map<kotlin.String,dev.aster.vega.runtime.scale.VegaScale>;dev.aster.vega.runtime.compile.SignalScope;kotlin.collections.List<dev.aster.vega.model.VegaDiagnostic>;dev.aster.vega.model.spec.VegaSpec?;kotlin.collections.Map<dev.aster.vega.scene.SceneNodeId,dev.aster.vega.scene.SceneNode>;kotlin.Boolean){}[0]
+    constructor <init>(dev.aster.vega.scene/Scene?, kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.scale/VegaScale>, dev.aster.vega.runtime.compile/SignalScope, kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic>, dev.aster.vega.model.spec/VegaSpec? = ..., kotlin.collections/Map<dev.aster.vega.scene/SceneNodeId, dev.aster.vega.scene/SceneNode> = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.compile/SignalScope> = ...) // dev.aster.vega.runtime.compile/CompiledSpec.<init>|<init>(dev.aster.vega.scene.Scene?;kotlin.collections.Map<kotlin.String,dev.aster.vega.runtime.scale.VegaScale>;dev.aster.vega.runtime.compile.SignalScope;kotlin.collections.List<dev.aster.vega.model.VegaDiagnostic>;dev.aster.vega.model.spec.VegaSpec?;kotlin.collections.Map<dev.aster.vega.scene.SceneNodeId,dev.aster.vega.scene.SceneNode>;kotlin.Boolean;kotlin.collections.Map<kotlin.String,dev.aster.vega.runtime.compile.SignalScope>){}[0]
 
     final val diagnostics // dev.aster.vega.runtime.compile/CompiledSpec.diagnostics|{}diagnostics[0]
         final fun <get-diagnostics>(): kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic> // dev.aster.vega.runtime.compile/CompiledSpec.diagnostics.<get-diagnostics>|<get-diagnostics>(){}[0]
+    final val groupScopes // dev.aster.vega.runtime.compile/CompiledSpec.groupScopes|{}groupScopes[0]
+        final fun <get-groupScopes>(): kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.compile/SignalScope> // dev.aster.vega.runtime.compile/CompiledSpec.groupScopes.<get-groupScopes>|<get-groupScopes>(){}[0]
     final val hoverVariants // dev.aster.vega.runtime.compile/CompiledSpec.hoverVariants|{}hoverVariants[0]
         final fun <get-hoverVariants>(): kotlin.collections/Map<dev.aster.vega.scene/SceneNodeId, dev.aster.vega.scene/SceneNode> // dev.aster.vega.runtime.compile/CompiledSpec.hoverVariants.<get-hoverVariants>|<get-hoverVariants>(){}[0]
     final val isUsable // dev.aster.vega.runtime.compile/CompiledSpec.isUsable|{}isUsable[0]
@@ -495,7 +497,8 @@ final class dev.aster.vega.runtime.compile/CompiledSpec { // dev.aster.vega.runt
     final fun component5(): dev.aster.vega.model.spec/VegaSpec? // dev.aster.vega.runtime.compile/CompiledSpec.component5|component5(){}[0]
     final fun component6(): kotlin.collections/Map<dev.aster.vega.scene/SceneNodeId, dev.aster.vega.scene/SceneNode> // dev.aster.vega.runtime.compile/CompiledSpec.component6|component6(){}[0]
     final fun component7(): kotlin/Boolean // dev.aster.vega.runtime.compile/CompiledSpec.component7|component7(){}[0]
-    final fun copy(dev.aster.vega.scene/Scene? = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.scale/VegaScale> = ..., dev.aster.vega.runtime.compile/SignalScope = ..., kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic> = ..., dev.aster.vega.model.spec/VegaSpec? = ..., kotlin.collections/Map<dev.aster.vega.scene/SceneNodeId, dev.aster.vega.scene/SceneNode> = ..., kotlin/Boolean = ...): dev.aster.vega.runtime.compile/CompiledSpec // dev.aster.vega.runtime.compile/CompiledSpec.copy|copy(dev.aster.vega.scene.Scene?;kotlin.collections.Map<kotlin.String,dev.aster.vega.runtime.scale.VegaScale>;dev.aster.vega.runtime.compile.SignalScope;kotlin.collections.List<dev.aster.vega.model.VegaDiagnostic>;dev.aster.vega.model.spec.VegaSpec?;kotlin.collections.Map<dev.aster.vega.scene.SceneNodeId,dev.aster.vega.scene.SceneNode>;kotlin.Boolean){}[0]
+    final fun component8(): kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.compile/SignalScope> // dev.aster.vega.runtime.compile/CompiledSpec.component8|component8(){}[0]
+    final fun copy(dev.aster.vega.scene/Scene? = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.scale/VegaScale> = ..., dev.aster.vega.runtime.compile/SignalScope = ..., kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic> = ..., dev.aster.vega.model.spec/VegaSpec? = ..., kotlin.collections/Map<dev.aster.vega.scene/SceneNodeId, dev.aster.vega.scene/SceneNode> = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.compile/SignalScope> = ...): dev.aster.vega.runtime.compile/CompiledSpec // dev.aster.vega.runtime.compile/CompiledSpec.copy|copy(dev.aster.vega.scene.Scene?;kotlin.collections.Map<kotlin.String,dev.aster.vega.runtime.scale.VegaScale>;dev.aster.vega.runtime.compile.SignalScope;kotlin.collections.List<dev.aster.vega.model.VegaDiagnostic>;dev.aster.vega.model.spec.VegaSpec?;kotlin.collections.Map<dev.aster.vega.scene.SceneNodeId,dev.aster.vega.scene.SceneNode>;kotlin.Boolean;kotlin.collections.Map<kotlin.String,dev.aster.vega.runtime.compile.SignalScope>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.runtime.compile/CompiledSpec.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.aster.vega.runtime.compile/CompiledSpec.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.aster.vega.runtime.compile/CompiledSpec.toString|toString(){}[0]
@@ -624,6 +627,7 @@ final class dev.aster.vega.runtime.compile/SpecCompiler { // dev.aster.vega.runt
 
     final fun compile(dev.aster.vega.model.spec/VegaSpec, kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ..., kotlin.collections/Map<dev.aster.vega.scene/SceneNodeId, dev.aster.vega.runtime.compile/ItemEncode> = ...): dev.aster.vega.runtime.compile/CompiledSpec // dev.aster.vega.runtime.compile/SpecCompiler.compile|compile(dev.aster.vega.model.spec.VegaSpec;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<dev.aster.vega.scene.SceneNodeId,dev.aster.vega.runtime.compile.ItemEncode>){}[0]
     final fun compileJson(kotlin/String, kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ..., kotlin.collections/Map<dev.aster.vega.scene/SceneNodeId, dev.aster.vega.runtime.compile/ItemEncode> = ...): dev.aster.vega.runtime.compile/CompiledSpec // dev.aster.vega.runtime.compile/SpecCompiler.compileJson|compileJson(kotlin.String;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<dev.aster.vega.scene.SceneNodeId,dev.aster.vega.runtime.compile.ItemEncode>){}[0]
+    final fun compileJsonInScopes(kotlin/String, kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue>, kotlin.collections/Map<dev.aster.vega.scene/SceneNodeId, dev.aster.vega.runtime.compile/ItemEncode>, kotlin.collections/Map<kotlin/String, kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue>>): dev.aster.vega.runtime.compile/CompiledSpec // dev.aster.vega.runtime.compile/SpecCompiler.compileJsonInScopes|compileJsonInScopes(kotlin.String;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<dev.aster.vega.scene.SceneNodeId,dev.aster.vega.runtime.compile.ItemEncode>;kotlin.collections.Map<kotlin.String,kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>>){}[0]
 
     final object Companion { // dev.aster.vega.runtime.compile/SpecCompiler.Companion|null[0]
         final const val DEFAULT_HEIGHT // dev.aster.vega.runtime.compile/SpecCompiler.Companion.DEFAULT_HEIGHT|{}DEFAULT_HEIGHT[0]
@@ -640,13 +644,13 @@ final class dev.aster.vega.runtime.interaction/CoroutineScheduler : dev.aster.ve
 }
 
 final class dev.aster.vega.runtime.interaction/EventDispatcher { // dev.aster.vega.runtime.interaction/EventDispatcher|null[0]
-    constructor <init>(kotlin.collections/List<dev.aster.vega.runtime.interaction/HandlerBinding>, dev.aster.vega.expression/ExpressionCompiler, dev.aster.vega.model/DiagnosticCollector, dev.aster.vega.expression/ExpressionScope, dev.aster.vega.model.spec/EventConfig = ..., kotlin/Boolean = ...) // dev.aster.vega.runtime.interaction/EventDispatcher.<init>|<init>(kotlin.collections.List<dev.aster.vega.runtime.interaction.HandlerBinding>;dev.aster.vega.expression.ExpressionCompiler;dev.aster.vega.model.DiagnosticCollector;dev.aster.vega.expression.ExpressionScope;dev.aster.vega.model.spec.EventConfig;kotlin.Boolean){}[0]
+    constructor <init>(kotlin.collections/List<dev.aster.vega.runtime.interaction/HandlerBinding>, dev.aster.vega.expression/ExpressionCompiler, dev.aster.vega.model/DiagnosticCollector, dev.aster.vega.expression/ExpressionScope, dev.aster.vega.model.spec/EventConfig = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.expression/ExpressionScope> = ...) // dev.aster.vega.runtime.interaction/EventDispatcher.<init>|<init>(kotlin.collections.List<dev.aster.vega.runtime.interaction.HandlerBinding>;dev.aster.vega.expression.ExpressionCompiler;dev.aster.vega.model.DiagnosticCollector;dev.aster.vega.expression.ExpressionScope;dev.aster.vega.model.spec.EventConfig;kotlin.Boolean;kotlin.collections.Map<kotlin.String,dev.aster.vega.expression.ExpressionScope>){}[0]
 
     final fun dispatch(dev.aster.vega.runtime.interaction/InputEvent): kotlin.collections/List<dev.aster.vega.runtime.interaction/FiredHandler> // dev.aster.vega.runtime.interaction/EventDispatcher.dispatch|dispatch(dev.aster.vega.runtime.interaction.InputEvent){}[0]
 }
 
 final class dev.aster.vega.runtime.interaction/FiredHandler { // dev.aster.vega.runtime.interaction/FiredHandler|null[0]
-    constructor <init>(kotlin/String, dev.aster.vega.model.spec/SignalHandler, dev.aster.vega.runtime.interaction/InputEvent? = ..., kotlin/Double? = ...) // dev.aster.vega.runtime.interaction/FiredHandler.<init>|<init>(kotlin.String;dev.aster.vega.model.spec.SignalHandler;dev.aster.vega.runtime.interaction.InputEvent?;kotlin.Double?){}[0]
+    constructor <init>(kotlin/String, dev.aster.vega.model.spec/SignalHandler, dev.aster.vega.runtime.interaction/InputEvent? = ..., kotlin/Double? = ..., kotlin/String = ..., kotlin/String? = ...) // dev.aster.vega.runtime.interaction/FiredHandler.<init>|<init>(kotlin.String;dev.aster.vega.model.spec.SignalHandler;dev.aster.vega.runtime.interaction.InputEvent?;kotlin.Double?;kotlin.String;kotlin.String?){}[0]
 
     final val deferByMillis // dev.aster.vega.runtime.interaction/FiredHandler.deferByMillis|{}deferByMillis[0]
         final fun <get-deferByMillis>(): kotlin/Double? // dev.aster.vega.runtime.interaction/FiredHandler.deferByMillis.<get-deferByMillis>|<get-deferByMillis>(){}[0]
@@ -654,30 +658,42 @@ final class dev.aster.vega.runtime.interaction/FiredHandler { // dev.aster.vega.
         final fun <get-event>(): dev.aster.vega.runtime.interaction/InputEvent? // dev.aster.vega.runtime.interaction/FiredHandler.event.<get-event>|<get-event>(){}[0]
     final val handler // dev.aster.vega.runtime.interaction/FiredHandler.handler|{}handler[0]
         final fun <get-handler>(): dev.aster.vega.model.spec/SignalHandler // dev.aster.vega.runtime.interaction/FiredHandler.handler.<get-handler>|<get-handler>(){}[0]
+    final val scopePath // dev.aster.vega.runtime.interaction/FiredHandler.scopePath|{}scopePath[0]
+        final fun <get-scopePath>(): kotlin/String // dev.aster.vega.runtime.interaction/FiredHandler.scopePath.<get-scopePath>|<get-scopePath>(){}[0]
     final val signalName // dev.aster.vega.runtime.interaction/FiredHandler.signalName|{}signalName[0]
         final fun <get-signalName>(): kotlin/String // dev.aster.vega.runtime.interaction/FiredHandler.signalName.<get-signalName>|<get-signalName>(){}[0]
+    final val writePath // dev.aster.vega.runtime.interaction/FiredHandler.writePath|{}writePath[0]
+        final fun <get-writePath>(): kotlin/String? // dev.aster.vega.runtime.interaction/FiredHandler.writePath.<get-writePath>|<get-writePath>(){}[0]
 
     final fun component1(): kotlin/String // dev.aster.vega.runtime.interaction/FiredHandler.component1|component1(){}[0]
     final fun component2(): dev.aster.vega.model.spec/SignalHandler // dev.aster.vega.runtime.interaction/FiredHandler.component2|component2(){}[0]
     final fun component3(): dev.aster.vega.runtime.interaction/InputEvent? // dev.aster.vega.runtime.interaction/FiredHandler.component3|component3(){}[0]
     final fun component4(): kotlin/Double? // dev.aster.vega.runtime.interaction/FiredHandler.component4|component4(){}[0]
-    final fun copy(kotlin/String = ..., dev.aster.vega.model.spec/SignalHandler = ..., dev.aster.vega.runtime.interaction/InputEvent? = ..., kotlin/Double? = ...): dev.aster.vega.runtime.interaction/FiredHandler // dev.aster.vega.runtime.interaction/FiredHandler.copy|copy(kotlin.String;dev.aster.vega.model.spec.SignalHandler;dev.aster.vega.runtime.interaction.InputEvent?;kotlin.Double?){}[0]
+    final fun component5(): kotlin/String // dev.aster.vega.runtime.interaction/FiredHandler.component5|component5(){}[0]
+    final fun component6(): kotlin/String? // dev.aster.vega.runtime.interaction/FiredHandler.component6|component6(){}[0]
+    final fun copy(kotlin/String = ..., dev.aster.vega.model.spec/SignalHandler = ..., dev.aster.vega.runtime.interaction/InputEvent? = ..., kotlin/Double? = ..., kotlin/String = ..., kotlin/String? = ...): dev.aster.vega.runtime.interaction/FiredHandler // dev.aster.vega.runtime.interaction/FiredHandler.copy|copy(kotlin.String;dev.aster.vega.model.spec.SignalHandler;dev.aster.vega.runtime.interaction.InputEvent?;kotlin.Double?;kotlin.String;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.runtime.interaction/FiredHandler.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.aster.vega.runtime.interaction/FiredHandler.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.aster.vega.runtime.interaction/FiredHandler.toString|toString(){}[0]
 }
 
 final class dev.aster.vega.runtime.interaction/HandlerBinding { // dev.aster.vega.runtime.interaction/HandlerBinding|null[0]
-    constructor <init>(kotlin/String, dev.aster.vega.model.spec/SignalHandler) // dev.aster.vega.runtime.interaction/HandlerBinding.<init>|<init>(kotlin.String;dev.aster.vega.model.spec.SignalHandler){}[0]
+    constructor <init>(kotlin/String, dev.aster.vega.model.spec/SignalHandler, kotlin/String = ..., kotlin/String? = ...) // dev.aster.vega.runtime.interaction/HandlerBinding.<init>|<init>(kotlin.String;dev.aster.vega.model.spec.SignalHandler;kotlin.String;kotlin.String?){}[0]
 
     final val handler // dev.aster.vega.runtime.interaction/HandlerBinding.handler|{}handler[0]
         final fun <get-handler>(): dev.aster.vega.model.spec/SignalHandler // dev.aster.vega.runtime.interaction/HandlerBinding.handler.<get-handler>|<get-handler>(){}[0]
+    final val scopePath // dev.aster.vega.runtime.interaction/HandlerBinding.scopePath|{}scopePath[0]
+        final fun <get-scopePath>(): kotlin/String // dev.aster.vega.runtime.interaction/HandlerBinding.scopePath.<get-scopePath>|<get-scopePath>(){}[0]
     final val signalName // dev.aster.vega.runtime.interaction/HandlerBinding.signalName|{}signalName[0]
         final fun <get-signalName>(): kotlin/String // dev.aster.vega.runtime.interaction/HandlerBinding.signalName.<get-signalName>|<get-signalName>(){}[0]
+    final val writePath // dev.aster.vega.runtime.interaction/HandlerBinding.writePath|{}writePath[0]
+        final fun <get-writePath>(): kotlin/String? // dev.aster.vega.runtime.interaction/HandlerBinding.writePath.<get-writePath>|<get-writePath>(){}[0]
 
     final fun component1(): kotlin/String // dev.aster.vega.runtime.interaction/HandlerBinding.component1|component1(){}[0]
     final fun component2(): dev.aster.vega.model.spec/SignalHandler // dev.aster.vega.runtime.interaction/HandlerBinding.component2|component2(){}[0]
-    final fun copy(kotlin/String = ..., dev.aster.vega.model.spec/SignalHandler = ...): dev.aster.vega.runtime.interaction/HandlerBinding // dev.aster.vega.runtime.interaction/HandlerBinding.copy|copy(kotlin.String;dev.aster.vega.model.spec.SignalHandler){}[0]
+    final fun component3(): kotlin/String // dev.aster.vega.runtime.interaction/HandlerBinding.component3|component3(){}[0]
+    final fun component4(): kotlin/String? // dev.aster.vega.runtime.interaction/HandlerBinding.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., dev.aster.vega.model.spec/SignalHandler = ..., kotlin/String = ..., kotlin/String? = ...): dev.aster.vega.runtime.interaction/HandlerBinding // dev.aster.vega.runtime.interaction/HandlerBinding.copy|copy(kotlin.String;dev.aster.vega.model.spec.SignalHandler;kotlin.String;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.runtime.interaction/HandlerBinding.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.aster.vega.runtime.interaction/HandlerBinding.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.aster.vega.runtime.interaction/HandlerBinding.toString|toString(){}[0]
@@ -736,9 +752,11 @@ final class dev.aster.vega.runtime.interaction/SignalUpdater { // dev.aster.vega
         final fun <get-itemEncodes>(): kotlin.collections/Map<dev.aster.vega.scene/SceneNodeId, dev.aster.vega.runtime.compile/ItemEncode> // dev.aster.vega.runtime.interaction/SignalUpdater.itemEncodes.<get-itemEncodes>|<get-itemEncodes>(){}[0]
     final val overrides // dev.aster.vega.runtime.interaction/SignalUpdater.overrides|{}overrides[0]
         final fun <get-overrides>(): kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> // dev.aster.vega.runtime.interaction/SignalUpdater.overrides.<get-overrides>|<get-overrides>(){}[0]
+    final val scopedOverrides // dev.aster.vega.runtime.interaction/SignalUpdater.scopedOverrides|{}scopedOverrides[0]
+        final fun <get-scopedOverrides>(): kotlin.collections/Map<kotlin/String, kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue>> // dev.aster.vega.runtime.interaction/SignalUpdater.scopedOverrides.<get-scopedOverrides>|<get-scopedOverrides>(){}[0]
 
     final fun ageItemEncodes() // dev.aster.vega.runtime.interaction/SignalUpdater.ageItemEncodes|ageItemEncodes(){}[0]
-    final fun apply(kotlin.collections/List<dev.aster.vega.runtime.interaction/FiredHandler>, dev.aster.vega.expression/ExpressionScope): kotlin.collections/Set<kotlin/String> // dev.aster.vega.runtime.interaction/SignalUpdater.apply|apply(kotlin.collections.List<dev.aster.vega.runtime.interaction.FiredHandler>;dev.aster.vega.expression.ExpressionScope){}[0]
+    final fun apply(kotlin.collections/List<dev.aster.vega.runtime.interaction/FiredHandler>, dev.aster.vega.expression/ExpressionScope, kotlin.collections/Map<kotlin/String, dev.aster.vega.expression/ExpressionScope> = ...): kotlin.collections/Set<kotlin/String> // dev.aster.vega.runtime.interaction/SignalUpdater.apply|apply(kotlin.collections.List<dev.aster.vega.runtime.interaction.FiredHandler>;dev.aster.vega.expression.ExpressionScope;kotlin.collections.Map<kotlin.String,dev.aster.vega.expression.ExpressionScope>){}[0]
     final fun reset() // dev.aster.vega.runtime.interaction/SignalUpdater.reset|reset(){}[0]
     final fun set(kotlin/String, dev.aster.vega.model/VegaValue) // dev.aster.vega.runtime.interaction/SignalUpdater.set|set(kotlin.String;dev.aster.vega.model.VegaValue){}[0]
 }
@@ -954,6 +972,7 @@ final class dev.aster.vega.runtime.scale/PointScale : dev.aster.vega.runtime.sca
         final fun <get-step>(): kotlin/Double // dev.aster.vega.runtime.scale/PointScale.step.<get-step>|<get-step>(){}[0]
 
     final fun invert(kotlin/Double): kotlin/String? // dev.aster.vega.runtime.scale/PointScale.invert|invert(kotlin.Double){}[0]
+    final fun invertRange(kotlin/Double, kotlin/Double): kotlin.collections/List<kotlin/String>? // dev.aster.vega.runtime.scale/PointScale.invertRange|invertRange(kotlin.Double;kotlin.Double){}[0]
     final fun position(dev.aster.vega.model/VegaValue): kotlin/Double // dev.aster.vega.runtime.scale/PointScale.position|position(dev.aster.vega.model.VegaValue){}[0]
     final fun scale(dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.runtime.scale/PointScale.scale|scale(dev.aster.vega.model.VegaValue){}[0]
     final fun ticks(): kotlin.collections/List<kotlin/String> // dev.aster.vega.runtime.scale/PointScale.ticks|ticks(){}[0]

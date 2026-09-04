@@ -120,10 +120,11 @@
       "status": "**Partial**",
       "tests": [
         "VegaLiteFixtureDifferentialTest",
-        "VegaLiteFixtureTest"
+        "VegaLiteFixtureTest",
+        "UpstreamVegaLiteCoverageTest"
       ],
-      "tests_text": "`VegaLiteFixtureTest`, `VegaLiteFixtureDifferentialTest`",
-      "notes": "`VegaLiteCompiler` compiles Vega-Lite to Vega in Kotlin, and the emitted specification is compared **property by property** against upstream's own compiler on every fixture — not only the picture it draws, because Vega-Lite's whole value is in the defaults it supplies and each of those is one property of the output. A single view, a `layer` of views, or a grid of them faceted by `row` and `column`; see the Vega-Lite section below for the channels and marks, and for what is reported instead of approximated",
+      "tests_text": "`VegaLiteFixtureTest`, `VegaLiteFixtureDifferentialTest`, `UpstreamVegaLiteCoverageTest`",
+      "notes": "`VegaLiteCompiler` compiles Vega-Lite to Vega in Kotlin, and the emitted specification is compared **property by property** against upstream's own compiler on every fixture — not only the picture it draws, because Vega-Lite's whole value is in the defaults it supplies and each of those is one property of the output. A single view, a `layer` of views, or a grid of them faceted by `row` and `column`; see the Vega-Lite section below for the channels and marks, and for what is reported instead of approximated Measured against the Vega-Lite schema in the pinned install: **77 of 77** constructs — all 41 encoding channels, all 17 marks and all 19 transforms — are accepted rather than refused by name (`docs/upstream-coverage.md`). That is breadth; whether each emits the Vega upstream emits is answered property by property on every fixture.",
       "milestone": "—",
       "limit": {
         "test": "SubsetIsRefusedTest.a mark outside the subset is refused by name",
@@ -163,10 +164,11 @@
       "tests": [
         "ConfigTest",
         "SubsetIsReportedTest",
-        "FixtureDifferentialTest"
+        "FixtureDifferentialTest",
+        "UpstreamConfigCoverageTest"
       ],
-      "tests_text": "`ConfigTest` (upstream vectors), `SubsetIsReportedTest`, `FixtureDifferentialTest` (`config-theme`, `config-marks`)",
-      "notes": "The guide blocks: `axis` with its `axisX`/`axisY`, `axisTop`/`axisBottom`/`axisLeft`/`axisRight` and `axisBand` variants, `legend`, the `guide-label` and `guide-title` styles, and `background`/`padding`/`autosize`. Precedence runs style → axis → dimension → side → band → the guide's own properties, verified by setting one property at every level and seeing which drew. A `style` block names its properties the way a **mark** does, so `fill` becomes `labelColor` on the way through — without that the form every Vega-Lite theme uses would set nothing. Also the mark blocks: `config.mark`, the per-mark-type blocks, and named `config.style` blocks a mark opts into through its own `style` property. `config.mark` sits **below** the engine's built-in per-type defaults and `config.{marktype}` sits above them, because upstream's default configuration is itself written into those per-type blocks — so `config.mark.fill` never recolours a rect and `config.rect.fill` does. `config.range`, `config.group` and `config.projection` are **honoured** — a named range reaches an ordinary scale, a group block paints the frame, and a projection block supplies the defaults a declared projection leaves out. This row listed all three as reported by name, which stopped being true with nothing checking. What is still reported by name is a block this engine does not implement at all",
+      "tests_text": "`ConfigTest` (upstream vectors), `SubsetIsReportedTest`, `FixtureDifferentialTest` (`config-theme`, `config-marks`), `UpstreamConfigCoverageTest`",
+      "notes": "The guide blocks: `axis` with its `axisX`/`axisY`, `axisTop`/`axisBottom`/`axisLeft`/`axisRight` and `axisBand` variants, `legend`, the `guide-label` and `guide-title` styles, and `background`/`padding`/`autosize`. Precedence runs style → axis → dimension → side → band → the guide's own properties, verified by setting one property at every level and seeing which drew. A `style` block names its properties the way a **mark** does, so `fill` becomes `labelColor` on the way through — without that the form every Vega-Lite theme uses would set nothing. Also the mark blocks: `config.mark`, the per-mark-type blocks, and named `config.style` blocks a mark opts into through its own `style` property. `config.mark` sits **below** the engine's built-in per-type defaults and `config.{marktype}` sits above them, because upstream's default configuration is itself written into those per-type blocks — so `config.mark.fill` never recolours a rect and `config.rect.fill` does. `config.range`, `config.group` and `config.projection` are **honoured** — a named range reaches an ordinary scale, a group block paints the frame, and a projection block supplies the defaults a declared projection leaves out. This row listed all three as reported by name, which stopped being true with nothing checking. What is still reported by name is a block this engine does not implement at all Measured against upstream's own default configuration: **25 of 25** top-level blocks are read rather than reported as unimplemented (`docs/upstream-coverage.md`). That is the block name; whether every property inside one is honoured is what the precedence vectors above check.",
       "milestone": "6",
       "limit": {
         "test": "SubsetIsReportedTest.a config block outside the subset is reported by name",
@@ -619,10 +621,11 @@
       "feature": "Transforms",
       "status": "**Partial**",
       "tests": [
-        "VegaLiteFixtureTest"
+        "VegaLiteFixtureTest",
+        "UpstreamVegaLiteCoverageTest"
       ],
-      "tests_text": "`VegaLiteFixtureTest` (`transforms`, `reshape`, `impute-area`, `bin-and-stack-transforms`)",
-      "notes": "`calculate`, `filter`, `aggregate` — whose `groupby` is a **set**, a column named twice being grouped by once, unlike a `joinaggregate`, which Vega takes as written — `bin` and `stack`, which are the same nodes their channel-written counterparts produce with everything stated rather than derived (`makeFromTransform`, where only the `as` has a rule of its own: one name becomes the pair of edges), `joinaggregate`, `window`, `fold` and `flatten` — both of which always write their output names, filling in `key`/`value` and each field's own, since those names are what everything downstream groups and scales by — `pivot`, `sample`, `extent`, `quantile`, `density`, `regression` and `loess`, and `impute` — as a transform of its own, naming its field, key and grouping, or on a position channel, either way taking a `keyvals` written as a **sequence**, and either way three transforms rather than one where the method is not `value`: Vega's `impute` fills a gap with a *constant* and nothing else, so the gap is filled with null, a `window` averages over the frame (which belongs to the window), and a formula writes the result back over the nulls, which becomes a `sequence(...)` signal — the *other* position is its key and a path mark's series fields are its grouping, so one series' gaps are filled from its own rows; a method other than `value` becomes a `window` beside it written back over the nulls,. A `filter` takes an expression or a **predicate object** — `equal`, `lt`/`lte`/`gt`/`gte`, `range`, `oneOf`, `valid`, over `and`/`or`/`not` — compiled to the expression upstream chose rather than an equivalent of it — including the two rules a **date** brings with it: a month or quarter written as a *number* is one-based to the reader and zero-based to `datetime()`, where one written as a *name* has already been resolved and must not be shifted again; and a **binned** time unit needs no bucketing on the way into the comparison, the column already holding the bucket — and a predicate also settles the *type* of the column it compares, which a CSV would not otherwise know. `lookup` joins a second table: its data stands *beside* the view's source rather than below it — a join reads a second table, it does not derive from the first — and is named in the same sequence. Both grammars say `fields` and mean different things, which is the one thing to get right: Vega's `fields` are the rows' own columns to match on and its `values` are what to bring across, where Vega-Lite's `lookup` is the first and `from.fields` the second. A lookup naming a **parameter** rather than a dataset joins against the rows that selection has picked: the selection is materialised as a table of its own — a filter on it hung off the view's main output, `materializeSelections` — and with no `from.fields` the whole matched row is nested under a name, which for a parameter lookup falls back to the parameter's own. Only the selections a lookup actually names are materialised, an output nobody reads still costing a dataset name; and the join's `from` is corrected after the flow has been walked and named, since the dataset that output node turns out to be is not known before then",
+      "tests_text": "`VegaLiteFixtureTest` (`transforms`, `reshape`, `impute-area`, `bin-and-stack-transforms`), `UpstreamVegaLiteCoverageTest`",
+      "notes": "`calculate`, `filter`, `aggregate` — whose `groupby` is a **set**, a column named twice being grouped by once, unlike a `joinaggregate`, which Vega takes as written — `bin` and `stack`, which are the same nodes their channel-written counterparts produce with everything stated rather than derived (`makeFromTransform`, where only the `as` has a rule of its own: one name becomes the pair of edges), `joinaggregate`, `window`, `fold` and `flatten` — both of which always write their output names, filling in `key`/`value` and each field's own, since those names are what everything downstream groups and scales by — `pivot`, `sample`, `extent`, `quantile`, `density`, `regression` and `loess`, and `impute` — as a transform of its own, naming its field, key and grouping, or on a position channel, either way taking a `keyvals` written as a **sequence**, and either way three transforms rather than one where the method is not `value`: Vega's `impute` fills a gap with a *constant* and nothing else, so the gap is filled with null, a `window` averages over the frame (which belongs to the window), and a formula writes the result back over the nulls, which becomes a `sequence(...)` signal — the *other* position is its key and a path mark's series fields are its grouping, so one series' gaps are filled from its own rows; a method other than `value` becomes a `window` beside it written back over the nulls,. A `filter` takes an expression or a **predicate object** — `equal`, `lt`/`lte`/`gt`/`gte`, `range`, `oneOf`, `valid`, over `and`/`or`/`not` — compiled to the expression upstream chose rather than an equivalent of it — including the two rules a **date** brings with it: a month or quarter written as a *number* is one-based to the reader and zero-based to `datetime()`, where one written as a *name* has already been resolved and must not be shifted again; and a **binned** time unit needs no bucketing on the way into the comparison, the column already holding the bucket — and a predicate also settles the *type* of the column it compares, which a CSV would not otherwise know. `lookup` joins a second table: its data stands *beside* the view's source rather than below it — a join reads a second table, it does not derive from the first — and is named in the same sequence. Both grammars say `fields` and mean different things, which is the one thing to get right: Vega's `fields` are the rows' own columns to match on and its `values` are what to bring across, where Vega-Lite's `lookup` is the first and `from.fields` the second. A lookup naming a **parameter** rather than a dataset joins against the rows that selection has picked: the selection is materialised as a table of its own — a filter on it hung off the view's main output, `materializeSelections` — and with no `from.fields` the whole matched row is nested under a name, which for a parameter lookup falls back to the parameter's own. Only the selections a lookup actually names are materialised, an output nobody reads still costing a dataset name; and the join's `from` is corrected after the flow has been walked and named, since the dataset that output node turns out to be is not known before then Measured against the Vega-Lite schema in the pinned install: **77 of 77** constructs — all 41 encoding channels, all 17 marks and all 19 transforms — are accepted rather than refused by name (`docs/upstream-coverage.md`). That is breadth; whether each emits the Vega upstream emits is answered property by property on every fixture.",
       "milestone": "—",
       "limit": {
         "test": "SubsetIsRefusedTest.a transform outside the subset is refused by name",
@@ -2473,7 +2476,9 @@
       "milestone": "4",
       "limit": {
         "test": "RecompileNotPulseTest.a changed signal rebuilds every node rather than patching",
-        "claim": "There is no incremental dataflow: a changed signal recompiles the whole specification and every scene node is rebuilt. Measured rather than assumed — the heaviest of 55 fixtures recompiles in 366 microseconds against a 16,600 microsecond frame — and a loose ceiling guards the decision against a hundredfold regression."
+        "claim": "There is no incremental dataflow: a changed signal recompiles the whole specification and every scene node is rebuilt. Measured rather than assumed — the heaviest of 55 fixtures recompiles in 366 microseconds against a 16,600 microsecond frame — and a loose ceiling guards the decision against a hundredfold regression.",
+        "permanent": true,
+        "because": "Measured: a full recompile of the heaviest fixture costs 366 microseconds against a 16,600 microsecond frame, so an incremental engine buys nothing an interaction can feel."
       }
     },
     {
@@ -2554,7 +2559,9 @@
       "milestone": "6",
       "limit": {
         "test": "DateToStringLimitTest.the optional parenthesised zone name is omitted",
-        "claim": "ECMA-262 21.4.4.41 permits an implementation to append a parenthesised zone name after the offset and V8 appends one; producing it needs CLDR data not available on every Kotlin/Native target, so it is omitted."
+        "claim": "ECMA-262 21.4.4.41 permits an implementation to append a parenthesised zone name after the offset and V8 appends one; producing it needs CLDR data not available on every Kotlin/Native target, so it is omitted.",
+        "permanent": true,
+        "because": "The omitted suffix needs CLDR data that is not on every Kotlin/Native target, and ECMA-262 marks it implementation-defined."
       }
     },
     {
@@ -3054,7 +3061,9 @@
       "milestone": "3",
       "limit": {
         "test": "RotatedScaledPathBoundsTest.the bounds are the painted extent and no larger",
-        "claim": "Upstream's bounds code rotates the already-placed points about the origin, reporting a box far from the shape it drew. This engine reports the box it painted, because reproducing the quirk would put every hit target for such a mark in the wrong place."
+        "claim": "Upstream's bounds code rotates the already-placed points about the origin, reporting a box far from the shape it drew. This engine reports the box it painted, because reproducing the quirk would put every hit target for such a mark in the wrong place.",
+        "permanent": true,
+        "because": "Reproducing upstream's reading would put every hit target for such a mark in the wrong place."
       }
     },
     {
@@ -3180,7 +3189,9 @@
       "milestone": "6",
       "limit": {
         "test": "StrokeWidthWithoutStrokeTest.a width with no colour leaves the node with no stroke",
-        "claim": "A scene node holds what a renderer needs, and a stroke with no colour paints nothing, so there is no stroke to hold a width on. The comparison accepts that one equivalence and nothing wider."
+        "claim": "A scene node holds what a renderer needs, and a stroke with no colour paints nothing, so there is no stroke to hold a width on. The comparison accepts that one equivalence and nothing wider.",
+        "permanent": true,
+        "because": "A scene node holds what a renderer needs, and a colourless stroke paints nothing."
       }
     },
     {
@@ -3669,7 +3680,7 @@
         "UpstreamTimeVectorsTest"
       ],
       "tests_text": "`UpstreamTimeVectorsTest`, `oracle-js/src/record-upstream-tests.mjs`",
-      "notes": "Upstream has ~3,700 assertions over ~30 packages. They are **recorded, not transcribed**: their test files are run against the installed 6.3.1 with the package's exports wrapped, and every call — arguments and upstream's actual answer — becomes a vector in `test-fixtures/upstream-vectors/`. The vectors are **not committed**: `scripts/record-upstream-vectors.sh` rebuilds them byte-identically from the pinned version, so the repository carries the recipe rather than 5 MB of derived data, and the replays skip *loudly* when they are absent. Their assertions are never read, which matters twice: several are deliberately loose (`t.ok(x > 0)`) where a port needs the exact value, and on a version upgrade the diff is *data* rather than a hand-edit across Kotlin files. Imports are rewritten by AST (`acorn`) — the regex version missed `import * as vega`, the form 55 files use. **15,220 vectors** recorded so far — the jump came from wrapping a **returned function**: d3's interpolators, its scales and a regression's `predict` are built and then called, so recording only the construction recorded `{$: 'function'}` and nothing else. Each call on the returned function is now a vector carrying the arguments it was built with. The largest are `d3-array` (1,538) and `d3-time` (1,047) — most of the *arithmetic* this engine ports is d3's, and d3 tests it far more thoroughly than a chart-level fixture can — then `vega-transforms` (548), `vega-time` (460), `d3-interpolate` (253), `d3-color` (216), `vega-scenegraph` (190) and `vega-expression` (149). d3 needed five accommodations, all in the same recorder: mocha's globally-injected `it` rather than an imported `tape`, `../src/index.js` rather than `../index.js`, one repository per package tagged from the installed version, each package's **own timezone** (d3-time's suite runs in `America/Los_Angeles`, recorded into the vector file so a replay knows), and a replaced `Date` **constructor**, since pinning `Date.now` leaves `new Date()` moving. The transform packages needed a second seam: they export operator *classes* driven through a dataflow, so nothing crosses the export boundary with plain arguments, and the recorder hooks `prototype.transform(_, pulse)` instead — parameters, tuples in, tuples out, and the operator's own value. Four things had to be right there: a comparator carries `fields` like an accessor does (and `orders`, which is how they are told apart), a single `facet` tuple can be 52 MB, an operator is **stateful** so only its first call is replayable, and an `expr` recorded as an accessor was a JavaScript function whose arithmetic is gone. The Kotlin side is an adapter per package with a **coverage floor**, so a harness cannot shrink into a pass: 281 of 460 time vectors replay, and the unmapped ones are named in the output. It has found **six** gaps so far, none of them visible to the 178 differential fixtures: an override of `null` in `timeUnitSpecifier` *removes* an entry rather than falling back, which a `Map<String, String>` could not express; `window` ignores peer rows, so `rank`/`dense_rank`/`percent_rank` are computed as if every row were unique; `timeunit` with `inferUnits` picks day where upstream picks month; `impute` does not set `_impute` on a row it invented, and misses one combination; `aggregate` ignores `cross`; and `bin` ignores `interval: false`. The last five are pinned **exactly** in `known-divergences.json` — a new divergence fails the build, and so does fixing one without deleting its entry",
+      "notes": "Upstream has ~3,700 assertions over ~30 packages. They are **recorded, not transcribed**: their test files are run against the installed 6.3.1 with the package's exports wrapped, and every call — arguments and upstream's actual answer — becomes a vector in `test-fixtures/upstream-vectors/`. The vectors are **not committed**: `scripts/record-upstream-vectors.sh` rebuilds them byte-identically from the pinned version, so the repository carries the recipe rather than 5 MB of derived data, and the replays skip *loudly* when they are absent. Their assertions are never read, which matters twice: several are deliberately loose (`t.ok(x > 0)`) where a port needs the exact value, and on a version upgrade the diff is *data* rather than a hand-edit across Kotlin files. Imports are rewritten by AST (`acorn`) — the regex version missed `import * as vega`, the form 55 files use. **15,220 vectors** recorded so far — the jump came from wrapping a **returned function**: d3's interpolators, its scales and a regression's `predict` are built and then called, so recording only the construction recorded `{$: 'function'}` and nothing else. Each call on the returned function is now a vector carrying the arguments it was built with. The largest are `d3-array` (1,538) and `d3-time` (1,047) — most of the *arithmetic* this engine ports is d3's, and d3 tests it far more thoroughly than a chart-level fixture can — then `vega-transforms` (548), `vega-time` (460), `d3-interpolate` (253), `d3-color` (216), `vega-scenegraph` (190) and `vega-expression` (149). d3 needed five accommodations, all in the same recorder: mocha's globally-injected `it` rather than an imported `tape`, `../src/index.js` rather than `../index.js`, one repository per package tagged from the installed version, each package's **own timezone** (d3-time's suite runs in `America/Los_Angeles`, recorded into the vector file so a replay knows), and a replaced `Date` **constructor**, since pinning `Date.now` leaves `new Date()` moving. The transform packages needed a second seam: they export operator *classes* driven through a dataflow, so nothing crosses the export boundary with plain arguments, and the recorder hooks `prototype.transform(_, pulse)` instead — parameters, tuples in, tuples out, and the operator's own value. Four things had to be right there: a comparator carries `fields` like an accessor does (and `orders`, which is how they are told apart), a single `facet` tuple can be 52 MB, an operator is **stateful** so only its first call is replayable, and an `expr` recorded as an accessor was a JavaScript function whose arithmetic is gone. The Kotlin side is an adapter per package with a **coverage floor**, so a harness cannot shrink into a pass: 281 of 460 time vectors replay, and the unmapped ones are named in the output. It has found **six** gaps so far, none of them visible to the 178 differential fixtures: an override of `null` in `timeUnitSpecifier` *removes* an entry rather than falling back, which a `Map<String, String>` could not express; `window` ignores peer rows, so `rank`/`dense_rank`/`percent_rank` are computed as if every row were unique; `timeunit` with `inferUnits` picks day where upstream picks month; `impute` does not set `_impute` on a row it invented, and misses one combination; `aggregate` ignores `cross`; and `bin` ignores `interval: false`. Every one of those six was **fixed**, and the entries that pinned them deleted, which is what `known-divergences.json` is for: it holds **4 accepted differences from upstream** now, pinned exactly, so a new divergence fails the build and so does making one agree without deleting its entry. This row said five were still pinned long after they were fixed, which is why the count is now derived from the file",
       "milestone": "6",
       "limit": {
         "test": "UpstreamTransformVectorsTest.upstream's own transform vectors replay against these transforms",
@@ -3685,7 +3696,7 @@
         "UpstreamD3ColorVectorsTest"
       ],
       "tests_text": "`UpstreamD3ColorVectorsTest`",
-      "notes": "34 of d3's `color()` vectors replay against `SceneColor.parse`, and **nineteen expect null** — rejecting a malformed colour is half the corpus and the half a hand-written test skips. Two findings, neither a parser bug: channels are 0..1 here and 0..255 in d3, so the comparison scales; and this parser accepts a **superset** — d3's regular expressions require integers and reject `rgb(120.5,30,50)`, `rgb(120.,…)` and an alpha of `1.`, all of which a browser accepts. That is right for rendering, where a `fill` goes to a renderer rather than to d3, and wrong for `luminance()`/`contrast()`, which are d3-color calls upstream and answer NaN for them. Thirteen signatures pinned in `known-divergences.json`. `hsl`, `hcl`, `lab`, `lch`, `cubehelix` and `gray` are colour spaces this engine does not model as objects",
+      "notes": "34 of d3's `color()` vectors replay against `SceneColor.parse`, and **nineteen expect null** — rejecting a malformed colour is half the corpus and the half a hand-written test skips. Two findings, neither a parser bug: channels are 0..1 here and 0..255 in d3, so the comparison scales; and this parser accepts a **superset** — d3's regular expressions require integers and reject `rgb(120.5,30,50)`, `rgb(120.,…)` and an alpha of `1.`, all of which a browser accepts. That is right for rendering, where a `fill` goes to a renderer rather than to d3, and wrong for `luminance()`/`contrast()`, which are d3-color calls upstream and answer NaN for them. The signatures that survived review are pinned in `known-divergences.json`; the rest were fixed and their entries deleted. This row quoted thirteen long after that. `hsl`, `hcl`, `lab`, `lch`, `cubehelix` and `gray` are colour spaces this engine does not model as objects",
       "milestone": "6"
     },
     {
@@ -3991,7 +4002,9 @@
       "milestone": "—",
       "limit": {
         "test": "ForbiddenFunctionsTest.naming a host object reaches nothing",
-        "claim": "No general evaluator is reachable: a call to `eval` and its family is refused by a closed function registry, and a bare name like `globalThis` resolves to nothing rather than to a host object. A specification is data somebody else wrote, so this is a security boundary rather than a missing feature."
+        "claim": "No general evaluator is reachable: a call to `eval` and its family is refused by a closed function registry, and a bare name like `globalThis` resolves to nothing rather than to a host object. A specification is data somebody else wrote, so this is a security boundary rather than a missing feature.",
+        "permanent": true,
+        "because": "A security boundary. A specification is data somebody else wrote, so a reachable evaluator would be arbitrary code execution in the host process."
       }
     },
     {
@@ -5121,7 +5134,9 @@
       "milestone": "5",
       "limit": {
         "test": "AxisLabelBoundInertTest.labelBound culls nothing, whatever it is set to",
-        "claim": "Upstream culls nothing: it applies the test inside `Overlap`, which runs before the label bounds exist, so every item holds a cleared `Bounds` that any rectangle encloses. Implementing the documented behaviour would make this engine differ from upstream on every chart that sets it."
+        "claim": "Upstream culls nothing: it applies the test inside `Overlap`, which runs before the label bounds exist, so every item holds a cleared `Bounds` that any rectangle encloses. Implementing the documented behaviour would make this engine differ from upstream on every chart that sets it.",
+        "permanent": true,
+        "because": "Upstream culls nothing, so implementing the documented behaviour would make this engine differ from it on every chart that sets the property."
       }
     },
     {
@@ -6002,7 +6017,9 @@
       "milestone": "—",
       "limit": {
         "test": "CurvedExtentLimitTest.a partial arc measures fractionally wider than the true circle",
-        "claim": "An arc's bounds come from the cubics that were painted rather than from its centre and radii, so a partial arc measures a millionth of the radius wide. A whole circle is exact, because eighth-turn segments put an endpoint on each axis."
+        "claim": "An arc's bounds come from the cubics that were painted rather than from its centre and radii, so a partial arc measures a millionth of the radius wide. A whole circle is exact, because eighth-turn segments put an endpoint on each axis.",
+        "permanent": true,
+        "because": "The scene graph has only cubics, which every backend it draws on takes; an analytic arc would mean a second geometry no renderer could use."
       }
     },
     {
@@ -6153,7 +6170,9 @@
       "milestone": "—",
       "limit": {
         "test": "TextBaselineFromMetricsTest.the fallback stays within a unit of upstream's approximation",
-        "claim": "The baseline is not upstream's number: the fallback engine differs from `round(0.79 x fontSize)` at some sizes, and a platform engine reads real font metrics. The difference is under a unit at the sizes a chart uses."
+        "claim": "The baseline is not upstream's number: the fallback engine differs from `round(0.79 x fontSize)` at some sizes, and a platform engine reads real font metrics. The difference is under a unit at the sizes a chart uses.",
+        "permanent": true,
+        "because": "Real font metrics are the better answer for something a person reads (ADR 0006)."
       }
     },
     {
@@ -6266,12 +6285,16 @@
       "section": "Rendering details",
       "feature": "Blend modes",
       "status": "Partial",
-      "tests": [],
-      "tests_text": "`encode-channels` fixture, SVG output",
-      "notes": "All sixteen CSS `mix-blend-mode` values are carried and all sixteen reach exported SVG. On an Android canvas the eleven above `lighten` need API 29's `BlendMode`; below that `PorterDuff` has only five, and anything outside them reports `VEGA_RENDER_UNSUPPORTED_BLEND_MODE` rather than being swapped for whichever mode looks closest",
+      "tests": [
+        "SvgRendererTest",
+        "AndroidBlendModeTableTest"
+      ],
+      "tests_text": "`SvgRendererTest`, `AndroidBlendModeTableTest` (on a device), `encode-channels` fixture",
+      "notes": "All sixteen CSS `mix-blend-mode` values are carried and all sixteen reach exported SVG. On an Android canvas, four have a true `PorterDuff` equivalent — screen, overlay, darken, lighten — and `normal` needs none, so below API 29 the remaining **eleven** report `VEGA_RENDER_UNSUPPORTED_BLEND_MODE` rather than being swapped for whichever mode looks closest. **`multiply` is among them on purpose**, which this row used to misdescribe as \"the eleven above `lighten`\": Android's `PorterDuff.MULTIPLY` is documented as modulate, and the two agree only where the destination is opaque — over the transparent background a chart has by default, modulate makes the mark vanish. So the most-used blend mode is refused rather than drawn wrong.",
       "milestone": "1",
       "limit": {
-        "scope": "The limitation is a branch on `Build.VERSION.SDK_INT` below 29, and this repository's test matrix cannot reach it: the emulator runs API 37 and there is no Robolectric to fake a lower one. `minSdk` is 26, so the devices it applies to are real. The supported half — all sixteen modes reaching exported SVG — is covered by `SvgRendererTest`."
+        "test": "AndroidBlendModeTableTest.elevenModesAreRefusedRatherThanApproximated",
+        "claim": "Below API 29 only four of the sixteen CSS blend modes have a `PorterDuff` equivalent; the other eleven, `multiply` included, are reported rather than approximated."
       }
     },
     {
@@ -6403,7 +6426,9 @@
       "milestone": "—",
       "limit": {
         "test": "DocumentedRenderingLimitsTest.a label containing markup is drawn as characters",
-        "claim": "Markup in a label is drawn literally rather than interpreted; there is no HTML or CSS layer."
+        "claim": "Markup in a label is drawn literally rather than interpreted; there is no HTML or CSS layer.",
+        "permanent": true,
+        "because": "A label comes from data, and interpreting data as markup is how an injection works."
       }
     },
     {
@@ -6681,7 +6706,9 @@
       "notes": "—",
       "milestone": "—",
       "limit": {
-        "scope": "A statement of what the project does not build, not of how any code behaves. There is no WebView, no JavaScript runtime, no NDK renderer and no GPU backend to assert anything about; the nearest testable neighbour is that no evaluator is reachable from an expression, which `ForbiddenFunctionsTest` already holds."
+        "scope": "A statement of what the project does not build, not of how any code behaves. There is no WebView, no JavaScript runtime, no NDK renderer and no GPU backend to assert anything about; the nearest testable neighbour is that no evaluator is reachable from an expression, which `ForbiddenFunctionsTest` already holds.",
+        "permanent": true,
+        "because": "A statement of what the project does not build (ADR 0011 non-goals)."
       }
     }
   ]
