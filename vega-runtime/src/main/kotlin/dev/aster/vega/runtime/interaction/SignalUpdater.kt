@@ -31,6 +31,15 @@ public class SignalUpdater(
 
   private val values = LinkedHashMap<String, VegaValue>()
 
+  /**
+   * The same, for signals declared inside a group mark, by that group's path.
+   *
+   * Separate maps rather than one keyed by a qualified name, because the namespaces are genuinely
+   * separate: a group may declare a `brush` while the chart declares another, and upstream gives
+   * each its own value. Flattening them is how a group's brush would come to move the chart's.
+   */
+  private val scopedValues = LinkedHashMap<String, LinkedHashMap<String, VegaValue>>()
+
   private val encodes = LinkedHashMap<SceneNodeId, ItemEncode>()
 
   /**
@@ -56,6 +65,11 @@ public class SignalUpdater(
   public val overrides: Map<String, VegaValue>
     get() = values
 
+  /** The same for signals inside a group mark, by path — see [overrides]. */
+  @InternalAsterVegaApi
+  public val scopedOverrides: Map<String, Map<String, VegaValue>>
+    get() = scopedValues
+
   /**
    * Pins a signal to a value, as a **control** does rather than as a handler does.
    *
@@ -69,6 +83,7 @@ public class SignalUpdater(
 
   public fun reset() {
     values.clear()
+    scopedValues.clear()
     encodes.clear()
   }
 
@@ -77,7 +92,18 @@ public class SignalUpdater(
    * @return the signals whose value actually changed, so the caller can skip a recompile when
    *   nothing did. A handler marked `force` reports its signal as changed either way.
    */
-  public fun apply(fired: List<FiredHandler>, scope: ExpressionScope): Set<String> {
+  public fun apply(
+    fired: List<FiredHandler>,
+    scope: ExpressionScope,
+    /**
+     * The scope inside each group mark, for a handler declared in one.
+     *
+     * A handler in a group is evaluated against its group's signals *and scales* —
+     * `invert('xOverview', brush)` is both at once — so handing it the chart's scope would read its
+     * own signals as null and its own scale as missing.
+     */
+    scopes: Map<String, ExpressionScope> = emptyMap(),
+  ): Set<String> {
     val changed = LinkedHashSet<String>()
     for (entry in fired) {
       val handler = entry.handler
@@ -85,13 +111,21 @@ public class SignalUpdater(
       // `encode(item(), '<set>')`, which is upstream's own desugaring, so it arrives as an ordinary
       // update expression whose side effect is recorded by [HandlerScope.encodeItem].
       val update = handler.update ?: continue
-      val next = evaluate(update, entry, scope) ?: continue
-      val previous = values[entry.signalName] ?: scope.signal(entry.signalName)
+      val here = if (entry.scopePath.isEmpty()) null else scopes[entry.scopePath]
+      val within = here ?: scope
+      val store =
+        if (entry.scopePath.isEmpty()) values
+        else scopedValues.getOrPut(entry.scopePath) { LinkedHashMap() }
+      val next = evaluate(update, entry, within, store) ?: continue
+      val previous = store[entry.signalName] ?: within.signal(entry.signalName)
       // `force` re-runs everything downstream even when the value is unchanged — needed when the
       // value is an object mutated in place, where equality would say nothing had happened.
       if (handler.force || next != previous) {
-        values[entry.signalName] = next
-        changed += entry.signalName
+        store[entry.signalName] = next
+        // Qualified, so a group's `brush` and the chart's are not reported as one signal changing.
+        changed +=
+          if (entry.scopePath.isEmpty()) entry.signalName
+          else "${entry.scopePath}/${entry.signalName}"
       }
     }
     return changed
@@ -101,10 +135,12 @@ public class SignalUpdater(
     update: SignalUpdate,
     entry: FiredHandler,
     scope: ExpressionScope,
+    /** The store this handler's scope reads first — its group's, or the chart's. */
+    store: Map<String, VegaValue>,
   ): VegaValue? =
     when (update) {
       is SignalUpdate.Constant -> update.value
-      is SignalUpdate.Reference -> values[update.name] ?: scope.signal(update.name)
+      is SignalUpdate.Reference -> store[update.name] ?: scope.signal(update.name)
       is SignalUpdate.Expression -> {
         when (val compiled = expressions.compile(update.expr)) {
           is ExpressionResult.Failed -> {
@@ -113,7 +149,10 @@ public class SignalUpdater(
           }
           is ExpressionResult.Compiled ->
             try {
-              compiled.expression.evaluate(HandlerScope(scope, values, entry))
+              // `store`, not `values`: what an earlier handler in this batch set is only visible
+              // to a handler in the *same* scope. `brush` set by the press must be readable by the
+              // drag that clamps against it, and must not be readable as the chart's `brush`.
+              compiled.expression.evaluate(HandlerScope(scope, store, entry))
             } catch (failure: ExpressionEvaluationException) {
               diagnostics.add(failure.diagnostic.copy(operator = entry.signalName))
               null

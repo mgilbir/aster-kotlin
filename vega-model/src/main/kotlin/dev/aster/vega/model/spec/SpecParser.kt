@@ -1281,30 +1281,6 @@ public class SpecParser {
         ->
         parseSignalHandler(entry, "$path.on[$index]", name, subscope)
       }
-    if (subscope && on.isNotEmpty()) {
-      // **A handler inside a group mark never fires**, and until this said so it did it in silence.
-      //
-      // `VegaChartController.publish` builds its event bindings from the *top-level* signals, so a
-      // signal declared inside a group carries its `on` handlers into a compile that nothing ever
-      // dispatches to. The two halves of Vega's own overview-plus-detail example are exactly this:
-      // its `brush` and the four signals around it live inside the `overview` group, so brushing
-      // the overview changes nothing at all, and no diagnostic said why.
-      //
-      // Reported here rather than left to the runtime because this is the parse that *represents*
-      // them faithfully — the specification is fine, and it is this engine that cannot act on it,
-      // which is the sentence a reader needs (ADR 0011). The value a group signal would need is
-      // the harder half: signal overrides are keyed by name in one flat map, so a group's own
-      // value has nowhere to live across the whole-specification recompile that a fired handler
-      // triggers.
-      diagnostics.warn(
-        DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-        "Signal '$name' is declared inside a group mark and carries ${on.size} 'on' handler(s); " +
-          "this engine dispatches events only to the specification's top-level signals, so these " +
-          "never fire. Moving the signal to the top level is the workaround where the group's own " +
-          "scope is not needed",
-        jsonPath = "$path.on",
-      )
-    }
     obj.reportUnhandled("Signal", path, SIGNAL_CONSUMED, SIGNAL_UNSUPPORTED)
     return SignalSpec(
       name = name,

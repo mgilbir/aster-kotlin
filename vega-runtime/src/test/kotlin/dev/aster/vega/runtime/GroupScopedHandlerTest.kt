@@ -12,21 +12,23 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
- * A signal handler declared **inside a group mark** does not fire, and now says so.
+ * The two shapes of group-scoped handler that still do not fire, each reported by name.
  *
- * `VegaChartController.publish` builds its event bindings from the specification's *top-level*
- * signals. A signal declared inside a group carries its `on` handlers into a compile that nothing
- * ever dispatches to, so the handler is unreachable — and until this test it was unreachable in
- * silence, which is the thing ADR 0011 exists to forbid.
+ * This class used to say that **no** handler declared inside a group fires — which was true, and is
+ * the thing `GroupScopedHandlerFiresTest` now closes for a group drawn once whose selector names a
+ * mark. What is left is narrower, and neither case may go quiet: a reader whose brush does nothing
+ * has to be told which of the two it is.
  *
- * Found by settling two audit questions that turned out to be the same fixture. Vega's own
- * `overview-plus-detail` example declares `brush`, `anchor`, `xdown`, `delta` and `detailDomain`
- * inside its `overview` group, so brushing the overview changes nothing. The audit had recorded
- * that as a *scale* problem (C4, `buildTime` ignoring `domainRaw`) and then as a `push: "outer"`
- * question (Q6); both were real, and neither was the reason it does not work.
+ * **A bare `scope` selector.** A handler declared in a group defaults to source `scope` — upstream
+ * attaches the listener to that group's own item — so `{"events": "mousedown"}` inside a group
+ * means "a mousedown anywhere in this group". Where the selector names a mark, the mark name does
+ * the narrowing and the two are the same listener; where it names none, narrowing it needs scene
+ * containment that nothing here answers yet. Refused at registration rather than widened to the
+ * whole view, because widening it would fire a group's handler on every event in the chart — the
+ * loud wrong answer where this is the quiet one (ADR 0011).
  *
- * What this test pins is the **diagnostic**, not the behaviour: the day handlers are dispatched
- * into group scopes, the warning goes and this goes red, which is when the row is rewritten.
+ * **A faceted group.** One scope per cell, so which cell the event landed in is part of the
+ * question, and it is not asked yet.
  */
 class GroupScopedHandlerTest {
 
@@ -53,8 +55,8 @@ class GroupScopedHandlerTest {
     """
       .trimIndent()
 
-  /** The same signal, the same handler, moved inside a group. Nothing else differs. */
-  private val insideAGroup =
+  /** The same signal and handler moved inside a group, with the selector left bare. */
+  private val bareSelectorInAGroup =
     """
     {"width": 100, "height": 100, "padding": 0, "autosize": "none",
      "data": [{"name": "t", "values": [{"v": 1}]}],
@@ -69,6 +71,12 @@ class GroupScopedHandlerTest {
     """
       .trimIndent()
 
+  /** The same again, with the mark named — which is all it takes, and which does fire. */
+  private val namedSelectorInAGroup =
+    bareSelectorInAGroup
+      .replace(""""events": "mousedown"""", """"events": "@box:mousedown"""")
+      .replace(""""type": "rect", "from"""", """"type": "rect", "name": "box", "from"""")
+
   private fun press(controller: VegaChartController) =
     controller.dispatch(
       ChartInputEvent.PointerDown(
@@ -80,8 +88,8 @@ class GroupScopedHandlerTest {
     )
 
   /**
-   * The control: at the top level the handler fires, so the two specifications differ only in where
-   * the signal is declared.
+   * The control: at the top level the handler fires, so the specifications differ only in where the
+   * signal is declared.
    */
   @Test
   fun `a top-level handler fires`() {
@@ -93,43 +101,95 @@ class GroupScopedHandlerTest {
     assertTrue(controller.state.value.diagnostics.isEmpty())
   }
 
+  /**
+   * Naming the mark is the whole difference, and it is what makes the refusal below a real choice
+   * rather than a limitation of group scopes in general.
+   */
   @Test
-  fun `the same handler inside a group does not fire, and says so`() {
+  fun `the same handler fires inside a group once its selector names a mark`() {
     val controller = VegaChartController()
-    controller.setSpec(insideAGroup)
+    controller.setSpec(namedSelectorInAGroup)
+    press(controller)
+    assertEquals(
+      listOf("#ff0000"),
+      fills(controller),
+      "a group-scoped handler naming a mark did not fire",
+    )
+  }
+
+  @Test
+  fun `a bare scope selector does not fire, and says which mark to name`() {
+    val controller = VegaChartController()
+    controller.setSpec(bareSelectorInAGroup)
     press(controller)
     assertEquals(
       listOf("#0000ff"),
       fills(controller),
-      "a group-scoped handler fired — events now reach group scopes, so the diagnostic must go",
+      "a bare scope selector fired, so it was widened to the whole view",
     )
     val reported = controller.state.value.diagnostics.map { it.message }
     assertTrue(
-      reported.any { "inside a group mark" in it && "never fire" in it },
-      "a group-scoped handler was ignored in silence: $reported",
+      reported.any { "@markname:" in it && "'hit'" in it },
+      "a bare scope selector was dropped without saying what to write instead: $reported",
     )
   }
 
   /**
-   * Vega's own `overview-plus-detail` is the case this was found on, and it reports for all five.
+   * A faceted group's handlers do not fire, and the reason names the group.
    *
-   * Its `brush`, `anchor`, `xdown`, `delta` and `detailDomain` live inside the `overview` group, so
-   * every one of them is unreachable — which is why brushing the overview does not move the detail
-   * panel. Named here because a reader who tries that fixture deserves to find this test.
+   * Distinct from the case above and reported differently, because the remedy is different: there
+   * is nothing the author can rewrite here.
    */
   @Test
-  fun `the overview-plus-detail fixture reports every unreachable handler`() {
+  fun `a faceted group's handlers are reported rather than silently unbound`() {
+    val controller = VegaChartController()
+    controller.setSpec(
+      """
+      {"width": 300, "height": 60, "padding": 0, "autosize": "none",
+       "data": [{"name": "t",
+                 "values": [{"c": "a", "v": 1}, {"c": "b", "v": 2}]}],
+       "marks": [{
+         "type": "group", "name": "cell",
+         "from": {"facet": {"name": "rows", "data": "t", "groupby": "c"}},
+         "signals": [{"name": "hit", "value": 0,
+                      "on": [{"events": "@box:mousedown", "update": "1"}]}],
+         "encode": {"enter": {"x": {"value": 0}, "y": {"value": 0},
+                              "width": {"value": 80}, "height": {"value": 50}}},
+         "marks": [{"type": "rect", "name": "box", "from": {"data": "rows"},
+                    "encode": {"enter": {"x": {"value": 0}, "y": {"value": 0},
+                                         "width": {"value": 20}, "height": {"value": 20}}}}]}]}
+      """
+        .trimIndent()
+    )
+    val reported = controller.state.value.diagnostics.map { it.message }
+    assertTrue(
+      reported.any { "once per facet" in it && "cell" in it },
+      "a faceted group's handlers were left unbound in silence: $reported",
+    )
+  }
+
+  /**
+   * Vega's own `overview-plus-detail`, which is the fixture this was all found on.
+   *
+   * Every one of its five overview signals now binds — four to a named mark and one to a signal
+   * source — so nothing about them is reported any more. Kept, and inverted, because a reader who
+   * tries that fixture deserves to find this test either way.
+   */
+  @Test
+  fun `the overview-plus-detail fixture reports no unreachable handler`() {
     val root = File(System.getProperty("user.dir")).parentFile
     val spec = File(root, "test-fixtures/specs/overview-plus-detail.vg.json")
     assertTrue(spec.isFile, "missing ${spec.path}")
     val controller = VegaChartController(loader = FileDataLoader(File(root, "test-fixtures")))
     controller.setSpec(spec.readText())
     val unreachable =
-      controller.state.value.diagnostics.filter { "inside a group mark" in it.message }
+      controller.state.value.diagnostics.filter {
+        "do not fire" in it.message || "not dispatched" in it.message
+      }
     assertEquals(
-      5,
-      unreachable.size,
-      "expected the five overview signals to be reported: " + unreachable.map { it.message },
+      emptyList<String>(),
+      unreachable.map { it.message },
+      "a handler in the overview group is still unreachable",
     )
   }
 }

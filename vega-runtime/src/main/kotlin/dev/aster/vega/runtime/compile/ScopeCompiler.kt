@@ -137,6 +137,15 @@ internal class ScopeCompiler(
    * What **local** time means in this compile; null is the device's own zone. See `SpecCompiler`.
    */
   private val timeZone: TimeZone? = null,
+  /**
+   * Signals a handler has set **inside a group**, by that group's path.
+   *
+   * The counterpart of the top level's `pinned`, and the second half of why a handler declared in a
+   * group never fired: `nest` resolved a group's signals with no pinned values at all, so a value a
+   * handler set had nowhere to live across the recompile the firing triggers. Empty for a
+   * specification nobody has interacted with, which is every first compile.
+   */
+  private val scopedOverrides: Map<String, Map<String, VegaValue>> = emptyMap(),
 ) {
 
   /**
@@ -689,7 +698,8 @@ internal class ScopeCompiler(
         // a `"width"` range inside one is the cell's width. Vega gives every group scope its own
         // size signals; this is that, for the case a specification actually writes — a cell sized
         // `{"signal": "child_width"}`, which no group-level signal declaration would reveal.
-        val nested = nest(spec, partitions[index], outer)
+        val here = cellPath(partitions.size, index)
+        val nested = nest(spec, partitions[index], outer, here)
         val sized =
           if (encodesSize(spec)) {
             CompileScope(
@@ -715,8 +725,7 @@ internal class ScopeCompiler(
         // from them — so the scope the signals were resolved in holds only the enclosing scales.
         // A handler needs both at once: `invert('xOverview', brush)` is a scale lookup and a signal
         // read in one expression, and `xOverview` is the group's own.
-        groupScopes[cellPath(partitions.size, index)] =
-          sized.signals.withScales(sized.scales, diagnostics)
+        groupScopes[here] = sized.signals.withScales(sized.scales, diagnostics)
         // An **empty** facet cell draws nothing at all — not even its gridlines. Vega instantiates
         // a faceted group's subflow only for keys that rows arrived under, so a cell `cross`
         // invented to keep the grid rectangular is a group with no contents, which is visibly
@@ -1294,7 +1303,12 @@ internal class ScopeCompiler(
    * Order matters and mirrors the top level: data first, then signals, then scales, because a scale
    * reads data and a scale property may be a signal.
    */
-  private fun nest(spec: MarkSpec, partition: Partition, outer: CompileScope): CompileScope {
+  private fun nest(
+    spec: MarkSpec,
+    partition: Partition,
+    outer: CompileScope,
+    here: String,
+  ): CompileScope {
     // `parent` is the group's datum, not the group item: upstream's subscope binds the tuple, so
     // `parent.width` is undefined even though `parent.cat` works. Verified against upstream.
     val signalValues = LinkedHashMap(outer.signals.values)
@@ -1334,6 +1348,10 @@ internal class ScopeCompiler(
           spec.signals,
           datasets,
           signalValues,
+          // What a handler in this group has set, which is what makes one able to fire at all: the
+          // whole specification is compiled again on every change, so a value with nowhere to be
+          // pinned is a value that lasts until the next compile and no longer.
+          pinned = scopedOverrides[here].orEmpty(),
           enclosingScales = outer.scales,
           pendingScales = spec.scales.mapTo(mutableSetOf()) { it.name },
         )

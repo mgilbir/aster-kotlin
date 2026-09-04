@@ -88,6 +88,8 @@ REASONS = {
     "intersect": "internal: @InternalAsterVegaApi, the expression evaluator's scope",
     "intersectLasso": "internal: @InternalAsterVegaApi, the expression evaluator's scope",
     "getExpr": "internal: the compiled expression's own AST",
+    "getScopePath": "internal: @InternalAsterVegaApi, which group scope a handler belongs to",
+    "getScopedOverrides": "internal: @InternalAsterVegaApi, group-scoped signal values for the next compile",
     "getBins": "reachable: ForeignScale.bins",
     "extentAt": "reachable: ForeignScale.bucketLow / bucketHigh",
     "legendFraction": "reachable: ForeignScale.legendFraction",

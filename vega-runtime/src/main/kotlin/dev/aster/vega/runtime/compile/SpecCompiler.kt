@@ -287,10 +287,38 @@ public class SpecCompiler(
     itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
   ): CompiledSpec = guarded { compileJsonUnguarded(json, signalOverrides, itemEncodes) }
 
+  /**
+   * The same, also carrying what handlers set **inside a group mark**, by that group's path.
+   *
+   * A separate map rather than qualified keys in `signalOverrides`, because the two namespaces are
+   * genuinely separate: a group may declare a `brush` while the chart declares another, and
+   * upstream gives each its own. The paths are [CompiledSpec.groupScopes]' paths.
+   *
+   * A **differently named** function rather than a fourth parameter on [compileJson], and rather
+   * than an overload of it. A defaulted parameter reads naturally in Kotlin and breaks every Swift
+   * caller, because a default has no Obj-C representation: Kotlin/Native exports the full parameter
+   * list and Swift must name all of it. Adding one here broke the demo app in this repository,
+   * which is the failure `scripts/foreign-api.sh` was written after.
+   *
+   * An overload does not help either, and that is the part worth writing down: Kotlin/Native
+   * exported only the four-parameter one, so the three-parameter signature disappeared from the
+   * boundary and every Swift caller broke anyway. Two Kotlin overloads are one Obj-C selector.
+   */
+  @InternalAsterVegaApi
+  public fun compileJsonInScopes(
+    json: String,
+    signalOverrides: Map<String, VegaValue>,
+    itemEncodes: Map<SceneNodeId, ItemEncode>,
+    scopedOverrides: Map<String, Map<String, VegaValue>>,
+  ): CompiledSpec = guarded {
+    compileJsonUnguarded(json, signalOverrides, itemEncodes, scopedOverrides)
+  }
+
   private fun compileJsonUnguarded(
     json: String,
     signalOverrides: Map<String, VegaValue> = emptyMap(),
     itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
+    scopedOverrides: Map<String, Map<String, VegaValue>> = emptyMap(),
   ): CompiledSpec {
     val parser = SpecParser()
     val parsed =
@@ -314,7 +342,7 @@ public class SpecCompiler(
     val spec =
       parsed.spec
         ?: return CompiledSpec(null, emptyMap(), EMPTY_SIGNALS, diagnostics = parsed.diagnostics)
-    val compiled = compile(spec, signalOverrides, itemEncodes)
+    val compiled = compileUnguarded(spec, signalOverrides, itemEncodes, scopedOverrides)
     // Parse diagnostics come first so a reader sees problems in specification order.
     return compiled.copy(diagnostics = parsed.diagnostics + compiled.diagnostics)
   }
@@ -375,6 +403,7 @@ public class SpecCompiler(
     spec: VegaSpec,
     signalOverrides: Map<String, VegaValue> = emptyMap(),
     itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
+    scopedOverrides: Map<String, Map<String, VegaValue>> = emptyMap(),
   ): CompiledSpec {
     // `fit` shrinks the plotting area so the *whole drawing* comes out the declared size, which
     // cannot be known until the drawing has been measured. Upstream measures, sets the `width` and
@@ -385,11 +414,28 @@ public class SpecCompiler(
     // ones against the size that is actually drawn.
     val fit =
       if (spec.autosize.type.isFit) {
-        measure(compileOnce(spec, signalOverrides, DiagnosticCollector(), null, itemEncodes))
+        measure(
+          compileOnce(
+            spec,
+            signalOverrides,
+            DiagnosticCollector(),
+            null,
+            itemEncodes,
+            scopedOverrides,
+          )
+        )
       } else {
         null
       }
-    return compileOnce(spec, signalOverrides, DiagnosticCollector(), fit, itemEncodes).compiled
+    return compileOnce(
+        spec,
+        signalOverrides,
+        DiagnosticCollector(),
+        fit,
+        itemEncodes,
+        scopedOverrides,
+      )
+      .compiled
   }
 
   /** One compile, with what a later pass needs to measure it. */
@@ -426,6 +472,7 @@ public class SpecCompiler(
     /** What the first pass measured, or null when this *is* the first pass. */
     fit: Overflow?,
     itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
+    scopedOverrides: Map<String, Map<String, VegaValue>> = emptyMap(),
   ): Pass {
     val ids = SceneNodeIdAllocator()
 
@@ -735,6 +782,7 @@ public class SpecCompiler(
         itemEncodes,
         locale,
         timeZone,
+        scopedOverrides,
       )
     val scope =
       scopeCompiler.compile(

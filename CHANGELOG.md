@@ -8,6 +8,35 @@ section here does not get released.
 
 ### Added
 
+- **A signal handler declared inside a group mark fires.** It never did, and Vega's own
+  `overview-plus-detail` is exactly that shape — `brush`, `anchor`, `xdown` and `delta` all live
+  inside its `overview` group — so brushing the overview changed nothing at all.
+
+  Three things stopped it, and the third was the surprise. `publish` built its bindings from the
+  top level only, so no binding existed. `ScopeCompiler.nest` resolved a group's signals with no
+  pinned values, so a value a handler set had nowhere to live across the recompile that firing
+  triggers — every change recompiles the whole specification here, so an unpinned value lasts until
+  the next compile and no longer. And a handler declared in a group has source `scope` rather than
+  `view`, because upstream attaches the listener to that group's own item; nothing mapped that, so
+  the stream could never match an arriving event.
+
+  Signals and their overrides are kept in **separate stores per scope** rather than one map keyed by
+  a qualified name, because the namespaces are genuinely separate: a group may declare a `brush`
+  while the chart declares another, and upstream gives each its own. Flattening them is how a
+  group's brush would come to move the chart's. The update expression is evaluated in the group's
+  own scope, signals and scales together, since `invert('xOverview', brush)` is both at once.
+
+  Two shapes still do not fire, each now reported by name rather than left quiet. A **bare** `scope`
+  selector — `{"events": "mousedown"}` inside a group — means "anywhere in this group", and
+  narrowing it needs scene containment nothing here answers yet; it is refused with the selector to
+  write instead, rather than widened to the whole view, which would fire a group's handler on every
+  event in the chart. And a **faceted** group has one scope per cell, so which cell the event landed
+  in is part of the question; that is reported against the group by name, since there is nothing the
+  author can rewrite.
+
+  The blanket parse-time warning that said group handlers never fire is gone, replaced by these two,
+  which say what actually does not work.
+
 - **What a group mark's scope resolved to is kept, under `CompiledSpec.groupScopes`.** A group's
   signals and scales have always been resolved — `ScopeCompiler.nest` does it, and the cell is drawn
   from them — and were then dropped, because nothing above could name them. That is the first half
