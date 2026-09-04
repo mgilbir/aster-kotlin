@@ -124,6 +124,15 @@ public data class CompiledSpec(
    * domain, a range and a bandwidth against upstream's.
    */
   @InternalAsterVegaApi val groupScales: Map<String, Map<String, VegaScale>> = emptyMap(),
+  /**
+   * The scene node each group cell was drawn as, by the same path as [groupScopes].
+   *
+   * What a `scope`-sourced signal handler needs: it fires for an event **inside** its own group,
+   * and "inside" is upstream's `inScope(event.item)` — the hit item's ancestors, walked upwards
+   * until one of these nodes is found. By node id rather than by mark name, because the scene holds
+   * group nodes for axes and legends too and pairing those to scopes by shape is guesswork.
+   */
+  @InternalAsterVegaApi val groupNodes: Map<String, SceneNodeId> = emptyMap(),
 ) {
   public val isUsable: Boolean
     get() = scene != null
@@ -840,6 +849,7 @@ public class SpecCompiler(
         signals = signals,
         groupScopes = scopeCompiler.groupScopes.toMap(),
         groupScales = scopeCompiler.groupScales.toMap(),
+        groupNodes = scopeCompiler.groupNodes.toMap(),
         diagnostics = diagnostics.diagnostics,
         spec = spec,
         hoverVariants = scopeCompiler.hoverVariants.toMap(),

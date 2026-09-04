@@ -5678,10 +5678,12 @@
       "status": "**Supported**",
       "tests": [
         "ControllerInteractionTest",
+        "FacetedScopeHandlerTest",
+        "ScopeSourcedHandlerTest",
         "VegaInteractionInstrumentedTest"
       ],
-      "tests_text": "`ControllerInteractionTest`, `VegaInteractionInstrumentedTest` (on device)",
-      "notes": "Parsed, matched, applied and redrawn. `update` in all four forms (bare expression, `expr`, `value`, `signal`), with `event` and the mark's `datum` in scope. A `merge` stream object is reported and asks for the equivalent comma-separated string",
+      "tests_text": "`ControllerInteractionTest`, `ScopeSourcedHandlerTest`, `FacetedScopeHandlerTest`, `VegaInteractionInstrumentedTest` (on device)",
+      "notes": "Parsed, matched, applied and redrawn. `update` in all four forms (bare expression, `expr`, `value`, `signal`), with `event` and the mark's `datum` in scope. A `merge` stream object is reported and asks for the equivalent comma-separated string. A handler declared **inside a group mark** fires too, in the group it was declared in and in no other — including a **faceted** group, which is bound once per cell, so each small multiple has its own live copy of the handler and its own signal values. Which scope an event is in is decided the way upstream decides it: `parseSelector` gives every selector written in a subscope the source `scope`, `parseStream` appends `inScope(event.item)` to it, and `inScope` walks the hit item's ancestors looking for the group. So it is item ancestry rather than the group's rectangle — a press on an unfilled group's background is inside the rectangle and on no item, and a mark overflowing an unclipped group is outside it and still the group's — and naming a mark does **not** narrow it, since every cell of a facet holds a mark of that name",
       "milestone": "6"
     },
     {

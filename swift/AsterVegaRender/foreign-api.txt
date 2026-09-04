@@ -702,12 +702,13 @@ ColorSpaces.toLab(color:)
 CompiledSpec
 CompiledSpec.description()
 CompiledSpec.diagnostics
-CompiledSpec.doCopy(scene:scales:signals:diagnostics:spec:hoverVariants:readsContainerSize:groupScopes:groupScales:)
+CompiledSpec.doCopy(scene:scales:signals:diagnostics:spec:hoverVariants:readsContainerSize:groupScopes:groupScales:groupNodes:)
+CompiledSpec.groupNodes
 CompiledSpec.groupScales
 CompiledSpec.groupScopes
 CompiledSpec.hash()
 CompiledSpec.hoverVariants
-CompiledSpec.init(scene:scales:signals:diagnostics:spec:hoverVariants:readsContainerSize:groupScopes:groupScales:)
+CompiledSpec.init(scene:scales:signals:diagnostics:spec:hoverVariants:readsContainerSize:groupScopes:groupScales:groupNodes:)
 CompiledSpec.isEqual(_:)
 CompiledSpec.isUsable
 CompiledSpec.readsContainerSize
@@ -1710,9 +1711,9 @@ ImputeTransform.type
 InputEvent
 InputEvent.datum
 InputEvent.description()
-InputEvent.doCopy(type:timestampMillis:source:itemId:markType:markName:datum:x:y:rootX:rootY:properties:)
+InputEvent.doCopy(type:timestampMillis:source:itemId:markType:markName:datum:x:y:rootX:rootY:properties:scopes:)
 InputEvent.hash()
-InputEvent.init(type:timestampMillis:source:itemId:markType:markName:datum:x:y:rootX:rootY:properties:)
+InputEvent.init(type:timestampMillis:source:itemId:markType:markName:datum:x:y:rootX:rootY:properties:scopes:)
 InputEvent.isEqual(_:)
 InputEvent.itemId
 InputEvent.markName
@@ -1720,6 +1721,7 @@ InputEvent.markType
 InputEvent.properties
 InputEvent.rootX
 InputEvent.rootY
+InputEvent.scopes
 InputEvent.source
 InputEvent.timestampMillis
 InputEvent.type

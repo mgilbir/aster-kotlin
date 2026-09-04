@@ -60,6 +60,22 @@ public data class InputEvent(
   val rootX: Double = 0.0,
   val rootY: Double = 0.0,
   val properties: Map<String, VegaValue> = emptyMap(),
+  /**
+   * The group scopes this event is **in**, by the paths `CompiledSpec.groupNodes` uses.
+   *
+   * What a `scope`-sourced stream needs. A handler declared in a group listens on that group's own
+   * item — upstream attaches the listener there — so `{"events": "mousedown"}` inside a group means
+   * "a mousedown anywhere in this group".
+   *
+   * "In" is upstream's `inScope(event.item)`: the ancestors of the item that was hit, walked
+   * upwards. Not containment of the group's rectangle, which answers differently in both directions
+   * — a press on an unfilled group's background is inside the rectangle and hits no item, and a
+   * mark overflowing an unclipped group is outside it and still the group's.
+   *
+   * Computed by the controller, which is the only place holding the scene and the point at once.
+   * Empty for an event that hit nothing, and for one with no position at all, which is every key.
+   */
+  @InternalAsterVegaApi val scopes: Set<String> = emptySet(),
 ) {
   /** The `event` object a filter expression sees. */
   internal fun asValue(): VegaValue {
@@ -260,21 +276,6 @@ public class EventDispatcher(
       )
       return
     }
-    // A `scope` stream that names no mark asks for "any event inside this group", and which group
-    // an event landed in is a question of scene containment that nothing here answers yet. Refused
-    // by name rather than widened to the whole view, which would fire a group's handler on every
-    // event in the chart — the loud wrong answer where this is the quiet one (ADR 0011).
-    if (stream.source == EventStream.SOURCE_SCOPE && stream.markName == null) {
-      diagnostics.warn(
-        DiagnosticCodes.INTERACTION_UNSUPPORTED,
-        "Signal '${binding.signalName}' is declared inside a group and its handler listens to " +
-          "'${stream.type}' anywhere in that group; this engine dispatches a group's handlers by " +
-          "the mark they name, so write '@markname:${stream.type}' to say which. The handler is " +
-          "not dispatched",
-        operator = binding.signalName,
-      )
-      return
-    }
     val watch = Watch(stream, binding, binding.scopePath)
     if (stream.between.size == 2) {
       val gate = Gate()
@@ -330,12 +331,12 @@ public class EventDispatcher(
     watches += watch
   }
 
-  /** @return the handlers this event fired, in registration order. */
   /**
-   * A `scope` stream's source for matching: `view`, since the narrowing is the mark name's job.
+   * A `scope` stream's source for matching: `view`.
    *
-   * Only reached for a stream that names a mark — [register] refuses a bare one — so this never
-   * widens a group's listener to the whole chart.
+   * Upstream's own `eventSource` does exactly this rewrite before binding the listener — a scope
+   * stream *is* a view listener, and what makes it the group's is the `inScope` filter it also
+   * carries. [matches] applies that filter, so nothing is widened by this.
    */
   private fun sourceOf(stream: EventStream): String =
     if (stream.source == EventStream.SOURCE_SCOPE) EventStream.SOURCE_VIEW else stream.source
@@ -346,7 +347,9 @@ public class EventDispatcher(
 
   public fun dispatch(event: InputEvent): List<FiredHandler> {
     for (gateWatch in gateWatches) {
-      if (!matches(gateWatch.stream, event, scopeFor(gateWatch.scopePath))) continue
+      if (!matches(gateWatch.stream, event, scopeFor(gateWatch.scopePath), gateWatch.scopePath)) {
+        continue
+      }
       for (gate in gateWatch.opens) gate.open = true
       for (gate in gateWatch.closes) gate.open = false
     }
@@ -354,7 +357,7 @@ public class EventDispatcher(
     val fired = mutableListOf<FiredHandler>()
     for (watch in watches) {
       val binding = watch.binding ?: continue
-      if (!matches(watch.stream, event, scopeFor(watch.scopePath))) continue
+      if (!matches(watch.stream, event, scopeFor(watch.scopePath), watch.scopePath)) continue
       if (gateOf[watch]?.open == false) continue
       val throttle = watch.stream.throttle
       val since = watch.lastFired
@@ -441,13 +444,15 @@ public class EventDispatcher(
     stream: EventStream,
     event: InputEvent,
     scope: ExpressionScope = this.scope,
+    /** The group this stream belongs to, for a `scope` stream to test containment against. */
+    scopePath: String = "",
   ): Boolean {
     if (stream.type != null && stream.type != event.type) return false
     // A stream declared inside a group has source `scope` rather than `view`: upstream attaches the
-    // listener to that group's own item rather than to the whole view. Where the selector *names a
-    // mark* the two are the same listener — naming the mark is what narrows it — so the source is
-    // compared as `view` and the mark name does the scoping. A **bare** one is refused at
-    // registration, because narrowing it to the group needs an answer this does not have.
+    // listener to that group's own item rather than to the whole view. The listener itself is on
+    // the
+    // view either way — upstream's `eventSource` rewrites `scope` to `view` before binding — and
+    // what makes it a group's listener is the filter below, so the source is compared as `view`.
     if (sourceOf(stream) != event.source) return false
     // `*` matches any mark, but still requires that the event landed on one.
     if (stream.markType != null) {
@@ -455,6 +460,23 @@ public class EventDispatcher(
       if (stream.markType != "*" && stream.markType != event.markType) return false
     }
     if (stream.markName != null && stream.markName != event.markName) return false
+    // A `scope` stream fires only for an event **inside its own group**, which is what upstream's
+    // `inScope(event.item)` says: `parseStream` appends that filter to every stream whose source is
+    // `scope`, and `parseSelector` gives that source to every selector written inside a subscope.
+    // So this applies to `@box:mousedown` exactly as much as to a bare `mousedown` — naming a mark
+    // narrows *which* item, not *which group's copy of it*, and a faceted group has one copy per
+    // cell with the same name in each.
+    //
+    // These used to be refused by name, because "which group did this land in" needed the scene and
+    // the dispatcher has neither the scene nor the point in world space. The controller answers it
+    // and hands the scopes over on the event, so the test here is a set membership.
+    //
+    // Never widened to the whole view: an event that landed in no group is in no scope, so a
+    // group's
+    // handler cannot fire on an event outside it.
+    if (stream.source == EventStream.SOURCE_SCOPE && scopePath.isNotEmpty()) {
+      if (scopePath !in event.scopes) return false
+    }
     return stream.filters.all { passes(it, event, scope) }
   }
 

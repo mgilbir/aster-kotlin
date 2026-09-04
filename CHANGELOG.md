@@ -8,6 +8,32 @@ section here does not get released.
 
 ### Added
 
+- **A signal handler declared inside a group fires for events in that group, and in no other —
+  including a faceted group, once per cell.** Two shapes were refused by name: a **bare `scope`
+  selector**, which named no mark and so had nothing to narrow it, and a **faceted group**, whose
+  path names one scope per cell rather than one scope. Both were reported rather than left silent,
+  because a group's handler quietly widened to the whole view fires on every event in the chart.
+
+  What was missing was the answer to "which group is this event in", and upstream's answer turns out
+  not to be the obvious one. `parseSelector` gives every selector written inside a subscope the
+  source `scope`; `parseStream` then appends the filter `inScope(event.item)` to it; and `inScope`
+  walks the **hit item's ancestors** looking for the group's own item. So it is item ancestry, not
+  containment of the group's rectangle — the two disagree in both directions, on a press over an
+  unfilled group's background (inside the rectangle, on no item, upstream does not fire) and on a
+  mark overflowing an unclipped group (outside the rectangle, still the group's, upstream fires).
+  `SceneHitIndex` already carries that chain on every hit, so this costs nothing and removed a
+  whole-scene walk that a first cut at it had added.
+
+  It applies to a selector that **names a mark** as much as to a bare one, which is the half that
+  would have looked like it worked: every cell of a facet holds a mark of the same name, so
+  `@box:mousedown` matches in all of them and only the scope tells them apart.
+
+  Underneath, a group nested inside a faceted one recorded `cell/inner` from *every* cell — one key,
+  last cell winning. A press in the first cell fired nothing at all, and a press in the second moved
+  a signal the first cell's marks were also drawn from. The compiler now compiles a cell's contents
+  under that cell's own path, and the binding walk carries concrete scopes instead of the shape the
+  specification has.
+
 - **A `field` or a conditional in a guide `encode` is honoured, and the warning that said otherwise
   is gone.** The row claimed they could not be, because "the guide's own datum does not exist until
   the guide is laid out". That is wrong about the ordering: an axis label's datum is
