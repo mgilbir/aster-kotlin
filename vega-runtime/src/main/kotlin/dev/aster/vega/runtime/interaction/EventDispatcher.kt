@@ -246,6 +246,20 @@ public class EventDispatcher(
       )
       return
     }
+    // `keyup` and `keypress` are events upstream's handler binds and this engine cannot produce: a
+    // host reports one `ChartInputEvent.Key` per press, with no phase, so there is nothing to tell
+    // a release from a repeat. Refused by name rather than left to never match, because a signal
+    // that never updates looks exactly like one whose expression is wrong.
+    if (stream.type == "keyup" || stream.type == "keypress") {
+      diagnostics.warn(
+        DiagnosticCodes.INTERACTION_UNSUPPORTED,
+        "Signal '${binding.signalName}' listens to '${stream.type}', which this engine does not " +
+          "produce: a host reports one key event per press and nothing distinguishes a release " +
+          "from a repeat. Use 'keydown', which is dispatched",
+        operator = binding.signalName,
+      )
+      return
+    }
     // A `scope` stream that names no mark asks for "any event inside this group", and which group
     // an event landed in is a question of scene containment that nothing here answers yet. Refused
     // by name rather than widened to the whole view, which would fire a group's handler on every

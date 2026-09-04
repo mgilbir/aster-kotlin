@@ -190,6 +190,26 @@ class KeyboardTraversalTest {
     )
   }
 
+  /**
+   * A key moves focus and a selection, and touches nothing else — no hover, no viewport.
+   *
+   * Inherited from `KeyboardTraversalLimitTest`, which is gone: every limitation it held is closed,
+   * traversal by this class and `keydown` handlers by `KeydownHandlerTest`. This is the part of it
+   * that was a guard rather than a claim — a key that panned the chart or changed what is hovered
+   * would surprise a reader who pressed an arrow.
+   */
+  @Test
+  fun `a key leaves the hover and the viewport alone`() {
+    controller.setSpec(bars)
+    val before = controller.state.value.snapshot.interactionState
+    for (key in ChartKey.entries) controller.dispatch(ChartInputEvent.Key(key))
+    val after = controller.state.value.snapshot.interactionState
+    assertEquals(before.hoveredNodeId, after.hoveredNodeId, "a key changed what is hovered")
+    assertEquals(before.viewportOffset, after.viewportOffset, "a key panned the chart")
+    assertEquals(before.viewportScale, after.viewportScale, "a key zoomed the chart")
+    assertEquals(before.tooltip, after.tooltip, "a key changed the tooltip")
+  }
+
   /** A chart with nothing to focus declines every key rather than pretending. */
   @Test
   fun `a chart with no focusable elements consumes nothing`() {
