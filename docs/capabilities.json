@@ -1122,6 +1122,18 @@
       "milestone": "—"
     },
     {
+      "line": 118,
+      "section": "Vega-Lite",
+      "feature": "The gallery, as a gate: all 627 examples",
+      "status": "**627 of 627**",
+      "tests": [
+        "VegaLiteGalleryTest"
+      ],
+      "tests_text": "`VegaLiteGalleryTest`",
+      "notes": "Every example Vega-Lite ships is compiled by upstream's compiler and by this one, and the two outputs compared property by property. Compiling is a **pure function of the specification** — no data is fetched and none is needed — so the whole sweep is a few seconds either side, which is what makes a corpus this size affordable at all. It began as a one-off *measurement* and took the corpus from **124 of 627** matching to all 627, cause by ranked cause; then nothing kept it there. The examples are not fixtures here, nothing about them was checked in, no script referenced them and no CI job ran them — so the largest surface this project had ever verified was protected by nothing, and a regression in any of the 503 that were fixed would have been invisible until somebody swept again by hand. `scripts/vega-lite-gallery.sh` is that gate now, run by `check.sh` before the Gradle gate and *not* skipped by `--fast`, because seconds is not what `--fast` exists to avoid. Still nothing checked in, and now for a second reason as well: the corpus comes from the source tarball at the version `oracle-js` has installed, so a version bump sweeps that version's examples rather than a copy somebody remembered to update, and the test asserts the version swept is the version compared against. Because the corpus is therefore absent on a fresh clone the suite **fails** rather than skipping when it is missing — the vacuous-test lesson this repository keeps relearning, applied rather than repeated. `normalized/` is excluded: those 183 files are what upstream's own normalizer produces from some of the 627, so sweeping them would compare this compiler against another stage of upstream's pipeline",
+      "milestone": "—"
+    },
+    {
       "line": 124,
       "section": "Marks",
       "feature": "Group",

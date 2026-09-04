@@ -8,6 +8,37 @@ section here does not get released.
 
 ### Added
 
+- **The Vega-Lite gallery is a gate, not a memory.** Vega-Lite ships 627 example specifications, and
+  a sweep of all of them against upstream's compiler took the corpus from **124 matching to every
+  one**, cause by ranked cause. Then nothing kept it there. The examples are not fixtures here,
+  nothing about them was checked in, no script referenced them and no CI job ran them — so the
+  largest surface this project had ever verified was protected by nothing, and a regression in any
+  of the 503 that were fixed would have been invisible until somebody swept again by hand.
+
+  `scripts/vega-lite-gallery.sh` fetches the examples from the source tarball at the version
+  `oracle-js` has installed, compiles all 627 with upstream in one Node process, and
+  `VegaLiteGalleryTest` compares them property by property. `check.sh` runs it before the Gradle
+  gate — and **`--fast` does not skip it**, because compiling is a pure function of the
+  specification, so no data is fetched and the whole sweep is a few seconds against the oracles'
+  several minutes. That matters twice over: CI runs `check.sh --fast`, so skipping there would leave
+  the gate unarmed in the one place it counts.
+
+  Still nothing checked in, and now for a second reason as well as the first: taking the corpus from
+  the pinned tarball means a version bump sweeps *that* version's examples rather than a copy
+  somebody remembered to update, and the test asserts that the version swept is the version compared
+  against. Because the corpus is absent on a fresh clone, the suite **fails** rather than skipping
+  when it is missing — the vacuous-test lesson `scripts/vega-lite-oracle.sh`'s own header records,
+  applied rather than repeated. Proved both ways: a mutated reference fails naming the example, and
+  a removed corpus fails three tests and skips none.
+
+  `examples/specs/normalized` is excluded. Those 183 files are what upstream's *normalizer* produces
+  from some of the 627 — its own test data for a stage of its own pipeline — so sweeping them would
+  report a corpus of 810 and compare this compiler against upstream's intermediate form. Found by
+  the script counting recursively and disagreeing with the sweep.
+
+
+### Added
+
 - **A reader can adjust the interval an axis draws its data against.** The row said they could not:
   the accessibility actions move the **viewport** — the visual transform a pinch applies — and leave
   every scale exactly as the specification built it, so someone exploring a crowded region got

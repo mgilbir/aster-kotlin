@@ -696,11 +696,26 @@ Three rules came out of upstream with it:
 ### The gallery, swept: 627 examples against upstream's own compiler
 
 Vega-Lite ships 627 example specifications, and compiling is a pure function of the specification —
-no data is needed to compare two compilers. So every one of them was compiled by upstream 6.4.3 and
-by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
-examples are not fixtures here, and nothing about them is checked in.
+no data is needed to compare two compilers. So every one of them is compiled by upstream 6.4.3 and
+by this one, and the outputs compared property by property.
 
 **124 of 627 matched exactly** at the start, and **all 627** do now.
+
+**It is a gate**, which it was not for a long time. It began as a one-off measurement — the examples
+are not fixtures here and nothing about them is checked in — and that is exactly what made it
+dangerous once it had done its work: 503 examples were fixed and then nothing kept them fixed. No
+script referenced the corpus, no CI job ran it, and a regression in any of them would have been
+invisible until somebody swept again by hand. `scripts/vega-lite-gallery.sh` now fetches the
+examples from the source tarball **at the version `oracle-js` has installed**, compiles them with
+upstream in one Node process, and `VegaLiteGalleryTest` compares all 627 — a few seconds either
+side, because no data is fetched. `check.sh` runs it before the Gradle gate, `--fast` included.
+
+Still nothing checked in, and now for a second reason as well as the first: taking the corpus from
+the pinned tarball means a version bump sweeps *that* version's examples rather than a copy somebody
+remembered to update, and `VegaLiteGalleryTest` asserts that the version swept is the version
+compared against. Because the corpus is absent on a fresh clone, the suite **fails** rather than
+skipping when it is missing — the lesson of `scripts/vega-lite-oracle.sh`'s own header, applied
+rather than repeated.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -7814,10 +7829,15 @@ broken?** Still open. `parseSignal` no longer drops the property in silence (M39
 using it now says so; whether the semantics are reachable at all under a whole-specification
 recompile needs a runtime-scoping answer or a fixture, and neither is written.
 
-**Q10 and Q14 are for the maintainer.** Q10 — should the release workflow require a green `ci.yml`
-run on the dispatched sha before verify? Today the Vega-Lite scene gate's only other coverage is
-that CI happened to run, and nothing enforces it; the verify job renders the references itself now,
-which closes the hole this branch was about but not the broader question. Q14 — is the design brief
+**Q10 and Q14 were for the maintainer, and both are now answered.** Q10 — should the release
+workflow require a green `ci.yml` run on the dispatched sha before verify? **Deferred, deliberately,
+on 2026-09-05.** The hole it was really about has narrowed twice since it was asked: the verify job
+renders the references itself, and the gallery sweep above is a gate rather than a thing CI happened
+to do. What remains is a policy question about releases rather than a gap in what is checked, and it
+is recorded here so it is a decision rather than an oversight — revisit it when a release actually
+goes out. Note the standing caveat while it stands open: **CI cancels a run when another push
+arrives**, so on a fast landing cadence most merges carry no CI verdict and `check.sh` is the real
+gate. Q14 — is the design brief
 still the contract? **Answered: no, and it has been retired.** It was a specification written before
 the engine existed, and most of it had been superseded by the code it specified — module
 responsibilities, interface sketches, milestones. What still bound was extracted to `docs/adr/`
