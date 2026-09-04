@@ -33,6 +33,8 @@ import dev.aster.vega.runtime.load.CachingDataLoader
 import dev.aster.vega.runtime.load.DataLoader
 import dev.aster.vega.runtime.load.DenyLoader
 import dev.aster.vega.runtime.scale.VegaScale
+import dev.aster.vega.scene.AccessibilityTree
+import dev.aster.vega.scene.AccessibleElement
 import dev.aster.vega.scene.HitTestOptions
 import dev.aster.vega.scene.MetricTextEngine
 import dev.aster.vega.scene.PointD
@@ -42,6 +44,7 @@ import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeId
 import dev.aster.vega.scene.SizeD
 import dev.aster.vega.scene.TextEngine
+import dev.aster.vega.scene.flatten
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -907,9 +910,9 @@ public class VegaChartController(
       is ChartInputEvent.LongPress -> handleLongPress(event.point)
       is ChartInputEvent.Pan -> handlePan(event)
       is ChartInputEvent.Zoom -> handleZoom(event)
+      is ChartInputEvent.Key -> handleKey(event.key, event.modifiers)
       is ChartInputEvent.PointerDown,
       is ChartInputEvent.PointerUp,
-      is ChartInputEvent.Key,
       is ChartInputEvent.Resized -> Unit // No built-in behaviour; a signal handler may still fire.
     }
     fireSignalHandlers(event)
@@ -1339,6 +1342,107 @@ public class VegaChartController(
     emit(ChartEvent.TooltipChanged(node?.metadata?.tooltip, point))
   }
 
+  /**
+   * Moves focus between marks with the keyboard, and says whether the key was **consumed**.
+   *
+   * The return value is the whole reason this is a method of its own rather than a return type on
+   * [dispatch]: a host that cannot tell whether the chart used a key has no way to avoid a **focus
+   * trap**, where TAB never leaves the chart and, on a television where the d-pad is the keyboard,
+   * the four arrows let a reader in and not out. Declining to claim keys was the previous answer to
+   * that, and it was the right one while nothing moved.
+   *
+   * So the rule is that a key is consumed **only when it actually did something**:
+   *
+   * - **TAB is never consumed**, whatever the state. It is how a reader leaves, and no traversal
+   *   worth having is worth trapping them for.
+   * - An **arrow** at the end of the order is not consumed either, so focus continues outward
+   *   rather than stopping dead. This is what makes a d-pad usable: pressing right past the last
+   *   mark leaves the chart the way it would leave any other widget.
+   * - `ENTER` and `SPACE` activate the focused element, and are consumed only when there is one and
+   *   it is activatable — an axis caption is not.
+   * - `ESCAPE` clears the focus and the selection, and is consumed only when there was something to
+   *   clear, so a reader can press it twice to dismiss the sheet the chart sits in.
+   *
+   * The order is the accessibility tree's, not the drawing's: a reader moves through a chart the
+   * way it reads. That is the same order and the same policy a screen reader gets, including the
+   * summary that stands in for the marks of a dense chart — so keyboard and screen reader cannot
+   * disagree about what is in the chart.
+   */
+  public fun handleKey(key: ChartKey, modifiers: Modifiers = Modifiers.None): Boolean {
+    // Never, under any state. See above.
+    if (key == ChartKey.TAB) return false
+
+    val snapshot = _state.value.snapshot
+    val elements =
+      AccessibilityTree.elements(snapshot.scene, snapshot.interactionState.selection.nodeIds)
+        .filter { it.nodeId != null }
+    if (elements.isEmpty()) return false
+
+    val current = snapshot.interactionState
+    val at = elements.indexOfFirst { it.nodeId == current.focusedNodeId }
+
+    fun focus(index: Int): Boolean {
+      val target = elements.getOrNull(index) ?: return false
+      if (target.nodeId == current.focusedNodeId) return false
+      publishInteraction(current.copy(focusedNodeId = target.nodeId))
+      return true
+    }
+
+    return when (key) {
+      // A chart with nothing focused takes the first element from either direction, which is what
+      // makes arriving at it by keyboard work at all.
+      ChartKey.ARROW_RIGHT,
+      ChartKey.ARROW_DOWN -> if (at < 0) focus(0) else focus(at + 1)
+      ChartKey.ARROW_LEFT,
+      ChartKey.ARROW_UP -> if (at < 0) focus(elements.lastIndex) else focus(at - 1)
+      ChartKey.HOME -> focus(0)
+      ChartKey.END -> focus(elements.lastIndex)
+      ChartKey.ENTER,
+      ChartKey.SPACE -> activateFocused(elements, at)
+      ChartKey.ESCAPE -> {
+        if (current.focusedNodeId == null && current.selection.isEmpty) {
+          false
+        } else {
+          publishInteraction(current.copy(focusedNodeId = null, selection = ChartSelection.Empty))
+          emit(ChartEvent.SelectionChanged(ChartSelection.Empty))
+          true
+        }
+      }
+      ChartKey.TAB -> false
+    }
+  }
+
+  /**
+   * `ENTER` on a focused mark, which reaches the dataflow exactly where a tap does.
+   *
+   * Deliberately the same path and the same events: a reader activating a bar by keyboard and one
+   * tapping it must leave the chart in the same state, or a specification that reacts to a click
+   * reacts to only half its audience.
+   */
+  private fun activateFocused(elements: List<AccessibleElement>, at: Int): Boolean {
+    val element = elements.getOrNull(at) ?: return false
+    // An axis caption is focusable and not activatable: offering an activation that does nothing is
+    // the thing `AccessibleElement.activatable` was added to stop.
+    if (!element.activatable) return false
+    val id = element.nodeId ?: return false
+    val node = nodeById(id) ?: return false
+    val current = _state.value.snapshot.interactionState
+    val selection =
+      ChartSelection(
+        nodeIds = setOf(id),
+        datumIds = node.metadata.datumId?.let { setOf(it) } ?: emptySet(),
+      )
+    publishInteraction(current.copy(selection = selection, focusedNodeId = id))
+    val centre = PointD(element.bounds.centerX, element.bounds.centerY)
+    emit(ChartEvent.MarkClicked(id, node.metadata.markName, datumOf(node), centre))
+    emit(ChartEvent.SelectionChanged(selection))
+    return true
+  }
+
+  /** The scene node an accessibility element came from. */
+  private fun nodeById(id: SceneNodeId): SceneNode? =
+    _state.value.snapshot.scene.flatten().firstOrNull { it.node.id == id }?.node
+
   private fun handleTap(point: PointD) {
     // A touch screen has no pointer to hover with, so a tap is also how a `hover` block and a
     // tooltip are reached. A browser does the same thing: it synthesises `pointerover` from a touch
@@ -1462,6 +1566,66 @@ public class VegaChartController(
   public val tooltipContent: TooltipContent?
     get() = TooltipContent.of(snapshot.interactionState.tooltip, locale, timeZone)
 
+  /**
+   * The chart-level actions worth offering **right now**, in the chart's own language.
+   *
+   * Recomputed from the viewport rather than fixed, and that is the point: an action is listed only
+   * when invoking it would change something. A reader at the zoom limit is not offered a zoom, and
+   * a chart at rest is not offered a reset — an action that does nothing is worse than one that was
+   * never there, because the reader has no way to tell which they met.
+   *
+   * A host attaches these to the chart's **own** accessibility node, not to a mark:
+   * `AccessibilityNodeInfo.addAction` on Android, `UIAccessibilityCustomAction` on Apple. That is
+   * also why they are not on `AccessibleElement` — panning is a property of the view, and the
+   * scene, which is what builds that tree, does not know it has been panned.
+   */
+  public val accessibilityActions: List<ChartAction>
+    get() {
+      val state = _state.value.snapshot.interactionState
+      val actions = mutableListOf<ChartAction>()
+      if (state.viewportScale < MAX_ZOOM) {
+        actions += ChartAction(ChartActionKind.ZOOM_IN, locale.captions.zoomInAction())
+      }
+      if (state.viewportScale > MIN_ZOOM) {
+        actions += ChartAction(ChartActionKind.ZOOM_OUT, locale.captions.zoomOutAction())
+      }
+      if (state.viewportScale != 1.0 || state.viewportOffset != dev.aster.vega.scene.VectorD.Zero) {
+        actions += ChartAction(ChartActionKind.RESET_ZOOM, locale.captions.resetZoomAction())
+      }
+      return actions
+    }
+
+  /**
+   * Performs one, and says whether it did anything.
+   *
+   * The same false-means-nothing-happened contract [handleKey] uses, and for a related reason: a
+   * host that cannot tell has to guess whether to announce a change, and announcing one that did
+   * not happen is how a reader loses track of where they are.
+   *
+   * A zoom is anchored at the **middle of the surface**, because a reader invoking an action has no
+   * pointer to anchor it at. That is the only difference from the gesture path, which this then
+   * goes down in full so the two cannot drift apart.
+   */
+  public fun perform(action: ChartActionKind): Boolean {
+    if (accessibilityActions.none { it.kind == action }) return false
+    val before = _state.value.snapshot.interactionState
+    when (action) {
+      ChartActionKind.RESET_ZOOM -> resetViewport()
+      ChartActionKind.ZOOM_IN,
+      ChartActionKind.ZOOM_OUT -> {
+        val size = _state.value.snapshot.scene.let { PointD(it.width / 2.0, it.height / 2.0) }
+        handleZoom(
+          ChartInputEvent.Zoom(
+            anchor = size,
+            scaleFactor = if (action == ChartActionKind.ZOOM_IN) ZOOM_STEP else 1.0 / ZOOM_STEP,
+            phase = GesturePhase.ENDED,
+          )
+        )
+      }
+    }
+    return _state.value.snapshot.interactionState != before
+  }
+
   public fun resetViewport() {
     publishInteraction(
       _state.value.snapshot.interactionState.copy(
@@ -1549,6 +1713,15 @@ public class VegaChartController(
   }
 
   public companion object {
+    /**
+     * How far one accessible zoom action moves, which a gesture has no equivalent of.
+     *
+     * A pinch reports a continuous factor; an action is a single step, so it needs a size. A
+     * quarter is large enough to be worth invoking and small enough that a reader can stop where
+     * they meant to — five presses roughly triple the view.
+     */
+    public const val ZOOM_STEP: Double = 1.25
+
     public const val MIN_ZOOM: Double = 0.1
     public const val MAX_ZOOM: Double = 50.0
 

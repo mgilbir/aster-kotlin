@@ -81,6 +81,19 @@ public interface VegaCaptions {
    */
   public fun denseChartSummary(marks: Int): String
 
+  /**
+   * What an assistive technology calls the chart's own actions: zooming, and undoing it.
+   *
+   * Defaulted rather than abstract, so a locale that already implements this interface keeps
+   * compiling — and so a locale that has not translated them yet says something in English rather
+   * than nothing at all. A reader offered a nameless action cannot tell what it does.
+   */
+  public fun zoomInAction(): String = "Zoom in"
+
+  public fun zoomOutAction(): String = "Zoom out"
+
+  public fun resetZoomAction(): String = "Reset zoom"
+
   public companion object {
     /** Upstream's wording, and the default. */
     public val English: VegaCaptions = EnglishCaptions

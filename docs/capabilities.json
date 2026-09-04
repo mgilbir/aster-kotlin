@@ -1112,18 +1112,14 @@
       "line": 118,
       "section": "Vega-Lite",
       "feature": "Surface size",
-      "status": "**Partial**",
+      "status": "**Exact**",
       "tests": [
         "VegaLiteFixtureDifferentialTest",
-        "SurfaceSizeShortfallTest"
+        "SurfaceSizeTest"
       ],
-      "tests_text": "`VegaLiteFixtureDifferentialTest`, `SurfaceSizeShortfallTest`",
-      "notes": "Every mark lands exactly where upstream puts it; the surface around them still comes out between half a unit and a unit small in each direction. Since nothing drawn has moved, the shortfall is in a guide *extent* — the one input the mark comparison cannot see, because text bounds are excluded by design (docs/adr/0006). The test asserts the shape of the difference rather than tolerating it silently",
-      "milestone": "—",
-      "limit": {
-        "test": "SurfaceSizeShortfallTest.the surface is between nothing and a unit small in each direction",
-        "claim": "Every mark lands where upstream puts it; the surface around them comes out up to a unit small in each direction, the shortfall being in a guide extent the mark comparison cannot see because text bounds are excluded by design (ADR 0006). Measured across all 566 dimensions of the corpus: the worst is exactly one unit."
-      }
+      "tests_text": "`VegaLiteFixtureDifferentialTest`, `SurfaceSizeTest`",
+      "notes": "Every mark lands exactly where upstream puts it and so does the surface around them: the worst difference across all 566 dimensions of the corpus is 0.0002, which is the arc-approximation allowance rather than anything about the frame. It used to be between half a unit and a unit **small**, explained here as a guide extent the mark comparison could not see. It was not that. Every shortfall was exactly 0.5 or 1.0 and never anything between — the signature of a half-pixel rather than of accumulated measurement — and the cause was `strokedFrame` unioning the frame's own stroked rectangle into the reach where upstream takes the union of the frame's extent and its children's and expands *that* by half the stroke. `min(-46, -0.5)` leaves an edge at -46 where upstream has -46.5, and every Vega-Lite chart carries a `cell` style with a one-unit border, so every one of them was short. The test now holds the equality in **both** directions, because an over-expansion would have satisfied the old \\\"at most a unit small\\\" just as well",
+      "milestone": "—"
     },
     {
       "line": 124,
@@ -2849,16 +2845,17 @@
       "line": 284,
       "section": "Expressions",
       "feature": "`label`",
-      "status": "Partial — **not verified against upstream**",
+      "status": "**Supported**, with one measured divergence",
       "tests": [
-        "BitmapTest"
+        "BitmapTest",
+        "LabelAgainstUpstreamTest"
       ],
-      "tests_text": "`BitmapTest` (upstream vectors for the bit algebra and the pixel scaler), visual inspection of `labeled-scatter-plot`",
-      "notes": "Places a text mark's items beside the marks they annotate and drops the ones that would collide. Everything is upstream's — the eight anchors and their two-bit arithmetic, the diagonal offsets scaled by `1/sqrt(2)`, the one-pixel-wide trial that avoids measuring a label that cannot fit, the bit-vector occupancy bitmap and its pixel scaler — **except the one step that decides what is occupied**. Upstream draws the avoided marks into a `<canvas>` and reads the alpha back; there is none under Node and its own transform throws there, so there is no reference to compare against. The occupancy is computed from the marks' geometry instead: a pixel is taken as occupied when the shape overlaps its square. The two answers agree except on pixels a shape barely grazes, and one pixel is enough to move a label to a different anchor or to drop one a crowded chart would otherwise fit — so **every use of the transform reports this**, and it is the only place in the engine that carries such a warning",
+      "tests_text": "`BitmapTest` (upstream vectors for the bit algebra and the pixel scaler), `LabelAgainstUpstreamTest` (upstream's own placements, recorded with a canvas)",
+      "notes": "Places a text mark's items beside the marks they annotate and drops the ones that would collide. Everything is upstream's — the eight anchors and their two-bit arithmetic, the diagonal offsets scaled by `1/sqrt(2)`, the one-pixel-wide trial that avoids measuring a label that cannot fit, the bit-vector occupancy bitmap and its pixel scaler — **except the one step that decides what is occupied**. Upstream draws the avoided marks into a `<canvas>` and reads the alpha back, which `vega-canvas` refuses under Node — so this row said, for as long as it existed, that there was no reference to compare against. There is: `oracle-js/src/record-label.mjs` installs `canvas` for the run, the way the wordcloud recorder does, and upstream places labels perfectly well. The occupancy here is computed from the marks' geometry instead — a pixel is occupied when the shape overlaps its square — and is measured against upstream's own placements **using upstream's own text widths**, so a difference in fonts is not mistaken for a difference in occupancy. They agree on every one of 48 drop decisions and on 45 of 46 anchors. The single divergence is pinned by name rather than tolerated as a count: in a crowd with the base mark not avoided, one label takes its second choice of anchor where upstream takes its third. That is the “pixels a shape barely grazes” case, now a number instead of a caveat — and **every use of the transform still reports** that the occupancy is geometric, because a crowded chart can still differ",
       "milestone": "6",
       "limit": {
         "test": "LabelOccupancyLimitTest.every use reports that the occupancy is geometric rather than rasterised",
-        "claim": "The occupancy bitmap is computed from the avoided marks' geometry rather than from a canvas raster, because there is no canvas under Node and upstream's own transform fails in the same place — so there is no reference to compare against. Every use of the transform reports it."
+        "claim": "The occupancy bitmap is computed from the avoided marks' geometry rather than from a canvas raster. Measured against upstream's own placements, recorded with a canvas and replayed with upstream's text widths: every drop agrees and 45 of 46 anchors agree, with the one divergence pinned by name. Every use of the transform reports it."
       }
     },
     {
@@ -5862,17 +5859,18 @@
       "line": 540,
       "section": "Interaction",
       "feature": "Keyboard focus navigation",
-      "status": "Partial",
+      "status": "**Supported**; a `keydown` handler still does not fire",
       "tests": [
+        "KeyboardTraversalTest",
         "KeyboardTraversalLimitTest",
         "VegaChartViewTest"
       ],
-      "tests_text": "`KeyboardTraversalLimitTest`, `VegaChartViewTest`",
-      "notes": "A host turns a platform key into a `ChartInputEvent.Key` and the controller takes it — `VegaChartView.onKeyDown` on Android, `ChartSession.press(_:)` on Apple. Nothing then moves: `fireSignalHandlers` maps only the pointer family, so a key fires no `keydown` handler and moves no focus between marks. That is deliberate rather than unfinished — claiming a key the chart does nothing with is a **focus trap**, where TAB never leaves the chart and, on a television where the d-pad is the keyboard, the arrows let a reader in and not out. Traversal semantics come with the accessibility work.",
+      "tests_text": "`KeyboardTraversalTest`, `KeyboardTraversalLimitTest`, `VegaChartViewTest`",
+      "notes": "A host turns a platform key into a `ChartInputEvent.Key` and the controller takes it — `VegaChartView.onKeyDown` on Android, `ChartSession.press(_:)` on Apple. Arrows walk the marks, `HOME`/`END` reach the ends, `ENTER`/`SPACE` activate down the same path a tap takes — the same selection and the same events, so a specification reacting to a click reaches both halves of its audience — and `ESCAPE` clears. The order is the accessibility tree's, so a keyboard reader and a screen reader cannot disagree about what is in the chart. `handleKey` returns whether the key was **consumed**, and that is the design rather than a detail: a host that cannot tell has no way to avoid a **focus trap**, so TAB is never consumed in any state, an arrow at the end of the order is not consumed either — a d-pad carries on out of the chart the way it would leave any other widget — and `ESCAPE` is declined once there is nothing left to clear. What a key still does not do is fire a signal handler: `fireSignalHandlers` maps only the pointer family, so a `{\\\"events\\\": \\\"keydown\\\"}` handler compiles, draws and never updates.",
       "milestone": "7",
       "limit": {
-        "test": "KeyboardTraversalLimitTest.no key moves focus between marks",
-        "claim": "A key press reaches the controller and moves no focus and fires no handler; traversal semantics are not implemented."
+        "test": "KeyboardTraversalLimitTest.a keydown handler does not fire",
+        "claim": "A key moves focus through the accessibility tree and activates a mark, and still fires no signal handler: `fireSignalHandlers` maps only the pointer family, so a `keydown` handler never updates."
       }
     },
     {
@@ -6609,17 +6607,17 @@
     {
       "line": 620,
       "section": "Accessibility",
-      "feature": "Domain adjustment and reset-zoom actions",
-      "status": "Planned",
+      "feature": "Zoom and reset-zoom actions",
+      "status": "**Supported**; a scale's domain is not adjustable",
       "tests": [
-        "DocumentedRenderingLimitsTest"
+        "AccessibilityActionsTest"
       ],
-      "tests_text": "`DocumentedRenderingLimitsTest`",
-      "notes": "—",
+      "tests_text": "`AccessibilityActionsTest`",
+      "notes": "`VegaChartController.accessibilityActions` offers zooming in, zooming out and resetting the view, each with a label in the chart's own locale; `perform` runs one and says whether it did anything. They belong to the **chart** rather than to any mark, which is why they are not on `AccessibleElement` — the scene builds that tree and does not know it has been panned — so a host attaches them to the chart's own node: `AccessibilityNodeInfo.addAction` on Android, `UIAccessibilityCustomAction` on Apple. An action is offered only when invoking it **would do something**: zooming is withdrawn at each limit and the reset only appears once the view has moved, because an action a reader triggers to no effect is worse than one that was never there. A zoom is anchored at the middle of the surface, since a reader has no pointer to anchor it at, and then goes down the gesture's own path so the two cannot drift. What is *not* here is adjusting a scale's **domain** — these move the viewport and leave every scale as the specification built it, which is a different feature and is pinned as absent rather than implied",
       "milestone": "7",
       "limit": {
-        "test": "DocumentedRenderingLimitsTest.no accessibility action offers to adjust a domain or reset a zoom",
-        "claim": "A chart that pans and zooms offers no accessible way to do either: the accessibility tree exposes activation and nothing else."
+        "test": "AccessibilityActionsTest.no action adjusts a scale's domain",
+        "claim": "The actions move the viewport and leave every scale as the specification built it; a reader cannot widen the domain the data is drawn against."
       }
     },
     {

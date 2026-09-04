@@ -8,6 +8,78 @@ section here does not get released.
 
 ### Added
 
+- **A chart that pans and zooms offers an accessible way to do both.** The row read `Planned` — "the
+  accessibility tree exposes activation and nothing else" — so a reader could reach every bar in a
+  chart and never the view they were drawn in. Panning and zooming were gestures and only gestures.
+
+  `VegaChartController.accessibilityActions` offers zooming in, zooming out and resetting the view,
+  each labelled in the chart's own locale, and `perform` runs one and says whether it did anything.
+  They belong to the **chart** rather than to any mark, which is why they are not on
+  `AccessibleElement`: the scene builds that tree and does not know it has been panned. A host
+  attaches them to the chart's own node — `AccessibilityNodeInfo.addAction` on Android,
+  `UIAccessibilityCustomAction` on Apple.
+
+  An action is offered **only when invoking it would do something**. Zooming is withdrawn at each
+  limit and the reset only appears once the view has moved, because an action a reader triggers to
+  no effect is worse than one that was never there — they have no way to tell which they met. A zoom
+  is anchored at the middle of the surface, since a reader has no pointer to anchor it at, and then
+  goes down the gesture's own path so a chart cannot come to zoom differently for a reader than for
+  a pointer.
+
+  **What this is not** is domain adjustment, and the row is split rather than allowed to imply it.
+  These move the viewport and leave every scale exactly as the specification built it; an adjustable
+  *domain*, where a reader widens the range the data is drawn against and the ticks change with it,
+  is a different feature and is pinned as absent by a test of its own rather than quietly folded in.
+
+- **Keyboard traversal: arrows walk the marks, `ENTER` activates one, `ESCAPE` clears.** The order is
+  the accessibility tree's, not the drawing's, so a keyboard reader and a screen reader cannot
+  disagree about what is in a chart or what order it is in — including the summary that stands in
+  for the marks of a dense one. `ENTER` and `SPACE` go down the same path a tap takes and emit the
+  same events, because a specification that reacts to a click has to reach both halves of its
+  audience.
+
+  **`handleKey` returns whether the key was consumed, and that is the design rather than a detail.**
+  A host that cannot tell has no way to avoid a **focus trap**, which is why this row said for so
+  long that declining every key was deliberate. So a key is consumed only when it actually did
+  something: TAB is never consumed in any state, an arrow at the end of the order is not consumed
+  either — a d-pad carries on out of the chart the way it would leave any other widget — and
+  `ESCAPE` is declined once there is nothing left to clear, so a reader can press it twice to
+  dismiss the sheet the chart sits in. It is a method of its own rather than a return type added to
+  `dispatch`, which would have broken every Swift caller.
+
+  `KeyboardTraversalLimitTest` is rewritten rather than deleted, and the reason is worth recording:
+  its old assertions used a chart whose rects carry no `description`, and a mark with no description
+  is not focusable — so there was nothing for a key to move focus *between*, and the class would
+  have gone on passing after traversal arrived while claiming traversal did not exist. It now uses
+  described marks and opens with a test whose only job is to prove they are focusable. What it still
+  holds is the narrower truth: a key fires no signal handler, so a `{"events": "keydown"}` handler
+  compiles, draws and never updates.
+
+- **The `label` transform is compared against upstream, which the row said was impossible.** It had
+  read `Partial — not verified against upstream` since it was written, because `vega-label`
+  rasterises the avoided marks through a canvas, `vega-canvas` answers null under Node, and
+  upstream's own transform throws there: "so there is no reference to compare against".
+
+  There is. `oracle-js/src/record-label.mjs` installs `canvas` for the run — the same trick
+  `record-wordcloud.mjs` uses, and for the same reason it must stay out of `package.json` — and
+  upstream places labels perfectly well. Six scenarios turn one knob each: four anchors and eight,
+  a crowd that forces drops, the same crowd without avoiding the base mark, an offset wide enough to
+  push labels off the surface, and marks large enough to fill the bitmap.
+
+  **The text widths are recorded too, and that is what makes the answer mean anything.** Canvas
+  changes upstream's measurement, and a label's width decides whether it fits, which decides its
+  anchor and whether it is dropped at all — so replaying the placements without also handing over
+  the widths compares typefaces and calls the result "occupancy". Measured that way first, the two
+  engines disagreed on 6 of 48 drops and 9 of 40 anchors; measured with upstream's own widths, on
+  **0 of 48 drops and 1 of 46 anchors**.
+
+  That one is pinned by name rather than tolerated as a count, the way `known-divergences.json` pins
+  the transform replays: in a crowd with the base mark not avoided, one label takes its second
+  choice of anchor where upstream takes its third. A new disagreement fails the build, and so does
+  fixing this one without deleting its entry. The transform still reports on every use that its
+  occupancy is geometric, because a crowded chart can still differ — but the row now says by how
+  much instead of saying it cannot be known.
+
 - **`push: "outer"` is honoured: a signal declared in a group can write the enclosing scope's.** It
   is how a group hands a value back out, and Vega's `overview-plus-detail` uses it to move the
   detail panel from a brush on the overview. This repository's own Vega-Lite compiler emits it for a
@@ -280,6 +352,27 @@ section here does not get released.
   agreement is as much a surprise as a new one.
 
 ### Fixed
+
+- **The Vega-Lite surface was half a unit to a unit small on every chart, and the stated reason was
+  wrong.** The row explained it as a guide extent the mark comparison could not see, "because text
+  bounds are excluded by design". It was not that.
+
+  Every shortfall was exactly 0.5 or 1.0 and never anything between, across all 193 affected
+  fixtures — the signature of a half-pixel rather than of accumulated measurement. `strokedFrame`
+  unioned the frame's own stroked rectangle into the measured reach, where upstream takes the union
+  of the frame's extent and its children's and expands **that** by half the stroke. So
+  `min(-46, -0.5)` left an edge at -46 where upstream has -46.5, and since every Vega-Lite chart
+  carries a `cell` style with a one-unit border, every one of them was short.
+
+  Checked edge by edge against upstream on a minimal chart before changing anything: -46 to -46.5,
+  306.74 to 307.24, -6.74 to -7.24, 332 to 332.5 — all four exact under the union-then-expand model
+  and none of them under the old one.
+
+  The worst difference across all 566 dimensions of the corpus is now **0.0002**, which is the
+  arc-approximation allowance rather than anything about the frame. `SurfaceSizeShortfallTest` is
+  renamed to `SurfaceSizeTest` and now holds the equality in **both** directions, because the
+  failure it guards against has changed: an over-expansion making every surface a unit too large
+  would have satisfied "at most a unit small" just as well.
 
 - **The foreign-coverage list is computed from the API that is actually there, not from the recorded
   snapshot.** The other half of the ordering fix above, and the half that bites in *check* mode:

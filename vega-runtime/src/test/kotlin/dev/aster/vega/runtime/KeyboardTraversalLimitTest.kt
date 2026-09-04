@@ -3,33 +3,30 @@ package dev.aster.vega.runtime
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.scene.PointD
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Test
 
 /**
- * A key press reaches the controller and moves nothing, which is what the row means by *partial*.
+ * What a key still does **not** do, now that traversal exists.
  *
- * `SUPPORTED_FEATURES.md`: "Key events are translated; traversal semantics come with accessibility
- * work." Two separate facts, and both are pinned here, because the second is the kind of gap a
- * reader has to be able to trust.
+ * This class used to hold that no key moved anything at all. `KeyboardTraversalTest` closes that,
+ * and what is left is narrower and easy to miss: a key moves focus, and it still fires **no signal
+ * handler**. `keydown` is a selector a specification may perfectly well write, so such a chart
+ * compiles, draws, traverses — and never updates.
  *
- * **Translated**: a host turns a platform key into a [ChartInputEvent.Key] and hands it over.
- * `VegaChartView.onKeyDown` does exactly that on Android and `ChartSession.press(_:)` on Apple.
- *
- * **And moves nothing**: `fireSignalHandlers` maps only the pointer family, so a key produces no
- * Vega event, fires no `keydown` handler, and moves no focus between marks. That is deliberate and
- * the Android view says why in its own comment — claiming a key the chart then does nothing with is
- * a **focus trap**: TAB would never move focus off the chart, ESC would never dismiss the sheet it
- * sits in, and on a television, where the d-pad is the keyboard, the four arrows would let a reader
- * enter the chart and not leave.
- *
- * So the day traversal arrives, these go red — which is correct, because the row will then be
- * describing something else.
+ * The old assertions are gone rather than kept, because they had stopped meaning anything. They
+ * used a chart whose rects carry no `description`, and a mark with no description is not focusable,
+ * so there was nothing for a key to move focus *between*: the test would have gone on passing after
+ * traversal arrived, while claiming traversal did not exist. Every test here now uses a chart with
+ * described marks, and the first one below exists only to prove that.
  */
 class KeyboardTraversalLimitTest {
 
   private val controller = VegaChartController()
 
+  /**
+   * Described marks, so the accessibility tree has something in it and a key has somewhere to go.
+   */
   private val json =
     """
     {
@@ -43,7 +40,8 @@ class KeyboardTraversalLimitTest {
         "type": "rect", "from": {"data": "t"},
         "encode": {"enter": {"x": {"field": "v"}, "y": {"value": 10},
                              "width": {"value": 20}, "height": {"value": 20},
-                             "fill": {"value": "#4c78a8"}}}
+                             "fill": {"value": "#4c78a8"},
+                             "description": {"signal": "'bar ' + datum.v"}}}
       }]
     }
     """
@@ -63,24 +61,28 @@ class KeyboardTraversalLimitTest {
       ChartKey.ESCAPE,
     )
 
+  /**
+   * The guard on everything below: this chart really does have somewhere for focus to go.
+   *
+   * Without it the rest would pass for a chart with nothing focusable in it, which is precisely how
+   * the previous version of this class came to assert something false and stay green.
+   */
   @Test
-  fun `no key moves focus between marks`() {
+  fun `the chart under test has focusable marks`() {
     controller.setSpec(json)
-    assertNull(controller.state.value.snapshot.interactionState.focusedNodeId)
-    for (key in everyKey) {
-      controller.dispatch(ChartInputEvent.Key(key))
-      assertNull(
-        controller.state.value.snapshot.interactionState.focusedNodeId,
-        "$key moved focus, so traversal has arrived and this row is out of date",
-      )
-    }
+    controller.handleKey(ChartKey.ARROW_RIGHT)
+    assertNotNull(
+      controller.state.value.snapshot.interactionState.focusedNodeId,
+      "no mark could be focused, so nothing else here is testing what it says",
+    )
   }
 
   /**
-   * And no key fires a signal handler, because no Vega event is produced for one.
+   * No key fires a signal handler, because no Vega event is produced for one.
    *
-   * `keydown` is a selector a specification may perfectly well write, so this is the sharper half:
-   * such a specification compiles, draws, and never fires. The row has to say so.
+   * `fireSignalHandlers` maps only the pointer family. A specification writing `{"events":
+   * "keydown"}` gets a chart that compiles and draws and never updates from the keyboard, and that
+   * is worth a test of its own now that keys visibly *do* something else.
    */
   @Test
   fun `a keydown handler does not fire`() {
@@ -88,16 +90,16 @@ class KeyboardTraversalLimitTest {
     for (key in everyKey) controller.dispatch(ChartInputEvent.Key(key))
     assertEquals(
       VegaValue.Num(0.0),
-      controller.lastCompiled!!.signals["keys"],
-      "a key fired a keydown handler, so key events now reach the dispatch",
+      controller.lastCompiled!!.signals.values["keys"],
+      "a key fired a keydown handler, so key events now reach the event dispatch",
     )
   }
 
   /**
-   * The pointer family *does* fire, which is what keeps the two above from being vacuous.
+   * The pointer family *does* fire, which is what keeps the above from being vacuous.
    *
-   * Without it they would pass equally well for a controller whose dispatch was broken outright,
-   * and the row would be recording the wrong limitation.
+   * Without it the test would pass equally well for a controller whose dispatch was broken
+   * outright.
    */
   @Test
   fun `the pointer family still fires, so the dispatch itself works`() {
@@ -110,20 +112,36 @@ class KeyboardTraversalLimitTest {
         buttons = 1,
       )
     )
-    assertEquals(VegaValue.Num(1.0), controller.lastCompiled!!.signals["taps"])
+    assertEquals(VegaValue.Num(1.0), controller.lastCompiled!!.signals.values["taps"])
   }
 
   /**
-   * A key changes nothing else either — no selection, no hover, no viewport.
+   * A key moves focus and a selection, and touches **nothing else** — no hover, no viewport.
    *
-   * Stated because "moves no focus" alone would leave room for a key that quietly panned the chart
-   * or cleared a selection, which a reader pressing ESC in a dialog would find surprising.
+   * The narrowed form of what this class used to claim. Traversal is allowed to move focus and, on
+   * activation, the selection; a key that panned the chart or changed what is hovered would be a
+   * surprise to a reader who pressed an arrow.
    */
   @Test
-  fun `a key leaves the rest of the interaction state alone`() {
+  fun `a key leaves the hover and the viewport alone`() {
     controller.setSpec(json)
     val before = controller.state.value.snapshot.interactionState
     for (key in everyKey) controller.dispatch(ChartInputEvent.Key(key))
-    assertEquals(before, controller.state.value.snapshot.interactionState)
+    val after = controller.state.value.snapshot.interactionState
+    assertEquals(before.hoveredNodeId, after.hoveredNodeId, "a key changed what is hovered")
+    assertEquals(before.viewportOffset, after.viewportOffset, "a key panned the chart")
+    assertEquals(before.viewportScale, after.viewportScale, "a key zoomed the chart")
+    assertEquals(before.tooltip, after.tooltip, "a key changed the tooltip")
+
+    // Focus is checked mid-sequence rather than at the end, because the run finishes on ESCAPE and
+    // ESCAPE clears it — comparing the ends would be comparing null with null and would pass for a
+    // controller in which no key did anything, which is the mistake this class made before.
+    val fresh = VegaChartController()
+    fresh.setSpec(json)
+    fresh.dispatch(ChartInputEvent.Key(ChartKey.ARROW_RIGHT))
+    assertNotNull(
+      fresh.state.value.snapshot.interactionState.focusedNodeId,
+      "no key moved focus, so traversal is not running and this test proves nothing",
+    )
   }
 }

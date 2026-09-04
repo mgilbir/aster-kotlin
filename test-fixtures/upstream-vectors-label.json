@@ -1,0 +1,1249 @@
+{
+ "package": "vega-label",
+ "version": "6.3.1",
+ "note": "Recorded with `canvas` installed, which oracle-js does not depend on. Anchors and drops are the comparable part; x/y are this run's font metrics.",
+ "scenarios": [
+  {
+   "name": "four-anchors",
+   "why": "the ordinary case: room for every label, and the anchor order decides which side it takes",
+   "spec": {
+    "$schema": "https://vega.github.io/schema/vega/v6.json",
+    "width": 200,
+    "height": 200,
+    "padding": 5,
+    "data": [
+     {
+      "name": "pts",
+      "values": [
+       {
+        "x": 20,
+        "y": 20,
+        "t": "alpha"
+       },
+       {
+        "x": 60,
+        "y": 40,
+        "t": "beta"
+       },
+       {
+        "x": 100,
+        "y": 30,
+        "t": "gamma"
+       },
+       {
+        "x": 140,
+        "y": 70,
+        "t": "delta"
+       },
+       {
+        "x": 40,
+        "y": 120,
+        "t": "epsilon"
+       },
+       {
+        "x": 120,
+        "y": 150,
+        "t": "zeta"
+       },
+       {
+        "x": 170,
+        "y": 110,
+        "t": "eta"
+       },
+       {
+        "x": 80,
+        "y": 180,
+        "t": "theta"
+       }
+      ]
+     }
+    ],
+    "marks": [
+     {
+      "type": "symbol",
+      "name": "dots",
+      "from": {
+       "data": "pts"
+      },
+      "encode": {
+       "enter": {
+        "x": {
+         "field": "x"
+        },
+        "y": {
+         "field": "y"
+        },
+        "size": {
+         "value": 200
+        },
+        "fill": {
+         "value": "#4c78a8"
+        }
+       }
+      }
+     },
+     {
+      "type": "text",
+      "name": "labels",
+      "from": {
+       "data": "dots"
+      },
+      "encode": {
+       "enter": {
+        "text": {
+         "field": "datum.t"
+        },
+        "fill": {
+         "value": "#000000"
+        },
+        "fontSize": {
+         "value": 11
+        }
+       }
+      },
+      "transform": [
+       {
+        "type": "label",
+        "size": [
+         {
+          "signal": "width"
+         },
+         {
+          "signal": "height"
+         }
+        ],
+        "anchor": [
+         "top",
+         "bottom",
+         "right",
+         "left"
+        ],
+        "offset": [
+         3
+        ],
+        "avoidBaseMark": true
+       }
+      ]
+     }
+    ]
+   },
+   "labels": [
+    {
+     "text": "alpha",
+     "width": 26.9169921875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "top",
+     "opacity": 1,
+     "x": 20,
+     "y": 30
+    },
+    {
+     "text": "beta",
+     "width": 21.4111328125,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 60,
+     "y": 30
+    },
+    {
+     "text": "gamma",
+     "width": 36.6806640625,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 100,
+     "y": 20
+    },
+    {
+     "text": "delta",
+     "width": 23.85546875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 140,
+     "y": 60
+    },
+    {
+     "text": "epsilon",
+     "width": 34.861328125,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 40,
+     "y": 110
+    },
+    {
+     "text": "zeta",
+     "width": 20.79296875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 120,
+     "y": 140
+    },
+    {
+     "text": "eta",
+     "width": 15.29296875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 170,
+     "y": 100
+    },
+    {
+     "text": "theta",
+     "width": 24.4677734375,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 80,
+     "y": 170
+    }
+   ]
+  },
+  {
+   "name": "eight-anchors",
+   "why": "the diagonals too, which are the anchors scaled by 1/sqrt(2)",
+   "spec": {
+    "$schema": "https://vega.github.io/schema/vega/v6.json",
+    "width": 200,
+    "height": 200,
+    "padding": 5,
+    "data": [
+     {
+      "name": "pts",
+      "values": [
+       {
+        "x": 20,
+        "y": 20,
+        "t": "alpha"
+       },
+       {
+        "x": 60,
+        "y": 40,
+        "t": "beta"
+       },
+       {
+        "x": 100,
+        "y": 30,
+        "t": "gamma"
+       },
+       {
+        "x": 140,
+        "y": 70,
+        "t": "delta"
+       },
+       {
+        "x": 40,
+        "y": 120,
+        "t": "epsilon"
+       },
+       {
+        "x": 120,
+        "y": 150,
+        "t": "zeta"
+       },
+       {
+        "x": 170,
+        "y": 110,
+        "t": "eta"
+       },
+       {
+        "x": 80,
+        "y": 180,
+        "t": "theta"
+       }
+      ]
+     }
+    ],
+    "marks": [
+     {
+      "type": "symbol",
+      "name": "dots",
+      "from": {
+       "data": "pts"
+      },
+      "encode": {
+       "enter": {
+        "x": {
+         "field": "x"
+        },
+        "y": {
+         "field": "y"
+        },
+        "size": {
+         "value": 200
+        },
+        "fill": {
+         "value": "#4c78a8"
+        }
+       }
+      }
+     },
+     {
+      "type": "text",
+      "name": "labels",
+      "from": {
+       "data": "dots"
+      },
+      "encode": {
+       "enter": {
+        "text": {
+         "field": "datum.t"
+        },
+        "fill": {
+         "value": "#000000"
+        },
+        "fontSize": {
+         "value": 11
+        }
+       }
+      },
+      "transform": [
+       {
+        "type": "label",
+        "size": [
+         {
+          "signal": "width"
+         },
+         {
+          "signal": "height"
+         }
+        ],
+        "anchor": [
+         "top",
+         "bottom",
+         "right",
+         "left",
+         "top-left",
+         "top-right",
+         "bottom-left",
+         "bottom-right"
+        ],
+        "offset": [
+         4
+        ],
+        "avoidBaseMark": true
+       }
+      ]
+     }
+    ]
+   },
+   "labels": [
+    {
+     "text": "alpha",
+     "width": 26.9169921875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "top",
+     "opacity": 1,
+     "x": 20,
+     "y": 31
+    },
+    {
+     "text": "beta",
+     "width": 21.4111328125,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 60,
+     "y": 29
+    },
+    {
+     "text": "gamma",
+     "width": 36.6806640625,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 100,
+     "y": 19
+    },
+    {
+     "text": "delta",
+     "width": 23.85546875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 140,
+     "y": 59
+    },
+    {
+     "text": "epsilon",
+     "width": 34.861328125,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 40,
+     "y": 109
+    },
+    {
+     "text": "zeta",
+     "width": 20.79296875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 120,
+     "y": 139
+    },
+    {
+     "text": "eta",
+     "width": 15.29296875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 170,
+     "y": 99
+    },
+    {
+     "text": "theta",
+     "width": 24.4677734375,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 80,
+     "y": 169
+    }
+   ]
+  },
+  {
+   "name": "crowded-drops",
+   "why": "eight points in a quarter of the surface, so the bitmap has to refuse some outright",
+   "spec": {
+    "$schema": "https://vega.github.io/schema/vega/v6.json",
+    "width": 200,
+    "height": 200,
+    "padding": 5,
+    "data": [
+     {
+      "name": "pts",
+      "values": [
+       {
+        "x": 40,
+        "y": 40,
+        "t": "one"
+       },
+       {
+        "x": 52,
+        "y": 44,
+        "t": "two"
+       },
+       {
+        "x": 64,
+        "y": 38,
+        "t": "three"
+       },
+       {
+        "x": 46,
+        "y": 56,
+        "t": "four"
+       },
+       {
+        "x": 58,
+        "y": 60,
+        "t": "five"
+       },
+       {
+        "x": 70,
+        "y": 52,
+        "t": "six"
+       },
+       {
+        "x": 44,
+        "y": 70,
+        "t": "seven"
+       },
+       {
+        "x": 62,
+        "y": 74,
+        "t": "eight"
+       }
+      ]
+     }
+    ],
+    "marks": [
+     {
+      "type": "symbol",
+      "name": "dots",
+      "from": {
+       "data": "pts"
+      },
+      "encode": {
+       "enter": {
+        "x": {
+         "field": "x"
+        },
+        "y": {
+         "field": "y"
+        },
+        "size": {
+         "value": 400
+        },
+        "fill": {
+         "value": "#4c78a8"
+        }
+       }
+      }
+     },
+     {
+      "type": "text",
+      "name": "labels",
+      "from": {
+       "data": "dots"
+      },
+      "encode": {
+       "enter": {
+        "text": {
+         "field": "datum.t"
+        },
+        "fill": {
+         "value": "#000000"
+        },
+        "fontSize": {
+         "value": 11
+        }
+       }
+      },
+      "transform": [
+       {
+        "type": "label",
+        "size": [
+         {
+          "signal": "width"
+         },
+         {
+          "signal": "height"
+         }
+        ],
+        "anchor": [
+         "top",
+         "bottom",
+         "right",
+         "left"
+        ],
+        "offset": [
+         2
+        ],
+        "avoidBaseMark": true
+       }
+      ]
+     }
+    ]
+   },
+   "labels": [
+    {
+     "text": "one",
+     "width": 18.3544921875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 40,
+     "y": 28
+    },
+    {
+     "text": "two",
+     "width": 17.119140625,
+     "fontSize": 11,
+     "opacity": 0,
+     "x": null,
+     "y": null
+    },
+    {
+     "text": "three",
+     "width": 25.07421875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 64,
+     "y": 26
+    },
+    {
+     "text": "four",
+     "width": 18.9560546875,
+     "fontSize": 11,
+     "align": "right",
+     "baseline": "middle",
+     "opacity": 1,
+     "x": 34,
+     "y": 56
+    },
+    {
+     "text": "five",
+     "width": 17.1181640625,
+     "fontSize": 11,
+     "opacity": 0,
+     "x": null,
+     "y": null
+    },
+    {
+     "text": "six",
+     "width": 13.4443359375,
+     "fontSize": 11,
+     "align": "left",
+     "baseline": "middle",
+     "opacity": 1,
+     "x": 82,
+     "y": 52
+    },
+    {
+     "text": "seven",
+     "width": 29.3544921875,
+     "fontSize": 11,
+     "align": "right",
+     "baseline": "middle",
+     "opacity": 1,
+     "x": 32,
+     "y": 70
+    },
+    {
+     "text": "eight",
+     "width": 23.85546875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "top",
+     "opacity": 1,
+     "x": 62,
+     "y": 86
+    }
+   ]
+  },
+  {
+   "name": "no-base-mark",
+   "why": "the same crowd without avoiding the dots, so only label-on-label collisions count",
+   "spec": {
+    "$schema": "https://vega.github.io/schema/vega/v6.json",
+    "width": 200,
+    "height": 200,
+    "padding": 5,
+    "data": [
+     {
+      "name": "pts",
+      "values": [
+       {
+        "x": 40,
+        "y": 40,
+        "t": "one"
+       },
+       {
+        "x": 52,
+        "y": 44,
+        "t": "two"
+       },
+       {
+        "x": 64,
+        "y": 38,
+        "t": "three"
+       },
+       {
+        "x": 46,
+        "y": 56,
+        "t": "four"
+       },
+       {
+        "x": 58,
+        "y": 60,
+        "t": "five"
+       },
+       {
+        "x": 70,
+        "y": 52,
+        "t": "six"
+       },
+       {
+        "x": 44,
+        "y": 70,
+        "t": "seven"
+       },
+       {
+        "x": 62,
+        "y": 74,
+        "t": "eight"
+       }
+      ]
+     }
+    ],
+    "marks": [
+     {
+      "type": "symbol",
+      "name": "dots",
+      "from": {
+       "data": "pts"
+      },
+      "encode": {
+       "enter": {
+        "x": {
+         "field": "x"
+        },
+        "y": {
+         "field": "y"
+        },
+        "size": {
+         "value": 400
+        },
+        "fill": {
+         "value": "#4c78a8"
+        }
+       }
+      }
+     },
+     {
+      "type": "text",
+      "name": "labels",
+      "from": {
+       "data": "dots"
+      },
+      "encode": {
+       "enter": {
+        "text": {
+         "field": "datum.t"
+        },
+        "fill": {
+         "value": "#000000"
+        },
+        "fontSize": {
+         "value": 11
+        }
+       }
+      },
+      "transform": [
+       {
+        "type": "label",
+        "size": [
+         {
+          "signal": "width"
+         },
+         {
+          "signal": "height"
+         }
+        ],
+        "anchor": [
+         "top",
+         "bottom",
+         "right",
+         "left"
+        ],
+        "offset": [
+         2
+        ],
+        "avoidBaseMark": false
+       }
+      ]
+     }
+    ]
+   },
+   "labels": [
+    {
+     "text": "one",
+     "width": 18.3544921875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 40,
+     "y": 28
+    },
+    {
+     "text": "two",
+     "width": 17.119140625,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "top",
+     "opacity": 1,
+     "x": 52,
+     "y": 56
+    },
+    {
+     "text": "three",
+     "width": 25.07421875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 64,
+     "y": 26
+    },
+    {
+     "text": "four",
+     "width": 18.9560546875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 46,
+     "y": 44
+    },
+    {
+     "text": "five",
+     "width": 17.1181640625,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "top",
+     "opacity": 1,
+     "x": 58,
+     "y": 72
+    },
+    {
+     "text": "six",
+     "width": 13.4443359375,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 70,
+     "y": 40
+    },
+    {
+     "text": "seven",
+     "width": 29.3544921875,
+     "fontSize": 11,
+     "align": "right",
+     "baseline": "middle",
+     "opacity": 1,
+     "x": 32,
+     "y": 70
+    },
+    {
+     "text": "eight",
+     "width": 23.85546875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "top",
+     "opacity": 1,
+     "x": 62,
+     "y": 86
+    }
+   ]
+  },
+  {
+   "name": "large-offset",
+   "why": "a wide offset pushes labels off the surface, which is a different refusal from a collision",
+   "spec": {
+    "$schema": "https://vega.github.io/schema/vega/v6.json",
+    "width": 200,
+    "height": 200,
+    "padding": 5,
+    "data": [
+     {
+      "name": "pts",
+      "values": [
+       {
+        "x": 20,
+        "y": 20,
+        "t": "alpha"
+       },
+       {
+        "x": 60,
+        "y": 40,
+        "t": "beta"
+       },
+       {
+        "x": 100,
+        "y": 30,
+        "t": "gamma"
+       },
+       {
+        "x": 140,
+        "y": 70,
+        "t": "delta"
+       },
+       {
+        "x": 40,
+        "y": 120,
+        "t": "epsilon"
+       },
+       {
+        "x": 120,
+        "y": 150,
+        "t": "zeta"
+       },
+       {
+        "x": 170,
+        "y": 110,
+        "t": "eta"
+       },
+       {
+        "x": 80,
+        "y": 180,
+        "t": "theta"
+       }
+      ]
+     }
+    ],
+    "marks": [
+     {
+      "type": "symbol",
+      "name": "dots",
+      "from": {
+       "data": "pts"
+      },
+      "encode": {
+       "enter": {
+        "x": {
+         "field": "x"
+        },
+        "y": {
+         "field": "y"
+        },
+        "size": {
+         "value": 200
+        },
+        "fill": {
+         "value": "#4c78a8"
+        }
+       }
+      }
+     },
+     {
+      "type": "text",
+      "name": "labels",
+      "from": {
+       "data": "dots"
+      },
+      "encode": {
+       "enter": {
+        "text": {
+         "field": "datum.t"
+        },
+        "fill": {
+         "value": "#000000"
+        },
+        "fontSize": {
+         "value": 11
+        }
+       }
+      },
+      "transform": [
+       {
+        "type": "label",
+        "size": [
+         {
+          "signal": "width"
+         },
+         {
+          "signal": "height"
+         }
+        ],
+        "anchor": [
+         "top",
+         "bottom",
+         "right",
+         "left"
+        ],
+        "offset": [
+         22
+        ],
+        "avoidBaseMark": true
+       }
+      ]
+     }
+    ]
+   },
+   "labels": [
+    {
+     "text": "alpha",
+     "width": 26.9169921875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "top",
+     "opacity": 1,
+     "x": 20,
+     "y": 49
+    },
+    {
+     "text": "beta",
+     "width": 21.4111328125,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 60,
+     "y": 11
+    },
+    {
+     "text": "gamma",
+     "width": 36.6806640625,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "top",
+     "opacity": 1,
+     "x": 100,
+     "y": 59
+    },
+    {
+     "text": "delta",
+     "width": 23.85546875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 140,
+     "y": 41
+    },
+    {
+     "text": "epsilon",
+     "width": 34.861328125,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 40,
+     "y": 91
+    },
+    {
+     "text": "zeta",
+     "width": 20.79296875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 120,
+     "y": 121
+    },
+    {
+     "text": "eta",
+     "width": 15.29296875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 170,
+     "y": 81
+    },
+    {
+     "text": "theta",
+     "width": 24.4677734375,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 80,
+     "y": 151
+    }
+   ]
+  },
+  {
+   "name": "big-marks",
+   "why": "large symbols occupy more of the bitmap, so more labels are pushed outward or dropped",
+   "spec": {
+    "$schema": "https://vega.github.io/schema/vega/v6.json",
+    "width": 200,
+    "height": 200,
+    "padding": 5,
+    "data": [
+     {
+      "name": "pts",
+      "values": [
+       {
+        "x": 20,
+        "y": 20,
+        "t": "alpha"
+       },
+       {
+        "x": 60,
+        "y": 40,
+        "t": "beta"
+       },
+       {
+        "x": 100,
+        "y": 30,
+        "t": "gamma"
+       },
+       {
+        "x": 140,
+        "y": 70,
+        "t": "delta"
+       },
+       {
+        "x": 40,
+        "y": 120,
+        "t": "epsilon"
+       },
+       {
+        "x": 120,
+        "y": 150,
+        "t": "zeta"
+       },
+       {
+        "x": 170,
+        "y": 110,
+        "t": "eta"
+       },
+       {
+        "x": 80,
+        "y": 180,
+        "t": "theta"
+       }
+      ]
+     }
+    ],
+    "marks": [
+     {
+      "type": "symbol",
+      "name": "dots",
+      "from": {
+       "data": "pts"
+      },
+      "encode": {
+       "enter": {
+        "x": {
+         "field": "x"
+        },
+        "y": {
+         "field": "y"
+        },
+        "size": {
+         "value": 2000
+        },
+        "fill": {
+         "value": "#4c78a8"
+        }
+       }
+      }
+     },
+     {
+      "type": "text",
+      "name": "labels",
+      "from": {
+       "data": "dots"
+      },
+      "encode": {
+       "enter": {
+        "text": {
+         "field": "datum.t"
+        },
+        "fill": {
+         "value": "#000000"
+        },
+        "fontSize": {
+         "value": 11
+        }
+       }
+      },
+      "transform": [
+       {
+        "type": "label",
+        "size": [
+         {
+          "signal": "width"
+         },
+         {
+          "signal": "height"
+         }
+        ],
+        "anchor": [
+         "top",
+         "bottom",
+         "right",
+         "left"
+        ],
+        "offset": [
+         3
+        ],
+        "avoidBaseMark": true
+       }
+      ]
+     }
+    ]
+   },
+   "labels": [
+    {
+     "text": "alpha",
+     "width": 26.9169921875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "top",
+     "opacity": 1,
+     "x": 20,
+     "y": 45
+    },
+    {
+     "text": "beta",
+     "width": 21.4111328125,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 60,
+     "y": 15
+    },
+    {
+     "text": "gamma",
+     "width": 36.6806640625,
+     "fontSize": 11,
+     "align": "left",
+     "baseline": "middle",
+     "opacity": 1,
+     "x": 125,
+     "y": 30
+    },
+    {
+     "text": "delta",
+     "width": 23.85546875,
+     "fontSize": 11,
+     "align": "left",
+     "baseline": "middle",
+     "opacity": 1,
+     "x": 165,
+     "y": 70
+    },
+    {
+     "text": "epsilon",
+     "width": 34.861328125,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 40,
+     "y": 95
+    },
+    {
+     "text": "zeta",
+     "width": 20.79296875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 120,
+     "y": 125
+    },
+    {
+     "text": "eta",
+     "width": 15.29296875,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "top",
+     "opacity": 1,
+     "x": 170,
+     "y": 135
+    },
+    {
+     "text": "theta",
+     "width": 24.4677734375,
+     "fontSize": 11,
+     "align": "center",
+     "baseline": "bottom",
+     "opacity": 1,
+     "x": 80,
+     "y": 155
+    }
+   ]
+  }
+ ]
+}

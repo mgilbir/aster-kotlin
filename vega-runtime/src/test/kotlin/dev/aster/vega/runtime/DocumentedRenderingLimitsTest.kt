@@ -1,12 +1,10 @@
 package dev.aster.vega.runtime
 
 import dev.aster.vega.runtime.compile.SpecCompiler
-import dev.aster.vega.scene.AccessibilityTree
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.TextNode
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
@@ -67,48 +65,5 @@ class DocumentedRenderingLimitsTest {
           "says is not planned and a way for data to become markup",
       )
     }
-  }
-
-  /**
-   * **Domain adjustment and reset-zoom actions — planned.** No such action is offered to assistive
-   * technology.
-   *
-   * A chart that pans and zooms has no accessible way to do either yet: the accessibility tree
-   * offers activation and nothing else. Pinned because the row says `Planned`, and a planned thing
-   * that quietly arrives leaves the row telling a reader it is still missing.
-   */
-  @Test
-  fun `no accessibility action offers to adjust a domain or reset a zoom`() {
-    val compiled =
-      compile(
-        """
-        {"width": 200, "height": 100, "padding": 0, "autosize": "none",
-         "data": [{"name": "t", "values": [{"c": "a", "v": 3}, {"c": "b", "v": 7}]}],
-         "signals": [{"name": "zoom", "value": 1,
-                      "on": [{"events": "wheel", "update": "zoom * 1.1"}]}],
-         "scales": [{"name": "x", "type": "band", "domain": {"data": "t", "field": "c"},
-                     "range": "width"},
-                    {"name": "y", "type": "linear", "domain": {"data": "t", "field": "v"},
-                     "range": "height"}],
-         "axes": [{"scale": "y", "orient": "left"}],
-         "marks": [{"type": "rect", "from": {"data": "t"},
-                    "encode": {"enter": {"x": {"scale": "x", "field": "c"},
-                                         "width": {"scale": "x", "band": 1},
-                                         "y": {"scale": "y", "field": "v"},
-                                         "y2": {"value": 0}}}}]}
-        """
-          .trimIndent()
-      )
-    val elements = AccessibilityTree.elements(requireNotNull(compiled.scene))
-    assertTrue(elements.isNotEmpty(), "the chart exposed nothing at all, so this proves nothing")
-    val offered = elements.filter { element ->
-      val said = (element.label + " " + (element.roleDescription ?: "")).lowercase()
-      "reset" in said || "zoom" in said || "adjust" in said || "domain" in said
-    }
-    assertEquals(
-      emptyList<String>(),
-      offered.map { it.label },
-      "an accessibility element offers a domain or zoom action, so this row is no longer `Planned`",
-    )
   }
 }
