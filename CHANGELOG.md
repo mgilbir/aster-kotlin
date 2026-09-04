@@ -439,6 +439,29 @@ section here does not get released.
 
 ### Fixed
 
+- **`check.sh` now runs the test-count gate CI had, which it did not.** The rule lived in a heredoc
+  inside the workflow, and that was a hole rather than a detail: `check.sh` is what somebody runs
+  before landing, so a rule only CI knows is a rule that lands broken.
+
+  It did. A nested-scale comparison that skipped 195 of 198 fixtures passed all twelve gates here
+  and failed CI's count step — twice, on two separate merges to `main` — before anybody read the
+  workflow. Three red runs for a rule that was never available to the person who could have acted
+  on it.
+
+  `scripts/test-counts.py` holds it now and both callers use it, so the thresholds cannot drift: the
+  per-module floors, the Kotlin/Native floor on macOS, and the ceiling of ten skips. Verified by
+  putting the skipping assumption back, where the new gate exits 1 and names the class that did it.
+
+- **The nested-scale comparison skipped 195 of the 198 fixtures, and CI was right to refuse it.** It
+  guarded itself with `assumeTrue(reference.nestedScales.isNotEmpty())`, so every fixture with no
+  scale inside a group reported a *skip* rather than a pass — and the workflow's "Say how many tests
+  actually ran" step fails above ten, because a suite that assumes itself out of existence is the
+  vacuous-test failure this repository keeps finding.
+
+  A fixture with nothing to compare now passes over an empty set, which is what it is. That the
+  corpus really does exercise the named, faceted and unnamed cases is `NestedScaleCoverageTest`'s
+  assertion, where it is made once rather than once per fixture. The suite reports **zero** skips.
+
 - **A channel this engine leaves out because it is the default no longer reads as a difference.**
   Upstream records a `strokeCap` or a `strokeJoin` whenever the specification **set** one, even to
   the default; this engine records one only when it *differs* from the default. Those two rules
