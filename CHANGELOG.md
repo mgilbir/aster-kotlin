@@ -8,6 +8,28 @@ section here does not get released.
 
 ### Added
 
+- **What a group mark's scope resolved to is kept, under `CompiledSpec.groupScopes`.** A group's
+  signals and scales have always been resolved — `ScopeCompiler.nest` does it, and the cell is drawn
+  from them — and were then dropped, because nothing above could name them. That is the first half
+  of why a signal handler declared inside a group never fires: there is no scope to evaluate it in,
+  and nowhere for its result to go. Vega's own `overview-plus-detail` is exactly this shape, and
+  brushing its overview changed nothing at all.
+
+  Keyed by the group's `name`, since that is what a specification addresses it by — `@overview:
+  pointerdown` names the mark — falling back to its index among its siblings when it has none. A
+  faceted group records one scope per cell, `cell/cells[0]` and so on, because it genuinely resolves
+  one per cell; collapsing those into a single entry is what would later make a brush in one cell
+  write another's signal.
+
+  The value is a `SignalScope`, which is already an expression scope carrying signals, datasets
+  *and* scales. That matters for what comes next: `detailDomain`'s update is
+  `invert('xOverview', brush)` — a scale lookup and a signal read in one expression, both of them
+  the group's own — so a scope holding only the signals would evaluate half of it. The group's own
+  scales are built *from* its signals and therefore after them, so they are joined back on with
+  `withScales` at the point the cell is compiled.
+
+  Nothing drawn changes; dispatch is the second half and comes next.
+
 - **The three vocabularies a specification names by a single word are measured: 146 of 146.** A
   projection type, a time unit and an expression function are each reached by writing a word
   upstream defines, and none of the three is in Vega's schema. That made them the last place a gap

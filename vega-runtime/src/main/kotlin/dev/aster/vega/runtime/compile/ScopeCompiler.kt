@@ -154,6 +154,38 @@ internal class ScopeCompiler(
   private var depth: Int = 0
 
   /**
+   * Where the group being compiled sits, as the path from the root.
+   *
+   * Pushed and popped around [groupContents] the way [depth] is, and for the same reason: a group
+   * is compiled recursively and there is no parameter to thread that would not have to be threaded
+   * through every guide and layout call between here and there.
+   *
+   * A segment is the group's own `name` when it has one, because that is what a specification
+   * addresses it by — `@overview:pointerdown` names the mark, so a scope keyed the same way is the
+   * one a handler can be attributed to. An unnamed group falls back to its index among its
+   * siblings, which is stable across a recompile because specification order is.
+   */
+  private val path = ArrayDeque<String>()
+
+  /**
+   * What each group mark's scope resolved to, by that path.
+   *
+   * A group's signals and scales have always been resolved — [nest] does it, and the cell is drawn
+   * from them — and then discarded, because nothing above could name them. So a signal declared
+   * inside a group had a value that no host could read and no handler could write, which is the
+   * first half of why a handler declared in a group never fires.
+   *
+   * This is that value, kept. A [SignalScope] rather than a bare map because it is already an
+   * expression scope holding the signals, the datasets *and* the scales in force at that point,
+   * which is exactly what evaluating one of those handlers will need: `invert('xOverview', brush)`
+   * is a scale lookup and a signal read in the same expression, and both are the group's own.
+   *
+   * A faceted group resolves its scope once per cell, so those are recorded per cell — `cells[0]`,
+   * `cells[1]` — and a group drawn once records one entry under its bare path.
+   */
+  val groupScopes: MutableMap<String, SignalScope> = LinkedHashMap()
+
+  /**
    * A scope's scene nodes, and how far the drawing they make up reaches.
    *
    * @param cellReach set only for a group mark's cells, which a `layout` needs in order to grid
@@ -297,7 +329,7 @@ internal class ScopeCompiler(
       }
       fun expose(rows: List<VegaValue>) = exposeItems(encoder.items(mark, rows))
       if (mark.type == MarkType.GROUP) {
-        val group = group(mark, scope, encoder)
+        val group = group(mark, scope, encoder, mark.name ?: "[$index]")
         expose(group.datums)
         if (layout != null) {
           // A trellis's cells and headers are group marks like any other and are announced the same
@@ -618,7 +650,12 @@ internal class ScopeCompiler(
    * so asking the finished [GroupNode] how big it is would quietly reintroduce the half-pixel crisp
    * offset that everything outside the cell is careful to exclude.
    */
-  private fun group(spec: MarkSpec, outer: CompileScope, encoder: MarkEncoder): BuiltGroup {
+  private fun group(
+    spec: MarkSpec,
+    outer: CompileScope,
+    encoder: MarkEncoder,
+    segment: String,
+  ): BuiltGroup {
     if (depth >= MAX_GROUP_DEPTH) {
       diagnostics.error(
         DiagnosticCodes.COMPILE_LIMIT_EXCEEDED,
@@ -629,9 +666,11 @@ internal class ScopeCompiler(
       return BuiltGroup(ScopeContent(emptyList(), RectD.Empty), emptyList())
     }
     depth++
+    path.addLast(segment)
     try {
       return groupContents(spec, outer, encoder)
     } finally {
+      path.removeLast()
       depth--
     }
   }
@@ -667,6 +706,17 @@ internal class ScopeCompiler(
           } else {
             nested
           }
+        // Recorded here rather than beside `nest`, because `sized` is the scope the cell is
+        // actually compiled with: a group that encodes its own width redefines `width` for
+        // everything inside it, and a handler reading `width` has to read the same one its marks
+        // did.
+        //
+        // `withScales` because a group's own scales are built *after* its signals — they are built
+        // from them — so the scope the signals were resolved in holds only the enclosing scales.
+        // A handler needs both at once: `invert('xOverview', brush)` is a scale lookup and a signal
+        // read in one expression, and `xOverview` is the group's own.
+        groupScopes[cellPath(partitions.size, index)] =
+          sized.signals.withScales(sized.scales, diagnostics)
         // An **empty** facet cell draws nothing at all — not even its gridlines. Vega instantiates
         // a faceted group's subflow only for keys that rows arrived under, so a cell `cross`
         // invented to keep the grid rectangular is a group with no contents, which is visibly
@@ -1308,6 +1358,17 @@ internal class ScopeCompiler(
       outer.scaleTypes + spec.scales.associate { it.name to it.type },
       outer.projections + ProjectionResolver(numbers, diagnostics).resolve(spec.projections),
     )
+  }
+
+  /**
+   * This cell's path: the group's own, with the cell's index only when there is more than one.
+   *
+   * A group drawn once is the overwhelming majority and reads better without a `[0]` nobody needs,
+   * while a faceted group genuinely has one scope per cell and they must not overwrite each other.
+   */
+  private fun cellPath(cells: Int, index: Int): String {
+    val here = path.joinToString("/")
+    return if (cells > 1) "$here/cells[$index]" else here
   }
 
   /** Whether a group mark states its own `width` or `height` in any of its encode blocks. */
