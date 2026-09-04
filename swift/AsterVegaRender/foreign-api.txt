@@ -3213,6 +3213,7 @@ PointScale.bandwidth
 PointScale.domain
 PointScale.init(name:domain:range:padding:align:round:)
 PointScale.invert(position:)
+PointScale.invertRange(from:to:)
 PointScale.name
 PointScale.padding
 PointScale.position(value:)

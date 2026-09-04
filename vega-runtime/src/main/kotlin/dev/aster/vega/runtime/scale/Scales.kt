@@ -420,6 +420,9 @@ public class PointScale(
   /** The one point a position falls nearest, through the band this scale is built on. */
   public fun invert(position: Double): String? = band.invert(position)
 
+  /** Which points a stretch of the range covers — see [BandScale.invertRange]. */
+  public fun invertRange(from: Double, to: Double): List<String>? = band.invertRange(from, to)
+
   public fun ticks(): List<String> = domain
 }
 

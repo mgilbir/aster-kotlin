@@ -966,6 +966,7 @@ final class dev.aster.vega.runtime.scale/PointScale : dev.aster.vega.runtime.sca
         final fun <get-step>(): kotlin/Double // dev.aster.vega.runtime.scale/PointScale.step.<get-step>|<get-step>(){}[0]
 
     final fun invert(kotlin/Double): kotlin/String? // dev.aster.vega.runtime.scale/PointScale.invert|invert(kotlin.Double){}[0]
+    final fun invertRange(kotlin/Double, kotlin/Double): kotlin.collections/List<kotlin/String>? // dev.aster.vega.runtime.scale/PointScale.invertRange|invertRange(kotlin.Double;kotlin.Double){}[0]
     final fun position(dev.aster.vega.model/VegaValue): kotlin/Double // dev.aster.vega.runtime.scale/PointScale.position|position(dev.aster.vega.model.VegaValue){}[0]
     final fun scale(dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.runtime.scale/PointScale.scale|scale(dev.aster.vega.model.VegaValue){}[0]
     final fun ticks(): kotlin.collections/List<kotlin/String> // dev.aster.vega.runtime.scale/PointScale.ticks|ticks(){}[0]

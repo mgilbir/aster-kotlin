@@ -252,6 +252,21 @@ section here does not get released.
 
 ### Fixed
 
+- **`invert('name', [lo, hi])` answered null for every scale.** The range form — the one every brush
+  in Vega's gallery is written with — reached `asDouble()`, came back NaN, and the whole call
+  produced nothing. Null reads as zero to the arithmetic downstream, so a brushed detail panel got
+  the domain `[0, 0]` rather than staying where it was.
+
+  The band and point scales already had `invertRange`, matched to upstream and tested through
+  `invert(position)`. Nothing had ever called it with two ends.
+
+  Every case is upstream's own answer, read from 6.3.1 rather than derived, including the ones that
+  look like mistakes and are not: a range written high-to-low gives the same answer as low-to-high,
+  because upstream orders the **range inputs** rather than the results — so on a scale whose range
+  runs backwards the answer descends, `[9, 4]`. A one-element array answers a pair with a hole in it
+  rather than refusing, and a range reaching outside the scale extrapolates rather than clamping.
+  A band whose range runs backwards answers the values at the other end, `["b", "c"]`.
+
 - **No scale function worked inside a signal handler, and nothing said so.** `invert`, `scale`,
   `domain`, `range`, `bandwidth`, `bandspace`, the whole geo family, `treePath` and `treeAncestors`
   all answered null in a handler's `update` — and null is zero to arithmetic.

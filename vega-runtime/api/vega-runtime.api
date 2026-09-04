@@ -1130,6 +1130,7 @@ public final class dev/aster/vega/runtime/scale/PointScale : dev/aster/vega/runt
 	public final fun getRound ()Z
 	public final fun getStep ()D
 	public final fun invert (D)Ljava/lang/String;
+	public final fun invertRange (DD)Ljava/util/List;
 	public fun position (Ldev/aster/vega/model/VegaValue;)D
 	public fun scale (Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
 	public final fun ticks ()Ljava/util/List;
