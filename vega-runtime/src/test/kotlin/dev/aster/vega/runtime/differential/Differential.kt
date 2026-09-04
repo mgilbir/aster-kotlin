@@ -7,6 +7,8 @@ import dev.aster.vega.model.asString
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.PointScale
+import dev.aster.vega.runtime.scale.TimeScale
+import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.FontStyle
 import dev.aster.vega.scene.GroupNode
@@ -917,6 +919,29 @@ public object Differential {
     (channel == "strokeWidth" || channel == "strokeOpacity") &&
       !expected.strings.containsKey("stroke")
 
+  /**
+   * A continuous scale's three comparable facts, shared by every family that has them.
+   *
+   * One function rather than a branch apiece, because the last time these were written out
+   * per-scale only `linear` got written: the others fell through to `else -> Unit` and went
+   * unchecked for as long as the harness has existed.
+   */
+  private fun compareContinuous(
+    name: String,
+    reference: ScaleReference,
+    domain: List<Double>,
+    range: List<Double>,
+    ticks: List<Double>,
+    tolerance: Double,
+    differences: MutableList<Difference>,
+  ) {
+    compareNumberList("scale $name domain", reference.domain, domain, tolerance, differences)
+    compareNumberList("scale $name range", reference.range, range, tolerance, differences)
+    reference.ticks?.let { wanted ->
+      compareNumberList("scale $name ticks", wanted.map { fmt(it) }, ticks, tolerance, differences)
+    }
+  }
+
   public fun compareScales(
     expected: Map<String, ScaleReference>,
     actual: Map<String, VegaScale>,
@@ -930,31 +955,41 @@ public object Differential {
         continue
       }
       when (scale) {
-        is LinearScale -> {
-          compareNumberList(
-            "scale $name domain",
-            reference.domain,
+        // Every continuous position scale, not only `linear`. The `when` used to name `linear`,
+        // `band` and `point` and fall to `else -> Unit`, so a third of the scales in the corpus
+        // were compared *not at all* — no domain, no range, no ticks — under a test called "scale
+        // domains, ranges, bandwidth and ticks match upstream". `log`, `pow`, `symlog` and `time`
+        // all carry the same three facts as `linear` and are read the same way.
+        is LinearScale ->
+          compareContinuous(
+            name,
+            reference,
             scale.domain,
-            tolerance,
-            differences,
-          )
-          compareNumberList(
-            "scale $name range",
-            reference.range,
             scale.range,
+            scale.ticks(),
             tolerance,
             differences,
           )
-          reference.ticks?.let { wanted ->
-            compareNumberList(
-              "scale $name ticks",
-              wanted.map { fmt(it) },
-              scale.ticks(),
-              tolerance,
-              differences,
-            )
-          }
-        }
+        is TimeScale ->
+          compareContinuous(
+            name,
+            reference,
+            scale.domain,
+            scale.range,
+            scale.ticks(),
+            tolerance,
+            differences,
+          )
+        is TransformedScale ->
+          compareContinuous(
+            name,
+            reference,
+            scale.domain,
+            scale.range,
+            scale.ticks(),
+            tolerance,
+            differences,
+          )
         is BandScale -> {
           if (reference.domain != scale.domain) {
             differences.add(

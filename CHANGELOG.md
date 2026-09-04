@@ -401,6 +401,36 @@ section here does not get released.
 
 ### Fixed
 
+- **A third of the corpus's scales were compared not at all, under a test that said they were.**
+  `compareScales`'s `when (scale)` named `linear`, `band` and `point` and fell to `else -> Unit`, so
+  152 of 466 recorded scales went straight past it — no domain, no range, no ticks — while
+  `FixtureDifferentialTest` ran a case called "scale domains, ranges, bandwidth and ticks match
+  upstream". The continuous families are compared now: **343 of 466**, up from 314.
+
+  Found by pulling on a smaller thread. A time scale's ticks recorded as `[{}, {}, …]` in every
+  reference, because `canonicalNumber` hands a `Date` back untouched where the domains beside them
+  went through `scaleValue` and came out as epoch millis. Fixing the recording meant the ticks could
+  be compared — which is when the `else -> Unit` came to light.
+
+  Enabling them found two genuine differences, both fixed rather than tolerated:
+
+  - **A time domain kept fractional milliseconds.** Upstream's is a pair of `Date`s and a `Date`
+    holds an integer, so a `padding` landing between two milliseconds is truncated there: upstream
+    records `1779154036363` where this produced `1779154036363.6365`.
+  - **A twelve-hour local axis stepped twelve absolute hours across a daylight-saving change**,
+    where upstream steps eleven real ones. `steppedDays` already implemented d3's filtered offset
+    for days, and a comment beside it said sub-day steps did not need one because "the tick table
+    only ever uses hour steps that divide 24" — true in UTC, where the grid repeats daily, and false
+    the day the clocks go forward: twelve hours after local midnight is local 13:00, and every tick
+    after it is off the grid. The `local-time-dst` fixture produced eight ticks where upstream
+    produces nine.
+
+  `ScaleComparisonCoverageTest` keeps the rest from going quiet again: a scale kind that is not
+  compared has to be **named there with a reason**, so a family added later, or one that stops
+  matching its branch, shows up as an unexplained kind rather than as silence. What is left is 123
+  scales across seven kinds whose facts the reference does not record in a comparable form —
+  ordinal and sequential-colour ranges, and the four discretizing families' bucket boundaries.
+
 - **The Vega-Lite surface was half a unit to a unit small on every chart, and the stated reason was
   wrong.** The row explained it as a guide extent the mark comparison could not see, "because text
   bounds are excluded by design". It was not that.
