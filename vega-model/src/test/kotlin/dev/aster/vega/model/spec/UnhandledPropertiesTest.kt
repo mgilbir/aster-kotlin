@@ -202,14 +202,18 @@ class UnhandledPropertiesTest {
   }
 
   /**
-   * The signal's nine schema properties, and the two of them this engine cannot act on.
+   * The signal's nine schema properties, and the **one** of them this engine cannot act on.
    *
-   * `push` is the one worth a test of its own. This repo's Vega-Lite compiler emits `"push":
-   * "outer"` for a faceted selection, so a signal written by one half of this project was being
-   * dropped by the other half without either saying anything.
+   * `push` used to be the second, and was the one worth a test of its own: this repository's own
+   * Vega-Lite compiler emits `"push": "outer"` for a faceted selection, so a signal written by one
+   * half of the project was dropped by the other half without either saying anything. It is
+   * honoured now — a group's handler writes the enclosing scope's signal — so only `react` is left.
+   *
+   * A `push` value that is **not** `outer` is still reported, because nothing defines one and
+   * guessing which scope was meant would be worse than saying nobody knows.
    */
   @Test
-  fun `a signal reports the two properties it cannot act on`() {
+  fun `a signal reports the one property it cannot act on`() {
     val reported =
       ignored(
         spec(
@@ -218,13 +222,22 @@ class UnhandledPropertiesTest {
              "push": "outer", "react": false}]"""
         )
       )
-    assertEquals(listOf("push", "react"), reported.sorted())
+    assertEquals(listOf("react"), reported.sorted())
 
-    val push =
-      diagnostics(spec(""""signals": [{"name": "s", "value": 1, "push": "outer"}]""")).single {
+    // And `push: "outer"` itself draws nothing, since it is acted on.
+    assertEquals(
+      emptyList<String>(),
+      diagnostics(spec(""""signals": [{"name": "s", "value": 1, "push": "outer"}]"""))
+        .filter { it.jsonPath?.endsWith("push") == true }
+        .map { it.message },
+    )
+
+    // A value nobody defines is reported, and says what the one defined value is.
+    val odd =
+      diagnostics(spec(""""signals": [{"name": "s", "value": 1, "push": "sideways"}]""")).single {
         it.jsonPath?.endsWith("push") == true
       }
-    assertTrue("shadowed inside the group" in push.message, push.message)
+    assertTrue("sideways" in odd.message && "outer" in odd.message, odd.message)
   }
 
   /**

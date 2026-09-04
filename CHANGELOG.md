@@ -8,6 +8,35 @@ section here does not get released.
 
 ### Added
 
+- **`push: "outer"` is honoured: a signal declared in a group can write the enclosing scope's.** It
+  is how a group hands a value back out, and Vega's `overview-plus-detail` uses it to move the
+  detail panel from a brush on the overview. This repository's own Vega-Lite compiler emits it for a
+  faceted selection, so it was a signal written by one half of the project and dropped by the other.
+
+  The definition is **not** a signal of the group's at all — it names the outer one — so it is
+  excluded from the group's own resolution. Resolving it there would make a fresh local copy, the
+  group's marks would read the shadow, and the outer signal would sit at its declared value however
+  hard the group was brushed, which is exactly what the old parse-time warning described.
+
+  A handler on it therefore **reads inside and writes outside**: its update sees the group's own
+  signals and scales, and the value it produces belongs to the enclosing scope. Both halves are
+  asserted, because each fails silently on its own — reading outward evaluates
+  `invert('xOverview', brush)` against a scale and a signal that are not there, and writing inward
+  leaves the outer signal untouched. The signal cascade crosses the boundary too, since a pushed
+  handler is usually sourced on `{"signal": ...}` naming one of the group's own.
+
+  A `push` value that is not `outer` is reported rather than taken as `outer`: nothing defines one,
+  and guessing which scope was meant is worse than saying nobody knows. Only `react` is left on the
+  list of signal properties this engine cannot act on.
+
+  **On `overview-plus-detail` specifically**, this does not finish the chart, and the test says so
+  rather than implying otherwise. Pressing the overview sets `brush` to a degenerate pair and every
+  handler that widens it — the drag and the pan alike — is sourced on `window:pointermove`. This
+  engine draws on a canvas rather than in a page, so nothing dispatches a window event and it
+  reports that; `span(brush)` is therefore zero and `detailDomain` is correctly null. The fixture
+  brushes as far as the engine can take it, and the step that remains is the window stream rather
+  than anything about group scopes.
+
 - **A signal handler declared inside a group mark fires.** It never did, and Vega's own
   `overview-plus-detail` is exactly that shape — `brush`, `anchor`, `xdown` and `delta` all live
   inside its `overview` group — so brushing the overview changed nothing at all.

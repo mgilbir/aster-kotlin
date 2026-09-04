@@ -2380,7 +2380,7 @@ final class dev.aster.vega.model.spec/SignalHandler { // dev.aster.vega.model.sp
 }
 
 final class dev.aster.vega.model.spec/SignalSpec { // dev.aster.vega.model.spec/SignalSpec|null[0]
-    constructor <init>(kotlin/String, dev.aster.vega.model/VegaValue? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<dev.aster.vega.model.spec/SignalHandler> = ..., dev.aster.vega.model.spec/SignalBind? = ...) // dev.aster.vega.model.spec/SignalSpec.<init>|<init>(kotlin.String;dev.aster.vega.model.VegaValue?;kotlin.String?;kotlin.String?;kotlin.collections.List<dev.aster.vega.model.spec.SignalHandler>;dev.aster.vega.model.spec.SignalBind?){}[0]
+    constructor <init>(kotlin/String, dev.aster.vega.model/VegaValue? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<dev.aster.vega.model.spec/SignalHandler> = ..., dev.aster.vega.model.spec/SignalBind? = ..., kotlin/String? = ...) // dev.aster.vega.model.spec/SignalSpec.<init>|<init>(kotlin.String;dev.aster.vega.model.VegaValue?;kotlin.String?;kotlin.String?;kotlin.collections.List<dev.aster.vega.model.spec.SignalHandler>;dev.aster.vega.model.spec.SignalBind?;kotlin.String?){}[0]
 
     final val bind // dev.aster.vega.model.spec/SignalSpec.bind|{}bind[0]
         final fun <get-bind>(): dev.aster.vega.model.spec/SignalBind? // dev.aster.vega.model.spec/SignalSpec.bind.<get-bind>|<get-bind>(){}[0]
@@ -2392,6 +2392,10 @@ final class dev.aster.vega.model.spec/SignalSpec { // dev.aster.vega.model.spec/
         final fun <get-name>(): kotlin/String // dev.aster.vega.model.spec/SignalSpec.name.<get-name>|<get-name>(){}[0]
     final val on // dev.aster.vega.model.spec/SignalSpec.on|{}on[0]
         final fun <get-on>(): kotlin.collections/List<dev.aster.vega.model.spec/SignalHandler> // dev.aster.vega.model.spec/SignalSpec.on.<get-on>|<get-on>(){}[0]
+    final val push // dev.aster.vega.model.spec/SignalSpec.push|{}push[0]
+        final fun <get-push>(): kotlin/String? // dev.aster.vega.model.spec/SignalSpec.push.<get-push>|<get-push>(){}[0]
+    final val pushesOuter // dev.aster.vega.model.spec/SignalSpec.pushesOuter|{}pushesOuter[0]
+        final fun <get-pushesOuter>(): kotlin/Boolean // dev.aster.vega.model.spec/SignalSpec.pushesOuter.<get-pushesOuter>|<get-pushesOuter>(){}[0]
     final val update // dev.aster.vega.model.spec/SignalSpec.update|{}update[0]
         final fun <get-update>(): kotlin/String? // dev.aster.vega.model.spec/SignalSpec.update.<get-update>|<get-update>(){}[0]
     final val value // dev.aster.vega.model.spec/SignalSpec.value|{}value[0]
@@ -2403,7 +2407,8 @@ final class dev.aster.vega.model.spec/SignalSpec { // dev.aster.vega.model.spec/
     final fun component4(): kotlin/String? // dev.aster.vega.model.spec/SignalSpec.component4|component4(){}[0]
     final fun component5(): kotlin.collections/List<dev.aster.vega.model.spec/SignalHandler> // dev.aster.vega.model.spec/SignalSpec.component5|component5(){}[0]
     final fun component6(): dev.aster.vega.model.spec/SignalBind? // dev.aster.vega.model.spec/SignalSpec.component6|component6(){}[0]
-    final fun copy(kotlin/String = ..., dev.aster.vega.model/VegaValue? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<dev.aster.vega.model.spec/SignalHandler> = ..., dev.aster.vega.model.spec/SignalBind? = ...): dev.aster.vega.model.spec/SignalSpec // dev.aster.vega.model.spec/SignalSpec.copy|copy(kotlin.String;dev.aster.vega.model.VegaValue?;kotlin.String?;kotlin.String?;kotlin.collections.List<dev.aster.vega.model.spec.SignalHandler>;dev.aster.vega.model.spec.SignalBind?){}[0]
+    final fun component7(): kotlin/String? // dev.aster.vega.model.spec/SignalSpec.component7|component7(){}[0]
+    final fun copy(kotlin/String = ..., dev.aster.vega.model/VegaValue? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<dev.aster.vega.model.spec/SignalHandler> = ..., dev.aster.vega.model.spec/SignalBind? = ..., kotlin/String? = ...): dev.aster.vega.model.spec/SignalSpec // dev.aster.vega.model.spec/SignalSpec.copy|copy(kotlin.String;dev.aster.vega.model.VegaValue?;kotlin.String?;kotlin.String?;kotlin.collections.List<dev.aster.vega.model.spec.SignalHandler>;dev.aster.vega.model.spec.SignalBind?;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.model.spec/SignalSpec.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.aster.vega.model.spec/SignalSpec.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.aster.vega.model.spec/SignalSpec.toString|toString(){}[0]

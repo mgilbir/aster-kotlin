@@ -1345,7 +1345,11 @@ internal class ScopeCompiler(
     val signals =
       SignalResolver(diagnostics, expressions, random, clock)
         .resolve(
-          spec.signals,
+          // A `push: "outer"` signal is **not** one of this group's: it names the enclosing scope's
+          // signal, so resolving it here would shadow the outer value with a fresh one and the
+          // group's own marks would read the shadow. Upstream treats the definition as a reference
+          // to the outer signal, and the value already reaches here through `signalValues`.
+          spec.signals.filterNot { it.pushesOuter },
           datasets,
           signalValues,
           // What a handler in this group has set, which is what makes one able to fire at all: the

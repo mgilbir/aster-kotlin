@@ -111,25 +111,34 @@ public class SignalUpdater(
       // `encode(item(), '<set>')`, which is upstream's own desugaring, so it arrives as an ordinary
       // update expression whose side effect is recorded by [HandlerScope.encodeItem].
       val update = handler.update ?: continue
-      val here = if (entry.scopePath.isEmpty()) null else scopes[entry.scopePath]
-      val within = here ?: scope
-      val store =
-        if (entry.scopePath.isEmpty()) values
-        else scopedValues.getOrPut(entry.scopePath) { LinkedHashMap() }
-      val next = evaluate(update, entry, within, store) ?: continue
-      val previous = store[entry.signalName] ?: within.signal(entry.signalName)
+      // **Read** in the scope it was declared in; **write** in the scope it targets. The two are
+      // the same except for a `push: "outer"` definition, which is how a group hands a value back
+      // out — and conflating them is subtle rather than obvious: the update reads its own scope's
+      // pending values, so a pushed handler that read the target's store would look for the
+      // group's `brushed` among the chart's signals and find nothing.
+      val within = if (entry.scopePath.isEmpty()) scope else scopes[entry.scopePath] ?: scope
+      val target = entry.writePath ?: entry.scopePath
+      val readStore = storeFor(entry.scopePath)
+      val writeStore = storeFor(target)
+      val next = evaluate(update, entry, within, readStore) ?: continue
+      // The previous value comes from the scope being *written*: a pushed signal compares against
+      // the outer value it is about to replace, not against anything of the group's.
+      val outward = if (target.isEmpty()) scope else scopes[target] ?: scope
+      val previous = writeStore[entry.signalName] ?: outward.signal(entry.signalName)
       // `force` re-runs everything downstream even when the value is unchanged — needed when the
       // value is an object mutated in place, where equality would say nothing had happened.
       if (handler.force || next != previous) {
-        store[entry.signalName] = next
+        writeStore[entry.signalName] = next
         // Qualified, so a group's `brush` and the chart's are not reported as one signal changing.
-        changed +=
-          if (entry.scopePath.isEmpty()) entry.signalName
-          else "${entry.scopePath}/${entry.signalName}"
+        changed += if (target.isEmpty()) entry.signalName else "$target/${entry.signalName}"
       }
     }
     return changed
   }
+
+  /** The accumulated values for one scope: the chart's own, or a group's by path. */
+  private fun storeFor(path: String): LinkedHashMap<String, VegaValue> =
+    if (path.isEmpty()) values else scopedValues.getOrPut(path) { LinkedHashMap() }
 
   private fun evaluate(
     update: SignalUpdate,

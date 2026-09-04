@@ -756,7 +756,14 @@ public class VegaChartController(
         val handlers = mark.signals.sumOf { it.on.size }
         if (here in compiled.groupScopes) {
           for (signal in mark.signals) {
-            for (handler in signal.on) bindings += HandlerBinding(signal.name, handler, here)
+            // A `push: "outer"` handler reads *here* and writes *there*: its update sees the
+            // group's own signals and scales — `invert('xOverview', brush)` is both at once — and
+            // the value it produces belongs to the enclosing scope's signal of that name. That is
+            // the whole of how a group hands a value back out.
+            val writes = if (signal.pushesOuter) prefix else here
+            for (handler in signal.on) {
+              bindings += HandlerBinding(signal.name, handler, here, writePath = writes)
+            }
           }
         } else if (handlers > 0) {
           // A faceted group resolves one scope per cell, so `here` names no single scope and the
@@ -1081,9 +1088,13 @@ public class VegaChartController(
     changed: MutableSet<String>,
     compiled: CompiledSpec,
   ): List<VegaDiagnostic> {
+    // Every scope, not only the top level: `detailDomain` in Vega's `overview-plus-detail` is
+    // sourced on `{"signal": "brush"}`, and `brush` is the group's own. Reusing the same walk as
+    // the event bindings is what keeps the two from disagreeing about which handlers exist; the
+    // diagnostics it can raise were already raised by `publish`, so they are dropped here.
     val bindings =
-      compiled.spec?.signals.orEmpty().flatMap { signal ->
-        signal.on.filter { it.signalSources.isNotEmpty() }.map { HandlerBinding(signal.name, it) }
+      bindingsOf(compiled, DiagnosticCollector()).filter {
+        it.handler.signalSources.isNotEmpty()
       }
     if (bindings.isEmpty()) return emptyList()
     var frontier: Set<String> = changed.toSet()
@@ -1101,15 +1112,30 @@ public class VegaChartController(
           )
         )
       }
+      // A source is a bare name written in the scope that declared the handler, and the frontier
+      // holds qualified ones. So a handler in a group matches its *own* scope's signal first and
+      // an enclosing one after — which is the ordinary shadowing rule, applied to what changed.
       val due =
         bindings
-          .filter { binding -> binding.handler.signalSources.any { it in frontier } }
-          .map { FiredHandler(it.signalName, it.handler) }
+          .filter { binding ->
+            binding.handler.signalSources.any { source ->
+              (binding.scopePath.isNotEmpty() && "${binding.scopePath}/$source" in frontier) ||
+                source in frontier
+            }
+          }
+          .map {
+            FiredHandler(
+              it.signalName,
+              it.handler,
+              scopePath = it.scopePath,
+              writePath = it.writePath,
+            )
+          }
       if (due.isEmpty()) return emptyList()
       // Read against the overrides accumulated so far, which is what makes a chain see the value
       // the
       // round before it produced rather than the one the last compile resolved.
-      frontier = signals.apply(due, compiled.signals)
+      frontier = signals.apply(due, compiled.signals, compiled.groupScopes)
       changed += frontier
     }
     return emptyList()

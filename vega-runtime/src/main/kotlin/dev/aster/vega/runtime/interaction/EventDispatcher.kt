@@ -108,6 +108,13 @@ public data class FiredHandler(
    * The paths are `CompiledSpec.groupScopes`' paths.
    */
   @InternalAsterVegaApi val scopePath: String = "",
+  /**
+   * The scope whose signal this handler **writes**, when that is not the one it reads.
+   *
+   * Only a `push: "outer"` definition differs: it reads the group's own scope and writes the
+   * enclosing one. Null everywhere else, meaning "the scope it was declared in".
+   */
+  @InternalAsterVegaApi val writePath: String? = null,
 )
 
 /** One `on` handler, bound to the signal it sets. */
@@ -122,6 +129,13 @@ public data class HandlerBinding(
    * The paths are `CompiledSpec.groupScopes`' paths.
    */
   @InternalAsterVegaApi val scopePath: String = "",
+  /**
+   * The scope whose signal this handler **writes**, when that is not the one it reads.
+   *
+   * Only a `push: "outer"` definition differs: it reads the group's own scope and writes the
+   * enclosing one. Null everywhere else, meaning "the scope it was declared in".
+   */
+  @InternalAsterVegaApi val writePath: String? = null,
 )
 
 /**
@@ -342,6 +356,7 @@ public class EventDispatcher(
           // Carried through so the value lands in the scope that declared the signal rather than
           // in the chart's, which for a same-named signal is a different one.
           scopePath = binding.scopePath,
+          writePath = binding.writePath,
         )
       // `!` on the type: this stream consumed the event, so nothing after it sees it.
       if (watch.stream.consume) break

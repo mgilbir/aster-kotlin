@@ -856,6 +856,7 @@ private val SIGNAL_CONSUMED =
     "update",
     "on",
     "bind",
+    "push",
     // Upstream's parser reads it no more than this one does: it is there for a reader.
     "description",
   )
@@ -869,13 +870,9 @@ private val SIGNAL_CONSUMED =
  */
 private val SIGNAL_UNSUPPORTED =
   mapOf(
-    "push" to
-      "'push' says this definition writes an enclosing scope's signal rather than declaring " +
-        "one of its own; a group's signals are resolved into a copy of the enclosing scope " +
-        "here, so the name is shadowed inside the group and the outer signal never changes",
     "react" to
       "'react' says whether a signal re-evaluates when what it reads changes; every signal is " +
-        "re-evaluated on every compile here, so 'react: false' does not hold it still",
+        "re-evaluated on every compile here, so 'react: false' does not hold it still"
   )
 
 /**
@@ -1281,6 +1278,17 @@ public class SpecParser {
         ->
         parseSignalHandler(entry, "$path.on[$index]", name, subscope)
       }
+    // Only `outer` means anything, to Vega or here. Anything else is reported rather than taken as
+    // `outer`, because guessing which scope was meant is worse than saying nobody knows.
+    val push = obj.fields["push"]?.asString()
+    if (push != null && push != "outer") {
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "Signal '$name' has \"push\": \"$push\"; only \"outer\" is defined, so this is ignored " +
+          "and the signal declares one of its own",
+        jsonPath = "$path.push",
+      )
+    }
     obj.reportUnhandled("Signal", path, SIGNAL_CONSUMED, SIGNAL_UNSUPPORTED)
     return SignalSpec(
       name = name,
@@ -1289,6 +1297,7 @@ public class SpecParser {
       update = obj.fields["update"]?.asString(),
       on = on,
       bind = parseBind(obj.fields["bind"], "$path.bind", name),
+      push = push?.takeIf { it == "outer" },
     )
   }
 
