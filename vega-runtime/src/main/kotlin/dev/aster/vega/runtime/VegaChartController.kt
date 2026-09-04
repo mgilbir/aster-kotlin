@@ -387,8 +387,12 @@ public class VegaChartController(
    * A tick recompiles, and a recompile used to start the timers again — which cancelled the ones
    * mid-flight, reset the `elapsed` every handler reads, and dropped the ticks that were between
    * the two. They are left alone unless the specification's timers have actually changed.
+   *
+   * The scope path is part of it: two cells of a faceted group declare the same signal name at the
+   * same throttle and are two timers, so a key that named only the signal would collapse them and
+   * leave one cell ticking for both.
    */
-  private var timerKeys: List<Pair<String, Double>> = emptyList()
+  private var timerKeys: List<Triple<String, String, Double>> = emptyList()
 
   /**
    * Serializes the two `…Async` entry points against each other. **Not every compile** — see
@@ -821,7 +825,7 @@ public class VegaChartController(
     // schedule — and those went into a collector nobody read. They are published with the
     // compiler's
     // own, since a listener that was refused is exactly the kind of thing a host needs told.
-    startTimers(compiled)
+    startTimers(compiled, bindings)
     vegaEvents =
       if (bindings.isEmpty()) {
         null
@@ -1323,27 +1327,40 @@ public class VegaChartController(
    * Restarted on every publish because the handlers come from the compile; a specification that no
    * longer has a timer stops ticking, which is the behaviour a host reloading a chart expects.
    */
-  private fun startTimers(compiled: CompiledSpec) {
+  private fun startTimers(compiled: CompiledSpec, all: List<HandlerBinding>) {
     val scheduler = this.scheduler
     if (stopped || scheduler == null) {
       stopTimers()
       return
     }
-    val bindings =
-      compiled.spec?.signals.orEmpty().flatMap { signal ->
-        signal.on.flatMap { handler ->
-          handler.streams
-            .filter { it.source == EventStream.SOURCE_TIMER }
-            .map { stream -> HandlerBinding(signal.name, handler) to stream }
-        }
-      }
-    val keys = bindings.map { (binding, stream) -> binding.signalName to (stream.throttle ?: 0.0) }
+    // **From the same bindings the dispatcher gets**, which is the whole of the fix here. This read
+    // `spec.signals` — the top level only — while `bindingsOf` beside it walks the group marks, so
+    // a `{"type": "timer"}` declared inside a group was bound to the dispatcher and then never
+    // dispatched to: nothing produces a timer event except this, and this had not been told. An
+    // animation inside a trellis cell simply stood still, with no diagnostic.
+    //
+    // A timer is the one stream in a group that is **not** scope-filtered, and upstream says so by
+    // construction: `parseStream` builds it as `scope.event(Timer, throttle)` and then replaces the
+    // stream object with `{between, filter}`, dropping `source`, so the `inScope(event.item)` it
+    // appends to every other scope-sourced stream is not appended to this one. It has no item to be
+    // in scope of. What makes it the group's is only which scope its update reads and writes, and
+    // that is [HandlerBinding.scopePath] — already correct, and already one binding per facet cell.
+    val timers = all.flatMap { binding ->
+      binding.handler.streams
+        .filter { it.source == EventStream.SOURCE_TIMER }
+        .map { stream -> binding to stream }
+    }
+    // The scope is part of the key: two cells of a facet declare the same signal name at the same
+    // throttle and are two timers, not one.
+    val keys = timers.map { (binding, stream) ->
+      Triple(binding.scopePath, binding.signalName, stream.throttle ?: 0.0)
+    }
     if (keys == timerKeys) return
     stopTimers()
     timerKeys = keys
-    if (bindings.isEmpty()) return
+    if (timers.isEmpty()) return
     val started = clock()
-    timerTasks = bindings.map { (binding, stream) ->
+    timerTasks = timers.map { (binding, stream) ->
       val interval = (stream.throttle ?: 0.0).coerceAtLeast(1.0)
       scheduler.schedule(interval.toLong(), repeating = true) {
         val compiledNow = lastCompiled ?: return@schedule
@@ -1362,8 +1379,17 @@ public class VegaChartController(
         val changed =
           LinkedHashSet(
             signals.apply(
-              listOf(FiredHandler(binding.signalName, binding.handler, event)),
+              listOf(
+                FiredHandler(
+                  binding.signalName,
+                  binding.handler,
+                  event,
+                  scopePath = binding.scopePath,
+                  writePath = binding.writePath,
+                )
+              ),
               compiledNow.signals,
+              compiledNow.groupScopes,
             )
           )
         applyFired(changed, compiledNow)

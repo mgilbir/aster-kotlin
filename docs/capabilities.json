@@ -5753,10 +5753,11 @@
       "feature": "Timer streams",
       "status": "**Supported**, with a scheduler",
       "tests": [
+        "GroupTimerTest",
         "SchedulerInteractionTest"
       ],
-      "tests_text": "`SchedulerInteractionTest`",
-      "notes": "Fires on its own with nothing to prompt it, at the interval it asked for, carrying the two fields upstream's timer event does: a wall-clock `timestamp` and the `elapsed` since the timer started, which is what an animation reads to know where it is. Started per specification and **left alone by a redraw** — restarting them on every publish cancelled the running ones mid-flight, reset every `elapsed` and dropped the ticks in between, which a test with virtual time makes visible immediately. `stop()` cancels them, and a host with a scheduler has to call it: a timer that outlives the view it draws into is a leak with a repaint attached. Reported by name, as before, when no scheduler was given",
+      "tests_text": "`SchedulerInteractionTest`, `GroupTimerTest`",
+      "notes": "Fires on its own with nothing to prompt it, at the interval it asked for, carrying the two fields upstream's timer event does: a wall-clock `timestamp` and the `elapsed` since the timer started, which is what an animation reads to know where it is. Started per specification and **left alone by a redraw** — restarting them on every publish cancelled the running ones mid-flight, reset every `elapsed` and dropped the ticks in between, which a test with virtual time makes visible immediately. `stop()` cancels them, and a host with a scheduler has to call it: a timer that outlives the view it draws into is a leak with a repaint attached. Reported by name, as before, when no scheduler was given. A timer declared **inside a group mark** ticks too, a faceted group's once per cell. It did not: the scheduling read the specification's top-level signals while the dispatcher's bindings beside it walk the group marks, so a group's timer was bound and then never dispatched to — nothing produces a timer event except the scheduler, and the scheduler had not been told. An animation inside a trellis cell stood still with no diagnostic. Both now come from the same bindings. A timer is the one stream in a group that is **not** narrowed to it, and upstream says so by construction: `parseStream` builds a timer as `scope.event(Timer, throttle)` and then replaces the stream object with `{between, filter}`, dropping `source`, so the `inScope(event.item)` filter it appends to every other scope-sourced stream is not appended to this one — it has no item to be in scope of. What makes it the group's is only which scope its update reads and writes",
       "milestone": "6"
     },
     {

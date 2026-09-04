@@ -6,6 +6,22 @@ section here does not get released.
 
 ## Unreleased
 
+### Fixed
+
+- **A timer stream declared inside a group mark ticks.** It never did, and said nothing about it.
+  `startTimers` read the specification's **top-level** signals while `bindingsOf` beside it walks
+  the group marks, so a group's `{"type": "timer"}` handler was bound to the dispatcher and then
+  never dispatched to — nothing produces a timer event except the scheduler, and the scheduler had
+  not been told. An animation declared inside a trellis cell simply stood still. Both now come from
+  the same bindings, which also means a **faceted** group gets one live timer per cell rather than
+  one shared across all of them.
+
+  A timer is the one stream in a group that is **not** narrowed to it, and upstream says so by
+  construction: `parseStream` builds a timer as `scope.event(Timer, throttle)` and then *replaces*
+  the stream object with `{between, filter}`, dropping `source`, so the `inScope(event.item)` filter
+  it appends to every other scope-sourced stream is not appended to this one. It has no item to be
+  in scope of. What makes it the group's is only which scope its update reads and writes.
+
 ### Added
 
 - **A faceted group's own scales are compared against upstream, one cell at a time.** The row said
