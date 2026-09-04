@@ -6,6 +6,18 @@
 // - Show declarations: true
 
 // Library unique name: <io.github.mgilbir.astervega:vega-runtime>
+final enum class dev.aster.vega.runtime/ChartActionKind : kotlin/Enum<dev.aster.vega.runtime/ChartActionKind> { // dev.aster.vega.runtime/ChartActionKind|null[0]
+    enum entry RESET_ZOOM // dev.aster.vega.runtime/ChartActionKind.RESET_ZOOM|null[0]
+    enum entry ZOOM_IN // dev.aster.vega.runtime/ChartActionKind.ZOOM_IN|null[0]
+    enum entry ZOOM_OUT // dev.aster.vega.runtime/ChartActionKind.ZOOM_OUT|null[0]
+
+    final val entries // dev.aster.vega.runtime/ChartActionKind.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<dev.aster.vega.runtime/ChartActionKind> // dev.aster.vega.runtime/ChartActionKind.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): dev.aster.vega.runtime/ChartActionKind // dev.aster.vega.runtime/ChartActionKind.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<dev.aster.vega.runtime/ChartActionKind> // dev.aster.vega.runtime/ChartActionKind.values|values#static(){}[0]
+}
+
 final enum class dev.aster.vega.runtime/ChartKey : kotlin/Enum<dev.aster.vega.runtime/ChartKey> { // dev.aster.vega.runtime/ChartKey|null[0]
     enum entry ARROW_DOWN // dev.aster.vega.runtime/ChartKey.ARROW_DOWN|null[0]
     enum entry ARROW_LEFT // dev.aster.vega.runtime/ChartKey.ARROW_LEFT|null[0]
@@ -1096,6 +1108,22 @@ final class dev.aster.vega.runtime.scale/TimeScale : dev.aster.vega.runtime.scal
     final fun ticks(kotlin/Int = ...): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/TimeScale.ticks|ticks(kotlin.Int){}[0]
 }
 
+final class dev.aster.vega.runtime/ChartAction { // dev.aster.vega.runtime/ChartAction|null[0]
+    constructor <init>(dev.aster.vega.runtime/ChartActionKind, kotlin/String) // dev.aster.vega.runtime/ChartAction.<init>|<init>(dev.aster.vega.runtime.ChartActionKind;kotlin.String){}[0]
+
+    final val kind // dev.aster.vega.runtime/ChartAction.kind|{}kind[0]
+        final fun <get-kind>(): dev.aster.vega.runtime/ChartActionKind // dev.aster.vega.runtime/ChartAction.kind.<get-kind>|<get-kind>(){}[0]
+    final val label // dev.aster.vega.runtime/ChartAction.label|{}label[0]
+        final fun <get-label>(): kotlin/String // dev.aster.vega.runtime/ChartAction.label.<get-label>|<get-label>(){}[0]
+
+    final fun component1(): dev.aster.vega.runtime/ChartActionKind // dev.aster.vega.runtime/ChartAction.component1|component1(){}[0]
+    final fun component2(): kotlin/String // dev.aster.vega.runtime/ChartAction.component2|component2(){}[0]
+    final fun copy(dev.aster.vega.runtime/ChartActionKind = ..., kotlin/String = ...): dev.aster.vega.runtime/ChartAction // dev.aster.vega.runtime/ChartAction.copy|copy(dev.aster.vega.runtime.ChartActionKind;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.runtime/ChartAction.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.runtime/ChartAction.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.runtime/ChartAction.toString|toString(){}[0]
+}
+
 final class dev.aster.vega.runtime/ChartSelection { // dev.aster.vega.runtime/ChartSelection|null[0]
     constructor <init>(kotlin.collections/Set<dev.aster.vega.scene/SceneNodeId> = ..., kotlin.collections/Set<kotlin/Long> = ..., dev.aster.vega.scene/RectD? = ...) // dev.aster.vega.runtime/ChartSelection.<init>|<init>(kotlin.collections.Set<dev.aster.vega.scene.SceneNodeId>;kotlin.collections.Set<kotlin.Long>;dev.aster.vega.scene.RectD?){}[0]
 
@@ -1301,6 +1329,8 @@ final class dev.aster.vega.runtime/TooltipRow { // dev.aster.vega.runtime/Toolti
 final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runtime/VegaChartController|null[0]
     constructor <init>(dev.aster.vega.scene/Scene = ..., dev.aster.vega.scene/TextEngine = ..., kotlin/Function0<kotlin/Long> = ..., dev.aster.vega.runtime.load/DataLoader = ..., dev.aster.vega.runtime.interaction/Scheduler? = ..., dev.aster.vega.model.locale/VegaLocale = ..., dev.aster.vega.model/VegaValue? = ..., dev.aster.vega.scene/SizeD? = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>>? = ..., kotlinx.datetime/TimeZone? = ...) // dev.aster.vega.runtime/VegaChartController.<init>|<init>(dev.aster.vega.scene.Scene;dev.aster.vega.scene.TextEngine;kotlin.Function0<kotlin.Long>;dev.aster.vega.runtime.load.DataLoader;dev.aster.vega.runtime.interaction.Scheduler?;dev.aster.vega.model.locale.VegaLocale;dev.aster.vega.model.VegaValue?;dev.aster.vega.scene.SizeD?;kotlin.collections.Map<kotlin.String,kotlin.collections.List<dev.aster.vega.model.VegaValue>>?;kotlinx.datetime.TimeZone?){}[0]
 
+    final val accessibilityActions // dev.aster.vega.runtime/VegaChartController.accessibilityActions|{}accessibilityActions[0]
+        final fun <get-accessibilityActions>(): kotlin.collections/List<dev.aster.vega.runtime/ChartAction> // dev.aster.vega.runtime/VegaChartController.accessibilityActions.<get-accessibilityActions>|<get-accessibilityActions>(){}[0]
     final val diagnostics // dev.aster.vega.runtime/VegaChartController.diagnostics|{}diagnostics[0]
         final fun <get-diagnostics>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic>> // dev.aster.vega.runtime/VegaChartController.diagnostics.<get-diagnostics>|<get-diagnostics>(){}[0]
     final val events // dev.aster.vega.runtime/VegaChartController.events|{}events[0]
@@ -1329,6 +1359,7 @@ final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runti
     final fun clearDiagnostics() // dev.aster.vega.runtime/VegaChartController.clearDiagnostics|clearDiagnostics(){}[0]
     final fun dispatch(dev.aster.vega.runtime/ChartInputEvent) // dev.aster.vega.runtime/VegaChartController.dispatch|dispatch(dev.aster.vega.runtime.ChartInputEvent){}[0]
     final fun handleKey(dev.aster.vega.runtime/ChartKey, dev.aster.vega.runtime/Modifiers = ...): kotlin/Boolean // dev.aster.vega.runtime/VegaChartController.handleKey|handleKey(dev.aster.vega.runtime.ChartKey;dev.aster.vega.runtime.Modifiers){}[0]
+    final fun perform(dev.aster.vega.runtime/ChartActionKind): kotlin/Boolean // dev.aster.vega.runtime/VegaChartController.perform|perform(dev.aster.vega.runtime.ChartActionKind){}[0]
     final fun report(dev.aster.vega.model/VegaDiagnostic) // dev.aster.vega.runtime/VegaChartController.report|report(dev.aster.vega.model.VegaDiagnostic){}[0]
     final fun resetViewport() // dev.aster.vega.runtime/VegaChartController.resetViewport|resetViewport(){}[0]
     final fun setData(kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>) // dev.aster.vega.runtime/VegaChartController.setData|setData(kotlin.String;kotlin.collections.List<dev.aster.vega.model.VegaValue>){}[0]
@@ -1347,6 +1378,8 @@ final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runti
             final fun <get-MAX_ZOOM>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.MAX_ZOOM.<get-MAX_ZOOM>|<get-MAX_ZOOM>(){}[0]
         final const val MIN_ZOOM // dev.aster.vega.runtime/VegaChartController.Companion.MIN_ZOOM|{}MIN_ZOOM[0]
             final fun <get-MIN_ZOOM>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.MIN_ZOOM.<get-MIN_ZOOM>|<get-MIN_ZOOM>(){}[0]
+        final const val ZOOM_STEP // dev.aster.vega.runtime/VegaChartController.Companion.ZOOM_STEP|{}ZOOM_STEP[0]
+            final fun <get-ZOOM_STEP>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.ZOOM_STEP.<get-ZOOM_STEP>|<get-ZOOM_STEP>(){}[0]
 
         final fun fromScene(dev.aster.vega.scene/Scene): dev.aster.vega.runtime/VegaChartController // dev.aster.vega.runtime/VegaChartController.Companion.fromScene|fromScene(dev.aster.vega.scene.Scene){}[0]
         final fun fromSpec(kotlin/String, dev.aster.vega.scene/TextEngine = ...): kotlin/Pair<dev.aster.vega.runtime/VegaChartController, dev.aster.vega.runtime.compile/CompiledSpec> // dev.aster.vega.runtime/VegaChartController.Companion.fromSpec|fromSpec(kotlin.String;dev.aster.vega.scene.TextEngine){}[0]

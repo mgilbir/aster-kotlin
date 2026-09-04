@@ -8,6 +8,29 @@ section here does not get released.
 
 ### Added
 
+- **A chart that pans and zooms offers an accessible way to do both.** The row read `Planned` — "the
+  accessibility tree exposes activation and nothing else" — so a reader could reach every bar in a
+  chart and never the view they were drawn in. Panning and zooming were gestures and only gestures.
+
+  `VegaChartController.accessibilityActions` offers zooming in, zooming out and resetting the view,
+  each labelled in the chart's own locale, and `perform` runs one and says whether it did anything.
+  They belong to the **chart** rather than to any mark, which is why they are not on
+  `AccessibleElement`: the scene builds that tree and does not know it has been panned. A host
+  attaches them to the chart's own node — `AccessibilityNodeInfo.addAction` on Android,
+  `UIAccessibilityCustomAction` on Apple.
+
+  An action is offered **only when invoking it would do something**. Zooming is withdrawn at each
+  limit and the reset only appears once the view has moved, because an action a reader triggers to
+  no effect is worse than one that was never there — they have no way to tell which they met. A zoom
+  is anchored at the middle of the surface, since a reader has no pointer to anchor it at, and then
+  goes down the gesture's own path so a chart cannot come to zoom differently for a reader than for
+  a pointer.
+
+  **What this is not** is domain adjustment, and the row is split rather than allowed to imply it.
+  These move the viewport and leave every scale exactly as the specification built it; an adjustable
+  *domain*, where a reader widens the range the data is drawn against and the ticks change with it,
+  is a different feature and is pinned as absent by a test of its own rather than quietly folded in.
+
 - **Keyboard traversal: arrows walk the marks, `ENTER` activates one, `ESCAPE` clears.** The order is
   the accessibility tree's, not the drawing's, so a keyboard reader and a screen reader cannot
   disagree about what is in a chart or what order it is in — including the summary that stands in

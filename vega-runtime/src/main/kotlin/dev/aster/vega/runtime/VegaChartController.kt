@@ -1566,6 +1566,66 @@ public class VegaChartController(
   public val tooltipContent: TooltipContent?
     get() = TooltipContent.of(snapshot.interactionState.tooltip, locale, timeZone)
 
+  /**
+   * The chart-level actions worth offering **right now**, in the chart's own language.
+   *
+   * Recomputed from the viewport rather than fixed, and that is the point: an action is listed only
+   * when invoking it would change something. A reader at the zoom limit is not offered a zoom, and
+   * a chart at rest is not offered a reset — an action that does nothing is worse than one that was
+   * never there, because the reader has no way to tell which they met.
+   *
+   * A host attaches these to the chart's **own** accessibility node, not to a mark:
+   * `AccessibilityNodeInfo.addAction` on Android, `UIAccessibilityCustomAction` on Apple. That is
+   * also why they are not on `AccessibleElement` — panning is a property of the view, and the
+   * scene, which is what builds that tree, does not know it has been panned.
+   */
+  public val accessibilityActions: List<ChartAction>
+    get() {
+      val state = _state.value.snapshot.interactionState
+      val actions = mutableListOf<ChartAction>()
+      if (state.viewportScale < MAX_ZOOM) {
+        actions += ChartAction(ChartActionKind.ZOOM_IN, locale.captions.zoomInAction())
+      }
+      if (state.viewportScale > MIN_ZOOM) {
+        actions += ChartAction(ChartActionKind.ZOOM_OUT, locale.captions.zoomOutAction())
+      }
+      if (state.viewportScale != 1.0 || state.viewportOffset != dev.aster.vega.scene.VectorD.Zero) {
+        actions += ChartAction(ChartActionKind.RESET_ZOOM, locale.captions.resetZoomAction())
+      }
+      return actions
+    }
+
+  /**
+   * Performs one, and says whether it did anything.
+   *
+   * The same false-means-nothing-happened contract [handleKey] uses, and for a related reason: a
+   * host that cannot tell has to guess whether to announce a change, and announcing one that did
+   * not happen is how a reader loses track of where they are.
+   *
+   * A zoom is anchored at the **middle of the surface**, because a reader invoking an action has no
+   * pointer to anchor it at. That is the only difference from the gesture path, which this then
+   * goes down in full so the two cannot drift apart.
+   */
+  public fun perform(action: ChartActionKind): Boolean {
+    if (accessibilityActions.none { it.kind == action }) return false
+    val before = _state.value.snapshot.interactionState
+    when (action) {
+      ChartActionKind.RESET_ZOOM -> resetViewport()
+      ChartActionKind.ZOOM_IN,
+      ChartActionKind.ZOOM_OUT -> {
+        val size = _state.value.snapshot.scene.let { PointD(it.width / 2.0, it.height / 2.0) }
+        handleZoom(
+          ChartInputEvent.Zoom(
+            anchor = size,
+            scaleFactor = if (action == ChartActionKind.ZOOM_IN) ZOOM_STEP else 1.0 / ZOOM_STEP,
+            phase = GesturePhase.ENDED,
+          )
+        )
+      }
+    }
+    return _state.value.snapshot.interactionState != before
+  }
+
   public fun resetViewport() {
     publishInteraction(
       _state.value.snapshot.interactionState.copy(
@@ -1653,6 +1713,15 @@ public class VegaChartController(
   }
 
   public companion object {
+    /**
+     * How far one accessible zoom action moves, which a gesture has no equivalent of.
+     *
+     * A pinch reports a continuous factor; an action is a single step, so it needs a size. A
+     * quarter is large enough to be worth invoking and small enough that a reader can stop where
+     * they meant to — five presses roughly triple the view.
+     */
+    public const val ZOOM_STEP: Double = 1.25
+
     public const val MIN_ZOOM: Double = 0.1
     public const val MAX_ZOOM: Double = 50.0
 

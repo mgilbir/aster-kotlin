@@ -6611,17 +6611,17 @@
     {
       "line": 620,
       "section": "Accessibility",
-      "feature": "Domain adjustment and reset-zoom actions",
-      "status": "Planned",
+      "feature": "Zoom and reset-zoom actions",
+      "status": "**Supported**; a scale's domain is not adjustable",
       "tests": [
-        "DocumentedRenderingLimitsTest"
+        "AccessibilityActionsTest"
       ],
-      "tests_text": "`DocumentedRenderingLimitsTest`",
-      "notes": "—",
+      "tests_text": "`AccessibilityActionsTest`",
+      "notes": "`VegaChartController.accessibilityActions` offers zooming in, zooming out and resetting the view, each with a label in the chart's own locale; `perform` runs one and says whether it did anything. They belong to the **chart** rather than to any mark, which is why they are not on `AccessibleElement` — the scene builds that tree and does not know it has been panned — so a host attaches them to the chart's own node: `AccessibilityNodeInfo.addAction` on Android, `UIAccessibilityCustomAction` on Apple. An action is offered only when invoking it **would do something**: zooming is withdrawn at each limit and the reset only appears once the view has moved, because an action a reader triggers to no effect is worse than one that was never there. A zoom is anchored at the middle of the surface, since a reader has no pointer to anchor it at, and then goes down the gesture's own path so the two cannot drift. What is *not* here is adjusting a scale's **domain** — these move the viewport and leave every scale as the specification built it, which is a different feature and is pinned as absent rather than implied",
       "milestone": "7",
       "limit": {
-        "test": "DocumentedRenderingLimitsTest.no accessibility action offers to adjust a domain or reset a zoom",
-        "claim": "A chart that pans and zooms offers no accessible way to do either: the accessibility tree exposes activation and nothing else."
+        "test": "AccessibilityActionsTest.no action adjusts a scale's domain",
+        "claim": "The actions move the viewport and leave every scale as the specification built it; a reader cannot widen the domain the data is drawn against."
       }
     },
     {
