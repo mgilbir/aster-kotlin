@@ -32,6 +32,12 @@ fi
 # says nothing about the rest of the surface a host outside it depends on. The snapshot covers all of it.
 ./scripts/foreign-api.sh
 
+# And that the snapshot mechanism itself settles in one accept, which it did not: the coverage list
+# is computed *from* the API snapshot, and they were written in the other order, so accepting a
+# member that had just started crossing left this gate red until somebody ran accept again. Cheap
+# to hold onto, and it was mistaken for a stale artefact both times it happened.
+./scripts/foreign-api.sh --selftest
+
 # And the other Apple surface, which that one does not cover: `foreign-api.txt` is what Kotlin exports
 # to Obj-C, while `VegaChartView.init` and `ChartSession` are Swift source and appear in it nowhere.
 # `CallShapeTests` pins the shapes somebody thought to write down; this pins the rest.

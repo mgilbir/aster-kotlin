@@ -201,6 +201,25 @@ section here does not get released.
 
 ### Fixed
 
+- **`foreign-api.sh --accept` needed running twice, and left the Apple gate red in between.** The
+  coverage list is computed *from* the API snapshot — `foreign-coverage.py` answers "which public
+  Kotlin members have no foreign counterpart" by reading `foreign-api.txt`, the recorded file rather
+  than the header just extracted — and the two were written in the other order. So accepting asked
+  the question against the *previous* commit's boundary: a member that had just started crossing was
+  recorded as one that does not, the next check recomputed against the now-updated snapshot, found
+  it crossing, and reported a difference nobody had introduced.
+
+  Both members added to the boundary this week hit it, and the second time it was misread as a stale
+  framework rather than as an ordering — which is the more expensive failure, because the remedy for
+  a stale artefact is to relink and the remedy for this is to accept again, and neither explains the
+  other. The snapshot is now written first.
+
+  `scripts/foreign-api.sh --selftest` holds the property, and the Apple gate runs it beside the
+  check it guards. It reproduces the bug without touching any Kotlin: telling the snapshot that a
+  member crosses which does not is the same input as one that genuinely just started crossing, and
+  the check after the accept has to come back clean. Verified by putting the old ordering back,
+  where it fails.
+
 - **A projection type this engine does not build is now reported instead of quietly not applying.**
   Found by the coverage probe above, on its first run, and silent in the worst available way: all
   ten sites that build a projection fall back to the identity stream when the type is unknown, so a
