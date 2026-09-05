@@ -82,9 +82,51 @@ SEAMS = {
     "engine-drawn tooltip": ("setTooltipsEnabled", "boolean", None, None),
     "placement reported": ("setOnPlaced", "ScenePlacement", r"Function1<dev\.aster\.vega\.scene/ScenePlacement", "onPlaced:"),
     "clear image cache": ("clearImageCache", None, r"ImageCache\?", "clearImageCache"),
+    # The raw pointer stream — `mousedown`, `mousemove`, `mouseup` — which is what every brush and
+    # interval selection in Vega is written against. It was on **no** host: Android emitted a down
+    # and an up but never a move during a drag, and the other two surfaces had nothing at all. There
+    # was no row here for it either, which is why nothing noticed; this file's own header is about
+    # two seams that were absent from a host while a table said the shape was deliberate.
+    #
+    # The Android column is `onTouchEvent` and that is a **weak** marker on purpose, flagged rather
+    # than dressed up: the View owns the pointer stream and dispatches it itself, so there is no
+    # signature a host wires and nothing in the recorded surface distinguishes "handles ACTION_MOVE"
+    # from "does not". What guards that is behavioural — `VegaInteractionInstrumentedTest` drags and
+    # asserts the brush followed. This row's job is the other three columns, where the seam *is* a
+    # signature.
+    "pointer events": (
+        "onTouchEvent",
+        None,
+        # Three `Function1<PointD, Unit>?` in a row, right after `onHover`'s two-argument one. The
+        # klib dump records types and not names, so the run is what identifies them.
+        r"Function2<dev\.aster\.vega\.scene/PointD\?, dev\.aster\.vega\.scene/SceneNodeId\?, "
+        r"kotlin/Unit>\?, kotlin/Function1<dev\.aster\.vega\.scene/PointD, kotlin/Unit>\?, "
+        r"kotlin/Function1<dev\.aster\.vega\.scene/PointD, kotlin/Unit>\?, "
+        r"kotlin/Function1<dev\.aster\.vega\.scene/PointD, kotlin/Unit>\?",
+        r"pointerDown\(at:\)",
+    ),
+    # And the other half of making a brush usable: a host has to be able to stop the drag *panning*.
+    # Both happen otherwise and they fight — the viewport slides under the finger by the distance
+    # the finger travels, so in the chart's own coordinates the pointer never moves and the brush
+    # selects a point. The Android instrumented test found exactly that, `[60, 60]` for a drag from
+    # 60 to 200, the first time it ran.
+    "viewport pan is optional": (
+        "setPanEnabled",
+        # `int, boolean, boolean` — the accessibility threshold, then `tooltipsEnabled`, then this.
+        r"Typeface>, int, boolean, boolean",
+        # Passing `onPan = null` is how this renderer says it: the parameter is nullable and the
+        # detector is not attached when nothing wants it.
+        r"Function2<dev\.aster\.vega\.scene/VectorD, kotlin/Boolean, kotlin/Unit>\?",
+        # `ChartGestures` without `.pan`, which is what `withoutDrag` already is.
+        r"static let withoutDrag",
+    ),
 }
 
 REASONS = {
+    ("pointer events", "vega-compose"): (
+        "hosts VegaChartView through AndroidView, which owns the pointer stream itself — there is "
+        "nothing for the composable to expose, and the capability is the View's"
+    ),
     ("engine-drawn tooltip", "compose-mp"): "paints a Scene and owns no tooltip; a host draws its own",
     ("engine-drawn tooltip", "swiftui"): "same — the session publishes the datum and the host presents it",
     ("clear image cache", "vega-compose"): "no handle on the view; passing a different imageResolver rebuilds the renderer",

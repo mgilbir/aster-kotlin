@@ -10,6 +10,7 @@ ChartGestures.init(rawValue:)  ::  init(rawValue: Int)
 ChartGestures.longPress  ::  static let longPress: ChartGestures
 ChartGestures.none  ::  static let none: ChartGestures
 ChartGestures.pan  ::  static let pan: ChartGestures
+ChartGestures.pointer  ::  static let pointer: ChartGestures
 ChartGestures.rawValue  ::  let rawValue: Int
 ChartGestures.tap  ::  static let tap: ChartGestures
 ChartGestures.withoutDrag  ::  static let withoutDrag: ChartGestures
@@ -52,6 +53,9 @@ ChartSession.loading  ::  @MainActor var loading: Bool { get set }
 ChartSession.longPress(at:)  ::  @MainActor func longPress(at point: Point)
 ChartSession.pan(by:phase:)  ::  @MainActor func pan(by delta: Point, phase: GesturePhase)
 ChartSession.place(contentScale:viewport:)  ::  @MainActor func place(contentScale: Double, viewport: Rect)
+ChartSession.pointerDown(at:)  ::  @MainActor func pointerDown(at point: Point)
+ChartSession.pointerMoved(at:)  ::  @MainActor func pointerMoved(at point: Point)
+ChartSession.pointerUp(at:)  ::  @MainActor func pointerUp(at point: Point)
 ChartSession.press(_:modifiers:)  ::  @MainActor func press(_ key: ChartKey, modifiers: Modifiers = Modifiers.Companion.shared.None)
 ChartSession.resetScaleDomains()  ::  @discardableResult @MainActor func resetScaleDomains() -> Bool
 ChartSession.resetViewport()  ::  @MainActor func resetViewport()

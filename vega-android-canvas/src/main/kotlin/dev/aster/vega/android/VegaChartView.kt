@@ -283,6 +283,8 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
           distanceX: Float,
           distanceY: Float,
         ): Boolean {
+          // A chart whose specification brushes wants the drag for itself; see [panEnabled].
+          if (!panEnabled) return false
           // GestureDetector reports the distance travelled, which is the negation of the pan.
           panning = true
           dispatchChartEvent(
@@ -518,6 +520,26 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
       field = value
       invalidate()
     }
+
+  /**
+   * Whether a drag moves the **viewport**.
+   *
+   * On by default, and worth turning off for a chart whose *specification* uses the drag — a brush,
+   * or any `[mousedown, mouseup] > mousemove` handler. Both happen otherwise, and they fight: the
+   * viewport slides under the finger by the same distance the finger travels, so in the chart's own
+   * coordinates the pointer never moves and the brush selects an empty interval. A drag that both
+   * pans and brushes is not a compromise between the two, it is neither.
+   *
+   * The viewport pan is **this engine's own idea** rather than something a specification asked for
+   * — it produces no Vega event at all — which is why it is the one that yields. Upstream has no
+   * viewport to pan, so a browser gives the whole drag to the chart.
+   *
+   * `ChartGestures.pan` is the SwiftUI counterpart: a host there asks for `[.tap, .pointer]` to get
+   * the same thing. Left as a host decision on both rather than inferred from the specification,
+   * because "does this chart use drags" is a question about handlers that a view should not be
+   * guessing at.
+   */
+  public var panEnabled: Boolean = true
 
   private val tooltipRect = RectF()
 
@@ -757,6 +779,18 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
           )
         )
       }
+      // **A finger that is down and moving.** This was `else -> Unit`, so a drag emitted its
+      // `mousedown` and its `mouseup` and nothing in between — and `mousemove` between the two is
+      // the whole of `[mousedown, mouseup] > mousemove`, which is how every brush and every
+      // interval selection in Vega is written. `PointerMoved` was reached only from
+      // `onHoverEvent`, which fires for a pointer that is *not* pressed, so the one gesture that
+      // needed it was the one gesture that could not produce it.
+      //
+      // A browser fires `mousemove` throughout a drag and updates what is under the pointer as it
+      // goes, which is what `dispatch` does with this; the pan gesture is unaffected, since the
+      // detectors above see the same `MotionEvent` and this is dispatched beside them exactly as
+      // the down and the up already were.
+      MotionEvent.ACTION_MOVE -> dispatchChartEvent(ChartInputEvent.PointerMoved(event.toPointD()))
       MotionEvent.ACTION_CANCEL -> {
         endPan()
         dispatchChartEvent(ChartInputEvent.PointerExited(null))

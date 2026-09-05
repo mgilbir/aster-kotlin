@@ -8,6 +8,36 @@ section here does not get released.
 
 ### Fixed
 
+- **A brush could not be driven from any host.** `[mousedown, mouseup] > mousemove` is how every
+  interval selection in Vega and Vega-Lite is written, and no surface could produce that sequence.
+  The Android View dispatched a `mousedown` and a `mouseup` but never handled `ACTION_MOVE`, so a
+  drag emitted nothing in between — `PointerMoved` was reached only from `onHoverEvent`, which fires
+  for a pointer that is **not** pressed, so the one gesture that needed a move was the one that
+  could not make one. `ChartSession` and the Compose Multiplatform composable exposed no pointer
+  events at all: a drag arrived as `pan`, which produces no Vega event, because the viewport
+  transform is this engine's own idea rather than something a specification asked for.
+
+  So a chart that brushes compiled, drew and never responded, on all four surfaces. Now:
+  `ACTION_MOVE` on Android, `ChartSession.pointerDown/Moved/Up` with `ChartGestures.pointer` on
+  Apple, `onPointerDown/Moved/Up` on Compose Multiplatform.
+
+  **A drag also has to be able to stop panning**, or the two fight. The viewport slides under the
+  finger by exactly the distance the finger travels, so in the chart's own coordinates the pointer
+  never moves and the brush selects a point — which is what the new Android test found on its first
+  run, `[60, 60]` for a drag from 60 to 200. `panEnabled` on the View and the Compose wrapper,
+  `ChartGestures` without `.pan` on Apple, `onPan = null` on Compose Multiplatform. The viewport pan
+  is the one that yields because it is the one no specification asked for.
+
+  On Apple the pointer events ride the **same** drag detector the pan uses, so asking for them
+  claims no more of the touch than a pan already does: a zero-distance drag of its own is what made
+  a chart inside a scroll view unscrollable (#124). The `mousedown` is emitted at `startLocation`
+  once the slop is passed, so a brush anchors where the reader put their finger.
+
+  `scripts/host-parity.py` now carries a row for each, which is the thing that was actually missing:
+  it had no entry for pointer events, so a seam absent from **every** host was absent from the
+  matrix too. Its own header is about two seams that were missing from a host while a table said the
+  shape was deliberate; this was a third, and the table did not mention it at all.
+
 - **The first drag of every brush was lost.** A `between` pair is a latch, and the dispatcher that
   holds it is rebuilt on every recompile with each gate starting closed — while a recompile is
   exactly what a fired handler causes. So in the standard brush idiom, an `anchor` set on

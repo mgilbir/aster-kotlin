@@ -715,6 +715,64 @@ public final class ChartSession {
     }
   }
 
+  /// A pointer touching down, which is Vega's `mousedown`.
+  ///
+  /// The three raw pointer events are what a **brush** is written against:
+  /// `[mousedown, mouseup] > mousemove` gates the move between the press and the release, and it is
+  /// how every interval selection in Vega and Vega-Lite is expressed. Without them a specification
+  /// that brushes compiles, draws, and never responds — the signal keeps its initial value and
+  /// nothing says why.
+  ///
+  /// Distinct from ``tap(at:)`` and ``pan(by:phase:)``, which are *gestures*: a tap is a `click` and
+  /// a pan produces no Vega event at all, because the viewport transform is this engine's own idea
+  /// rather than something a specification asked for. These are the events the specification names.
+  ///
+  /// `VegaChartView` emits them from its drag gesture when ``ChartGestures/pointer`` is asked for.
+  /// A host driving the session itself calls them in the order a pointer really moves: down, then
+  /// any number of moves, then up.
+  public func pointerDown(at point: Point) {
+    serialised {
+      self.controller.setHitTestOptions(options: HitTestOptions.companion.Touch)
+      self.controller.dispatch(
+        event: ChartInputEventPointerDown(
+          point: PointD(x: point.x, y: point.y),
+          pointerId: 1,
+          device: PointerDevice.touch,
+          buttons: 1
+        )
+      )
+      self.publish()
+    }
+  }
+
+  /// A pointer moving, which is Vega's `mousemove`. See ``pointerDown(at:)``.
+  ///
+  /// Emitted while the pointer is **down** as well as while it hovers: a browser fires `mousemove`
+  /// throughout a drag, and the move between a press and a release is the one a brush is gated on.
+  public func pointerMoved(at point: Point) {
+    serialised {
+      self.controller.dispatch(
+        event: ChartInputEventPointerMoved(point: PointD(x: point.x, y: point.y))
+      )
+      self.publish()
+    }
+  }
+
+  /// A pointer lifting, which is Vega's `mouseup`. See ``pointerDown(at:)``.
+  public func pointerUp(at point: Point) {
+    serialised {
+      self.controller.dispatch(
+        event: ChartInputEventPointerUp(
+          point: PointD(x: point.x, y: point.y),
+          pointerId: 1,
+          device: PointerDevice.touch,
+          buttons: 0
+        )
+      )
+      self.publish()
+    }
+  }
+
   /// Narrows or widens the interval an axis draws its data against, and says whether it moved.
   ///
   /// What an **adjustable axis** does. `VegaChartView` gives an axis element carrying

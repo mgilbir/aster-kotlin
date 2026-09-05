@@ -139,6 +139,21 @@ public fun VegaChart(
   onPan: ((VectorD, Boolean) -> Unit)? = null,
   onZoom: ((Double, PointD, Boolean) -> Unit)? = null,
   onHover: ((PointD?, SceneNodeId?) -> Unit)? = null,
+  /**
+   * The raw pointer events a **brush** is written against: `mousedown`, `mousemove`, `mouseup`.
+   *
+   * `[mousedown, mouseup] > mousemove` is how every interval selection in Vega and Vega-Lite is
+   * expressed, and this renderer reported no event that could open one — a specification that
+   * brushes compiled, drew, and never responded. Distinct from [onPan], which is the *viewport*
+   * transform and produces no Vega event at all.
+   *
+   * Reported in controller space, like [onTap] and [onPan] beside them, so a host forwards each
+   * straight to `VegaChartController.dispatch`. A move is reported while the pointer is **down**,
+   * which is the case a brush needs and the one a hover cannot supply.
+   */
+  onPointerDown: ((PointD) -> Unit)? = null,
+  onPointerMoved: ((PointD) -> Unit)? = null,
+  onPointerUp: ((PointD) -> Unit)? = null,
   hitTestOptions: HitTestOptions = HitTestOptions.Touch,
   viewportOffset: VectorD = VectorD.Zero,
   viewportScale: Double = 1.0,
@@ -205,6 +220,9 @@ public fun VegaChart(
             onPan = onPan,
             onZoom = onZoom,
             onHover = onHover,
+            onPointerDown = onPointerDown,
+            onPointerMoved = onPointerMoved,
+            onPointerUp = onPointerUp,
             // **Read, not keyed.** See `chartPointerInput`: a `pointerInput` restarts when a key
             // changes, and the viewport changes on the first pixel of every pan.
             viewport = rememberUpdatedState(Viewport(viewportOffset, viewportScale)),
@@ -460,6 +478,9 @@ private fun Modifier.chartPointerInput(
   onPan: ((VectorD, Boolean) -> Unit)?,
   onZoom: ((Double, PointD, Boolean) -> Unit)?,
   onHover: ((PointD?, SceneNodeId?) -> Unit)?,
+  onPointerDown: ((PointD) -> Unit)?,
+  onPointerMoved: ((PointD) -> Unit)?,
+  onPointerUp: ((PointD) -> Unit)?,
   /**
    * The pan and the zoom the host has accumulated, as a **state to read** rather than a value.
    *
@@ -473,10 +494,52 @@ private fun Modifier.chartPointerInput(
    */
   viewport: State<Viewport>,
 ): Modifier {
-  if (onTap == null && onLongPress == null && onPan == null && onZoom == null && onHover == null) {
+  val wantsPointer = onPointerDown != null || onPointerMoved != null || onPointerUp != null
+  if (
+    onTap == null &&
+      onLongPress == null &&
+      onPan == null &&
+      onZoom == null &&
+      onHover == null &&
+      !wantsPointer
+  ) {
     return this
   }
   return this.then(
+      if (!wantsPointer) Modifier
+      else
+      // **The raw pointer stream**, which none of the detectors below expose.
+      //
+      // `detectTapGestures` reports a completed tap and `detectTransformGestures` reports
+      // increments; neither says "a finger went down here, moved here, and lifted here", and that
+      // sequence is exactly what `[mousedown, mouseup] > mousemove` is written against. So a brush
+      // could not be started on this renderer at all.
+      //
+      // On the **Final** pass and consuming nothing, like the gesture-end watcher further down: it
+      // observes the same stream the detectors work on rather than competing with them, so adding
+      // it takes no touch away from a pan, a pinch or a tap. `positionChangedIgnoreConsumed` for
+      // the same reason — by the Final pass the detectors have already consumed the movement.
+      Modifier.pointerInput(scene, fit, density) {
+          awaitEachGesture {
+            val first = awaitFirstDown(requireUnconsumed = false)
+            fun report(offset: Offset) =
+              controllerPoint(offset, scene, fit, density, size.width, size.height)
+            onPointerDown?.invoke(report(first.position))
+            var last = first.position
+            while (true) {
+              val event = awaitPointerEvent(PointerEventPass.Final)
+              val moved = event.changes.firstOrNull { it.positionChangedIgnoreConsumed() }
+              if (moved != null) {
+                last = moved.position
+                onPointerMoved?.invoke(report(last))
+              }
+              if (event.changes.none { it.pressed }) break
+            }
+            onPointerUp?.invoke(report(last))
+          }
+        }
+    )
+    .then(
       if (onTap == null && onLongPress == null) Modifier
       else
         Modifier.pointerInput(scene, fit, density, hitIndex) {
