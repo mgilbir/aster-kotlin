@@ -580,30 +580,39 @@ Both went in against the fixtures rather than ahead of them: `donut` failed on i
 property named the way *Vega* names the channel, `innerRadius`, which has no Vega-Lite name of its
 own) and `grouped-bar` on the step arithmetic.
 
-### Where the compiler stands, and what it still refuses
+### Where the compiler stood when this was written
 
 Seventy-three fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view, a layer of them to any depth, a concatenation of
 either to any depth, a
 repetition of any of those, both facet operators, eleven marks including `arc`,
-the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
+the Cartesian and polar position pairs, nested offsets, sorting,
 binning, time units, stacking, faceting by `row` and `column`, conditional encodings, a line or an
 area that draws its own points, legends, axes, and a user `config` carried through as a theme.
 
-What it still refuses, by name, with the reason each is refused rather than approximated:
+**What it refuses now is in `SUPPORTED_FEATURES.md`, not here**, and this section is the reason that
+rule exists. It used to carry a list of three things the compiler "still refuses", and every one of
+them had been implemented since it was written:
 
-- **A selection parameter** — one carrying `select`. It stands for the rows a reader picked, and
-  needs an interaction loop this engine does not run. Reported one parameter at a time, so a
-  specification mixing the two kinds still gets the variables it declared. A **variable** parameter
-  is implemented (below), and a condition naming a `param` is still refused by itself, leaving the
-  rest of its definition standing.
-- **Geographic projections and the `geoshape` mark.** The runtime draws maps — `world-map` is in the
-  Vega corpus — so this is now a *compiler* gap and not an engine one: nothing here yet translates
-  Vega-Lite's `projection` block and its `geoshape` mark into the Vega equivalents.
-- A facet `sort` that names a **written-out list**, whose place in it has to be computed onto every
-  row as a column of its own; and one that names an aggregate on a facet gridded **both** ways,
-  where the key has to be written onto the rows first so each cell can take the greatest of its own.
-  An aggregate sort on a facet gridded one way is implemented (below).
+- a **selection parameter** — `Selection.kt` compiles them, and `select` appears in 27 of the fixtures;
+- **geographic projections and the `geoshape` mark** — `Marks.kt` maps the mark and `Model.kt`
+  carries the projection, across three `geoshape` and seven `projection` fixtures;
+- a facet `sort` naming a **written-out list** — `reportUnsupportedSort` returns early for an array,
+  whose place is computed onto every row as a column of its own.
+
+Three claims that told a reader their chart would not work when it already did, which is the
+direction this repository has now corrected four times over. The generated document said the
+opposite of this one about the same three capabilities, and nothing noticed, because
+`DocumentedNumbersTest` guards the *numbers* in this file and nothing guards the prose.
+
+So the present tense moved to `docs/capabilities.json`, where a limitation names a test that asserts
+it and `scripts/capabilities.py` refuses a row that does not. The one sort shape still refused —
+a facet `sort` **object naming no `field`** to aggregate — is pinned by
+`SubsetIsRefusedTest`, along with the list form that is honoured, so the two cannot drift into
+agreeing again.
+
+What this file keeps is what it is good at and what nothing else holds: the dated account of how each
+of those was reached.
 
 ### Concatenation: two plots, and what they do not share
 

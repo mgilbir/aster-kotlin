@@ -119,16 +119,17 @@
       "feature": "Vega-Lite compilation",
       "status": "**Partial**",
       "tests": [
+        "SubsetIsRefusedTest",
+        "UpstreamVegaLiteCoverageTest",
         "VegaLiteFixtureDifferentialTest",
-        "VegaLiteFixtureTest",
-        "UpstreamVegaLiteCoverageTest"
+        "VegaLiteFixtureTest"
       ],
       "tests_text": "`VegaLiteFixtureTest`, `VegaLiteFixtureDifferentialTest`, `UpstreamVegaLiteCoverageTest`",
-      "notes": "`VegaLiteCompiler` compiles Vega-Lite to Vega in Kotlin, and the emitted specification is compared **property by property** against upstream's own compiler on every fixture — not only the picture it draws, because Vega-Lite's whole value is in the defaults it supplies and each of those is one property of the output. A single view, a `layer` of views, or a grid of them faceted by `row` and `column`; see the Vega-Lite section below for the channels and marks, and for what is reported instead of approximated Measured against the Vega-Lite schema in the pinned install: **77 of 77** constructs — all 41 encoding channels, all 17 marks and all 19 transforms — are accepted rather than refused by name (`docs/upstream-coverage.md`). That is breadth; whether each emits the Vega upstream emits is answered property by property on every fixture.",
+      "notes": "`VegaLiteCompiler` compiles Vega-Lite to Vega in Kotlin, and the emitted specification is compared **property by property** against upstream's own compiler on every fixture — not only the picture it draws, because Vega-Lite's whole value is in the defaults it supplies and each of those is one property of the output. A single view, a `layer` of views, or a grid of them faceted by `row` and `column`; see the Vega-Lite section below for the channels and marks, and for what is reported instead of approximated Measured against the Vega-Lite schema in the pinned install: **77 of 77** constructs — all 41 encoding channels, all 17 marks and all 19 transforms — are accepted rather than refused by name (`docs/upstream-coverage.md`). That is breadth; whether each emits the Vega upstream emits is answered property by property on every fixture.. **What it refuses is here rather than in STATUS.md**, which listed three things and was wrong about all three (#231): selection parameters, `geoshape` and `projection`, and a facet `sort` naming a written-out list were each described as refused and each had been implemented — the prose said a reader's chart would not work when it already did, which is the direction this repository has now corrected four times. `SUPPORTED_FEATURES.md` is generated from this file and every limitation cites a test that asserts it; STATUS.md's numbers are guarded by `DocumentedNumbersTest` and its prose by nothing, which is why the present-tense claims belong on this side and that file keeps the dated account of how each was reached",
       "milestone": "—",
       "limit": {
-        "test": "SubsetIsRefusedTest.a mark outside the subset is refused by name",
-        "claim": "The implemented subset is documented in the Vega-Lite section; anything outside it is refused by name rather than approximated."
+        "test": "SubsetIsRefusedTest.a facet sort naming no field to aggregate is refused by name",
+        "claim": "The implemented subset is documented in the Vega-Lite section; anything outside it is refused by name rather than approximated. The one sort shape still refused is a facet `sort` **object naming no `field`** to aggregate — a bare direction, a written-out list and an aggregate naming its field all compile."
       }
     },
     {

@@ -8,6 +8,24 @@ section here does not get released.
 
 ### Fixed
 
+- **`STATUS.md` contradicted `SUPPORTED_FEATURES.md` about three capabilities** (#231), and was
+  wrong about all three. Its "what it still refuses" list named a selection parameter, geographic
+  projections with the `geoshape` mark, and a facet `sort` naming a written-out list — each
+  implemented since the list was written, and each described as refused. Three claims telling a
+  reader their chart would not work when it already did, which is the direction this repository has
+  now corrected four times over.
+
+  The generated document said the opposite of the hand-written one about the same three
+  capabilities, and nothing noticed: `DocumentedNumbersTest` guards STATUS.md's *numbers* and
+  nothing guards its prose.
+
+  So the present tense moved to `docs/capabilities.json`, where a limitation names a test that
+  asserts it and `scripts/capabilities.py` refuses a row that does not. The one sort shape still
+  refused — a facet `sort` **object naming no `field`** to aggregate — is pinned by
+  `SubsetIsRefusedTest`, along with the list form that *is* honoured, so the two cannot drift into
+  agreeing again. `STATUS.md` keeps what nothing else holds and what it is good at: the dated
+  account of how each of those was reached.
+
 - **Keyboard focus was invisible and unannounced on every host** (#227). `focusedNodeId` was written
   by `handleKey` and read by **no renderer** — not the Android canvas, not the SVG one, not Compose
   Multiplatform — and announced by no host either. Arrow-key traversal moved an invisible cursor: a
