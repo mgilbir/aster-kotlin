@@ -8,6 +8,28 @@ section here does not get released.
 
 ### Fixed
 
+- **The first drag of every brush was lost.** A `between` pair is a latch, and the dispatcher that
+  holds it is rebuilt on every recompile with each gate starting closed — while a recompile is
+  exactly what a fired handler causes. So in the standard brush idiom, an `anchor` set on
+  `mousedown` beside a `brush` on `[mousedown, mouseup] > mousemove`, the press opened the latch,
+  changed `anchor`, rebuilt the dispatcher, and threw the latch away before the `mousemove` it was
+  meant to gate ever arrived.
+
+  It hid because the failure depends on whether the opening event **changed** anything. A second
+  drag from the same point sets `anchor` to the value it already had, changes no signal, rebuilds
+  nothing and works perfectly — so a brush that had been dragged once looked right from then on, and
+  only a drag starting somewhere new was silently dropped.
+
+  Upstream never rebuilds its streams at all: a `View`'s dataflow outlives every signal update, so
+  its latches do too. The open ones are now carried into the dispatcher that replaces the old one,
+  and dropped on a new specification, which is the one time a drag genuinely should not carry over.
+  This is the same lesson `startTimers` had already recorded **three lines away**, where restarting
+  on every publish cancelled the running timers mid-flight.
+
+  Found by verifying the audit's Q6, which asked whether *faceted* interval selections were broken.
+  They are not — a faceted brush selects in its own cell and `push: "outer"` carries the cell's key
+  back out — but every brush, faceted or not, was losing its first drag.
+
 - **A label's turn and anchor are resolved per tick, and two false warnings are gone.** The row
   named `angle` as *the* guide encode channel with no per-item path — "it folds into `labelAngle` or
   it is nothing". Upstream has a path for it: `axis-labels.js` builds `angle: _('labelAngle')` into

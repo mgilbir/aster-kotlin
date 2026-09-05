@@ -1076,7 +1076,8 @@ EventConfig.view
 EventConfig.window
 EventDispatcher
 EventDispatcher.dispatch(event:)
-EventDispatcher.init(bindings:expressions:diagnostics:scope:events:deferrable:scopes:)
+EventDispatcher.init(bindings:expressions:diagnostics:scope:events:deferrable:scopes:openLatches:)
+EventDispatcher.openLatches()
 EventPermit
 EventPermitAll
 EventPermitAll.description()
@@ -2470,6 +2471,16 @@ LabelTransform.apply(input:params:context:)
 LabelTransform.init()
 LabelTransform.shared
 LabelTransform.type
+LatchKey
+LatchKey.closes
+LatchKey.description()
+LatchKey.doCopy(signalName:scopePath:opens:closes:)
+LatchKey.hash()
+LatchKey.init(signalName:scopePath:opens:closes:)
+LatchKey.isEqual(_:)
+LatchKey.opens
+LatchKey.scopePath
+LatchKey.signalName
 LayoutOffset
 LayoutOffset.columnFooter
 LayoutOffset.columnHeader

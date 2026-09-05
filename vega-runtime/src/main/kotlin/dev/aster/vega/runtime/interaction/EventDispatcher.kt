@@ -133,6 +133,32 @@ public data class FiredHandler(
   @InternalAsterVegaApi val writePath: String? = null,
 )
 
+/**
+ * One `between` latch's identity, so its state can outlive the dispatcher that held it.
+ *
+ * A `between` pair is a latch — opened by the first stream, closed by the second — and a drag is
+ * the span between them. The dispatcher is rebuilt on **every recompile**, and a recompile is what
+ * a fired handler causes, so the latch a `mousedown` had just opened was thrown away before the
+ * `mousemove` it was meant to gate arrived. That is the standard brush idiom: an `anchor` set on
+ * `mousedown` and a `brush` on `[mousedown, mouseup] > mousemove`. The first drag of every brush
+ * was lost, and so was any drag that started somewhere new — a second drag from the *same* point
+ * worked, because setting `anchor` to the value it already had changed nothing and so recompiled
+ * nothing.
+ *
+ * Upstream never rebuilds its streams: a `View`'s dataflow outlives every signal update, so its
+ * latches do too. Carrying them across is what matches it.
+ *
+ * The two boundary streams identify the pair within a binding. Two handlers on one signal sharing a
+ * pair would share a key, and share the latch — which is the same latch either way, since the same
+ * events open and close both.
+ */
+public data class LatchKey(
+  val signalName: String,
+  @InternalAsterVegaApi val scopePath: String,
+  val opens: EventStream,
+  val closes: EventStream,
+)
+
 /** One `on` handler, bound to the signal it sets. */
 public data class HandlerBinding(
   val signalName: String,
@@ -206,6 +232,17 @@ public class EventDispatcher(
    * notice, since nothing fires and nothing is reported.
    */
   private val scopes: Map<String, ExpressionScope> = emptyMap(),
+  /**
+   * The `between` latches that were **open** when the previous dispatcher was replaced.
+   *
+   * A drag outlives a recompile, and a recompile is what a fired handler causes — so without this
+   * the latch a `mousedown` had just opened was thrown away before the `mousemove` it gates
+   * arrived. See [LatchKey] for the shape that made it invisible: a second drag from the same point
+   * worked, because it changed no signal and so rebuilt nothing.
+   *
+   * Empty for a fresh document, which is the only time a drag genuinely should not carry over.
+   */
+  @InternalAsterVegaApi private val openLatches: Set<LatchKey> = emptySet(),
 ) {
 
   /** One stream being watched, with whatever state it needs between events. */
@@ -233,6 +270,19 @@ public class EventDispatcher(
   private class Gate {
     var open: Boolean = false
   }
+
+  /** Every gate this dispatcher owns, so its state can be handed to the one that replaces it. */
+  private val latchKeys = LinkedHashMap<Gate, LatchKey>()
+
+  /**
+   * Which latches are open now, for the dispatcher that replaces this one.
+   *
+   * Read by `VegaChartController.publish` immediately before it builds the replacement, which is
+   * the only place a dispatcher is ever replaced.
+   */
+  @InternalAsterVegaApi
+  public fun openLatches(): Set<LatchKey> =
+    latchKeys.entries.filter { it.key.open }.map { it.value }.toSet()
 
   /**
    * The gates a stream must pass, all of them open, or absent if it has none.
@@ -305,6 +355,12 @@ public class EventDispatcher(
         .filter { it.between.size == 2 }
         .map { link ->
           val gate = Gate()
+          val key =
+            LatchKey(binding.signalName, binding.scopePath, link.between[0], link.between[1])
+          // Reopened where the dispatcher this one replaces had it open: a drag spans a recompile,
+          // and a recompile is what the drag's own first event causes.
+          gate.open = key in openLatches
+          latchKeys[gate] = key
           gateWatches +=
             Watch(link.between[0], null, binding.scopePath, opens = mutableListOf(gate))
           gateWatches +=

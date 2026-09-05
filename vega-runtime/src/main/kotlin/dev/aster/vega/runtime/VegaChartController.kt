@@ -603,6 +603,11 @@ public class VegaChartController(
     if (!isCurrent(generation)) return compiled
     loadedSpecJson = json
     signals.reset()
+    // A drag does not span two documents. `publish` carries the open `between` latches into the
+    // dispatcher it builds, which is what lets a brush survive the recompile its own first event
+    // causes; a new specification is the one time that would be wrong, since the latch belongs to
+    // streams that no longer exist.
+    vegaEvents = null
     return publish(compiled)
   }
 
@@ -707,6 +712,11 @@ public class VegaChartController(
     // compile rather than before it, so a load that was cancelled leaves the chart on screen alone.
     loadedSpecJson = json
     signals.reset()
+    // A drag does not span two documents. `publish` carries the open `between` latches into the
+    // dispatcher it builds, which is what lets a brush survive the recompile its own first event
+    // causes; a new specification is the one time that would be wrong, since the latch belongs to
+    // streams that no longer exist.
+    vegaEvents = null
     return publish(compiled)
   }
 
@@ -853,6 +863,19 @@ public class VegaChartController(
     // compiler's
     // own, since a listener that was refused is exactly the kind of thing a host needs told.
     startTimers(compiled, bindings)
+    // **The open `between` latches, carried across.** A drag outlives a recompile and a recompile
+    // is what a fired handler causes, so the latch a `mousedown` had just opened was thrown away
+    // before the `mousemove` it gates arrived — the dispatcher is rebuilt here and every `Gate`
+    // starts closed. That is the standard brush idiom, an `anchor` set on `mousedown` beside a
+    // `brush` on `[mousedown, mouseup] > mousemove`, so the first drag of every brush was lost.
+    //
+    // It hid because the failure depends on whether the opening event *changed* anything: a second
+    // drag from the same point sets `anchor` to the value it already had, changes no signal,
+    // rebuilds nothing, and works. Upstream never rebuilds its streams at all — a `View`'s dataflow
+    // outlives every signal update — so carrying these is what matches it. The same lesson
+    // `startTimers` above records for timers, which were being cancelled mid-flight for the same
+    // reason.
+    val carriedLatches = vegaEvents?.openLatches().orEmpty()
     vegaEvents =
       if (bindings.isEmpty()) {
         null
@@ -866,6 +889,7 @@ public class VegaChartController(
           compiled.spec?.events ?: EventConfig(),
           deferrable = scheduler != null,
           scopes = compiled.groupScopes,
+          openLatches = carriedLatches,
         )
       }
     val diagnostics = compiled.diagnostics + listenerDiagnostics.diagnostics

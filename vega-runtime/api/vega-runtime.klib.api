@@ -667,9 +667,10 @@ final class dev.aster.vega.runtime.interaction/CoroutineScheduler : dev.aster.ve
 }
 
 final class dev.aster.vega.runtime.interaction/EventDispatcher { // dev.aster.vega.runtime.interaction/EventDispatcher|null[0]
-    constructor <init>(kotlin.collections/List<dev.aster.vega.runtime.interaction/HandlerBinding>, dev.aster.vega.expression/ExpressionCompiler, dev.aster.vega.model/DiagnosticCollector, dev.aster.vega.expression/ExpressionScope, dev.aster.vega.model.spec/EventConfig = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.expression/ExpressionScope> = ...) // dev.aster.vega.runtime.interaction/EventDispatcher.<init>|<init>(kotlin.collections.List<dev.aster.vega.runtime.interaction.HandlerBinding>;dev.aster.vega.expression.ExpressionCompiler;dev.aster.vega.model.DiagnosticCollector;dev.aster.vega.expression.ExpressionScope;dev.aster.vega.model.spec.EventConfig;kotlin.Boolean;kotlin.collections.Map<kotlin.String,dev.aster.vega.expression.ExpressionScope>){}[0]
+    constructor <init>(kotlin.collections/List<dev.aster.vega.runtime.interaction/HandlerBinding>, dev.aster.vega.expression/ExpressionCompiler, dev.aster.vega.model/DiagnosticCollector, dev.aster.vega.expression/ExpressionScope, dev.aster.vega.model.spec/EventConfig = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.expression/ExpressionScope> = ..., kotlin.collections/Set<dev.aster.vega.runtime.interaction/LatchKey> = ...) // dev.aster.vega.runtime.interaction/EventDispatcher.<init>|<init>(kotlin.collections.List<dev.aster.vega.runtime.interaction.HandlerBinding>;dev.aster.vega.expression.ExpressionCompiler;dev.aster.vega.model.DiagnosticCollector;dev.aster.vega.expression.ExpressionScope;dev.aster.vega.model.spec.EventConfig;kotlin.Boolean;kotlin.collections.Map<kotlin.String,dev.aster.vega.expression.ExpressionScope>;kotlin.collections.Set<dev.aster.vega.runtime.interaction.LatchKey>){}[0]
 
     final fun dispatch(dev.aster.vega.runtime.interaction/InputEvent): kotlin.collections/List<dev.aster.vega.runtime.interaction/FiredHandler> // dev.aster.vega.runtime.interaction/EventDispatcher.dispatch|dispatch(dev.aster.vega.runtime.interaction.InputEvent){}[0]
+    final fun openLatches(): kotlin.collections/Set<dev.aster.vega.runtime.interaction/LatchKey> // dev.aster.vega.runtime.interaction/EventDispatcher.openLatches|openLatches(){}[0]
 }
 
 final class dev.aster.vega.runtime.interaction/FiredHandler { // dev.aster.vega.runtime.interaction/FiredHandler|null[0]
@@ -769,6 +770,28 @@ final class dev.aster.vega.runtime.interaction/InputEvent { // dev.aster.vega.ru
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.runtime.interaction/InputEvent.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.aster.vega.runtime.interaction/InputEvent.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.aster.vega.runtime.interaction/InputEvent.toString|toString(){}[0]
+}
+
+final class dev.aster.vega.runtime.interaction/LatchKey { // dev.aster.vega.runtime.interaction/LatchKey|null[0]
+    constructor <init>(kotlin/String, kotlin/String, dev.aster.vega.model.spec/EventStream, dev.aster.vega.model.spec/EventStream) // dev.aster.vega.runtime.interaction/LatchKey.<init>|<init>(kotlin.String;kotlin.String;dev.aster.vega.model.spec.EventStream;dev.aster.vega.model.spec.EventStream){}[0]
+
+    final val closes // dev.aster.vega.runtime.interaction/LatchKey.closes|{}closes[0]
+        final fun <get-closes>(): dev.aster.vega.model.spec/EventStream // dev.aster.vega.runtime.interaction/LatchKey.closes.<get-closes>|<get-closes>(){}[0]
+    final val opens // dev.aster.vega.runtime.interaction/LatchKey.opens|{}opens[0]
+        final fun <get-opens>(): dev.aster.vega.model.spec/EventStream // dev.aster.vega.runtime.interaction/LatchKey.opens.<get-opens>|<get-opens>(){}[0]
+    final val scopePath // dev.aster.vega.runtime.interaction/LatchKey.scopePath|{}scopePath[0]
+        final fun <get-scopePath>(): kotlin/String // dev.aster.vega.runtime.interaction/LatchKey.scopePath.<get-scopePath>|<get-scopePath>(){}[0]
+    final val signalName // dev.aster.vega.runtime.interaction/LatchKey.signalName|{}signalName[0]
+        final fun <get-signalName>(): kotlin/String // dev.aster.vega.runtime.interaction/LatchKey.signalName.<get-signalName>|<get-signalName>(){}[0]
+
+    final fun component1(): kotlin/String // dev.aster.vega.runtime.interaction/LatchKey.component1|component1(){}[0]
+    final fun component2(): kotlin/String // dev.aster.vega.runtime.interaction/LatchKey.component2|component2(){}[0]
+    final fun component3(): dev.aster.vega.model.spec/EventStream // dev.aster.vega.runtime.interaction/LatchKey.component3|component3(){}[0]
+    final fun component4(): dev.aster.vega.model.spec/EventStream // dev.aster.vega.runtime.interaction/LatchKey.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., dev.aster.vega.model.spec/EventStream = ..., dev.aster.vega.model.spec/EventStream = ...): dev.aster.vega.runtime.interaction/LatchKey // dev.aster.vega.runtime.interaction/LatchKey.copy|copy(kotlin.String;kotlin.String;dev.aster.vega.model.spec.EventStream;dev.aster.vega.model.spec.EventStream){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.runtime.interaction/LatchKey.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.runtime.interaction/LatchKey.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.runtime.interaction/LatchKey.toString|toString(){}[0]
 }
 
 final class dev.aster.vega.runtime.interaction/SignalUpdater { // dev.aster.vega.runtime.interaction/SignalUpdater|null[0]
