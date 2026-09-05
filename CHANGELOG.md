@@ -6,6 +6,36 @@ section here does not get released.
 
 ## Unreleased
 
+### Added
+
+- **An unnamed group's own scales are compared against upstream.** The last surviving form of the
+  row's original reason was "an unnamed group has no key to record it under". It has one, and it is
+  the one the engine already gives it: `ScopeCompiler` has spelled an unnamed group `[i]` — its
+  index among its siblings — since it was written, because a scope has to be recorded under
+  *something*. `normalizeNestedScales` now builds the same spelling from the runtime.
+
+  That took the recording from **14 group scopes to 59**, and every one of the 45 new ones matched
+  upstream on the first run. Proved by mutation rather than by the pass: a range moved in one
+  unnamed cell fails naming `[2][|"korean"|]`.
+
+  Building the path from the runtime means taking the **guides out of the sibling list first** — the
+  scenegraph interleaves an axis, a legend and a title among the marks and the specification does
+  not, so `u-district-cuisine`'s group is third in `items` and third-of-three in `marks`. The guide
+  test is upstream's own `getRole`, inverted: a role starting with `axis`, `legend` or `title`. A
+  whitelist of known mark roles would have dropped a mark carrying a custom `role`, which a
+  specification may write.
+
+  **A position taken from the specification, not from an array of results**, which is what makes
+  this safe where "pair them by subcontext index" was not: add a mark and both engines renumber
+  together, because both are counting the same `marks` array.
+
+  What is left is one shape, and it is narrower than what it replaces: a group with
+  `from: {"data": …}` is drawn **once per row**, so several scopes share one path with no grouping
+  value between them. The only thing telling two cells apart is the row each was drawn for, and
+  pairing on that means agreeing on a canonical form for an arbitrary datum in two languages — where
+  a key that fails to pair is a comparison that goes *silent*, which is worse than the honest gap.
+  One such group in the corpus, and its cells' geometry is compared in full.
+
 ### Fixed
 
 - **A `between` pair wrapping another one is dispatched, in both of its spellings.** It was refused

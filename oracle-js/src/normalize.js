@@ -559,77 +559,117 @@ function scaleValue(value, precision) {
 
 /** Scale outputs, compared exactly: they are pure arithmetic with no rendering in the way. */
 /**
- * The scales a **named group mark** built for itself — a faceted one once per cell.
+ * The scales a group mark built for itself — a faceted one once per cell.
  *
  * `view.scale(name)` reaches only the top level, so a scale declared inside a group was recorded
- * nowhere and the row said it could not be: "a faceted group resolves its scales once per cell and
- * there is no single scale of that name to compare". The first half of that was answered by keying
- * a singly-drawn group by its name. This is the second half, and the premise turns out to be about
- * the *key* rather than about the data: upstream keeps one `subcontext` entry per cell, each with
- * that cell's own resolved scales, and what was missing was a name to record them under.
+ * nowhere and the row said it could not be. That reason has now been read too wide three times.
  *
- * The name is the group's plus its **facet key** — the `groupby` values that made the cell, read
- * off the cell's own datum and written `site[|"Waseca"|]`. Not the cell's index: upstream hands out
- * subcontexts in an array and the engine builds its cells in partition order, and pairing those by
- * position would silently mis-pair the moment either side reordered. The facet key is what both
- * engines agree the cell *is*, so a cell that only one of them built is a missing key rather than a
- * comparison against the wrong cell.
+ * First it was "a faceted group resolves its scales once per cell, so there is no single scale of
+ * that name" — true of a faceted group and of nothing else, so a group drawn **once** was excluded
+ * by a reason that did not apply to it. Then the faceted half turned out to be about the *key* and
+ * not the data: upstream keeps one `subcontext` entry per cell, each with that cell's own resolved
+ * scales, so there is one scale per cell and what was missing was a name.
  *
- * Only the `groupby` values go into it, not the whole datum: a facet's datum also carries `count`
- * and whatever `facet.aggregate` measured, and keying on a measurement would turn a disagreement
- * about that measurement into a pair that silently does not match — the comparison going quiet at
- * exactly the moment it has something to say. Those are compared as the cell's geometry instead.
+ * What is left is this one: an **unnamed** group has no name to record under. It still has an
+ * identity, and it is the one the engine already gives it — its **position among its siblings**, in
+ * the specification. `ScopeCompiler` spells a group's path `name` or `[i]`, joined by `/`, and this
+ * builds the same spelling from the runtime.
  *
- * An **unnamed** group is still not recorded, for the reason it always was: there is no key. Its
- * cells' geometry is compared in full, which is what those scales produce.
+ * **A position derived from the specification, not from an array of results.** That distinction is
+ * the whole reason this is safe where "pair them by subcontext index" was not: if a mark is added,
+ * both engines renumber together, because both are counting the same `marks` array. `i` is the
+ * index among *all* of a group's marks, matching `ScopeCompiler`'s own `forEachIndexed`, which is
+ * why the guides have to come out of the runtime's sibling list first — the scenegraph interleaves
+ * an axis, a legend and a title among them and the specification does not.
+ *
+ * The guide test is upstream's own, inverted: `getRole` treats a role starting with `axis`,
+ * `legend` or `title` as a guide and everything else as a mark. A whitelist of known mark roles
+ * would drop a mark carrying a custom `role`, which is a thing a specification may write.
  */
 export function normalizeNestedScales(view, spec, precision = DEFAULT_PRECISION) {
-  const groupbyOf = facetGroupbyByName(spec);
+  const groupbyOf = facetGroupbyByPath(spec);
   const subs = (view._runtime && view._runtime.subcontext) || [];
-  const byName = new Map();
+  const byPath = new Map();
   for (const sub of subs) {
-    const name = sub.group && sub.group.mark && sub.group.mark.name;
-    if (!name || !sub.scales) continue;
-    if (!byName.has(name)) byName.set(name, []);
-    byName.get(name).push(sub);
+    if (!sub.scales || !sub.group) continue;
+    const path = markPath(sub.group);
+    if (!path) continue;
+    if (!byPath.has(path)) byPath.set(path, []);
+    byPath.get(path).push(sub);
   }
   const result = {};
-  for (const [name, group] of byName) {
-    const groupby = groupbyOf.get(name);
+  for (const [path, group] of byPath) {
+    const groupby = groupbyOf.get(path);
     if (group.length === 1 && !groupby) {
       const scales = scalesOf(group[0], precision);
-      if (Object.keys(scales).length) result[name] = scales;
+      if (Object.keys(scales).length) result[path] = scales;
       continue;
     }
-    // Several subcontexts under one name and no facet to key them by: a name reused across group
-    // marks, which nothing here can tell apart. Left out rather than guessed at.
+    // Several subcontexts at one path and no facet to key them by. The shape that produces it is a
+    // group nested **inside** a faceted one: it is drawn once per cell of its parent, and this path
+    // names all of them. `ScopeCompiler` distinguishes those by pushing the parent's cell onto the
+    // path, and nothing here reads that back yet. No fixture has one; `NestedScaleCoverageTest`
+    // fails if one arrives, because it expects a named group drawn once to be recorded.
     if (!groupby) continue;
     for (const sub of group) {
       const key = facetKey(sub.group && sub.group.datum, groupby);
       if (key === null) continue;
       const scales = scalesOf(sub, precision);
-      if (Object.keys(scales).length) result[`${name}[${key}]`] = scales;
+      if (Object.keys(scales).length) result[`${path}[${key}]`] = scales;
     }
   }
   return result;
 }
 
-/** The `groupby` fields of every **named** faceted group mark in a specification, by name. */
-function facetGroupbyByName(spec) {
+/** Whether a role is a guide's. Upstream's own test, in `vega-parser`'s `getRole`. */
+function isGuideRole(role) {
+  return (
+    typeof role === 'string' &&
+    (role.startsWith('axis') || role.startsWith('legend') || role.startsWith('title'))
+  );
+}
+
+/**
+ * Where a group item's mark sits, spelled the way `ScopeCompiler` spells a scope path.
+ *
+ * Walks out through `mark.group`, which is the enclosing group **item**, collecting a segment per
+ * level. The outermost is dropped: that is the chart's own root group, which the engine's paths are
+ * relative to.
+ */
+function markPath(item) {
+  const segments = [];
+  let mark = item && item.mark;
+  while (mark) {
+    const parentItem = mark.group;
+    const siblings = (parentItem && parentItem.items) || [];
+    const index = siblings.filter((m) => !isGuideRole(m.role)).indexOf(mark);
+    segments.unshift(mark.name || `[${index}]`);
+    if (!parentItem || !parentItem.mark) break;
+    mark = parentItem.mark;
+  }
+  segments.shift();
+  return segments.join('/');
+}
+
+/**
+ * The `groupby` fields of every faceted group mark, by the path the mark sits at.
+ *
+ * The index counts **every** mark, not only the group ones, because `ScopeCompiler` numbers a
+ * group's siblings with `forEachIndexed` over the whole `marks` array.
+ */
+function facetGroupbyByPath(spec) {
   const out = new Map();
-  const walk = (marks) => {
-    for (const mark of marks || []) {
-      if (mark && mark.type === 'group') {
-        const facet = mark.from && mark.from.facet;
-        // `facet.field` is pre-faceted data — one cell per *row*, with no groupby to key by.
-        if (mark.name && facet && facet.groupby != null) {
-          out.set(mark.name, [].concat(facet.groupby));
-        }
-        walk(mark.marks);
-      }
-    }
+  const walk = (marks, prefix) => {
+    (marks || []).forEach((mark, index) => {
+      if (!mark || mark.type !== 'group') return;
+      const here = (prefix ? `${prefix}/` : '') + (mark.name || `[${index}]`);
+      const facet = mark.from && mark.from.facet;
+      // `facet.field` is pre-faceted data — one cell per *row*, with no groupby to key by.
+      if (facet && facet.groupby != null) out.set(here, [].concat(facet.groupby));
+      walk(mark.marks, here);
+    });
   };
-  walk(spec && spec.marks);
+  walk(spec && spec.marks, '');
   return out;
 }
 

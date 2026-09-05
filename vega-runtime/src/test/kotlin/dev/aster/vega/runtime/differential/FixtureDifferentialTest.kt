@@ -142,11 +142,18 @@ class FixtureDifferentialTest {
   }
 
   /**
-   * This engine's per-cell scales, under the same `name[|key|]` the recorder writes.
+   * This engine's per-cell scales, under the same `path[|key|]` the recorder writes.
    *
-   * The compiler keys a cell by its path — `site/cells[3]` — which is the right key for dispatching
-   * a handler and the wrong one for comparing against another engine's array. So the facet key is
-   * rebuilt here from the cell's own datum, which is the thing both engines agree the cell *is*.
+   * The compiler keys a cell by its path *plus* the cell — `site/cells[3]` — which is the right key
+   * for dispatching a handler and the wrong one for pairing with another engine's array. So the
+   * facet key is rebuilt here from the cell's own datum, which is the thing both engines agree the
+   * cell *is*.
+   *
+   * Keyed by the group's **path** rather than its name, which is what lets an *unnamed* group be
+   * compared at all: `ScopeCompiler` spells an unnamed group `[i]`, its index among its siblings,
+   * and `normalizeNestedScales` builds the same spelling from the runtime. That is a position taken
+   * from the **specification** and not from an array of results — add a mark and both engines
+   * renumber together — which is why it is safe where pairing by subcontext index was not.
    *
    * A group whose `from.facet` names a `field` rather than a `groupby` is left out: that is
    * pre-faceted data, one cell per *row*, and there is no grouping value to key by.
@@ -155,24 +162,23 @@ class FixtureDifferentialTest {
     compiled: dev.aster.vega.runtime.compile.CompiledSpec
   ): Map<String, Map<String, dev.aster.vega.runtime.scale.VegaScale>> {
     val groupby = mutableMapOf<String, List<String>>()
-    fun walk(marks: List<dev.aster.vega.model.spec.MarkSpec>) {
-      for (mark in marks) {
-        if (mark.type != dev.aster.vega.model.spec.MarkType.GROUP) continue
+    fun walk(marks: List<dev.aster.vega.model.spec.MarkSpec>, prefix: String) {
+      marks.forEachIndexed { index, mark ->
+        if (mark.type != dev.aster.vega.model.spec.MarkType.GROUP) return@forEachIndexed
+        val here = (if (prefix.isEmpty()) "" else "$prefix/") + (mark.name ?: "[$index]")
         val facet = mark.from?.facet
-        if (mark.name != null && facet != null && facet.groupby.isNotEmpty()) {
-          groupby[mark.name!!] = facet.groupby
-        }
-        walk(mark.marks)
+        if (facet != null && facet.groupby.isNotEmpty()) groupby[here] = facet.groupby
+        walk(mark.marks, here)
       }
     }
-    walk(compiled.spec?.marks.orEmpty())
+    walk(compiled.spec?.marks.orEmpty(), "")
     if (groupby.isEmpty()) return emptyMap()
     val out = mutableMapOf<String, Map<String, dev.aster.vega.runtime.scale.VegaScale>>()
     for ((path, scales) in compiled.groupScales) {
-      val name = path.substringBefore("/cells[").substringAfterLast('/')
-      val fields = groupby[name] ?: continue
+      val specPath = path.replace(Regex("""/cells\[\d+]$"""), "")
+      val fields = groupby[specPath] ?: continue
       val key = Differential.facetKeyOf(compiled.groupDatums[path] ?: VegaValue.Null, fields)
-      if (key != null) out["$name[$key]"] = scales
+      if (key != null) out["$specPath[$key]"] = scales
     }
     return out
   }
