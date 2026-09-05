@@ -1,11 +1,14 @@
 package dev.aster.vega.android
 
+import android.view.KeyEvent
 import android.view.View
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.aster.vega.runtime.VegaChartController
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,7 +42,8 @@ class ChartActionsInstrumentedTest {
      "marks": [{"type": "rect", "from": {"data": "t"},
                 "encode": {"enter": {"x": {"scale": "x", "field": "c"},
                                      "width": {"scale": "x", "band": 1},
-                                     "y": {"value": 0}, "y2": {"value": 100}}}}]}
+                                     "y": {"value": 0}, "y2": {"value": 100},
+                                     "description": {"signal": "'bar ' + datum.c"}}}}]}
     """
       .trimIndent()
 
@@ -134,6 +138,38 @@ class ChartActionsInstrumentedTest {
     assertTrue(
       "an adjusted chart offers no way back",
       R.id.aster_vega_action_reset_domains in actionIds(hostNode(view)),
+    )
+  }
+
+  /**
+   * The **engine's** focus follows this host's traversal, so the focus ring follows the reader.
+   *
+   * Two notions of focus existed and never met. `ExploreByTouchHelper.dispatchKeyEvent` claims the
+   * arrow keys to walk its own virtual views, so `VegaChartController.handleKey`'s traversal never
+   * runs here — the platform's implementation wins before the engine's is asked, which is the right
+   * outcome because the helper's traversal is what a TalkBack reader already knows. What was
+   * missing is the engine being told, so the focus ring drawn into the scene follows them (#227).
+   *
+   * The direction is the whole finding, and the first attempt had it backwards: pushing the
+   * engine's focus into the helper could never have worked, because the engine's focus never moves
+   * on this host.
+   */
+  @Test
+  fun theHostsTraversalMovesTheEnginesFocus() {
+    val (view, controller) = laidOut()
+    assertNull(
+      "a fresh chart already has a focused node",
+      controller.snapshot.interactionState.focusedNodeId,
+    )
+    InstrumentationRegistryHelper.onMain {
+      view.isFocusableInTouchMode = true
+      view.requestFocus()
+      view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT))
+    }
+    assertNotNull(
+      "walking the chart with an arrow key did not move the engine's focus, so the focus ring " +
+        "cannot follow the reader",
+      controller.snapshot.interactionState.focusedNodeId,
     )
   }
 }

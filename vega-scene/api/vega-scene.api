@@ -1084,6 +1084,7 @@ public final class dev/aster/vega/scene/SceneNodeId {
 
 public final class dev/aster/vega/scene/SceneNodeId$Companion {
 	public final fun getNone-aJBrClo ()J
+	public final fun getOverlay-aJBrClo ()J
 }
 
 public final class dev/aster/vega/scene/SceneNodeIdAllocator {

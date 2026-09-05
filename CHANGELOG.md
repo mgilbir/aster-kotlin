@@ -8,6 +8,29 @@ section here does not get released.
 
 ### Fixed
 
+- **Keyboard focus was invisible and unannounced on every host** (#227). `focusedNodeId` was written
+  by `handleKey` and read by **no renderer** — not the Android canvas, not the SVG one, not Compose
+  Multiplatform — and announced by no host either. Arrow-key traversal moved an invisible cursor: a
+  reader learned where they were by pressing Enter and watching the selection change.
+
+  A focus ring is drawn **into the scene** rather than by each host, for the reason the accessibility
+  tree is built once — three renderers drawing their own is three chances to disagree about a thing a
+  reader needs identical. Every renderer already draws whatever the scene holds, so it reaches all of
+  them at once, the SVG export included. It is appended to the root rather than replacing the mark,
+  so the mark keeps its own paint; it is non-interactive and carries no descriptor, so it is neither
+  a hit target nor a second element for one mark.
+
+  Its id is `SceneNodeId.Overlay`, **reserved**, and that took a bug to get right: a fresh
+  `SceneNodeIdAllocator` gives `SceneNodeId(1)` — the first mark of every scene — so stripping the
+  ring stripped a bar, and a chart lost a mark on hover.
+
+  On Android the two notions of focus are joined the **other way round**. `ExploreByTouchHelper`
+  claims the arrow keys to walk its own virtual views, so the engine's traversal never runs there and
+  the platform's wins — which is the right outcome, since that is the traversal a TalkBack reader
+  already knows. `onVirtualViewKeyboardFocusChanged` now tells the engine, through the new
+  `focusNode`, so the ring follows the reader. Pushing the engine's focus *into* the helper was the
+  first attempt and could never have worked, because the engine's focus never moves on that host.
+
 - **Compose Multiplatform's accessibility caught up with the other two hosts** (#230). A mark there
   said its label and nothing else: Android sets `node.roleDescription` and Apple puts it in
   `accessibilityInputLabels`, so a reader on either hears "Total: 18, rect mark" where here they

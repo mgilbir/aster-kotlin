@@ -44,12 +44,17 @@ import dev.aster.vega.scene.HitResult
 import dev.aster.vega.scene.HitTestOptions
 import dev.aster.vega.scene.MetricTextEngine
 import dev.aster.vega.scene.Modifiers
+import dev.aster.vega.scene.NodeMetadata
 import dev.aster.vega.scene.PointD
+import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.Scene
+import dev.aster.vega.scene.SceneColor
 import dev.aster.vega.scene.SceneHitIndex
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeId
+import dev.aster.vega.scene.ScenePaint
 import dev.aster.vega.scene.SizeD
+import dev.aster.vega.scene.Stroke
 import dev.aster.vega.scene.TextEngine
 import dev.aster.vega.scene.flatten
 import kotlin.concurrent.atomics.AtomicInt
@@ -1895,6 +1900,26 @@ public class VegaChartController(
     return true
   }
 
+  /**
+   * Moves the engine's focus to [nodeId], for a host whose own traversal moved first.
+   *
+   * Android's is that host. `ExploreByTouchHelper.dispatchKeyEvent` claims the arrow keys to walk
+   * its **own** virtual views, so [handleKey]'s traversal never runs there — two implementations of
+   * one feature, and the platform's wins before the engine's is asked. That is the right outcome:
+   * the helper's traversal is what a TalkBack reader already knows, and it moves the screen
+   * reader's focus properly. What was missing is the other direction, so the engine knows where the
+   * reader is and the focus ring follows them (#227).
+   *
+   * `null` clears it. Returns whether anything moved, so a host does not republish for a focus that
+   * was already there.
+   */
+  public fun focusNode(nodeId: SceneNodeId?): Boolean {
+    val current = _state.value.snapshot.interactionState
+    if (current.focusedNodeId == nodeId) return false
+    publishInteraction(current.copy(focusedNodeId = nodeId))
+    return true
+  }
+
   public fun resetViewport() {
     publishInteraction(
       _state.value.snapshot.interactionState.copy(
@@ -1954,15 +1979,77 @@ public class VegaChartController(
     return base.replacing(mapOf(hovered to variant))
   }
 
+  /**
+   * The scene with a **focus ring** around the focused mark, or unchanged when nothing is focused.
+   *
+   * Arrow-key traversal moved `InteractionState.focusedNodeId` and **no renderer read it** — not
+   * the Android canvas, not the SVG one, not Compose Multiplatform — and no host announced it
+   * either, so a reader pressing an arrow key moved an invisible cursor and learned where it was
+   * only by pressing Enter and watching the selection change (#227).
+   *
+   * Drawn **into the scene** rather than by each host, for the reason the accessibility tree is
+   * built once: three renderers drawing their own idea of a focus ring is three chances to disagree
+   * about a thing a reader needs to be identical. Every renderer already draws whatever the scene
+   * holds, so this reaches all of them at once and the SVG export shows it too.
+   *
+   * Appended to the root rather than replacing the mark, so the mark keeps its own paint and the
+   * ring sits over it. It is marked non-interactive and carries no accessibility descriptor: it
+   * must not become a hit-test target, and it must not be announced as an element of its own — a
+   * reader is already on the thing it surrounds.
+   */
+  private fun focusedScene(scene: Scene, focused: SceneNodeId?): Scene {
+    if (focused == null) return scene
+    val placed = scene.flatten().firstOrNull { it.node.id == focused } ?: return scene
+    val bounds = placed.worldBounds
+    if (bounds.isEmpty) return scene
+    val ring =
+      RectNode(
+        id = focusRingId,
+        x = bounds.left - FOCUS_RING_INSET,
+        y = bounds.top - FOCUS_RING_INSET,
+        width = bounds.width + FOCUS_RING_INSET * 2,
+        height = bounds.height + FOCUS_RING_INSET * 2,
+        fill = null,
+        stroke = Stroke(paint = ScenePaint.Solid(FOCUS_RING_COLOUR), width = FOCUS_RING_WIDTH),
+        metadata = NodeMetadata(interactive = false),
+      )
+    return scene.copy(root = scene.root.copy(children = scene.root.children + ring))
+  }
+
+  /**
+   * The ring's own id: [SceneNodeId.Overlay], which no allocator hands out.
+   *
+   * Stable, so a renderer diffing scenes sees one node moving rather than one appearing and another
+   * disappearing on every arrow key — and **reserved**, which took a bug to get right. A fresh
+   * `SceneNodeIdAllocator` gives `SceneNodeId(1)`, and that is the first mark of every scene, so
+   * stripping the ring stripped a bar instead. The chart lost a mark on hover.
+   */
+  private val focusRingId: SceneNodeId = SceneNodeId.Overlay
+
+  /** The scene without the ring, so publishing twice does not stack them. */
+  private fun withoutFocusRing(scene: Scene): Scene {
+    val children = scene.root.children
+    if (children.none { it.id == focusRingId }) return scene
+    return scene.copy(
+      root = scene.root.copy(children = children.filterNot { it.id == focusRingId })
+    )
+  }
+
   private fun publishInteraction(
     interaction: InteractionState,
     /** Defaults to whatever is on screen, so a selection or a pan keeps the hover styling. */
     scene: Scene = _state.value.snapshot.scene,
   ) {
     val revision = nextRevision.fetchAndIncrement()
+    // **The focus ring, rebuilt here rather than at each caller.** Every path that changes the
+    // focus comes through this one, and the ring has to follow — it is drawn at the focused mark's
+    // *world* bounds, so it also has to move when a pan or a zoom moves the mark under it. Stripped
+    // first so the ring is never drawn twice or left behind by a focus that cleared.
+    val focused = focusedScene(withoutFocusRing(scene), interaction.focusedNodeId)
     _state.update {
       it.copy(
-        snapshot = ChartSnapshot(scene = scene, interactionState = interaction, revision = revision)
+        snapshot =
+          ChartSnapshot(scene = focused, interactionState = interaction, revision = revision)
       )
     }
   }
@@ -2010,6 +2097,26 @@ public class VegaChartController(
      * narrowed an axis a long way has to be able to get back out the way they came, one step at a
      * time, without the widening end running out first.
      */
+    /**
+     * How far the focus ring sits outside the mark it surrounds, and how thick it is.
+     *
+     * Outside rather than on the outline, so a ring around a thin mark — a rule, a tick — is still
+     * a ring rather than a thicker version of the mark. Two units is enough to read at a glance and
+     * small enough that a ring around a dense scatter's point does not swallow its neighbours.
+     */
+    public const val FOCUS_RING_INSET: Double = 2.0
+
+    /**
+     * The ring's colour: the platform-neutral blue every focus indicator converges on.
+     *
+     * Not taken from the chart, deliberately. A focus ring has to be findable against whatever the
+     * specification chose to paint, and a colour derived from the chart is a colour that can match
+     * the mark it is meant to distinguish.
+     */
+    public val FOCUS_RING_COLOUR: SceneColor = SceneColor(0x1A / 255.0, 0x73 / 255.0, 0xE8 / 255.0)
+
+    public const val FOCUS_RING_WIDTH: Double = 2.0
+
     public const val MIN_DOMAIN_FACTOR: Double = 1.0 / 50.0
 
     public const val MAX_DOMAIN_FACTOR: Double = 50.0

@@ -1719,6 +1719,8 @@ final value class dev.aster.vega.scene/SceneNodeId { // dev.aster.vega.scene/Sce
     final object Companion { // dev.aster.vega.scene/SceneNodeId.Companion|null[0]
         final val None // dev.aster.vega.scene/SceneNodeId.Companion.None|{}None[0]
             final fun <get-None>(): dev.aster.vega.scene/SceneNodeId // dev.aster.vega.scene/SceneNodeId.Companion.None.<get-None>|<get-None>(){}[0]
+        final val Overlay // dev.aster.vega.scene/SceneNodeId.Companion.Overlay|{}Overlay[0]
+            final fun <get-Overlay>(): dev.aster.vega.scene/SceneNodeId // dev.aster.vega.scene/SceneNodeId.Companion.Overlay.<get-Overlay>|<get-Overlay>(){}[0]
     }
 }
 

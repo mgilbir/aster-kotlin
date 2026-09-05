@@ -441,6 +441,8 @@ public final class dev/aster/vega/runtime/TooltipRow {
 public final class dev/aster/vega/runtime/VegaChartController {
 	public static final field Companion Ldev/aster/vega/runtime/VegaChartController$Companion;
 	public static final field DOMAIN_STEP D
+	public static final field FOCUS_RING_INSET D
+	public static final field FOCUS_RING_WIDTH D
 	public static final field MAX_DOMAIN_FACTOR D
 	public static final field MAX_ZOOM D
 	public static final field MIN_DOMAIN_FACTOR D
@@ -452,6 +454,7 @@ public final class dev/aster/vega/runtime/VegaChartController {
 	public final fun adjustScaleDomain (Ljava/lang/String;Z)Z
 	public final fun clearDiagnostics ()V
 	public final fun dispatch (Ldev/aster/vega/runtime/ChartInputEvent;)V
+	public final fun focusNode-FOt1xws (Ldev/aster/vega/scene/SceneNodeId;)Z
 	public final fun getAccessibilityActions ()Ljava/util/List;
 	public final fun getContainerSize ()Ldev/aster/vega/scene/SizeD;
 	public final fun getContentScale ()D
@@ -491,6 +494,7 @@ public final class dev/aster/vega/runtime/VegaChartController$Companion {
 	public final fun fromScene (Ldev/aster/vega/scene/Scene;)Ldev/aster/vega/runtime/VegaChartController;
 	public final fun fromSpec (Ljava/lang/String;Ldev/aster/vega/scene/TextEngine;)Lkotlin/Pair;
 	public static synthetic fun fromSpec$default (Ldev/aster/vega/runtime/VegaChartController$Companion;Ljava/lang/String;Ldev/aster/vega/scene/TextEngine;ILjava/lang/Object;)Lkotlin/Pair;
+	public final fun getFOCUS_RING_COLOUR ()Ldev/aster/vega/scene/SceneColor;
 }
 
 public final class dev/aster/vega/runtime/compile/AxisBuilder {

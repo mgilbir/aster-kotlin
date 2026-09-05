@@ -1323,6 +1323,7 @@ final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runti
     final fun adjustScaleDomain(kotlin/String, kotlin/Boolean): kotlin/Boolean // dev.aster.vega.runtime/VegaChartController.adjustScaleDomain|adjustScaleDomain(kotlin.String;kotlin.Boolean){}[0]
     final fun clearDiagnostics() // dev.aster.vega.runtime/VegaChartController.clearDiagnostics|clearDiagnostics(){}[0]
     final fun dispatch(dev.aster.vega.runtime/ChartInputEvent) // dev.aster.vega.runtime/VegaChartController.dispatch|dispatch(dev.aster.vega.runtime.ChartInputEvent){}[0]
+    final fun focusNode(dev.aster.vega.scene/SceneNodeId?): kotlin/Boolean // dev.aster.vega.runtime/VegaChartController.focusNode|focusNode(dev.aster.vega.scene.SceneNodeId?){}[0]
     final fun handleKey(dev.aster.vega.scene/ChartKey, dev.aster.vega.scene/Modifiers = ...): kotlin/Boolean // dev.aster.vega.runtime/VegaChartController.handleKey|handleKey(dev.aster.vega.scene.ChartKey;dev.aster.vega.scene.Modifiers){}[0]
     final fun perform(dev.aster.vega.scene/ChartActionKind): kotlin/Boolean // dev.aster.vega.runtime/VegaChartController.perform|perform(dev.aster.vega.scene.ChartActionKind){}[0]
     final fun report(dev.aster.vega.model/VegaDiagnostic) // dev.aster.vega.runtime/VegaChartController.report|report(dev.aster.vega.model.VegaDiagnostic){}[0]
@@ -1342,6 +1343,10 @@ final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runti
     final object Companion { // dev.aster.vega.runtime/VegaChartController.Companion|null[0]
         final const val DOMAIN_STEP // dev.aster.vega.runtime/VegaChartController.Companion.DOMAIN_STEP|{}DOMAIN_STEP[0]
             final fun <get-DOMAIN_STEP>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.DOMAIN_STEP.<get-DOMAIN_STEP>|<get-DOMAIN_STEP>(){}[0]
+        final const val FOCUS_RING_INSET // dev.aster.vega.runtime/VegaChartController.Companion.FOCUS_RING_INSET|{}FOCUS_RING_INSET[0]
+            final fun <get-FOCUS_RING_INSET>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.FOCUS_RING_INSET.<get-FOCUS_RING_INSET>|<get-FOCUS_RING_INSET>(){}[0]
+        final const val FOCUS_RING_WIDTH // dev.aster.vega.runtime/VegaChartController.Companion.FOCUS_RING_WIDTH|{}FOCUS_RING_WIDTH[0]
+            final fun <get-FOCUS_RING_WIDTH>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.FOCUS_RING_WIDTH.<get-FOCUS_RING_WIDTH>|<get-FOCUS_RING_WIDTH>(){}[0]
         final const val MAX_DOMAIN_FACTOR // dev.aster.vega.runtime/VegaChartController.Companion.MAX_DOMAIN_FACTOR|{}MAX_DOMAIN_FACTOR[0]
             final fun <get-MAX_DOMAIN_FACTOR>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.MAX_DOMAIN_FACTOR.<get-MAX_DOMAIN_FACTOR>|<get-MAX_DOMAIN_FACTOR>(){}[0]
         final const val MAX_ZOOM // dev.aster.vega.runtime/VegaChartController.Companion.MAX_ZOOM|{}MAX_ZOOM[0]
@@ -1352,6 +1357,9 @@ final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runti
             final fun <get-MIN_ZOOM>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.MIN_ZOOM.<get-MIN_ZOOM>|<get-MIN_ZOOM>(){}[0]
         final const val ZOOM_STEP // dev.aster.vega.runtime/VegaChartController.Companion.ZOOM_STEP|{}ZOOM_STEP[0]
             final fun <get-ZOOM_STEP>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.ZOOM_STEP.<get-ZOOM_STEP>|<get-ZOOM_STEP>(){}[0]
+
+        final val FOCUS_RING_COLOUR // dev.aster.vega.runtime/VegaChartController.Companion.FOCUS_RING_COLOUR|{}FOCUS_RING_COLOUR[0]
+            final fun <get-FOCUS_RING_COLOUR>(): dev.aster.vega.scene/SceneColor // dev.aster.vega.runtime/VegaChartController.Companion.FOCUS_RING_COLOUR.<get-FOCUS_RING_COLOUR>|<get-FOCUS_RING_COLOUR>(){}[0]
 
         final fun fromScene(dev.aster.vega.scene/Scene): dev.aster.vega.runtime/VegaChartController // dev.aster.vega.runtime/VegaChartController.Companion.fromScene|fromScene(dev.aster.vega.scene.Scene){}[0]
         final fun fromSpec(kotlin/String, dev.aster.vega.scene/TextEngine = ...): kotlin/Pair<dev.aster.vega.runtime/VegaChartController, dev.aster.vega.runtime.compile/CompiledSpec> // dev.aster.vega.runtime/VegaChartController.Companion.fromSpec|fromSpec(kotlin.String;dev.aster.vega.scene.TextEngine){}[0]

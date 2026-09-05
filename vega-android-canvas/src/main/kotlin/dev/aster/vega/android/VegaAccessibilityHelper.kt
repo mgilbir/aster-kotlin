@@ -66,6 +66,34 @@ internal class VegaAccessibilityHelper(private val view: VegaChartView) :
       listOf(it.id, it.label, it.selected, it.activatable, it.roleDescription, it.adjustableScale)
     }
 
+  /**
+   * Keeps the **engine's** focus on whatever this helper's traversal landed on.
+   *
+   * Two notions of focus existed and never met. `ExploreByTouchHelper.dispatchKeyEvent` claims the
+   * arrow keys to walk its own virtual views, so `VegaChartController.handleKey`'s traversal never
+   * runs on this host — the platform's implementation wins before the engine's is asked. That is
+   * the right outcome, because the helper's traversal is what a TalkBack reader already knows and
+   * it moves the screen reader's focus properly; what was missing is the engine being told, so that
+   * the focus ring drawn into the scene follows the reader (#227).
+   *
+   * The direction matters and is easy to get backwards: pushing the engine's focus *into* the
+   * helper was the first attempt, and it could never have worked, because the engine's focus never
+   * moves here.
+   */
+  override fun onVirtualViewKeyboardFocusChanged(virtualViewId: Int, hasFocus: Boolean) {
+    val node = nodes().firstOrNull { it.id == virtualViewId }?.node?.id
+    val moved =
+      if (hasFocus) view.controller.focusNode(node)
+      // Only where this view still *is* the focused one: a focus leaving because it moved to
+      // another virtual view is followed by the gain above, and clearing here would fight it.
+      else if (view.controller.snapshot.interactionState.focusedNodeId == node) {
+        view.controller.focusNode(null)
+      } else {
+        false
+      }
+    if (moved) view.invalidateIfStale()
+  }
+
   /** Drops the cached semantic tree; the next query rebuilds it from the current snapshot. */
   fun invalidateSemanticTree() {
     cachedRevision = Long.MIN_VALUE

@@ -4585,6 +4585,9 @@ VegaCaptionsCompanion.shared
 VegaChartController
 VegaChartController.Companion
 VegaChartController.Companion.DOMAIN_STEP
+VegaChartController.Companion.FOCUS_RING_COLOUR
+VegaChartController.Companion.FOCUS_RING_INSET
+VegaChartController.Companion.FOCUS_RING_WIDTH
 VegaChartController.Companion.MAX_DOMAIN_FACTOR
 VegaChartController.Companion.MAX_ZOOM
 VegaChartController.Companion.MIN_DOMAIN_FACTOR
@@ -4603,6 +4606,7 @@ VegaChartController.contentScale
 VegaChartController.diagnostics
 VegaChartController.dispatch(event:)
 VegaChartController.events
+VegaChartController.focusNode(nodeId:)
 VegaChartController.handleKey(key:modifiers:)
 VegaChartController.hostData
 VegaChartController.init(initialScene:textEngine:clock:loader:scheduler:locale:hostConfig:containerSize:hostData:timeZone:)

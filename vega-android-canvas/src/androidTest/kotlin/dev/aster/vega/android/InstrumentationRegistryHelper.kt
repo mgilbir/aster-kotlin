@@ -8,4 +8,12 @@ internal object InstrumentationRegistryHelper {
     InstrumentationRegistry.getInstrumentation().runOnMainSync(block)
     InstrumentationRegistry.getInstrumentation().waitForIdleSync()
   }
+
+  /** The same, for a block that answers something. */
+  fun <T> onMainReturning(block: () -> T): T {
+    var result: T? = null
+    onMain { result = block() }
+    @Suppress("UNCHECKED_CAST")
+    return result as T
+  }
 }
