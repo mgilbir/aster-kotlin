@@ -1,5 +1,6 @@
 package dev.aster.vega.compose.mp
 
+import dev.aster.vega.scene.Corners
 import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.FontStyle
 import dev.aster.vega.scene.ForeignPaint
@@ -327,20 +328,30 @@ public class SceneWalk {
       }
     }
 
-  private fun corners(node: RectNode): DrawCorners =
-    DrawCorners(
-      node.cornerRadiusTopLeft ?: node.cornerRadius,
-      node.cornerRadiusTopRight ?: node.cornerRadius,
-      node.cornerRadiusBottomRight ?: node.cornerRadius,
-      node.cornerRadiusBottomLeft ?: node.cornerRadius,
-    )
+  /**
+   * The radii to draw with, **clamped by the scene** rather than by whatever receives them.
+   *
+   * These used to be the raw `cornerRadius` overrides, and that is a divergence rather than a
+   * shortcut: `Corners.of` clamps the four as one group against `min(width, height) / 2`, which is
+   * upstream's rule, and a platform primitive handed the unclamped value applies its own. Skia's
+   * `RoundRect` scales all four radii by a common factor so they fit — the CSS rule — so a 100×20
+   * bar with a 40-unit top-left radius came out with a 20-unit corner here and a 10-unit one on the
+   * Android canvas and in an exported SVG of the same chart, which read the clamped
+   * `RectNode.corners`.
+   *
+   * The Apple target was right by doing the work again itself, which is what hid this: the two
+   * walks are compared call for call, and both were emitting the same wrong number.
+   */
+  private fun corners(node: RectNode): DrawCorners = corners(node.corners)
 
-  private fun corners(node: GroupNode): DrawCorners =
+  private fun corners(node: GroupNode): DrawCorners = corners(node.paintCorners)
+
+  private fun corners(corners: Corners): DrawCorners =
     DrawCorners(
-      node.cornerRadiusTopLeft ?: node.cornerRadius,
-      node.cornerRadiusTopRight ?: node.cornerRadius,
-      node.cornerRadiusBottomRight ?: node.cornerRadius,
-      node.cornerRadiusBottomLeft ?: node.cornerRadius,
+      corners.topLeft,
+      corners.topRight,
+      corners.bottomRight,
+      corners.bottomLeft,
     )
 
   /**

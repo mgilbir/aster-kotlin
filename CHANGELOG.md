@@ -8,6 +8,22 @@ section here does not get released.
 
 ### Fixed
 
+- **A corner radius too large for its bar is clamped by the scene, so every renderer draws the same
+  corner** (#245). The walk handed each target the raw `cornerRadius` and left the clamping to
+  whatever received it. That is a divergence rather than a shortcut: `Corners.of` clamps the four
+  radii as one group against `min(width, height) / 2`, which is `vega-scenegraph`'s rule, and a
+  platform rounded-rectangle primitive applies its own — Skia scales all four by a common factor
+  until they fit, which is the CSS rule and answers differently whenever the radii are unequal.
+
+  On the `encode-channels` fixture that is a 50×39 rect asking for 40: the Android canvas and an
+  exported SVG drew **19.5**, reading the clamped `RectNode.corners`, and Compose Multiplatform drew
+  what Skia made of the unclamped 40. The Apple renderer's picture was right by doing the work again
+  in its own target — and that is exactly what hid the fault, because the two walks are compared
+  call for call and both were emitting the same wrong number.
+
+  Both walks now read the scene's own answer, `RectNode.corners` and the new `GroupNode.paintCorners`.
+  The goldens moved by one line, which is the bug.
+
 - **`STATUS.md` contradicted `SUPPORTED_FEATURES.md` about three capabilities** (#231), and was
   wrong about all three. Its "what it still refuses" list named a selection parameter, geographic
   projections with the `geoshape` mark, and a facet `sort` naming a written-out list — each

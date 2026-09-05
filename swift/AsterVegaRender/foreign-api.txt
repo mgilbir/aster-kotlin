@@ -1529,6 +1529,7 @@ GroupNode.init(id:children:transform:opacity:visible:metadata:fill:stroke:size:c
 GroupNode.isEqual(_:)
 GroupNode.metadata
 GroupNode.opacity
+GroupNode.paintCorners
 GroupNode.paintRect
 GroupNode.roundedPaintPath
 GroupNode.size

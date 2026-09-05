@@ -608,6 +608,8 @@ final class dev.aster.vega.scene/GroupNode : dev.aster.vega.scene/SceneNode { //
         final fun <get-metadata>(): dev.aster.vega.scene/NodeMetadata // dev.aster.vega.scene/GroupNode.metadata.<get-metadata>|<get-metadata>(){}[0]
     final val opacity // dev.aster.vega.scene/GroupNode.opacity|{}opacity[0]
         final fun <get-opacity>(): kotlin/Double // dev.aster.vega.scene/GroupNode.opacity.<get-opacity>|<get-opacity>(){}[0]
+    final val paintCorners // dev.aster.vega.scene/GroupNode.paintCorners|{}paintCorners[0]
+        final fun <get-paintCorners>(): dev.aster.vega.scene/Corners // dev.aster.vega.scene/GroupNode.paintCorners.<get-paintCorners>|<get-paintCorners>(){}[0]
     final val paintRect // dev.aster.vega.scene/GroupNode.paintRect|{}paintRect[0]
         final fun <get-paintRect>(): dev.aster.vega.scene/RectD? // dev.aster.vega.scene/GroupNode.paintRect.<get-paintRect>|<get-paintRect>(){}[0]
     final val roundedPaintPath // dev.aster.vega.scene/GroupNode.roundedPaintPath|{}roundedPaintPath[0]
