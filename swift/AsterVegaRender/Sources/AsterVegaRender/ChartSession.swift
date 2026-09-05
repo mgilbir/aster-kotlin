@@ -715,6 +715,12 @@ public final class ChartSession {
     }
   }
 
+  /// Whether the pointer is inside the chart, so the first hover of a run is an **enter**.
+  ///
+  /// A browser fires `mouseover` once on entry and `mousemove` for every move after it, and the two
+  /// are different Vega selectors. Cleared on exit, so leaving and returning enters again.
+  private var hovering = false
+
   /// A pointer touching down, which is Vega's `mousedown`.
   ///
   /// The three raw pointer events are what a **brush** is written against:
@@ -875,10 +881,25 @@ public final class ChartSession {
     serialised {
       self.controller.setHitTestOptions(options: HitTestOptions.companion.Mouse)
       if let point {
-        self.controller.dispatch(
-          event: ChartInputEventPointerMoved(point: PointD(x: point.x, y: point.y))
-        )
+        // **The first point of a hover is an enter**, and this used to dispatch a move for it.
+        // `PointerEntered` is what the controller turns into `pointerover` and `mouseover`, and
+        // nothing here ever produced one — so `@mark:mouseover`, which is what most highlight and
+        // tooltip specifications are written against, was inert on this host while working on
+        // Android (#228). A browser fires `mouseover` once on entry and `mousemove` thereafter, and
+        // that is the distinction being kept: the flag is cleared by the exit below, so a reader
+        // who leaves and returns gets a second `mouseover` exactly as they would in a page.
+        if self.hovering {
+          self.controller.dispatch(
+            event: ChartInputEventPointerMoved(point: PointD(x: point.x, y: point.y))
+          )
+        } else {
+          self.hovering = true
+          self.controller.dispatch(
+            event: ChartInputEventPointerEntered(point: PointD(x: point.x, y: point.y))
+          )
+        }
       } else {
+        self.hovering = false
         // The exit still carries a point — the last one, as far as the chart is concerned.
         self.controller.dispatch(event: ChartInputEventPointerExited(point: PointD(x: 0, y: 0)))
       }

@@ -116,4 +116,77 @@ final class BrushTests: XCTestCase {
       ChartGestures.withoutDrag.contains(.pointer),
       "a chart in a scroll view claims the drag it was promised it would not")
   }
+
+  /// A hover **enters** before it moves, which is what `mouseover` is.
+  ///
+  /// `PointerEntered` is what the controller turns into `pointerover` and `mouseover`, and this host
+  /// never produced one: `hover(at:)` dispatched a move for every point and an exit for `nil`. So
+  /// `@mark:mouseover` — what most highlight and tooltip specifications are written against — was
+  /// inert here while working on Android (#228).
+  ///
+  /// A browser fires `mouseover` once on entry and `mousemove` thereafter, and that is the shape
+  /// asserted: the counts are drawn as rect widths so they can be read off the scene, since
+  /// `ChartSession` exposes no way to read an arbitrary signal.
+  @MainActor
+  func testAHoverEntersOnceAndMovesAfterwards() async throws {
+    let counting = """
+      {"$schema": "https://vega.github.io/schema/vega/v6.json",
+       "width": 200, "height": 100, "padding": 0, "autosize": "none",
+       "data": [{"name": "t", "values": [{"v": 1}]}],
+       "signals": [
+         {"name": "overs", "value": 0, "on": [{"events": "mouseover", "update": "overs + 1"}]},
+         {"name": "moves", "value": 0, "on": [{"events": "mousemove", "update": "moves + 1"}]}
+       ],
+       "marks": [
+         {"type": "rect", "from": {"data": "t"},
+          "encode": {"enter": {"x": {"value": 0}, "y": {"value": 0},
+                               "width": {"value": 200}, "height": {"value": 100},
+                               "fill": {"value": "#eeeeee"}}}},
+         {"type": "rect", "name": "overs", "from": {"data": "t"},
+          "encode": {"enter": {"x": {"value": 0}, "y": {"value": 0}, "height": {"value": 10}},
+                     "update": {"width": {"signal": "overs"}}}},
+         {"type": "rect", "name": "moves", "from": {"data": "t"},
+          "encode": {"enter": {"x": {"value": 0}, "y": {"value": 20}, "height": {"value": 10}},
+                     "update": {"width": {"signal": "moves"}}}}]}
+      """
+    let session = ChartSession()
+    session.load(specification: counting)
+    await session.settle()
+
+    /// The two counters, as the widths of the two rects that draw them.
+    func counts() -> (overs: Double, moves: Double) {
+      guard let scene = session.scene else { return (-1, -1) }
+      var rects: [RectNode] = []
+      func walk(_ node: SceneNode) {
+        if let rect = node as? RectNode { rects.append(rect) }
+        if let group = node as? GroupNode { group.children.forEach(walk) }
+      }
+      walk(scene.root)
+      let counters = rects.filter { $0.rect.height == 10 }
+      guard counters.count == 2 else { return (-1, -1) }
+      return (counters[0].rect.width, counters[1].rect.width)
+    }
+
+    session.hover(at: Point(x: 20, y: 50))
+    await session.settle()
+    XCTAssertEqual(
+      counts().overs, 1,
+      "the first hover did not fire mouseover, so `@mark:mouseover` is inert on this host")
+    XCTAssertEqual(counts().moves, 0, "the entry also fired a move")
+
+    session.hover(at: Point(x: 40, y: 50))
+    await session.settle()
+    session.hover(at: Point(x: 60, y: 50))
+    await session.settle()
+    XCTAssertEqual(counts().overs, 1, "a move inside the chart fired a second mouseover")
+    XCTAssertEqual(counts().moves, 2, "the moves after the entry did not fire mousemove")
+
+    // Leaving and returning enters again, exactly as it would in a page.
+    session.hover(at: nil)
+    await session.settle()
+    session.hover(at: Point(x: 20, y: 50))
+    await session.settle()
+    XCTAssertEqual(
+      counts().overs, 2, "returning to the chart did not fire a second mouseover")
+  }
 }

@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **`mouseover` never fired on Apple or Compose Multiplatform** (#228). `ChartInputEvent.PointerEntered`
+  is what the controller turns into `pointerover` and `mouseover`, and only Android produced one —
+  from `ACTION_HOVER_ENTER`. `ChartSession.hover(at:)` dispatched a **move** for every point, and the
+  Compose Multiplatform `onHover` fires for an entry *and* for every move after it with the same
+  shape, so a host had nothing to tell them apart. `@mark:mouseover`, which most highlight and
+  tooltip specifications are written against, was inert on both.
+
+  A browser's own order is what is kept: entering an element gives `mouseover` and then `mousemove`.
+  Leaving and returning enters again. The exit needed nothing new — both hosts already report it.
+
 - **The chart's own accessibility actions were wired on no host at all** (#226). Zooming, zooming
   out, resetting the view and putting an adjusted axis back are offered by
   `VegaChartController.accessibilityActions`, and `perform` runs one — and both were referenced

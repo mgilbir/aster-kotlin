@@ -133,6 +133,20 @@ SEAMS = {
         r"kotlin.collections/List<dev\.aster\.vega\.scene/ChartAction>",
         r"perform\(_:\)",
     ),
+    # Entering the chart, apart from moving within it — `pointerover`/`mouseover`, which most
+    # highlight and tooltip specifications are written against. Android emitted it from
+    # `ACTION_HOVER_ENTER` and the other two could not: `ChartSession.hover(at:)` dispatched a move
+    # for every point, and `onHover` fires for an entry and for every move after it with the same
+    # shape, so a host could not tell them apart (#228).
+    "pointer entered": (
+        "onHoverEvent",
+        None,
+        # A fourth `Function1<PointD, Unit>?`, so the run the pointer row matches is now four long;
+        # matched on its own rather than by position, for the reason recorded on that row.
+        r"(kotlin/Function1<dev\.aster\.vega\.scene/PointD, kotlin/Unit>\?, ){3}"
+        r"kotlin/Function1<dev\.aster\.vega\.scene/PointD, kotlin/Unit>\?",
+        r"hover\(at:\)",
+    ),
     "viewport pan is optional": (
         "setPanEnabled",
         # `int, boolean, boolean` — the accessibility threshold, then `tooltipsEnabled`, then this.
@@ -146,6 +160,10 @@ SEAMS = {
 }
 
 REASONS = {
+    ("pointer entered", "vega-compose"): (
+        "hosts VegaChartView through AndroidView, which owns the hover stream itself — there is "
+        "nothing for the composable to expose, and the capability is the View's"
+    ),
     ("chart accessibility actions", "vega-compose"): (
         "hosts VegaChartView through AndroidView, so it inherits that View's own accessibility "
         "node and every action on it — there is nothing for the composable to expose"

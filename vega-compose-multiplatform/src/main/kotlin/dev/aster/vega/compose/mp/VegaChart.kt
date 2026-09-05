@@ -172,6 +172,19 @@ public fun VegaChart(
   onPointerDown: ((PointD) -> Unit)? = null,
   onPointerMoved: ((PointD) -> Unit)? = null,
   onPointerUp: ((PointD) -> Unit)? = null,
+  /**
+   * A pointer **entering** the chart, which is Vega's `pointerover` and `mouseover`.
+   *
+   * Distinct from [onHover], which fires for an entry *and* for every move after it and so cannot
+   * tell a host which happened. `@mark:mouseover` is what most highlight and tooltip specifications
+   * are written against, and with only [onHover] to go on a host could not produce it — the
+   * selector was inert on this renderer while working on Android (#228).
+   *
+   * Both fire on entry, which is a browser's own order: entering an element gives `mouseover` and
+   * then `mousemove`. The exit needs nothing new — [onHover] already reports it with a null point,
+   * and that is what a host turns into `PointerExited`.
+   */
+  onPointerEntered: ((PointD) -> Unit)? = null,
   hitTestOptions: HitTestOptions = HitTestOptions.Touch,
   viewportOffset: VectorD = VectorD.Zero,
   viewportScale: Double = 1.0,
@@ -268,6 +281,7 @@ public fun VegaChart(
             onPointerDown = onPointerDown,
             onPointerMoved = onPointerMoved,
             onPointerUp = onPointerUp,
+            onPointerEntered = onPointerEntered,
             // **Read, not keyed.** See `chartPointerInput`: a `pointerInput` restarts when a key
             // changes, and the viewport changes on the first pixel of every pan.
             viewport = rememberUpdatedState(Viewport(viewportOffset, viewportScale)),
@@ -526,6 +540,7 @@ private fun Modifier.chartPointerInput(
   onPointerDown: ((PointD) -> Unit)?,
   onPointerMoved: ((PointD) -> Unit)?,
   onPointerUp: ((PointD) -> Unit)?,
+  onPointerEntered: ((PointD) -> Unit)?,
   /**
    * The pan and the zoom the host has accumulated, as a **state to read** rather than a value.
    *
@@ -546,6 +561,7 @@ private fun Modifier.chartPointerInput(
       onPan == null &&
       onZoom == null &&
       onHover == null &&
+      onPointerEntered == null &&
       !wantsPointer
   ) {
     return this
@@ -719,7 +735,7 @@ private fun Modifier.chartPointerInput(
         }
     )
     .then(
-      if (onHover == null) Modifier
+      if (onHover == null && onPointerEntered == null) Modifier
       else
         Modifier.pointerInput(scene, fit, density, hitIndex) {
           awaitPointerEventScope {
@@ -735,6 +751,14 @@ private fun Modifier.chartPointerInput(
                 PointerEventType.Move,
                 PointerEventType.Enter -> {
                   val offset = event.changes.firstOrNull()?.position ?: continue
+                  // The **entry** on its own, which `onHover` cannot express: it fires for this and
+                  // for every move after it with the same shape. A host turns this one into
+                  // `PointerEntered` and so into `mouseover`.
+                  if (event.type == PointerEventType.Enter) {
+                    onPointerEntered?.invoke(
+                      controllerPoint(offset, scene, fit, density, size.width, size.height)
+                    )
+                  }
                   val reported =
                     controllerPoint(offset, scene, fit, density, size.width, size.height)
                   val hit =
@@ -750,11 +774,11 @@ private fun Modifier.chartPointerInput(
                         viewport.value.scale,
                       )
                     )
-                  onHover(reported, hit?.node?.id)
+                  onHover?.invoke(reported, hit?.node?.id)
                 }
                 // A pointer that left says so with a null, which is what clears a hover state. The
                 // engine's own `PointerExited` means the same thing.
-                PointerEventType.Exit -> onHover(null, null)
+                PointerEventType.Exit -> onHover?.invoke(null, null)
                 else -> Unit
               }
             }
