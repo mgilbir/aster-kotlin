@@ -115,7 +115,57 @@ public data class Scene(
   }
 }
 
-/** Depth-first walk in paint order (parents before children, children in declaration order). */
+/**
+ * Whether this node paints **nothing at all**, so a renderer can leave before it starts.
+ *
+ * Four renderers walk a scene — the Android canvas, the Compose Multiplatform target, the Swift one
+ * and the SVG export — and each was carrying its own copy of this. They drifted, twice, and both
+ * times the copies that agreed hid the ones that did not:
+ *
+ * - The Swift walk had no zero-opacity guard, so a label an axis had *hidden* reached its text
+ *   branch and was painted black. On `label-overlap.vg.json` it drew 43 text runs where the Compose
+ *   walk drew 19. That is what `test-fixtures/scene-walk` exists to catch, and it caught it.
+ * - The `absent` guard went the other way: only the two walks that golden compares had it, so the
+ *   Android canvas and the SVG export kept drawing items that carry no text and no outline. In
+ *   markup that is visible — `legend-discretizing` exported three empty `<text>` elements and
+ *   `projection-families` twelve `<path d="">`, where upstream emits no element at all.
+ * - A label with **no usable anchor** was the reverse again, and one copy against three: only the
+ *   SVG export left it out. An axis's `tickExtra` label scales a value its datum does not carry, so
+ *   its position is `NaN`; upstream's own SVG has no element for it. The three canvas walks handed
+ *   the platform a draw call at `NaN`, which paints nothing — so the picture always agreed and the
+ *   work was always wasted, which is why nothing found it.
+ *
+ * So it lives here once and every walk asks it, which is the arrangement `paintOrder` below already
+ * arrived at for the same reason.
+ *
+ * **A group is the exception**, and deliberately: its opacity paints its own panel and is not
+ * inherited, so a group at zero opacity still draws its children. That is upstream's behaviour in
+ * both of its renderers — `vega-scenegraph`'s canvas group never touches `globalAlpha`, and its SVG
+ * renderer puts `opacity` on the group's background `path` and leaves the child element bare. A
+ * group whose opacity is zero is a group with no panel, not an invisible subtree.
+ *
+ * **`absent` is not an empty string**, which is the distinction that earns it a place here rather
+ * than a check on the text or the command list. A `TextNode` that is absent carries no `text`
+ * property at all — a banded legend's lowest bucket, whose formatter returns nothing — and a
+ * `PathNode` that is absent has no outline, as `geopath` over a geometry with no coordinates does.
+ * An item carrying an *empty* one is a different item that upstream still emits, so neither is
+ * caught by asking whether anything would be drawn. See the fields' own documentation.
+ *
+ * **A `NaN` position is not the same as a position of zero**, and `TextNode.bounds` deliberately
+ * measures the item at the origin anyway — upstream's `anchorPoint` reads `item.x || 0` and `NaN`
+ * is falsy, so the label occupies a row in the layout it is never drawn in. Keeping the two apart
+ * is the whole of that field's documentation; this asks only about drawing.
+ *
+ * A renderer with its own reasons to draw more than this may still do so, and the SVG export does:
+ * a group's panel at zero opacity is emitted there with `opacity="0"`, because upstream's markup
+ * carries it. This answers about the node, not about a group's panel.
+ */
+public fun paintsNothing(node: SceneNode): Boolean =
+  !node.visible ||
+    (node.opacity <= 0.0 && node !is GroupNode) ||
+    (node is PathNode && node.absent) ||
+    (node is TextNode && (node.absent || !node.x.isFinite() || !node.y.isFinite()))
+
 /**
  * A group's children in the order they are **painted**, which `zindex` decides.
  *
@@ -179,6 +229,7 @@ private fun sameMark(node: SceneNode, name: String?, kind: String?, ordinal: Int
     node.metadata.markKind == kind &&
     node.metadata.markOrdinal == ordinal
 
+/** Depth-first walk in paint order (parents before children, children in [paintOrder]). */
 public fun SceneNode.walk(visit: (node: SceneNode, parentTransform: Transform2D) -> Unit) {
   walkInternal(Transform2D.Identity, visit)
 }

@@ -24,6 +24,7 @@ import dev.aster.vega.scene.TextBaseline
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.paintOrder
+import dev.aster.vega.scene.paintsNothing
 import kotlin.math.max
 
 /**
@@ -82,10 +83,10 @@ public class SceneWalk {
   }
 
   private fun walk(node: SceneNode, transform: Transform2D, target: SceneDrawTarget) {
-    if (!node.visible) return
-    // Nothing else paints anything at zero opacity, so leaving early is the same picture drawn
-    // faster. A group is the exception: see the note on opacity above.
-    if (node.opacity <= 0.0 && node !is GroupNode) return
+    // Hidden, transparent, or an item with no text and no outline at all. The predicate is shared
+    // with the other three walks — see `paintsNothing`, whose documentation is the record of what
+    // it cost to have four copies of it.
+    if (paintsNothing(node)) return
     val local = transform then node.transform
 
     when (node) {
@@ -108,14 +109,12 @@ public class SceneWalk {
           node.blendMode,
         )
       is PathNode ->
-        if (!node.absent) {
-          target.path(
-            commands(node.path, local),
-            brush(node.fill, node.opacity, node.bounds, local),
-            stroke(node.stroke, node.opacity, node.bounds, local),
-            node.blendMode,
-          )
-        }
+        target.path(
+          commands(node.path, local),
+          brush(node.fill, node.opacity, node.bounds, local),
+          stroke(node.stroke, node.opacity, node.bounds, local),
+          node.blendMode,
+        )
       is SymbolNode ->
         // A symbol's shape is already a path — the engine turns a circle, a cross or a custom SVG
         // string into one — so there is no shape vocabulary for a renderer to reimplement.
@@ -125,7 +124,7 @@ public class SceneWalk {
           stroke(node.stroke, node.opacity, node.bounds, local),
           node.blendMode,
         )
-      is TextNode -> if (!node.absent) walkText(node, local, target)
+      is TextNode -> walkText(node, local, target)
       is ImageNode ->
         // `rect` rather than the raw channels: the node has already applied `align` and `baseline`
         // to

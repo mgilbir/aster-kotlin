@@ -38,6 +38,7 @@ import dev.aster.vega.scene.SymbolNode
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.paintOrder
+import dev.aster.vega.scene.paintsNothing
 
 /**
  * Draws an immutable [Scene] onto an Android [Canvas].
@@ -119,11 +120,10 @@ public class AndroidCanvasSceneRenderer(
    * it, having made the identical mistake.
    */
   private fun drawNode(node: SceneNode, canvas: Canvas, diagnostics: DiagnosticCollector) {
-    if (!node.visible) return
-    // A fully transparent *group* still draws its children — upstream renders them and only its own
-    // background disappears. For everything else nothing would be painted anyway, so leaving early
-    // is the same picture drawn faster.
-    if (node.opacity <= 0.0 && node !is GroupNode) return
+    // Hidden, transparent, or an item with no text and no outline at all. A fully transparent
+    // *group* is the exception and still draws its children. All four walks ask one predicate; see
+    // `paintsNothing`, which records what the four copies of it cost.
+    if (paintsNothing(node)) return
     val opacity = node.opacity
 
     val saveCount = canvas.save()
