@@ -4572,8 +4572,10 @@ VegaCaptions.identityDomain()
 VegaCaptions.legend(kind:title:channels:domain:)
 VegaCaptions.markContainerRole(markType:)
 VegaCaptions.markRole(markType:)
+VegaCaptions.narrowAxisAction()
 VegaCaptions.resetAxesAction()
 VegaCaptions.resetZoomAction()
+VegaCaptions.widenAxisAction()
 VegaCaptions.zoomInAction()
 VegaCaptions.zoomOutAction()
 VegaCaptionsCompanion
@@ -4606,6 +4608,7 @@ VegaChartController.hostData
 VegaChartController.init(initialScene:textEngine:clock:loader:scheduler:locale:hostConfig:containerSize:hostData:timeZone:)
 VegaChartController.inputs
 VegaChartController.lastCompiled
+VegaChartController.locale
 VegaChartController.perform(action:)
 VegaChartController.report(diagnostic:)
 VegaChartController.resetScaleDomains()

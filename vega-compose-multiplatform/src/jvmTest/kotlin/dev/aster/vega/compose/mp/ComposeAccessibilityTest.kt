@@ -71,8 +71,8 @@ class ComposeAccessibilityTest {
     setContent { VegaChart(scene()) }
 
     // The two bars, by the label the engine derived for them: a category and its value.
-    onNodeWithContentDescription("Total: 18").assertExists()
-    onNodeWithContentDescription("Sleep: 7").assertExists()
+    onNodeWithContentDescription("Total: 18", substring = true).assertExists()
+    onNodeWithContentDescription("Sleep: 7", substring = true).assertExists()
   }
 
   @Test
@@ -83,7 +83,9 @@ class ComposeAccessibilityTest {
     // it. An element with no frame can be swiped through and not touched, which is the defect the
     // Swift renderer's overlay exists to avoid — `accessibilityChildren` there yields frames of
     // `(inf, inf, 0, 0)`.
-    onNodeWithContentDescription("Total: 18").assertWidthIsAtLeast(1.dp).assertHeightIsAtLeast(1.dp)
+    onNodeWithContentDescription("Total: 18", substring = true)
+      .assertWidthIsAtLeast(1.dp)
+      .assertHeightIsAtLeast(1.dp)
   }
 
   @Test
@@ -111,7 +113,7 @@ class ComposeAccessibilityTest {
   fun `a mark is a button only when there is something to activate`() = runComposeUiTest {
     setContent { VegaChart(scene()) }
     // No callback: the chart is being looked at, so nothing offers an activation.
-    onNodeWithContentDescription("Total: 18")
+    onNodeWithContentDescription("Total: 18", substring = true)
       .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
   }
 
@@ -120,7 +122,7 @@ class ComposeAccessibilityTest {
     val activated = mutableListOf<SceneNodeId>()
     setContent { VegaChart(scene(), onActivate = { activated += it }) }
 
-    onNodeWithContentDescription("Sleep: 7")
+    onNodeWithContentDescription("Sleep: 7", substring = true)
       .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
       .performSemanticsAction(SemanticsActions.OnClick)
 
@@ -200,5 +202,99 @@ class ComposeAccessibilityTest {
     setContent { VegaChart(scene()) }
     onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions), useUnmergedTree = true)
       .assertDoesNotExist()
+  }
+
+  /**
+   * A mark says **what kind of thing it is**, which this renderer did not.
+   *
+   * Android sets `node.roleDescription` and Apple puts it in `accessibilityInputLabels`, so a
+   * reader on either hears "Total: 18, rect mark". Here they heard the label alone (#230). Compose
+   * has no `roleDescription` of its own, so the two are joined the way a reader hears them anyway —
+   * TalkBack reads the description and then the role description, in that order, which is this
+   * string.
+   */
+  @Test
+  fun `a mark says what kind of thing it is`() = runComposeUiTest {
+    setContent { VegaChart(scene()) }
+    onNodeWithContentDescription("Total: 18", substring = true)
+      .assert(
+        SemanticsMatcher("carries the kind of thing it is") { node ->
+          node.config
+            .getOrElseNullable(SemanticsProperties.ContentDescription) { null }
+            ?.any { it.contains("mark") } == true
+        }
+      )
+  }
+
+  /**
+   * An **adjustable axis** offers the two directions, which this renderer did not.
+   *
+   * The other two hosts have offered it since it was written — the scroll actions on Android,
+   * `.accessibilityAdjustableAction` on Apple — and here a reader could reach an axis and not
+   * change it (#230). Named actions rather than a trait, because Compose has neither of those
+   * primitives: they both let the system say "swipe up or down to adjust" in the reader's own
+   * language, and there is no equivalent here, so this is the one host the engine has to supply
+   * words for.
+   */
+  @Test
+  fun `an adjustable axis offers narrowing and widening`() = runComposeUiTest {
+    val adjusted = mutableListOf<Pair<String, Boolean>>()
+    setContent {
+      VegaChart(axed(), onAdjustAxis = { scale, narrow -> adjusted.add(scale to narrow) })
+    }
+    val axis =
+      onNode(
+        SemanticsMatcher("an element with custom actions") { node ->
+          node.config.getOrElseNullable(SemanticsActions.CustomActions) { null } != null
+        },
+        useUnmergedTree = true,
+      )
+    axis.assertExists()
+    val actions = axis.fetchSemanticsNode().config[SemanticsActions.CustomActions]
+    assertEquals(
+      listOf("Narrow this axis", "Widen this axis"),
+      actions.map { it.label },
+      "the axis does not offer both directions",
+    )
+    actions[0].action()
+    actions[1].action()
+    assertEquals(
+      listOf("y" to true, "y" to false),
+      adjusted,
+      "invoking the actions did not reach the host with the scale and the direction",
+    )
+  }
+
+  /** And an axis nobody can adjust offers nothing, so no action does nothing. */
+  @Test
+  fun `an axis offers no adjustment when the host wants none`() = runComposeUiTest {
+    setContent { VegaChart(axed()) }
+    onNode(
+        SemanticsMatcher("an element with custom actions") { node ->
+          node.config.getOrElseNullable(SemanticsActions.CustomActions) { null } != null
+        },
+        useUnmergedTree = true,
+      )
+      .assertDoesNotExist()
+  }
+
+  /** A chart with a continuous axis, for the two cases above. */
+  private fun axed(): Scene {
+    val compiled =
+      SpecCompiler(textEngine = MetricTextEngine(), loader = DenyLoader)
+        .compileJson(
+          """
+          {"${'$'}schema": "https://vega.github.io/schema/vega/v6.json",
+           "width": 120, "height": 60, "padding": 4,
+           "data": [{"name": "t", "values": [{"v": 3}, {"v": 7}]}],
+           "scales": [{"name": "y", "type": "linear", "domain": {"data": "t", "field": "v"},
+                       "range": "height"}],
+           "axes": [{"orient": "left", "scale": "y"}],
+           "marks": [{"type": "rect", "from": {"data": "t"}, "encode": {"enter": {
+             "x": {"value": 0}, "width": {"value": 10},
+             "y": {"scale": "y", "field": "v"}, "y2": {"scale": "y", "value": 0}}}}]}
+          """
+        )
+    return requireNotNull(compiled.scene) { "no scene" }
   }
 }

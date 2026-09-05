@@ -217,6 +217,19 @@ public fun VegaChart(
    * only when a host asks.
    */
   onKey: ((ChartKey, Modifiers) -> Unit)? = null,
+  /**
+   * A reader adjusting an **axis**, narrowing or widening the interval it draws its data against.
+   *
+   * The other two hosts have offered this since it was written — the scroll actions on Android,
+   * `.accessibilityAdjustableAction` on Apple — and this renderer did not, so a reader here could
+   * reach an axis and not change it (#230). The scale is [AccessibleElement.adjustableScale];
+   * `narrow` is true for the direction that reveals more detail. A host forwards it to
+   * `VegaChartController.adjustScaleDomain`.
+   *
+   * Distinct from the zoom in [chartActions], which magnifies the drawing and leaves every scale
+   * where the specification put it, so the ticks a reader hears never change.
+   */
+  onAdjustAxis: ((String, Boolean) -> Unit)? = null,
   hitTestOptions: HitTestOptions = HitTestOptions.Touch,
   viewportOffset: VectorD = VectorD.Zero,
   viewportScale: Double = 1.0,
@@ -382,6 +395,8 @@ public fun VegaChart(
       fit = fit,
       density = density,
       onActivate = onActivate,
+      onAdjustAxis = onAdjustAxis,
+      captions = captions,
       // The same pan and zoom the drawing used: a reader exploring by touch has to land on the mark
       // where it *is* now, not where it was before the chart was moved.
       viewportOffset = viewportOffset,
@@ -414,6 +429,8 @@ private fun AccessibilityOverlay(
   fit: SceneFit,
   density: Float,
   onActivate: ((SceneNodeId) -> Unit)?,
+  onAdjustAxis: ((String, Boolean) -> Unit)?,
+  captions: VegaCaptions,
   viewportOffset: VectorD,
   viewportScale: Double,
   modifier: Modifier = Modifier,
@@ -425,9 +442,18 @@ private fun AccessibilityOverlay(
       for (element in elements) {
         val nodeId = element.nodeId
         val activate = if (element.activatable && nodeId != null) onActivate else null
+        val adjustable = element.adjustableScale
         Box(
           Modifier.semantics {
-            contentDescription = element.label
+            // **What kind of thing it is, in words, appended to the label.** Android sets
+            // `node.roleDescription` and Apple puts it in `accessibilityInputLabels`; this renderer
+            // said nothing, so a reader here heard a bare label where the other two heard "line
+            // mark" or "axis" (#230). Compose has no `roleDescription` of its own, so the two are
+            // joined the way a reader hears them anyway — TalkBack reads Android's description and
+            // then its role description, in that order, which is exactly this string. The engine
+            // writes the words through the chart's locale, so a Dutch chart says so.
+            contentDescription =
+              element.roleDescription?.let { "${element.label}, $it" } ?: element.label
             selected = element.selected
             // A **button only where activating it does something.** Both existing hosts announce
             // every element as a button — `className = "android.widget.Button"` on Android,
@@ -440,6 +466,25 @@ private fun AccessibilityOverlay(
                 activate(nodeId!!)
                 true
               }
+            }
+            // An **adjustable axis**: the interval it draws its data against, narrowed or widened.
+            //
+            // Named actions rather than a trait, because Compose has neither: Android's scroll
+            // actions and Apple's `.isAdjustable` both let the system say "swipe up or down to
+            // adjust" in the reader's own language, and there is no equivalent here. So this host
+            // is the one the engine has to supply words for — see `VegaCaptions.narrowAxisAction`.
+            if (adjustable != null && onAdjustAxis != null) {
+              customActions =
+                listOf(
+                  CustomAccessibilityAction(captions.narrowAxisAction()) {
+                    onAdjustAxis(adjustable, true)
+                    true
+                  },
+                  CustomAccessibilityAction(captions.widenAxisAction()) {
+                    onAdjustAxis(adjustable, false)
+                    true
+                  },
+                )
             }
           }
         )

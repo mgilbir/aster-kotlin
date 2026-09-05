@@ -167,6 +167,21 @@ internal class VegaAccessibilityHelper(private val view: VegaChartView) :
     if (virtual.adjustableScale != null) {
       node.addAction(AccessibilityNodeInfoCompat.ACTION_SCROLL_FORWARD)
       node.addAction(AccessibilityNodeInfoCompat.ACTION_SCROLL_BACKWARD)
+      // The same two directions **by name** as well, for a reader who is walking a list of actions
+      // rather than swiping. The scroll pair above is what TalkBack maps a swipe onto and carries
+      // no wording of its own; these say what they do, in the chart's own locale.
+      node.addAction(
+        AccessibilityNodeInfoCompat.AccessibilityActionCompat(
+          R.id.aster_vega_action_narrow_axis,
+          view.controller.locale.captions.narrowAxisAction(),
+        )
+      )
+      node.addAction(
+        AccessibilityNodeInfoCompat.AccessibilityActionCompat(
+          R.id.aster_vega_action_widen_axis,
+          view.controller.locale.captions.widenAxisAction(),
+        )
+      )
     }
   }
 
@@ -245,11 +260,13 @@ internal class VegaAccessibilityHelper(private val view: VegaChartView) :
   ): Boolean {
     val virtual = nodes().firstOrNull { it.id == virtualViewId } ?: return false
     val scale = virtual.adjustableScale
-    if (
-      scale != null &&
-        (action == AccessibilityNodeInfo.ACTION_SCROLL_FORWARD ||
-          action == AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)
-    ) {
+    val narrowing =
+      action == AccessibilityNodeInfo.ACTION_SCROLL_FORWARD ||
+        action == R.id.aster_vega_action_narrow_axis
+    val widening =
+      action == AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD ||
+        action == R.id.aster_vega_action_widen_axis
+    if (scale != null && (narrowing || widening)) {
       // The controller answers whether anything moved, and `false` here is what stops TalkBack
       // announcing a change that did not happen — which is how a reader loses track of where they
       // are.

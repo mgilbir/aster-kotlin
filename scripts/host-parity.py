@@ -158,6 +158,15 @@ SEAMS = {
         r"kotlin/Unit>\?",
         r"press\(_:modifiers:\)",
     ),
+    # An **adjustable axis**: narrowing and widening the interval it draws its data against. Android
+    # and Apple have had it since it was written and Compose Multiplatform had not, so a reader
+    # there could reach an axis and not change it (#230).
+    "adjustable axis": (
+        "aster_vega_action_narrow_axis",
+        None,
+        r"kotlin/Function2<kotlin/String, kotlin/Boolean, kotlin/Unit>\?",
+        r"adjustScaleDomain\(scale:narrow:\)",
+    ),
     "viewport pan is optional": (
         "setPanEnabled",
         # `int, boolean, boolean` — the accessibility threshold, then `tooltipsEnabled`, then this.
@@ -171,6 +180,10 @@ SEAMS = {
 }
 
 REASONS = {
+    ("adjustable axis", "vega-compose"): (
+        "hosts VegaChartView through AndroidView, so it inherits that View's accessibility nodes "
+        "and the axis actions on them — there is nothing for the composable to expose"
+    ),
     ("keyboard", "vega-compose"): (
         "hosts VegaChartView through AndroidView, which handles key events itself — there is "
         "nothing for the composable to expose, and the capability is the View's"

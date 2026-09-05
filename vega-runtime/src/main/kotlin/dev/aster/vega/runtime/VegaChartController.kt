@@ -176,7 +176,16 @@ public class VegaChartController(
    * chart built without one is what upstream draws — and does **not** change how a specification's
    * own dates are parsed, which is part of the wire format rather than of the language.
    */
-  private val locale: VegaLocale = VegaLocale.EnglishUS,
+  /**
+   * The chart's language, which a **host** needs as much as the engine does.
+   *
+   * Public because the wording a reader hears has to come from one place. `ChartAction` carries its
+   * own label for that reason, and an adjustable axis has no such carrier — the two directions are
+   * named by the platform on Android and Apple and by this locale on Compose Multiplatform, where
+   * there is no adjustable primitive to name them. A host reaching for its own strings would put
+   * the chart's wording in three places and none of them in the chart's language.
+   */
+  public val locale: VegaLocale = VegaLocale.EnglishUS,
   /**
    * A `config` block this host supplies, which a specification's own beats key by key.
    *

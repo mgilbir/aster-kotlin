@@ -460,6 +460,7 @@ public final class dev/aster/vega/runtime/VegaChartController {
 	public final fun getHostData ()Ljava/util/Map;
 	public final fun getInputs ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getLastCompiled ()Ldev/aster/vega/runtime/compile/CompiledSpec;
+	public final fun getLocale ()Ldev/aster/vega/model/locale/VegaLocale;
 	public final fun getSnapshot ()Ldev/aster/vega/runtime/ChartSnapshot;
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getTooltipContent ()Ldev/aster/vega/runtime/TooltipContent;

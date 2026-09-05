@@ -1299,6 +1299,8 @@ final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runti
         final fun <get-events>(): kotlinx.coroutines.flow/Flow<dev.aster.vega.runtime/ChartEvent> // dev.aster.vega.runtime/VegaChartController.events.<get-events>|<get-events>(){}[0]
     final val inputs // dev.aster.vega.runtime/VegaChartController.inputs|{}inputs[0]
         final fun <get-inputs>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<dev.aster.vega.runtime/SignalInput>> // dev.aster.vega.runtime/VegaChartController.inputs.<get-inputs>|<get-inputs>(){}[0]
+    final val locale // dev.aster.vega.runtime/VegaChartController.locale|{}locale[0]
+        final fun <get-locale>(): dev.aster.vega.model.locale/VegaLocale // dev.aster.vega.runtime/VegaChartController.locale.<get-locale>|<get-locale>(){}[0]
     final val snapshot // dev.aster.vega.runtime/VegaChartController.snapshot|{}snapshot[0]
         final fun <get-snapshot>(): dev.aster.vega.runtime/ChartSnapshot // dev.aster.vega.runtime/VegaChartController.snapshot.<get-snapshot>|<get-snapshot>(){}[0]
     final val state // dev.aster.vega.runtime/VegaChartController.state|{}state[0]

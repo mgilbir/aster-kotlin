@@ -108,6 +108,22 @@ public interface VegaCaptions {
    */
   public fun resetAxesAction(): String = "Reset the axes"
 
+  /**
+   * Narrowing and widening an adjustable axis, **for the host that has to name them**.
+   *
+   * The note above says there is no caption for these because both platforms name the increment and
+   * the decrement themselves — a reader hears "swipe up or down to adjust" from the system, in
+   * their own language. That is true of Android and of Apple, and not of Compose Multiplatform: it
+   * has no adjustable trait, so the only way to offer the two directions there is as named actions,
+   * and a nameless action is one a reader cannot use.
+   *
+   * So these exist for the one host that needs them rather than for all three, which is why the
+   * wording says what the action *does* rather than which way to swipe: there is no swipe.
+   */
+  public fun narrowAxisAction(): String = "Narrow this axis"
+
+  public fun widenAxisAction(): String = "Widen this axis"
+
   public companion object {
     /** Upstream's wording, and the default. */
     public val English: VegaCaptions = EnglishCaptions

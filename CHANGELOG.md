@@ -8,6 +8,29 @@ section here does not get released.
 
 ### Fixed
 
+- **Compose Multiplatform's accessibility caught up with the other two hosts** (#230). A mark there
+  said its label and nothing else: Android sets `node.roleDescription` and Apple puts it in
+  `accessibilityInputLabels`, so a reader on either hears "Total: 18, rect mark" where here they
+  heard the label alone. Compose has no `roleDescription` property, so the two are joined the way a
+  reader hears them anyway — TalkBack reads the description and then the role description, in that
+  order, which is exactly this string.
+
+  An **adjustable axis** works there too. The other two hosts have offered it since it was written
+  and this one had not, so a reader could reach an axis and not change it. Named actions rather than
+  a trait, because Compose has neither primitive: Android's scroll actions and Apple's
+  `.isAdjustable` both let the system say "swipe up or down to adjust" in the reader's own language,
+  and there is no equivalent here — so this is the one host the engine has to supply words for.
+  `VegaCaptions.narrowAxisAction` and `widenAxisAction` exist for it, and Android uses them too,
+  beside its scroll pair, for a reader walking a list of actions rather than swiping.
+
+  `VegaChartController.locale` is public for the same reason `ChartAction` carries its own label:
+  the wording a reader hears has to come from one place, and an adjustable axis has no carrier of
+  its own.
+
+  The dense-chart **summary trait** is deliberately not copied across, and the issue was wrong to
+  list it: `AccessibleElement.isSummary` is consumed by iOS alone because only Apple has the trait —
+  Android does not use it either. The summary *element* is announced by every host.
+
 - **Compose Multiplatform had no keyboard path at all** (#229) — zero references to `ChartKey`,
   `KeyEvent` or `onKeyEvent`. So a specification's `keydown` handlers never fired and the engine's
   own traversal between marks was unreachable, on the surface most likely to be running on a
