@@ -773,6 +773,34 @@ public final class ChartSession {
     }
   }
 
+  /// The chart's **own** accessibility actions, each with a label in the chart's locale.
+  ///
+  /// Zooming, resetting the view, and putting an adjusted axis back. They belong to the whole chart
+  /// rather than to any mark, which is why they are not on ``AccessibleElement`` — the scene builds
+  /// that tree and does not know it has been panned.
+  ///
+  /// Offered only when invoking one **would do something**: zooming is withdrawn at each limit and a
+  /// reset appears only once there is something to undo, because an action a reader triggers to no
+  /// effect is worse than one that was never there.
+  ///
+  /// `VegaChartView` presents them as `.accessibilityAction(named:)`. Until it did, no host on any
+  /// platform wired them and the feature was unreachable (#226).
+  public var accessibilityActions: [ChartAction] { controller.accessibilityActions }
+
+  /// Performs one, and says whether it did anything.
+  ///
+  /// `false` means nothing happened — the action was not offered, or the view was already at rest —
+  /// so a caller knows not to announce a change.
+  @discardableResult
+  public func perform(_ action: ChartActionKind) -> Bool {
+    let did = controller.perform(action: action)
+    if did {
+      refreshControls()
+      publish()
+    }
+    return did
+  }
+
   /// Narrows or widens the interval an axis draws its data against, and says whether it moved.
   ///
   /// What an **adjustable axis** does. `VegaChartView` gives an axis element carrying

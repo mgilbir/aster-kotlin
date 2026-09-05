@@ -7,6 +7,7 @@ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.customview.widget.ExploreByTouchHelper
 import dev.aster.vega.runtime.ChartInputEvent
 import dev.aster.vega.scene.AccessibilityTree
+import dev.aster.vega.scene.ChartActionKind
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.Scene
@@ -168,6 +169,74 @@ internal class VegaAccessibilityHelper(private val view: VegaChartView) :
       node.addAction(AccessibilityNodeInfoCompat.ACTION_SCROLL_BACKWARD)
     }
   }
+
+  /**
+   * The chart's **own** actions, on the host view's node rather than on any virtual one.
+   *
+   * `VegaChartController.accessibilityActions` offers zooming, resetting the view and putting an
+   * adjusted axis back, each with a label in the chart's own locale — and until this, **no host
+   * wired them**. The feature was built, tested and documented against
+   * `AccessibilityNodeInfo.addAction`, and the call was never written, so a reader could reach
+   * every bar in a chart and never the view they were drawn in (#226).
+   *
+   * They belong to the whole chart rather than to a mark, which is why they go here:
+   * `ExploreByTouchHelper` hands out virtual nodes for the marks and this is the one node that
+   * stands for the chart.
+   *
+   * Offered only when the controller offers them, which is its own rule — an action is in that list
+   * only when invoking it would do something, so zooming is withdrawn at each limit and a reset
+   * appears only once there is something to undo. A node's actions are re-read whenever
+   * accessibility focus lands on it, so the list a reader hears is the current one.
+   */
+  override fun onInitializeAccessibilityNodeInfo(
+    host: android.view.View,
+    info: AccessibilityNodeInfoCompat,
+  ) {
+    super.onInitializeAccessibilityNodeInfo(host, info)
+    for (action in view.controller.accessibilityActions) {
+      info.addAction(
+        AccessibilityNodeInfoCompat.AccessibilityActionCompat(idOf(action.kind), action.label)
+      )
+    }
+  }
+
+  /**
+   * Performs one, and reports whether it did anything.
+   *
+   * `false` is not a formality: the controller returns it for an action that is not currently
+   * offered, and TalkBack uses the answer to decide whether to announce a change. Announcing one
+   * that did not happen is how a reader loses track of where they are.
+   */
+  override fun performAccessibilityAction(
+    host: android.view.View,
+    action: Int,
+    args: Bundle?,
+  ): Boolean {
+    val kind = ChartActionKind.entries.firstOrNull { idOf(it) == action }
+    if (kind != null) {
+      if (!view.controller.perform(kind)) return false
+      view.invalidateIfStale()
+      // The domain actions change the scales, so the ticks and the labels a reader explores are a
+      // different tree now.
+      invalidateSemanticTree()
+      return true
+    }
+    return super.performAccessibilityAction(host, action, args)
+  }
+
+  /**
+   * The resource id for a kind, spelled out rather than derived from `ordinal`.
+   *
+   * An exhaustive `when` over the enum, so a kind added to `ChartActionKind` without an id here is
+   * a build error rather than an action that silently collides with another one's id.
+   */
+  private fun idOf(kind: ChartActionKind): Int =
+    when (kind) {
+      ChartActionKind.ZOOM_IN -> R.id.aster_vega_action_zoom_in
+      ChartActionKind.ZOOM_OUT -> R.id.aster_vega_action_zoom_out
+      ChartActionKind.RESET_ZOOM -> R.id.aster_vega_action_reset_zoom
+      ChartActionKind.RESET_DOMAINS -> R.id.aster_vega_action_reset_domains
+    }
 
   override fun onPerformActionForVirtualView(
     virtualViewId: Int,

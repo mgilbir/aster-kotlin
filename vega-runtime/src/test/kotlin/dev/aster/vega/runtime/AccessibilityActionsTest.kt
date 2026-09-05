@@ -2,6 +2,7 @@ package dev.aster.vega.runtime
 
 import dev.aster.vega.model.locale.VegaCaptions
 import dev.aster.vega.model.locale.VegaLocale
+import dev.aster.vega.scene.ChartActionKind
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.VectorD
 import org.junit.jupiter.api.Assertions.assertEquals

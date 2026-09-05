@@ -8,6 +8,37 @@ section here does not get released.
 
 ### Fixed
 
+- **The chart's own accessibility actions were wired on no host at all** (#226). Zooming, zooming
+  out, resetting the view and putting an adjusted axis back are offered by
+  `VegaChartController.accessibilityActions`, and `perform` runs one — and both were referenced
+  *only by the controller's own tests*. The feature was built, tested and documented against
+  `AccessibilityNodeInfo.addAction` on Android and `UIAccessibilityCustomAction` on Apple, and
+  neither call was ever written. A reader could reach every bar in a chart and never the view they
+  were drawn in.
+
+  Now the Android View carries them on its own accessibility node, `VegaChartView` on Apple presents
+  them with `.accessibilityAction(named:)`, and the Compose Multiplatform composable puts them on
+  the chart's own node as `customActions`. Each is the same primitive in that platform's spelling.
+
+  The Android action ids are declared as **resources**. That is the platform's guidance and not
+  ceremony: the framework's own action ids are bit flags in a low range, and a hand-picked constant
+  can collide with one a future release adds.
+
+  **`ChartAction` and `ChartActionKind` moved from `vega-runtime` to `vega-scene`.** The
+  multiplatform renderer depends on the scene layer alone — it paints a `Scene` and owns its
+  semantics tree — so a type in the runtime is one it cannot name, which is exactly why the actions
+  were unreachable from it. That layer is already where `AccessibleElement`, `AccessibilityTree` and
+  `SceneNodeId` live for the same reason, and `VegaChart`'s `onActivate` already answers in it. The
+  alternative was a second definition beside the first with a string bridging them, which is the
+  shape `scripts/host-conformance.py` exists to prevent.
+
+  `scripts/host-parity.py` gains a row for it, and its Android surface now includes the declared
+  ids — `javap` records class members and a resource id is not one, so without that the seam had no
+  marker on the one host that owns the whole thing internally, and a row with no marker is a row
+  that cannot fail. The **pointer events** marker was also rewritten: it had been anchored to
+  `onHover`'s callback and broke the moment two parameters were inserted between them, reporting a
+  seam missing that was right there.
+
 - **A brush could not be driven from any host.** `[mousedown, mouseup] > mousemove` is how every
   interval selection in Vega and Vega-Lite is written, and no surface could produce that sequence.
   The Android View dispatched a `mousedown` and a `mouseup` but never handled `ACTION_MOVE`, so a

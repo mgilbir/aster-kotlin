@@ -54,7 +54,14 @@ def block(text, header):
     return "\n".join(out)
 
 
-ANDROID_VIEW = block(ANDROID, "dev.aster.vega.android.VegaChartView")
+# **The View's class block, plus the accessibility ids it declares.** `android-api.txt` is `javap`
+# over the compiled classes and a resource id is not a class member — but an accessibility action id
+# *is* part of what this library offers an assistive technology, and an app can name it. Without it
+# the chart-action seam had no marker at all on the one host that owns the whole thing internally,
+# and a row with no marker is a row that cannot fail.
+ANDROID_VIEW = block(ANDROID, "dev.aster.vega.android.VegaChartView") + pathlib.Path(
+    "vega-android-canvas/src/main/res/values/ids.xml"
+).read_text()
 # `clearImageCache` is a static on `CoreGraphicsTarget` rather than on the view, so the Swift
 # surface has to be read whole rather than filtered to the two obvious types.
 SWIFT_VIEW = SWIFT
@@ -97,11 +104,12 @@ SEAMS = {
     "pointer events": (
         "onTouchEvent",
         None,
-        # Three `Function1<PointD, Unit>?` in a row, right after `onHover`'s two-argument one. The
-        # klib dump records types and not names, so the run is what identifies them.
-        r"Function2<dev\.aster\.vega\.scene/PointD\?, dev\.aster\.vega\.scene/SceneNodeId\?, "
-        r"kotlin/Unit>\?, kotlin/Function1<dev\.aster\.vega\.scene/PointD, kotlin/Unit>\?, "
-        r"kotlin/Function1<dev\.aster\.vega\.scene/PointD, kotlin/Unit>\?, "
+        # Three `Function1<PointD, Unit>?` in a **row**, and anchored to nothing before them on
+        # purpose. This marker was first written relative to `onHover`'s two-argument callback and
+        # broke the moment two parameters were inserted between the two, reporting a seam missing
+        # that was right there. A marker that depends on its neighbours fails for the wrong reason.
+        # The klib dump records types and not names, so the run is what identifies them.
+        r"(kotlin/Function1<dev\.aster\.vega\.scene/PointD, kotlin/Unit>\?, ){2}"
         r"kotlin/Function1<dev\.aster\.vega\.scene/PointD, kotlin/Unit>\?",
         r"pointerDown\(at:\)",
     ),
@@ -110,6 +118,21 @@ SEAMS = {
     # the finger travels, so in the chart's own coordinates the pointer never moves and the brush
     # selects a point. The Android instrumented test found exactly that, `[60, 60]` for a drag from
     # 60 to 200, the first time it ran.
+    # The chart's **own** accessibility actions — zooming, resetting the view, putting an adjusted
+    # axis back. They were offered by `VegaChartController` and wired by **no host at all**: built,
+    # tested, documented against `AccessibilityNodeInfo.addAction` and `UIAccessibilityCustomAction`,
+    # and the call was never written anywhere (#226). A reader could reach every bar in a chart and
+    # never the view they were drawn in. There was no row here either, which is how it stayed
+    # invisible while three of these columns grew other accessibility seams around it.
+    "chart accessibility actions": (
+        # The View owns its own node, so the seam is the delegate rather than something a host
+        # wires; the ids it hangs the actions on are the marker, and they exist only for this.
+        "aster_vega_action_zoom_in",
+        # `vega-compose` hosts that View, so it inherits the node and everything on it.
+        None,
+        r"kotlin.collections/List<dev\.aster\.vega\.scene/ChartAction>",
+        r"perform\(_:\)",
+    ),
     "viewport pan is optional": (
         "setPanEnabled",
         # `int, boolean, boolean` — the accessibility threshold, then `tooltipsEnabled`, then this.
@@ -123,6 +146,10 @@ SEAMS = {
 }
 
 REASONS = {
+    ("chart accessibility actions", "vega-compose"): (
+        "hosts VegaChartView through AndroidView, so it inherits that View's own accessibility "
+        "node and every action on it — there is nothing for the composable to expose"
+    ),
     ("pointer events", "vega-compose"): (
         "hosts VegaChartView through AndroidView, which owns the pointer stream itself — there is "
         "nothing for the composable to expose, and the capability is the View's"

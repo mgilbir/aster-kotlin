@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.runtime.compile.SpecCompiler
 import dev.aster.vega.runtime.load.DenyLoader
+import dev.aster.vega.scene.ChartAction
+import dev.aster.vega.scene.ChartActionKind
 import dev.aster.vega.scene.MetricTextEngine
 import dev.aster.vega.scene.Scene
 import dev.aster.vega.scene.SceneNodeId
@@ -144,5 +146,59 @@ class ComposeAccessibilityTest {
           it.config.getOrElseNullable(SemanticsProperties.ContentDescription) { null }
         },
     )
+  }
+
+  /**
+   * The chart's **own** actions — zooming, resetting — on the chart's own node.
+   *
+   * They belong to the whole chart rather than to any mark, which is why they are not on
+   * `AccessibleElement`, and until this **no host on any platform wired them**: the feature was
+   * built, tested and documented against `AccessibilityNodeInfo.addAction` and
+   * `UIAccessibilityCustomAction` and the call was never made anywhere (#226). Compose's
+   * `customActions` is the same primitive in this framework's spelling.
+   *
+   * Handed in rather than read, because this composable takes a `Scene` and not a controller — the
+   * same reason `onActivate` reports a `SceneNodeId` instead of selecting anything itself.
+   */
+  @Test
+  fun `the chart's own actions are offered on its own node`() = runComposeUiTest {
+    val invoked = mutableListOf<ChartActionKind>()
+    setContent {
+      VegaChart(
+        scene(),
+        chartActions =
+          listOf(
+            ChartAction(ChartActionKind.ZOOM_IN, "Zoom in"),
+            ChartAction(ChartActionKind.RESET_ZOOM, "Reset zoom"),
+          ),
+        onChartAction = { invoked += it },
+      )
+    }
+    val node =
+      onNode(
+        SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions),
+        useUnmergedTree = true,
+      )
+    node.assertExists()
+    val actions = node.fetchSemanticsNode().config[SemanticsActions.CustomActions]
+    assertEquals(
+      listOf("Zoom in", "Reset zoom"),
+      actions.map { it.label },
+      "the chart's node carries the wrong actions, with the wrong labels",
+    )
+    actions.first().action()
+    assertEquals(
+      listOf(ChartActionKind.ZOOM_IN),
+      invoked,
+      "invoking a custom action did not reach the host",
+    )
+  }
+
+  /** No actions handed in, no action node: nothing is offered that would do nothing. */
+  @Test
+  fun `a chart with no actions offers none`() = runComposeUiTest {
+    setContent { VegaChart(scene()) }
+    onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions), useUnmergedTree = true)
+      .assertDoesNotExist()
   }
 }

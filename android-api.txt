@@ -163,11 +163,13 @@ vega-android-canvas  public final class dev.aster.vega.android.SceneExporter {
 vega-android-canvas  public final class dev.aster.vega.android.SceneExporter$Companion {
     public dev.aster.vega.android.SceneExporter$Companion(kotlin.jvm.internal.DefaultConstructorMarker);
 vega-android-canvas  public final class dev.aster.vega.android.VegaAccessibilityHelper extends androidx.customview.widget.ExploreByTouchHelper {
+    public boolean performAccessibilityAction(android.view.View, int, android.os.Bundle);
     public dev.aster.vega.android.VegaAccessibilityHelper(dev.aster.vega.android.VegaChartView);
     public final java.util.List<java.lang.Object> semanticIdentity();
     public final void invalidateSemanticTree();
     public static final dev.aster.vega.android.VegaAccessibilityHelper$Companion Companion;
     public static final int MAX_EXPOSED_MARKS;
+    public void onInitializeAccessibilityNodeInfo(android.view.View, androidx.core.view.accessibility.AccessibilityNodeInfoCompat);
 vega-android-canvas  public final class dev.aster.vega.android.VegaAccessibilityHelper$Companion {
     public dev.aster.vega.android.VegaAccessibilityHelper$Companion(kotlin.jvm.internal.DefaultConstructorMarker);
 vega-android-canvas  public final class dev.aster.vega.android.VegaChartView$Companion {

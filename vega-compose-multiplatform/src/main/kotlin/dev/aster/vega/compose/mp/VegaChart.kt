@@ -24,9 +24,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChangedIgnoreConsumed
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -36,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import dev.aster.vega.model.locale.VegaCaptions
 import dev.aster.vega.scene.AccessibilityTree
 import dev.aster.vega.scene.AccessibleElement
+import dev.aster.vega.scene.ChartAction
+import dev.aster.vega.scene.ChartActionKind
 import dev.aster.vega.scene.HitTestOptions
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.Scene
@@ -151,6 +155,20 @@ public fun VegaChart(
    * straight to `VegaChartController.dispatch`. A move is reported while the pointer is **down**,
    * which is the case a brush needs and the one a hover cannot supply.
    */
+  /**
+   * The chart's **own** accessibility actions, and what to do when a reader invokes one.
+   *
+   * Zooming, resetting the view, and putting an adjusted axis back — they belong to the whole chart
+   * rather than to any mark, which is why they are not on `AccessibleElement`. Until this, no host
+   * on any platform wired them and the feature was unreachable (#226).
+   *
+   * Handed in rather than read, because this composable takes a `Scene` and not a controller: a
+   * host passes `controller.accessibilityActions` and forwards the invocation to
+   * `controller.perform`. The list is expected to *change* — an action is offered only while
+   * invoking it would do something — so pass the current one on every composition.
+   */
+  chartActions: List<ChartAction> = emptyList(),
+  onChartAction: ((ChartActionKind) -> Unit)? = null,
   onPointerDown: ((PointD) -> Unit)? = null,
   onPointerMoved: ((PointD) -> Unit)? = null,
   onPointerUp: ((PointD) -> Unit)? = null,
@@ -203,7 +221,34 @@ public fun VegaChart(
   // was reported, not an input to the drawing.
   val lastPlacement = remember { Ref<ChartPlacement>() }
 
-  Box(modifier = modifier.then(sized).then(Modifier.size(scene.width.dp, scene.height.dp))) {
+  // **The chart's own actions**, on the chart's own node rather than on any element's.
+  //
+  // Zooming, resetting the view and putting an adjusted axis back belong to the whole chart, which
+  // is why they are not on `AccessibleElement`. Compose's `customActions` is the same primitive
+  // Android's `AccessibilityNodeInfo.addAction` and Apple's `UIAccessibilityCustomAction` are, and
+  // until this none of the three was wired (#226).
+  //
+  // Rebuilt on every composition rather than remembered: the list *changes* — an action is offered
+  // only while invoking it would do something — so a cached copy would offer a reader an action
+  // that does nothing.
+  val actions =
+    modifier
+      .then(sized)
+      .then(Modifier.size(scene.width.dp, scene.height.dp))
+      .then(
+        if (chartActions.isEmpty() || onChartAction == null) Modifier
+        else
+          Modifier.semantics {
+            customActions = chartActions.map { action ->
+              CustomAccessibilityAction(action.label) {
+                onChartAction(action.kind)
+                true
+              }
+            }
+          }
+      )
+
+  Box(modifier = actions) {
     Canvas(
       modifier =
         Modifier.matchParentSize()

@@ -1,26 +1,3 @@
-public final class dev/aster/vega/runtime/ChartAction {
-	public fun <init> (Ldev/aster/vega/runtime/ChartActionKind;Ljava/lang/String;)V
-	public final fun component1 ()Ldev/aster/vega/runtime/ChartActionKind;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun copy (Ldev/aster/vega/runtime/ChartActionKind;Ljava/lang/String;)Ldev/aster/vega/runtime/ChartAction;
-	public static synthetic fun copy$default (Ldev/aster/vega/runtime/ChartAction;Ldev/aster/vega/runtime/ChartActionKind;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/runtime/ChartAction;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getKind ()Ldev/aster/vega/runtime/ChartActionKind;
-	public final fun getLabel ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class dev/aster/vega/runtime/ChartActionKind : java/lang/Enum {
-	public static final field RESET_DOMAINS Ldev/aster/vega/runtime/ChartActionKind;
-	public static final field RESET_ZOOM Ldev/aster/vega/runtime/ChartActionKind;
-	public static final field ZOOM_IN Ldev/aster/vega/runtime/ChartActionKind;
-	public static final field ZOOM_OUT Ldev/aster/vega/runtime/ChartActionKind;
-	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/runtime/ChartActionKind;
-	public static fun values ()[Ldev/aster/vega/runtime/ChartActionKind;
-}
-
 public abstract interface class dev/aster/vega/runtime/ChartEvent {
 }
 
@@ -528,7 +505,7 @@ public final class dev/aster/vega/runtime/VegaChartController {
 	public final fun getTooltipContent ()Ldev/aster/vega/runtime/TooltipContent;
 	public final fun handleKey (Ldev/aster/vega/runtime/ChartKey;Ldev/aster/vega/runtime/Modifiers;)Z
 	public static synthetic fun handleKey$default (Ldev/aster/vega/runtime/VegaChartController;Ldev/aster/vega/runtime/ChartKey;Ldev/aster/vega/runtime/Modifiers;ILjava/lang/Object;)Z
-	public final fun perform (Ldev/aster/vega/runtime/ChartActionKind;)Z
+	public final fun perform (Ldev/aster/vega/scene/ChartActionKind;)Z
 	public final fun report (Ldev/aster/vega/model/VegaDiagnostic;)V
 	public final fun resetScaleDomains ()Z
 	public final fun resetViewport ()V

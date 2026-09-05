@@ -6,6 +6,19 @@
 // - Show declarations: true
 
 // Library unique name: <io.github.mgilbir.astervega:vega-scene>
+final enum class dev.aster.vega.scene/ChartActionKind : kotlin/Enum<dev.aster.vega.scene/ChartActionKind> { // dev.aster.vega.scene/ChartActionKind|null[0]
+    enum entry RESET_DOMAINS // dev.aster.vega.scene/ChartActionKind.RESET_DOMAINS|null[0]
+    enum entry RESET_ZOOM // dev.aster.vega.scene/ChartActionKind.RESET_ZOOM|null[0]
+    enum entry ZOOM_IN // dev.aster.vega.scene/ChartActionKind.ZOOM_IN|null[0]
+    enum entry ZOOM_OUT // dev.aster.vega.scene/ChartActionKind.ZOOM_OUT|null[0]
+
+    final val entries // dev.aster.vega.scene/ChartActionKind.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<dev.aster.vega.scene/ChartActionKind> // dev.aster.vega.scene/ChartActionKind.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): dev.aster.vega.scene/ChartActionKind // dev.aster.vega.scene/ChartActionKind.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<dev.aster.vega.scene/ChartActionKind> // dev.aster.vega.scene/ChartActionKind.values|values#static(){}[0]
+}
+
 final enum class dev.aster.vega.scene/CurveKind : kotlin/Enum<dev.aster.vega.scene/CurveKind> { // dev.aster.vega.scene/CurveKind|null[0]
     enum entry BASIS // dev.aster.vega.scene/CurveKind.BASIS|null[0]
     enum entry BASIS_CLOSED // dev.aster.vega.scene/CurveKind.BASIS_CLOSED|null[0]
@@ -457,6 +470,22 @@ final class dev.aster.vega.scene/AccessibleElement { // dev.aster.vega.scene/Acc
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.scene/AccessibleElement.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.aster.vega.scene/AccessibleElement.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.aster.vega.scene/AccessibleElement.toString|toString(){}[0]
+}
+
+final class dev.aster.vega.scene/ChartAction { // dev.aster.vega.scene/ChartAction|null[0]
+    constructor <init>(dev.aster.vega.scene/ChartActionKind, kotlin/String) // dev.aster.vega.scene/ChartAction.<init>|<init>(dev.aster.vega.scene.ChartActionKind;kotlin.String){}[0]
+
+    final val kind // dev.aster.vega.scene/ChartAction.kind|{}kind[0]
+        final fun <get-kind>(): dev.aster.vega.scene/ChartActionKind // dev.aster.vega.scene/ChartAction.kind.<get-kind>|<get-kind>(){}[0]
+    final val label // dev.aster.vega.scene/ChartAction.label|{}label[0]
+        final fun <get-label>(): kotlin/String // dev.aster.vega.scene/ChartAction.label.<get-label>|<get-label>(){}[0]
+
+    final fun component1(): dev.aster.vega.scene/ChartActionKind // dev.aster.vega.scene/ChartAction.component1|component1(){}[0]
+    final fun component2(): kotlin/String // dev.aster.vega.scene/ChartAction.component2|component2(){}[0]
+    final fun copy(dev.aster.vega.scene/ChartActionKind = ..., kotlin/String = ...): dev.aster.vega.scene/ChartAction // dev.aster.vega.scene/ChartAction.copy|copy(dev.aster.vega.scene.ChartActionKind;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.scene/ChartAction.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.scene/ChartAction.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.scene/ChartAction.toString|toString(){}[0]
 }
 
 final class dev.aster.vega.scene/Corners { // dev.aster.vega.scene/Corners|null[0]

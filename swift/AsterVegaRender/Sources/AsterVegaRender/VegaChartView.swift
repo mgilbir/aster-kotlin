@@ -264,6 +264,17 @@ public struct VegaChartView: View {
     //
     // Gated in the handler rather than at attachment because a hover cannot claim a drag: it is the one
     // gesture here whose mere presence costs a host nothing.
+    // **The chart's own actions**, as VoiceOver custom actions on the chart itself.
+    //
+    // Zooming, resetting the view and putting an adjusted axis back. They belong to the whole chart
+    // rather than to any mark, and until this no host on any platform offered them — the feature
+    // was built, tested and documented against `UIAccessibilityCustomAction` and the call was never
+    // written (#226).
+    //
+    // Rebuilt from the session on every pass rather than cached: the list is short and it *changes*
+    // — zooming is withdrawn at each limit, and a reset appears only once there is something to
+    // undo — so a stale copy would offer a reader an action that does nothing.
+    .modifier(ChartActions(session: session))
     .onContinuousHover { phase in
       guard let session, gestures.contains(.hover) else { return }
       switch phase {
@@ -802,6 +813,28 @@ private struct AdjustableAxis: ViewModifier {
         // whether anything moved; at the end of the range nothing has, and there is nothing to
         // announce.
         _ = session.adjustScaleDomain(scale: scale, narrow: direction == .increment)
+      }
+    } else {
+      content
+    }
+  }
+}
+
+/// The chart's own accessibility actions, offered as VoiceOver custom actions.
+///
+/// A `ViewModifier` because the set is dynamic: `accessibilityAction(named:)` has to be applied once
+/// per action, and the actions come from the session. Applied to nothing when there is no session,
+/// which is the same promise `activatable(_:)` keeps for `.isButton` — an action a reader invokes to
+/// no effect is worse than one that was never offered.
+@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
+private struct ChartActions: ViewModifier {
+  let session: ChartSession?
+
+  func body(content: Content) -> some View {
+    if let session {
+      // `reduce` rather than a `ForEach`: these are modifiers on one view, not sibling views.
+      session.accessibilityActions.reduce(AnyView(content)) { view, action in
+        AnyView(view.accessibilityAction(named: Text(action.label)) { _ = session.perform(action.kind) })
       }
     } else {
       content

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Stable ids for the chart's own accessibility actions.
+
+  An `AccessibilityActionCompat` needs an id that is unique on the node and stable across processes,
+  and the platform's guidance is to declare it as a resource rather than to pick an integer: the
+  framework's own action ids are bit flags in a low range and nothing stops a hand-picked constant
+  from colliding with one a future release adds.
+
+  One per `ChartActionKind`. A kind added without an id here fails `VegaAccessibilityHelper`'s
+  exhaustive `when`, which is the point of spelling them out rather than deriving from `ordinal`.
+-->
+<resources>
+  <item name="aster_vega_action_zoom_in" type="id" />
+  <item name="aster_vega_action_zoom_out" type="id" />
+  <item name="aster_vega_action_reset_zoom" type="id" />
+  <item name="aster_vega_action_reset_domains" type="id" />
+</resources>

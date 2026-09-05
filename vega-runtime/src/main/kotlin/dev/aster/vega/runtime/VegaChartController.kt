@@ -37,6 +37,8 @@ import dev.aster.vega.runtime.scale.PositionScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.AccessibilityTree
 import dev.aster.vega.scene.AccessibleElement
+import dev.aster.vega.scene.ChartAction
+import dev.aster.vega.scene.ChartActionKind
 import dev.aster.vega.scene.HitResult
 import dev.aster.vega.scene.HitTestOptions
 import dev.aster.vega.scene.MetricTextEngine
