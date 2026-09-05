@@ -1,6 +1,7 @@
 package dev.aster.vega.compose.mp
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -13,10 +14,21 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerType
@@ -40,7 +52,9 @@ import dev.aster.vega.scene.AccessibilityTree
 import dev.aster.vega.scene.AccessibleElement
 import dev.aster.vega.scene.ChartAction
 import dev.aster.vega.scene.ChartActionKind
+import dev.aster.vega.scene.ChartKey
 import dev.aster.vega.scene.HitTestOptions
+import dev.aster.vega.scene.Modifiers
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.Scene
 import dev.aster.vega.scene.SceneHitIndex
@@ -185,6 +199,24 @@ public fun VegaChart(
    * and that is what a host turns into `PointerExited`.
    */
   onPointerEntered: ((PointD) -> Unit)? = null,
+  /**
+   * A key the chart reacts to, with the modifiers held with it.
+   *
+   * This renderer had **no keyboard path of any kind** (#229): a specification's `keydown` handlers
+   * never fired and the engine's own traversal between marks was unreachable — on the surface most
+   * likely to be running on a desktop, where a keyboard is the primary input. Android translates
+   * keys through `dispatchKeyEvent` and Apple through `ChartSession.press(_:modifiers:)`.
+   *
+   * Reported in the engine's own [ChartKey] vocabulary rather than the platform's, so the
+   * translation happens **once** here instead of once per host. A host forwards it to
+   * `VegaChartController.dispatch(ChartInputEvent.Key(...))`, which both fires the specification's
+   * handlers and moves the focus.
+   *
+   * Asking for it makes the chart **focusable**, because a Compose node that cannot take focus
+   * receives no key events at all. That is a visible change to a layout, which is why it happens
+   * only when a host asks.
+   */
+  onKey: ((ChartKey, Modifiers) -> Unit)? = null,
   hitTestOptions: HitTestOptions = HitTestOptions.Touch,
   viewportOffset: VectorD = VectorD.Zero,
   viewportScale: Double = 1.0,
@@ -233,6 +265,7 @@ public fun VegaChart(
   // than a `MutableState`, because writing it must not invalidate anything — it is a record of what
   // was reported, not an input to the drawing.
   val lastPlacement = remember { Ref<ChartPlacement>() }
+  val keyFocus = remember { FocusRequester() }
 
   // **The chart's own actions**, on the chart's own node rather than on any element's.
   //
@@ -261,7 +294,29 @@ public fun VegaChart(
           }
       )
 
-  Box(modifier = actions) {
+  // **Focusable, and only when a host wants keys.** A Compose node that cannot take focus is never
+  // offered a key event, so the seam needs the focus target as much as the handler — and a node
+  // that takes focus changes how a surrounding layout traverses, which is not something to do to
+  // every chart uninvited.
+  val keyed =
+    if (onKey == null) actions
+    else
+      actions.focusRequester(keyFocus).focusable().onKeyEvent { event ->
+        if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+        val key = chartKeyOf(event.key) ?: return@onKeyEvent false
+        onKey(
+          key,
+          Modifiers(
+            shift = event.isShiftPressed,
+            control = event.isCtrlPressed,
+            alt = event.isAltPressed,
+            meta = event.isMetaPressed,
+          ),
+        )
+        true
+      }
+
+  Box(modifier = keyed) {
     Canvas(
       modifier =
         Modifier.matchParentSize()
@@ -922,4 +977,28 @@ private fun fitPlacement(
 public fun rememberVegaImageCache(maxEntries: Int = 64): ImageCache =
   remember(maxEntries) {
     ImageCache(maxEntries)
+  }
+
+/**
+ * Compose's key to the engine's, or null for one the chart does not react to.
+ *
+ * The translation lives **here**, once, rather than in each host: `ChartKey` is the engine's own
+ * vocabulary and the reason it exists is that a keyboard is no more a platform detail than a screen
+ * reader is. A key outside the set is left alone — the event is not consumed, so a surrounding
+ * layout still sees it, which is what makes a chart inside a form usable.
+ */
+private fun chartKeyOf(key: Key): ChartKey? =
+  when (key) {
+    Key.DirectionLeft -> ChartKey.ARROW_LEFT
+    Key.DirectionRight -> ChartKey.ARROW_RIGHT
+    Key.DirectionUp -> ChartKey.ARROW_UP
+    Key.DirectionDown -> ChartKey.ARROW_DOWN
+    Key.Enter,
+    Key.NumPadEnter -> ChartKey.ENTER
+    Key.Spacebar -> ChartKey.SPACE
+    Key.Escape -> ChartKey.ESCAPE
+    Key.Tab -> ChartKey.TAB
+    Key.MoveHome -> ChartKey.HOME
+    Key.MoveEnd -> ChartKey.END
+    else -> null
   }

@@ -1,6 +1,8 @@
 package dev.aster.vega.runtime
 
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.scene.ChartKey
+import dev.aster.vega.scene.Modifiers
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test

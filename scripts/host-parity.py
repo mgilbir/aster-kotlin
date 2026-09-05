@@ -147,6 +147,17 @@ SEAMS = {
         r"kotlin/Function1<dev\.aster\.vega\.scene/PointD, kotlin/Unit>\?",
         r"hover\(at:\)",
     ),
+    # The keyboard. `VegaChart.kt` had **zero** references to `ChartKey`, `KeyEvent` or
+    # `onKeyEvent`, so a specification's `keydown` handlers never fired and the engine's own
+    # traversal between marks was unreachable — on the surface most likely to be running on a
+    # desktop, where a keyboard is the primary input (#229).
+    "keyboard": (
+        "dispatchKeyEvent",
+        None,
+        r"kotlin/Function2<dev\.aster\.vega\.scene/ChartKey, dev\.aster\.vega\.scene/Modifiers, "
+        r"kotlin/Unit>\?",
+        r"press\(_:modifiers:\)",
+    ),
     "viewport pan is optional": (
         "setPanEnabled",
         # `int, boolean, boolean` — the accessibility threshold, then `tooltipsEnabled`, then this.
@@ -160,6 +171,10 @@ SEAMS = {
 }
 
 REASONS = {
+    ("keyboard", "vega-compose"): (
+        "hosts VegaChartView through AndroidView, which handles key events itself — there is "
+        "nothing for the composable to expose, and the capability is the View's"
+    ),
     ("pointer entered", "vega-compose"): (
         "hosts VegaChartView through AndroidView, which owns the hover stream itself — there is "
         "nothing for the composable to expose, and the capability is the View's"

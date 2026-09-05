@@ -39,9 +39,11 @@ import dev.aster.vega.scene.AccessibilityTree
 import dev.aster.vega.scene.AccessibleElement
 import dev.aster.vega.scene.ChartAction
 import dev.aster.vega.scene.ChartActionKind
+import dev.aster.vega.scene.ChartKey
 import dev.aster.vega.scene.HitResult
 import dev.aster.vega.scene.HitTestOptions
 import dev.aster.vega.scene.MetricTextEngine
+import dev.aster.vega.scene.Modifiers
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.Scene
 import dev.aster.vega.scene.SceneHitIndex

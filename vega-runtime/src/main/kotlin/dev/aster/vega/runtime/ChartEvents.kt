@@ -1,6 +1,8 @@
 package dev.aster.vega.runtime
 
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.scene.ChartKey
+import dev.aster.vega.scene.Modifiers
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.SceneNodeId
@@ -19,31 +21,6 @@ public enum class GesturePhase {
   CHANGED,
   ENDED,
   CANCELLED,
-}
-
-/** Keys the chart reacts to. Anything else is left to the host view. */
-public enum class ChartKey {
-  ARROW_LEFT,
-  ARROW_RIGHT,
-  ARROW_UP,
-  ARROW_DOWN,
-  ENTER,
-  SPACE,
-  ESCAPE,
-  TAB,
-  HOME,
-  END,
-}
-
-public data class Modifiers(
-  val shift: Boolean = false,
-  val control: Boolean = false,
-  val alt: Boolean = false,
-  val meta: Boolean = false,
-) {
-  public companion object {
-    public val None: Modifiers = Modifiers()
-  }
 }
 
 /**

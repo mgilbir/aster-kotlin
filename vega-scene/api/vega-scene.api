@@ -88,6 +88,22 @@ public final class dev/aster/vega/scene/ChartActionKind : java/lang/Enum {
 	public static fun values ()[Ldev/aster/vega/scene/ChartActionKind;
 }
 
+public final class dev/aster/vega/scene/ChartKey : java/lang/Enum {
+	public static final field ARROW_DOWN Ldev/aster/vega/scene/ChartKey;
+	public static final field ARROW_LEFT Ldev/aster/vega/scene/ChartKey;
+	public static final field ARROW_RIGHT Ldev/aster/vega/scene/ChartKey;
+	public static final field ARROW_UP Ldev/aster/vega/scene/ChartKey;
+	public static final field END Ldev/aster/vega/scene/ChartKey;
+	public static final field ENTER Ldev/aster/vega/scene/ChartKey;
+	public static final field ESCAPE Ldev/aster/vega/scene/ChartKey;
+	public static final field HOME Ldev/aster/vega/scene/ChartKey;
+	public static final field SPACE Ldev/aster/vega/scene/ChartKey;
+	public static final field TAB Ldev/aster/vega/scene/ChartKey;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/scene/ChartKey;
+	public static fun values ()[Ldev/aster/vega/scene/ChartKey;
+}
+
 public final class dev/aster/vega/scene/ColorSpaces {
 	public static final field INSTANCE Ldev/aster/vega/scene/ColorSpaces;
 	public final fun fromCubehelix (Ldev/aster/vega/scene/ColorSpaces$Cubehelix;D)Ldev/aster/vega/scene/SceneColor;
@@ -559,6 +575,30 @@ public final class dev/aster/vega/scene/MetricTextEngine : dev/aster/vega/scene/
 	public fun advanceOf (Ljava/lang/String;Ldev/aster/vega/scene/TextStyle;)D
 	public fun ascentOf (Ldev/aster/vega/scene/TextStyle;)D
 	public fun descentOf (Ldev/aster/vega/scene/TextStyle;)D
+}
+
+public final class dev/aster/vega/scene/Modifiers {
+	public static final field Companion Ldev/aster/vega/scene/Modifiers$Companion;
+	public fun <init> ()V
+	public fun <init> (ZZZZ)V
+	public synthetic fun <init> (ZZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun component2 ()Z
+	public final fun component3 ()Z
+	public final fun component4 ()Z
+	public final fun copy (ZZZZ)Ldev/aster/vega/scene/Modifiers;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/Modifiers;ZZZZILjava/lang/Object;)Ldev/aster/vega/scene/Modifiers;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlt ()Z
+	public final fun getControl ()Z
+	public final fun getMeta ()Z
+	public final fun getShift ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/Modifiers$Companion {
+	public final fun getNone ()Ldev/aster/vega/scene/Modifiers;
 }
 
 public final class dev/aster/vega/scene/NodeMetadata {

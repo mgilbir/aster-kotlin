@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime
 
+import dev.aster.vega.scene.ChartKey
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.flatten
 import org.junit.jupiter.api.Assertions.assertEquals

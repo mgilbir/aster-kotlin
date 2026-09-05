@@ -100,15 +100,15 @@ public abstract interface class dev/aster/vega/runtime/ChartInputEvent {
 }
 
 public final class dev/aster/vega/runtime/ChartInputEvent$Key : dev/aster/vega/runtime/ChartInputEvent {
-	public fun <init> (Ldev/aster/vega/runtime/ChartKey;Ldev/aster/vega/runtime/Modifiers;)V
-	public synthetic fun <init> (Ldev/aster/vega/runtime/ChartKey;Ldev/aster/vega/runtime/Modifiers;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ldev/aster/vega/runtime/ChartKey;
-	public final fun component2 ()Ldev/aster/vega/runtime/Modifiers;
-	public final fun copy (Ldev/aster/vega/runtime/ChartKey;Ldev/aster/vega/runtime/Modifiers;)Ldev/aster/vega/runtime/ChartInputEvent$Key;
-	public static synthetic fun copy$default (Ldev/aster/vega/runtime/ChartInputEvent$Key;Ldev/aster/vega/runtime/ChartKey;Ldev/aster/vega/runtime/Modifiers;ILjava/lang/Object;)Ldev/aster/vega/runtime/ChartInputEvent$Key;
+	public fun <init> (Ldev/aster/vega/scene/ChartKey;Ldev/aster/vega/scene/Modifiers;)V
+	public synthetic fun <init> (Ldev/aster/vega/scene/ChartKey;Ldev/aster/vega/scene/Modifiers;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ldev/aster/vega/scene/ChartKey;
+	public final fun component2 ()Ldev/aster/vega/scene/Modifiers;
+	public final fun copy (Ldev/aster/vega/scene/ChartKey;Ldev/aster/vega/scene/Modifiers;)Ldev/aster/vega/runtime/ChartInputEvent$Key;
+	public static synthetic fun copy$default (Ldev/aster/vega/runtime/ChartInputEvent$Key;Ldev/aster/vega/scene/ChartKey;Ldev/aster/vega/scene/Modifiers;ILjava/lang/Object;)Ldev/aster/vega/runtime/ChartInputEvent$Key;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getKey ()Ldev/aster/vega/runtime/ChartKey;
-	public final fun getModifiers ()Ldev/aster/vega/runtime/Modifiers;
+	public final fun getKey ()Ldev/aster/vega/scene/ChartKey;
+	public final fun getModifiers ()Ldev/aster/vega/scene/Modifiers;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -245,22 +245,6 @@ public final class dev/aster/vega/runtime/ChartInputEvent$Zoom : dev/aster/vega/
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class dev/aster/vega/runtime/ChartKey : java/lang/Enum {
-	public static final field ARROW_DOWN Ldev/aster/vega/runtime/ChartKey;
-	public static final field ARROW_LEFT Ldev/aster/vega/runtime/ChartKey;
-	public static final field ARROW_RIGHT Ldev/aster/vega/runtime/ChartKey;
-	public static final field ARROW_UP Ldev/aster/vega/runtime/ChartKey;
-	public static final field END Ldev/aster/vega/runtime/ChartKey;
-	public static final field ENTER Ldev/aster/vega/runtime/ChartKey;
-	public static final field ESCAPE Ldev/aster/vega/runtime/ChartKey;
-	public static final field HOME Ldev/aster/vega/runtime/ChartKey;
-	public static final field SPACE Ldev/aster/vega/runtime/ChartKey;
-	public static final field TAB Ldev/aster/vega/runtime/ChartKey;
-	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/runtime/ChartKey;
-	public static fun values ()[Ldev/aster/vega/runtime/ChartKey;
-}
-
 public final class dev/aster/vega/runtime/ChartSelection {
 	public static final field Companion Ldev/aster/vega/runtime/ChartSelection$Companion;
 	public fun <init> ()V
@@ -388,30 +372,6 @@ public final class dev/aster/vega/runtime/InteractionState$Companion {
 	public final fun getInitial ()Ldev/aster/vega/runtime/InteractionState;
 }
 
-public final class dev/aster/vega/runtime/Modifiers {
-	public static final field Companion Ldev/aster/vega/runtime/Modifiers$Companion;
-	public fun <init> ()V
-	public fun <init> (ZZZZ)V
-	public synthetic fun <init> (ZZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Z
-	public final fun component2 ()Z
-	public final fun component3 ()Z
-	public final fun component4 ()Z
-	public final fun copy (ZZZZ)Ldev/aster/vega/runtime/Modifiers;
-	public static synthetic fun copy$default (Ldev/aster/vega/runtime/Modifiers;ZZZZILjava/lang/Object;)Ldev/aster/vega/runtime/Modifiers;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAlt ()Z
-	public final fun getControl ()Z
-	public final fun getMeta ()Z
-	public final fun getShift ()Z
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class dev/aster/vega/runtime/Modifiers$Companion {
-	public final fun getNone ()Ldev/aster/vega/runtime/Modifiers;
-}
-
 public final class dev/aster/vega/runtime/PointerDevice : java/lang/Enum {
 	public static final field MOUSE Ldev/aster/vega/runtime/PointerDevice;
 	public static final field STYLUS Ldev/aster/vega/runtime/PointerDevice;
@@ -503,8 +463,8 @@ public final class dev/aster/vega/runtime/VegaChartController {
 	public final fun getSnapshot ()Ldev/aster/vega/runtime/ChartSnapshot;
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getTooltipContent ()Ldev/aster/vega/runtime/TooltipContent;
-	public final fun handleKey (Ldev/aster/vega/runtime/ChartKey;Ldev/aster/vega/runtime/Modifiers;)Z
-	public static synthetic fun handleKey$default (Ldev/aster/vega/runtime/VegaChartController;Ldev/aster/vega/runtime/ChartKey;Ldev/aster/vega/runtime/Modifiers;ILjava/lang/Object;)Z
+	public final fun handleKey (Ldev/aster/vega/scene/ChartKey;Ldev/aster/vega/scene/Modifiers;)Z
+	public static synthetic fun handleKey$default (Ldev/aster/vega/runtime/VegaChartController;Ldev/aster/vega/scene/ChartKey;Ldev/aster/vega/scene/Modifiers;ILjava/lang/Object;)Z
 	public final fun perform (Ldev/aster/vega/scene/ChartActionKind;)Z
 	public final fun report (Ldev/aster/vega/model/VegaDiagnostic;)V
 	public final fun resetScaleDomains ()Z

@@ -8,6 +8,22 @@ section here does not get released.
 
 ### Fixed
 
+- **Compose Multiplatform had no keyboard path at all** (#229) — zero references to `ChartKey`,
+  `KeyEvent` or `onKeyEvent`. So a specification's `keydown` handlers never fired and the engine's
+  own traversal between marks was unreachable, on the surface most likely to be running on a
+  desktop, where a keyboard is the primary input.
+
+  `onKey` reports in the engine's own `ChartKey` vocabulary rather than the platform's, so the
+  translation happens **once** in the renderer instead of once per host — a keyboard is no more a
+  platform detail than a screen reader is. `ChartKey` and `Modifiers` moved to `vega-scene` for the
+  same reason `ChartAction` did: that module depends on the scene layer alone.
+
+  Asking for keys makes the chart **focusable**, because a Compose node that cannot take focus is
+  offered no key event — and only then, since a node that takes focus changes how a surrounding
+  layout traverses. A chart does not take focus when it appears, which would steal it from whatever
+  the reader was using; a reader tabs to it. A key outside the set is not consumed, so a chart
+  inside a form leaves the form's own keys alone.
+
 - **`mouseover` never fired on Apple or Compose Multiplatform** (#228). `ChartInputEvent.PointerEntered`
   is what the controller turns into `pointerover` and `mouseover`, and only Android produced one —
   from `ACTION_HOVER_ENTER`. `ChartSession.hover(at:)` dispatched a **move** for every point, and the

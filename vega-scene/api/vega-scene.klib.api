@@ -19,6 +19,25 @@ final enum class dev.aster.vega.scene/ChartActionKind : kotlin/Enum<dev.aster.ve
     final fun values(): kotlin/Array<dev.aster.vega.scene/ChartActionKind> // dev.aster.vega.scene/ChartActionKind.values|values#static(){}[0]
 }
 
+final enum class dev.aster.vega.scene/ChartKey : kotlin/Enum<dev.aster.vega.scene/ChartKey> { // dev.aster.vega.scene/ChartKey|null[0]
+    enum entry ARROW_DOWN // dev.aster.vega.scene/ChartKey.ARROW_DOWN|null[0]
+    enum entry ARROW_LEFT // dev.aster.vega.scene/ChartKey.ARROW_LEFT|null[0]
+    enum entry ARROW_RIGHT // dev.aster.vega.scene/ChartKey.ARROW_RIGHT|null[0]
+    enum entry ARROW_UP // dev.aster.vega.scene/ChartKey.ARROW_UP|null[0]
+    enum entry END // dev.aster.vega.scene/ChartKey.END|null[0]
+    enum entry ENTER // dev.aster.vega.scene/ChartKey.ENTER|null[0]
+    enum entry ESCAPE // dev.aster.vega.scene/ChartKey.ESCAPE|null[0]
+    enum entry HOME // dev.aster.vega.scene/ChartKey.HOME|null[0]
+    enum entry SPACE // dev.aster.vega.scene/ChartKey.SPACE|null[0]
+    enum entry TAB // dev.aster.vega.scene/ChartKey.TAB|null[0]
+
+    final val entries // dev.aster.vega.scene/ChartKey.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<dev.aster.vega.scene/ChartKey> // dev.aster.vega.scene/ChartKey.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): dev.aster.vega.scene/ChartKey // dev.aster.vega.scene/ChartKey.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<dev.aster.vega.scene/ChartKey> // dev.aster.vega.scene/ChartKey.values|values#static(){}[0]
+}
+
 final enum class dev.aster.vega.scene/CurveKind : kotlin/Enum<dev.aster.vega.scene/CurveKind> { // dev.aster.vega.scene/CurveKind|null[0]
     enum entry BASIS // dev.aster.vega.scene/CurveKind.BASIS|null[0]
     enum entry BASIS_CLOSED // dev.aster.vega.scene/CurveKind.BASIS_CLOSED|null[0]
@@ -773,6 +792,33 @@ final class dev.aster.vega.scene/MetricTextEngine : dev.aster.vega.scene/Measure
     final fun advanceOf(kotlin/String, dev.aster.vega.scene/TextStyle): kotlin/Double // dev.aster.vega.scene/MetricTextEngine.advanceOf|advanceOf(kotlin.String;dev.aster.vega.scene.TextStyle){}[0]
     final fun ascentOf(dev.aster.vega.scene/TextStyle): kotlin/Double // dev.aster.vega.scene/MetricTextEngine.ascentOf|ascentOf(dev.aster.vega.scene.TextStyle){}[0]
     final fun descentOf(dev.aster.vega.scene/TextStyle): kotlin/Double // dev.aster.vega.scene/MetricTextEngine.descentOf|descentOf(dev.aster.vega.scene.TextStyle){}[0]
+}
+
+final class dev.aster.vega.scene/Modifiers { // dev.aster.vega.scene/Modifiers|null[0]
+    constructor <init>(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // dev.aster.vega.scene/Modifiers.<init>|<init>(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+
+    final val alt // dev.aster.vega.scene/Modifiers.alt|{}alt[0]
+        final fun <get-alt>(): kotlin/Boolean // dev.aster.vega.scene/Modifiers.alt.<get-alt>|<get-alt>(){}[0]
+    final val control // dev.aster.vega.scene/Modifiers.control|{}control[0]
+        final fun <get-control>(): kotlin/Boolean // dev.aster.vega.scene/Modifiers.control.<get-control>|<get-control>(){}[0]
+    final val meta // dev.aster.vega.scene/Modifiers.meta|{}meta[0]
+        final fun <get-meta>(): kotlin/Boolean // dev.aster.vega.scene/Modifiers.meta.<get-meta>|<get-meta>(){}[0]
+    final val shift // dev.aster.vega.scene/Modifiers.shift|{}shift[0]
+        final fun <get-shift>(): kotlin/Boolean // dev.aster.vega.scene/Modifiers.shift.<get-shift>|<get-shift>(){}[0]
+
+    final fun component1(): kotlin/Boolean // dev.aster.vega.scene/Modifiers.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // dev.aster.vega.scene/Modifiers.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // dev.aster.vega.scene/Modifiers.component3|component3(){}[0]
+    final fun component4(): kotlin/Boolean // dev.aster.vega.scene/Modifiers.component4|component4(){}[0]
+    final fun copy(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): dev.aster.vega.scene/Modifiers // dev.aster.vega.scene/Modifiers.copy|copy(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.scene/Modifiers.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.scene/Modifiers.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.scene/Modifiers.toString|toString(){}[0]
+
+    final object Companion { // dev.aster.vega.scene/Modifiers.Companion|null[0]
+        final val None // dev.aster.vega.scene/Modifiers.Companion.None|{}None[0]
+            final fun <get-None>(): dev.aster.vega.scene/Modifiers // dev.aster.vega.scene/Modifiers.Companion.None.<get-None>|<get-None>(){}[0]
+    }
 }
 
 final class dev.aster.vega.scene/NodeMetadata { // dev.aster.vega.scene/NodeMetadata|null[0]
