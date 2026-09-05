@@ -339,6 +339,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A label with no usable anchor is left out by every renderer, not only by the SVG export.** An
+  axis's `tickExtra` label scales a value its datum does not carry, so its position is `NaN` and
+  upstream's own SVG has no element for it. One of the four walks knew that; the three canvas walks
+  handed the platform a draw call at `NaN` instead. Nothing found it because nothing could: a draw
+  call at `NaN` paints nothing, so the picture always agreed and only the work was wasted.
+
+  Now the fourth clause of `paintsNothing`, so the answer is the same everywhere. Two labels across
+  the fixture corpus, in `axis-placement` and `error-bars`. **A `NaN` position is not a position of
+  zero**, which is the part worth keeping apart: `TextNode.bounds` deliberately measures such an
+  item at the origin, because upstream's `anchorPoint` reads `item.x || 0` and `NaN` is falsy, so
+  the label occupies a row in a layout it is never drawn in.
+
 - **Every renderer asks one question before it draws an item, instead of four copies of it.** Four
   walks cross a scene — the Android canvas, the Compose Multiplatform target, the Swift one and the
   SVG export — and each carried its own guard for "this paints nothing". They drifted twice, and

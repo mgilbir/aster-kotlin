@@ -27,11 +27,16 @@ class PaintsNothingTest {
       visible = visible,
     )
 
-  private fun text(absent: Boolean, content: String = "12") =
+  private fun text(
+    absent: Boolean,
+    content: String = "12",
+    x: Double = 0.0,
+    y: Double = 0.0,
+  ) =
     TextNode(
       id = ids.allocate(),
-      x = 0.0,
-      y = 0.0,
+      x = x,
+      y = y,
       layout = MetricTextEngine().layout(TextRun(content, TextStyle(fontSize = 10.0))),
       absent = absent,
       fill = Fill(ScenePaint.Black),
@@ -102,6 +107,26 @@ class PaintsNothingTest {
       "an empty label is still an item",
     )
     assertFalse(paintsNothing(text(absent = false)))
+  }
+
+  /**
+   * A label with **no usable anchor** is not painted, and this is not the same as one at the
+   * origin.
+   *
+   * An axis's `tickExtra` label scales a value its datum does not carry, so its position is `NaN`
+   * and upstream's own SVG has no element for it. The item is still *measured* at the origin —
+   * `anchorPoint` reads `item.x || 0` and `NaN` is falsy — so it occupies a row in the layout it is
+   * never drawn in, which is why the two cases have to stay apart.
+   */
+  @Test
+  fun `a label with no usable anchor is not painted, and one at the origin is`() {
+    assertTrue(paintsNothing(text(absent = false, x = Double.NaN, y = 0.0)))
+    assertTrue(paintsNothing(text(absent = false, x = 0.0, y = Double.NaN)))
+    assertTrue(paintsNothing(text(absent = false, x = Double.POSITIVE_INFINITY, y = 0.0)))
+    assertFalse(
+      paintsNothing(text(absent = false, x = 0.0, y = 0.0)),
+      "a label at the origin is a label that is drawn",
+    )
   }
 
   /** The same for an outline: `geopath` over a geometry with no coordinates has none at all. */

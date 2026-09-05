@@ -129,6 +129,11 @@ public data class Scene(
  *   Android canvas and the SVG export kept drawing items that carry no text and no outline. In
  *   markup that is visible — `legend-discretizing` exported three empty `<text>` elements and
  *   `projection-families` twelve `<path d="">`, where upstream emits no element at all.
+ * - A label with **no usable anchor** was the reverse again, and one copy against three: only the
+ *   SVG export left it out. An axis's `tickExtra` label scales a value its datum does not carry, so
+ *   its position is `NaN`; upstream's own SVG has no element for it. The three canvas walks handed
+ *   the platform a draw call at `NaN`, which paints nothing — so the picture always agreed and the
+ *   work was always wasted, which is why nothing found it.
  *
  * So it lives here once and every walk asks it, which is the arrangement `paintOrder` below already
  * arrived at for the same reason.
@@ -146,6 +151,11 @@ public data class Scene(
  * An item carrying an *empty* one is a different item that upstream still emits, so neither is
  * caught by asking whether anything would be drawn. See the fields' own documentation.
  *
+ * **A `NaN` position is not the same as a position of zero**, and `TextNode.bounds` deliberately
+ * measures the item at the origin anyway — upstream's `anchorPoint` reads `item.x || 0` and `NaN`
+ * is falsy, so the label occupies a row in the layout it is never drawn in. Keeping the two apart
+ * is the whole of that field's documentation; this asks only about drawing.
+ *
  * A renderer with its own reasons to draw more than this may still do so, and the SVG export does:
  * a group's panel at zero opacity is emitted there with `opacity="0"`, because upstream's markup
  * carries it. This answers about the node, not about a group's panel.
@@ -154,7 +164,7 @@ public fun paintsNothing(node: SceneNode): Boolean =
   !node.visible ||
     (node.opacity <= 0.0 && node !is GroupNode) ||
     (node is PathNode && node.absent) ||
-    (node is TextNode && node.absent)
+    (node is TextNode && (node.absent || !node.x.isFinite() || !node.y.isFinite()))
 
 /**
  * A group's children in the order they are **painted**, which `zindex` decides.

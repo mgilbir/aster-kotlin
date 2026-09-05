@@ -36,13 +36,10 @@ import org.junit.jupiter.api.Test
  * for an image it could not resolve. Labels are also the interesting half — the defect that started
  * all of this was 43 text runs against 19.
  *
- * The **one** divergence this found, and the reason the label count is not simply "every text node
- * that paints": this export skips a label whose position is not finite, and the three canvas walks
- * do not. An axis's `tickExtra` label is exactly that — it scales a value its datum does not carry
- * — and upstream emits no element for it either. The canvas renderers hand the platform a draw call
- * at `NaN`, which paints nothing, so the picture agrees and the call is wasted. Recorded here
- * rather than folded into `paintsNothing`, because moving it would change what the two compared
- * walks emit and that is a change to review on its own evidence.
+ * This test is what found the last uneven guard. A label whose position is not finite — an axis's
+ * `tickExtra` label, which scales a value its datum does not carry — was left out by this export
+ * and drawn by the other three, so the expected count here had to exclude it by hand. It is now
+ * `paintsNothing`'s answer for all four, and the count is simply every text node the scene paints.
  */
 class SvgWalkSelectionTest {
 
@@ -93,9 +90,7 @@ class SvgWalkSelectionTest {
       val svg = SvgRenderer().render(scene).svg
 
       val expectedRules = nodes.count { it is RuleNode }
-      // See the note above: this export emits no element for a label whose position is not finite,
-      // where the three canvas walks hand the platform a draw call at `NaN` that paints nothing.
-      val expectedLabels = nodes.count { it is TextNode && it.x.isFinite() && it.y.isFinite() }
+      val expectedLabels = nodes.count { it is TextNode }
       rules += expectedRules
       labels += expectedLabels
 

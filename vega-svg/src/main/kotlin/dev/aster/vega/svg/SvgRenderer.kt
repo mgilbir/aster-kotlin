@@ -425,9 +425,9 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
   }
 
   private fun renderText(node: TextNode, out: StringBuilder, defs: Defs, depth: Int) {
-    // A text item with no usable anchor draws nothing, which is what upstream's own SVG contains:
-    // its `tickExtra` label has a `NaN` position in the scene and no element in the output at all.
-    if (!node.x.isFinite() || !node.y.isFinite()) return
+    // A text item with no usable anchor draws nothing — upstream's own SVG has no element for its
+    // `tickExtra` label — and that is now `paintsNothing`'s answer for every walk rather than this
+    // one's alone, so `renderNode` has already left before reaching here.
     val run = node.layout.run
     val style = run.style
     newline(out, depth)
