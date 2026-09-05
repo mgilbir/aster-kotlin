@@ -298,23 +298,29 @@ public struct SceneWalk {
     }
   }
 
+  /// The radii to draw with, **clamped by the scene** rather than by whatever receives them.
+  ///
+  /// These were the raw `cornerRadius` overrides, resolved here, and that is a divergence rather
+  /// than a shortcut: `Corners.of` clamps the four as one group against `min(width, height) / 2`,
+  /// which is upstream's rule, and a platform primitive handed the unclamped value applies its own.
+  /// This renderer's picture was right anyway, because `CoreGraphicsTarget` clamps a second time
+  /// for itself — which is precisely what hid the fault, since the Compose walk emitted the same
+  /// unclamped number and its target does not.
   private func corners(of node: RectNode) -> Corners {
-    let all = node.cornerRadius
-    return Corners(
-      topLeft: node.cornerRadiusTopLeft?.doubleValue ?? all,
-      topRight: node.cornerRadiusTopRight?.doubleValue ?? all,
-      bottomRight: node.cornerRadiusBottomRight?.doubleValue ?? all,
-      bottomLeft: node.cornerRadiusBottomLeft?.doubleValue ?? all
-    )
+    resolved(node.corners)
   }
 
   private func corners(of node: GroupNode) -> Corners {
-    let all = node.cornerRadius
-    return Corners(
-      topLeft: node.cornerRadiusTopLeft?.doubleValue ?? all,
-      topRight: node.cornerRadiusTopRight?.doubleValue ?? all,
-      bottomRight: node.cornerRadiusBottomRight?.doubleValue ?? all,
-      bottomLeft: node.cornerRadiusBottomLeft?.doubleValue ?? all
+    resolved(node.paintCorners)
+  }
+
+  /// The engine's `Corners` in this renderer's vocabulary. Qualified, because both modules have one.
+  private func resolved(_ corners: AsterVega.Corners) -> Corners {
+    Corners(
+      topLeft: corners.topLeft,
+      topRight: corners.topRight,
+      bottomRight: corners.bottomRight,
+      bottomLeft: corners.bottomLeft
     )
   }
 

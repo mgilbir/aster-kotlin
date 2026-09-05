@@ -394,6 +394,7 @@ public final class dev/aster/vega/scene/GroupNode : dev/aster/vega/scene/SceneNo
 	public fun getId-aJBrClo ()J
 	public fun getMetadata ()Ldev/aster/vega/scene/NodeMetadata;
 	public fun getOpacity ()D
+	public final fun getPaintCorners ()Ldev/aster/vega/scene/Corners;
 	public final fun getPaintRect ()Ldev/aster/vega/scene/RectD;
 	public final fun getRoundedPaintPath ()Ldev/aster/vega/scene/PathData;
 	public final fun getSize ()Ldev/aster/vega/scene/SizeD;

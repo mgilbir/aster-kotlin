@@ -361,6 +361,10 @@ public struct CoreGraphicsTarget: DrawTarget {
   }
 
   /// A rectangle with four independent radii, each clamped so opposite corners cannot overlap.
+  /// - Note: `SceneWalk` now supplies radii the scene has already clamped, so this clamp is a
+  ///   no-op for anything it draws. It stays for a host driving this target directly, which is a
+  ///   supported thing to do and the only caller that can still hand over a radius that does not
+  ///   fit. It is deliberately the *same* rule as `Corners.of`, not a second opinion.
   private func rounded(_ rect: Rect, _ corners: Corners) -> CGPath {
     let limit = min(rect.width, rect.height) / 2
     let tl = min(corners.topLeft, limit), tr = min(corners.topRight, limit)

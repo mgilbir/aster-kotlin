@@ -370,19 +370,31 @@ public data class GroupNode(
       return if (width > 0.5 && width < 1.5) 0.5 - kotlin.math.abs(width - 1.0) else 0.0
     }
 
+  /**
+   * The four radii this group's panel is actually drawn with: the overrides where given, clamped to
+   * fit the panel.
+   *
+   * The counterpart of [RectNode.corners], and public for the same reason: a renderer must not
+   * clamp for itself. See that property.
+   */
+  public val paintCorners: Corners
+    get() {
+      val rect = paintRect ?: return Corners(0.0, 0.0, 0.0, 0.0)
+      return Corners.of(
+        rect.width,
+        rect.height,
+        cornerRadiusTopLeft ?: cornerRadius,
+        cornerRadiusTopRight ?: cornerRadius,
+        cornerRadiusBottomRight ?: cornerRadius,
+        cornerRadiusBottomLeft ?: cornerRadius,
+      )
+    }
+
   /** That rectangle rounded, or null when it is square or there is nothing to paint. */
   public val roundedPaintPath: PathData?
     get() {
       val rect = paintRect ?: return null
-      val corners =
-        Corners.of(
-          rect.width,
-          rect.height,
-          cornerRadiusTopLeft ?: cornerRadius,
-          cornerRadiusTopRight ?: cornerRadius,
-          cornerRadiusBottomRight ?: cornerRadius,
-          cornerRadiusBottomLeft ?: cornerRadius,
-        )
+      val corners = paintCorners
       if (corners.isSquare) return null
       val offset = effectiveStrokeOffset
       return RectPath.of(rect.left + offset, rect.top + offset, rect.width, rect.height, corners)
@@ -462,7 +474,16 @@ public data class RectNode(
   public val rect: RectD
     get() = RectD.fromSize(x, y, width, height)
 
-  /** The four radii actually drawn: the overrides where given, clamped to fit. */
+  /**
+   * The four radii actually drawn: the overrides where given, **clamped to fit**.
+   *
+   * Public, and the only answer a renderer should use, because the clamping is upstream's and not a
+   * platform's. `Corners.of` clamps the four as one group against `min(width, height) / 2`, so a
+   * 100×20 bar with a 40-unit top-left radius draws 10. A platform rounded-rectangle primitive that
+   * is handed the raw 40 does something else with it — Skia scales all four by a common factor so
+   * they fit, which is the CSS rule, and gives 20 for that bar. Half the radius, on the shape a
+   * rounded bar chart is made of.
+   */
   public val corners: Corners
     get() =
       Corners.of(

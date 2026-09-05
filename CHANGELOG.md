@@ -6,7 +6,40 @@ section here does not get released.
 
 ## Unreleased
 
+### Added
+
+- **The Android canvas is checked against the scene it was given, the way the SVG export already
+  is** (#244). `SvgWalkSelectionTest` asserts on the JVM that the export paints exactly what the
+  scene says; the primary renderer had no equivalent, so the four guards in `paintsNothing` were
+  taken on trust there.
+
+  `AndroidWalkSelectionTest` counts by **intercepting the real `Canvas`** — a subclass that tallies
+  `drawText` and `drawLine` and then delegates — so it is a statement about the renderer's own
+  behaviour rather than about a parallel implementation of it. A hidden label, an invisible one, one
+  with no text property and one with no usable anchor are put in front of it together with a label
+  that should be drawn, and one call arrives. Stripping the guard back to `visible` alone paints
+  four of the five.
+
+  It runs where the other instrumented suites run: on a device, and in CI at API 26 and 36 through
+  `instrumented.yml`.
+
 ### Fixed
+
+- **A corner radius too large for its bar is clamped by the scene, so every renderer draws the same
+  corner** (#245). The walk handed each target the raw `cornerRadius` and left the clamping to
+  whatever received it. That is a divergence rather than a shortcut: `Corners.of` clamps the four
+  radii as one group against `min(width, height) / 2`, which is `vega-scenegraph`'s rule, and a
+  platform rounded-rectangle primitive applies its own — Skia scales all four by a common factor
+  until they fit, which is the CSS rule and answers differently whenever the radii are unequal.
+
+  On the `encode-channels` fixture that is a 50×39 rect asking for 40: the Android canvas and an
+  exported SVG drew **19.5**, reading the clamped `RectNode.corners`, and Compose Multiplatform drew
+  what Skia made of the unclamped 40. The Apple renderer's picture was right by doing the work again
+  in its own target — and that is exactly what hid the fault, because the two walks are compared
+  call for call and both were emitting the same wrong number.
+
+  Both walks now read the scene's own answer, `RectNode.corners` and the new `GroupNode.paintCorners`.
+  The goldens moved by one line, which is the bug.
 
 - **`STATUS.md` contradicted `SUPPORTED_FEATURES.md` about three capabilities** (#231), and was
   wrong about all three. Its "what it still refuses" list named a selection parameter, geographic
