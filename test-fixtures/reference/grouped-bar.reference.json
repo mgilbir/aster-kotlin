@@ -665,6 +665,56 @@
       "y2": 240.5
     }
   ],
+  "nestedScales": {
+    "[0][|\"A\"|]": {
+      "pos": {
+        "bandwidth": 15,
+        "domain": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "range": [
+          0,
+          60
+        ],
+        "step": 15
+      }
+    },
+    "[0][|\"B\"|]": {
+      "pos": {
+        "bandwidth": 15,
+        "domain": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "range": [
+          0,
+          60
+        ],
+        "step": 15
+      }
+    },
+    "[0][|\"C\"|]": {
+      "pos": {
+        "bandwidth": 15,
+        "domain": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "range": [
+          0,
+          60
+        ],
+        "step": 15
+      }
+    }
+  },
   "scales": {
     "color": {
       "domain": [

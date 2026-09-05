@@ -715,6 +715,98 @@ public final class ChartSession {
     }
   }
 
+  /// Whether the pointer is inside the chart, so the first hover of a run is an **enter**.
+  ///
+  /// A browser fires `mouseover` once on entry and `mousemove` for every move after it, and the two
+  /// are different Vega selectors. Cleared on exit, so leaving and returning enters again.
+  private var hovering = false
+
+  /// A pointer touching down, which is Vega's `mousedown`.
+  ///
+  /// The three raw pointer events are what a **brush** is written against:
+  /// `[mousedown, mouseup] > mousemove` gates the move between the press and the release, and it is
+  /// how every interval selection in Vega and Vega-Lite is expressed. Without them a specification
+  /// that brushes compiles, draws, and never responds — the signal keeps its initial value and
+  /// nothing says why.
+  ///
+  /// Distinct from ``tap(at:)`` and ``pan(by:phase:)``, which are *gestures*: a tap is a `click` and
+  /// a pan produces no Vega event at all, because the viewport transform is this engine's own idea
+  /// rather than something a specification asked for. These are the events the specification names.
+  ///
+  /// `VegaChartView` emits them from its drag gesture when ``ChartGestures/pointer`` is asked for.
+  /// A host driving the session itself calls them in the order a pointer really moves: down, then
+  /// any number of moves, then up.
+  public func pointerDown(at point: Point) {
+    serialised {
+      self.controller.setHitTestOptions(options: HitTestOptions.companion.Touch)
+      self.controller.dispatch(
+        event: ChartInputEventPointerDown(
+          point: PointD(x: point.x, y: point.y),
+          pointerId: 1,
+          device: PointerDevice.touch,
+          buttons: 1
+        )
+      )
+      self.publish()
+    }
+  }
+
+  /// A pointer moving, which is Vega's `mousemove`. See ``pointerDown(at:)``.
+  ///
+  /// Emitted while the pointer is **down** as well as while it hovers: a browser fires `mousemove`
+  /// throughout a drag, and the move between a press and a release is the one a brush is gated on.
+  public func pointerMoved(at point: Point) {
+    serialised {
+      self.controller.dispatch(
+        event: ChartInputEventPointerMoved(point: PointD(x: point.x, y: point.y))
+      )
+      self.publish()
+    }
+  }
+
+  /// A pointer lifting, which is Vega's `mouseup`. See ``pointerDown(at:)``.
+  public func pointerUp(at point: Point) {
+    serialised {
+      self.controller.dispatch(
+        event: ChartInputEventPointerUp(
+          point: PointD(x: point.x, y: point.y),
+          pointerId: 1,
+          device: PointerDevice.touch,
+          buttons: 0
+        )
+      )
+      self.publish()
+    }
+  }
+
+  /// The chart's **own** accessibility actions, each with a label in the chart's locale.
+  ///
+  /// Zooming, resetting the view, and putting an adjusted axis back. They belong to the whole chart
+  /// rather than to any mark, which is why they are not on ``AccessibleElement`` — the scene builds
+  /// that tree and does not know it has been panned.
+  ///
+  /// Offered only when invoking one **would do something**: zooming is withdrawn at each limit and a
+  /// reset appears only once there is something to undo, because an action a reader triggers to no
+  /// effect is worse than one that was never there.
+  ///
+  /// `VegaChartView` presents them as `.accessibilityAction(named:)`. Until it did, no host on any
+  /// platform wired them and the feature was unreachable (#226).
+  public var accessibilityActions: [ChartAction] { controller.accessibilityActions }
+
+  /// Performs one, and says whether it did anything.
+  ///
+  /// `false` means nothing happened — the action was not offered, or the view was already at rest —
+  /// so a caller knows not to announce a change.
+  @discardableResult
+  public func perform(_ action: ChartActionKind) -> Bool {
+    let did = controller.perform(action: action)
+    if did {
+      refreshControls()
+      publish()
+    }
+    return did
+  }
+
   /// Narrows or widens the interval an axis draws its data against, and says whether it moved.
   ///
   /// What an **adjustable axis** does. `VegaChartView` gives an axis element carrying
@@ -789,10 +881,25 @@ public final class ChartSession {
     serialised {
       self.controller.setHitTestOptions(options: HitTestOptions.companion.Mouse)
       if let point {
-        self.controller.dispatch(
-          event: ChartInputEventPointerMoved(point: PointD(x: point.x, y: point.y))
-        )
+        // **The first point of a hover is an enter**, and this used to dispatch a move for it.
+        // `PointerEntered` is what the controller turns into `pointerover` and `mouseover`, and
+        // nothing here ever produced one — so `@mark:mouseover`, which is what most highlight and
+        // tooltip specifications are written against, was inert on this host while working on
+        // Android (#228). A browser fires `mouseover` once on entry and `mousemove` thereafter, and
+        // that is the distinction being kept: the flag is cleared by the exit below, so a reader
+        // who leaves and returns gets a second `mouseover` exactly as they would in a page.
+        if self.hovering {
+          self.controller.dispatch(
+            event: ChartInputEventPointerMoved(point: PointD(x: point.x, y: point.y))
+          )
+        } else {
+          self.hovering = true
+          self.controller.dispatch(
+            event: ChartInputEventPointerEntered(point: PointD(x: point.x, y: point.y))
+          )
+        }
       } else {
+        self.hovering = false
         // The exit still carries a point — the last one, as far as the chart is concerned.
         self.controller.dispatch(event: ChartInputEventPointerExited(point: PointD(x: 0, y: 0)))
       }

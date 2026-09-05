@@ -102,4 +102,47 @@ class SubsetIsRefusedTest {
     // colour rather than Vega's default.
     assertTrue("steelblue" in emitted, "the unconditional arm was dropped")
   }
+
+  /**
+   * A facet `sort` **object naming no `field`** is refused, and it is the only sort shape that is.
+   *
+   * `STATUS.md` claimed two others were refused with it — a written-out list, and an aggregate on a
+   * facet gridded both ways — and both had been implemented since: `reportUnsupportedSort` returns
+   * early for an array, whose place is computed onto every row as a column of its own. The prose
+   * said "refuses" while the code said otherwise, in the direction that costs a reader most (#231).
+   *
+   * So the claim lives here now, where the capability row can cite it and it cannot drift.
+   */
+  @Test
+  fun `a facet sort naming no field to aggregate is refused by name`() {
+    val json =
+      """
+      {"data": {"values": [{"a": 1, "b": 2, "g": "x"}]},
+       "facet": {"column": {"field": "g", "sort": {"op": "sum"}}},
+       "spec": {"mark": "point", "encoding": {"x": {"field": "a", "type": "quantitative"}}}}
+      """
+        .trimIndent()
+    assertTrue(
+      refuses(json, "names no `field` to aggregate"),
+      "a facet sort with nothing to aggregate was accepted: ${compile(json).second}",
+    )
+  }
+
+  /** And a **written-out list** is honoured, which the same prose said it was not. */
+  @Test
+  fun `a facet sort naming a written-out list is honoured`() {
+    val json =
+      """
+      {"data": {"values": [{"a": 1, "g": "x"}, {"a": 2, "g": "y"}]},
+       "facet": {"column": {"field": "g", "sort": ["y", "x"]}},
+       "spec": {"mark": "point", "encoding": {"x": {"field": "a", "type": "quantitative"}}}}
+      """
+        .trimIndent()
+    val (vega, diagnostics) = compile(json)
+    assertTrue(vega != null, "a facet sorted by a stated list did not compile: $diagnostics")
+    assertTrue(
+      diagnostics.none { "is not implemented" in it },
+      "a facet sorted by a stated list was reported as unimplemented: $diagnostics",
+    )
+  }
 }

@@ -82,6 +82,33 @@
               {
                 "value": 10
               }
+            ],
+            "angle": [
+              {
+                "test": "datum.value === 6",
+                "value": -45
+              },
+              {
+                "value": 0
+              }
+            ],
+            "align": [
+              {
+                "test": "datum.value === 2",
+                "value": "left"
+              },
+              {
+                "value": "right"
+              }
+            ],
+            "baseline": [
+              {
+                "test": "datum.value === 8",
+                "value": "top"
+              },
+              {
+                "value": "middle"
+              }
             ]
           }
         },

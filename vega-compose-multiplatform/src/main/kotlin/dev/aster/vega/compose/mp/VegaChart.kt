@@ -1,6 +1,7 @@
 package dev.aster.vega.compose.mp
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -13,10 +14,21 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerType
@@ -24,9 +36,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChangedIgnoreConsumed
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -36,7 +50,11 @@ import androidx.compose.ui.unit.dp
 import dev.aster.vega.model.locale.VegaCaptions
 import dev.aster.vega.scene.AccessibilityTree
 import dev.aster.vega.scene.AccessibleElement
+import dev.aster.vega.scene.ChartAction
+import dev.aster.vega.scene.ChartActionKind
+import dev.aster.vega.scene.ChartKey
 import dev.aster.vega.scene.HitTestOptions
+import dev.aster.vega.scene.Modifiers
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.Scene
 import dev.aster.vega.scene.SceneHitIndex
@@ -139,6 +157,79 @@ public fun VegaChart(
   onPan: ((VectorD, Boolean) -> Unit)? = null,
   onZoom: ((Double, PointD, Boolean) -> Unit)? = null,
   onHover: ((PointD?, SceneNodeId?) -> Unit)? = null,
+  /**
+   * The raw pointer events a **brush** is written against: `mousedown`, `mousemove`, `mouseup`.
+   *
+   * `[mousedown, mouseup] > mousemove` is how every interval selection in Vega and Vega-Lite is
+   * expressed, and this renderer reported no event that could open one — a specification that
+   * brushes compiled, drew, and never responded. Distinct from [onPan], which is the *viewport*
+   * transform and produces no Vega event at all.
+   *
+   * Reported in controller space, like [onTap] and [onPan] beside them, so a host forwards each
+   * straight to `VegaChartController.dispatch`. A move is reported while the pointer is **down**,
+   * which is the case a brush needs and the one a hover cannot supply.
+   */
+  /**
+   * The chart's **own** accessibility actions, and what to do when a reader invokes one.
+   *
+   * Zooming, resetting the view, and putting an adjusted axis back — they belong to the whole chart
+   * rather than to any mark, which is why they are not on `AccessibleElement`. Until this, no host
+   * on any platform wired them and the feature was unreachable (#226).
+   *
+   * Handed in rather than read, because this composable takes a `Scene` and not a controller: a
+   * host passes `controller.accessibilityActions` and forwards the invocation to
+   * `controller.perform`. The list is expected to *change* — an action is offered only while
+   * invoking it would do something — so pass the current one on every composition.
+   */
+  chartActions: List<ChartAction> = emptyList(),
+  onChartAction: ((ChartActionKind) -> Unit)? = null,
+  onPointerDown: ((PointD) -> Unit)? = null,
+  onPointerMoved: ((PointD) -> Unit)? = null,
+  onPointerUp: ((PointD) -> Unit)? = null,
+  /**
+   * A pointer **entering** the chart, which is Vega's `pointerover` and `mouseover`.
+   *
+   * Distinct from [onHover], which fires for an entry *and* for every move after it and so cannot
+   * tell a host which happened. `@mark:mouseover` is what most highlight and tooltip specifications
+   * are written against, and with only [onHover] to go on a host could not produce it — the
+   * selector was inert on this renderer while working on Android (#228).
+   *
+   * Both fire on entry, which is a browser's own order: entering an element gives `mouseover` and
+   * then `mousemove`. The exit needs nothing new — [onHover] already reports it with a null point,
+   * and that is what a host turns into `PointerExited`.
+   */
+  onPointerEntered: ((PointD) -> Unit)? = null,
+  /**
+   * A key the chart reacts to, with the modifiers held with it.
+   *
+   * This renderer had **no keyboard path of any kind** (#229): a specification's `keydown` handlers
+   * never fired and the engine's own traversal between marks was unreachable — on the surface most
+   * likely to be running on a desktop, where a keyboard is the primary input. Android translates
+   * keys through `dispatchKeyEvent` and Apple through `ChartSession.press(_:modifiers:)`.
+   *
+   * Reported in the engine's own [ChartKey] vocabulary rather than the platform's, so the
+   * translation happens **once** here instead of once per host. A host forwards it to
+   * `VegaChartController.dispatch(ChartInputEvent.Key(...))`, which both fires the specification's
+   * handlers and moves the focus.
+   *
+   * Asking for it makes the chart **focusable**, because a Compose node that cannot take focus
+   * receives no key events at all. That is a visible change to a layout, which is why it happens
+   * only when a host asks.
+   */
+  onKey: ((ChartKey, Modifiers) -> Unit)? = null,
+  /**
+   * A reader adjusting an **axis**, narrowing or widening the interval it draws its data against.
+   *
+   * The other two hosts have offered this since it was written — the scroll actions on Android,
+   * `.accessibilityAdjustableAction` on Apple — and this renderer did not, so a reader here could
+   * reach an axis and not change it (#230). The scale is [AccessibleElement.adjustableScale];
+   * `narrow` is true for the direction that reveals more detail. A host forwards it to
+   * `VegaChartController.adjustScaleDomain`.
+   *
+   * Distinct from the zoom in [chartActions], which magnifies the drawing and leaves every scale
+   * where the specification put it, so the ticks a reader hears never change.
+   */
+  onAdjustAxis: ((String, Boolean) -> Unit)? = null,
   hitTestOptions: HitTestOptions = HitTestOptions.Touch,
   viewportOffset: VectorD = VectorD.Zero,
   viewportScale: Double = 1.0,
@@ -187,8 +278,58 @@ public fun VegaChart(
   // than a `MutableState`, because writing it must not invalidate anything — it is a record of what
   // was reported, not an input to the drawing.
   val lastPlacement = remember { Ref<ChartPlacement>() }
+  val keyFocus = remember { FocusRequester() }
 
-  Box(modifier = modifier.then(sized).then(Modifier.size(scene.width.dp, scene.height.dp))) {
+  // **The chart's own actions**, on the chart's own node rather than on any element's.
+  //
+  // Zooming, resetting the view and putting an adjusted axis back belong to the whole chart, which
+  // is why they are not on `AccessibleElement`. Compose's `customActions` is the same primitive
+  // Android's `AccessibilityNodeInfo.addAction` and Apple's `UIAccessibilityCustomAction` are, and
+  // until this none of the three was wired (#226).
+  //
+  // Rebuilt on every composition rather than remembered: the list *changes* — an action is offered
+  // only while invoking it would do something — so a cached copy would offer a reader an action
+  // that does nothing.
+  val actions =
+    modifier
+      .then(sized)
+      .then(Modifier.size(scene.width.dp, scene.height.dp))
+      .then(
+        if (chartActions.isEmpty() || onChartAction == null) Modifier
+        else
+          Modifier.semantics {
+            customActions = chartActions.map { action ->
+              CustomAccessibilityAction(action.label) {
+                onChartAction(action.kind)
+                true
+              }
+            }
+          }
+      )
+
+  // **Focusable, and only when a host wants keys.** A Compose node that cannot take focus is never
+  // offered a key event, so the seam needs the focus target as much as the handler — and a node
+  // that takes focus changes how a surrounding layout traverses, which is not something to do to
+  // every chart uninvited.
+  val keyed =
+    if (onKey == null) actions
+    else
+      actions.focusRequester(keyFocus).focusable().onKeyEvent { event ->
+        if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+        val key = chartKeyOf(event.key) ?: return@onKeyEvent false
+        onKey(
+          key,
+          Modifiers(
+            shift = event.isShiftPressed,
+            control = event.isCtrlPressed,
+            alt = event.isAltPressed,
+            meta = event.isMetaPressed,
+          ),
+        )
+        true
+      }
+
+  Box(modifier = keyed) {
     Canvas(
       modifier =
         Modifier.matchParentSize()
@@ -205,6 +346,10 @@ public fun VegaChart(
             onPan = onPan,
             onZoom = onZoom,
             onHover = onHover,
+            onPointerDown = onPointerDown,
+            onPointerMoved = onPointerMoved,
+            onPointerUp = onPointerUp,
+            onPointerEntered = onPointerEntered,
             // **Read, not keyed.** See `chartPointerInput`: a `pointerInput` restarts when a key
             // changes, and the viewport changes on the first pixel of every pan.
             viewport = rememberUpdatedState(Viewport(viewportOffset, viewportScale)),
@@ -250,6 +395,8 @@ public fun VegaChart(
       fit = fit,
       density = density,
       onActivate = onActivate,
+      onAdjustAxis = onAdjustAxis,
+      captions = captions,
       // The same pan and zoom the drawing used: a reader exploring by touch has to land on the mark
       // where it *is* now, not where it was before the chart was moved.
       viewportOffset = viewportOffset,
@@ -282,6 +429,8 @@ private fun AccessibilityOverlay(
   fit: SceneFit,
   density: Float,
   onActivate: ((SceneNodeId) -> Unit)?,
+  onAdjustAxis: ((String, Boolean) -> Unit)?,
+  captions: VegaCaptions,
   viewportOffset: VectorD,
   viewportScale: Double,
   modifier: Modifier = Modifier,
@@ -293,9 +442,18 @@ private fun AccessibilityOverlay(
       for (element in elements) {
         val nodeId = element.nodeId
         val activate = if (element.activatable && nodeId != null) onActivate else null
+        val adjustable = element.adjustableScale
         Box(
           Modifier.semantics {
-            contentDescription = element.label
+            // **What kind of thing it is, in words, appended to the label.** Android sets
+            // `node.roleDescription` and Apple puts it in `accessibilityInputLabels`; this renderer
+            // said nothing, so a reader here heard a bare label where the other two heard "line
+            // mark" or "axis" (#230). Compose has no `roleDescription` of its own, so the two are
+            // joined the way a reader hears them anyway — TalkBack reads Android's description and
+            // then its role description, in that order, which is exactly this string. The engine
+            // writes the words through the chart's locale, so a Dutch chart says so.
+            contentDescription =
+              element.roleDescription?.let { "${element.label}, $it" } ?: element.label
             selected = element.selected
             // A **button only where activating it does something.** Both existing hosts announce
             // every element as a button — `className = "android.widget.Button"` on Android,
@@ -308,6 +466,25 @@ private fun AccessibilityOverlay(
                 activate(nodeId!!)
                 true
               }
+            }
+            // An **adjustable axis**: the interval it draws its data against, narrowed or widened.
+            //
+            // Named actions rather than a trait, because Compose has neither: Android's scroll
+            // actions and Apple's `.isAdjustable` both let the system say "swipe up or down to
+            // adjust" in the reader's own language, and there is no equivalent here. So this host
+            // is the one the engine has to supply words for — see `VegaCaptions.narrowAxisAction`.
+            if (adjustable != null && onAdjustAxis != null) {
+              customActions =
+                listOf(
+                  CustomAccessibilityAction(captions.narrowAxisAction()) {
+                    onAdjustAxis(adjustable, true)
+                    true
+                  },
+                  CustomAccessibilityAction(captions.widenAxisAction()) {
+                    onAdjustAxis(adjustable, false)
+                    true
+                  },
+                )
             }
           }
         )
@@ -460,6 +637,10 @@ private fun Modifier.chartPointerInput(
   onPan: ((VectorD, Boolean) -> Unit)?,
   onZoom: ((Double, PointD, Boolean) -> Unit)?,
   onHover: ((PointD?, SceneNodeId?) -> Unit)?,
+  onPointerDown: ((PointD) -> Unit)?,
+  onPointerMoved: ((PointD) -> Unit)?,
+  onPointerUp: ((PointD) -> Unit)?,
+  onPointerEntered: ((PointD) -> Unit)?,
   /**
    * The pan and the zoom the host has accumulated, as a **state to read** rather than a value.
    *
@@ -473,10 +654,53 @@ private fun Modifier.chartPointerInput(
    */
   viewport: State<Viewport>,
 ): Modifier {
-  if (onTap == null && onLongPress == null && onPan == null && onZoom == null && onHover == null) {
+  val wantsPointer = onPointerDown != null || onPointerMoved != null || onPointerUp != null
+  if (
+    onTap == null &&
+      onLongPress == null &&
+      onPan == null &&
+      onZoom == null &&
+      onHover == null &&
+      onPointerEntered == null &&
+      !wantsPointer
+  ) {
     return this
   }
   return this.then(
+      if (!wantsPointer) Modifier
+      else
+      // **The raw pointer stream**, which none of the detectors below expose.
+      //
+      // `detectTapGestures` reports a completed tap and `detectTransformGestures` reports
+      // increments; neither says "a finger went down here, moved here, and lifted here", and that
+      // sequence is exactly what `[mousedown, mouseup] > mousemove` is written against. So a brush
+      // could not be started on this renderer at all.
+      //
+      // On the **Final** pass and consuming nothing, like the gesture-end watcher further down: it
+      // observes the same stream the detectors work on rather than competing with them, so adding
+      // it takes no touch away from a pan, a pinch or a tap. `positionChangedIgnoreConsumed` for
+      // the same reason — by the Final pass the detectors have already consumed the movement.
+      Modifier.pointerInput(scene, fit, density) {
+          awaitEachGesture {
+            val first = awaitFirstDown(requireUnconsumed = false)
+            fun report(offset: Offset) =
+              controllerPoint(offset, scene, fit, density, size.width, size.height)
+            onPointerDown?.invoke(report(first.position))
+            var last = first.position
+            while (true) {
+              val event = awaitPointerEvent(PointerEventPass.Final)
+              val moved = event.changes.firstOrNull { it.positionChangedIgnoreConsumed() }
+              if (moved != null) {
+                last = moved.position
+                onPointerMoved?.invoke(report(last))
+              }
+              if (event.changes.none { it.pressed }) break
+            }
+            onPointerUp?.invoke(report(last))
+          }
+        }
+    )
+    .then(
       if (onTap == null && onLongPress == null) Modifier
       else
         Modifier.pointerInput(scene, fit, density, hitIndex) {
@@ -611,7 +835,7 @@ private fun Modifier.chartPointerInput(
         }
     )
     .then(
-      if (onHover == null) Modifier
+      if (onHover == null && onPointerEntered == null) Modifier
       else
         Modifier.pointerInput(scene, fit, density, hitIndex) {
           awaitPointerEventScope {
@@ -627,6 +851,14 @@ private fun Modifier.chartPointerInput(
                 PointerEventType.Move,
                 PointerEventType.Enter -> {
                   val offset = event.changes.firstOrNull()?.position ?: continue
+                  // The **entry** on its own, which `onHover` cannot express: it fires for this and
+                  // for every move after it with the same shape. A host turns this one into
+                  // `PointerEntered` and so into `mouseover`.
+                  if (event.type == PointerEventType.Enter) {
+                    onPointerEntered?.invoke(
+                      controllerPoint(offset, scene, fit, density, size.width, size.height)
+                    )
+                  }
                   val reported =
                     controllerPoint(offset, scene, fit, density, size.width, size.height)
                   val hit =
@@ -642,11 +874,11 @@ private fun Modifier.chartPointerInput(
                         viewport.value.scale,
                       )
                     )
-                  onHover(reported, hit?.node?.id)
+                  onHover?.invoke(reported, hit?.node?.id)
                 }
                 // A pointer that left says so with a null, which is what clears a hover state. The
                 // engine's own `PointerExited` means the same thing.
-                PointerEventType.Exit -> onHover(null, null)
+                PointerEventType.Exit -> onHover?.invoke(null, null)
                 else -> Unit
               }
             }
@@ -790,4 +1022,28 @@ private fun fitPlacement(
 public fun rememberVegaImageCache(maxEntries: Int = 64): ImageCache =
   remember(maxEntries) {
     ImageCache(maxEntries)
+  }
+
+/**
+ * Compose's key to the engine's, or null for one the chart does not react to.
+ *
+ * The translation lives **here**, once, rather than in each host: `ChartKey` is the engine's own
+ * vocabulary and the reason it exists is that a keyboard is no more a platform detail than a screen
+ * reader is. A key outside the set is left alone — the event is not consumed, so a surrounding
+ * layout still sees it, which is what makes a chart inside a form usable.
+ */
+private fun chartKeyOf(key: Key): ChartKey? =
+  when (key) {
+    Key.DirectionLeft -> ChartKey.ARROW_LEFT
+    Key.DirectionRight -> ChartKey.ARROW_RIGHT
+    Key.DirectionUp -> ChartKey.ARROW_UP
+    Key.DirectionDown -> ChartKey.ARROW_DOWN
+    Key.Enter,
+    Key.NumPadEnter -> ChartKey.ENTER
+    Key.Spacebar -> ChartKey.SPACE
+    Key.Escape -> ChartKey.ESCAPE
+    Key.Tab -> ChartKey.TAB
+    Key.MoveHome -> ChartKey.HOME
+    Key.MoveEnd -> ChartKey.END
+    else -> null
   }

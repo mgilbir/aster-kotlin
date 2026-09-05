@@ -199,14 +199,17 @@ final class AccessibilityTests: XCTestCase {
 
   /// The gesture sets, whose whole purpose is that a host can ask for the ones that claim nothing.
   func testTheGestureSetsSayWhichClaimATouch() {
-    XCTAssertEqual(ChartGestures.all, [.tap, .longPress, .pan, .zoom, .hover])
+    XCTAssertEqual(ChartGestures.all, [.tap, .longPress, .pan, .zoom, .hover, .pointer])
 
     // The set that exists for a chart inside a scroll view: neither of these claims the touch.
     XCTAssertTrue(ChartGestures.withoutDrag.contains(.tap))
     XCTAssertTrue(ChartGestures.withoutDrag.contains(.hover))
-    // And none of the three that do.
+    // And none of the four that do. `.pointer` rides the pan's detector rather than attaching one
+    // of its own — a zero-distance drag is what made a chart in a scroll view unscrollable — but it
+    // is still a drag, so it stays out of the set whose whole promise is that it claims nothing.
     XCTAssertFalse(ChartGestures.withoutDrag.contains(.pan))
     XCTAssertFalse(ChartGestures.withoutDrag.contains(.zoom))
+    XCTAssertFalse(ChartGestures.withoutDrag.contains(.pointer))
     XCTAssertFalse(
       ChartGestures.withoutDrag.contains(.longPress),
       "a long press reports no location in SwiftUI, so it needs a zero-distance drag to source one")

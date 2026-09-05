@@ -216,7 +216,8 @@ class ComposeViewportTest {
         fit = SceneFit.None,
       )
     }
-    resting = onNodeWithContentDescription("Total: 2").getBoundsInRoot().left.value
+    resting =
+      onNodeWithContentDescription("Total: 2", substring = true).getBoundsInRoot().left.value
 
     setContent {
       VegaChart(
@@ -226,7 +227,8 @@ class ComposeViewportTest {
         viewportOffset = VectorD(15.0, 0.0),
       )
     }
-    val moved = onNodeWithContentDescription("Total: 2").getBoundsInRoot().left.value
+    val moved =
+      onNodeWithContentDescription("Total: 2", substring = true).getBoundsInRoot().left.value
 
     // A reader exploring by touch has to land on the mark where it is now. Fifteen dp at density 1.
     assertEquals(resting + 15f, moved, 1.5f, "the element did not move with the drawing")

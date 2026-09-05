@@ -138,7 +138,7 @@
       "y": 120.5
     },
     {
-      "align": "right",
+      "align": "left",
       "angle": 0,
       "baseline": "middle",
       "fill": "#333333",
@@ -171,7 +171,7 @@
     },
     {
       "align": "right",
-      "angle": 0,
+      "angle": -45,
       "baseline": "middle",
       "fill": "#d62728",
       "font": "sans-serif",
@@ -188,7 +188,7 @@
     {
       "align": "right",
       "angle": 0,
-      "baseline": "middle",
+      "baseline": "top",
       "fill": "#d62728",
       "font": "sans-serif",
       "fontSize": 10,
@@ -365,7 +365,7 @@
     }
   },
   "size": {
-    "height": 152,
+    "height": 148.5,
     "width": 268
   },
   "spec": "guide-encode-datum.vg.json",

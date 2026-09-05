@@ -59,6 +59,15 @@ public fun VegaChart(
   /** Whether the view draws the tooltip itself, or leaves it to a host that renders its own. */
   tooltipsEnabled: Boolean = true,
   /**
+   * Whether a drag moves the **viewport**, forwarded to `VegaChartView.panEnabled`.
+   *
+   * Off for a chart whose specification uses the drag — a brush, or any `[mousedown, mouseup] >
+   * mousemove` handler — because otherwise both happen and they fight: the viewport slides under
+   * the finger by the distance the finger travels, so in the chart's own coordinates the pointer
+   * never moves.
+   */
+  panEnabled: Boolean = true,
+  /**
    * Turns an image mark's URL into a bitmap. See [VegaChartView.imageResolver]: a URL is asked once
    * rather than once per frame, and a refusal is remembered, so a resolver that fetches should
    * answer from a cache and start the fetch elsewhere.
@@ -131,6 +140,7 @@ public fun VegaChart(
         this.fontResolver = stableFontResolver
         this.accessibilityMaxExposedMarks = accessibilityMaxExposedMarks
         this.tooltipsEnabled = tooltipsEnabled
+        this.panEnabled = panEnabled
         this.imageResolver = stableImageResolver
         this.onUnresolvedImage = stableOnUnresolvedImage
         this.onPlaced = stableOnPlaced
@@ -143,6 +153,7 @@ public fun VegaChart(
       view.fontResolver = stableFontResolver
       view.accessibilityMaxExposedMarks = accessibilityMaxExposedMarks
       view.tooltipsEnabled = tooltipsEnabled
+      view.panEnabled = panEnabled
       view.imageResolver = stableImageResolver
       view.onUnresolvedImage = stableOnUnresolvedImage
       view.onPlaced = stableOnPlaced
@@ -174,6 +185,15 @@ public fun VegaChart(
   fontResolver: ((String) -> android.graphics.Typeface?)? = null,
   accessibilityMaxExposedMarks: Int = AccessibilityTree.MAX_EXPOSED_MARKS,
   tooltipsEnabled: Boolean = true,
+  /**
+   * Whether a drag moves the **viewport**, forwarded to `VegaChartView.panEnabled`.
+   *
+   * Off for a chart whose specification uses the drag — a brush, or any `[mousedown, mouseup] >
+   * mousemove` handler — because otherwise both happen and they fight: the viewport slides under
+   * the finger by the distance the finger travels, so in the chart's own coordinates the pointer
+   * never moves.
+   */
+  panEnabled: Boolean = true,
   imageResolver: AndroidImageResolver = AndroidImageResolver.None,
   onUnresolvedImage: ((String) -> Unit)? = null,
   onPlaced: ((ScenePlacement) -> Unit)? = null,
@@ -194,6 +214,7 @@ public fun VegaChart(
     fontResolver = fontResolver,
     accessibilityMaxExposedMarks = accessibilityMaxExposedMarks,
     tooltipsEnabled = tooltipsEnabled,
+    panEnabled = panEnabled,
     imageResolver = imageResolver,
     onUnresolvedImage = onUnresolvedImage,
     onPlaced = onPlaced,

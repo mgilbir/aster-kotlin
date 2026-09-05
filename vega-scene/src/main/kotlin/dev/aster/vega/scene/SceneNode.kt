@@ -7,6 +7,18 @@ import kotlin.jvm.JvmInline
 public value class SceneNodeId(public val value: Long) {
   public companion object {
     public val None: SceneNodeId = SceneNodeId(0L)
+
+    /**
+     * An id no [SceneNodeIdAllocator] can hand out, for a node the **engine** adds after a build.
+     *
+     * The focus ring is one: it is appended to a finished scene and removed again when the focus
+     * moves, so it needs an identity that cannot be mistaken for a mark's. Taking one from a fresh
+     * allocator gives `SceneNodeId(1)` — which is the *first mark of every scene* — and the removal
+     * then deleted a real node. A test caught it as a chart that lost a bar on hover.
+     *
+     * Negative because the allocator counts up from 1 and nothing else here produces one.
+     */
+    public val Overlay: SceneNodeId = SceneNodeId(-1L)
   }
 }
 

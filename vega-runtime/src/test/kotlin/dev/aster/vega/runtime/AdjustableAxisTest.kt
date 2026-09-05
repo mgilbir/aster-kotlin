@@ -8,6 +8,7 @@ import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.runtime.scale.InvertibleScale
 import dev.aster.vega.runtime.scale.PositionScale
 import dev.aster.vega.scene.AccessibilityTree
+import dev.aster.vega.scene.ChartActionKind
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals

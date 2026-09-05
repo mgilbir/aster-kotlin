@@ -580,30 +580,39 @@ Both went in against the fixtures rather than ahead of them: `donut` failed on i
 property named the way *Vega* names the channel, `innerRadius`, which has no Vega-Lite name of its
 own) and `grouped-bar` on the step arithmetic.
 
-### Where the compiler stands, and what it still refuses
+### Where the compiler stood when this was written
 
 Seventy-three fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view, a layer of them to any depth, a concatenation of
 either to any depth, a
 repetition of any of those, both facet operators, eleven marks including `arc`,
-the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
+the Cartesian and polar position pairs, nested offsets, sorting,
 binning, time units, stacking, faceting by `row` and `column`, conditional encodings, a line or an
 area that draws its own points, legends, axes, and a user `config` carried through as a theme.
 
-What it still refuses, by name, with the reason each is refused rather than approximated:
+**What it refuses now is in `SUPPORTED_FEATURES.md`, not here**, and this section is the reason that
+rule exists. It used to carry a list of three things the compiler "still refuses", and every one of
+them had been implemented since it was written:
 
-- **A selection parameter** — one carrying `select`. It stands for the rows a reader picked, and
-  needs an interaction loop this engine does not run. Reported one parameter at a time, so a
-  specification mixing the two kinds still gets the variables it declared. A **variable** parameter
-  is implemented (below), and a condition naming a `param` is still refused by itself, leaving the
-  rest of its definition standing.
-- **Geographic projections and the `geoshape` mark.** The runtime draws maps — `world-map` is in the
-  Vega corpus — so this is now a *compiler* gap and not an engine one: nothing here yet translates
-  Vega-Lite's `projection` block and its `geoshape` mark into the Vega equivalents.
-- A facet `sort` that names a **written-out list**, whose place in it has to be computed onto every
-  row as a column of its own; and one that names an aggregate on a facet gridded **both** ways,
-  where the key has to be written onto the rows first so each cell can take the greatest of its own.
-  An aggregate sort on a facet gridded one way is implemented (below).
+- a **selection parameter** — `Selection.kt` compiles them, and `select` appears in 27 of the fixtures;
+- **geographic projections and the `geoshape` mark** — `Marks.kt` maps the mark and `Model.kt`
+  carries the projection, across three `geoshape` and seven `projection` fixtures;
+- a facet `sort` naming a **written-out list** — `reportUnsupportedSort` returns early for an array,
+  whose place is computed onto every row as a column of its own.
+
+Three claims that told a reader their chart would not work when it already did, which is the
+direction this repository has now corrected four times over. The generated document said the
+opposite of this one about the same three capabilities, and nothing noticed, because
+`DocumentedNumbersTest` guards the *numbers* in this file and nothing guards the prose.
+
+So the present tense moved to `docs/capabilities.json`, where a limitation names a test that asserts
+it and `scripts/capabilities.py` refuses a row that does not. The one sort shape still refused —
+a facet `sort` **object naming no `field`** to aggregate — is pinned by
+`SubsetIsRefusedTest`, along with the list form that is honoured, so the two cannot drift into
+agreeing again.
+
+What this file keeps is what it is good at and what nothing else holds: the dated account of how each
+of those was reached.
 
 ### Concatenation: two plots, and what they do not share
 
@@ -696,11 +705,26 @@ Three rules came out of upstream with it:
 ### The gallery, swept: 627 examples against upstream's own compiler
 
 Vega-Lite ships 627 example specifications, and compiling is a pure function of the specification —
-no data is needed to compare two compilers. So every one of them was compiled by upstream 6.4.3 and
-by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
-examples are not fixtures here, and nothing about them is checked in.
+no data is needed to compare two compilers. So every one of them is compiled by upstream 6.4.3 and
+by this one, and the outputs compared property by property.
 
 **124 of 627 matched exactly** at the start, and **all 627** do now.
+
+**It is a gate**, which it was not for a long time. It began as a one-off measurement — the examples
+are not fixtures here and nothing about them is checked in — and that is exactly what made it
+dangerous once it had done its work: 503 examples were fixed and then nothing kept them fixed. No
+script referenced the corpus, no CI job ran it, and a regression in any of them would have been
+invisible until somebody swept again by hand. `scripts/vega-lite-gallery.sh` now fetches the
+examples from the source tarball **at the version `oracle-js` has installed**, compiles them with
+upstream in one Node process, and `VegaLiteGalleryTest` compares all 627 — a few seconds either
+side, because no data is fetched. `check.sh` runs it before the Gradle gate, `--fast` included.
+
+Still nothing checked in, and now for a second reason as well as the first: taking the corpus from
+the pinned tarball means a version bump sweeps *that* version's examples rather than a copy somebody
+remembered to update, and `VegaLiteGalleryTest` asserts that the version swept is the version
+compared against. Because the corpus is absent on a fresh clone, the suite **fails** rather than
+skipping when it is missing — the lesson of `scripts/vega-lite-oracle.sh`'s own header, applied
+rather than repeated.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -7814,10 +7838,15 @@ broken?** Still open. `parseSignal` no longer drops the property in silence (M39
 using it now says so; whether the semantics are reachable at all under a whole-specification
 recompile needs a runtime-scoping answer or a fixture, and neither is written.
 
-**Q10 and Q14 are for the maintainer.** Q10 — should the release workflow require a green `ci.yml`
-run on the dispatched sha before verify? Today the Vega-Lite scene gate's only other coverage is
-that CI happened to run, and nothing enforces it; the verify job renders the references itself now,
-which closes the hole this branch was about but not the broader question. Q14 — is the design brief
+**Q10 and Q14 were for the maintainer, and both are now answered.** Q10 — should the release
+workflow require a green `ci.yml` run on the dispatched sha before verify? **Deferred, deliberately,
+on 2026-09-05.** The hole it was really about has narrowed twice since it was asked: the verify job
+renders the references itself, and the gallery sweep above is a gate rather than a thing CI happened
+to do. What remains is a policy question about releases rather than a gap in what is checked, and it
+is recorded here so it is a decision rather than an oversight — revisit it when a release actually
+goes out. Note the standing caveat while it stands open: **CI cancels a run when another push
+arrives**, so on a fast landing cadence most merges carry no CI verdict and `check.sh` is the real
+gate. Q14 — is the design brief
 still the contract? **Answered: no, and it has been retired.** It was a specification written before
 the engine existed, and most of it had been superseded by the code it specified — module
 responsibilities, interface sketches, milestones. What still bound was extracted to `docs/adr/`

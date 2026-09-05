@@ -6,38 +6,6 @@
 // - Show declarations: true
 
 // Library unique name: <io.github.mgilbir.astervega:vega-runtime>
-final enum class dev.aster.vega.runtime/ChartActionKind : kotlin/Enum<dev.aster.vega.runtime/ChartActionKind> { // dev.aster.vega.runtime/ChartActionKind|null[0]
-    enum entry RESET_DOMAINS // dev.aster.vega.runtime/ChartActionKind.RESET_DOMAINS|null[0]
-    enum entry RESET_ZOOM // dev.aster.vega.runtime/ChartActionKind.RESET_ZOOM|null[0]
-    enum entry ZOOM_IN // dev.aster.vega.runtime/ChartActionKind.ZOOM_IN|null[0]
-    enum entry ZOOM_OUT // dev.aster.vega.runtime/ChartActionKind.ZOOM_OUT|null[0]
-
-    final val entries // dev.aster.vega.runtime/ChartActionKind.entries|#static{}entries[0]
-        final fun <get-entries>(): kotlin.enums/EnumEntries<dev.aster.vega.runtime/ChartActionKind> // dev.aster.vega.runtime/ChartActionKind.entries.<get-entries>|<get-entries>#static(){}[0]
-
-    final fun valueOf(kotlin/String): dev.aster.vega.runtime/ChartActionKind // dev.aster.vega.runtime/ChartActionKind.valueOf|valueOf#static(kotlin.String){}[0]
-    final fun values(): kotlin/Array<dev.aster.vega.runtime/ChartActionKind> // dev.aster.vega.runtime/ChartActionKind.values|values#static(){}[0]
-}
-
-final enum class dev.aster.vega.runtime/ChartKey : kotlin/Enum<dev.aster.vega.runtime/ChartKey> { // dev.aster.vega.runtime/ChartKey|null[0]
-    enum entry ARROW_DOWN // dev.aster.vega.runtime/ChartKey.ARROW_DOWN|null[0]
-    enum entry ARROW_LEFT // dev.aster.vega.runtime/ChartKey.ARROW_LEFT|null[0]
-    enum entry ARROW_RIGHT // dev.aster.vega.runtime/ChartKey.ARROW_RIGHT|null[0]
-    enum entry ARROW_UP // dev.aster.vega.runtime/ChartKey.ARROW_UP|null[0]
-    enum entry END // dev.aster.vega.runtime/ChartKey.END|null[0]
-    enum entry ENTER // dev.aster.vega.runtime/ChartKey.ENTER|null[0]
-    enum entry ESCAPE // dev.aster.vega.runtime/ChartKey.ESCAPE|null[0]
-    enum entry HOME // dev.aster.vega.runtime/ChartKey.HOME|null[0]
-    enum entry SPACE // dev.aster.vega.runtime/ChartKey.SPACE|null[0]
-    enum entry TAB // dev.aster.vega.runtime/ChartKey.TAB|null[0]
-
-    final val entries // dev.aster.vega.runtime/ChartKey.entries|#static{}entries[0]
-        final fun <get-entries>(): kotlin.enums/EnumEntries<dev.aster.vega.runtime/ChartKey> // dev.aster.vega.runtime/ChartKey.entries.<get-entries>|<get-entries>#static(){}[0]
-
-    final fun valueOf(kotlin/String): dev.aster.vega.runtime/ChartKey // dev.aster.vega.runtime/ChartKey.valueOf|valueOf#static(kotlin.String){}[0]
-    final fun values(): kotlin/Array<dev.aster.vega.runtime/ChartKey> // dev.aster.vega.runtime/ChartKey.values|values#static(){}[0]
-}
-
 final enum class dev.aster.vega.runtime/GesturePhase : kotlin/Enum<dev.aster.vega.runtime/GesturePhase> { // dev.aster.vega.runtime/GesturePhase|null[0]
     enum entry BEGAN // dev.aster.vega.runtime/GesturePhase.BEGAN|null[0]
     enum entry CANCELLED // dev.aster.vega.runtime/GesturePhase.CANCELLED|null[0]
@@ -253,16 +221,16 @@ sealed interface dev.aster.vega.runtime/ChartEvent { // dev.aster.vega.runtime/C
 
 sealed interface dev.aster.vega.runtime/ChartInputEvent { // dev.aster.vega.runtime/ChartInputEvent|null[0]
     final class Key : dev.aster.vega.runtime/ChartInputEvent { // dev.aster.vega.runtime/ChartInputEvent.Key|null[0]
-        constructor <init>(dev.aster.vega.runtime/ChartKey, dev.aster.vega.runtime/Modifiers = ...) // dev.aster.vega.runtime/ChartInputEvent.Key.<init>|<init>(dev.aster.vega.runtime.ChartKey;dev.aster.vega.runtime.Modifiers){}[0]
+        constructor <init>(dev.aster.vega.scene/ChartKey, dev.aster.vega.scene/Modifiers = ...) // dev.aster.vega.runtime/ChartInputEvent.Key.<init>|<init>(dev.aster.vega.scene.ChartKey;dev.aster.vega.scene.Modifiers){}[0]
 
         final val key // dev.aster.vega.runtime/ChartInputEvent.Key.key|{}key[0]
-            final fun <get-key>(): dev.aster.vega.runtime/ChartKey // dev.aster.vega.runtime/ChartInputEvent.Key.key.<get-key>|<get-key>(){}[0]
+            final fun <get-key>(): dev.aster.vega.scene/ChartKey // dev.aster.vega.runtime/ChartInputEvent.Key.key.<get-key>|<get-key>(){}[0]
         final val modifiers // dev.aster.vega.runtime/ChartInputEvent.Key.modifiers|{}modifiers[0]
-            final fun <get-modifiers>(): dev.aster.vega.runtime/Modifiers // dev.aster.vega.runtime/ChartInputEvent.Key.modifiers.<get-modifiers>|<get-modifiers>(){}[0]
+            final fun <get-modifiers>(): dev.aster.vega.scene/Modifiers // dev.aster.vega.runtime/ChartInputEvent.Key.modifiers.<get-modifiers>|<get-modifiers>(){}[0]
 
-        final fun component1(): dev.aster.vega.runtime/ChartKey // dev.aster.vega.runtime/ChartInputEvent.Key.component1|component1(){}[0]
-        final fun component2(): dev.aster.vega.runtime/Modifiers // dev.aster.vega.runtime/ChartInputEvent.Key.component2|component2(){}[0]
-        final fun copy(dev.aster.vega.runtime/ChartKey = ..., dev.aster.vega.runtime/Modifiers = ...): dev.aster.vega.runtime/ChartInputEvent.Key // dev.aster.vega.runtime/ChartInputEvent.Key.copy|copy(dev.aster.vega.runtime.ChartKey;dev.aster.vega.runtime.Modifiers){}[0]
+        final fun component1(): dev.aster.vega.scene/ChartKey // dev.aster.vega.runtime/ChartInputEvent.Key.component1|component1(){}[0]
+        final fun component2(): dev.aster.vega.scene/Modifiers // dev.aster.vega.runtime/ChartInputEvent.Key.component2|component2(){}[0]
+        final fun copy(dev.aster.vega.scene/ChartKey = ..., dev.aster.vega.scene/Modifiers = ...): dev.aster.vega.runtime/ChartInputEvent.Key // dev.aster.vega.runtime/ChartInputEvent.Key.copy|copy(dev.aster.vega.scene.ChartKey;dev.aster.vega.scene.Modifiers){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.runtime/ChartInputEvent.Key.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // dev.aster.vega.runtime/ChartInputEvent.Key.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // dev.aster.vega.runtime/ChartInputEvent.Key.toString|toString(){}[0]
@@ -667,9 +635,10 @@ final class dev.aster.vega.runtime.interaction/CoroutineScheduler : dev.aster.ve
 }
 
 final class dev.aster.vega.runtime.interaction/EventDispatcher { // dev.aster.vega.runtime.interaction/EventDispatcher|null[0]
-    constructor <init>(kotlin.collections/List<dev.aster.vega.runtime.interaction/HandlerBinding>, dev.aster.vega.expression/ExpressionCompiler, dev.aster.vega.model/DiagnosticCollector, dev.aster.vega.expression/ExpressionScope, dev.aster.vega.model.spec/EventConfig = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.expression/ExpressionScope> = ...) // dev.aster.vega.runtime.interaction/EventDispatcher.<init>|<init>(kotlin.collections.List<dev.aster.vega.runtime.interaction.HandlerBinding>;dev.aster.vega.expression.ExpressionCompiler;dev.aster.vega.model.DiagnosticCollector;dev.aster.vega.expression.ExpressionScope;dev.aster.vega.model.spec.EventConfig;kotlin.Boolean;kotlin.collections.Map<kotlin.String,dev.aster.vega.expression.ExpressionScope>){}[0]
+    constructor <init>(kotlin.collections/List<dev.aster.vega.runtime.interaction/HandlerBinding>, dev.aster.vega.expression/ExpressionCompiler, dev.aster.vega.model/DiagnosticCollector, dev.aster.vega.expression/ExpressionScope, dev.aster.vega.model.spec/EventConfig = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.expression/ExpressionScope> = ..., kotlin.collections/Set<dev.aster.vega.runtime.interaction/LatchKey> = ...) // dev.aster.vega.runtime.interaction/EventDispatcher.<init>|<init>(kotlin.collections.List<dev.aster.vega.runtime.interaction.HandlerBinding>;dev.aster.vega.expression.ExpressionCompiler;dev.aster.vega.model.DiagnosticCollector;dev.aster.vega.expression.ExpressionScope;dev.aster.vega.model.spec.EventConfig;kotlin.Boolean;kotlin.collections.Map<kotlin.String,dev.aster.vega.expression.ExpressionScope>;kotlin.collections.Set<dev.aster.vega.runtime.interaction.LatchKey>){}[0]
 
     final fun dispatch(dev.aster.vega.runtime.interaction/InputEvent): kotlin.collections/List<dev.aster.vega.runtime.interaction/FiredHandler> // dev.aster.vega.runtime.interaction/EventDispatcher.dispatch|dispatch(dev.aster.vega.runtime.interaction.InputEvent){}[0]
+    final fun openLatches(): kotlin.collections/Set<dev.aster.vega.runtime.interaction/LatchKey> // dev.aster.vega.runtime.interaction/EventDispatcher.openLatches|openLatches(){}[0]
 }
 
 final class dev.aster.vega.runtime.interaction/FiredHandler { // dev.aster.vega.runtime.interaction/FiredHandler|null[0]
@@ -769,6 +738,28 @@ final class dev.aster.vega.runtime.interaction/InputEvent { // dev.aster.vega.ru
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.runtime.interaction/InputEvent.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.aster.vega.runtime.interaction/InputEvent.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.aster.vega.runtime.interaction/InputEvent.toString|toString(){}[0]
+}
+
+final class dev.aster.vega.runtime.interaction/LatchKey { // dev.aster.vega.runtime.interaction/LatchKey|null[0]
+    constructor <init>(kotlin/String, kotlin/String, dev.aster.vega.model.spec/EventStream, dev.aster.vega.model.spec/EventStream) // dev.aster.vega.runtime.interaction/LatchKey.<init>|<init>(kotlin.String;kotlin.String;dev.aster.vega.model.spec.EventStream;dev.aster.vega.model.spec.EventStream){}[0]
+
+    final val closes // dev.aster.vega.runtime.interaction/LatchKey.closes|{}closes[0]
+        final fun <get-closes>(): dev.aster.vega.model.spec/EventStream // dev.aster.vega.runtime.interaction/LatchKey.closes.<get-closes>|<get-closes>(){}[0]
+    final val opens // dev.aster.vega.runtime.interaction/LatchKey.opens|{}opens[0]
+        final fun <get-opens>(): dev.aster.vega.model.spec/EventStream // dev.aster.vega.runtime.interaction/LatchKey.opens.<get-opens>|<get-opens>(){}[0]
+    final val scopePath // dev.aster.vega.runtime.interaction/LatchKey.scopePath|{}scopePath[0]
+        final fun <get-scopePath>(): kotlin/String // dev.aster.vega.runtime.interaction/LatchKey.scopePath.<get-scopePath>|<get-scopePath>(){}[0]
+    final val signalName // dev.aster.vega.runtime.interaction/LatchKey.signalName|{}signalName[0]
+        final fun <get-signalName>(): kotlin/String // dev.aster.vega.runtime.interaction/LatchKey.signalName.<get-signalName>|<get-signalName>(){}[0]
+
+    final fun component1(): kotlin/String // dev.aster.vega.runtime.interaction/LatchKey.component1|component1(){}[0]
+    final fun component2(): kotlin/String // dev.aster.vega.runtime.interaction/LatchKey.component2|component2(){}[0]
+    final fun component3(): dev.aster.vega.model.spec/EventStream // dev.aster.vega.runtime.interaction/LatchKey.component3|component3(){}[0]
+    final fun component4(): dev.aster.vega.model.spec/EventStream // dev.aster.vega.runtime.interaction/LatchKey.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., dev.aster.vega.model.spec/EventStream = ..., dev.aster.vega.model.spec/EventStream = ...): dev.aster.vega.runtime.interaction/LatchKey // dev.aster.vega.runtime.interaction/LatchKey.copy|copy(kotlin.String;kotlin.String;dev.aster.vega.model.spec.EventStream;dev.aster.vega.model.spec.EventStream){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.runtime.interaction/LatchKey.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.runtime.interaction/LatchKey.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.runtime.interaction/LatchKey.toString|toString(){}[0]
 }
 
 final class dev.aster.vega.runtime.interaction/SignalUpdater { // dev.aster.vega.runtime.interaction/SignalUpdater|null[0]
@@ -1122,22 +1113,6 @@ final class dev.aster.vega.runtime.scale/TimeScale : dev.aster.vega.runtime.scal
     final fun ticks(kotlin/Int = ...): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/TimeScale.ticks|ticks(kotlin.Int){}[0]
 }
 
-final class dev.aster.vega.runtime/ChartAction { // dev.aster.vega.runtime/ChartAction|null[0]
-    constructor <init>(dev.aster.vega.runtime/ChartActionKind, kotlin/String) // dev.aster.vega.runtime/ChartAction.<init>|<init>(dev.aster.vega.runtime.ChartActionKind;kotlin.String){}[0]
-
-    final val kind // dev.aster.vega.runtime/ChartAction.kind|{}kind[0]
-        final fun <get-kind>(): dev.aster.vega.runtime/ChartActionKind // dev.aster.vega.runtime/ChartAction.kind.<get-kind>|<get-kind>(){}[0]
-    final val label // dev.aster.vega.runtime/ChartAction.label|{}label[0]
-        final fun <get-label>(): kotlin/String // dev.aster.vega.runtime/ChartAction.label.<get-label>|<get-label>(){}[0]
-
-    final fun component1(): dev.aster.vega.runtime/ChartActionKind // dev.aster.vega.runtime/ChartAction.component1|component1(){}[0]
-    final fun component2(): kotlin/String // dev.aster.vega.runtime/ChartAction.component2|component2(){}[0]
-    final fun copy(dev.aster.vega.runtime/ChartActionKind = ..., kotlin/String = ...): dev.aster.vega.runtime/ChartAction // dev.aster.vega.runtime/ChartAction.copy|copy(dev.aster.vega.runtime.ChartActionKind;kotlin.String){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.runtime/ChartAction.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // dev.aster.vega.runtime/ChartAction.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // dev.aster.vega.runtime/ChartAction.toString|toString(){}[0]
-}
-
 final class dev.aster.vega.runtime/ChartSelection { // dev.aster.vega.runtime/ChartSelection|null[0]
     constructor <init>(kotlin.collections/Set<dev.aster.vega.scene/SceneNodeId> = ..., kotlin.collections/Set<kotlin/Long> = ..., dev.aster.vega.scene/RectD? = ...) // dev.aster.vega.runtime/ChartSelection.<init>|<init>(kotlin.collections.Set<dev.aster.vega.scene.SceneNodeId>;kotlin.collections.Set<kotlin.Long>;dev.aster.vega.scene.RectD?){}[0]
 
@@ -1248,33 +1223,6 @@ final class dev.aster.vega.runtime/InteractionState { // dev.aster.vega.runtime/
     }
 }
 
-final class dev.aster.vega.runtime/Modifiers { // dev.aster.vega.runtime/Modifiers|null[0]
-    constructor <init>(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // dev.aster.vega.runtime/Modifiers.<init>|<init>(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
-
-    final val alt // dev.aster.vega.runtime/Modifiers.alt|{}alt[0]
-        final fun <get-alt>(): kotlin/Boolean // dev.aster.vega.runtime/Modifiers.alt.<get-alt>|<get-alt>(){}[0]
-    final val control // dev.aster.vega.runtime/Modifiers.control|{}control[0]
-        final fun <get-control>(): kotlin/Boolean // dev.aster.vega.runtime/Modifiers.control.<get-control>|<get-control>(){}[0]
-    final val meta // dev.aster.vega.runtime/Modifiers.meta|{}meta[0]
-        final fun <get-meta>(): kotlin/Boolean // dev.aster.vega.runtime/Modifiers.meta.<get-meta>|<get-meta>(){}[0]
-    final val shift // dev.aster.vega.runtime/Modifiers.shift|{}shift[0]
-        final fun <get-shift>(): kotlin/Boolean // dev.aster.vega.runtime/Modifiers.shift.<get-shift>|<get-shift>(){}[0]
-
-    final fun component1(): kotlin/Boolean // dev.aster.vega.runtime/Modifiers.component1|component1(){}[0]
-    final fun component2(): kotlin/Boolean // dev.aster.vega.runtime/Modifiers.component2|component2(){}[0]
-    final fun component3(): kotlin/Boolean // dev.aster.vega.runtime/Modifiers.component3|component3(){}[0]
-    final fun component4(): kotlin/Boolean // dev.aster.vega.runtime/Modifiers.component4|component4(){}[0]
-    final fun copy(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): dev.aster.vega.runtime/Modifiers // dev.aster.vega.runtime/Modifiers.copy|copy(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.runtime/Modifiers.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // dev.aster.vega.runtime/Modifiers.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // dev.aster.vega.runtime/Modifiers.toString|toString(){}[0]
-
-    final object Companion { // dev.aster.vega.runtime/Modifiers.Companion|null[0]
-        final val None // dev.aster.vega.runtime/Modifiers.Companion.None|{}None[0]
-            final fun <get-None>(): dev.aster.vega.runtime/Modifiers // dev.aster.vega.runtime/Modifiers.Companion.None.<get-None>|<get-None>(){}[0]
-    }
-}
-
 final class dev.aster.vega.runtime/SignalInput { // dev.aster.vega.runtime/SignalInput|null[0]
     constructor <init>(kotlin/String, kotlin/String, dev.aster.vega.model.spec/SignalBind, dev.aster.vega.model/VegaValue) // dev.aster.vega.runtime/SignalInput.<init>|<init>(kotlin.String;kotlin.String;dev.aster.vega.model.spec.SignalBind;dev.aster.vega.model.VegaValue){}[0]
 
@@ -1344,13 +1292,15 @@ final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runti
     constructor <init>(dev.aster.vega.scene/Scene = ..., dev.aster.vega.scene/TextEngine = ..., kotlin/Function0<kotlin/Long> = ..., dev.aster.vega.runtime.load/DataLoader = ..., dev.aster.vega.runtime.interaction/Scheduler? = ..., dev.aster.vega.model.locale/VegaLocale = ..., dev.aster.vega.model/VegaValue? = ..., dev.aster.vega.scene/SizeD? = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>>? = ..., kotlinx.datetime/TimeZone? = ...) // dev.aster.vega.runtime/VegaChartController.<init>|<init>(dev.aster.vega.scene.Scene;dev.aster.vega.scene.TextEngine;kotlin.Function0<kotlin.Long>;dev.aster.vega.runtime.load.DataLoader;dev.aster.vega.runtime.interaction.Scheduler?;dev.aster.vega.model.locale.VegaLocale;dev.aster.vega.model.VegaValue?;dev.aster.vega.scene.SizeD?;kotlin.collections.Map<kotlin.String,kotlin.collections.List<dev.aster.vega.model.VegaValue>>?;kotlinx.datetime.TimeZone?){}[0]
 
     final val accessibilityActions // dev.aster.vega.runtime/VegaChartController.accessibilityActions|{}accessibilityActions[0]
-        final fun <get-accessibilityActions>(): kotlin.collections/List<dev.aster.vega.runtime/ChartAction> // dev.aster.vega.runtime/VegaChartController.accessibilityActions.<get-accessibilityActions>|<get-accessibilityActions>(){}[0]
+        final fun <get-accessibilityActions>(): kotlin.collections/List<dev.aster.vega.scene/ChartAction> // dev.aster.vega.runtime/VegaChartController.accessibilityActions.<get-accessibilityActions>|<get-accessibilityActions>(){}[0]
     final val diagnostics // dev.aster.vega.runtime/VegaChartController.diagnostics|{}diagnostics[0]
         final fun <get-diagnostics>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic>> // dev.aster.vega.runtime/VegaChartController.diagnostics.<get-diagnostics>|<get-diagnostics>(){}[0]
     final val events // dev.aster.vega.runtime/VegaChartController.events|{}events[0]
         final fun <get-events>(): kotlinx.coroutines.flow/Flow<dev.aster.vega.runtime/ChartEvent> // dev.aster.vega.runtime/VegaChartController.events.<get-events>|<get-events>(){}[0]
     final val inputs // dev.aster.vega.runtime/VegaChartController.inputs|{}inputs[0]
         final fun <get-inputs>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<dev.aster.vega.runtime/SignalInput>> // dev.aster.vega.runtime/VegaChartController.inputs.<get-inputs>|<get-inputs>(){}[0]
+    final val locale // dev.aster.vega.runtime/VegaChartController.locale|{}locale[0]
+        final fun <get-locale>(): dev.aster.vega.model.locale/VegaLocale // dev.aster.vega.runtime/VegaChartController.locale.<get-locale>|<get-locale>(){}[0]
     final val snapshot // dev.aster.vega.runtime/VegaChartController.snapshot|{}snapshot[0]
         final fun <get-snapshot>(): dev.aster.vega.runtime/ChartSnapshot // dev.aster.vega.runtime/VegaChartController.snapshot.<get-snapshot>|<get-snapshot>(){}[0]
     final val state // dev.aster.vega.runtime/VegaChartController.state|{}state[0]
@@ -1373,8 +1323,9 @@ final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runti
     final fun adjustScaleDomain(kotlin/String, kotlin/Boolean): kotlin/Boolean // dev.aster.vega.runtime/VegaChartController.adjustScaleDomain|adjustScaleDomain(kotlin.String;kotlin.Boolean){}[0]
     final fun clearDiagnostics() // dev.aster.vega.runtime/VegaChartController.clearDiagnostics|clearDiagnostics(){}[0]
     final fun dispatch(dev.aster.vega.runtime/ChartInputEvent) // dev.aster.vega.runtime/VegaChartController.dispatch|dispatch(dev.aster.vega.runtime.ChartInputEvent){}[0]
-    final fun handleKey(dev.aster.vega.runtime/ChartKey, dev.aster.vega.runtime/Modifiers = ...): kotlin/Boolean // dev.aster.vega.runtime/VegaChartController.handleKey|handleKey(dev.aster.vega.runtime.ChartKey;dev.aster.vega.runtime.Modifiers){}[0]
-    final fun perform(dev.aster.vega.runtime/ChartActionKind): kotlin/Boolean // dev.aster.vega.runtime/VegaChartController.perform|perform(dev.aster.vega.runtime.ChartActionKind){}[0]
+    final fun focusNode(dev.aster.vega.scene/SceneNodeId?): kotlin/Boolean // dev.aster.vega.runtime/VegaChartController.focusNode|focusNode(dev.aster.vega.scene.SceneNodeId?){}[0]
+    final fun handleKey(dev.aster.vega.scene/ChartKey, dev.aster.vega.scene/Modifiers = ...): kotlin/Boolean // dev.aster.vega.runtime/VegaChartController.handleKey|handleKey(dev.aster.vega.scene.ChartKey;dev.aster.vega.scene.Modifiers){}[0]
+    final fun perform(dev.aster.vega.scene/ChartActionKind): kotlin/Boolean // dev.aster.vega.runtime/VegaChartController.perform|perform(dev.aster.vega.scene.ChartActionKind){}[0]
     final fun report(dev.aster.vega.model/VegaDiagnostic) // dev.aster.vega.runtime/VegaChartController.report|report(dev.aster.vega.model.VegaDiagnostic){}[0]
     final fun resetScaleDomains(): kotlin/Boolean // dev.aster.vega.runtime/VegaChartController.resetScaleDomains|resetScaleDomains(){}[0]
     final fun resetViewport() // dev.aster.vega.runtime/VegaChartController.resetViewport|resetViewport(){}[0]
@@ -1392,6 +1343,10 @@ final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runti
     final object Companion { // dev.aster.vega.runtime/VegaChartController.Companion|null[0]
         final const val DOMAIN_STEP // dev.aster.vega.runtime/VegaChartController.Companion.DOMAIN_STEP|{}DOMAIN_STEP[0]
             final fun <get-DOMAIN_STEP>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.DOMAIN_STEP.<get-DOMAIN_STEP>|<get-DOMAIN_STEP>(){}[0]
+        final const val FOCUS_RING_INSET // dev.aster.vega.runtime/VegaChartController.Companion.FOCUS_RING_INSET|{}FOCUS_RING_INSET[0]
+            final fun <get-FOCUS_RING_INSET>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.FOCUS_RING_INSET.<get-FOCUS_RING_INSET>|<get-FOCUS_RING_INSET>(){}[0]
+        final const val FOCUS_RING_WIDTH // dev.aster.vega.runtime/VegaChartController.Companion.FOCUS_RING_WIDTH|{}FOCUS_RING_WIDTH[0]
+            final fun <get-FOCUS_RING_WIDTH>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.FOCUS_RING_WIDTH.<get-FOCUS_RING_WIDTH>|<get-FOCUS_RING_WIDTH>(){}[0]
         final const val MAX_DOMAIN_FACTOR // dev.aster.vega.runtime/VegaChartController.Companion.MAX_DOMAIN_FACTOR|{}MAX_DOMAIN_FACTOR[0]
             final fun <get-MAX_DOMAIN_FACTOR>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.MAX_DOMAIN_FACTOR.<get-MAX_DOMAIN_FACTOR>|<get-MAX_DOMAIN_FACTOR>(){}[0]
         final const val MAX_ZOOM // dev.aster.vega.runtime/VegaChartController.Companion.MAX_ZOOM|{}MAX_ZOOM[0]
@@ -1402,6 +1357,9 @@ final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runti
             final fun <get-MIN_ZOOM>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.MIN_ZOOM.<get-MIN_ZOOM>|<get-MIN_ZOOM>(){}[0]
         final const val ZOOM_STEP // dev.aster.vega.runtime/VegaChartController.Companion.ZOOM_STEP|{}ZOOM_STEP[0]
             final fun <get-ZOOM_STEP>(): kotlin/Double // dev.aster.vega.runtime/VegaChartController.Companion.ZOOM_STEP.<get-ZOOM_STEP>|<get-ZOOM_STEP>(){}[0]
+
+        final val FOCUS_RING_COLOUR // dev.aster.vega.runtime/VegaChartController.Companion.FOCUS_RING_COLOUR|{}FOCUS_RING_COLOUR[0]
+            final fun <get-FOCUS_RING_COLOUR>(): dev.aster.vega.scene/SceneColor // dev.aster.vega.runtime/VegaChartController.Companion.FOCUS_RING_COLOUR.<get-FOCUS_RING_COLOUR>|<get-FOCUS_RING_COLOUR>(){}[0]
 
         final fun fromScene(dev.aster.vega.scene/Scene): dev.aster.vega.runtime/VegaChartController // dev.aster.vega.runtime/VegaChartController.Companion.fromScene|fromScene(dev.aster.vega.scene.Scene){}[0]
         final fun fromSpec(kotlin/String, dev.aster.vega.scene/TextEngine = ...): kotlin/Pair<dev.aster.vega.runtime/VegaChartController, dev.aster.vega.runtime.compile/CompiledSpec> // dev.aster.vega.runtime/VegaChartController.Companion.fromSpec|fromSpec(kotlin.String;dev.aster.vega.scene.TextEngine){}[0]

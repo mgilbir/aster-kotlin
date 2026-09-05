@@ -50,9 +50,23 @@ public struct ChartGestures: OptionSet, Sendable {
   public static let zoom = ChartGestures(rawValue: 1 << 3)
   /// A pointer moving without touching — a trackpad or mouse on iPad. Claims nothing.
   public static let hover = ChartGestures(rawValue: 1 << 4)
+  /// The raw pointer events a **brush** is written against: `mousedown`, `mousemove`, `mouseup`.
+  ///
+  /// `[mousedown, mouseup] > mousemove` is how every interval selection in Vega and Vega-Lite is
+  /// expressed, and without these a specification that brushes compiles, draws and never responds.
+  /// Distinct from ``pan``, which moves the *viewport* and produces no Vega event at all: a chart
+  /// may want one, the other, or both.
+  ///
+  /// Rides the same drag detector ``pan`` uses, so asking for it claims **no more** of the touch
+  /// than a pan already does — a zero-distance drag of its own would claim on touch-down and is the
+  /// thing that made a chart inside a scroll view unscrollable (#124). The consequence is that the
+  /// `mousedown` is emitted once the finger passes ``VegaChartView``'s slop rather than the instant
+  /// it lands, at the location it *started* from — so a brush anchors where the reader put their
+  /// finger, a few milliseconds late.
+  public static let pointer = ChartGestures(rawValue: 1 << 5)
 
   /// Everything, which is what a chart that owns its space wants.
-  public static let all: ChartGestures = [.tap, .longPress, .pan, .zoom, .hover]
+  public static let all: ChartGestures = [.tap, .longPress, .pan, .zoom, .hover, .pointer]
 
   /// Everything that does **not** claim a drag: a tap and a hover.
   ///
@@ -192,6 +206,9 @@ public struct VegaChartView: View {
   /// Where the last finger went down, for a long press — which SwiftUI reports without a location.
   @State private var lastDown: CGPoint = .zero
 
+  /// Whether the drag in progress has already sent its `mousedown`, so the next change is a move.
+  @State private var pointerIsDown = false
+
   public var body: some View {
     ZStack {
       canvas
@@ -236,7 +253,9 @@ public struct VegaChartView: View {
     .gesture(tap, including: mask(for: .tap))
     // Separate detectors, and a real minimum distance on this one. The tap above tolerates a small
     // movement and fails past it, so the two do not overlap and the hand-rolled slop is gone.
-    .simultaneousGesture(pan, including: mask(for: .pan))
+    // One detector for both, `pan` and `pointer`, so asking for the raw events claims no more of
+    // the touch than a pan already does. See `ChartGestures.pointer`.
+    .simultaneousGesture(pan, including: dragMask)
     .simultaneousGesture(pinch, including: mask(for: .zoom))
     .simultaneousGesture(longPress, including: mask(for: .longPress))
     // A pointer that moves without touching: a trackpad or mouse on iPad, and nothing on a phone. Wired
@@ -245,6 +264,17 @@ public struct VegaChartView: View {
     //
     // Gated in the handler rather than at attachment because a hover cannot claim a drag: it is the one
     // gesture here whose mere presence costs a host nothing.
+    // **The chart's own actions**, as VoiceOver custom actions on the chart itself.
+    //
+    // Zooming, resetting the view and putting an adjusted axis back. They belong to the whole chart
+    // rather than to any mark, and until this no host on any platform offered them — the feature
+    // was built, tested and documented against `UIAccessibilityCustomAction` and the call was never
+    // written (#226).
+    //
+    // Rebuilt from the session on every pass rather than cached: the list is short and it *changes*
+    // — zooming is withdrawn at each limit, and a reset appears only once there is something to
+    // undo — so a stale copy would offer a reader an action that does nothing.
+    .modifier(ChartActions(session: session))
     .onContinuousHover { phase in
       guard let session, gestures.contains(.hover) else { return }
       switch phase {
@@ -275,6 +305,16 @@ public struct VegaChartView: View {
   /// is null.
   private func mask(for gesture: ChartGestures) -> GestureMask {
     session != nil && gestures.contains(gesture) ? .all : .none
+  }
+
+  /// The drag detector is attached when **either** thing it feeds was asked for.
+  ///
+  /// It serves two: the viewport pan, and the raw pointer events a brush needs. A host may want
+  /// only one — a chart that brushes but does not pan is `[.tap, .pointer]` — and neither should
+  /// have to attach a detector of its own, because a second zero-distance drag is what made a chart
+  /// in a scroll view unscrollable (#124).
+  private var dragMask: GestureMask {
+    session != nil && (gestures.contains(.pan) || gestures.contains(.pointer)) ? .all : .none
   }
 
   /// Whether this chart takes a touch away from whatever is behind it.
@@ -337,6 +377,18 @@ public struct VegaChartView: View {
       .onChanged { value in
         guard let session else { return }
         lastDown = value.startLocation
+        if gestures.contains(.pointer) {
+          // The `mousedown` goes at the location the drag **started** from, not where the finger is
+          // now: the detector only reports once the slop is passed, and a brush that anchored at
+          // the first reported point would start a few points inside where the reader put their
+          // finger. `value.startLocation` is that place, so only the timing is late.
+          if !pointerIsDown, let start = scenePoint(of: value.startLocation) {
+            pointerIsDown = true
+            session.pointerDown(at: start)
+          }
+          if let here = scenePoint(of: value.location) { session.pointerMoved(at: here) }
+        }
+        guard gestures.contains(.pan) else { return }
         // Incremental, because the controller adds each delta to the viewport offset: handing it the
         // gesture's cumulative translation every time would accelerate the pan quadratically.
         //
@@ -358,8 +410,13 @@ public struct VegaChartView: View {
           phase: GesturePhase.changed
         )
       }
-      .onEnded { _ in
+      .onEnded { value in
         guard let session else { return }
+        if pointerIsDown {
+          pointerIsDown = false
+          if let end = scenePoint(of: value.location) { session.pointerUp(at: end) }
+        }
+        guard gestures.contains(.pan) else { return }
         session.pan(by: Point(x: 0, y: 0), phase: GesturePhase.ended)
         panned = .zero
       }
@@ -756,6 +813,28 @@ private struct AdjustableAxis: ViewModifier {
         // whether anything moved; at the end of the range nothing has, and there is nothing to
         // announce.
         _ = session.adjustScaleDomain(scale: scale, narrow: direction == .increment)
+      }
+    } else {
+      content
+    }
+  }
+}
+
+/// The chart's own accessibility actions, offered as VoiceOver custom actions.
+///
+/// A `ViewModifier` because the set is dynamic: `accessibilityAction(named:)` has to be applied once
+/// per action, and the actions come from the session. Applied to nothing when there is no session,
+/// which is the same promise `activatable(_:)` keeps for `.isButton` — an action a reader invokes to
+/// no effect is worse than one that was never offered.
+@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
+private struct ChartActions: ViewModifier {
+  let session: ChartSession?
+
+  func body(content: Content) -> some View {
+    if let session {
+      // `reduce` rather than a `ForEach`: these are modifiers on one view, not sibling views.
+      session.accessibilityActions.reduce(AnyView(content)) { view, action in
+        AnyView(view.accessibilityAction(named: Text(action.label)) { _ = session.perform(action.kind) })
       }
     } else {
       content

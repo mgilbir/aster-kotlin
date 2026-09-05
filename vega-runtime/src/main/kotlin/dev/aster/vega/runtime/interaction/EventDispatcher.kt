@@ -133,6 +133,32 @@ public data class FiredHandler(
   @InternalAsterVegaApi val writePath: String? = null,
 )
 
+/**
+ * One `between` latch's identity, so its state can outlive the dispatcher that held it.
+ *
+ * A `between` pair is a latch — opened by the first stream, closed by the second — and a drag is
+ * the span between them. The dispatcher is rebuilt on **every recompile**, and a recompile is what
+ * a fired handler causes, so the latch a `mousedown` had just opened was thrown away before the
+ * `mousemove` it was meant to gate arrived. That is the standard brush idiom: an `anchor` set on
+ * `mousedown` and a `brush` on `[mousedown, mouseup] > mousemove`. The first drag of every brush
+ * was lost, and so was any drag that started somewhere new — a second drag from the *same* point
+ * worked, because setting `anchor` to the value it already had changed nothing and so recompiled
+ * nothing.
+ *
+ * Upstream never rebuilds its streams: a `View`'s dataflow outlives every signal update, so its
+ * latches do too. Carrying them across is what matches it.
+ *
+ * The two boundary streams identify the pair within a binding. Two handlers on one signal sharing a
+ * pair would share a key, and share the latch — which is the same latch either way, since the same
+ * events open and close both.
+ */
+public data class LatchKey(
+  val signalName: String,
+  @InternalAsterVegaApi val scopePath: String,
+  val opens: EventStream,
+  val closes: EventStream,
+)
+
 /** One `on` handler, bound to the signal it sets. */
 public data class HandlerBinding(
   val signalName: String,
@@ -206,6 +232,17 @@ public class EventDispatcher(
    * notice, since nothing fires and nothing is reported.
    */
   private val scopes: Map<String, ExpressionScope> = emptyMap(),
+  /**
+   * The `between` latches that were **open** when the previous dispatcher was replaced.
+   *
+   * A drag outlives a recompile, and a recompile is what a fired handler causes — so without this
+   * the latch a `mousedown` had just opened was thrown away before the `mousemove` it gates
+   * arrived. See [LatchKey] for the shape that made it invisible: a second drag from the same point
+   * worked, because it changed no signal and so rebuilt nothing.
+   *
+   * Empty for a fresh document, which is the only time a drag genuinely should not carry over.
+   */
+  @InternalAsterVegaApi private val openLatches: Set<LatchKey> = emptySet(),
 ) {
 
   /** One stream being watched, with whatever state it needs between events. */
@@ -234,8 +271,28 @@ public class EventDispatcher(
     var open: Boolean = false
   }
 
-  /** The gate a stream must pass, or null if it has none. */
-  private val gateOf = HashMap<Watch, Gate>()
+  /** Every gate this dispatcher owns, so its state can be handed to the one that replaces it. */
+  private val latchKeys = LinkedHashMap<Gate, LatchKey>()
+
+  /**
+   * Which latches are open now, for the dispatcher that replaces this one.
+   *
+   * Read by `VegaChartController.publish` immediately before it builds the replacement, which is
+   * the only place a dispatcher is ever replaced.
+   */
+  @InternalAsterVegaApi
+  public fun openLatches(): Set<LatchKey> =
+    latchKeys.entries.filter { it.key.open }.map { it.value }.toSet()
+
+  /**
+   * The gates a stream must pass, all of them open, or absent if it has none.
+   *
+   * A **list** because a `between` composes: `[a, b] > [c, d] > mousemove` is upstream's
+   * `stream.between(c, d).between(a, b)`, and `between` is a latch plus a filter — so an event
+   * fires only where every latch in the chain is open. There is no ordering between them to get
+   * wrong, which is what makes the chain expressible at all.
+   */
+  private val gateOf = HashMap<Watch, List<Gate>>()
 
   private val watches = mutableListOf<Watch>()
 
@@ -248,20 +305,36 @@ public class EventDispatcher(
     }
   }
 
-  private fun register(stream: EventStream, binding: HandlerBinding) {
+  private fun register(declared: EventStream, binding: HandlerBinding) {
+    // **The chain, resolved first**, because everything below asks what this stream *listens to*
+    // and a wrapper does not know. A `between` composes: `[a, b] > [c, d] > mousemove` arrives as
+    // two wrappers around one ordinary stream, and only the innermost carries a source, a type and
+    // a mark. Asking the outer one whether it is a timer, a `window:` stream or a `keyup` gets the
+    // defaults every time.
+    //
+    // What each wrapper adds is a gate the event has to pass. Upstream composes these as
+    // `stream.between(c, d).between(a, b)`, and `between` is a latch plus a filter — so "gating a
+    // gate" is just "every latch open". This was refused by name until the composition was read
+    // rather than guessed at: the diagnostic said the ordering could not be known, and there is no
+    // ordering, since each latch is opened and closed by its own pair independently of the others.
+    val chain = generateSequence(declared) { it.nested }.toList()
+    val listened = chain.last()
+    // A wrapper's own filter, throttle, debounce and `consume` apply to the composed stream, so
+    // they are merged onto the one that does the matching. Two throttles in a chain would be two
+    // limits in series and are **not** modelled: the outermost wins, which is upstream's
+    // last-applied.
+    val stream =
+      if (chain.size == 1) {
+        declared
+      } else {
+        listened.copy(
+          filters = chain.flatMap { it.filters },
+          throttle = chain.firstNotNullOfOrNull { it.throttle },
+          debounce = chain.firstNotNullOfOrNull { it.debounce },
+          consume = chain.any { it.consume },
+        )
+      }
     if (!permitted(stream, binding)) return
-    if (stream.nested != null) {
-      // A pair wrapping a pair. Honouring it means gating a gate, which the latch model can do,
-      // but nothing in the corpus uses it and guessing at the ordering would be worse than saying
-      // so.
-      diagnostics.warn(
-        DiagnosticCodes.INTERACTION_UNSUPPORTED,
-        "A 'between' selector wrapping another 'between' is not dispatched; signal " +
-          "'${binding.signalName}' will not update from it",
-        operator = binding.signalName,
-      )
-      return
-    }
     // `keyup` and `keypress` are events upstream's handler binds and this engine cannot produce: a
     // host reports one `ChartInputEvent.Key` per press, with no phase, so there is nothing to tell
     // a release from a repeat. Refused by name rather than left to never match, because a signal
@@ -277,12 +350,24 @@ public class EventDispatcher(
       return
     }
     val watch = Watch(stream, binding, binding.scopePath)
-    if (stream.between.size == 2) {
-      val gate = Gate()
-      gateOf[watch] = gate
-      gateWatches += Watch(stream.between[0], null, binding.scopePath, opens = mutableListOf(gate))
-      gateWatches += Watch(stream.between[1], null, binding.scopePath, closes = mutableListOf(gate))
-    }
+    val gates =
+      chain
+        .filter { it.between.size == 2 }
+        .map { link ->
+          val gate = Gate()
+          val key =
+            LatchKey(binding.signalName, binding.scopePath, link.between[0], link.between[1])
+          // Reopened where the dispatcher this one replaces had it open: a drag spans a recompile,
+          // and a recompile is what the drag's own first event causes.
+          gate.open = key in openLatches
+          latchKeys[gate] = key
+          gateWatches +=
+            Watch(link.between[0], null, binding.scopePath, opens = mutableListOf(gate))
+          gateWatches +=
+            Watch(link.between[1], null, binding.scopePath, closes = mutableListOf(gate))
+          gate
+        }
+    if (gates.isNotEmpty()) gateOf[watch] = gates
     if (stream.source == EventStream.SOURCE_TIMER && deferrable) {
       // Someone else has the clock; the controller starts it and this stream is not dispatched from
       // an input event at all.
@@ -358,7 +443,7 @@ public class EventDispatcher(
     for (watch in watches) {
       val binding = watch.binding ?: continue
       if (!matches(watch.stream, event, scopeFor(watch.scopePath), watch.scopePath)) continue
-      if (gateOf[watch]?.open == false) continue
+      if (gateOf[watch]?.any { !it.open } == true) continue
       val throttle = watch.stream.throttle
       val since = watch.lastFired
       if (throttle != null && since != null && event.timestampMillis - since < throttle) continue

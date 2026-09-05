@@ -328,6 +328,64 @@ class ComposePointerTest {
     assertEquals(null to null, hovered.last(), "leaving the chart was not reported: $hovered")
   }
 
+  /**
+   * **Entering** is reported apart from moving, which is what `mouseover` is.
+   *
+   * `onHover` fires for an entry *and* for every move after it with the same shape, so a host could
+   * not tell them apart — and `PointerEntered` is what the controller turns into `pointerover` and
+   * `mouseover`. `@mark:mouseover` is what most highlight and tooltip specifications are written
+   * against, and it was inert on this renderer while working on Android (#228).
+   *
+   * Both fire on entry, which is a browser's own order: entering an element gives `mouseover` and
+   * then `mousemove`. The exit needs nothing new — `onHover` already reports it with a null.
+   */
+  @Test
+  fun `entering the chart is reported apart from moving within it`() = runComposeUiTest {
+    val scene = scene()
+    val entered = mutableListOf<PointD>()
+    val hovered = mutableListOf<PointD?>()
+    setContent {
+      VegaChart(
+        scene,
+        modifier = Modifier.size(scene.width.dp, scene.height.dp),
+        onHover = { point, _ -> hovered.add(point) },
+        onPointerEntered = { entered.add(it) },
+      )
+    }
+
+    val centre = firstBarCentre(scene)
+    onRoot().performMouseInput {
+      moveTo(Offset(centre.x.toFloat(), centre.y.toFloat()))
+      moveTo(Offset(centre.x.toFloat() + 4f, centre.y.toFloat()))
+      moveTo(Offset(centre.x.toFloat() + 8f, centre.y.toFloat()))
+      exit()
+    }
+
+    assertEquals(1, entered.size, "entering was reported ${entered.size} time(s), not once")
+    assertTrue(
+      hovered.filterNotNull().size >= 2,
+      "the moves after the entry were not reported: $hovered",
+    )
+    assertEquals(null, hovered.last(), "leaving was not reported")
+  }
+
+  /** A chart that wants only the entry still gets one, without asking for every move. */
+  @Test
+  fun `a chart can ask for the entry alone`() = runComposeUiTest {
+    val scene = scene()
+    val entered = mutableListOf<PointD>()
+    setContent {
+      VegaChart(
+        scene,
+        modifier = Modifier.size(scene.width.dp, scene.height.dp),
+        onPointerEntered = { entered.add(it) },
+      )
+    }
+    val centre = firstBarCentre(scene)
+    onRoot().performMouseInput { moveTo(Offset(centre.x.toFloat(), centre.y.toFloat())) }
+    assertEquals(1, entered.size, "the entry was not reported without an onHover beside it")
+  }
+
   @Test
   fun `a chart with no callbacks takes no pointer input at all`() = runComposeUiTest {
     // The module's bargain: a host that only draws pays for nothing. Asserted by tapping a chart
