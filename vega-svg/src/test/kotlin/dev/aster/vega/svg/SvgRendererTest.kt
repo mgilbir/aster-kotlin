@@ -27,6 +27,7 @@ import dev.aster.vega.scene.SymbolNode
 import dev.aster.vega.scene.TextAlign
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.TextRun
+import dev.aster.vega.scene.TextStyle
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.flatten
 import javax.xml.parsers.DocumentBuilderFactory
@@ -645,6 +646,88 @@ class SvgRendererTest {
         )
         .toSvg()
     assertEquals(1, svg.split("<linearGradient").size - 1, svg)
+  }
+
+  /**
+   * An item that carries **no** text and one that carries an empty string are different items, and
+   * only the first emits nothing.
+   *
+   * This export used to emit an element for both. On the fixture corpus that was three empty
+   * `<text>` elements in `legend-discretizing` — a banded legend's lowest bucket reaches to
+   * negative infinity, so upstream's formatter returns nothing at all and its renderer draws no
+   * element — and twelve `<path d="">` in `projection-families`, where `geopath` over a geometry
+   * with no coordinates has no outline. Nothing caught it: the two walks that
+   * `test-fixtures/scene-walk` compares both had the guard, and these two did not.
+   */
+  @Test
+  fun `an absent label emits no element, and an empty one emits its own`() {
+    val absent =
+      sceneOf(
+          TextNode(
+            id = ids.allocate(),
+            x = 5.0,
+            y = 5.0,
+            layout = textEngine.layout(TextRun("", TextStyle())),
+            absent = true,
+            fill = Fill(ScenePaint.Black),
+          )
+        )
+        .toSvg()
+    assertEquals(
+      0,
+      absent.split("<text").size - 1,
+      "an item with no text property drew one:\n$absent",
+    )
+
+    val empty =
+      sceneOf(
+          TextNode(
+            id = ids.allocate(),
+            x = 5.0,
+            y = 5.0,
+            layout = textEngine.layout(TextRun("", TextStyle())),
+            fill = Fill(ScenePaint.Black),
+          )
+        )
+        .toSvg()
+    assertEquals(
+      1,
+      empty.split("<text").size - 1,
+      "an item carrying an empty label lost it:\n$empty",
+    )
+  }
+
+  /**
+   * The same distinction for an outline: no path at all, against one that happens to draw nothing.
+   */
+  @Test
+  fun `an absent outline emits no element, and one that draws nothing emits its own`() {
+    val absent =
+      sceneOf(
+          PathNode(
+            id = ids.allocate(),
+            path = PathData(emptyList()),
+            absent = true,
+            fill = Fill(ScenePaint.Black),
+          )
+        )
+        .toSvg()
+    assertEquals(0, absent.split("<path").size - 1, "an item with no outline drew one:\n$absent")
+
+    val drawsNothing =
+      sceneOf(
+          PathNode(
+            id = ids.allocate(),
+            path = PathData(emptyList()),
+            fill = Fill(ScenePaint.Black),
+          )
+        )
+        .toSvg()
+    assertEquals(
+      1,
+      drawsNothing.split("<path").size - 1,
+      "an item whose outline draws nothing lost its element:\n$drawsNothing",
+    )
   }
 
   private fun allSampleScenes(): List<Scene> =

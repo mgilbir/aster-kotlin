@@ -55,22 +55,19 @@ public struct SceneWalk {
     transform: Affine,
     into target: inout T
   ) {
-    guard node.visible else { return }
+    // Hidden, transparent, or an item carrying no text and no outline at all. A group is the
+    // exception and still draws its children: a transparent group is not an invisible one.
+    //
+    // **Asked of the engine, not decided here.** This walk once had only the `visible` check, and
+    // that omission is the whole of the divergence behind a dense temporal axis coming out
+    // unreadable on this renderer — an axis hides an overlapping label by setting its opacity to
+    // zero rather than removing it, so the node arrived here, `brush` answered nil for it, and
+    // `CoreTextDrawing` read that nil as a paint it could not express and painted black. Four walks
+    // held four copies of this predicate and two of them were wrong; `SceneKt.paintsNothing` is now
+    // the one copy, and its documentation is the record.
+    if SceneKt.paintsNothing(node: node) { return }
     // This item's own opacity, multiplied into this item's own paints below.
     let own = node.opacity
-    // **Nothing paints anything at zero opacity**, so leaving early is the same picture drawn faster.
-    // A group is the exception, as it is in the Compose walk: a transparent group is not an invisible
-    // one, and its children carry their own opacity.
-    //
-    // This line is the whole of the divergence behind a dense temporal axis coming out unreadable on
-    // this renderer. The Compose walk has had it from the start with this same comment; this one had
-    // only the `visible` check. An axis hides an overlapping label by setting its **opacity to zero**
-    // rather than removing it — `AxisBuilder` says so, so that the mark count does not change with
-    // the chart's width — so the node arrived here, `brush` answered nil for it, and
-    // `CoreTextDrawing` read that nil as a paint it could not express and painted black. Measured on
-    // `label-overlap.vg.json`: 43 labels of which 24 are hidden, and this renderer drew all 43 where
-    // Compose drew the 19.
-    if own <= 0, !(node is GroupNode) { return }
 
     switch ForeignRenderersKt.foreignKind(node) {
     case "group":
@@ -157,7 +154,7 @@ public struct SceneWalk {
       )
 
     case "path":
-      guard let path = node as? PathNode, !path.absent else { return }
+      guard let path = node as? PathNode else { return }
       let local = transform.concatenating(Affine(path.transform))
       target.path(
         commands(of: path.path, through: local),
@@ -179,7 +176,7 @@ public struct SceneWalk {
       )
 
     case "text":
-      guard let text = node as? TextNode, !text.absent else { return }
+      guard let text = node as? TextNode else { return }
       let local = transform.concatenating(Affine(text.transform))
       let layout = text.layout
       let run = layout.run

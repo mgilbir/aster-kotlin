@@ -3664,6 +3664,7 @@ SceneHitIndex.nodesIntersecting(rect:)
 SceneHitIndex.usesSpatialIndex
 SceneKt
 SceneKt.paintOrder(children:)
+SceneKt.paintsNothing(node:)
 SceneKt.walk(_:visit:)
 SceneNode
 SceneNode.bounds

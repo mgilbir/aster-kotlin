@@ -26,6 +26,7 @@ import dev.aster.vega.scene.TextBaseline
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.paintOrder
+import dev.aster.vega.scene.paintsNothing
 
 /** How images are represented in exported SVG. */
 public enum class SvgImagePolicy {
@@ -139,8 +140,10 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     // A fully transparent *group* still emits its children: upstream puts `opacity="0"` on the
     // group's own background path and leaves the child elements exactly as they were, because a
     // group's opacity applies to its panel and is not inherited. Anything else paints nothing at
-    // zero opacity, so omitting it says the same thing in less markup.
-    if (!node.visible || (node.opacity <= 0.0 && node !is GroupNode)) return
+    // zero opacity, so omitting it says the same thing in less markup — and an item with no text
+    // and no outline at all emits no element, which upstream also does and this export did not.
+    // The predicate is shared with the three other walks; see `paintsNothing`.
+    if (paintsNothing(node)) return
 
     // An `href` makes the item a link, which in SVG means wrapping whatever it draws in an anchor —
     // upstream emits `<a xlink:href="…">` around the element and nothing else. Done here rather

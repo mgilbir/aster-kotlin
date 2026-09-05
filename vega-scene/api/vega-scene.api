@@ -1055,6 +1055,7 @@ public final class dev/aster/vega/scene/SceneKt {
 	public static final fun findNode-DetAXdY (Ldev/aster/vega/scene/Scene;J)Ldev/aster/vega/scene/SceneNode;
 	public static final fun flatten (Ldev/aster/vega/scene/Scene;)Ljava/util/List;
 	public static final fun paintOrder (Ljava/util/List;)Ljava/util/List;
+	public static final fun paintsNothing (Ldev/aster/vega/scene/SceneNode;)Z
 	public static final fun walk (Ldev/aster/vega/scene/SceneNode;Lkotlin/jvm/functions/Function2;)V
 }
 

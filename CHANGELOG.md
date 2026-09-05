@@ -324,6 +324,24 @@ section here does not get released.
 
 ### Fixed
 
+- **Every renderer asks one question before it draws an item, instead of four copies of it.** Four
+  walks cross a scene — the Android canvas, the Compose Multiplatform target, the Swift one and the
+  SVG export — and each carried its own guard for "this paints nothing". They drifted twice, and
+  both times the copies that agreed hid the ones that did not.
+
+  The first drift was found by `test-fixtures/scene-walk`, which compares two of the four: the Swift
+  walk had no zero-opacity guard, so a label an axis had hidden was painted black, 43 text runs
+  against 19. The second went the other way and nothing was watching it. Only those same two walks
+  had the guard for an item that is **absent** — one carrying no text property at all, or no outline
+  at all — so the Android canvas and the SVG export kept drawing them. In markup that is visible:
+  `legend-discretizing` exported three empty `<text>` elements and `projection-families` twelve
+  `<path d="">`, where upstream emits no element. Eight of the 198 fixtures carry such an item.
+
+  `paintsNothing` in `vega-scene` is now the one copy, and all four walks ask it — Swift through
+  `SceneKt.paintsNothing`. **Absent is not empty**, which is why this belongs beside the scene rather
+  than in a renderer: an item carrying an *empty* label is a different item that upstream still
+  emits, and asking whether anything would be drawn cannot tell them apart.
+
 - **A timer stream declared inside a group mark ticks.** It never did, and said nothing about it.
   `startTimers` read the specification's **top-level** signals while `bindingsOf` beside it walks
   the group marks, so a group's `{"type": "timer"}` handler was bound to the dispatcher and then
