@@ -322,6 +322,21 @@ section here does not get released.
   the scale. A band or point axis is not adjustable: it frames a list of values with nothing between
   them to narrow towards.
 
+### Added
+
+- **The SVG walk is checked against the scene it was given, on every fixture.** Two of the four
+  walks over a scene are compared with each other call for call; the export was checked by nothing
+  but its own tests, which is how the guard for an item that paints nothing went missing from it
+  without a suite going red.
+
+  Now that the selection is shared code, it can be asserted against rather than compared between:
+  for each of the 198 fixtures, every `RuleNode` and every `TextNode` the scene says must be painted
+  is counted against the `<line>` and `<text>` elements the document carries. Those two are exact —
+  one element apiece — where a rect with rounded corners comes out as a `<path>` and a symbol and a
+  path are indistinguishable, so counting the rest would be a weaker claim dressed as a strong one.
+  2595 rules and 3792 labels, with floors under both so that a corpus which stopped compiling cannot
+  read as agreement.
+
 ### Fixed
 
 - **Every renderer asks one question before it draws an item, instead of four copies of it.** Four
