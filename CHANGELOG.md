@@ -6,6 +6,29 @@ section here does not get released.
 
 ## Unreleased
 
+### Fixed
+
+- **A `between` pair wrapping another one is dispatched, in both of its spellings.** It was refused
+  by name, on the grounds that honouring it means gating a gate and that "guessing at the ordering
+  would be worse than saying so". Reading upstream rather than guessing shows there is **no ordering
+  to get wrong**: `vega-dataflow`'s `between(a, b)` is a boolean set true by `a` and false by `b`
+  plus a filter on it, and `parseStream` composes a nested pair as
+  `stream.between(c, d).between(a, b)`. So an event fires when the innermost stream matches and
+  every latch in the chain is open, each latch minding only its own pair. The chain is flattened to
+  a list of gates and the gate watches are updated first — which is what a single pair already did.
+
+  Resolving the chain is now the **first** thing `register` does, and that is the half that would
+  have gone quiet. A wrapper carries a `between` and the stream it wraps and nothing that says what
+  to listen to: the source, the type and the mark are all on the innermost stream. Every refusal
+  below — timer, `window:`, `keyup` — was asking the wrapper and getting the defaults, so a gated
+  `keyup` would have been registered and then never fired with nothing said.
+
+  The object spelling `{"stream": {…}, "between": […]}` — upstream's `nestedStream` — was not parsed
+  at all. `stream` was not a key the object form consumed, so a wrapper fell into the missing-`type`
+  error and the handler was dropped. Reported, but as *"An event stream object needs a `type`"*,
+  which tells an author to add the one thing a wrapper is correct to omit; following that diagnostic
+  would have produced a stream that listens to everything.
+
 ### Added
 
 - **The Vega-Lite gallery is a gate, not a memory.** Vega-Lite ships 627 example specifications, and

@@ -236,12 +236,26 @@ class EventDispatcherTest {
     )
   }
 
+  /**
+   * A `between` wrapping another one is dispatched, gated by **both** latches.
+   *
+   * This asserted the opposite, on the grounds that honouring it means gating a gate and that the
+   * ordering could not be guessed at. There is no ordering: `vega-dataflow`'s `between(a, b)` is a
+   * boolean set true by `a` and false by `b`, plus a filter on it, and a nested pair composes as
+   * `stream.between(c, d).between(a, b)` — so an event fires when the innermost stream matches and
+   * every latch is open, each latch minding only its own pair. `NestedBetweenTest` covers it in
+   * full; this keeps the case in the class that used to refuse it.
+   */
   @Test
-  fun `a nested between is reported rather than half-dispatched`() {
-    val d = dispatcher(binding("s", "[click, click] > [mousedown, mouseup] > mousemove"))
-    assertEquals("", fired(d, event("mousemove")))
+  fun `a nested between is gated by every latch in the chain`() {
+    val d = dispatcher(binding("s", "[keydown, keyup] > [mousedown, mouseup] > mousemove"))
+    assertEquals("", fired(d, event("mousemove")), "it fired with both latches shut")
+    d.dispatch(event("keydown"))
+    assertEquals("", fired(d, event("mousemove")), "one latch was enough")
+    d.dispatch(event("mousedown"))
+    assertEquals("s", fired(d, event("mousemove")), "both latches are open and it did not fire")
     assertTrue(
-      diagnostics.diagnostics.any { it.message.contains("wrapping another 'between'") },
+      diagnostics.diagnostics.none { it.message.contains("wrapping another") },
       diagnostics.diagnostics.toString(),
     )
   }

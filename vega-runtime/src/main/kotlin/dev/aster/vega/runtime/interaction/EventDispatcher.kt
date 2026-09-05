@@ -234,8 +234,15 @@ public class EventDispatcher(
     var open: Boolean = false
   }
 
-  /** The gate a stream must pass, or null if it has none. */
-  private val gateOf = HashMap<Watch, Gate>()
+  /**
+   * The gates a stream must pass, all of them open, or absent if it has none.
+   *
+   * A **list** because a `between` composes: `[a, b] > [c, d] > mousemove` is upstream's
+   * `stream.between(c, d).between(a, b)`, and `between` is a latch plus a filter — so an event
+   * fires only where every latch in the chain is open. There is no ordering between them to get
+   * wrong, which is what makes the chain expressible at all.
+   */
+  private val gateOf = HashMap<Watch, List<Gate>>()
 
   private val watches = mutableListOf<Watch>()
 
@@ -248,20 +255,36 @@ public class EventDispatcher(
     }
   }
 
-  private fun register(stream: EventStream, binding: HandlerBinding) {
+  private fun register(declared: EventStream, binding: HandlerBinding) {
+    // **The chain, resolved first**, because everything below asks what this stream *listens to*
+    // and a wrapper does not know. A `between` composes: `[a, b] > [c, d] > mousemove` arrives as
+    // two wrappers around one ordinary stream, and only the innermost carries a source, a type and
+    // a mark. Asking the outer one whether it is a timer, a `window:` stream or a `keyup` gets the
+    // defaults every time.
+    //
+    // What each wrapper adds is a gate the event has to pass. Upstream composes these as
+    // `stream.between(c, d).between(a, b)`, and `between` is a latch plus a filter — so "gating a
+    // gate" is just "every latch open". This was refused by name until the composition was read
+    // rather than guessed at: the diagnostic said the ordering could not be known, and there is no
+    // ordering, since each latch is opened and closed by its own pair independently of the others.
+    val chain = generateSequence(declared) { it.nested }.toList()
+    val listened = chain.last()
+    // A wrapper's own filter, throttle, debounce and `consume` apply to the composed stream, so
+    // they are merged onto the one that does the matching. Two throttles in a chain would be two
+    // limits in series and are **not** modelled: the outermost wins, which is upstream's
+    // last-applied.
+    val stream =
+      if (chain.size == 1) {
+        declared
+      } else {
+        listened.copy(
+          filters = chain.flatMap { it.filters },
+          throttle = chain.firstNotNullOfOrNull { it.throttle },
+          debounce = chain.firstNotNullOfOrNull { it.debounce },
+          consume = chain.any { it.consume },
+        )
+      }
     if (!permitted(stream, binding)) return
-    if (stream.nested != null) {
-      // A pair wrapping a pair. Honouring it means gating a gate, which the latch model can do,
-      // but nothing in the corpus uses it and guessing at the ordering would be worse than saying
-      // so.
-      diagnostics.warn(
-        DiagnosticCodes.INTERACTION_UNSUPPORTED,
-        "A 'between' selector wrapping another 'between' is not dispatched; signal " +
-          "'${binding.signalName}' will not update from it",
-        operator = binding.signalName,
-      )
-      return
-    }
     // `keyup` and `keypress` are events upstream's handler binds and this engine cannot produce: a
     // host reports one `ChartInputEvent.Key` per press, with no phase, so there is nothing to tell
     // a release from a repeat. Refused by name rather than left to never match, because a signal
@@ -277,12 +300,18 @@ public class EventDispatcher(
       return
     }
     val watch = Watch(stream, binding, binding.scopePath)
-    if (stream.between.size == 2) {
-      val gate = Gate()
-      gateOf[watch] = gate
-      gateWatches += Watch(stream.between[0], null, binding.scopePath, opens = mutableListOf(gate))
-      gateWatches += Watch(stream.between[1], null, binding.scopePath, closes = mutableListOf(gate))
-    }
+    val gates =
+      chain
+        .filter { it.between.size == 2 }
+        .map { link ->
+          val gate = Gate()
+          gateWatches +=
+            Watch(link.between[0], null, binding.scopePath, opens = mutableListOf(gate))
+          gateWatches +=
+            Watch(link.between[1], null, binding.scopePath, closes = mutableListOf(gate))
+          gate
+        }
+    if (gates.isNotEmpty()) gateOf[watch] = gates
     if (stream.source == EventStream.SOURCE_TIMER && deferrable) {
       // Someone else has the clock; the controller starts it and this stream is not dispatched from
       // an input event at all.
@@ -358,7 +387,7 @@ public class EventDispatcher(
     for (watch in watches) {
       val binding = watch.binding ?: continue
       if (!matches(watch.stream, event, scopeFor(watch.scopePath), watch.scopePath)) continue
-      if (gateOf[watch]?.open == false) continue
+      if (gateOf[watch]?.any { !it.open } == true) continue
       val throttle = watch.stream.throttle
       val since = watch.lastFired
       if (throttle != null && since != null && event.timestampMillis - since < throttle) continue

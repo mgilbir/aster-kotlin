@@ -108,6 +108,7 @@ private val EVENT_STREAM_CONSUMED =
     "debounce",
     "consume",
     "between",
+    "stream",
   )
 
 private val AXIS_CONSUMED =
@@ -1613,6 +1614,35 @@ public class SpecParser {
     path: String,
     defaultSource: String,
   ): EventStream? {
+    // **A `stream` key wraps another stream**, which is upstream's `nestedStream`: the inner one
+    // says what to listen to and this one adds a `between`, a filter or a throttle on top of it.
+    // The outer therefore has no `type` of its own, which is why this is answered before the
+    // missing-`type` error below rather than after it.
+    //
+    // It used to fall straight into that error, and the error was the misleading part: a wrapper
+    // has no `type` **because it is a wrapper**, so "An event stream object needs a 'type'" told an
+    // author to add the one thing this form correctly omits. The handler was dropped, so a
+    // specification gating its mouse moves the long way round got nothing, pointed at the wrong
+    // fix.
+    (obj.fields["stream"] as? VegaValue.Obj)?.let { inner ->
+      val nested = parseEventStreamObject(inner, "$path.stream", defaultSource) ?: return null
+      obj.reportUnhandled("Event stream", path, EVENT_STREAM_CONSUMED)
+      return EventStream(
+        // Everything the wrapper may add to what it wraps. No `source`, `type`, `marktype` or
+        // `markname`: those say what to listen to, and the inner stream has already said it.
+        filters = obj.eventFilters(),
+        throttle = obj.fields["throttle"]?.asDouble()?.takeIf { !it.isNaN() && it != 0.0 },
+        debounce = obj.fields["debounce"]?.asDouble()?.takeIf { !it.isNaN() && it != 0.0 },
+        consume = (obj.fields["consume"] as? VegaValue.Bool)?.value ?: false,
+        between =
+          (obj.fields["between"] as? VegaValue.Arr)?.values?.mapNotNull {
+            (it as? VegaValue.Obj)?.let { child ->
+              parseEventStreamObject(child, "$path.between", defaultSource)
+            }
+          } ?: emptyList(),
+        nested = nested,
+      )
+    }
     val type = obj.fields["type"]?.asString()
     if (type.isNullOrEmpty()) {
       diagnostics.error(
