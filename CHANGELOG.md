@@ -6,6 +6,30 @@ section here does not get released.
 
 ## Unreleased
 
+### Fixed
+
+- **A label's turn and anchor are resolved per tick, and two false warnings are gone.** The row
+  named `angle` as *the* guide encode channel with no per-item path — "it folds into `labelAngle` or
+  it is nothing". Upstream has a path for it: `axis-labels.js` builds `angle: _('labelAngle')` into
+  the label mark's own encode block and then extends it with whatever the specification wrote, so a
+  conditional angle is resolved by the mark encoder exactly like a conditional fill. One line in
+  `AxisBuilder` was still asking the axis instead of the tick, in a loop where `fill`, `fontSize`,
+  `x`, `dx` and `dy` were already per tick.
+
+  `align` and `baseline` were worse: the loop had resolved both per tick since it was written —
+  `labelString(spec, "align", tick)` sits beside the `fill` the list already claimed — and the
+  parser reported them as constants-only regardless. That is the same false direction this row was
+  rewritten once before to remove: telling a reader their chart will not work when it already does.
+
+  Found by asking the parser one channel at a time rather than by reading it, which is also how the
+  first round was found. `guide-encode-datum` now turns one label and moves the anchor of two
+  others, and matches upstream on all of it; reverting the angle line fails it naming
+  `text/axis-label[3].angle: expected -45, got 0`.
+
+  `SubsetIsReportedTest` now pins `font` and `lineHeight`, which genuinely have no per-tick path,
+  and asserts that the three above are **not** reported — the list and the fixture are meant to be
+  disjoint, and this is the third time a channel has been named in the wrong one.
+
 ### Added
 
 - **An unnamed group's own scales are compared against upstream.** The last surviving form of the

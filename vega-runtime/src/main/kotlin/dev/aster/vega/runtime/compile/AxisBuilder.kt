@@ -414,7 +414,16 @@ public class AxisBuilder(
             layout = layout,
             // The angle alone: upstream leaves the alignment and baseline where the orientation put
             // them, so a turned label pivots about its anchor rather than being re-hung from it.
-            angleDegrees = labelAngle,
+            //
+            // **Per tick**, like everything else in this loop. This read the folded `labelAngle`
+            // and nothing else, so a `field` or a conditional on `encode.labels.update.angle` was
+            // dropped and reported as a channel with no per-item path. It has the same path the
+            // rest of them do: upstream builds `angle: _('labelAngle')` into the label mark's own
+            // encode block and then extends it with the specification's, so a conditional angle is
+            // resolved by the mark encoder exactly like a conditional fill. `labelChannel` already
+            // resolved `fontSize`, `x`, `dx` and `dy` that way; the angle was the one line still
+            // asking the axis instead of the tick.
+            angleDegrees = labelChannel(spec, "angle", tick) ?: labelAngle,
             // Per tick, not once: a label's own `encode` may colour it from its **datum** —
             // `[{"test": "datum.value >= 4", "value": "#d62728"}, ...]` — which no axis property
             // can say, because the rule is about the tick rather than the axis. The line parts

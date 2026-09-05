@@ -628,11 +628,18 @@ private val GUIDE_ITEM_CHANNELS =
  */
 private val DATUM_RESOLVED_GUIDE_CHANNELS =
   setOf(
-    // A label's own text, colour and type, from its tick's value.
+    // A label's own text, colour, type, turn and anchor, from its tick's value.
     "labels.text",
     "labels.fill",
     "labels.fontWeight",
     "labels.fontSize",
+    "labels.angle",
+    // `align` and `baseline` were reported as constants-only while the label loop had been
+    // resolving both per tick since it was written — `labelString(spec, "align", tick)` is right
+    // there beside the `fill` this list already claimed. The same false direction the row's own
+    // note warns about: telling a reader their chart will not work when it already does.
+    "labels.align",
+    "labels.baseline",
     // The stroke family on each of the three line parts, through `strokeFor`.
     "grid.stroke",
     "grid.strokeWidth",

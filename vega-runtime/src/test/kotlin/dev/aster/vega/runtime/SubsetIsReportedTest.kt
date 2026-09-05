@@ -99,24 +99,43 @@ class SubsetIsReportedTest {
       """
         .trimIndent()
 
-    // A channel **no** builder reads per item. `labels.angle` is folded into `labelAngle` or it is
-    // nothing: there is no per-tick path for it, so a conditional really is dropped and really is
-    // reported. This used to be asserted of `grid.stroke`, which was wrong — `strokeFor` had been
-    // resolving that per tick since it was written, and the warning told a reader their chart would
-    // not work when it already did.
+    // A channel **no** builder reads per item. A label's `font` and `lineHeight` fold into
+    // `labelFont` and `labelLineHeight` or they are nothing: the style is resolved once for the
+    // axis — `labelStyleFor` varies the weight and the size and says so — so a conditional really
+    // is dropped and really is reported.
+    //
+    // This has now been asserted of two channels that turned out to work, which is the failure
+    // this class is most prone to. It was `grid.stroke` first — `strokeFor` had resolved that per
+    // tick since it was written — and then `labels.angle`, which upstream builds into the label
+    // mark's own encode block and which now resolves per tick here too. Each time the warning told
+    // a reader their chart would not work when it already did. So the channel named here is one
+    // `guide-encode-datum` does **not** exercise, and that is the point: this list and that fixture
+    // are meant to be disjoint.
     assertTrue(
       reports(
         axis(
-          """{"labels": {"update": {"angle": [{"test": "true", "value": 45}, {"value": 0}]}}}"""
+          """{"labels": {"update": {"font": [{"test": "true", "value": "serif"}, """ +
+            """{"value": "sans-serif"}]}}}"""
         ),
-        "'angle'",
+        "'font'",
       ),
       "a conditional on a channel with no per-item path was dropped in silence",
     )
     assertTrue(
-      reports(axis("""{"labels": {"update": {"angle": {"field": "value"}}}}"""), "'angle'"),
+      reports(
+        axis("""{"labels": {"update": {"lineHeight": {"field": "value"}}}}"""),
+        "'lineHeight'",
+      ),
       "a field-valued channel with no per-item path was dropped in silence",
     )
+    // And the two that were being reported wrongly are not any more. `guide-encode-datum` proves
+    // each against upstream: a label turned at one tick, and its anchor moved at two others.
+    for (channel in listOf("angle", "align", "baseline")) {
+      assertFalse(
+        reports(axis("""{"labels": {"update": {"$channel": {"field": "value"}}}}"""), "'$channel'"),
+        "'$channel' is resolved per tick and is still reported as constants-only",
+      )
+    }
   }
 
   /**
