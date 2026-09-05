@@ -6,6 +6,23 @@ section here does not get released.
 
 ## Unreleased
 
+### Added
+
+- **The Android canvas is checked against the scene it was given, the way the SVG export already
+  is** (#244). `SvgWalkSelectionTest` asserts on the JVM that the export paints exactly what the
+  scene says; the primary renderer had no equivalent, so the four guards in `paintsNothing` were
+  taken on trust there.
+
+  `AndroidWalkSelectionTest` counts by **intercepting the real `Canvas`** — a subclass that tallies
+  `drawText` and `drawLine` and then delegates — so it is a statement about the renderer's own
+  behaviour rather than about a parallel implementation of it. A hidden label, an invisible one, one
+  with no text property and one with no usable anchor are put in front of it together with a label
+  that should be drawn, and one call arrives. Stripping the guard back to `visible` alone paints
+  four of the five.
+
+  It runs where the other instrumented suites run: on a device, and in CI at API 26 and 36 through
+  `instrumented.yml`.
+
 ### Fixed
 
 - **A corner radius too large for its bar is clamped by the scene, so every renderer draws the same
