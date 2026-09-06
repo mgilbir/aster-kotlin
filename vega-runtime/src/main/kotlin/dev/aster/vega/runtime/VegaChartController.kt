@@ -48,7 +48,6 @@ import dev.aster.vega.scene.NodeMetadata
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.Scene
-import dev.aster.vega.scene.SceneColor
 import dev.aster.vega.scene.SceneHitIndex
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeId
@@ -518,6 +517,19 @@ public class VegaChartController(
 
   /** Hit index for the current scene, rebuilt only when the scene itself changes. */
   private var hitIndex: SceneHitIndex = SceneHitIndex(initialScene, HitTestOptions.Touch)
+  /**
+   * How the focus ring is drawn, and whether a pointer draws one at all.
+   *
+   * Setting it republishes, so a host can change it while a ring is on screen and see the change.
+   */
+  public var focusRing: FocusRing = FocusRing()
+    set(value) {
+      if (field == value) return
+      field = value
+      val current = _state.value.snapshot.interactionState
+      if (current.focusedNodeId != null) publishInteraction(current)
+    }
+
   private var hitOptions: HitTestOptions = HitTestOptions.Touch
 
   public val snapshot: ChartSnapshot
@@ -559,7 +571,7 @@ public class VegaChartController(
         snapshot =
           ChartSnapshot(
             scene = scene.copy(revision = revision),
-            interactionState = previous.snapshot.interactionState,
+            interactionState = previous.snapshot.interactionState.forNewChart(),
             revision = revision,
           ),
         isLoading = false,
@@ -650,6 +662,14 @@ public class VegaChartController(
     // causes; a new specification is the one time that would be wrong, since the latch belongs to
     // streams that no longer exist.
     vegaEvents = null
+    // The same argument for what the *reader* is pointing at: a tooltip, a selection and a focus
+    // ring name marks in the document being replaced. Carried across a recompile, dropped for a new
+    // one.
+    _state.update {
+      it.copy(
+        snapshot = it.snapshot.copy(interactionState = it.snapshot.interactionState.forNewChart())
+      )
+    }
     return publish(compiled)
   }
 
@@ -759,6 +779,14 @@ public class VegaChartController(
     // causes; a new specification is the one time that would be wrong, since the latch belongs to
     // streams that no longer exist.
     vegaEvents = null
+    // The same argument for what the *reader* is pointing at: a tooltip, a selection and a focus
+    // ring name marks in the document being replaced. Carried across a recompile, dropped for a new
+    // one.
+    _state.update {
+      it.copy(
+        snapshot = it.snapshot.copy(interactionState = it.snapshot.interactionState.forNewChart())
+      )
+    }
     return publish(compiled)
   }
 
@@ -1597,7 +1625,7 @@ public class VegaChartController(
     fun focus(index: Int): Boolean {
       val target = elements.getOrNull(index) ?: return false
       if (target.nodeId == current.focusedNodeId) return false
-      publishInteraction(current.copy(focusedNodeId = target.nodeId))
+      publishInteraction(current.copy(focusedNodeId = target.nodeId, focusVisible = true))
       return true
     }
 
@@ -1645,7 +1673,7 @@ public class VegaChartController(
         nodeIds = setOf(id),
         datumIds = node.metadata.datumId?.let { setOf(it) } ?: emptySet(),
       )
-    publishInteraction(current.copy(selection = selection, focusedNodeId = id))
+    publishInteraction(current.copy(selection = selection, focusedNodeId = id, focusVisible = true))
     val centre = PointD(element.bounds.centerX, element.bounds.centerY)
     emit(ChartEvent.MarkClicked(id, node.metadata.markName, datumOf(node), centre))
     emit(ChartEvent.SelectionChanged(selection))
@@ -1676,7 +1704,13 @@ public class VegaChartController(
         nodeIds = setOf(node.id),
         datumIds = node.metadata.datumId?.let { setOf(it) } ?: emptySet(),
       )
-    publishInteraction(current.copy(selection = selection, focusedNodeId = node.id))
+    publishInteraction(
+      current.copy(
+        selection = selection,
+        focusedNodeId = node.id,
+        focusVisible = focusRing.showsOnPointer,
+      )
+    )
     emit(ChartEvent.MarkClicked(node.id, node.metadata.markName, datumOf(node), point))
     emit(ChartEvent.SelectionChanged(selection))
   }
@@ -1940,7 +1974,7 @@ public class VegaChartController(
   public fun focusNode(nodeId: SceneNodeId?): Boolean {
     val current = _state.value.snapshot.interactionState
     if (current.focusedNodeId == nodeId) return false
-    publishInteraction(current.copy(focusedNodeId = nodeId))
+    publishInteraction(current.copy(focusedNodeId = nodeId, focusVisible = true))
     return true
   }
 
@@ -2029,12 +2063,12 @@ public class VegaChartController(
     val ring =
       RectNode(
         id = focusRingId,
-        x = bounds.left - FOCUS_RING_INSET,
-        y = bounds.top - FOCUS_RING_INSET,
-        width = bounds.width + FOCUS_RING_INSET * 2,
-        height = bounds.height + FOCUS_RING_INSET * 2,
+        x = bounds.left - focusRing.inset,
+        y = bounds.top - focusRing.inset,
+        width = bounds.width + focusRing.inset * 2,
+        height = bounds.height + focusRing.inset * 2,
         fill = null,
-        stroke = Stroke(paint = ScenePaint.Solid(FOCUS_RING_COLOUR), width = FOCUS_RING_WIDTH),
+        stroke = Stroke(paint = ScenePaint.Solid(focusRing.colour), width = focusRing.width),
         metadata = NodeMetadata(interactive = false),
       )
     return scene.copy(root = scene.root.copy(children = scene.root.children + ring))
@@ -2069,7 +2103,13 @@ public class VegaChartController(
     // focus comes through this one, and the ring has to follow — it is drawn at the focused mark's
     // *world* bounds, so it also has to move when a pan or a zoom moves the mark under it. Stripped
     // first so the ring is never drawn twice or left behind by a focus that cleared.
-    val focused = focusedScene(withoutFocusRing(scene), interaction.focusedNodeId)
+    // `focusVisible`, not merely `focusedNodeId`: focus follows a tap so that arrowing on from a
+    // tapped mark carries on from there, and the ring is what stays behind. See `FocusRing`.
+    val focused =
+      focusedScene(
+        withoutFocusRing(scene),
+        interaction.focusedNodeId.takeIf { interaction.focusVisible },
+      )
     _state.update {
       it.copy(
         snapshot =
@@ -2121,26 +2161,6 @@ public class VegaChartController(
      * narrowed an axis a long way has to be able to get back out the way they came, one step at a
      * time, without the widening end running out first.
      */
-    /**
-     * How far the focus ring sits outside the mark it surrounds, and how thick it is.
-     *
-     * Outside rather than on the outline, so a ring around a thin mark — a rule, a tick — is still
-     * a ring rather than a thicker version of the mark. Two units is enough to read at a glance and
-     * small enough that a ring around a dense scatter's point does not swallow its neighbours.
-     */
-    public const val FOCUS_RING_INSET: Double = 2.0
-
-    /**
-     * The ring's colour: the platform-neutral blue every focus indicator converges on.
-     *
-     * Not taken from the chart, deliberately. A focus ring has to be findable against whatever the
-     * specification chose to paint, and a colour derived from the chart is a colour that can match
-     * the mark it is meant to distinguish.
-     */
-    public val FOCUS_RING_COLOUR: SceneColor = SceneColor(0x1A / 255.0, 0x73 / 255.0, 0xE8 / 255.0)
-
-    public const val FOCUS_RING_WIDTH: Double = 2.0
-
     public const val MIN_DOMAIN_FACTOR: Double = 1.0 / 50.0
 
     public const val MAX_DOMAIN_FACTOR: Double = 50.0
