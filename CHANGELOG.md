@@ -6,7 +6,26 @@ section here does not get released.
 
 ## Unreleased
 
-### Added
+### Fixed
+
+- **A hand-authored scene replaces the compiled chart, instead of being replaced by it at the first
+  touch.** `setScene` published the scene and the hit index and left behind every field the
+  specification path installs — `lastCompiled`, `loadedSpecJson`, the event dispatcher, the running
+  timers, the scale fingerprints. Eight code paths then went on answering about a chart that was no
+  longer on screen.
+
+  Two of them put it back. `hoveredScene` reads `lastCompiled` for the base it applies a hover
+  variant to, so the first **hover** after switching from a specification to a scene republished the
+  specification's chart; and because `handleTap` hovers before it selects, a tap on a touch screen
+  took that path before it ever reached the selection. `adoptContainerSize` is the other: it
+  recompiles `loadedSpecJson` when a host reports a new size, so on a specification that reads
+  `containerSize()` a layout pass alone was enough.
+
+  **It reads as three faults and is one.** The hit index had been replaced and the scene had not, so
+  the tooltip and the selection answered for the chart that was supposed to be there while a
+  different chart was drawn underneath: a selection that will not clear, a tooltip in the wrong
+  place, and a chart drawn outside the box it was given. Found by using the demo, which is the only
+  place the two paths meet — the built-in charts are scenes and the pasted ones are specifications.
 
 - **The Android canvas is checked against the scene it was given, the way the SVG export already
   is** (#244). `SvgWalkSelectionTest` asserts on the JVM that the export paints exactly what the

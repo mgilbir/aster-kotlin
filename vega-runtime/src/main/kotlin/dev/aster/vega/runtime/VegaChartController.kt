@@ -528,6 +528,30 @@ public class VegaChartController(
    * revisions rather than diffing the scene.
    */
   public fun setScene(scene: Scene) {
+    // **A hand-authored scene replaces the compiled chart**, so everything a specification left
+    // behind stops describing what is on screen and has to go with it.
+    //
+    // Leaving it was not inert, and the demo showed all of it at once. `hoveredScene` reads
+    // `lastCompiled` for the base it applies a hover variant to, so the first *hover* after
+    // switching from a specification to a scene republished the specification's chart — the
+    // hand-authored one vanished under a chart the reader had moved away from, while the hit index
+    // and the tooltip still answered for the scene that was supposed to be there. That reads as
+    // three separate faults: a selection that will not clear, a tooltip in the wrong place, and a
+    // chart drawn outside the box it was given.
+    //
+    // `adoptContainerSize` is the second route to the same place: it recompiles `loadedSpecJson`
+    // when a host reports a new size, so a resize alone was enough to put the old chart back.
+    // `setSignal`, the timer tick and the scale-fingerprint comparison ask the same fields.
+    //
+    // Cleared in the order the specification path installs them — timers first, since a tick that
+    // arrives mid-teardown would recompile from the json this is about to drop.
+    stopTimers()
+    vegaEvents = null
+    lastCompiled = null
+    loadedSpecJson = null
+    scaleFingerprints = emptyMap()
+    signals.reset()
+
     val revision = nextRevision.fetchAndIncrement()
     hitIndex = SceneHitIndex(scene, hitOptions)
     _state.update { previous ->
