@@ -72,10 +72,10 @@ class FocusRingTest {
     // rather than a thicker version of itself.
     val mark =
       controller.state.value.snapshot.scene.flatten().first { it.node.id == focused }.worldBounds
-    assertEquals(mark.left - VegaChartController.FOCUS_RING_INSET, drawn!!.x, 1e-9)
-    assertEquals(mark.top - VegaChartController.FOCUS_RING_INSET, drawn.y, 1e-9)
-    assertEquals(mark.width + VegaChartController.FOCUS_RING_INSET * 2, drawn.width, 1e-9)
-    assertEquals(mark.height + VegaChartController.FOCUS_RING_INSET * 2, drawn.height, 1e-9)
+    assertEquals(mark.left - FocusRing().inset, drawn!!.x, 1e-9)
+    assertEquals(mark.top - FocusRing().inset, drawn.y, 1e-9)
+    assertEquals(mark.width + FocusRing().inset * 2, drawn.width, 1e-9)
+    assertEquals(mark.height + FocusRing().inset * 2, drawn.height, 1e-9)
     // An outline, not a fill: the mark's own paint has to stay visible underneath.
     assertNull(drawn.fill, "the focus ring is filled, so it hides the mark it surrounds")
     assertNotNull(drawn.stroke, "the focus ring has no outline")

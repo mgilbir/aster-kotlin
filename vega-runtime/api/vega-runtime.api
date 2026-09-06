@@ -306,6 +306,25 @@ public final class dev/aster/vega/runtime/ChartState$Companion {
 	public final fun empty ()Ldev/aster/vega/runtime/ChartState;
 }
 
+public final class dev/aster/vega/runtime/FocusRing {
+	public fun <init> ()V
+	public fun <init> (DDLdev/aster/vega/scene/SceneColor;Z)V
+	public synthetic fun <init> (DDLdev/aster/vega/scene/SceneColor;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()Ldev/aster/vega/scene/SceneColor;
+	public final fun component4 ()Z
+	public final fun copy (DDLdev/aster/vega/scene/SceneColor;Z)Ldev/aster/vega/runtime/FocusRing;
+	public static synthetic fun copy$default (Ldev/aster/vega/runtime/FocusRing;DDLdev/aster/vega/scene/SceneColor;ZILjava/lang/Object;)Ldev/aster/vega/runtime/FocusRing;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getColour ()Ldev/aster/vega/scene/SceneColor;
+	public final fun getInset ()D
+	public final fun getShowsOnPointer ()Z
+	public final fun getWidth ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class dev/aster/vega/runtime/ForeignData {
 	public static final field INSTANCE Ldev/aster/vega/runtime/ForeignData;
 	public final fun instant (D)Ldev/aster/vega/model/VegaValue;
@@ -343,20 +362,23 @@ public final class dev/aster/vega/runtime/GesturePhase : java/lang/Enum {
 
 public final class dev/aster/vega/runtime/InteractionState {
 	public static final field Companion Ldev/aster/vega/runtime/InteractionState$Companion;
-	public synthetic fun <init> (Ldev/aster/vega/scene/SceneNodeId;Ldev/aster/vega/scene/SceneNodeId;Ldev/aster/vega/runtime/ChartSelection;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/scene/PointD;Ljava/lang/String;Ldev/aster/vega/scene/VectorD;DILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Ldev/aster/vega/scene/SceneNodeId;Ldev/aster/vega/scene/SceneNodeId;Ldev/aster/vega/runtime/ChartSelection;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/scene/PointD;Ljava/lang/String;Ldev/aster/vega/scene/VectorD;DLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ldev/aster/vega/scene/SceneNodeId;Ldev/aster/vega/scene/SceneNodeId;ZLdev/aster/vega/runtime/ChartSelection;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/scene/PointD;Ljava/lang/String;Ldev/aster/vega/scene/VectorD;DILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ldev/aster/vega/scene/SceneNodeId;Ldev/aster/vega/scene/SceneNodeId;ZLdev/aster/vega/runtime/ChartSelection;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/scene/PointD;Ljava/lang/String;Ldev/aster/vega/scene/VectorD;DLkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1-0z_ufP4 ()Ldev/aster/vega/scene/SceneNodeId;
 	public final fun component2-0z_ufP4 ()Ldev/aster/vega/scene/SceneNodeId;
-	public final fun component3 ()Ldev/aster/vega/runtime/ChartSelection;
-	public final fun component4 ()Ldev/aster/vega/model/VegaValue;
-	public final fun component5 ()Ldev/aster/vega/scene/PointD;
-	public final fun component6 ()Ljava/lang/String;
-	public final fun component7 ()Ldev/aster/vega/scene/VectorD;
-	public final fun component8 ()D
-	public final fun copy-HwCeyvo (Ldev/aster/vega/scene/SceneNodeId;Ldev/aster/vega/scene/SceneNodeId;Ldev/aster/vega/runtime/ChartSelection;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/scene/PointD;Ljava/lang/String;Ldev/aster/vega/scene/VectorD;D)Ldev/aster/vega/runtime/InteractionState;
-	public static synthetic fun copy-HwCeyvo$default (Ldev/aster/vega/runtime/InteractionState;Ldev/aster/vega/scene/SceneNodeId;Ldev/aster/vega/scene/SceneNodeId;Ldev/aster/vega/runtime/ChartSelection;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/scene/PointD;Ljava/lang/String;Ldev/aster/vega/scene/VectorD;DILjava/lang/Object;)Ldev/aster/vega/runtime/InteractionState;
+	public final fun component3 ()Z
+	public final fun component4 ()Ldev/aster/vega/runtime/ChartSelection;
+	public final fun component5 ()Ldev/aster/vega/model/VegaValue;
+	public final fun component6 ()Ldev/aster/vega/scene/PointD;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()Ldev/aster/vega/scene/VectorD;
+	public final fun component9 ()D
+	public final fun copy-mYIHWxI (Ldev/aster/vega/scene/SceneNodeId;Ldev/aster/vega/scene/SceneNodeId;ZLdev/aster/vega/runtime/ChartSelection;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/scene/PointD;Ljava/lang/String;Ldev/aster/vega/scene/VectorD;D)Ldev/aster/vega/runtime/InteractionState;
+	public static synthetic fun copy-mYIHWxI$default (Ldev/aster/vega/runtime/InteractionState;Ldev/aster/vega/scene/SceneNodeId;Ldev/aster/vega/scene/SceneNodeId;ZLdev/aster/vega/runtime/ChartSelection;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/scene/PointD;Ljava/lang/String;Ldev/aster/vega/scene/VectorD;DILjava/lang/Object;)Ldev/aster/vega/runtime/InteractionState;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun forNewChart ()Ldev/aster/vega/runtime/InteractionState;
 	public final fun getCursor ()Ljava/lang/String;
+	public final fun getFocusVisible ()Z
 	public final fun getFocusedNodeId-0z_ufP4 ()Ldev/aster/vega/scene/SceneNodeId;
 	public final fun getHoveredNodeId-0z_ufP4 ()Ldev/aster/vega/scene/SceneNodeId;
 	public final fun getSelection ()Ldev/aster/vega/runtime/ChartSelection;
@@ -441,8 +463,6 @@ public final class dev/aster/vega/runtime/TooltipRow {
 public final class dev/aster/vega/runtime/VegaChartController {
 	public static final field Companion Ldev/aster/vega/runtime/VegaChartController$Companion;
 	public static final field DOMAIN_STEP D
-	public static final field FOCUS_RING_INSET D
-	public static final field FOCUS_RING_WIDTH D
 	public static final field MAX_DOMAIN_FACTOR D
 	public static final field MAX_ZOOM D
 	public static final field MIN_DOMAIN_FACTOR D
@@ -460,6 +480,7 @@ public final class dev/aster/vega/runtime/VegaChartController {
 	public final fun getContentScale ()D
 	public final fun getDiagnostics ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getEvents ()Lkotlinx/coroutines/flow/Flow;
+	public final fun getFocusRing ()Ldev/aster/vega/runtime/FocusRing;
 	public final fun getHostData ()Ljava/util/Map;
 	public final fun getInputs ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getLastCompiled ()Ldev/aster/vega/runtime/compile/CompiledSpec;
@@ -479,6 +500,7 @@ public final class dev/aster/vega/runtime/VegaChartController {
 	public static synthetic fun setContainerSizeAsync$default (Ldev/aster/vega/runtime/VegaChartController;Ldev/aster/vega/scene/SizeD;Lkotlinx/coroutines/CoroutineDispatcher;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun setContentScale (D)V
 	public final fun setData (Ljava/lang/String;Ljava/util/List;)V
+	public final fun setFocusRing (Ldev/aster/vega/runtime/FocusRing;)V
 	public final fun setHitTestOptions (Ldev/aster/vega/scene/HitTestOptions;)V
 	public final fun setHostData (Ljava/util/Map;)V
 	public final fun setScene (Ldev/aster/vega/scene/Scene;)V
@@ -494,7 +516,6 @@ public final class dev/aster/vega/runtime/VegaChartController$Companion {
 	public final fun fromScene (Ldev/aster/vega/scene/Scene;)Ldev/aster/vega/runtime/VegaChartController;
 	public final fun fromSpec (Ljava/lang/String;Ldev/aster/vega/scene/TextEngine;)Lkotlin/Pair;
 	public static synthetic fun fromSpec$default (Ldev/aster/vega/runtime/VegaChartController$Companion;Ljava/lang/String;Ldev/aster/vega/scene/TextEngine;ILjava/lang/Object;)Lkotlin/Pair;
-	public final fun getFOCUS_RING_COLOUR ()Ldev/aster/vega/scene/SceneColor;
 }
 
 public final class dev/aster/vega/runtime/compile/AxisBuilder {

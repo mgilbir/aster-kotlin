@@ -6,7 +6,55 @@ section here does not get released.
 
 ## Unreleased
 
-### Added
+### Changed
+
+- **A tap no longer draws the focus ring, and a host can style it or ask for it back.** Every click
+  outlined the mark it hit, which reads as clutter and says "focused" about something the reader is
+  looking straight at. The ring exists so that someone moving through a chart with **arrow keys** can
+  see where they are, and that is now when it is drawn — the web's `:focus-visible` rule.
+
+  Focus still *moves* on a tap, so arrowing on from a mark just tapped carries on from there rather
+  than starting again; `InteractionState.focusVisible` is the new distinction between focus and a
+  drawn ring. A host that wants the old behaviour — a kiosk driven entirely by touch, where nothing
+  else indicates the current mark — sets `FocusRing(showsOnPointer = true)`, and the same type
+  carries the ring's inset, width and colour. Setting `VegaChartController.focusRing` republishes, so
+  a restyle shows while a ring is on screen.
+
+  `FOCUS_RING_INSET`, `FOCUS_RING_WIDTH` and `FOCUS_RING_COLOUR` are gone from
+  `VegaChartController`; they are `FocusRing`'s defaults, which is one place rather than two.
+
+### Fixed
+
+- **A tooltip, a selection and a focus ring do not outlive the chart they name.** Tapping a stacked
+  bar and then switching to the line chart left the tooltip sitting on top of it. `setScene` and a
+  new specification both carried `InteractionState` across unchanged, and every field in it that
+  names a mark — the hover, the focus, the selection, the tooltip and its anchor — pointed at a
+  `SceneNodeId` from the scene being replaced.
+
+  Now dropped by `InteractionState.forNewChart()` wherever the chart is replaced, on the same
+  argument the dispatcher was already reset on: a latch belongs to streams that no longer exist, and
+  so does a selection. **The viewport is kept**, which is the line between the two halves of that
+  class: a pan and a zoom are a statement about the surface rather than about any mark, so they
+  survive the recompile that carrying this state across exists for.
+
+- **A hand-authored scene replaces the compiled chart, instead of being replaced by it at the first
+  touch.** `setScene` published the scene and the hit index and left behind every field the
+  specification path installs — `lastCompiled`, `loadedSpecJson`, the event dispatcher, the running
+  timers, the scale fingerprints. Eight code paths then went on answering about a chart that was no
+  longer on screen.
+
+  Two of them put it back. `hoveredScene` reads `lastCompiled` for the base it applies a hover
+  variant to, so the first **hover** after switching from a specification to a scene republished the
+  specification's chart; and because `handleTap` hovers before it selects, a tap on a touch screen
+  took that path before it ever reached the selection. `adoptContainerSize` is the other: it
+  recompiles `loadedSpecJson` when a host reports a new size, so on a specification that reads
+  `containerSize()` a layout pass alone was enough.
+
+  **It reads as three faults and is one.** The hit index had been replaced and the scene had not, so
+  the tooltip and the selection answered for the chart that was supposed to be there while a
+  different chart was drawn underneath: a selection that will not clear, a tooltip in the wrong
+  place, and a chart drawn outside the box it was given. Found by using the demo, which is the only
+  place the two paths meet — the built-in charts are scenes and the pasted ones are specifications.
 
 - **The Android canvas is checked against the scene it was given, the way the SVG export already
   is** (#244). `SvgWalkSelectionTest` asserts on the JVM that the export paints exactly what the
