@@ -1185,10 +1185,12 @@ final class dev.aster.vega.runtime/ChartState { // dev.aster.vega.runtime/ChartS
 }
 
 final class dev.aster.vega.runtime/FocusRing { // dev.aster.vega.runtime/FocusRing|null[0]
-    constructor <init>(kotlin/Double = ..., kotlin/Double = ..., dev.aster.vega.scene/SceneColor = ..., kotlin/Boolean = ...) // dev.aster.vega.runtime/FocusRing.<init>|<init>(kotlin.Double;kotlin.Double;dev.aster.vega.scene.SceneColor;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/Double = ..., kotlin/Double = ..., dev.aster.vega.scene/SceneColor = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin/Boolean = ...) // dev.aster.vega.runtime/FocusRing.<init>|<init>(kotlin.Double;kotlin.Double;dev.aster.vega.scene.SceneColor;kotlin.collections.List<kotlin.Double>;kotlin.Boolean){}[0]
 
     final val colour // dev.aster.vega.runtime/FocusRing.colour|{}colour[0]
         final fun <get-colour>(): dev.aster.vega.scene/SceneColor // dev.aster.vega.runtime/FocusRing.colour.<get-colour>|<get-colour>(){}[0]
+    final val dash // dev.aster.vega.runtime/FocusRing.dash|{}dash[0]
+        final fun <get-dash>(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime/FocusRing.dash.<get-dash>|<get-dash>(){}[0]
     final val inset // dev.aster.vega.runtime/FocusRing.inset|{}inset[0]
         final fun <get-inset>(): kotlin/Double // dev.aster.vega.runtime/FocusRing.inset.<get-inset>|<get-inset>(){}[0]
     final val showsOnPointer // dev.aster.vega.runtime/FocusRing.showsOnPointer|{}showsOnPointer[0]
@@ -1199,8 +1201,9 @@ final class dev.aster.vega.runtime/FocusRing { // dev.aster.vega.runtime/FocusRi
     final fun component1(): kotlin/Double // dev.aster.vega.runtime/FocusRing.component1|component1(){}[0]
     final fun component2(): kotlin/Double // dev.aster.vega.runtime/FocusRing.component2|component2(){}[0]
     final fun component3(): dev.aster.vega.scene/SceneColor // dev.aster.vega.runtime/FocusRing.component3|component3(){}[0]
-    final fun component4(): kotlin/Boolean // dev.aster.vega.runtime/FocusRing.component4|component4(){}[0]
-    final fun copy(kotlin/Double = ..., kotlin/Double = ..., dev.aster.vega.scene/SceneColor = ..., kotlin/Boolean = ...): dev.aster.vega.runtime/FocusRing // dev.aster.vega.runtime/FocusRing.copy|copy(kotlin.Double;kotlin.Double;dev.aster.vega.scene.SceneColor;kotlin.Boolean){}[0]
+    final fun component4(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime/FocusRing.component4|component4(){}[0]
+    final fun component5(): kotlin/Boolean // dev.aster.vega.runtime/FocusRing.component5|component5(){}[0]
+    final fun copy(kotlin/Double = ..., kotlin/Double = ..., dev.aster.vega.scene/SceneColor = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin/Boolean = ...): dev.aster.vega.runtime/FocusRing // dev.aster.vega.runtime/FocusRing.copy|copy(kotlin.Double;kotlin.Double;dev.aster.vega.scene.SceneColor;kotlin.collections.List<kotlin.Double>;kotlin.Boolean){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.runtime/FocusRing.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.aster.vega.runtime/FocusRing.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.aster.vega.runtime/FocusRing.toString|toString(){}[0]

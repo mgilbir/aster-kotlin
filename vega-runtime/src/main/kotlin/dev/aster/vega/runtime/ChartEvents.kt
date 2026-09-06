@@ -140,6 +140,17 @@ public data class FocusRing(
   val width: Double = 2.0,
   /** The platform-neutral blue every focus indicator converges on. */
   val colour: SceneColor = SceneColor(0x1A / 255.0, 0x73 / 255.0, 0xE8 / 255.0),
+  /**
+   * A dash pattern, in scene units; empty for a solid ring.
+   *
+   * Here because it is the lever a quieter ring actually needs — a thinner or paler outline loses
+   * contrast, where a dashed one stays as findable while reading as less of a border. **Quieter has
+   * a floor**, though: this ring is what tells a reader using arrow keys where they are, so a host
+   * tuning it is tuning an accessibility affordance, not decoration. WCAG's focus-appearance
+   * guidance wants an indicator at least two units thick against a 3:1 contrast, and a hairline at
+   * low alpha does not clear it.
+   */
+  val dash: List<Double> = emptyList(),
   /** Whether a pointer tap draws the ring as well as moving focus. Off, as `:focus-visible` is. */
   val showsOnPointer: Boolean = false,
 )

@@ -308,16 +308,18 @@ public final class dev/aster/vega/runtime/ChartState$Companion {
 
 public final class dev/aster/vega/runtime/FocusRing {
 	public fun <init> ()V
-	public fun <init> (DDLdev/aster/vega/scene/SceneColor;Z)V
-	public synthetic fun <init> (DDLdev/aster/vega/scene/SceneColor;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (DDLdev/aster/vega/scene/SceneColor;Ljava/util/List;Z)V
+	public synthetic fun <init> (DDLdev/aster/vega/scene/SceneColor;Ljava/util/List;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()D
 	public final fun component2 ()D
 	public final fun component3 ()Ldev/aster/vega/scene/SceneColor;
-	public final fun component4 ()Z
-	public final fun copy (DDLdev/aster/vega/scene/SceneColor;Z)Ldev/aster/vega/runtime/FocusRing;
-	public static synthetic fun copy$default (Ldev/aster/vega/runtime/FocusRing;DDLdev/aster/vega/scene/SceneColor;ZILjava/lang/Object;)Ldev/aster/vega/runtime/FocusRing;
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()Z
+	public final fun copy (DDLdev/aster/vega/scene/SceneColor;Ljava/util/List;Z)Ldev/aster/vega/runtime/FocusRing;
+	public static synthetic fun copy$default (Ldev/aster/vega/runtime/FocusRing;DDLdev/aster/vega/scene/SceneColor;Ljava/util/List;ZILjava/lang/Object;)Ldev/aster/vega/runtime/FocusRing;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getColour ()Ldev/aster/vega/scene/SceneColor;
+	public final fun getDash ()Ljava/util/List;
 	public final fun getInset ()D
 	public final fun getShowsOnPointer ()Z
 	public final fun getWidth ()D

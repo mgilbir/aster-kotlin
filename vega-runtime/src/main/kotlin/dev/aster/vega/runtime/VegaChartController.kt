@@ -2068,7 +2068,12 @@ public class VegaChartController(
         width = bounds.width + focusRing.inset * 2,
         height = bounds.height + focusRing.inset * 2,
         fill = null,
-        stroke = Stroke(paint = ScenePaint.Solid(focusRing.colour), width = focusRing.width),
+        stroke =
+          Stroke(
+            paint = ScenePaint.Solid(focusRing.colour),
+            width = focusRing.width,
+            dashArray = focusRing.dash,
+          ),
         metadata = NodeMetadata(interactive = false),
       )
     return scene.copy(root = scene.root.copy(children = scene.root.children + ring))

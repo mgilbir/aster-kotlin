@@ -6,6 +6,24 @@ section here does not get released.
 
 ## Unreleased
 
+### Added
+
+- **The focus ring carries a dash, and the demo lets you choose one.** A quieter ring is the thing a
+  host most often wants to tune, and thinner or paler is the wrong lever: both lose the contrast that
+  makes a focus indicator findable. A dash keeps it and simply reads as less of a border, so
+  `FocusRing.dash` is what the demo's `Subtle` preset uses — same colour and thickness, standing
+  further off, dashed.
+
+  Four presets in the demo — `Default`, `Subtle`, `Hairline`, `Bold` — with a switch for whether a
+  tap draws one, so the decision can be looked at rather than argued about. They are deliberately
+  demo code and not the engine's opinion: the library draws one ring for the keyboard and leaves its
+  appearance to whoever embeds the chart.
+
+  `Hairline` is under the accessibility floor on purpose. This ring is what tells a reader moving by
+  arrow key where they are, so it is an affordance rather than decoration, and WCAG's
+  focus-appearance guidance asks for about two units at 3:1 contrast. Including a preset that misses
+  it is how the floor becomes visible instead of asserted.
+
 ### Changed
 
 - **A tap no longer draws the focus ring, and a host can style it or ask for it back.** Every click
