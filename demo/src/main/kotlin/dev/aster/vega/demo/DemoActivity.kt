@@ -78,6 +78,10 @@ private fun DemoScreen() {
   var status by remember { mutableStateOf("Tap a mark, drag to pan, pinch to zoom.") }
   /** The specification the user pasted or typed, and what compiling it had to say. */
   var pasted by remember { mutableStateOf("") }
+  // The focus ring is the host's decision, so the demo makes it here and pushes it down. See
+  // `FocusRingControls`.
+  var ringPreset by remember { mutableStateOf(RingPreset.DEFAULT) }
+  var ringOnPointer by remember { mutableStateOf(false) }
   var report by remember { mutableStateOf<PasteReport?>(null) }
 
   val context = LocalContext.current
@@ -200,6 +204,10 @@ private fun DemoScreen() {
     }
   }
 
+  LaunchedEffect(controller, ringPreset, ringOnPointer) {
+    controller.focusRing = ringPreset.ring.copy(showsOnPointer = ringOnPointer)
+  }
+
   MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme()) {
     Surface(modifier = Modifier.fillMaxSize()) {
       // safeDrawingPadding keeps the controls out from under the status and navigation bars, which
@@ -227,6 +235,13 @@ private fun DemoScreen() {
           Switch(checked = dark, onCheckedChange = { dark = it }, enabled = !chart.isSpec)
           Button(onClick = { controller.resetViewport() }) { Text("Reset zoom") }
         }
+
+        FocusRingControls(
+          preset = ringPreset,
+          onPreset = { ringPreset = it },
+          onPointer = ringOnPointer,
+          onOnPointer = { ringOnPointer = it },
+        )
 
         if (chart.isPasted) {
           PasteControls(

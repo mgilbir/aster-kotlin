@@ -1328,10 +1328,11 @@ FlattenTransform.shared
 FlattenTransform.type
 FocusRing
 FocusRing.colour
+FocusRing.dash
 FocusRing.description()
-FocusRing.doCopy(inset:width:colour:showsOnPointer:)
+FocusRing.doCopy(inset:width:colour:dash:showsOnPointer:)
 FocusRing.hash()
-FocusRing.init(inset:width:colour:showsOnPointer:)
+FocusRing.init(inset:width:colour:dash:showsOnPointer:)
 FocusRing.inset
 FocusRing.isEqual(_:)
 FocusRing.showsOnPointer

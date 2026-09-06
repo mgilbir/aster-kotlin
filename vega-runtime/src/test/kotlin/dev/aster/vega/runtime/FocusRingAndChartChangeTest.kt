@@ -135,6 +135,22 @@ class FocusRingAndChartChangeTest {
     assertNotNull(ring(controller), "showsOnPointer did not draw a ring on a tap")
   }
 
+  /**
+   * A **dash** reaches the ring, which is the lever a quieter one actually needs.
+   *
+   * Thinner or paler loses the contrast that makes a focus indicator findable; a dash keeps it and
+   * reads as less of a border. The demo offers both so the difference can be seen.
+   */
+  @Test
+  fun `a dashed ring reaches the scene`() {
+    val controller = VegaChartController.fromScene(SampleScenes.barChart())
+    controller.focusRing = FocusRing(dash = listOf(3.0, 3.0))
+    controller.dispatch(ChartInputEvent.Key(dev.aster.vega.scene.ChartKey.ARROW_RIGHT))
+
+    val drawn = ring(controller) ?: error("the keyboard drew no ring")
+    assertEquals(listOf(3.0, 3.0), drawn.stroke?.dashArray, "the dash did not reach the ring")
+  }
+
   /** And can restyle it, live, while one is on screen. */
   @Test
   fun `a host can restyle the ring and see it change`() {
