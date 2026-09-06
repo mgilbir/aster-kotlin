@@ -118,14 +118,14 @@ below then resolves against `mavenLocal()`.
 ```kotlin
 dependencies {
   // The engine: a specification in, a scene out, plus the controller a host drives.
-  implementation("io.github.mgilbir.astervega:vega-runtime:0.5.0")
+  implementation("io.github.mgilbir.astervega:vega-runtime:0.6.0")
   // Vega-Lite in, Vega out. Only needed if the specifications are Vega-Lite.
-  implementation("io.github.mgilbir.astervega:vega-lite:0.5.0")
+  implementation("io.github.mgilbir.astervega:vega-lite:0.6.0")
 
   // One renderer, whichever suits the host:
-  implementation("io.github.mgilbir.astervega:vega-android-canvas:0.5.0")        // Android View
-  implementation("io.github.mgilbir.astervega:vega-compose:0.5.0")               // Jetpack Compose
-  implementation("io.github.mgilbir.astervega:vega-compose-multiplatform:0.5.0") // Compose MP
+  implementation("io.github.mgilbir.astervega:vega-android-canvas:0.6.0")        // Android View
+  implementation("io.github.mgilbir.astervega:vega-compose:0.6.0")               // Jetpack Compose
+  implementation("io.github.mgilbir.astervega:vega-compose-multiplatform:0.6.0") // Compose MP
 }
 ```
 
@@ -139,7 +139,7 @@ to the release, so a consuming build needs no Kotlin toolchain and never runs Gr
 
 ```swift
 // Package.swift
-.package(url: "https://github.com/mgilbir/aster-kotlin", from: "0.5.0")
+.package(url: "https://github.com/mgilbir/aster-kotlin", from: "0.6.0")
 ```
 
 ```swift
