@@ -57,6 +57,24 @@ until [[ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" =
 echo "==> Installing the demo"
 ./gradlew --console=plain :demo:assembleDebug
 "$ADB" install -r demo/build/outputs/apk/debug/demo-debug.apk
-"$ADB" shell monkey -p dev.aster.vega.demo -c android.intent.category.LAUNCHER 1
+# `am start` and not `monkey`. Monkey resolves the launcher intent itself and, on this image, prints
+# its arguments back and leaves the home screen in front — so this script reported "Demo running"
+# three separate times while the demo was not running, and the next thing anyone did was debug an app
+# that had never started. Naming the activity is both more direct and checkable.
+"$ADB" shell am start -n dev.aster.vega.demo/.DemoActivity
 
-echo "Demo running on $AVD. Log: build/emulator.log"
+# Said only if it is true, which is the actual fix: a launch that fails silently is what went wrong.
+#
+# **Polled, not asked once.** `am start` returns when the intent is dispatched rather than when the
+# process is up, so a single `pidof` straight after it reports failure for an app that is starting
+# perfectly well — which is what the first version of this check did, and what testing caught.
+for _ in $(seq 1 20); do
+  "$ADB" shell pidof dev.aster.vega.demo > /dev/null 2>&1 && break
+  sleep 1
+done
+if "$ADB" shell pidof dev.aster.vega.demo > /dev/null 2>&1; then
+  echo "Demo running on $AVD. Log: build/emulator.log"
+else
+  echo "The demo was installed on $AVD but did not start. Log: build/emulator.log" >&2
+  exit 1
+fi
