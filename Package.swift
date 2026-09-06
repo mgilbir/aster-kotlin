@@ -15,8 +15,8 @@ import PackageDescription
 //
 // `swift/AsterVegaRender/Package.swift` is the other half of this — it builds against a locally
 // compiled framework and is what the tests and `scripts/swift-test.sh` use.
-let version = "0.5.0"
-let checksum = "015a146a72729caa7958cd206641ceef22e0b1f01f39f180ef3471c61a5338c2"
+let version = "0.6.0"
+let checksum = "db7c6efdfcbd6e6a33a2a9316dcd69094303f13a5c4997b27c60e496a160a391"
 
 let package = Package(
   name: "AsterVega",
