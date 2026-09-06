@@ -208,6 +208,19 @@ jobs:
         # nothing had recorded them. CI does this on both hosts for the same reason.
         run: ./scripts/record-upstream-vectors.sh
 
+      - name: Fetch the Vega-Lite gallery
+        # **Same rule as the vectors above: arm what fails, leave what skips.** `VegaLiteGalleryTest`
+        # answers a missing corpus with a *failure* rather than an assumption — deliberately, since a
+        # sweep of 627 examples that quietly skips is a gate in name only — so `build` below cannot
+        # run without it. The verify job arms it by running `check.sh`, which fetches the corpus
+        # itself; this job calls Gradle directly on a fresh clone of a different machine and had no
+        # such step, so the 0.6.0 release failed here after every gate had passed. Exactly the shape
+        # the vectors comment above describes, one gate later.
+        #
+        # `--references-only`: this fetches and compiles with upstream, and the comparison itself is
+        # the Gradle test that `build` runs.
+        run: ./scripts/vega-lite-gallery.sh --references-only
+
       - name: Build every target
         # The Vega-Lite *scene* references are deliberately not rendered here. Their gate answers a
         # missing reference with an assumption rather than a failure, so it skips quietly; the verify
