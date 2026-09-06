@@ -4,25 +4,71 @@ Notable changes, newest first. The release workflow reads the section for the
 version it is publishing and uses it as the release notes, so a version without a
 section here does not get released.
 
-## Unreleased
+## 0.6.0
 
-### Fixed
+### Changed
 
-- **The iOS UI tests declare the isolation they actually run under.** `XCUIApplication` and every
-  query on it are `@MainActor`; `XCTestCase` methods are not. So each of the thirty XCUI calls in
-  `AccessibilityUITests` reached a main-actor member from a nonisolated context, and Swift said so
-  thirty times — `call to main actor-isolated initializer 'init()' in a synchronous nonisolated
-  context` and six other shapes of the same fault.
+- **A tap no longer draws the focus ring, and a host can style it or ask for it back.** Every click
+  outlined the mark it hit, which reads as clutter and says "focused" about something the reader is
+  looking straight at. The ring exists so that someone moving through a chart with **arrow keys** can
+  see where they are, and that is now when it is drawn — the web's `:focus-visible` rule.
 
-  One `@MainActor` on the class, rather than thirty fixes at the call sites or one per test, because
-  the isolation is a property of what the target is: a UI test drives an application through its
-  interface, and that interface lives on the main actor.
+  Focus still *moves* on a tap, so arrowing on from a mark just tapped carries on from there rather
+  than starting again; `InteractionState.focusVisible` is the new distinction between focus and a
+  drawn ring. A host that wants the old behaviour — a kiosk driven entirely by touch, where nothing
+  else indicates the current mark — sets `FocusRing(showsOnPointer = true)`, and the same type
+  carries the ring's inset, width and colour. Setting `VegaChartController.focusRing` republishes, so
+  a restyle shows while a ring is on screen.
 
-  **Warnings today, errors later** — this is the diagnostic class that hardens as Swift's
-  concurrency rules finish landing, so the build was going to break on it eventually. Worth knowing
-  before anyone deletes the annotation: it is toolchain-dependent. Xcode 26.6 / Swift 6.3.3 reports
-  none of these, and the CI runner's older Swift reports all thirty. Both are right about their own
-  rules and the annotation is correct under either, which is why it is written down in the file.
+  `FOCUS_RING_INSET`, `FOCUS_RING_WIDTH` and `FOCUS_RING_COLOUR` are gone from
+  `VegaChartController`; they are `FocusRing`'s defaults, which is one place rather than two.
+
+
+- **The Android blend-mode limitation is filed as a settled floor rather than as pending work.** All
+  sixteen CSS blend modes reach an Android canvas on API 29 and above, through `BlendMode`; below it
+  `PorterDuff` has four of them and no arrangement of it produces the rest. With `minSdk` at 26
+  there is nothing to implement on API 26 to 28 — closing this would mean raising `minSdk`, which is
+  a product decision.
+
+  `limit.permanent` exists so the open list is the honest one, and a platform floor sitting beside
+  real gaps invites somebody to "finish" it. Nothing about the behaviour changes: the eleven modes
+  are still reported rather than approximated, and `multiply` is still among them because Android's
+  is modulate and vanishes over the transparent background a chart has by default.
+
+- **The blend-mode row is pinned to a test rather than to scope.** It recorded that below API 29 the
+  modes `PorterDuff` cannot express are reported rather than approximated, and stood on *scope*
+  because the branch is gated on `Build.VERSION.SDK_INT` and this project has no way to run below
+  29 — the emulator is far above it and there is no Robolectric.
+
+  But the branch is not the claim; the **table** is, and a table is testable anywhere.
+  `porterDuffFor` is now a pure function of the mode and `AndroidBlendModeTableTest` holds it on
+  whatever device runs the suite. That leaves one scope entry in the whole document.
+
+  Two things the row had wrong. It said "the eleven above `lighten`", and `multiply` is *below*
+  lighten and is also refused — deliberately, and it is the one that matters most: Android's
+  `PorterDuff.MULTIPLY` is modulate, which agrees with CSS `multiply` only where the destination is
+  opaque, so over the transparent background a chart has by default it makes the mark vanish. The
+  count of eleven was right; the description was not.
+
+  `internal` is JVM-public, so the extracted function appears in the Android API snapshot under a
+  mangled name. Recorded rather than worked around: the snapshot exists to make surface changes
+  visible, and this is one.
+
+- **A settled decision is no longer filed beside a gap.** 22 rows claim a limitation; 10 of them are
+  decisions nobody should try to close — reproducing upstream's rotated-path bounds would put every
+  hit target in the wrong place, implementing `labelBound` as documented would make this engine
+  differ from upstream on every chart that sets it, and a reachable `eval` would be arbitrary code
+  execution in a host process. `limit.permanent` marks those, with the reason, and the counts are
+  printed on every run, so the open list is 12 rather than 22.
+
+  The flag changes what is *reported* and never what is required: a settled row still needs a test,
+  because the decision has to keep being true. Making it skip the pin check fails the self-test.
+
+- **`known-divergences.json` no longer calls its entries bugs.** The header said "every entry is a
+  BUG TO FIX", and when it was written that was true: eighteen were recorded, and the ones that were
+  bugs were fixed. What is left is four differences that survived review twice. The exact-set
+  assertion is unchanged, and still cuts both ways — an accepted difference that quietly becomes
+  agreement is as much a surprise as a new one.
 
 ### Added
 
@@ -42,285 +88,6 @@ section here does not get released.
   focus-appearance guidance asks for about two units at 3:1 contrast. Including a preset that misses
   it is how the floor becomes visible instead of asserted.
 
-### Changed
-
-- **A tap no longer draws the focus ring, and a host can style it or ask for it back.** Every click
-  outlined the mark it hit, which reads as clutter and says "focused" about something the reader is
-  looking straight at. The ring exists so that someone moving through a chart with **arrow keys** can
-  see where they are, and that is now when it is drawn — the web's `:focus-visible` rule.
-
-  Focus still *moves* on a tap, so arrowing on from a mark just tapped carries on from there rather
-  than starting again; `InteractionState.focusVisible` is the new distinction between focus and a
-  drawn ring. A host that wants the old behaviour — a kiosk driven entirely by touch, where nothing
-  else indicates the current mark — sets `FocusRing(showsOnPointer = true)`, and the same type
-  carries the ring's inset, width and colour. Setting `VegaChartController.focusRing` republishes, so
-  a restyle shows while a ring is on screen.
-
-  `FOCUS_RING_INSET`, `FOCUS_RING_WIDTH` and `FOCUS_RING_COLOUR` are gone from
-  `VegaChartController`; they are `FocusRing`'s defaults, which is one place rather than two.
-
-### Fixed
-
-- **A tooltip, a selection and a focus ring do not outlive the chart they name.** Tapping a stacked
-  bar and then switching to the line chart left the tooltip sitting on top of it. `setScene` and a
-  new specification both carried `InteractionState` across unchanged, and every field in it that
-  names a mark — the hover, the focus, the selection, the tooltip and its anchor — pointed at a
-  `SceneNodeId` from the scene being replaced.
-
-  Now dropped by `InteractionState.forNewChart()` wherever the chart is replaced, on the same
-  argument the dispatcher was already reset on: a latch belongs to streams that no longer exist, and
-  so does a selection. **The viewport is kept**, which is the line between the two halves of that
-  class: a pan and a zoom are a statement about the surface rather than about any mark, so they
-  survive the recompile that carrying this state across exists for.
-
-- **A hand-authored scene replaces the compiled chart, instead of being replaced by it at the first
-  touch.** `setScene` published the scene and the hit index and left behind every field the
-  specification path installs — `lastCompiled`, `loadedSpecJson`, the event dispatcher, the running
-  timers, the scale fingerprints. Eight code paths then went on answering about a chart that was no
-  longer on screen.
-
-  Two of them put it back. `hoveredScene` reads `lastCompiled` for the base it applies a hover
-  variant to, so the first **hover** after switching from a specification to a scene republished the
-  specification's chart; and because `handleTap` hovers before it selects, a tap on a touch screen
-  took that path before it ever reached the selection. `adoptContainerSize` is the other: it
-  recompiles `loadedSpecJson` when a host reports a new size, so on a specification that reads
-  `containerSize()` a layout pass alone was enough.
-
-  **It reads as three faults and is one.** The hit index had been replaced and the scene had not, so
-  the tooltip and the selection answered for the chart that was supposed to be there while a
-  different chart was drawn underneath: a selection that will not clear, a tooltip in the wrong
-  place, and a chart drawn outside the box it was given. Found by using the demo, which is the only
-  place the two paths meet — the built-in charts are scenes and the pasted ones are specifications.
-
-- **The Android canvas is checked against the scene it was given, the way the SVG export already
-  is** (#244). `SvgWalkSelectionTest` asserts on the JVM that the export paints exactly what the
-  scene says; the primary renderer had no equivalent, so the four guards in `paintsNothing` were
-  taken on trust there.
-
-  `AndroidWalkSelectionTest` counts by **intercepting the real `Canvas`** — a subclass that tallies
-  `drawText` and `drawLine` and then delegates — so it is a statement about the renderer's own
-  behaviour rather than about a parallel implementation of it. A hidden label, an invisible one, one
-  with no text property and one with no usable anchor are put in front of it together with a label
-  that should be drawn, and one call arrives. Stripping the guard back to `visible` alone paints
-  four of the five.
-
-  It runs where the other instrumented suites run: on a device, and in CI at API 26 and 36 through
-  `instrumented.yml`.
-
-### Fixed
-
-- **A corner radius too large for its bar is clamped by the scene, so every renderer draws the same
-  corner** (#245). The walk handed each target the raw `cornerRadius` and left the clamping to
-  whatever received it. That is a divergence rather than a shortcut: `Corners.of` clamps the four
-  radii as one group against `min(width, height) / 2`, which is `vega-scenegraph`'s rule, and a
-  platform rounded-rectangle primitive applies its own — Skia scales all four by a common factor
-  until they fit, which is the CSS rule and answers differently whenever the radii are unequal.
-
-  On the `encode-channels` fixture that is a 50×39 rect asking for 40: the Android canvas and an
-  exported SVG drew **19.5**, reading the clamped `RectNode.corners`, and Compose Multiplatform drew
-  what Skia made of the unclamped 40. The Apple renderer's picture was right by doing the work again
-  in its own target — and that is exactly what hid the fault, because the two walks are compared
-  call for call and both were emitting the same wrong number.
-
-  Both walks now read the scene's own answer, `RectNode.corners` and the new `GroupNode.paintCorners`.
-  The goldens moved by one line, which is the bug.
-
-- **`STATUS.md` contradicted `SUPPORTED_FEATURES.md` about three capabilities** (#231), and was
-  wrong about all three. Its "what it still refuses" list named a selection parameter, geographic
-  projections with the `geoshape` mark, and a facet `sort` naming a written-out list — each
-  implemented since the list was written, and each described as refused. Three claims telling a
-  reader their chart would not work when it already did, which is the direction this repository has
-  now corrected four times over.
-
-  The generated document said the opposite of the hand-written one about the same three
-  capabilities, and nothing noticed: `DocumentedNumbersTest` guards STATUS.md's *numbers* and
-  nothing guards its prose.
-
-  So the present tense moved to `docs/capabilities.json`, where a limitation names a test that
-  asserts it and `scripts/capabilities.py` refuses a row that does not. The one sort shape still
-  refused — a facet `sort` **object naming no `field`** to aggregate — is pinned by
-  `SubsetIsRefusedTest`, along with the list form that *is* honoured, so the two cannot drift into
-  agreeing again. `STATUS.md` keeps what nothing else holds and what it is good at: the dated
-  account of how each of those was reached.
-
-- **Keyboard focus was invisible and unannounced on every host** (#227). `focusedNodeId` was written
-  by `handleKey` and read by **no renderer** — not the Android canvas, not the SVG one, not Compose
-  Multiplatform — and announced by no host either. Arrow-key traversal moved an invisible cursor: a
-  reader learned where they were by pressing Enter and watching the selection change.
-
-  A focus ring is drawn **into the scene** rather than by each host, for the reason the accessibility
-  tree is built once — three renderers drawing their own is three chances to disagree about a thing a
-  reader needs identical. Every renderer already draws whatever the scene holds, so it reaches all of
-  them at once, the SVG export included. It is appended to the root rather than replacing the mark,
-  so the mark keeps its own paint; it is non-interactive and carries no descriptor, so it is neither
-  a hit target nor a second element for one mark.
-
-  Its id is `SceneNodeId.Overlay`, **reserved**, and that took a bug to get right: a fresh
-  `SceneNodeIdAllocator` gives `SceneNodeId(1)` — the first mark of every scene — so stripping the
-  ring stripped a bar, and a chart lost a mark on hover.
-
-  On Android the two notions of focus are joined the **other way round**. `ExploreByTouchHelper`
-  claims the arrow keys to walk its own virtual views, so the engine's traversal never runs there and
-  the platform's wins — which is the right outcome, since that is the traversal a TalkBack reader
-  already knows. `onVirtualViewKeyboardFocusChanged` now tells the engine, through the new
-  `focusNode`, so the ring follows the reader. Pushing the engine's focus *into* the helper was the
-  first attempt and could never have worked, because the engine's focus never moves on that host.
-
-- **Compose Multiplatform's accessibility caught up with the other two hosts** (#230). A mark there
-  said its label and nothing else: Android sets `node.roleDescription` and Apple puts it in
-  `accessibilityInputLabels`, so a reader on either hears "Total: 18, rect mark" where here they
-  heard the label alone. Compose has no `roleDescription` property, so the two are joined the way a
-  reader hears them anyway — TalkBack reads the description and then the role description, in that
-  order, which is exactly this string.
-
-  An **adjustable axis** works there too. The other two hosts have offered it since it was written
-  and this one had not, so a reader could reach an axis and not change it. Named actions rather than
-  a trait, because Compose has neither primitive: Android's scroll actions and Apple's
-  `.isAdjustable` both let the system say "swipe up or down to adjust" in the reader's own language,
-  and there is no equivalent here — so this is the one host the engine has to supply words for.
-  `VegaCaptions.narrowAxisAction` and `widenAxisAction` exist for it, and Android uses them too,
-  beside its scroll pair, for a reader walking a list of actions rather than swiping.
-
-  `VegaChartController.locale` is public for the same reason `ChartAction` carries its own label:
-  the wording a reader hears has to come from one place, and an adjustable axis has no carrier of
-  its own.
-
-  The dense-chart **summary trait** is deliberately not copied across, and the issue was wrong to
-  list it: `AccessibleElement.isSummary` is consumed by iOS alone because only Apple has the trait —
-  Android does not use it either. The summary *element* is announced by every host.
-
-- **Compose Multiplatform had no keyboard path at all** (#229) — zero references to `ChartKey`,
-  `KeyEvent` or `onKeyEvent`. So a specification's `keydown` handlers never fired and the engine's
-  own traversal between marks was unreachable, on the surface most likely to be running on a
-  desktop, where a keyboard is the primary input.
-
-  `onKey` reports in the engine's own `ChartKey` vocabulary rather than the platform's, so the
-  translation happens **once** in the renderer instead of once per host — a keyboard is no more a
-  platform detail than a screen reader is. `ChartKey` and `Modifiers` moved to `vega-scene` for the
-  same reason `ChartAction` did: that module depends on the scene layer alone.
-
-  Asking for keys makes the chart **focusable**, because a Compose node that cannot take focus is
-  offered no key event — and only then, since a node that takes focus changes how a surrounding
-  layout traverses. A chart does not take focus when it appears, which would steal it from whatever
-  the reader was using; a reader tabs to it. A key outside the set is not consumed, so a chart
-  inside a form leaves the form's own keys alone.
-
-- **`mouseover` never fired on Apple or Compose Multiplatform** (#228). `ChartInputEvent.PointerEntered`
-  is what the controller turns into `pointerover` and `mouseover`, and only Android produced one —
-  from `ACTION_HOVER_ENTER`. `ChartSession.hover(at:)` dispatched a **move** for every point, and the
-  Compose Multiplatform `onHover` fires for an entry *and* for every move after it with the same
-  shape, so a host had nothing to tell them apart. `@mark:mouseover`, which most highlight and
-  tooltip specifications are written against, was inert on both.
-
-  A browser's own order is what is kept: entering an element gives `mouseover` and then `mousemove`.
-  Leaving and returning enters again. The exit needed nothing new — both hosts already report it.
-
-- **The chart's own accessibility actions were wired on no host at all** (#226). Zooming, zooming
-  out, resetting the view and putting an adjusted axis back are offered by
-  `VegaChartController.accessibilityActions`, and `perform` runs one — and both were referenced
-  *only by the controller's own tests*. The feature was built, tested and documented against
-  `AccessibilityNodeInfo.addAction` on Android and `UIAccessibilityCustomAction` on Apple, and
-  neither call was ever written. A reader could reach every bar in a chart and never the view they
-  were drawn in.
-
-  Now the Android View carries them on its own accessibility node, `VegaChartView` on Apple presents
-  them with `.accessibilityAction(named:)`, and the Compose Multiplatform composable puts them on
-  the chart's own node as `customActions`. Each is the same primitive in that platform's spelling.
-
-  The Android action ids are declared as **resources**. That is the platform's guidance and not
-  ceremony: the framework's own action ids are bit flags in a low range, and a hand-picked constant
-  can collide with one a future release adds.
-
-  **`ChartAction` and `ChartActionKind` moved from `vega-runtime` to `vega-scene`.** The
-  multiplatform renderer depends on the scene layer alone — it paints a `Scene` and owns its
-  semantics tree — so a type in the runtime is one it cannot name, which is exactly why the actions
-  were unreachable from it. That layer is already where `AccessibleElement`, `AccessibilityTree` and
-  `SceneNodeId` live for the same reason, and `VegaChart`'s `onActivate` already answers in it. The
-  alternative was a second definition beside the first with a string bridging them, which is the
-  shape `scripts/host-conformance.py` exists to prevent.
-
-  `scripts/host-parity.py` gains a row for it, and its Android surface now includes the declared
-  ids — `javap` records class members and a resource id is not one, so without that the seam had no
-  marker on the one host that owns the whole thing internally, and a row with no marker is a row
-  that cannot fail. The **pointer events** marker was also rewritten: it had been anchored to
-  `onHover`'s callback and broke the moment two parameters were inserted between them, reporting a
-  seam missing that was right there.
-
-- **A brush could not be driven from any host.** `[mousedown, mouseup] > mousemove` is how every
-  interval selection in Vega and Vega-Lite is written, and no surface could produce that sequence.
-  The Android View dispatched a `mousedown` and a `mouseup` but never handled `ACTION_MOVE`, so a
-  drag emitted nothing in between — `PointerMoved` was reached only from `onHoverEvent`, which fires
-  for a pointer that is **not** pressed, so the one gesture that needed a move was the one that
-  could not make one. `ChartSession` and the Compose Multiplatform composable exposed no pointer
-  events at all: a drag arrived as `pan`, which produces no Vega event, because the viewport
-  transform is this engine's own idea rather than something a specification asked for.
-
-  So a chart that brushes compiled, drew and never responded, on all four surfaces. Now:
-  `ACTION_MOVE` on Android, `ChartSession.pointerDown/Moved/Up` with `ChartGestures.pointer` on
-  Apple, `onPointerDown/Moved/Up` on Compose Multiplatform.
-
-  **A drag also has to be able to stop panning**, or the two fight. The viewport slides under the
-  finger by exactly the distance the finger travels, so in the chart's own coordinates the pointer
-  never moves and the brush selects a point — which is what the new Android test found on its first
-  run, `[60, 60]` for a drag from 60 to 200. `panEnabled` on the View and the Compose wrapper,
-  `ChartGestures` without `.pan` on Apple, `onPan = null` on Compose Multiplatform. The viewport pan
-  is the one that yields because it is the one no specification asked for.
-
-  On Apple the pointer events ride the **same** drag detector the pan uses, so asking for them
-  claims no more of the touch than a pan already does: a zero-distance drag of its own is what made
-  a chart inside a scroll view unscrollable (#124). The `mousedown` is emitted at `startLocation`
-  once the slop is passed, so a brush anchors where the reader put their finger.
-
-  `scripts/host-parity.py` now carries a row for each, which is the thing that was actually missing:
-  it had no entry for pointer events, so a seam absent from **every** host was absent from the
-  matrix too. Its own header is about two seams that were missing from a host while a table said the
-  shape was deliberate; this was a third, and the table did not mention it at all.
-
-- **The first drag of every brush was lost.** A `between` pair is a latch, and the dispatcher that
-  holds it is rebuilt on every recompile with each gate starting closed — while a recompile is
-  exactly what a fired handler causes. So in the standard brush idiom, an `anchor` set on
-  `mousedown` beside a `brush` on `[mousedown, mouseup] > mousemove`, the press opened the latch,
-  changed `anchor`, rebuilt the dispatcher, and threw the latch away before the `mousemove` it was
-  meant to gate ever arrived.
-
-  It hid because the failure depends on whether the opening event **changed** anything. A second
-  drag from the same point sets `anchor` to the value it already had, changes no signal, rebuilds
-  nothing and works perfectly — so a brush that had been dragged once looked right from then on, and
-  only a drag starting somewhere new was silently dropped.
-
-  Upstream never rebuilds its streams at all: a `View`'s dataflow outlives every signal update, so
-  its latches do too. The open ones are now carried into the dispatcher that replaces the old one,
-  and dropped on a new specification, which is the one time a drag genuinely should not carry over.
-  This is the same lesson `startTimers` had already recorded **three lines away**, where restarting
-  on every publish cancelled the running timers mid-flight.
-
-  Found by verifying the audit's Q6, which asked whether *faceted* interval selections were broken.
-  They are not — a faceted brush selects in its own cell and `push: "outer"` carries the cell's key
-  back out — but every brush, faceted or not, was losing its first drag.
-
-- **A label's turn and anchor are resolved per tick, and two false warnings are gone.** The row
-  named `angle` as *the* guide encode channel with no per-item path — "it folds into `labelAngle` or
-  it is nothing". Upstream has a path for it: `axis-labels.js` builds `angle: _('labelAngle')` into
-  the label mark's own encode block and then extends it with whatever the specification wrote, so a
-  conditional angle is resolved by the mark encoder exactly like a conditional fill. One line in
-  `AxisBuilder` was still asking the axis instead of the tick, in a loop where `fill`, `fontSize`,
-  `x`, `dx` and `dy` were already per tick.
-
-  `align` and `baseline` were worse: the loop had resolved both per tick since it was written —
-  `labelString(spec, "align", tick)` sits beside the `fill` the list already claimed — and the
-  parser reported them as constants-only regardless. That is the same false direction this row was
-  rewritten once before to remove: telling a reader their chart will not work when it already does.
-
-  Found by asking the parser one channel at a time rather than by reading it, which is also how the
-  first round was found. `guide-encode-datum` now turns one label and moves the anchor of two
-  others, and matches upstream on all of it; reverting the angle line fails it naming
-  `text/axis-label[3].angle: expected -45, got 0`.
-
-  `SubsetIsReportedTest` now pins `font` and `lineHeight`, which genuinely have no per-tick path,
-  and asserts that the three above are **not** reported — the list and the fixture are meant to be
-  disjoint, and this is the third time a channel has been named in the wrong one.
-
-### Added
 
 - **An unnamed group's own scales are compared against upstream.** The last surviving form of the
   row's original reason was "an unnamed group has no key to record it under". It has one, and it is
@@ -350,30 +117,6 @@ section here does not get released.
   a key that fails to pair is a comparison that goes *silent*, which is worse than the honest gap.
   One such group in the corpus, and its cells' geometry is compared in full.
 
-### Fixed
-
-- **A `between` pair wrapping another one is dispatched, in both of its spellings.** It was refused
-  by name, on the grounds that honouring it means gating a gate and that "guessing at the ordering
-  would be worse than saying so". Reading upstream rather than guessing shows there is **no ordering
-  to get wrong**: `vega-dataflow`'s `between(a, b)` is a boolean set true by `a` and false by `b`
-  plus a filter on it, and `parseStream` composes a nested pair as
-  `stream.between(c, d).between(a, b)`. So an event fires when the innermost stream matches and
-  every latch in the chain is open, each latch minding only its own pair. The chain is flattened to
-  a list of gates and the gate watches are updated first — which is what a single pair already did.
-
-  Resolving the chain is now the **first** thing `register` does, and that is the half that would
-  have gone quiet. A wrapper carries a `between` and the stream it wraps and nothing that says what
-  to listen to: the source, the type and the mark are all on the innermost stream. Every refusal
-  below — timer, `window:`, `keyup` — was asking the wrapper and getting the defaults, so a gated
-  `keyup` would have been registered and then never fired with nothing said.
-
-  The object spelling `{"stream": {…}, "between": […]}` — upstream's `nestedStream` — was not parsed
-  at all. `stream` was not a key the object form consumed, so a wrapper fell into the missing-`type`
-  error and the handler was dropped. Reported, but as *"An event stream object needs a `type`"*,
-  which tells an author to add the one thing a wrapper is correct to omit; following that diagnostic
-  would have produced a stream that listens to everything.
-
-### Added
 
 - **The Vega-Lite gallery is a gate, not a memory.** Vega-Lite ships 627 example specifications, and
   a sweep of all of them against upstream's compiler took the corpus from **124 matching to every
@@ -404,7 +147,6 @@ section here does not get released.
   the script counting recursively and disagreeing with the sweep.
 
 
-### Added
 
 - **A reader can adjust the interval an axis draws its data against.** The row said they could not:
   the accessibility actions move the **viewport** — the visual transform a pinch applies — and leave
@@ -439,7 +181,6 @@ section here does not get released.
   the scale. A band or point axis is not adjustable: it frames a list of values with nothing between
   them to narrow towards.
 
-### Added
 
 - **The SVG walk is checked against the scene it was given, on every fixture.** Two of the four
   walks over a scene are compared with each other call for call; the export was checked by nothing
@@ -454,53 +195,6 @@ section here does not get released.
   2595 rules and 3792 labels, with floors under both so that a corpus which stopped compiling cannot
   read as agreement.
 
-### Fixed
-
-- **A label with no usable anchor is left out by every renderer, not only by the SVG export.** An
-  axis's `tickExtra` label scales a value its datum does not carry, so its position is `NaN` and
-  upstream's own SVG has no element for it. One of the four walks knew that; the three canvas walks
-  handed the platform a draw call at `NaN` instead. Nothing found it because nothing could: a draw
-  call at `NaN` paints nothing, so the picture always agreed and only the work was wasted.
-
-  Now the fourth clause of `paintsNothing`, so the answer is the same everywhere. Two labels across
-  the fixture corpus, in `axis-placement` and `error-bars`. **A `NaN` position is not a position of
-  zero**, which is the part worth keeping apart: `TextNode.bounds` deliberately measures such an
-  item at the origin, because upstream's `anchorPoint` reads `item.x || 0` and `NaN` is falsy, so
-  the label occupies a row in a layout it is never drawn in.
-
-- **Every renderer asks one question before it draws an item, instead of four copies of it.** Four
-  walks cross a scene — the Android canvas, the Compose Multiplatform target, the Swift one and the
-  SVG export — and each carried its own guard for "this paints nothing". They drifted twice, and
-  both times the copies that agreed hid the ones that did not.
-
-  The first drift was found by `test-fixtures/scene-walk`, which compares two of the four: the Swift
-  walk had no zero-opacity guard, so a label an axis had hidden was painted black, 43 text runs
-  against 19. The second went the other way and nothing was watching it. Only those same two walks
-  had the guard for an item that is **absent** — one carrying no text property at all, or no outline
-  at all — so the Android canvas and the SVG export kept drawing them. In markup that is visible:
-  `legend-discretizing` exported three empty `<text>` elements and `projection-families` twelve
-  `<path d="">`, where upstream emits no element. Eight of the 198 fixtures carry such an item.
-
-  `paintsNothing` in `vega-scene` is now the one copy, and all four walks ask it — Swift through
-  `SceneKt.paintsNothing`. **Absent is not empty**, which is why this belongs beside the scene rather
-  than in a renderer: an item carrying an *empty* label is a different item that upstream still
-  emits, and asking whether anything would be drawn cannot tell them apart.
-
-- **A timer stream declared inside a group mark ticks.** It never did, and said nothing about it.
-  `startTimers` read the specification's **top-level** signals while `bindingsOf` beside it walks
-  the group marks, so a group's `{"type": "timer"}` handler was bound to the dispatcher and then
-  never dispatched to — nothing produces a timer event except the scheduler, and the scheduler had
-  not been told. An animation declared inside a trellis cell simply stood still. Both now come from
-  the same bindings, which also means a **faceted** group gets one live timer per cell rather than
-  one shared across all of them.
-
-  A timer is the one stream in a group that is **not** narrowed to it, and upstream says so by
-  construction: `parseStream` builds a timer as `scope.event(Timer, throttle)` and then *replaces*
-  the stream object with `{between, filter}`, dropping `source`, so the `inScope(event.item)` filter
-  it appends to every other scope-sourced stream is not appended to this one. It has no item to be
-  in scope of. What makes it the group's is only which scope its update reads and writes.
-
-### Added
 
 - **A faceted group's own scales are compared against upstream, one cell at a time.** The row said
   they could not be: "a faceted group resolves its scales once per cell, so there is no single scale
@@ -933,55 +627,350 @@ section here does not get released.
   `TokenType` gains a `REGEX` entry, which is additive but will make an exhaustive `when` over it
   in consumer code incomplete.
 
-### Changed
-
-- **The Android blend-mode limitation is filed as a settled floor rather than as pending work.** All
-  sixteen CSS blend modes reach an Android canvas on API 29 and above, through `BlendMode`; below it
-  `PorterDuff` has four of them and no arrangement of it produces the rest. With `minSdk` at 26
-  there is nothing to implement on API 26 to 28 — closing this would mean raising `minSdk`, which is
-  a product decision.
-
-  `limit.permanent` exists so the open list is the honest one, and a platform floor sitting beside
-  real gaps invites somebody to "finish" it. Nothing about the behaviour changes: the eleven modes
-  are still reported rather than approximated, and `multiply` is still among them because Android's
-  is modulate and vanishes over the transparent background a chart has by default.
-
-- **The blend-mode row is pinned to a test rather than to scope.** It recorded that below API 29 the
-  modes `PorterDuff` cannot express are reported rather than approximated, and stood on *scope*
-  because the branch is gated on `Build.VERSION.SDK_INT` and this project has no way to run below
-  29 — the emulator is far above it and there is no Robolectric.
-
-  But the branch is not the claim; the **table** is, and a table is testable anywhere.
-  `porterDuffFor` is now a pure function of the mode and `AndroidBlendModeTableTest` holds it on
-  whatever device runs the suite. That leaves one scope entry in the whole document.
-
-  Two things the row had wrong. It said "the eleven above `lighten`", and `multiply` is *below*
-  lighten and is also refused — deliberately, and it is the one that matters most: Android's
-  `PorterDuff.MULTIPLY` is modulate, which agrees with CSS `multiply` only where the destination is
-  opaque, so over the transparent background a chart has by default it makes the mark vanish. The
-  count of eleven was right; the description was not.
-
-  `internal` is JVM-public, so the extracted function appears in the Android API snapshot under a
-  mangled name. Recorded rather than worked around: the snapshot exists to make surface changes
-  visible, and this is one.
-
-- **A settled decision is no longer filed beside a gap.** 22 rows claim a limitation; 10 of them are
-  decisions nobody should try to close — reproducing upstream's rotated-path bounds would put every
-  hit target in the wrong place, implementing `labelBound` as documented would make this engine
-  differ from upstream on every chart that sets it, and a reachable `eval` would be arbitrary code
-  execution in a host process. `limit.permanent` marks those, with the reason, and the counts are
-  printed on every run, so the open list is 12 rather than 22.
-
-  The flag changes what is *reported* and never what is required: a settled row still needs a test,
-  because the decision has to keep being true. Making it skip the pin check fails the self-test.
-
-- **`known-divergences.json` no longer calls its entries bugs.** The header said "every entry is a
-  BUG TO FIX", and when it was written that was true: eighteen were recorded, and the ones that were
-  bugs were fixed. What is left is four differences that survived review twice. The exact-set
-  assertion is unchanged, and still cuts both ways — an accepted difference that quietly becomes
-  agreement is as much a surprise as a new one.
-
 ### Fixed
+
+- **The iOS UI tests declare the isolation they actually run under.** `XCUIApplication` and every
+  query on it are `@MainActor`; `XCTestCase` methods are not. So each of the thirty XCUI calls in
+  `AccessibilityUITests` reached a main-actor member from a nonisolated context, and Swift said so
+  thirty times — `call to main actor-isolated initializer 'init()' in a synchronous nonisolated
+  context` and six other shapes of the same fault.
+
+  One `@MainActor` on the class, rather than thirty fixes at the call sites or one per test, because
+  the isolation is a property of what the target is: a UI test drives an application through its
+  interface, and that interface lives on the main actor.
+
+  **Warnings today, errors later** — this is the diagnostic class that hardens as Swift's
+  concurrency rules finish landing, so the build was going to break on it eventually. Worth knowing
+  before anyone deletes the annotation: it is toolchain-dependent. Xcode 26.6 / Swift 6.3.3 reports
+  none of these, and the CI runner's older Swift reports all thirty. Both are right about their own
+  rules and the annotation is correct under either, which is why it is written down in the file.
+
+
+- **A tooltip, a selection and a focus ring do not outlive the chart they name.** Tapping a stacked
+  bar and then switching to the line chart left the tooltip sitting on top of it. `setScene` and a
+  new specification both carried `InteractionState` across unchanged, and every field in it that
+  names a mark — the hover, the focus, the selection, the tooltip and its anchor — pointed at a
+  `SceneNodeId` from the scene being replaced.
+
+  Now dropped by `InteractionState.forNewChart()` wherever the chart is replaced, on the same
+  argument the dispatcher was already reset on: a latch belongs to streams that no longer exist, and
+  so does a selection. **The viewport is kept**, which is the line between the two halves of that
+  class: a pan and a zoom are a statement about the surface rather than about any mark, so they
+  survive the recompile that carrying this state across exists for.
+
+- **A hand-authored scene replaces the compiled chart, instead of being replaced by it at the first
+  touch.** `setScene` published the scene and the hit index and left behind every field the
+  specification path installs — `lastCompiled`, `loadedSpecJson`, the event dispatcher, the running
+  timers, the scale fingerprints. Eight code paths then went on answering about a chart that was no
+  longer on screen.
+
+  Two of them put it back. `hoveredScene` reads `lastCompiled` for the base it applies a hover
+  variant to, so the first **hover** after switching from a specification to a scene republished the
+  specification's chart; and because `handleTap` hovers before it selects, a tap on a touch screen
+  took that path before it ever reached the selection. `adoptContainerSize` is the other: it
+  recompiles `loadedSpecJson` when a host reports a new size, so on a specification that reads
+  `containerSize()` a layout pass alone was enough.
+
+  **It reads as three faults and is one.** The hit index had been replaced and the scene had not, so
+  the tooltip and the selection answered for the chart that was supposed to be there while a
+  different chart was drawn underneath: a selection that will not clear, a tooltip in the wrong
+  place, and a chart drawn outside the box it was given. Found by using the demo, which is the only
+  place the two paths meet — the built-in charts are scenes and the pasted ones are specifications.
+
+- **The Android canvas is checked against the scene it was given, the way the SVG export already
+  is** (#244). `SvgWalkSelectionTest` asserts on the JVM that the export paints exactly what the
+  scene says; the primary renderer had no equivalent, so the four guards in `paintsNothing` were
+  taken on trust there.
+
+  `AndroidWalkSelectionTest` counts by **intercepting the real `Canvas`** — a subclass that tallies
+  `drawText` and `drawLine` and then delegates — so it is a statement about the renderer's own
+  behaviour rather than about a parallel implementation of it. A hidden label, an invisible one, one
+  with no text property and one with no usable anchor are put in front of it together with a label
+  that should be drawn, and one call arrives. Stripping the guard back to `visible` alone paints
+  four of the five.
+
+  It runs where the other instrumented suites run: on a device, and in CI at API 26 and 36 through
+  `instrumented.yml`.
+
+
+- **A corner radius too large for its bar is clamped by the scene, so every renderer draws the same
+  corner** (#245). The walk handed each target the raw `cornerRadius` and left the clamping to
+  whatever received it. That is a divergence rather than a shortcut: `Corners.of` clamps the four
+  radii as one group against `min(width, height) / 2`, which is `vega-scenegraph`'s rule, and a
+  platform rounded-rectangle primitive applies its own — Skia scales all four by a common factor
+  until they fit, which is the CSS rule and answers differently whenever the radii are unequal.
+
+  On the `encode-channels` fixture that is a 50×39 rect asking for 40: the Android canvas and an
+  exported SVG drew **19.5**, reading the clamped `RectNode.corners`, and Compose Multiplatform drew
+  what Skia made of the unclamped 40. The Apple renderer's picture was right by doing the work again
+  in its own target — and that is exactly what hid the fault, because the two walks are compared
+  call for call and both were emitting the same wrong number.
+
+  Both walks now read the scene's own answer, `RectNode.corners` and the new `GroupNode.paintCorners`.
+  The goldens moved by one line, which is the bug.
+
+- **`STATUS.md` contradicted `SUPPORTED_FEATURES.md` about three capabilities** (#231), and was
+  wrong about all three. Its "what it still refuses" list named a selection parameter, geographic
+  projections with the `geoshape` mark, and a facet `sort` naming a written-out list — each
+  implemented since the list was written, and each described as refused. Three claims telling a
+  reader their chart would not work when it already did, which is the direction this repository has
+  now corrected four times over.
+
+  The generated document said the opposite of the hand-written one about the same three
+  capabilities, and nothing noticed: `DocumentedNumbersTest` guards STATUS.md's *numbers* and
+  nothing guards its prose.
+
+  So the present tense moved to `docs/capabilities.json`, where a limitation names a test that
+  asserts it and `scripts/capabilities.py` refuses a row that does not. The one sort shape still
+  refused — a facet `sort` **object naming no `field`** to aggregate — is pinned by
+  `SubsetIsRefusedTest`, along with the list form that *is* honoured, so the two cannot drift into
+  agreeing again. `STATUS.md` keeps what nothing else holds and what it is good at: the dated
+  account of how each of those was reached.
+
+- **Keyboard focus was invisible and unannounced on every host** (#227). `focusedNodeId` was written
+  by `handleKey` and read by **no renderer** — not the Android canvas, not the SVG one, not Compose
+  Multiplatform — and announced by no host either. Arrow-key traversal moved an invisible cursor: a
+  reader learned where they were by pressing Enter and watching the selection change.
+
+  A focus ring is drawn **into the scene** rather than by each host, for the reason the accessibility
+  tree is built once — three renderers drawing their own is three chances to disagree about a thing a
+  reader needs identical. Every renderer already draws whatever the scene holds, so it reaches all of
+  them at once, the SVG export included. It is appended to the root rather than replacing the mark,
+  so the mark keeps its own paint; it is non-interactive and carries no descriptor, so it is neither
+  a hit target nor a second element for one mark.
+
+  Its id is `SceneNodeId.Overlay`, **reserved**, and that took a bug to get right: a fresh
+  `SceneNodeIdAllocator` gives `SceneNodeId(1)` — the first mark of every scene — so stripping the
+  ring stripped a bar, and a chart lost a mark on hover.
+
+  On Android the two notions of focus are joined the **other way round**. `ExploreByTouchHelper`
+  claims the arrow keys to walk its own virtual views, so the engine's traversal never runs there and
+  the platform's wins — which is the right outcome, since that is the traversal a TalkBack reader
+  already knows. `onVirtualViewKeyboardFocusChanged` now tells the engine, through the new
+  `focusNode`, so the ring follows the reader. Pushing the engine's focus *into* the helper was the
+  first attempt and could never have worked, because the engine's focus never moves on that host.
+
+- **Compose Multiplatform's accessibility caught up with the other two hosts** (#230). A mark there
+  said its label and nothing else: Android sets `node.roleDescription` and Apple puts it in
+  `accessibilityInputLabels`, so a reader on either hears "Total: 18, rect mark" where here they
+  heard the label alone. Compose has no `roleDescription` property, so the two are joined the way a
+  reader hears them anyway — TalkBack reads the description and then the role description, in that
+  order, which is exactly this string.
+
+  An **adjustable axis** works there too. The other two hosts have offered it since it was written
+  and this one had not, so a reader could reach an axis and not change it. Named actions rather than
+  a trait, because Compose has neither primitive: Android's scroll actions and Apple's
+  `.isAdjustable` both let the system say "swipe up or down to adjust" in the reader's own language,
+  and there is no equivalent here — so this is the one host the engine has to supply words for.
+  `VegaCaptions.narrowAxisAction` and `widenAxisAction` exist for it, and Android uses them too,
+  beside its scroll pair, for a reader walking a list of actions rather than swiping.
+
+  `VegaChartController.locale` is public for the same reason `ChartAction` carries its own label:
+  the wording a reader hears has to come from one place, and an adjustable axis has no carrier of
+  its own.
+
+  The dense-chart **summary trait** is deliberately not copied across, and the issue was wrong to
+  list it: `AccessibleElement.isSummary` is consumed by iOS alone because only Apple has the trait —
+  Android does not use it either. The summary *element* is announced by every host.
+
+- **Compose Multiplatform had no keyboard path at all** (#229) — zero references to `ChartKey`,
+  `KeyEvent` or `onKeyEvent`. So a specification's `keydown` handlers never fired and the engine's
+  own traversal between marks was unreachable, on the surface most likely to be running on a
+  desktop, where a keyboard is the primary input.
+
+  `onKey` reports in the engine's own `ChartKey` vocabulary rather than the platform's, so the
+  translation happens **once** in the renderer instead of once per host — a keyboard is no more a
+  platform detail than a screen reader is. `ChartKey` and `Modifiers` moved to `vega-scene` for the
+  same reason `ChartAction` did: that module depends on the scene layer alone.
+
+  Asking for keys makes the chart **focusable**, because a Compose node that cannot take focus is
+  offered no key event — and only then, since a node that takes focus changes how a surrounding
+  layout traverses. A chart does not take focus when it appears, which would steal it from whatever
+  the reader was using; a reader tabs to it. A key outside the set is not consumed, so a chart
+  inside a form leaves the form's own keys alone.
+
+- **`mouseover` never fired on Apple or Compose Multiplatform** (#228). `ChartInputEvent.PointerEntered`
+  is what the controller turns into `pointerover` and `mouseover`, and only Android produced one —
+  from `ACTION_HOVER_ENTER`. `ChartSession.hover(at:)` dispatched a **move** for every point, and the
+  Compose Multiplatform `onHover` fires for an entry *and* for every move after it with the same
+  shape, so a host had nothing to tell them apart. `@mark:mouseover`, which most highlight and
+  tooltip specifications are written against, was inert on both.
+
+  A browser's own order is what is kept: entering an element gives `mouseover` and then `mousemove`.
+  Leaving and returning enters again. The exit needed nothing new — both hosts already report it.
+
+- **The chart's own accessibility actions were wired on no host at all** (#226). Zooming, zooming
+  out, resetting the view and putting an adjusted axis back are offered by
+  `VegaChartController.accessibilityActions`, and `perform` runs one — and both were referenced
+  *only by the controller's own tests*. The feature was built, tested and documented against
+  `AccessibilityNodeInfo.addAction` on Android and `UIAccessibilityCustomAction` on Apple, and
+  neither call was ever written. A reader could reach every bar in a chart and never the view they
+  were drawn in.
+
+  Now the Android View carries them on its own accessibility node, `VegaChartView` on Apple presents
+  them with `.accessibilityAction(named:)`, and the Compose Multiplatform composable puts them on
+  the chart's own node as `customActions`. Each is the same primitive in that platform's spelling.
+
+  The Android action ids are declared as **resources**. That is the platform's guidance and not
+  ceremony: the framework's own action ids are bit flags in a low range, and a hand-picked constant
+  can collide with one a future release adds.
+
+  **`ChartAction` and `ChartActionKind` moved from `vega-runtime` to `vega-scene`.** The
+  multiplatform renderer depends on the scene layer alone — it paints a `Scene` and owns its
+  semantics tree — so a type in the runtime is one it cannot name, which is exactly why the actions
+  were unreachable from it. That layer is already where `AccessibleElement`, `AccessibilityTree` and
+  `SceneNodeId` live for the same reason, and `VegaChart`'s `onActivate` already answers in it. The
+  alternative was a second definition beside the first with a string bridging them, which is the
+  shape `scripts/host-conformance.py` exists to prevent.
+
+  `scripts/host-parity.py` gains a row for it, and its Android surface now includes the declared
+  ids — `javap` records class members and a resource id is not one, so without that the seam had no
+  marker on the one host that owns the whole thing internally, and a row with no marker is a row
+  that cannot fail. The **pointer events** marker was also rewritten: it had been anchored to
+  `onHover`'s callback and broke the moment two parameters were inserted between them, reporting a
+  seam missing that was right there.
+
+- **A brush could not be driven from any host.** `[mousedown, mouseup] > mousemove` is how every
+  interval selection in Vega and Vega-Lite is written, and no surface could produce that sequence.
+  The Android View dispatched a `mousedown` and a `mouseup` but never handled `ACTION_MOVE`, so a
+  drag emitted nothing in between — `PointerMoved` was reached only from `onHoverEvent`, which fires
+  for a pointer that is **not** pressed, so the one gesture that needed a move was the one that
+  could not make one. `ChartSession` and the Compose Multiplatform composable exposed no pointer
+  events at all: a drag arrived as `pan`, which produces no Vega event, because the viewport
+  transform is this engine's own idea rather than something a specification asked for.
+
+  So a chart that brushes compiled, drew and never responded, on all four surfaces. Now:
+  `ACTION_MOVE` on Android, `ChartSession.pointerDown/Moved/Up` with `ChartGestures.pointer` on
+  Apple, `onPointerDown/Moved/Up` on Compose Multiplatform.
+
+  **A drag also has to be able to stop panning**, or the two fight. The viewport slides under the
+  finger by exactly the distance the finger travels, so in the chart's own coordinates the pointer
+  never moves and the brush selects a point — which is what the new Android test found on its first
+  run, `[60, 60]` for a drag from 60 to 200. `panEnabled` on the View and the Compose wrapper,
+  `ChartGestures` without `.pan` on Apple, `onPan = null` on Compose Multiplatform. The viewport pan
+  is the one that yields because it is the one no specification asked for.
+
+  On Apple the pointer events ride the **same** drag detector the pan uses, so asking for them
+  claims no more of the touch than a pan already does: a zero-distance drag of its own is what made
+  a chart inside a scroll view unscrollable (#124). The `mousedown` is emitted at `startLocation`
+  once the slop is passed, so a brush anchors where the reader put their finger.
+
+  `scripts/host-parity.py` now carries a row for each, which is the thing that was actually missing:
+  it had no entry for pointer events, so a seam absent from **every** host was absent from the
+  matrix too. Its own header is about two seams that were missing from a host while a table said the
+  shape was deliberate; this was a third, and the table did not mention it at all.
+
+- **The first drag of every brush was lost.** A `between` pair is a latch, and the dispatcher that
+  holds it is rebuilt on every recompile with each gate starting closed — while a recompile is
+  exactly what a fired handler causes. So in the standard brush idiom, an `anchor` set on
+  `mousedown` beside a `brush` on `[mousedown, mouseup] > mousemove`, the press opened the latch,
+  changed `anchor`, rebuilt the dispatcher, and threw the latch away before the `mousemove` it was
+  meant to gate ever arrived.
+
+  It hid because the failure depends on whether the opening event **changed** anything. A second
+  drag from the same point sets `anchor` to the value it already had, changes no signal, rebuilds
+  nothing and works perfectly — so a brush that had been dragged once looked right from then on, and
+  only a drag starting somewhere new was silently dropped.
+
+  Upstream never rebuilds its streams at all: a `View`'s dataflow outlives every signal update, so
+  its latches do too. The open ones are now carried into the dispatcher that replaces the old one,
+  and dropped on a new specification, which is the one time a drag genuinely should not carry over.
+  This is the same lesson `startTimers` had already recorded **three lines away**, where restarting
+  on every publish cancelled the running timers mid-flight.
+
+  Found by verifying the audit's Q6, which asked whether *faceted* interval selections were broken.
+  They are not — a faceted brush selects in its own cell and `push: "outer"` carries the cell's key
+  back out — but every brush, faceted or not, was losing its first drag.
+
+- **A label's turn and anchor are resolved per tick, and two false warnings are gone.** The row
+  named `angle` as *the* guide encode channel with no per-item path — "it folds into `labelAngle` or
+  it is nothing". Upstream has a path for it: `axis-labels.js` builds `angle: _('labelAngle')` into
+  the label mark's own encode block and then extends it with whatever the specification wrote, so a
+  conditional angle is resolved by the mark encoder exactly like a conditional fill. One line in
+  `AxisBuilder` was still asking the axis instead of the tick, in a loop where `fill`, `fontSize`,
+  `x`, `dx` and `dy` were already per tick.
+
+  `align` and `baseline` were worse: the loop had resolved both per tick since it was written —
+  `labelString(spec, "align", tick)` sits beside the `fill` the list already claimed — and the
+  parser reported them as constants-only regardless. That is the same false direction this row was
+  rewritten once before to remove: telling a reader their chart will not work when it already does.
+
+  Found by asking the parser one channel at a time rather than by reading it, which is also how the
+  first round was found. `guide-encode-datum` now turns one label and moves the anchor of two
+  others, and matches upstream on all of it; reverting the angle line fails it naming
+  `text/axis-label[3].angle: expected -45, got 0`.
+
+  `SubsetIsReportedTest` now pins `font` and `lineHeight`, which genuinely have no per-tick path,
+  and asserts that the three above are **not** reported — the list and the fixture are meant to be
+  disjoint, and this is the third time a channel has been named in the wrong one.
+
+
+- **A `between` pair wrapping another one is dispatched, in both of its spellings.** It was refused
+  by name, on the grounds that honouring it means gating a gate and that "guessing at the ordering
+  would be worse than saying so". Reading upstream rather than guessing shows there is **no ordering
+  to get wrong**: `vega-dataflow`'s `between(a, b)` is a boolean set true by `a` and false by `b`
+  plus a filter on it, and `parseStream` composes a nested pair as
+  `stream.between(c, d).between(a, b)`. So an event fires when the innermost stream matches and
+  every latch in the chain is open, each latch minding only its own pair. The chain is flattened to
+  a list of gates and the gate watches are updated first — which is what a single pair already did.
+
+  Resolving the chain is now the **first** thing `register` does, and that is the half that would
+  have gone quiet. A wrapper carries a `between` and the stream it wraps and nothing that says what
+  to listen to: the source, the type and the mark are all on the innermost stream. Every refusal
+  below — timer, `window:`, `keyup` — was asking the wrapper and getting the defaults, so a gated
+  `keyup` would have been registered and then never fired with nothing said.
+
+  The object spelling `{"stream": {…}, "between": […]}` — upstream's `nestedStream` — was not parsed
+  at all. `stream` was not a key the object form consumed, so a wrapper fell into the missing-`type`
+  error and the handler was dropped. Reported, but as *"An event stream object needs a `type`"*,
+  which tells an author to add the one thing a wrapper is correct to omit; following that diagnostic
+  would have produced a stream that listens to everything.
+
+
+- **A label with no usable anchor is left out by every renderer, not only by the SVG export.** An
+  axis's `tickExtra` label scales a value its datum does not carry, so its position is `NaN` and
+  upstream's own SVG has no element for it. One of the four walks knew that; the three canvas walks
+  handed the platform a draw call at `NaN` instead. Nothing found it because nothing could: a draw
+  call at `NaN` paints nothing, so the picture always agreed and only the work was wasted.
+
+  Now the fourth clause of `paintsNothing`, so the answer is the same everywhere. Two labels across
+  the fixture corpus, in `axis-placement` and `error-bars`. **A `NaN` position is not a position of
+  zero**, which is the part worth keeping apart: `TextNode.bounds` deliberately measures such an
+  item at the origin, because upstream's `anchorPoint` reads `item.x || 0` and `NaN` is falsy, so
+  the label occupies a row in a layout it is never drawn in.
+
+- **Every renderer asks one question before it draws an item, instead of four copies of it.** Four
+  walks cross a scene — the Android canvas, the Compose Multiplatform target, the Swift one and the
+  SVG export — and each carried its own guard for "this paints nothing". They drifted twice, and
+  both times the copies that agreed hid the ones that did not.
+
+  The first drift was found by `test-fixtures/scene-walk`, which compares two of the four: the Swift
+  walk had no zero-opacity guard, so a label an axis had hidden was painted black, 43 text runs
+  against 19. The second went the other way and nothing was watching it. Only those same two walks
+  had the guard for an item that is **absent** — one carrying no text property at all, or no outline
+  at all — so the Android canvas and the SVG export kept drawing them. In markup that is visible:
+  `legend-discretizing` exported three empty `<text>` elements and `projection-families` twelve
+  `<path d="">`, where upstream emits no element. Eight of the 198 fixtures carry such an item.
+
+  `paintsNothing` in `vega-scene` is now the one copy, and all four walks ask it — Swift through
+  `SceneKt.paintsNothing`. **Absent is not empty**, which is why this belongs beside the scene rather
+  than in a renderer: an item carrying an *empty* label is a different item that upstream still
+  emits, and asking whether anything would be drawn cannot tell them apart.
+
+- **A timer stream declared inside a group mark ticks.** It never did, and said nothing about it.
+  `startTimers` read the specification's **top-level** signals while `bindingsOf` beside it walks
+  the group marks, so a group's `{"type": "timer"}` handler was bound to the dispatcher and then
+  never dispatched to — nothing produces a timer event except the scheduler, and the scheduler had
+  not been told. An animation declared inside a trellis cell simply stood still. Both now come from
+  the same bindings, which also means a **faceted** group gets one live timer per cell rather than
+  one shared across all of them.
+
+  A timer is the one stream in a group that is **not** narrowed to it, and upstream says so by
+  construction: `parseStream` builds a timer as `scope.event(Timer, throttle)` and then *replaces*
+  the stream object with `{between, filter}`, dropping `source`, so the `inScope(event.item)` filter
+  it appends to every other scope-sourced stream is not appended to this one. It has no item to be
+  in scope of. What makes it the group's is only which scope its update reads and writes.
+
 
 - **Gradient fills were compared nowhere at all — 20 of them, across 12 fixtures.** Two silences
   that cancelled out: `readReference` kept numbers and strings and let an object fall into an
@@ -1334,37 +1323,6 @@ section here does not get released.
   digits instead of three. `Date.parse` is allowed an implementation-defined fallback and every
   browser has one. Swapping would turn four accepted inputs into a datum silently leaving the domain.
 
-### Performance
-
-- **Resolving a font on Apple is about seven times cheaper, and a host's face is now cached at all.**
-  Two things, found by measuring rather than by reading.
-
-  The reported one: `CoreTextFonts` returned the host resolver's answer *before* the cache was
-  consulted, so a host that supplied a resolver — which is what the documentation asks a host to do
-  — rebuilt a `CTFontCreateCopyWithAttributes` copy for every advance, ascent, descent and line
-  height, on every measured line, and again on every drawn run. The reason it was uncached was the
-  key: a family name does not say which resolver answered, and the cache is process-wide, so two
-  charts with different resolvers would have shared an entry. Keying on the *face the resolver
-  returned* — `CFEqual`, so identity rather than a hash gamble — removes the hazard instead of
-  avoiding it. (#152)
-
-  The larger one, which the issue did not predict and the numbers did:
-  `FontStack.shared.families(stack:)` was **86 per cent** of the cost of resolving a font, at 2.77µs
-  of a 3.23µs call. It is a Kotlin object reached across the Obj-C bridge and it was called on every
-  lookup, so a chart paid a bridge crossing and a list conversion per metric for what is a comma
-  split. It is memoised per family string now — safe because it is pure, and memoised rather than
-  reimplemented in Swift so that every renderer keeps splitting a family list by the same rule
-  (#123). A 60-style working set went from 3.23µs to 0.48µs a call.
-
-  The cache's own LRU bookkeeping was also linear *per hit* — `order.removeAll { $0 == key }`, an
-  `==` per resident key, and for a face key that is a `CFEqual`. It stamps a counter now, so a hit is
-  a dictionary read and an integer write and the only scan is on eviction.
-
-  Worth recording against the issue's open question: `CTFontCreateCopyWithAttributes` costs about
-  0.95µs, so CoreText does memoise it internally. The font copy was real but it was never the
-  expensive part.
-
-### Fixed
 
 - **A new fixture's container announcements were compared against nothing.** `MarkContainerTest`
   walks the harvested reference and asks this engine for a matching answer, so a fixture the
@@ -1427,6 +1385,36 @@ section here does not get released.
   wants the month *name*, so `%d-%m-%Y` has to yield `%d %b` and not `%d-%m` — that would be a
   different label rather than a wider one. A month-first locale writing a padded day still derives
   nothing, which is what keeps d3's default a default. (#151, the same discard as #97 one path over.)
+
+### Performance
+
+- **Resolving a font on Apple is about seven times cheaper, and a host's face is now cached at all.**
+  Two things, found by measuring rather than by reading.
+
+  The reported one: `CoreTextFonts` returned the host resolver's answer *before* the cache was
+  consulted, so a host that supplied a resolver — which is what the documentation asks a host to do
+  — rebuilt a `CTFontCreateCopyWithAttributes` copy for every advance, ascent, descent and line
+  height, on every measured line, and again on every drawn run. The reason it was uncached was the
+  key: a family name does not say which resolver answered, and the cache is process-wide, so two
+  charts with different resolvers would have shared an entry. Keying on the *face the resolver
+  returned* — `CFEqual`, so identity rather than a hash gamble — removes the hazard instead of
+  avoiding it. (#152)
+
+  The larger one, which the issue did not predict and the numbers did:
+  `FontStack.shared.families(stack:)` was **86 per cent** of the cost of resolving a font, at 2.77µs
+  of a 3.23µs call. It is a Kotlin object reached across the Obj-C bridge and it was called on every
+  lookup, so a chart paid a bridge crossing and a list conversion per metric for what is a comma
+  split. It is memoised per family string now — safe because it is pure, and memoised rather than
+  reimplemented in Swift so that every renderer keeps splitting a family list by the same rule
+  (#123). A 60-style working set went from 3.23µs to 0.48µs a call.
+
+  The cache's own LRU bookkeeping was also linear *per hit* — `order.removeAll { $0 == key }`, an
+  `==` per resident key, and for a face key that is a `CFEqual`. It stamps a counter now, so a hit is
+  a dictionary read and an integer write and the only scan is on eviction.
+
+  Worth recording against the issue's open question: `CTFontCreateCopyWithAttributes` costs about
+  0.95µs, so CoreText does memoise it internally. The font copy was real but it was never the
+  expensive part.
 
 ## 0.5.0
 

@@ -179,7 +179,7 @@ val TEST_TIME_ZONE = "Europe/Amsterdam"
  * One place, because eleven modules publishing at eleven versions is not a release. The release
  * workflow reads this line, so its shape matters: `version = "x.y.z"` at the top level.
  */
-version = "0.5.0"
+version = "0.6.0"
 
 plugins {
   alias(libs.plugins.android.application) apply false
