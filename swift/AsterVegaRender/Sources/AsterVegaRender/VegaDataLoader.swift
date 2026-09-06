@@ -130,25 +130,25 @@ public final class VegaDataLoader: NSObject, DataLoader, @unchecked Sendable {
       throw denial("'\(path)' is not a name that can be fetched")
     }
 
-    var result: Result<String, Error>!
+    let outcome = Outcome()
     let finished = DispatchSemaphore(value: 0)
     let task = session.dataTask(with: URLRequest(url: url, timeoutInterval: timeout)) {
       data, response, error in
       defer { finished.signal() }
       if let error {
-        result = .failure(error)
+        outcome.set(.failure(error))
         return
       }
       let status = (response as? HTTPURLResponse)?.statusCode ?? 0
       guard status == 200 else {
-        result = .failure(self.denial("\(url.absoluteString) answered HTTP \(status)"))
+        outcome.set(.failure(self.denial("\(url.absoluteString) answered HTTP \(status)")))
         return
       }
       guard let data, let text = String(data: data, encoding: .utf8) else {
-        result = .failure(self.denial("\(url.absoluteString) was not text"))
+        outcome.set(.failure(self.denial("\(url.absoluteString) was not text")))
         return
       }
-      result = .success(text)
+      outcome.set(.success(text))
     }
     task.resume()
 
@@ -157,7 +157,40 @@ public final class VegaDataLoader: NSObject, DataLoader, @unchecked Sendable {
       task.cancel()
       throw denial("\(url.absoluteString) timed out")
     }
-    return try result.get()
+    // Answered rather than force-unwrapped. The semaphore only says the handler ran, and a handler
+    // that fell through every branch would have crashed here on the `!` this used to carry.
+    guard let answer = outcome.take() else {
+      throw denial("\(url.absoluteString) finished without an answer")
+    }
+    return try answer.get()
+  }
+
+  /// What the completion handler produced, behind a lock.
+  ///
+  /// **Not a race, and worth removing anyway.** The handler writes and then signals; the caller
+  /// waits and then reads, so the semaphore already orders the write before the read and the
+  /// captured `var` this replaces was safe in fact. The compiler cannot see that ordering, so it
+  /// warned four times — and it is right to be unconvinced: the argument lived in a comment, where
+  /// nothing checks it, and it would quietly stop holding if anyone read the value before the wait
+  /// or added a second writer. One `NSLock` makes it checkable instead of argued.
+  ///
+  /// The same trade [Cache] in this file already makes, and for the same stated reason: `load` is
+  /// called synchronously from Kotlin, so it cannot await an actor.
+  private final class Outcome: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Result<String, Error>?
+
+    func set(_ newValue: Result<String, Error>) {
+      lock.lock()
+      defer { lock.unlock() }
+      value = newValue
+    }
+
+    func take() -> Result<String, Error>? {
+      lock.lock()
+      defer { lock.unlock() }
+      return value
+    }
   }
 
   /// The engine turns whatever a loader throws into a diagnostic, so the message is what a reader sees.
