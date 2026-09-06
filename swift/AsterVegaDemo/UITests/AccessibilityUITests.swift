@@ -11,6 +11,22 @@ import XCTest
 /// exposes nothing at all — the first version of these tests passed with the whole accessibility block
 /// deleted, because they asserted on things a navigation bar provides. They now assert on labels only the
 /// engine produces.
+///
+/// **Main-actor isolated**, because `XCUIApplication` and every query on it are.
+///
+/// `XCTestCase` methods are nonisolated, so under Swift 6 each of the thirty XCUI calls below was a
+/// main-actor member reached from a nonisolated context. The compiler said so thirty times and CI
+/// stayed green, since they are warnings rather than errors — and they will not stay warnings: this
+/// is the diagnostic that becomes an error as the concurrency rules finish landing.
+///
+/// One annotation on the class rather than thirty on the calls, and on the class rather than on each
+/// test, because the isolation is a property of what this target *is*: a UI test drives an
+/// application through its interface, and that interface lives on the main actor.
+///
+/// Not reproducible on every toolchain, which is worth knowing before deleting it. Xcode 26.6 /
+/// Swift 6.3.3 emits none of these warnings; the CI runner's older Swift emits all thirty. Both are
+/// right about their own rules, and the annotation is correct under either.
+@MainActor
 final class AccessibilityUITests: XCTestCase {
 
   private func launch(chart: String) -> XCUIApplication {

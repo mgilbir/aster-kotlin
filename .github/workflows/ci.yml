@@ -48,6 +48,25 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      - name: Record the Apple toolchain
+        # **Which Swift produced a diagnostic**, written into the log rather than reconstructed later.
+        #
+        # Thirty main-actor warnings appeared here and on no developer machine, and establishing why
+        # cost a forced rebuild of the Swift package, a re-run of both iOS type-check slices and a
+        # grep of every local gate log — all to find that the runner's Swift and a local Swift simply
+        # disagree about a concurrency rule. Two lines answer that next time.
+        #
+        # Recording rather than **pinning**, deliberately. Pinning is the better fix and it is a
+        # decision rather than a version bump: this workflow pins every action by commit, so adding
+        # `setup-xcode` takes on a third-party dependency, and `xcode-select` needs a version known to
+        # be installed on the image. The listing is what lets that be chosen on evidence.
+        if: runner.os == 'macOS'
+        run: |
+          xcodebuild -version
+          swift --version
+          echo "selected: $(xcode-select -p)"
+          echo "available:"; ls -d /Applications/Xcode*.app 2>/dev/null || echo "  (only the default)"
+
       - name: Set up JDK 21
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
