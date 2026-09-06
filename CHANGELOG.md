@@ -6,6 +6,24 @@ section here does not get released.
 
 ## Unreleased
 
+### Fixed
+
+- **The iOS UI tests declare the isolation they actually run under.** `XCUIApplication` and every
+  query on it are `@MainActor`; `XCTestCase` methods are not. So each of the thirty XCUI calls in
+  `AccessibilityUITests` reached a main-actor member from a nonisolated context, and Swift said so
+  thirty times — `call to main actor-isolated initializer 'init()' in a synchronous nonisolated
+  context` and six other shapes of the same fault.
+
+  One `@MainActor` on the class, rather than thirty fixes at the call sites or one per test, because
+  the isolation is a property of what the target is: a UI test drives an application through its
+  interface, and that interface lives on the main actor.
+
+  **Warnings today, errors later** — this is the diagnostic class that hardens as Swift's
+  concurrency rules finish landing, so the build was going to break on it eventually. Worth knowing
+  before anyone deletes the annotation: it is toolchain-dependent. Xcode 26.6 / Swift 6.3.3 reports
+  none of these, and the CI runner's older Swift reports all thirty. Both are right about their own
+  rules and the annotation is correct under either, which is why it is written down in the file.
+
 ### Added
 
 - **The focus ring carries a dash, and the demo lets you choose one.** A quieter ring is the thing a
