@@ -323,10 +323,15 @@ internal object Guides {
         // then drops it rather than writing it out.
         axis.set(
           "labelAlign",
-          labelAlign(labelAngle, channel, side)?.let { str(it) } ?: VegaValue.Null,
+          labelAlign(angle, channel, side)?.let { str(it) } ?: VegaValue.Null,
         )
       }
-      labelBaseline(labelAngle, channel, side)?.let { axis.set("labelBaseline", str(it)) }
+      // The **normalised** angle, as `defaultLabelAngle` hands it to both of these: the label at
+      // minus ninety degrees that is written out as two hundred and seventy has to be *compared* as
+      // two hundred and seventy too. `225 < angle && angle < 315` is how a vertical label on the
+      // bottom axis earns `baseline: "middle"`, and minus ninety satisfies neither that nor the
+      // arm above it, so such a label was anchored by its top instead.
+      labelBaseline(angle, channel, side)?.let { axis.set("labelBaseline", str(it)) }
     }
 
     if (

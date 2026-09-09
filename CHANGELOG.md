@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A label's anchors are derived from the angle that gets written out.** `defaultLabelAngle`
+  normalises what the specification wrote and hands *that* to `defaultLabelAlign` and
+  `defaultLabelBaseline`, both of which read the angle as a position on the circle. This normalised
+  it for the value it emitted and then compared the raw one, so a label at `labelAngle: -90` — a
+  label at 270°, which is how a column of dates is usually written — satisfied neither arm of the
+  baseline rule, fell through to `angle <= 45` (true of every negative angle) and was anchored by
+  its top instead of through its middle, hanging a line below its axis. The alignment was wrong with
+  it on the vertical axis. Ten specifications in the wild corpus turn their labels that way.
+
 - **A key captioned with nothing has no caption.** `assembleLegend` strips a falsy title on the way
   out — `if (!legend.title) delete legend.title`, its own comment being "title schema doesn't
   include null, ''". This dropped only the `null`, so `"title": ""` was written out and reserved the
