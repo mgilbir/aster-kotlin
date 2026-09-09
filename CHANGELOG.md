@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A wrapped facet's cells are aligned only along a direction they can be.** `assembleDefaultLayout`
+  starts from `align: "all"` and drops to `"none"` where the scale along a direction is each cell's
+  own — the cells' plotting areas are then different sizes, and lining them up lines up nothing.
+  A *crossed* grid is aligned regardless, which is what upstream's `!row` and `!column` guards say;
+  a *wrapped* facet has neither, so either direction being independent is enough.
+
+  This wrote `align: "all"` on every wrapped facet and never read the resolution. A stated `align`
+  or `center` is now honoured as well: `getFacetMappingAndLayout` lifts them off the facet
+  definition and `assembleLayout` spreads them after the default, so what a specification says
+  outranks what was computed. 42 specifications in the wild corpus disagreed with upstream here,
+  most of them for this reason alone.
+
 - **A mark property Vega has no channel for is no longer forwarded to Vega.** `markDefProperties`
   walks `VG_MARK_CONFIGS` and asks the mark for each of the 57 properties Vega actually has, so
   anything else a specification wrote is never looked at. This engine iterated the *mark's own* keys

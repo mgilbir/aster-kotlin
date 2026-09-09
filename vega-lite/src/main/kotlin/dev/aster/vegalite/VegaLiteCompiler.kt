@@ -1526,6 +1526,7 @@ private class Compilation(
         (spec.number("columns") ?: it.raw.number("columns"))?.toInt(),
         owner,
         config,
+        wrappedFacetLayout(level, it),
       )
     }
     val row = channels["row"]?.let { Facet("row", it, owner) }
@@ -1848,6 +1849,19 @@ private class Compilation(
    * trellis of rows an inch apart still wants the configured gap between its columns, so the side
    * left out is filled in rather than dropped.
    */
+  /**
+   * `getFacetMappingAndLayout`: the composition-layout properties a **wrapped** facet carries.
+   *
+   * `align` and `center` are stated beside the facet in the operator form and on the channel in the
+   * encoding form, and upstream's normaliser lifts the one onto the other before either is read —
+   * the same two places `columns` is looked for.
+   */
+  private fun wrappedFacetLayout(owner: VegaValue.Obj, def: ChannelDef): VegaValue.Obj = obj {
+    for (key in listOf("align", "center")) {
+      (owner.fields[key] ?: def.raw.fields[key])?.let { put(key, it) }
+    }
+  }
+
   private fun facetSpacing(owner: VegaValue.Obj): VegaValue {
     val stated = owner.fields["spacing"] ?: config.raw.obj("facet")?.fields?.get("spacing")
     val configured = config.raw.obj("facet")?.number("spacing") ?: FACET_SPACING
@@ -2242,6 +2256,7 @@ private class Compilation(
           (spec.number("columns") ?: wrapped.raw.number("columns"))?.toInt(),
           named,
           config,
+          wrappedFacetLayout(spec, wrapped),
         )
       else FacetGrid(row, column, named)
 

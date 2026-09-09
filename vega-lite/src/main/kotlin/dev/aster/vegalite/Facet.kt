@@ -956,6 +956,8 @@ internal class FacetWrap(
   private val prefix: String = "",
   /** Kept because a wrapped facet captions its **cells**, and a caption reads the number format. */
   private val config: Config? = null,
+  /** The composition-layout properties stated for this grid, which outrank the defaults. */
+  private val declared: VegaValue.Obj = VegaValue.EmptyObject,
 ) : FacetLayout {
 
   override fun named(suffix: String): String =
@@ -1072,10 +1074,22 @@ internal class FacetWrap(
   ): VegaValue = obj {
     put("padding", spacing)
     put("bounds", "full")
-    put("align", "all")
+    // `assembleDefaultLayout` with neither a row nor a column: a wrapped facet has no direction
+    // whose cells share a scale by construction, so a direction resolved **independently** leaves
+    // the cells unalignable along it — their plotting areas are different sizes, and lining them up
+    // would be lining up nothing. Upstream's two arms both apply here, where a crossed grid's
+    // `!row`/`!column` guards let only one of them through.
+    val unalignable = "x" in independent || "y" in independent
+    put("align", if (unalignable) "none" else "all")
     // Only where the specification said so: with no `columns`, the whole facet is one row and the
     // layout has no number to write down.
     columns?.let { put("columns", num(it.toDouble())) }
+    // `{...this.assembleDefaultLayout(), ...layout}`: what the specification stated outranks the
+    // default computed beside it. `getFacetMappingAndLayout` lifts these off the facet definition,
+    // so a wrapped facet states them where it is written.
+    for (key in listOf("align", "center")) {
+      declared.fields[key]?.let { put(key, it) }
+    }
   }
 
   override fun headings(config: Config): Map<String, String> = emptyMap()
