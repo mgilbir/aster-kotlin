@@ -856,14 +856,27 @@ internal object Scales {
     }
 
     // `nice` rounds a domain outwards to readable bounds, but only where the reader reads bounds:
-    // a position axis, with no binning (which already picked its edges), no stated domain, and not
-    // a time scale — d3's time ticks already land on calendar boundaries.
-    // A stated domain suppresses it only where it is an **array**: `isArray(specifiedDomain)`. A
-    // domain that names a selection is not a pair of bounds — it is empty until something is
-    // picked — so the scale still rounds the domain the data gave it.
+    // a position axis, with no binning (which already picked its edges), and not a time scale —
+    // d3's time ticks already land on calendar boundaries.
+    //
+    // What a *stated* domain does to it is upstream's list, and this had the shape of it and not
+    // the substance:
+    //
+    //     if (getFieldDef(fieldOrDatumDef)?.bin || isArray(specifiedDomain) ||
+    //         domainMax != null || domainMin != null ||
+    //         contains([ScaleType.TIME, ScaleType.UTC], scaleType)) return undefined;
+    //
+    // A domain suppresses it only where it is an **array**, a pair of bounds already chosen; a
+    // domain that names a dataset or a selection is not bounds at all, and the scale still rounds
+    // whatever the data turns out to give it. The two *ends* suppress it on their own, stated
+    // separately or together, because either one is a bound somebody picked. This asked instead
+    // whether a domain had been written at all — which suppressed a `{"data": …, "field": …}`
+    // domain that upstream nices — and never looked at the ends, which upstream does.
     if (
       def.bin == null &&
-        (specifiedDomain == null || (specifiedDomain as? VegaValue.Obj)?.has("param") == true) &&
+        specifiedDomain !is VegaValue.Arr &&
+        user?.fields?.get("domainMin") == null &&
+        user?.fields?.get("domainMax") == null &&
         channelIsPosition(channel) &&
         type != "time" &&
         type != "utc"

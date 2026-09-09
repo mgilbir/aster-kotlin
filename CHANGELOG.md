@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **`nice` follows a stated extent, not the mere presence of a domain.** Upstream suppresses the
+  rounding for a binned field, an **array** domain, a stated `domainMin` or `domainMax`, and a time
+  or UTC scale. Two of those five were wrong here, and the comment beside the code had upstream's
+  rule written out correctly while the code did something else: it asked whether a domain had been
+  written *at all*, which suppressed a `{"data": …, "field": …}` domain that upstream rounds — the
+  bounds are not known until the data is read — and it never looked at the two ends, so a scale
+  pinned to `domainMin: -1, domainMax: 7` was rounded past both of them.
+
 - **A label's anchors are derived from the angle that gets written out.** `defaultLabelAngle`
   normalises what the specification wrote and hands *that* to `defaultLabelAlign` and
   `defaultLabelBaseline`, both of which read the angle as a position on the circle. This normalised
