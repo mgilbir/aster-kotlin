@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A rect-based mark's own `width` or `height` is its band size.** `getBandSize` settles the size
+  before it looks at the scale at all, and `getMarkPropOrConfig` reads the mark's **Vega** name
+  first — so `{"type": "bar", "width": 25}` is 25 wide, whatever its band or the configured band
+  size would have made it. This looked for `size` and never for the Vega name, so every such mark
+  came out at the configured band size.
+
+  The alignment follows: upstream centres a mark whose band size is not *relative*, so a `rect` on
+  a nominal scale with `"width": 20` is written `xc` with `band: 0.5` where one left to fill its
+  band gets `x` and a bandwidth. A `{"band": 0.5}` is a fraction rather than a size and still takes
+  the bandwidth path; a `width` in a **style block** is still not read, upstream looking a style up
+  under the Vega-Lite name only. 25 specifications in the wild corpus stated a width on the mark.
+
 - **A wrapped facet's cells are aligned only along a direction they can be.** `assembleDefaultLayout`
   starts from `align: "all"` and drops to `"none"` where the scale along a direction is each cell's
   own — the cells' plotting areas are then different sizes, and lining them up lines up nothing.

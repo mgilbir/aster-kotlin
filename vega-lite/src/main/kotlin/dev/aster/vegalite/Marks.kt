@@ -1916,6 +1916,30 @@ internal object Marks {
     val declaredSize = view.spec.encoding["size"]
     val markSize = view.markDef.raw.fields["size"]
 
+    // `getBandSize` asks for the size under its **Vega** name before anything else:
+    //
+    //     const size = getMarkPropOrConfig(useVlSizeChannel ? 'size' : sizeChannel, mark, config,
+    //                                      {vgChannel: sizeChannel});
+    //     if (size !== undefined) return size;
+    //
+    // and `getMarkPropOrConfig` reads `mark[vgChannel]` first of all. So a bar written
+    // `{"type": "bar", "width": 25}` is 25 wide, whatever its band or the configured band size
+    // would have made it — and 25 of the wild corpus's disagreements over a mark's width were
+    // exactly that, a width stated on the mark and never looked for.
+    //
+    // Only where it is a size, though: `{"width": {"band": 0.5}}` is a *fraction* of the band, and
+    // `isRelativeBandSize` sends that down the bandwidth path [relativeBandSize] already walks.
+    //
+    // The mark and the mark type's configuration, and **not** a style block: `getMarkConfig` looks
+    // a style up under the Vega-Lite name only — `getMarkStyleConfig(channel, …)` — so a `width` in
+    // a style is not a size, and upstream leaves a bar styled that way filling its band. Its own
+    // comment says why: "if there is vgChannel, skip vl channel. For example, vl size for text is
+    // vg fontSize, but config.mark.size is only for point size."
+    val markSizeChannel =
+      sizeChannel
+        ?.let { view.markDef.raw.fields[it] ?: markConfig.fields[it] }
+        ?.takeIf { (it as? VegaValue.Obj)?.fields?.containsKey("band") != true }
+
     val useVlSizeChannel =
       view.spec.mark == "tick" ||
         (view.markDef.orient == "horizontal" && channel == "y") ||
@@ -1935,6 +1959,10 @@ internal object Marks {
         // a signal, as it is everywhere else a value is read.
         markSize != null && useVlSizeChannel ->
           literalRef(markSize)?.let { (key, value) -> obj { put(key, value) } }
+            ?: VegaValue.EmptyObject
+        // The band size proper, which `getBandSize` settles before it looks at the scale at all.
+        markSizeChannel != null ->
+          literalRef(markSizeChannel)?.let { (key, value) -> obj { put(key, value) } }
             ?: VegaValue.EmptyObject
         offsetChannel != null || bandingType == "band" -> {
           // The width of one *nested* mark where there is an offset scale, and of the whole band
@@ -1998,7 +2026,12 @@ internal object Marks {
     // `x`/`y` with the band's width. Six of the ten smallest disagreements in the wild corpus were
     // exactly that.
     val sizeWasHonoured = (declaredSize != null || markSize != null) && useVlSizeChannel
-    val centred = bandingType != "band" || sizeWasHonoured
+    // Upstream's third term is `isRelativeBandSize(bandSize)`, and a band size stated as a
+    // **number** is not relative — so a mark given a width of its own is centred in its band
+    // exactly as one given a `size` is. Upstream writes `xc` with `band: 0.5` for a `rect` on a
+    // nominal scale with `"width": 20`, where a mark left to fill the band gets `x` and a
+    // bandwidth.
+    val centred = bandingType != "band" || sizeWasHonoured || markSizeChannel != null
     val vgChannel = if (centred) if (channel == "x") "xc" else "yc" else channel
 
     val posRef =
