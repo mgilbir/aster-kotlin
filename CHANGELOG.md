@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A mark that says how solid its fill is keeps the reduced scatter opacity off.** `initMarkDef`
+  asks for both `opacity` and `fillOpacity` before applying the seven-tenths default that lets
+  overlapping points read through each other, and either one answering leaves the mark alone — a
+  mark that has already stated its fill would otherwise be drawn at `0.9 * 0.7`, fainter than either
+  number. This looked only at `opacity`, and only on the mark itself, so eight of the wild corpus's
+  scatters came out fainter than upstream draws them. Both are now read through the mark, its style
+  blocks and the configuration alike. `strokeOpacity` is not one of the two and still leaves the
+  default standing.
+
 - **A facet channel carries its own `spacing`.** `getFacetMappingAndLayout` lifts `align`, `center`,
   `spacing` and `columns` off a facet definition, and `assembleLayout` then extracts the spacing and
   writes it as the layout's `padding`. So the gap between a trellis's cells may be stated beside the

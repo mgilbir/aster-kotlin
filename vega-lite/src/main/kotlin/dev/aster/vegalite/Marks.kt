@@ -725,10 +725,29 @@ internal object Marks {
       put("orient", obj { put("value", view.markDef.orient) })
     }
     // The reduced opacity a scatter of unaggregated points is drawn with, so overlaps read.
+    //
+    // `initMarkDef` asks for **both** opacities before it applies the default, and either one
+    // answering is enough to leave the mark opaque:
+    //
+    //     const specifiedOpacity = getMarkPropOrConfig('opacity', markDef, config);
+    //     const specifiedFillOpacity = getMarkPropOrConfig('fillOpacity', markDef, config);
+    //     if (specifiedOpacity === undefined && specifiedFillOpacity === undefined) {
+    //       markDef.opacity = opacity(markDef.type, encoding);
+    //     }
+    //
+    // A mark that has already said how solid its fill is has answered the question the default was
+    // going to answer, and multiplying the two would have made it fainter than either.
+    // `fillOpacity`
+    // was not looked at here at all, so such a mark came out at `0.9 * 0.7`.
+    //
+    // Both are read through the mark, its styles and the configuration alike — a `fillOpacity` in a
+    // style block or in `config.mark` suppresses it just as one on the mark does. (`strokeOpacity`
+    // does not: it says nothing about the fill, and upstream leaves the default in place.)
     if (
       view.spec.mark in setOf("point", "tick", "circle", "square") &&
         !Stack.isAggregate(view.spec) &&
-        view.markDef.raw.fields["opacity"] == null &&
+        styled(view, "opacity") == null &&
+        styled(view, "fillOpacity") == null &&
         view.spec.encoding["opacity"] == null
     ) {
       put("opacity", obj { put("value", 0.7) })
