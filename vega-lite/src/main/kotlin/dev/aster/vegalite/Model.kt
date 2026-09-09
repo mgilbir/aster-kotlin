@@ -132,20 +132,24 @@ internal data class ChannelDef(
   val scale: VegaValue.Obj?
     get() = raw["scale"] as? VegaValue.Obj
 
+  /**
+   * `specifiedScale !== null && specifiedScale !== false`: the scale names the two values it
+   * refuses, rather than asking whether what it was given is truthy the way the guides do.
+   */
   val scaleDisabled: Boolean
-    get() = raw.fields["scale"] == VegaValue.Null
+    get() = raw.fields["scale"].let { it == VegaValue.Null || it == VegaValue.Bool(false) }
 
   val axis: VegaValue.Obj?
     get() = raw["axis"] as? VegaValue.Obj
 
   val axisDisabled: Boolean
-    get() = raw.fields["axis"] == VegaValue.Null
+    get() = isFalsy(raw.fields["axis"])
 
   val legend: VegaValue.Obj?
     get() = raw["legend"] as? VegaValue.Obj
 
   val legendDisabled: Boolean
-    get() = raw.fields["legend"] == VegaValue.Null
+    get() = isFalsy(raw.fields["legend"])
 
   val format: VegaValue?
     get() = raw["format"] ?: axis?.get("format") ?: legend?.get("format")
@@ -156,6 +160,29 @@ internal data class ChannelDef(
   /** `type: "quantitative"` and not binned — the shape that decides stacking and zero-baselines. */
   val isUnbinnedQuantitative: Boolean =
     isFieldDef && type == MeasureType.QUANTITATIVE && bin == null
+
+  private companion object {
+    /**
+     * Whether a guide was switched off, which upstream asks as `!axis` and `!legend`.
+     *
+     * Both `parseLegendForChannel` and `parseAxis` settle it the same way — `axis !== undefined ?
+     * !axis : «the configured default»` — so the question is JavaScript truthiness rather than a
+     * comparison against `null`. `"legend": false` is what specifications in the wild actually
+     * write, and reading only `null` left the key with a legend beside it.
+     *
+     * An empty object is *truthy*, which is what makes `"axis": {}` a guide with no properties
+     * rather than no guide.
+     */
+    fun isFalsy(value: VegaValue?): Boolean =
+      when (value) {
+        null -> false
+        VegaValue.Null -> true
+        is VegaValue.Bool -> !value.value
+        is VegaValue.Num -> value.value == 0.0
+        is VegaValue.Str -> value.value.isEmpty()
+        else -> false
+      }
+  }
 }
 
 /** The mark, with the defaults upstream fills in before anything else reads them. */

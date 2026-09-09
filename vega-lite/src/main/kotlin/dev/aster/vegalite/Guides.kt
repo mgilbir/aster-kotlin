@@ -773,6 +773,16 @@ internal object Guides {
   /** The legend a scaled non-position channel produces, or null when it produces none. */
   fun legend(view: UnitView, channel: String, def: ChannelDef, type: String): VegaValue? {
     if (def.legendDisabled) return null
+    // `const disable = legend !== undefined ? !legend : legendConfig.disable;` — the channel's own
+    // `legend` settles it either way, and where the channel says nothing the theme decides.
+    // `config: {"legend": {"disable": true}}` is how a chart drops every legend at once, and the
+    // axis beside this has honoured its own `config.axis.disable` all along.
+    if (
+      def.raw.fields["legend"] == null &&
+        view.config.raw.obj("legend")?.fields?.get("disable") == VegaValue.Bool(true)
+    ) {
+      return null
+    }
     val filled = view.markDef.filled
     // `getLegendDefWithScale`: a trail's legend names two channels differently from every other
     // mark's. Its swatch is a short stroke, so colour goes on the `stroke` however the mark is

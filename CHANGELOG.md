@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A guide switched off with `false` is switched off.** `parseLegendForChannel` and `parseAxis`
+  both settle it as `legend !== undefined ? !legend : legendConfig.disable`, so the question is
+  JavaScript truthiness rather than a comparison against `null`. `"legend": false` is what
+  specifications in the wild write — the documented spelling is `null`, and the schema does not
+  admit `false` — and upstream honours it because `!false` is true. This compared against `null`
+  alone and left the key with a legend beside it. An empty object stays truthy, which is what makes
+  `"axis": {}` a guide with no properties rather than no guide.
+
+  The second arm of the same line is the theme's: where a channel says nothing about its legend,
+  `config.legend.disable` decides. The axis had honoured `config.axis.disable` all along. Together
+  the two arms account for 25 disagreements in the wild corpus, 18 of them a chart's only one.
+
 - **A rect-based mark's own `width` or `height` is its band size.** `getBandSize` settles the size
   before it looks at the scale at all, and `getMarkPropOrConfig` reads the mark's **Vega** name
   first — so `{"type": "bar", "width": 25}` is 25 wide, whatever its band or the configured band
