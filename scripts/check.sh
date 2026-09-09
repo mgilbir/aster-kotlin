@@ -437,10 +437,44 @@ adb_path="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Library/Android/sdk}}/platfo
 [ -x "$adb_path" ] || adb_path="$(command -v adb || true)"
 if [ -n "$adb_path" ] && [ -x "$adb_path" ] && "$adb_path" devices | grep -qE '\sdevice$'; then
   instrumented_gate() {
+    local status=0
     ./gradlew \
       :vega-android-canvas:connectedDebugAndroidTest \
       :vega-compose:connectedDebugAndroidTest \
-      :demo:connectedDebugAndroidTest
+      :demo:connectedDebugAndroidTest || status=$?
+    [ "$status" -eq 0 ] && return 0
+
+    # **Say whether the device is the reason.** The check above this gate asks `adb` once, so a device
+    # that is healthy then and gone by the time the tests run fails as though a test failed: Gradle
+    # reports "No compatible devices connected", which reads like a misconfigured project. It is
+    # usually memory — an emulator holds about three gigabytes, and on a laptop already in swap it
+    # goes `offline` while its process stays alive, so `pgrep` finds it and `adb` will not use it.
+    # That cost twenty minutes of looking in the wrong place once, which is what this exists to
+    # prevent.
+    #
+    # A guess is not offered where none is warranted: a failure with the device still healthy is
+    # reported as what it is, a failing test.
+    local attached
+    attached="$("$adb_path" devices | sed -n '2,$p' | awk 'NF {printf "%s=%s ", $1, $2}')"
+    echo
+    if [ -z "$attached" ]; then
+      echo "NOTE: no device is on adb now, and one was when this gate started — it disappeared"
+      echo "      mid-run, so the failure above is probably that rather than a failing test."
+    elif ! printf '%s' "$attached" | grep -q "=device"; then
+      echo "NOTE: a device is attached but not usable: $attached"
+      echo "      It went unusable mid-run, so the failure above is probably that rather than a"
+      echo "      failing test. An emulator whose process is alive but whose adb interface has died"
+      echo "      looks exactly like this."
+    else
+      echo "NOTE: the device is still healthy ($attached), so the failure above is a real one."
+    fi
+    # The commonest cause, stated with a number rather than as folklore.
+    if command -v vm_stat >/dev/null 2>&1; then
+      vm_stat | awk '/Pages free/ {printf "      free memory now: ~%.2f GB\n", $3 * 16384 / 1073741824}'
+    elif [ -r /proc/meminfo ]; then
+      awk '/MemAvailable/ {printf "      memory available now: ~%.2f GB\n", $2 / 1048576}' /proc/meminfo
+    fi
+    return "$status"
   }
   run_gate "instrumented" instrumented_gate
 

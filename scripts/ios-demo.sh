@@ -79,6 +79,30 @@ if [ "$MODE" = "--test" ]; then
     xcrun simctl create "$DEVICE_NAME" "$DEVICE_TYPE" "$RUNTIME"
   fi
 
+  # **Shut down what this script booted, and only that.** `xcodebuild` boots the simulator it is
+  # given and nothing ever stopped it, so a booted simulator outlived the gate — and `check.sh` runs
+  # `instrumented` on the line after this one, which needs an Android emulator on a machine that has
+  # just been asked to hold both. On a 32 GB laptop already in swap that is what tipped the emulator
+  # into `offline`, where Gradle reports "No compatible devices connected" and the reason looks like
+  # configuration rather than memory.
+  #
+  # Recorded before the run rather than assumed: a developer who had this simulator open for their
+  # own reasons keeps it. Shutting down someone else's session to save memory is not this script's
+  # call to make.
+  SIMULATOR_WAS_BOOTED=false
+  if xcrun simctl list devices | grep -F "$DEVICE_NAME" | grep -q "(Booted)"; then
+    SIMULATOR_WAS_BOOTED=true
+  fi
+  # A trap, so an interrupted run cleans up too. `|| true` because a shutdown that fails is not a
+  # reason to fail a green test run, and `simctl` errors when the device is already down.
+  cleanup_simulator() {
+    if [ "$SIMULATOR_WAS_BOOTED" = false ]; then
+      echo "==> Shutting down $DEVICE_NAME, which this run booted"
+      xcrun simctl shutdown "$DEVICE_NAME" 2>/dev/null || true
+    fi
+  }
+  trap cleanup_simulator EXIT INT TERM
+
   echo "==> Running the UI tests on $DEVICE_NAME"
   # `set -e` is on, so the exit code is captured rather than allowed to end the script: the JUnit
   # XML below has to be written for a *failing* run too, or a red suite renders in
