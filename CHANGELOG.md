@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **A `sort` upstream does not recognise orders nothing.** `domainSort` is a chain of arms — an
+  array, a sort field, a sort by encoding, `"descending"`, then `ascending`-or-nothing — and
+  anything failing all of them falls out of the bottom as `undefined`, leaving the domain in
+  whatever order the data arrived. This had a default at the end of each arm instead: an unknown
+  string became the ascending order, and an object with nothing in it became an `{"op": "min"}` over
+  no field at all. Three shapes that turn up in hand-written specifications — `"-"`, `""` and `{}` —
+  sorted charts upstream leaves alone, in seven of the wild corpus's specifications.
+
 - **Every interval selection's brush guards a point pick, whatever it is bound to.** A click on a
   brush belongs to the brush rather than to whatever row lies under the drag, and upstream's guard
   asks a selection only its type. This also asked what it was bound to and excluded a scale-bound

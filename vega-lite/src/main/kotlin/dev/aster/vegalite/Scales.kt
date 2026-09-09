@@ -458,7 +458,13 @@ internal object Scales {
                 },
               )
             } else {
-              bool(true)
+              // Not a channel, and not a word `domainSort` knows. Upstream's chain has no arm for
+              // it — `contains(['ascending', undefined], sort)` is the last test and an unknown
+              // string fails it — so the whole function falls through to `undefined` and the scale
+              // sorts its domain however the data arrived. `"-"` and `""` are both in the wild
+              // corpus, and reading them as the default ascending order sorted a chart that
+              // upstream leaves alone.
+              null
             }
           }
         }
@@ -475,6 +481,11 @@ internal object Scales {
         // Sorting by another channel's aggregate reads the pre-aggregation table, so the ordering
         // is computed independently of the values being drawn.
         val encoding = sort.string("encoding")
+        // `isSortField(sort)` is `sort.op === 'count' || 'field' in sort`, and `isSortByEncoding`
+        // is `'encoding' in sort`. An object holding none of the three is not a sort upstream
+        // recognises, and the chain falls past every arm to `undefined`. An empty `{}` is the
+        // shape in the wild, and this built an `{"op": "min"}` over no field at all.
+        if (encoding == null && sort.string("op") != "count" && !sort.has("field")) return null
         val field = sort.string("field") ?: encoding?.let { view.spec.fieldDef(it)?.field }
         val op = sort.string("op") ?: encoding?.let { view.spec.fieldDef(it)?.aggregate }
         obj {
@@ -483,7 +494,8 @@ internal object Scales {
           put("order", sort.string("order"))
         }
       }
-      else -> bool(true)
+      // A number, or a boolean other than the `null` above: nothing `domainSort` has an arm for.
+      else -> null
     }
   }
 
