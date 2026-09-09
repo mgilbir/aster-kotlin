@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **A facet channel carries its own `spacing`.** `getFacetMappingAndLayout` lifts `align`, `center`,
+  `spacing` and `columns` off a facet definition, and `assembleLayout` then extracts the spacing and
+  writes it as the layout's `padding`. So the gap between a trellis's cells may be stated beside the
+  facet or on the channel that makes it, and this read only the first place, falling back to the
+  configured twenty for the second — exactly as it once read `columns` in only one place. A crossed
+  facet states it per channel, so a trellis whose rows name a gap and whose columns do not is a pair
+  with the other side filled in from the theme.
+
 - **`nice` follows a stated extent, not the mere presence of a domain.** Upstream suppresses the
   rounding for a binned field, an **array** domain, a stated `domainMin` or `domainMax`, and a time
   or UTC scale. Two of those five were wrong here, and the comment beside the code had upstream's

@@ -1862,8 +1862,34 @@ private class Compilation(
     }
   }
 
+  /**
+   * `getFacetMappingAndLayout`: a facet **channel** carries its own `spacing`.
+   *
+   * The operator form writes it beside the facet and the encoding form writes it on the channel,
+   * and upstream's normaliser lifts the one onto the other before `assembleLayout` turns it into
+   * the layout's `padding` — the same two places `columns` and `align` are looked for.
+   *
+   * A wrapped facet's is a number, lifted whole. A crossed one's is written **per channel**,
+   * `layout[prop][channel] = def[prop]`, so a trellis whose rows state a gap and whose columns do
+   * not is a `{row, column}` pair with one side still to fill in.
+   */
+  private fun statedFacetSpacing(owner: VegaValue.Obj): VegaValue? {
+    owner.fields["spacing"]?.let {
+      return it
+    }
+    val encoding = owner.obj("encoding") ?: return null
+    encoding.obj("facet")?.fields?.get("spacing")?.let {
+      return it
+    }
+    val sides = LinkedHashMap<String, VegaValue>()
+    for (channel in listOf("row", "column")) {
+      encoding.obj(channel)?.fields?.get("spacing")?.let { sides[channel] = it }
+    }
+    return if (sides.isEmpty()) null else VegaValue.Obj(sides)
+  }
+
   private fun facetSpacing(owner: VegaValue.Obj): VegaValue {
-    val stated = owner.fields["spacing"] ?: config.raw.obj("facet")?.fields?.get("spacing")
+    val stated = statedFacetSpacing(owner) ?: config.raw.obj("facet")?.fields?.get("spacing")
     val configured = config.raw.obj("facet")?.number("spacing") ?: FACET_SPACING
     return if (stated is VegaValue.Obj)
       obj {
