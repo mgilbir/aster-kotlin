@@ -162,28 +162,31 @@ internal data class ChannelDef(
     isFieldDef && type == MeasureType.QUANTITATIVE && bin == null
 
   private companion object {
-    /**
-     * Whether a guide was switched off, which upstream asks as `!axis` and `!legend`.
-     *
-     * Both `parseLegendForChannel` and `parseAxis` settle it the same way — `axis !== undefined ?
-     * !axis : «the configured default»` — so the question is JavaScript truthiness rather than a
-     * comparison against `null`. `"legend": false` is what specifications in the wild actually
-     * write, and reading only `null` left the key with a legend beside it.
-     *
-     * An empty object is *truthy*, which is what makes `"axis": {}` a guide with no properties
-     * rather than no guide.
-     */
-    fun isFalsy(value: VegaValue?): Boolean =
-      when (value) {
-        null -> false
-        VegaValue.Null -> true
-        is VegaValue.Bool -> !value.value
-        is VegaValue.Num -> value.value == 0.0
-        is VegaValue.Str -> value.value.isEmpty()
-        else -> false
-      }
+    /** Whether a guide was switched off, which upstream asks as `!axis` and `!legend`. */
+    fun isFalsy(value: VegaValue?): Boolean = value != null && !value.isTruthy()
   }
 }
+
+/**
+ * JavaScript truthiness, which several of upstream's rules turn on directly.
+ *
+ * A guide is disabled by `!axis` or `!legend`; a legend's caption is dropped by `if (!legend.title)
+ * delete legend.title`; and `extractTitleConfig` spreads four of its six properties as `...(anchor
+ * ? {anchor} : {})`. Each of those is this question and not a comparison against `null`, which is
+ * why `"legend": false` and `"title": ""` mean what they mean.
+ *
+ * An empty object and an empty array are **truthy**, which is what makes `"axis": {}` a guide with
+ * no properties rather than no guide.
+ */
+internal fun VegaValue?.isTruthy(): Boolean =
+  when (this) {
+    null,
+    VegaValue.Null -> false
+    is VegaValue.Bool -> value
+    is VegaValue.Num -> value != 0.0
+    is VegaValue.Str -> value.isNotEmpty()
+    else -> true
+  }
 
 /** The mark, with the defaults upstream fills in before anything else reads them. */
 internal data class MarkDef(

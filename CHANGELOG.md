@@ -8,6 +8,22 @@ section here does not get released.
 
 ### Fixed
 
+- **A key captioned with nothing has no caption.** `assembleLegend` strips a falsy title on the way
+  out — `if (!legend.title) delete legend.title`, its own comment being "title schema doesn't
+  include null, ''". This dropped only the `null`, so `"title": ""` was written out and reserved the
+  space for a caption that says nothing. Eleven of the wild corpus's legends were captioned that
+  way, from the channel's own `title` and from the `legend` block's alike.
+
+  The rule stays at assembly, after the layers have been merged, because the caption is what
+  `mergeValuesWithExplicit` settled between them: a layer stating `"title": null` has been explicit,
+  and an explicit value beats a sibling's derived one, so one layer naming its colour `null` and
+  another leaving it derived is one uncaptioned key. Stripping it earlier takes the key away and the
+  merge fills the caption back in from the other layer.
+
+  The three rules that read JavaScript truthiness — a disabled guide, a falsy caption and
+  `extractTitleConfig`'s four spread properties — now share one helper rather than three copies of
+  the same `when`.
+
 - **A title written on one of a layer's members is the chart's title.** A layer's members are drawn
   in one group, so there is no child group for such a title to sit over — and rather than lose it,
   `LayerModel.assembleTitle` promotes it: "if title does not provide layer, look into children". The

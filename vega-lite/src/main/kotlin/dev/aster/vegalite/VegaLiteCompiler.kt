@@ -2815,17 +2815,7 @@ private class Compilation(
     val properties = LinkedHashMap<String, VegaValue>()
     for (key in listOf("anchor", "frame", "offset", "orient", "angle", "limit")) {
       val value = block.fields[key] ?: continue
-      val stated =
-        key == "angle" ||
-          key == "limit" ||
-          when (value) {
-            VegaValue.Null -> false
-            is VegaValue.Bool -> value.value
-            is VegaValue.Num -> value.value != 0.0
-            is VegaValue.Str -> value.value.isNotEmpty()
-            else -> true
-          }
-      if (stated) properties[key] = value
+      if (key == "angle" || key == "limit" || value.isTruthy()) properties[key] = value
     }
     return properties
   }
@@ -3536,9 +3526,16 @@ private class Compilation(
    * runs after the merge, because it is the *merged* legend's own channels that decide it.
    */
   private fun settle(fields: LinkedHashMap<String, VegaValue>) {
-    // "title schema doesn't include null" — `assembleLegend` drops the property rather than
-    // writing an empty one, which is how `"legend": {"title": null}` takes a key's caption off.
-    if (fields["title"].let { it == null || it == VegaValue.Null }) fields.remove("title")
+    // `if (!legend.title) delete legend.title` — "title schema doesn't include null, ''". Any
+    // **falsy** caption, so `"legend": {"title": ""}` takes a key's caption off exactly as
+    // `null` does; a key captioned with the empty string is a key with no caption, and writing one
+    // out reserved the space for it.
+    //
+    // It has to happen *here*, after the merge, and not where a title is read. The caption is what
+    // `mergeValuesWithExplicit` settled between the layers, and a stated `null` is what wins that:
+    // one layer naming its colour `null` and another leaving it derived is one uncaptioned key.
+    // Dropping it earlier takes the key away and the merge then fills it in from the other layer.
+    if (!fields["title"].isTruthy()) fields.remove("title")
     val symbols = fields["encode"]?.get("symbols")?.get("update") as? VegaValue.Obj ?: return
     val remaining =
       symbols.fields.filterKeys { it !in Channels.LEGEND_SCALE_CHANNELS || !fields.containsKey(it) }
