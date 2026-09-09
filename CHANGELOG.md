@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A `size` a rect-based mark cannot apply no longer moves it either.** Upstream honours `size` on
+  a rect-family mark only where the mark has an orientation to apply it along — always for a `tick`,
+  otherwise `horizontal` with `y` or `vertical` with `x` — and elsewhere logs
+  `cannotApplySizeToNonOrientedMark` and uses the band. The size was already gated that way here;
+  the **alignment** was not, so a mark that merely mentioned `size` was centred in its band. A
+  `rect` on two discrete scales came out on `xc`/`yc` at half a band where upstream writes `x`/`y`
+  across the band's width.
+
+  Upstream's test is `!hasSizeFromMarkOrEncoding`, and that flag is set only where the size was
+  actually used. Six of the ten smallest disagreements in the wild-corpus sweep were this one
+  specification shape.
+
 - **Vega-Lite 4's `selection` spelling compiles, instead of being ignored.** Vega-Lite 5 replaced
   `selection` with `params` and upstream kept the old spelling working; this compiler did not, so a
   selection it never saw produced no store dataset, no signals, no `interactive` on the marks it

@@ -1843,6 +1843,12 @@ internal object Marks {
         (view.markDef.orient == "horizontal" && channel == "y") ||
         (view.markDef.orient == "vertical" && channel == "x")
 
+    // **Not reported, and that is a gap rather than a decision about silence.** Upstream logs
+    // `cannotApplySizeToNonOrientedMark` here, and a reader who wrote a `size` that does nothing is
+    // owed the reason. `UnitView` carries no diagnostic collector and every construction site would
+    // have to thread one, which is a change of its own rather than part of this fix. The drawing is
+    // upstream's either way; only the explanation is missing.
+
     val sizeRef: VegaValue =
       when {
         declaredSize != null && useVlSizeChannel && sizeChannel != null ->
@@ -1905,7 +1911,16 @@ internal object Marks {
 
     // `defaultBandAlign`: a rect filling a *relative* band starts at the band's leading edge; one
     // given a size of its own is centred in it. The band in question may be the offset's.
-    val centred = bandingType != "band" || (declaredSize != null || markSize != null)
+    //
+    // **A size only centres the mark if it was honoured.** Upstream's test is
+    // `!hasSizeFromMarkOrEncoding`, and that flag is `!!sizeMixins` — set only where
+    // `useVlSizeChannel` held. So a size the mark cannot use does not move it either: this read
+    // `declaredSize != null || markSize != null` and centred a `rect` on two discrete scales
+    // because it *mentioned* `size`, emitting `xc`/`yc` with a half band where upstream emits
+    // `x`/`y` with the band's width. Six of the ten smallest disagreements in the wild corpus were
+    // exactly that.
+    val sizeWasHonoured = (declaredSize != null || markSize != null) && useVlSizeChannel
+    val centred = bandingType != "band" || sizeWasHonoured
     val vgChannel = if (centred) if (channel == "x") "xc" else "yc" else channel
 
     val posRef =
