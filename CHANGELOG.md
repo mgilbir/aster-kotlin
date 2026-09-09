@@ -6,6 +6,30 @@ section here does not get released.
 
 ## Unreleased
 
+### Fixed
+
+- **Vega-Lite 4's `selection` spelling compiles, instead of being ignored.** Vega-Lite 5 replaced
+  `selection` with `params` and upstream kept the old spelling working; this compiler did not, so a
+  selection it never saw produced no store dataset, no signals, no `interactive` on the marks it
+  applies to and no cursor.
+
+  In the wild-corpus sweep that was **237 charts matching upstream on none of them** — not slightly
+  off, categorically absent — and every top-ranked difference in that sweep was a symptom of it.
+  Those 237 now match at the same rate as the charts written in the v5 spelling, which is what says
+  the gap was the spelling and not the selections.
+
+  `SelectionCompat` is a port of upstream's `normalize/selectioncompat.ts` rather than an
+  interpretation of it, and the port matters: an experiment against upstream's compiler suggested a
+  straight `selection`→`param` rename, and reading the source showed **six** constructs and two
+  wrong answers. A condition becomes a `test` holding a predicate, not a `param`; and `empty` is
+  taken *out* of the select block and propagated to the predicates that test the selection. Bin
+  extents, lookup sources, scale domains and logical compositions like `{selection: {and: […]}}` are
+  the three shapes an experiment would not have found at all.
+
+  Emptiness is resolved in two passes rather than by upstream's back-patching, which is equivalent —
+  the value it converges on is the definition's, wherever it appeared — and is the only version that
+  works on an immutable tree.
+
 ### Internal
 
 - **A sweep of Vega-Lite specifications other people wrote.** The gallery sweep compiles the 627

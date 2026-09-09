@@ -370,6 +370,11 @@ private class Compilation(
     reportSchemaVersion()
     reportUnsupportedTopLevel()
 
+    // **Vega-Lite 4's `selection` first**, because upstream runs its compatibility normalizer
+    // before
+    // the core one — `coreNormalizer.map(selectionCompatNormalizer.map(spec))` — and everything
+    // below here is written against `params`. See `SelectionCompat`.
+    if (SelectionCompat.applies(spec)) spec = SelectionCompat.normalize(spec)
     // A repetition is rewritten into a concatenation before anything is compiled, exactly as
     // upstream normalizes it, so there is nothing further down that knows what `repeat` is.
     if (spec.has("repeat")) spec = Repeat.normalize(spec, diagnostics) ?: return failed()
