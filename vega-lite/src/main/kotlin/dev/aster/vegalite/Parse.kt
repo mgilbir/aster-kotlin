@@ -36,7 +36,30 @@ internal class Parse(
 
     // `alignStackOrderWithColorDomain`: a chart whose colours are listed in a stated order is drawn
     // in that order too, and the rule reaches into the encoding to say so.
-    val aligned = alignStackOrderWithColorDomain(encoding, markDef)
+    //
+    // **Asked of the stack, not guessed from the encoding.** Upstream computes `this.stack` and
+    // then
+    // aligns — `stack(markDef, encoding)` on line 118 of `unit.ts`, the alignment on line 128 — so
+    // the question is answered by the same code that decides whether anything stacks at all. This
+    // used to approximate it as "a quantitative position that aggregates", which misses a chart
+    // that stacks because it *said* `stack: true` and nothing else: 62 charts in the wild corpus
+    // differed by exactly the one formula this produces.
+    //
+    // The provisional spec is the pre-alignment one, which is also upstream's: the alignment adds
+    // an
+    // `order` channel afterwards and the stack is never recomputed against it.
+    val provisional =
+      UnitSpec(
+        markDef = markDef,
+        encoding = encoding,
+        data = spec.fields["data"],
+        transforms = spec.array("transform") ?: emptyList(),
+        width = spec.fields["width"],
+        height = spec.fields["height"],
+        params = spec.array("params").orEmpty(),
+        projection = spec.obj("projection"),
+      )
+    val aligned = alignStackOrderWithColorDomain(encoding, markDef, Stack.of(provisional) != null)
 
     return UnitSpec(
       markDef = markDef,
@@ -77,6 +100,10 @@ internal class Parse(
   private fun alignStackOrderWithColorDomain(
     encoding: Map<String, ChannelDef>,
     markDef: MarkDef,
+    /**
+     * Whether this view stacks, which is `this.stack` in `unit.ts` and decides the second branch.
+     */
+    stacked: Boolean,
   ): Aligned {
     if (encoding.containsKey("order")) return Aligned(encoding)
     val colour = encoding["fill"] ?: encoding["color"] ?: return Aligned(encoding)
@@ -86,9 +113,16 @@ internal class Parse(
 
     val offsetChannel =
       listOf("xOffset", "yOffset").firstOrNull { encoding[it]?.isFieldDef == true }
-    if (offsetChannel != null) {
+    // Upstream: `if (offsetEncoding && !offsetEncoding.sort) … else { … the stack branch … }`. An
+    // offset that already states a `sort` therefore **falls through** to the stack branch rather
+    // than ending the rule, which is what this used to do.
+    //
+    // No observable difference has been found for it: a chart dodged by an offset channel does not
+    // stack, so the branch returns on `!stacked` either way. Aligned regardless, because a rule
+    // that
+    // agrees by accident stops agreeing as soon as anything around it moves.
+    if (offsetChannel != null && encoding.getValue(offsetChannel).sort == null) {
       val offset = encoding.getValue(offsetChannel)
-      if (offset.sort != null) return Aligned(encoding)
       val listed = arr(domain)
       return Aligned(
         encoding +
@@ -100,16 +134,8 @@ internal class Parse(
       )
     }
     // A stack, and only a stack: with neither an offset channel nor an accumulation there is
-    // nothing whose order this could be. An accumulation is an aggregated measure against a
-    // discrete other position, which is what `Stack.of` decides from the whole view — but the mark
-    // is not built yet here, so the question is asked of the encoding: a quantitative position
-    // that aggregates.
-    val accumulating =
-      listOf("x", "y").firstOrNull { channel ->
-        val def = encoding[channel] ?: return@firstOrNull false
-        def.aggregate != null && def.type == MeasureType.QUANTITATIVE
-      }
-    if (accumulating == null) return Aligned(encoding)
+    // nothing whose order this could be. Upstream's test is `if (!this.stack) return`.
+    if (!stacked) return Aligned(encoding)
     val order = "_${field}_sort_index"
     // Written as Vega writes it, since it is the *text* of the list that reaches the expression:
     // `indexof(["sun","fog"], datum['weather'])`.
@@ -126,11 +152,17 @@ internal class Parse(
     }
     // A stack is accumulated from the origin outwards, so the *first* listed colour is the one
     // nearest it: at the bottom of a vertical stack, which counts down, and at the left of a
-    // horizontal one, which counts up. The orientation is the mark's where it states one and the
-    // accumulating channel's otherwise — a bar measured along x is a horizontal bar.
-    val horizontal =
-      markDef.raw.string("orient")?.let { it == "horizontal" } ?: (accumulating == "x")
-    val direction = if (horizontal) "ascending" else "descending"
+    // horizontal one, which counts up.
+    //
+    // **The mark's *resolved* orientation.** Upstream reads
+    // `this.markDef?.orient === 'horizontal' ? 'ascending' : 'descending'`, and `this.markDef` is
+    // the initialised definition: `initMarkDef` has already run
+    // `markDef.orient = orient(type, encoding, specifiedOrient)`, so a chart that states no
+    // `orient`
+    // still has the one inferred from its encoding. Reading the *stated* value instead ordered
+    // `stacked_bar_h_custom_color_domain` the wrong way about, which the gallery gate caught on the
+    // first run — the reason this rule is checked against those 627 before the wild corpus.
+    val direction = if (markDef.orient == "horizontal") "ascending" else "descending"
     val orderDef = obj {
       put("field", order)
       put("type", "quantitative")

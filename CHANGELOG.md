@@ -8,6 +8,20 @@ section here does not get released.
 
 ### Fixed
 
+- **A stated colour domain orders a stack that says `stack: true`, not only one that aggregates.**
+  `alignStackOrderWithColorDomain` adds a `_«field»_sort_index` column so a chart listing its colour
+  domain is drawn in that order rather than merely having its legend in it. Upstream asks
+  `this.stack` — the properties its own stack code computed — and this asked the encoding instead,
+  approximating it as "a quantitative position that aggregates". A chart that stacks because it
+  *said* so, with nothing aggregated, got no ordering: 62 charts in the wild corpus differed from
+  upstream by exactly the one formula that costs.
+
+  Two more divergences went with it. The direction reads the mark's **resolved** `orient` — which
+  `initMarkDef` infers from the encoding — where this read the stated one, ordering a horizontal
+  stack backwards; the 627-example gallery caught that on the first run. And an offset channel that
+  already states a `sort` now falls through to the stack branch as upstream's `else` does, rather
+  than ending the rule.
+
 - **A `size` a rect-based mark cannot apply no longer moves it either.** Upstream honours `size` on
   a rect-family mark only where the mark has an orientation to apply it along — always for a `tick`,
   otherwise `horizontal` with `y` or `vertical` with `x` — and elsewhere logs
