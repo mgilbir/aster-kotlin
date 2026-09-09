@@ -4,6 +4,26 @@ Notable changes, newest first. The release workflow reads the section for the
 version it is publishing and uses it as the release notes, so a version without a
 section here does not get released.
 
+## Unreleased
+
+### Internal
+
+- **A sweep of Vega-Lite specifications other people wrote.** The gallery sweep compiles the 627
+  examples Vega-Lite ships, and those are upstream's own: written to demonstrate features, by the
+  people who built them, in the version that shipped them. `scripts/vega-lite-wild.sh` adds a
+  different distribution — 1981 charts collected from public GitHub repositories by
+  `hyungkwonko/chart-llm`, MIT licensed and pinned to a commit — where schema versions are older,
+  defaults are left unstated and features combine in ways no example demonstrates.
+
+  **A measurement, not a gate**, which is the shape the gallery sweep had until it earned the
+  promotion by going from 124 of 627 matching to all 627. `check.sh` does not call this and the test
+  skips when the corpus is absent: a fresh corpus of somebody else's charts would paint every branch
+  red for reasons unconnected to it. It reports a match rate and ranks the differences by how many
+  charts each affects, which is the input to deciding what to fix.
+
+  The first reading is **1273 of 1981, 64.3%**. Upstream refused none of them and neither did this
+  compiler, so every one of the 708 differences is a real disagreement rather than an invalid input.
+
 ## 0.6.0
 
 ### Changed
