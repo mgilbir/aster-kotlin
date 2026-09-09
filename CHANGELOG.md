@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A mark property Vega has no channel for is no longer forwarded to Vega.** `markDefProperties`
+  walks `VG_MARK_CONFIGS` and asks the mark for each of the 57 properties Vega actually has, so
+  anything else a specification wrote is never looked at. This engine iterated the *mark's own* keys
+  and skipped a list of known Vega-Lite-only ones instead, which meant every word not on that list
+  went out verbatim.
+
+  A denylist cannot be finished, because what it has to exclude is every word nobody has written
+  yet. In the wild corpus the word was `fontsize` — a misspelling of `fontSize`, which upstream
+  ignores and this emitted as `"fontsize": {"value": 7.5}` into a Vega mark that has no such
+  channel. A property from a later Vega-Lite, and a polar bound such as `theta2` on a mark with no
+  polar bounds, were forwarded the same way and are now dropped for the same reason.
+
 - **A stated colour domain orders a stack that says `stack: true`, not only one that aggregates.**
   `alignStackOrderWithColorDomain` adds a `_«field»_sort_index` column so a chart listing its colour
   domain is drawn in that order rather than merely having its legend in it. Upstream asks

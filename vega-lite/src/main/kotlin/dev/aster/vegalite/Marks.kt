@@ -734,6 +734,11 @@ internal object Marks {
       put("opacity", obj { put("value", 0.7) })
     }
     for ((key, value) in view.markDef.raw.fields) {
+      // `markDefProperties` walks `VG_MARK_CONFIGS` and asks the mark for each — so a property
+      // Vega has no mark channel for never reaches the encode block, whether it is a Vega-Lite
+      // word consumed earlier or simply a misspelling. Asking the *mark* for its keys instead
+      // would forward `fontsize` verbatim to a Vega that has never heard of it.
+      if (key !in VG_MARK_PROPERTIES) continue
       if (key in VL_ONLY_MARK_PROPERTIES) continue
       // An **arc** ignores `theta` — `baseEncodeEntry(model, {theta: 'ignore'})` — and Vega has no
       // `theta2` or `radius2` on any mark, so those three are written above under Vega's own names
@@ -766,6 +771,79 @@ internal object Marks {
 
   /** `isRectBasedMark`: the marks whose size along a channel is a *band* rather than a symbol. */
   private val RECT_BASED_MARKS = setOf("rect", "bar", "image", "arc", "tick")
+
+  /**
+   * `VG_MARK_CONFIG_INDEX`: every property Vega has a mark channel for.
+   *
+   * The list is what makes a mark definition a *filter* rather than a passthrough. Vega-Lite reads
+   * a mark by walking this list and asking for each entry, so anything else the specification wrote
+   * — a word Vega-Lite resolved earlier, a word from a newer version, or a plain misspelling like
+   * `fontsize` for `fontSize` — is simply not asked for, and never reaches Vega.
+   *
+   * Some of these are Vega's names for something Vega-Lite spells differently, or are written from
+   * the encoding rather than the mark; those are excluded again by [VL_ONLY_MARK_PROPERTIES], which
+   * stands for upstream's `ALWAYS_IGNORE` plus its per-mark `ignore` argument.
+   */
+  private val VG_MARK_PROPERTIES =
+    setOf(
+      "aria",
+      "description",
+      "ariaRole",
+      "ariaRoleDescription",
+      "blend",
+      "opacity",
+      "fill",
+      "fillOpacity",
+      "stroke",
+      "strokeCap",
+      "strokeWidth",
+      "strokeOpacity",
+      "strokeDash",
+      "strokeDashOffset",
+      "strokeJoin",
+      "strokeOffset",
+      "strokeMiterLimit",
+      "startAngle",
+      "endAngle",
+      "padAngle",
+      "innerRadius",
+      "outerRadius",
+      "size",
+      "shape",
+      "interpolate",
+      "tension",
+      "orient",
+      "align",
+      "baseline",
+      "text",
+      "dir",
+      "dx",
+      "dy",
+      "ellipsis",
+      "limit",
+      "radius",
+      "theta",
+      "angle",
+      "font",
+      "fontSize",
+      "fontWeight",
+      "fontStyle",
+      "lineBreak",
+      "lineHeight",
+      "cursor",
+      "href",
+      "tooltip",
+      "cornerRadius",
+      "cornerRadiusTopLeft",
+      "cornerRadiusTopRight",
+      "cornerRadiusBottomLeft",
+      "cornerRadiusBottomRight",
+      "aspect",
+      "width",
+      "height",
+      "url",
+      "smooth",
+    )
 
   private val VL_ONLY_MARK_PROPERTIES =
     setOf(
