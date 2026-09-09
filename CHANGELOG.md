@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **A title written on one of a layer's members is the chart's title.** A layer's members are drawn
+  in one group, so there is no child group for such a title to sit over — and rather than lose it,
+  `LayerModel.assembleTitle` promotes it: "if title does not provide layer, look into children". The
+  first member that has one wins, depth first, and a title on the layer itself outranks every one of
+  them. A concatenation does not do this, its children having groups of their own. This dropped such
+  a title entirely, and 14 specifications in the wild corpus — Altair's output, which writes the
+  title on the layer carrying the text mark — came out untitled.
+
+  Two smaller facts of the same function went with it. A title needs `text` to be a title, so a
+  block of title properties with nothing to say is no longer written as an empty one; and `isText`
+  accepts an **array** of strings as readily as one string, so a title over several lines becomes
+  the title's `text` rather than standing as the title itself.
+
 - **A chart's title reads the theme, and a wrapped facet's title is a composition's.**
   `assembleTitle` frames a **unit or layer** title to its plotting group, and gives a
   **composition** `anchor: "start"` instead — upstream's note being that a centred title "does not

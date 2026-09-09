@@ -2717,28 +2717,63 @@ private class Compilation(
     return merged
   }
 
+  /**
+   * Whether this specification makes a **composition** rather than a unit or a layer.
+   *
+   * `assembleTitle` reads the two kinds of model differently. A unit or layer anchors its title to
+   * the *group* rather than to the whole surface, which keeps it over the plotting area when an
+   * axis widens the drawing to its left. A composition cannot: its groups are laid out and there is
+   * no one plotting area to sit over, so it takes `anchor: "start"` instead — upstream's note is
+   * that a centred title "does not look nice" over a grid.
+   */
+  private fun isComposition(from: VegaValue.Obj): Boolean {
+    val encoding = from.obj("encoding")
+    return from.has("facet") ||
+      from.has("concat") ||
+      from.has("hconcat") ||
+      from.has("vconcat") ||
+      from.has("repeat") ||
+      // A facet channel is a facet written in the encoding, and the model it makes is a facet
+      // model — so its title is a composition's, laid out above a grid. All three channels:
+      // `facet` wraps one field's values, and a chart that wraps is as composed as one that
+      // crosses. Leaving it out framed such a title to a plotting area the chart does not have.
+      encoding?.has("row") == true ||
+      encoding?.has("column") == true ||
+      encoding?.has("facet") == true
+  }
+
   private fun title(): VegaValue? {
-    val declared = spec.fields["title"] ?: return null
-    // `assembleTitle` reads the two kinds of model differently. A **unit or layer** anchors its
-    // title to the *group* rather than to the whole surface, which keeps it over the plotting area
-    // when an axis widens the drawing to its left. A **composition** cannot: its groups are laid
-    // out and there is no one plotting area to sit over, so it takes `anchor: "start"` instead —
-    // upstream's note is that a centred title "does not look nice" over a grid.
-    val encoding = spec.obj("encoding")
-    val composed =
-      spec.has("facet") ||
-        spec.has("concat") ||
-        spec.has("hconcat") ||
-        spec.has("vconcat") ||
-        spec.has("repeat") ||
-        // A facet channel is a facet written in the encoding, and the model it makes is a facet
-        // model — so its title is a composition's, laid out above a grid. All three channels:
-        // `facet` wraps one field's values, and a chart that wraps is as composed as one that
-        // crosses. Leaving it out framed such a title to a plotting area the chart does not have.
-        encoding?.has("row") == true ||
-        encoding?.has("column") == true ||
-        encoding?.has("facet") == true
-    return titleFor(declared, composed)
+    spec.fields["title"]?.let { declared ->
+      titleFor(declared, isComposition(spec))?.let {
+        return it
+      }
+    }
+    return layerTitle(spec)
+  }
+
+  /**
+   * `LayerModel.assembleTitle`: "if title does not provide layer, look into children".
+   *
+   * A layer's members are drawn in one group, so there is no child group for a title written on one
+   * of them to sit over — and rather than lose it, upstream promotes it to the chart's own. The
+   * first member that has one wins, depth first, and a title on the layer itself outranks all of
+   * them. A **concatenation** does not do this: its children have groups of their own, and a title
+   * written on one stays there.
+   */
+  private fun layerTitle(from: VegaValue.Obj): VegaValue? {
+    val layers = (from.fields["layer"] as? VegaValue.Arr)?.values ?: return null
+    for (member in layers) {
+      val child = member as? VegaValue.Obj ?: continue
+      child.fields["title"]?.let { declared ->
+        titleFor(declared, isComposition(child))?.let {
+          return it
+        }
+      }
+      layerTitle(child)?.let {
+        return it
+      }
+    }
+    return null
   }
 
   /** The chart group's own `encode`, which is where a top-level `view` block's paint lands. */
@@ -2795,11 +2830,22 @@ private class Compilation(
     return properties
   }
 
-  /** `assembleTitle`, for a title on any model: the group frame, or the composition's anchor. */
-  private fun titleFor(declared: VegaValue, composed: Boolean): VegaValue {
+  /**
+   * `assembleTitle`, for a title on any model: the group frame, or the composition's anchor.
+   *
+   * Nothing at all where there is no `text`, which is upstream's `if (title.text) { … } return
+   * undefined` — a block of title properties with nothing to say is not a title. And `isText`
+   * accepts an **array** of strings as readily as one string, a title written over several lines
+   * being a list of them.
+   */
+  private fun titleFor(declared: VegaValue, composed: Boolean): VegaValue? {
     val fields = (declared as? VegaValue.Obj)?.fields
-    val text = fields?.get("text") ?: declared.takeIf { it is VegaValue.Str }
-    if (text == null) return declared
+    val text =
+      fields?.get("text")
+        ?: declared.takeIf {
+          it is VegaValue.Str || (it as? VegaValue.Arr)?.values?.firstOrNull() is VegaValue.Str
+        }
+    if (text == null) return null
     // `{...nonMarkTitleProperties, ...titleNoEncoding, ...(encoding ? {encode: …} : {})}`, and in
     // that order: what the title itself states outranks what the theme did.
     val title = LinkedHashMap<String, VegaValue>(nonMarkTitleProperties())
