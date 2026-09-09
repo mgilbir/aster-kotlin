@@ -258,9 +258,21 @@ private class Compilation(
     if (selection.type != "interval") {
       // A click on another selection's **brush** is not a pick: the rectangle belongs to the brush
       // that owns it, and a click on it would otherwise pick whatever row lies under the drag.
+      //
+      // Every interval selection on the same view, whatever it is bound to. Upstream asks only its
+      // type:
+      //
+      //     vals(model.component.selection ?? {})
+      //       .reduce((acc, cmpt) => cmpt.type === 'interval' ? acc.concat(cmpt.name + BRUSH) :
+      // acc, [])
+      //
+      // A **scale-bound** interval was excluded here on the reasoning that it draws no brush, so
+      // there is no rectangle to click — but `indexof` on a name nothing carries is simply always
+      // less than zero, and the guard costs nothing. Upstream writes it, so a chart that pans its
+      // axes while picking points disagreed on the one signal that does the picking.
       val brushes =
         selections
-          .filter { it.type == "interval" && !it.bindsScales && it.owner === selection.owner }
+          .filter { it.type == "interval" && it.owner === selection.owner }
           .map { "${it.name}_brush" }
       return selection.signals(
         unit = selection.unitName(views.firstOrNull().takeIf { facet != null }, facet),

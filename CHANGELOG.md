@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **Every interval selection's brush guards a point pick, whatever it is bound to.** A click on a
+  brush belongs to the brush rather than to whatever row lies under the drag, and upstream's guard
+  asks a selection only its type. This also asked what it was bound to and excluded a scale-bound
+  interval, on the reasoning that such a selection draws no brush and so has no rectangle to click.
+  The reasoning is sound and the conclusion is wrong: `indexof` on a name nothing carries is always
+  less than zero, the guard costs nothing, and upstream writes it. Six specifications in the wild
+  corpus pan their axes while picking points — a scale-bound interval beside a point selection is
+  the ordinary way to write that — and disagreed on the one signal that does the picking.
+
 - **A mark that says how solid its fill is keeps the reduced scatter opacity off.** `initMarkDef`
   asks for both `opacity` and `fillOpacity` before applying the seven-tenths default that lets
   overlapping points read through each other, and either one answering leaves the mark alone — a
