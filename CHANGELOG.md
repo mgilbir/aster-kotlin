@@ -8,6 +8,21 @@ section here does not get released.
 
 ### Fixed
 
+- **A chart's title reads the theme, and a wrapped facet's title is a composition's.**
+  `assembleTitle` frames a **unit or layer** title to its plotting group, and gives a
+  **composition** `anchor: "start"` instead — upstream's note being that a centred title "does not
+  look nice" over a grid. A chart faceted by the `facet` channel was read as a unit where `row` and
+  `column` were already read as compositions, so its title was framed to a plotting area the chart
+  does not have.
+
+  `config.title`'s six non-mark properties — `anchor`, `frame`, `offset`, `orient`, `angle`,
+  `limit` — now reach the title directive. They are deliberately kept out of the `group-title`
+  style because that is where upstream puts them, and nothing then wrote them anywhere, so a theme
+  whose `config.title.anchor` is `"start"` produced a centred title with a group frame. The frame
+  and anchor defaults read the assembled title, so a theme's anchor is as explicit as the title's
+  own. A title's `encoding` also becomes an `encode.update` block rather than being passed through
+  under a name Vega has no title property for.
+
 - **A guide switched off with `false` is switched off.** `parseLegendForChannel` and `parseAxis`
   both settle it as `legend !== undefined ? !legend : legendConfig.disable`, so the question is
   JavaScript truthiness rather than a comparison against `null`. `"legend": false` is what

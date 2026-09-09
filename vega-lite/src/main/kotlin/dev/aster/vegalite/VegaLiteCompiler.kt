@@ -2731,10 +2731,13 @@ private class Compilation(
         spec.has("hconcat") ||
         spec.has("vconcat") ||
         spec.has("repeat") ||
-        // A `row`/`column` channel is a facet written in the encoding, and the model it makes is a
-        // facet model — so its title is a composition's, laid out above a grid.
+        // A facet channel is a facet written in the encoding, and the model it makes is a facet
+        // model — so its title is a composition's, laid out above a grid. All three channels:
+        // `facet` wraps one field's values, and a chart that wraps is as composed as one that
+        // crosses. Leaving it out framed such a title to a plotting area the chart does not have.
         encoding?.has("row") == true ||
-        encoding?.has("column") == true
+        encoding?.has("column") == true ||
+        encoding?.has("facet") == true
     return titleFor(declared, composed)
   }
 
@@ -2760,22 +2763,63 @@ private class Compilation(
     }
   }
 
+  /**
+   * `extractTitleConfig(…).nonMarkTitleProperties`: the six a theme writes on the title *directive*
+   * rather than into a style block.
+   *
+   * Every other `config.title` property is paint and becomes the `group-title` style, which is why
+   * [Config] keeps these six out of it — and until now nothing put them back, so a theme whose
+   * `config.title.anchor` is `"start"` produced a centred title with a group frame instead.
+   *
+   * `angle` and `limit` come through wherever they are stated, the other four only where they are
+   * truthy: upstream spreads them as `...(anchor ? {anchor} : {})` against `...(angle !== undefined
+   * ? {angle} : {})`, and an `anchor: ""` is no anchor at all.
+   */
+  private fun nonMarkTitleProperties(): Map<String, VegaValue> {
+    val block = config.raw.obj("title") ?: return emptyMap()
+    val properties = LinkedHashMap<String, VegaValue>()
+    for (key in listOf("anchor", "frame", "offset", "orient", "angle", "limit")) {
+      val value = block.fields[key] ?: continue
+      val stated =
+        key == "angle" ||
+          key == "limit" ||
+          when (value) {
+            VegaValue.Null -> false
+            is VegaValue.Bool -> value.value
+            is VegaValue.Num -> value.value != 0.0
+            is VegaValue.Str -> value.value.isNotEmpty()
+            else -> true
+          }
+      if (stated) properties[key] = value
+    }
+    return properties
+  }
+
   /** `assembleTitle`, for a title on any model: the group frame, or the composition's anchor. */
   private fun titleFor(declared: VegaValue, composed: Boolean): VegaValue {
     val fields = (declared as? VegaValue.Obj)?.fields
     val text = fields?.get("text") ?: declared.takeIf { it is VegaValue.Str }
     if (text == null) return declared
-    return obj {
-      if (fields == null) put("text", text) else fields.forEach { (key, value) -> put(key, value) }
-      if (composed) {
-        if (fields?.containsKey("anchor") != true) put("anchor", "start")
-      } else {
-        val anchor = (fields?.get("anchor") as? VegaValue.Str)?.value
-        if ((anchor == null || anchor == "middle") && fields?.containsKey("frame") != true) {
-          put("frame", "group")
-        }
+    // `{...nonMarkTitleProperties, ...titleNoEncoding, ...(encoding ? {encode: …} : {})}`, and in
+    // that order: what the title itself states outranks what the theme did.
+    val title = LinkedHashMap<String, VegaValue>(nonMarkTitleProperties())
+    if (fields == null) title["text"] = text
+    // A title's `encoding` is a Vega `encode` block rather than a title property, which is the one
+    // key upstream destructures out before it spreads the rest.
+    else fields.forEach { (key, value) -> if (key != "encoding") title[key] = value }
+    fields?.get("encoding")?.let { title["encode"] = obj { put("update", it) } }
+    // The two defaults are applied to the assembled title, after everything it was spread from —
+    // so they read a theme's anchor as being as explicit as the title's own, and a `frame` lands
+    // last of all, which is where upstream's `??=` puts it.
+    if (composed) {
+      if (!title.containsKey("anchor")) title["anchor"] = VegaValue.Str("start")
+    } else {
+      val anchor = (title["anchor"] as? VegaValue.Str)?.value
+      if ((anchor == null || anchor == "middle") && !title.containsKey("frame")) {
+        title["frame"] = VegaValue.Str("group")
       }
     }
+    return VegaValue.Obj(title)
   }
 
   // -----------------------------------------------------------------------------------------
