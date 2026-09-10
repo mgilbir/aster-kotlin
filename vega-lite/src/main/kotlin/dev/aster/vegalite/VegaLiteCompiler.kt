@@ -3660,14 +3660,40 @@ private class Compilation(
     // one layer naming its colour `null` and another leaving it derived is one uncaptioned key.
     // Dropping it earlier takes the key away and the merge then fills it in from the other layer.
     if (!fields["title"].isTruthy()) fields.remove("title")
+    // `const {disable, labelExpr, selections, ...legend} = legendCmpt.combine()`, and then:
+    //
+    //     if (labelExpr !== undefined) {
+    //       let expr = labelExpr;
+    //       if (legend.encode?.labels?.update && isSignalRef(legend.encode.labels.update.text)) {
+    //         expr = util.replaceAll(labelExpr, 'datum.label',
+    // legend.encode.labels.update.text.signal);
+    //       }
+    //       …
+    //     }
+    //
+    // After the merge, so every layer's encode is in hand: the expression composes with a text the
+    // encode already states rather than replacing whatever was there.
+    (fields.remove("labelExpr") as? VegaValue.Str)?.let { expression ->
+      fields["encode"] = Guides.withLabelText(fields["encode"], expression.value)
+    }
     val symbols = fields["encode"]?.get("symbols")?.get("update") as? VegaValue.Obj ?: return
     val remaining =
       symbols.fields.filterKeys { it !in Channels.LEGEND_SCALE_CHANNELS || !fields.containsKey(it) }
     if (remaining.size == symbols.fields.size) return
+    // Upstream deletes from the swatch's own update **in place** — `delete out[property]` — so
+    // every other part of the encode is untouched. Rebuilding the whole `encode` from the swatch
+    // discarded the rest of it: a legend whose labels carry an expression lost them the moment a
+    // scale channel was dropped from its swatch.
+    val whole = fields["encode"] as? VegaValue.Obj
+    val swatches = (whole?.fields?.get("symbols") as? VegaValue.Obj)?.fields.orEmpty()
     fields["encode"] = obj {
+      whole?.fields?.forEach { (key, value) -> if (key != "symbols") put(key, value) }
       put(
         "symbols",
-        obj { put("update", obj { remaining.forEach { (key, value) -> put(key, value) } }) },
+        obj {
+          swatches.forEach { (key, value) -> if (key != "update") put(key, value) }
+          put("update", obj { remaining.forEach { (key, value) -> put(key, value) } })
+        },
       )
     }
   }

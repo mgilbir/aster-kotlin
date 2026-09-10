@@ -729,7 +729,7 @@ internal object Guides {
    * means that text rather than the axis's own, so the two compose instead of one replacing the
    * other.
    */
-  private fun withLabelText(encode: VegaValue?, labelExpr: String): VegaValue {
+  fun withLabelText(encode: VegaValue?, labelExpr: String): VegaValue {
     val parts = (encode as? VegaValue.Obj)?.fields.orEmpty()
     val labels = (parts["labels"] as? VegaValue.Obj)?.fields.orEmpty()
     val update = (labels["update"] as? VegaValue.Obj)?.fields.orEmpty()
@@ -1104,11 +1104,15 @@ internal object Guides {
       // the labels' text — a custom number format type writes one — `datum.label` in the expression
       // means *that* text rather than the scale's, so the two compose instead of one replacing the
       // other. `withLabelText` is the axis's own function; the rule is the same on both guides.
-      val labelExpr = def.legend?.string("labelExpr")
       val own =
         if (parts.isEmpty()) null else obj { parts.forEach { (key, value) -> put(key, value) } }
-      val encode = if (labelExpr == null) own else withLabelText(own, labelExpr)
-      encode?.let { put("encode", it) }
+      own?.let { put("encode", it) }
+      // Carried rather than applied. `assembleLegend` destructures `labelExpr` off the component
+      // and applies it to the **merged** legend, and the difference is not cosmetic: a line with a
+      // point overlay is two layers, and only the point's legend has a swatch encode. Applied per
+      // layer, the line's `{labels: …}` encode reached the merge first and the point's `{symbols:
+      // …}` was dropped behind it — the swatch lost the overlay's white fill.
+      def.legend?.string("labelExpr")?.let { put("labelExpr", str(it)) }
     }
   }
 

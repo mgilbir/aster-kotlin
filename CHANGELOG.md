@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A legend's label expression is applied to the merged legend, and no longer costs the swatch.**
+  `assembleLegend` destructures `labelExpr` off the component and applies it at assembly. The place
+  matters: a line with a point overlay is two layers, and only the point's legend has a swatch
+  encode, so an expression applied per layer let the line's `{labels: …}` reach the merge first and
+  the point's `{symbols: …}` was dropped behind it — the swatch lost the overlay's white fill.
+
+  Moving it uncovered a second fault in the same function. Upstream removes a scale channel from
+  the swatch with `delete out[property]`, **in place**, leaving the rest of the encode alone; this
+  rebuilt the whole `encode` from the swatch, so a legend whose labels carry an expression lost them
+  the moment a scale channel was dropped from its swatch.
+
 - **The last four readers of an encoding now spread a list channel too.** `forEachFieldDef` and
   `reduceFieldDef` spread an array before they call, so a `tooltip` naming four columns is four
   definitions to every pass that walks the encoding. The same shape had been fixed in five separate
