@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A weekday written beside a year and a month is dropped, and no longer moves the date.**
+  `dateTimeParts` deletes a `day` whenever the object holds anything else, before it reads any of
+  the rest — upstream's comment is "day only works as a standalone unit", a weekday being a position
+  in a *week* and the `day + 1` that places it arithmetic that makes sense only when nothing else is
+  pinned. Carrying it there moved the date by a day: `{"year": 1900, "month": 1, "day": 1}` came out
+  as the second of January. A date-time literal in a predicate also goes through `dateTimeToExpr`
+  rather than its parts alone, which is what writes an instant marked `utc` as `utc(…)` instead of
+  as local time; both were wrong in the same line.
+
 - **A map is as tall as a continuous plot.** `defaultUnitSize`'s third arm is
   `model.hasProjection || model.mark === 'arc'`, and this had only the `arc` half of it. A chart
   drawn through a projection has no position scale on either channel, so it fell to the *discrete*

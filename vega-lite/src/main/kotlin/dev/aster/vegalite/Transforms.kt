@@ -957,8 +957,10 @@ internal class Transforms(
       value is VegaValue.Num -> canonicalNumberString(value.value)
       value is VegaValue.Bool -> value.value.toString()
       // A date-time literal is compared as a number too, so it takes the same `time()` wrapper the
-      // field does — `predicateValueExpr` passes `wrapTime`.
-      value is VegaValue.Obj -> "time(datetime(${dateTimeArguments(value)}))"
+      // field does — `predicateValueExpr` passes `wrapTime`. Through `dateTimeToExpr` and not the
+      // arguments alone: that is what drops a `day` written beside a year, and what writes an
+      // instant the specification marked `utc` as `utc(…)` rather than as local time.
+      value is VegaValue.Obj -> "time(${dateTimeExpression(value)})"
       else -> "null"
     }
 
@@ -969,10 +971,37 @@ internal class Transforms(
    * month to zero *or* to a quarter times three, and a date to one *or* to a day plus one, which is
    * the arithmetic that makes a bare `{"day": "mon"}` land on a Monday.
    */
+  /**
+   * `dateTimeParts(d, normalize = true)`'s first step: a **day** beside anything else is dropped.
+   *
+   * ```js
+   * if (normalize && d.day !== undefined) {
+   *   if (keys(d).length > 1) {
+   *     log.warn(log.message.droppedDay(d));
+   *     d = duplicate(d);
+   *     delete d.day;
+   *   }
+   * }
+   * ```
+   *
+   * Upstream's own comment further down says why: "HACK: Day only works as a standalone unit. This
+   * is only correct because we always set year to 2006 for day." A weekday is a position in a week
+   * and not a position in a month, and the `day + 1` that places it is arithmetic that only makes
+   * sense when nothing else is pinned. Written beside a year and a month it is nonsense, and
+   * carrying it there moved the date a day: `{"year": 1900, "month": 1, "day": 1}` came out as the
+   * second of January rather than the first.
+   */
+  private fun standaloneDay(value: VegaValue.Obj): VegaValue.Obj =
+    if (value.fields.containsKey("day") && value.fields.size > 1)
+      VegaValue.Obj(LinkedHashMap(value.fields).apply { remove("day") })
+    else value
+
   /** `dateTimeToExpr`: the instant a `DateTime` object names, as an expression. */
-  fun dateTimeExpression(value: VegaValue.Obj): String =
-    if (value.fields["utc"] == VegaValue.Bool(true)) "utc(${dateTimeArguments(value)})"
+  fun dateTimeExpression(raw: VegaValue.Obj): String {
+    val value = standaloneDay(raw)
+    return if (value.fields["utc"] == VegaValue.Bool(true)) "utc(${dateTimeArguments(value)})"
     else "datetime(${dateTimeArguments(value)})"
+  }
 
   private fun dateTimeArguments(value: VegaValue.Obj): String {
     fun number(key: String): String? =
@@ -1030,7 +1059,9 @@ internal class Transforms(
    * Date(year, month, …)` reads it — the two sides of the comparison agree because both ask the
    * same machine what its zone is.
    */
-  fun dateTimeTimestamp(value: VegaValue.Obj): Double {
+  fun dateTimeTimestamp(raw: VegaValue.Obj): Double {
+    // `dateTimeToTimestamp` reads the same normalised parts the expression does.
+    val value = standaloneDay(raw)
     fun part(key: String): Double? =
       when (val own = value.fields[key]) {
         is VegaValue.Num -> own.value
