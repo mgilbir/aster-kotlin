@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **`config.view.width` and `config.view.height` size a plot, as the names those properties had
+  before the continuous and discrete sizes were told apart.** Both of upstream's readers ask for
+  them first — "get width/height for backwards compatibility" — and this read only the newer names
+  on the continuous side, so a theme written against an older Vega-Lite had its charts drawn at the
+  default 300. Eight specifications in the wild corpus size themselves that way. The discrete reader
+  answers a **number** where the theme states one and `{step: …}` only otherwise, so a themed
+  discrete size replaces the step arithmetic entirely — every strip in the document is that deep,
+  with no `«scale»_step` signal to compute it from — while the specification's own `width` still
+  outranks the theme either way.
+
 - **A theme naming the side a legend sits on decides which way it runs.** `getDirection` is
   `legend.direction ?? legendConfig[…] ?? defaultDirection(orient, legendType)` with `orient` being
   `legend.orient || config.legend.orient || 'right'`, so `config.legend.orient: "top"` turns every

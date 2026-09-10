@@ -87,10 +87,17 @@ internal class Config(
   fun scaleInvalid(channel: String): VegaValue? =
     user.obj("scale")?.obj("invalid")?.fields?.get(channel)
 
-  /** `view.continuousWidth`/`continuousHeight`: the size of a plot with a continuous position. */
-  val continuousWidth: Double = view.number("continuousWidth") ?: 300.0
+  /**
+   * `view.continuousWidth`/`continuousHeight`: the size of a plot with a continuous position.
+   *
+   * `view.width` and `view.height` are the same properties under the names they had before the
+   * continuous and discrete sizes were told apart, and upstream still reads them **first** — "get
+   * width/height for backwards compatibility". A theme written against an older Vega-Lite sizes its
+   * plots that way, and this read only the newer names, so such a chart was drawn at the default.
+   */
+  val continuousWidth: Double = view.number("width") ?: view.number("continuousWidth") ?: 300.0
 
-  val continuousHeight: Double = view.number("continuousHeight") ?: 300.0
+  val continuousHeight: Double = view.number("height") ?: view.number("continuousHeight") ?: 300.0
 
   /** One discrete step, from which a band-scaled plot's whole width is computed. */
   val step: Double = view.number("step") ?: 20.0
@@ -366,7 +373,13 @@ internal class Config(
     for ((key, property) in block.fields) {
       if (
         key in
-          setOf("continuousWidth", "continuousHeight", "discreteWidth", "discreteHeight", "step")
+          setOf(
+            "continuousWidth",
+            "continuousHeight",
+            "discreteWidth",
+            "discreteHeight",
+            "step",
+          )
       ) {
         continue
       }

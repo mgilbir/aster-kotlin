@@ -109,9 +109,14 @@ internal class LayoutSize(
         continue
       }
 
+      // `getViewConfigDiscreteSize` answers a **number** where the theme states one and `{step: …}`
+      // only otherwise, so a themed discrete size replaces the step arithmetic entirely: every
+      // strip in the document is that deep, however many categories it holds.
+      val themedDiscrete = if (channel == "x") config.discreteWidth else config.discreteHeight
       val value: VegaValue? =
         when {
           !discrete || declared is VegaValue.Num -> value(views, scales, config, spec, channel)
+          declared == null && themedDiscrete != null -> num(themedDiscrete)
           else -> {
             val padding = (scale.properties["padding"] as? VegaValue.Num)?.value
             // Only a *band* scale has a real inner padding. A **point** scale counts as 1, because
