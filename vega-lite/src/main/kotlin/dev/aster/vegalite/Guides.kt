@@ -920,24 +920,40 @@ internal object Guides {
       "encode",
     )
 
+  /**
+   * Whether this channel's legend is switched off, and whether the specification **said so**.
+   *
+   * ```js
+   * const disable = legend !== undefined ? !legend : legendConfig.disable;
+   * legendCmpt.set('disable', disable, legend !== undefined);
+   * if (disable) return legendCmpt;
+   * ```
+   *
+   * The channel's own `legend` settles it either way, and where the channel says nothing the theme
+   * decides — `config: {"legend": {"disable": true}}` is how a chart drops every legend at once. A
+   * `disable` written **inside** the block settles it too: it is one of
+   * `LEGEND_COMPONENT_PROPERTIES`, read off the block like any other and then destructured away by
+   * `assembleLegend`, which answers nothing for a disabled component.
+   *
+   * The second half of the pair is what makes this more than a local question. A disabled component
+   * is still a component, and its `disable` is *explicit* whenever the channel wrote a `legend` at
+   * all — so it beats a derived one through `mergeValuesWithExplicit`, and a layer writing
+   * `"legend": null` takes the **merged** legend away rather than only its own. By the same rule a
+   * layer writing `"legend": {}` says explicitly that it is *not* disabled, which is how one layer
+   * brings a key back that `config.legend.disable` had switched off.
+   */
+  fun legendDisable(view: UnitView, def: ChannelDef): Pair<Boolean, Boolean> {
+    val stated =
+      def.raw.fields["legend"]
+        ?: return (view.config.raw.obj("legend")?.fields?.get("disable") == VegaValue.Bool(true)) to
+          false
+    if (!stated.isTruthy()) return true to true
+    return (stated as? VegaValue.Obj)?.fields?.get("disable").isTruthy() to true
+  }
+
   /** The legend a scaled non-position channel produces, or null when it produces none. */
   fun legend(view: UnitView, channel: String, def: ChannelDef, type: String): VegaValue? {
-    if (def.legendDisabled) return null
-    // `const disable = legend !== undefined ? !legend : legendConfig.disable;` — the channel's own
-    // `legend` settles it either way, and where the channel says nothing the theme decides.
-    // `config: {"legend": {"disable": true}}` is how a chart drops every legend at once, and the
-    // axis beside this has honoured its own `config.axis.disable` all along.
-    if (
-      def.raw.fields["legend"] == null &&
-        view.config.raw.obj("legend")?.fields?.get("disable") == VegaValue.Bool(true)
-    ) {
-      return null
-    }
-    // And `disable` written **inside** the block. It is one of `LEGEND_COMPONENT_PROPERTIES` and is
-    // read off the block like any other, then destructured away by `assembleLegend`, which answers
-    // nothing for a disabled component. Dropping it as an internal without honouring it first left
-    // the key drawn.
-    if (def.legend?.fields?.get("disable").isTruthy()) return null
+    if (legendDisable(view, def).first) return null
     val filled = view.markDef.filled
     // `getLegendDefWithScale`: a trail's legend names two channels differently from every other
     // mark's. Its swatch is a short stroke, so colour goes on the `stroke` however the mark is

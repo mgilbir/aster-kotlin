@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A legend one layer switches off stays off for the merged legend.** `parseLegendForChannel` builds
+  a component for a disabled legend rather than none, and records its `disable` as *explicit*
+  whenever the channel wrote a `legend` at all — `legendCmpt.set('disable', disable, legend !==
+  undefined)`. `mergeLegendComponent` folds that property like any other, so a layer writing
+  `"legend": null` takes the **merged** key away rather than only its own share of it. Dropping the
+  disabled component instead let the other layer's legend stand: four specifications in the wild
+  corpus drew a key their first layer had switched off, one of them captioned `gender, t, t` — the
+  three layers' titles joined. The rule cuts both ways: a layer writing `"legend": {}` says
+  explicitly that its legend is *not* disabled, and brings back a key `config.legend.disable` had
+  switched off.
+
 - **A table two models name is written out with a `format` block, whatever it comes to.** `parseRoot`
   runs for the root and for every model that states its own `data`; where it finds a source already
   standing it assigns `mergeDeep({}, model.data.format, existingSource.data.format)`

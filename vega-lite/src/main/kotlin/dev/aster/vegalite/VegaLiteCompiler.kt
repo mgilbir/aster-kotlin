@@ -3593,6 +3593,8 @@ private class Compilation(
   ): LinkedHashMap<String, VegaValue> {
     val legends = LinkedHashMap<String, LinkedHashMap<String, VegaValue>>()
     val explicitlyTitled = mutableSetOf<String>()
+    /** Whether each key's merged legend is switched off, and whether that was stated. */
+    val disableOf = LinkedHashMap<String, Pair<Boolean, Boolean>>()
     for (view in views) {
       for (channel in Channels.LEGEND_CHANNELS) {
         // The same definition the *scale* was built from, which for a channel written entirely as
@@ -3600,7 +3602,6 @@ private class Compilation(
         // needs a key saying what its colours mean.
         val def = view.spec.encoding[channel]?.let { view.scaledDef(it) } ?: continue
         val component = view.scaleComponents[channel] ?: continue
-        val built = Guides.legend(view, channel, def, component.type) as? VegaValue.Obj ?: continue
         // Keyed by the **field**, not by the scale — `assembleLegends` groups by
         // `field:<name>`. One field encoded twice, as a colour *and* as a size, is one key to the
         // reader and one legend whose swatches carry both; keying by the scale gave it two, side by
@@ -3644,6 +3645,18 @@ private class Compilation(
             else -> ""
           }
         val key = "$prefix|${def.field?.let { fieldKey } ?: channel}|$discrete|$ownChild"
+        // A **disabled** legend is still a component, and its disable is folded into the merged
+        // one: a layer writing `"legend": null` takes the whole key away rather than only its own
+        // share of it. See [Guides.legendDisable] for which way round the explicitness goes.
+        val (disabled, explicitDisable) = Guides.legendDisable(view, def)
+        val standing = disableOf[key]
+        if (standing == null) {
+          disableOf[key] = disabled to explicitDisable
+        } else if (!standing.second && explicitDisable) {
+          disableOf[key] = disabled to true
+        }
+        if (disabled) continue
+        val built = Guides.legend(view, channel, def, component.type) as? VegaValue.Obj ?: continue
         // `mergeValuesWithExplicit` settles a property before any tie-breaker runs: a value the
         // specification stated beats one this compiler derived. A field encoded as both a colour
         // and a size, with a title written on only one of them, is titled by the one that was
@@ -3672,6 +3685,10 @@ private class Compilation(
     }
     val out = LinkedHashMap<String, VegaValue>()
     legends.forEach { (name, fields) ->
+      // `if (disable) return undefined` — `assembleLegend` answers nothing for a disabled
+      // component, and the merge is what decided it: a key another layer supplied every property of
+      // still goes where one layer said it was not to be drawn.
+      if (disableOf[name]?.first == true) return@forEach
       settle(fields)
       out[name] = obj { fields.forEach { (key, value) -> put(key, value) } }
     }
