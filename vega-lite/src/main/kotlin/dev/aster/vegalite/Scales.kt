@@ -661,6 +661,16 @@ internal object Scales {
         if (type == "point" || type == "band") {
           val declared = if (channel == "x") view.spec.width else view.spec.height
           val step = (declared as? VegaValue.Obj)?.number("step")
+          // `getDiscretePositionSize`: the specification's own size where it states one, and the
+          // **theme's** discrete size otherwise — which is a step only where the theme states no
+          // number. A document that sizes every plot with `config.view.discreteWidth` (or `width`,
+          // its older name) has said how wide a band chart is, so its range runs the whole way
+          // across rather than being one step per category. 21 specifications in the wild corpus
+          // differ on this key alone.
+          val themed = if (channel == "x") view.config.discreteWidth else view.config.discreteHeight
+          if (declared == null && themed != null) {
+            return arr(num(0), signalRef(view.sizeSignal(channel)))
+          }
           if (declared == null || step != null) {
             // The step signal is named after the *scale*, not the channel: inside a concatenation
             // each plot counts its own categories, so a row of band charts reads

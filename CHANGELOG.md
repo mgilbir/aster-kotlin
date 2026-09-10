@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A band scale's range is a step only where the size it is measured against is one.**
+  `getDiscretePositionSize` is the specification's own `width` where it states one and the theme's
+  discrete size otherwise, and `defaultRange` returns `{step}` only when that answer *is* a step. So
+  a document sizing every plot with `config.view.discreteWidth` — or with `width`, its older name —
+  has said how wide a band chart is: the scale runs the whole way across rather than one step per
+  category, and there is no `«scale»_step` signal at all. 21 specifications in the wild corpus
+  differ on this key alone. The specification's own size still outranks the theme, a stated
+  `{"step": …}` staying a step however the theme sizes the plot.
+
 - **`config.view.width` and `config.view.height` size a plot, as the names those properties had
   before the continuous and discrete sizes were told apart.** Both of upstream's readers ask for
   them first — "get width/height for backwards compatibility" — and this read only the newer names
