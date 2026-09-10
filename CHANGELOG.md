@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **An axis caption may be several lines.** `assembleTitle` passes a title through untouched unless
+  it is an array that is *not* text — the list of field definitions a shared axis's merged titles
+  are, which it joins with commas. A list of **strings** is already text, and Vega draws it one line
+  per entry. This kept only single-string captions and dropped a list of lines entirely: four
+  specifications in the wild corpus caption an axis with an arrow over a phrase, which is how a
+  chart labels a direction, and came out with no caption at all.
+
 - **A padding the theme sets to nothing is no padding; one the chart sets to nothing is a zero.**
   `getTopLevelProperties` spreads the configuration's top-level properties and then the
   specification's, and the asymmetry is upstream of that: a falsy `padding` does not survive the

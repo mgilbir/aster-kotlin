@@ -143,6 +143,16 @@ internal object Guides {
     var disabled: Boolean = false
 
     /**
+     * A title written as **several lines**, which is a list of strings rather than one.
+     *
+     * `assembleTitle` passes such a title through untouched — `isArray(title) && !isText(title)` is
+     * what picks out the *other* kind of array, a list of field definitions to be joined with
+     * commas. A list of strings is already text, and Vega draws it one line per entry. It cannot be
+     * folded into [titles], which are the definitions the merge counts.
+     */
+    var lines: VegaValue.Arr? = null
+
+    /**
      * Whether the specification named the side itself.
      *
      * Two independent axes on one channel are moved apart, and one the specification placed is left
@@ -271,6 +281,13 @@ internal object Guides {
       axis.explicitTitle = true
     } else if (stated.isNotEmpty()) {
       axis.explicitTitle = true
+      // `isText`: a list whose first entry is a string is a caption over several lines, and goes
+      // out as it stands. Reading only a single string dropped such a caption altogether.
+      stated
+        .firstOrNull { it is VegaValue.Arr && it.values.firstOrNull() is VegaValue.Str }
+        ?.let {
+          axis.lines = it as VegaValue.Arr
+        }
       stated.mapNotNull { (it as? VegaValue.Str)?.value }.forEach { axis.addTitle(it, it) }
     } else {
       for (channelDef in listOfNotNull(def, secondary)) {
@@ -767,10 +784,13 @@ internal object Guides {
         // merge is where two of them become one — by *definition*, not by the words they render
         // to. Two layers naming one column differently, one bucketed and one not, say its name
         // twice, and upstream writes it twice.
-        axis.titles
-          .filter { it.isNotEmpty() }
-          .takeIf { it.isNotEmpty() }
-          ?.let { put("title", str(it.joinToString(", "))) }
+        val lines = axis.lines
+        if (lines != null) put("title", lines)
+        else
+          axis.titles
+            .filter { it.isNotEmpty() }
+            .takeIf { it.isNotEmpty() }
+            ?.let { put("title", str(it.joinToString(", "))) }
         var wroteEncode = false
         axis.properties.forEach { (key, value) ->
           if (key == "encode") {
