@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A swatch takes the mark's opacity as it stands, and only where that opacity is truthy.** `const
+  opacity = getMaxValue(encoding.opacity) ?? markDef.opacity; if (opacity) { out.opacity = {value:
+  opacity} }` — so a mark saying `"opacity": "1"`, a string a hand-written specification may well
+  hold, gives a swatch drawn at that string, where reading it as a number answered nothing and left
+  the swatch undrawn; and a mark drawn at **zero** has no swatch opacity written at all rather than a
+  swatch drawn at nothing. `point: "transparent"` on a line is the second case, the overlay being
+  `{opacity: 0}` and its legend the line's own key. Two specifications in the wild corpus are each
+  one of the two.
+
 - **A composite mark's parts are named by their position among the parts actually drawn.** Upstream
   builds the layer array from the enabled parts and every name follows the array, so a box plot with
   its box switched off has its median at `layer_1_layer_0`, taking the box's place rather than

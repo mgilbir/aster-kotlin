@@ -1379,8 +1379,14 @@ internal object Guides {
       }
     }
 
+    // `const opacity = getMaxValue(encoding.opacity) ?? markDef.opacity; if (opacity) {…}` — the
+    // opacity is tested for **truth**, so a mark drawn at zero has no swatch opacity written at all
+    // rather than a swatch drawn at nothing. `point: "transparent"` on a line is exactly that: the
+    // overlay is `{opacity: 0}`, and its legend is the line's own key.
     if (channel != "opacity") {
-      symbolOpacity(view)?.let { fields["opacity"] = obj { put("value", it) } }
+      symbolOpacityValue(view)
+        ?.takeIf { it.isTruthy() }
+        ?.let { fields["opacity"] = obj { put("value", it) } }
     }
 
     // A swatch that is filled and not stroked is stroked *transparently*, so that Vega's own legend
@@ -1432,16 +1438,20 @@ internal object Guides {
    * falling back to the mark's: a legend cannot show a condition, and showing one arm of it as if
    * it were the whole would be a swatch that lies about half the marks.
    */
-  private fun symbolOpacity(view: UnitView): Double? {
+  private fun symbolOpacityValue(view: UnitView): VegaValue? {
     val def = view.spec.encoding["opacity"]
     if (def != null && def.conditions.isNotEmpty()) {
       val stated = (def.value as? VegaValue.Num)?.value ?: return null
       val conditioned =
         def.conditions.mapNotNull { (it.value as? VegaValue.Num)?.value }.maxOrNull()
-      return maxOf(stated, conditioned ?: stated).takeIf { it != 0.0 }
+      return maxOf(stated, conditioned ?: stated).takeIf { it != 0.0 }?.let { num(it) }
     }
-    return (def?.value as? VegaValue.Num)?.value
-      ?: view.markDef.number("opacity")
+    // Whatever the value **is**: `out.opacity = {value: opacity}` writes it through, so a mark that
+    // says `"opacity": "1"` — a string, which a specification written by hand may well hold — gives
+    // a swatch drawn at the string. Reading it as a number answered nothing and left the swatch
+    // undrawn.
+    return def?.value
+      ?: view.markDef.raw.fields["opacity"]
       // The reduced scatter opacity, which is `markDef.opacity` by the time a legend reads it:
       // `initMarkDef` has already settled it, and it settles it from **both** opacities —
       // `specifiedOpacity === undefined && specifiedFillOpacity === undefined`. A mark that says
@@ -1455,9 +1465,13 @@ internal object Guides {
           Marks.styled(view, "opacity") == null &&
           Marks.styled(view, "fillOpacity") == null
       ) {
-        0.7
+        num(0.7)
       } else {
         null
       }
   }
+
+  /** [symbolOpacityValue] as a number, for the places that compute with it rather than write it. */
+  private fun symbolOpacity(view: UnitView): Double? =
+    (symbolOpacityValue(view) as? VegaValue.Num)?.value
 }
