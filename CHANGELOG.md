@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A mark is clipped because the scale under it is driven by a selection, and only where one is.**
+  `scaleClip` asks the position scales whether they carry a `selectionExtent`; this engine asked the
+  *selection* whether it was bound to the scales. The two part company when the binding is
+  **refused**: a categorical position has no halfway between two of its values, so
+  `scaleBindings.parse` warns and passes over that channel, and a heatmap with a `"bind": "scales"`
+  interval over it is clipped for a pan that cannot happen. One specification in the wild corpus is
+  that chart. The question is now asked of the scale that was actually driven — a `domainRaw` is what
+  a driven scale carries — and asked of the **plot's** position scales rather than the view's, since
+  `getScaleComponent` walks up the model tree: a layer member that encodes no position of its own is
+  measured by its layer's, and a text label beside a panned scatter is clipped along with it.
+
 - **A `view` block names the style its plotting area is drawn with.** `assembleGroupStyle` asks the
   view for its `view.style` before deciding anything, `cell` being a default like any other: a chart
   writing `{"view": {"style": "myStyle"}}` is asking for its own style block instead, which is how a

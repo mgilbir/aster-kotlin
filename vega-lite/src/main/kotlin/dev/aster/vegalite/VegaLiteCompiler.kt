@@ -662,19 +662,35 @@ private class Compilation(
             ?: continue
         val scale = view.scaleComponents[channel] ?: continue
         scale.properties["domainRaw"] = signalRef("$named[${quoted(field)}]")
-        view.clippedByScale = true
       }
     }
-    // `scaleClip`: a mark whose position scale is driven by a selection is **clipped**, or a pan
-    // that moves the domain past the data draws the rows that fell outside the plot. It asks about
-    // the *scale*, not the view: two plots sharing the panned scale are both clipped, which is what
-    // makes a pair of linked plots move together without either spilling over its neighbour.
-    for (selection in selections.filter { it.bindsScales }) {
-      val declaring = selection.owner ?: views.firstOrNull() ?: continue
-      val panned = selection.intervalChannels(declaring).map { declaring.scale(it.first) }.toSet()
-      for (view in views) {
-        if (setOf("x", "y").any { view.scale(it) in panned }) view.clippedByScale = true
-      }
+    // ```js
+    // export function scaleClip(model: UnitModel) {
+    //   const xScale = model.getScaleComponent('x');
+    //   const yScale = model.getScaleComponent('y');
+    //   return xScale?.get('selectionExtent') || yScale?.get('selectionExtent') ? true : undefined;
+    // }
+    // ```
+    //
+    // A mark whose position scale is driven by a selection is **clipped**, or a pan that moves the
+    // domain past the data draws the rows that fell outside the plot. The question is asked of the
+    // *scale* — which is why two plots sharing the panned scale are both clipped, and what makes a
+    // pair of linked plots move together without either spilling over its neighbour — and it is
+    // asked of the scale that was actually driven. Both loops above have already answered it: a
+    // `domainRaw` is what a driven scale carries, and it is written only where a selection can
+    // drive one. Asking the selection instead clipped a chart whose brush was **refused**: a
+    // categorical position has no halfway between two of its values, so binding one to the scales
+    // moves nothing, and upstream warns and passes over the channel.
+    // `getScaleComponent` walks **up** the model tree — a member that encodes no `y` of its own is
+    // still measured by its layer's — so the question is asked of the plot's position scales rather
+    // than of the view's own: a text label beside a panned scatter is clipped along with it.
+    for (plot in plots) {
+      val driven =
+        plot.scales.values.any {
+          // `x` and `y` alone, which is what `scaleClip` asks for: a polar position is not panned.
+          it.channel in setOf("x", "y") && it.properties.containsKey("domainRaw")
+        }
+      if (driven) plot.views.forEach { it.clippedByScale = true }
     }
 
     // The sizes are named before anything reads them, because what a concatenation calls them
