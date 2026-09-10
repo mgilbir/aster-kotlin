@@ -583,8 +583,17 @@ internal interface FacetLayout {
   ): VegaValue
 }
 
-internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix: String = "") :
-  FacetLayout {
+internal class FacetGrid(
+  val row: Facet?,
+  val column: Facet?,
+  private val prefix: String = "",
+  /**
+   * `extractCompositionLayout(spec, 'facet', config)`: the layout properties the **specification**
+   * stated, which outrank the defaults computed beside them — `{...this.assembleDefaultLayout(),
+   * ...layout}`.
+   */
+  private val declared: VegaValue.Obj = VegaValue.EmptyObject,
+) : FacetLayout {
 
   override fun named(suffix: String): String =
     listOf(prefix, suffix).filter { it.isNotEmpty() }.joinToString("_")
@@ -696,6 +705,12 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
     // faceted both ways is aligned regardless, since every cell then shares a row and a column.
     val unalignable = (row == null && "x" in independent) || (column == null && "y" in independent)
     put("align", if (unalignable) "none" else "all")
+    // `{...this.assembleDefaultLayout(), ...layout}`: what the specification stated outranks the
+    // default computed beside it, `bounds` and `align` taking the place the default already holds
+    // and a `center` — which has no default — landing after them.
+    for (key in listOf("bounds", "align", "center")) {
+      declared.fields[key]?.let { put(key, it) }
+    }
   }
 
   /**
@@ -1142,7 +1157,7 @@ internal class FacetWrap(
     // `{...this.assembleDefaultLayout(), ...layout}`: what the specification stated outranks the
     // default computed beside it. `getFacetMappingAndLayout` lifts these off the facet definition,
     // so a wrapped facet states them where it is written.
-    for (key in listOf("align", "center")) {
+    for (key in listOf("bounds", "align", "center")) {
       declared.fields[key]?.let { put(key, it) }
     }
   }

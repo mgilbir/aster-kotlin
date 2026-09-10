@@ -1588,7 +1588,12 @@ private class Compilation(
       )
       return null
     }
-    return FacetGrid(row, column, owner)
+    return FacetGrid(
+      row,
+      column,
+      owner,
+      crossedFacetLayout(level, channels["row"], channels["column"]),
+    )
   }
 
   private fun plots(): List<Plot>? {
@@ -1906,8 +1911,52 @@ private class Compilation(
    * the same two places `columns` is looked for.
    */
   private fun wrappedFacetLayout(owner: VegaValue.Obj, def: ChannelDef): VegaValue.Obj = obj {
+    // `bounds` is never lifted — a facet definition has no such property — so it is the chart's own
+    // and nothing else's.
+    owner.fields["bounds"]?.let { put("bounds", it) }
+    // `{...outerSpec, ...layout}`: the **lifted** properties are spread after the chart's own, so a
+    // `center` written on the facet channel outranks one written beside the chart. This asked the
+    // chart first and had the precedence the other way round.
     for (key in listOf("align", "center")) {
-      (owner.fields[key] ?: def.raw.fields[key])?.let { put(key, it) }
+      (def.raw.fields[key] ?: owner.fields[key])?.let { put(key, it) }
+    }
+  }
+
+  /**
+   * `extractCompositionLayout` and the crossed half of `getFacetMappingAndLayout`, together.
+   *
+   * A **crossed** grid lifts its layout properties per channel:
+   * ```js
+   * for (const prop of ['align', 'center', 'spacing'] as const) {
+   *   if (def[prop] !== undefined) {
+   *     layout[prop] ??= {};
+   *     layout[prop][channel] = def[prop];
+   *   }
+   * }
+   * ```
+   *
+   * so a trellis whose *rows* state an alignment gets `{"align": {"row": …}}` — an object, which
+   * **replaces** whatever the chart itself said rather than filling in the other side. Row before
+   * column, the loop's own order.
+   *
+   * `bounds` is not lifted and comes from the chart alone. `spacing` is [statedFacetSpacing]'s, the
+   * layout's `padding` being a different key.
+   */
+  private fun crossedFacetLayout(
+    owner: VegaValue.Obj,
+    row: ChannelDef?,
+    column: ChannelDef?,
+  ): VegaValue.Obj = obj {
+    owner.fields["bounds"]?.let { put("bounds", it) }
+    for (key in listOf("align", "center")) {
+      val perChannel =
+        listOfNotNull("row" to row, "column" to column).mapNotNull { (channel, def) ->
+          def?.raw?.fields?.get(key)?.let { channel to it }
+        }
+      when {
+        perChannel.isNotEmpty() -> put(key, obj { perChannel.forEach { (c, v) -> put(c, v) } })
+        else -> owner.fields[key]?.let { put(key, it) }
+      }
     }
   }
 
@@ -2340,7 +2389,7 @@ private class Compilation(
           config,
           wrappedFacetLayout(spec, wrapped),
         )
-      else FacetGrid(row, column, named)
+      else FacetGrid(row, column, named, crossedFacetLayout(spec, row?.def, column?.def))
 
     return views.map { view ->
       val withoutFacet = view.spec.encoding.filterKeys { it !in Channels.FACET_CHANNELS }

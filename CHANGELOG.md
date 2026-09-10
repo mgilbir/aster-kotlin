@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A trellis's stated `bounds`, `align` and `center` outrank the defaults computed beside them.**
+  `assembleLayout` is `{padding: spacing, ...this.assembleDefaultLayout(), ...layout}`, where
+  `layout` is `extractCompositionLayout(spec, 'facet', config)` — so `"bounds": "flush"` gets it,
+  however firmly the default says `full`. A crossed grid was reading none of them and two
+  specifications in the wild corpus were drawn with the wrong bounds.
+
+  A crossed grid also *lifts* `align` and `center` per channel: an alignment written on the `row`
+  channel becomes `{"align": {"row": …}}`, an object that **replaces** whatever the chart itself said
+  rather than filling in the other side, with row before column. And because the lifted properties
+  are spread after the chart's own, a property on the facet channel outranks the chart's — a wrapped
+  facet had that precedence the other way round.
+
 - **A wrapped trellis's heading is styled by its header's `title…` properties.** `assembleTitleGroup`
   ends with `assembleHeaderProperties(config, facetFieldDef, channel, HEADER_TITLE_PROPERTIES, …)`,
   exactly as each cell's caption ends with the `label…` half of the same table. This wrote the
