@@ -8,6 +8,11 @@ section here does not get released.
 
 ### Fixed
 
+- **An offset of nothing is no offset.** `positionOffset` writes one only where the stated value is
+  truthy, so a `"thetaOffset": 0` — what a chart written by a tool that always emits the key leaves
+  behind — moves nothing and is not written. An offset written as an expression is an object, and
+  objects are truthy, so it still applies.
+
 - **A colour ramp follows the plot only where it lies along the measure it would follow.** A
   horizontal ramp is as long as the plot is wide when it sits above or below it, and otherwise
   simply the shortest a horizontal ramp may be — one *beside* the plot has no width to follow, and

@@ -1072,7 +1072,12 @@ internal object Marks {
    * as an object moves the mark nowhere at all.
    */
   private fun markOffset(view: UnitView, channel: String): VegaValue? {
-    val stated = view.markDef.raw.fields["${channel}Offset"] ?: return null
+    // `if (markDefOffsetValue) return {offsetType: 'visual', offset: markDefOffsetValue}` — truthy,
+    // so an offset of **nothing** is no offset. `"thetaOffset": 0` is what a chart written by a
+    // tool that always emits the key leaves behind, and writing `offset: 0` onto a position says
+    // the same thing at more length.
+    val stated =
+      view.markDef.raw.fields["${channel}Offset"]?.takeIf { it.isTruthy() } ?: return null
     val (key, value) = literalRef(stated) ?: return null
     return if (key == "signal") signalRef((value as? VegaValue.Str)?.value.orEmpty()) else value
   }
