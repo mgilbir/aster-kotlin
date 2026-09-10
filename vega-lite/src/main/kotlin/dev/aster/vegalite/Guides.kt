@@ -240,15 +240,33 @@ internal object Guides {
     val configuredSide = user?.string("orient") ?: if (channel == "x") "bottom" else "left"
     val (vegaLiteOnlyConfigs, vegaConfigs) =
       view.config.axisConfigFamilies(channel, type, configuredSide)
-    val axisConfigs = vegaLiteOnlyConfigs + vegaConfigs
+    // `getStyleConfig(property, axis.style, config.style)`: an axis may **name style blocks**, and
+    // they outrank every configuration family. That is how a document keeps its axis styling in one
+    // place and points an axis at it by name, and it is the only way to reach the properties a
+    // family cannot state — a `labelExpr` in a style block writes the labels of every axis that
+    // names it.
+    val styleConfigs = namedStyles(user).mapNotNull { view.config.style(it) }
+    // `getAxisConfigStyle`: a configuration **family** may name style blocks too, and those are the
+    // last word rather than the first — `[...vgConfigTypes, ...vlOnlyConfigTypes]` merged in order,
+    // which is behind everything the families themselves state.
+    val familyStyles =
+      (vegaConfigs + vegaLiteOnlyConfigs)
+        .flatMap { namedStyles(it) }
+        .mapNotNull {
+          view.config.style(it)
+        }
+    val axisConfigs = styleConfigs + vegaLiteOnlyConfigs + vegaConfigs + familyStyles
     fun configured(name: String): VegaValue? = axisConfigs.firstNotNullOfOrNull { it.fields[name] }
     // `configFrom === 'vgAxisConfig'`: a property the theme states in a block **Vega** knows is
     // left off the axis, so that Vega applies it from its own config block — writing a *derived*
     // value here as well would settle it for this axis alone, and settle it with a default. One
     // stated in a Vega-Lite-only block has to be written out instead, there being nothing else to
     // apply it, and so does one of `propsToAlwaysIncludeConfig`.
+    // A style block is not a Vega config block: a property found in one has to be written **out**,
+    // as a Vega-Lite-only family's is.
     fun themedByVega(name: String): Boolean =
-      vegaLiteOnlyConfigs.none { it.fields.containsKey(name) } &&
+      styleConfigs.none { it.fields.containsKey(name) } &&
+        vegaLiteOnlyConfigs.none { it.fields.containsKey(name) } &&
         vegaConfigs.any { it.fields.containsKey(name) }
     // `config.axis.disable` turns every axis off at once, which is how a chart made of shapes
     // rather
@@ -486,19 +504,32 @@ internal object Guides {
     // has to be resolved here, onto this axis, or nothing acts on it at all. That is upstream's
     // `propsToAlwaysIncludeConfig` together with its conditional-value case, over the blocks a
     // theme may write an axis in — `config.axisX` as much as `config.axis`.
-    val orient = (axis.properties["orient"] as? VegaValue.Str)?.value ?: "bottom"
     for (property in VL_ONLY_AXIS_PROPERTIES) {
       if (user?.fields?.containsKey(property) == true) continue
-      val configured =
-        view.config.axisConfigChain(channel, type, orient).firstNotNullOfOrNull {
-          it.fields[property]
-        } ?: continue
+      val value = configured(property) ?: continue
       if (
-        property !in CONDITIONAL_AXIS_PARTS ||
-          (configured as? VegaValue.Obj)?.has("condition") == true
+        property !in CONDITIONAL_AXIS_PARTS || (value as? VegaValue.Obj)?.has("condition") == true
       ) {
-        axis.properties[property] = asSignal(configured)
+        axis.properties[property] = asSignal(value)
       }
+    }
+    // A property a **style block** settles has to be written out: this compiler resolves the block
+    // rather than forwarding its name, so nothing downstream would apply it. Upstream writes out
+    // every property whose `configFrom` is not `vgAxisConfig` — for a style block that is what
+    // keeps a `gridColor` kept in `config.style` on the axis that names it.
+    for (property in AXIS_PROPERTIES) {
+      if (axis.properties.containsKey(property)) continue
+      // Only where a **style** is what settled it. A family's own property is left for Vega to
+      // apply where Vega knows the family — `configFrom === 'vgAxisConfig'` — and a family's style
+      // block is behind every family, so it is read only where none of them spoke.
+      val quiet =
+        vegaLiteOnlyConfigs.none { it.fields.containsKey(property) } &&
+          vegaConfigs.none { it.fields.containsKey(property) }
+      val value =
+        styleConfigs.firstNotNullOfOrNull { it.fields[property] }
+          ?: familyStyles.takeIf { quiet }?.firstNotNullOfOrNull { it.fields[property] }
+          ?: continue
+      axis.properties[property] = asSignal(value)
     }
     conditionalToEncode(axis, diagnostics)
 
@@ -715,10 +746,16 @@ internal object Guides {
    * `AXIS_PROPERTIES`: the properties an axis is **asked** for, in `AXIS_COMPONENT_PROPERTIES`
    * order.
    *
-   * `COMMON_AXIS_PROPERTIES_INDEX` together with the three Vega-Lite adds — `style`, `labelExpr`
-   * and `encoding` — and the loop that reads a stated axis walks exactly this list. It is an
-   * allowlist for the reason the mark's and the legend's are: a `gridCap` this compiler has never
-   * heard of still reaches Vega, and an `axisWidth` from Vega-Lite version 1 does not.
+   * `COMMON_AXIS_PROPERTIES_INDEX` together with the two of Vega-Lite's own that are written out —
+   * `labelExpr` and `encoding` — and the loop that reads a stated axis walks exactly this list. It
+   * is an allowlist for the reason the mark's and the legend's are: a `gridCap` this compiler has
+   * never heard of still reaches Vega, and an `axisWidth` from Vega-Lite version 1 does not.
+   *
+   * `style` is **not** here. It is a property an axis may state — `isAxisProperty` accepts it, and
+   * `getAxisConfig` reads the blocks it names — and it is not one of `AXIS_COMPONENT_PROPERTIES`,
+   * so it is never written onto the axis. Forwarding it handed Vega a style block reference beside
+   * the properties this compiler had already resolved out of it, which is the same styling applied
+   * twice.
    */
   private val AXIS_PROPERTIES =
     listOf(
@@ -798,12 +835,31 @@ internal object Guides {
       "translate",
       "values",
       "zindex",
-      "style",
       "labelExpr",
       "encoding",
     )
 
   private val VL_ONLY_AXIS_PROPERTIES = listOf("labelExpr") + CONDITIONAL_AXIS_PARTS.keys
+
+  /**
+   * The style blocks a `style` property names, **last first**.
+   *
+   * ```js
+   * for (const style of styles) {
+   *   const styleConfig = styleConfigIndex[style];
+   *   if (hasProperty(styleConfig, p)) value = styleConfig[p];
+   * }
+   * ```
+   *
+   * A later style overrides an earlier one, and this list is read front to back by whoever asks it
+   * for a property — so the order is reversed here, once, rather than at each reader.
+   */
+  private fun namedStyles(block: VegaValue.Obj?): List<String> =
+    when (val stated = block?.fields?.get("style")) {
+      is VegaValue.Str -> listOf(stated.value)
+      is VegaValue.Arr -> stated.values.mapNotNull { (it as? VegaValue.Str)?.value }.reversed()
+      else -> emptyList()
+    }
 
   /** Moves every conditional property onto the encode block of the part it paints. */
   private fun conditionalToEncode(axis: AxisComponent, diagnostics: DiagnosticCollector) {

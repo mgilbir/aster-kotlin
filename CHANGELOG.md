@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **An axis reads the style blocks it names.** `getAxisConfig` asks `config.style` for the blocks the
+  axis named *before* any configuration family, which is how a document keeps its axis styling in one
+  place and points an axis at it by name — and the only way to reach a property no family can state,
+  a `labelExpr` in a style block writing the labels of every axis that names it. This engine asked
+  the families and not the styles, and **forwarded** the `style` property to Vega instead, which is
+  not one of `AXIS_COMPONENT_PROPERTIES` and never reaches an axis upstream. The two are not the
+  same chart: Vega applies a style block to the axis as a whole, where Vega-Lite resolves it first
+  and lets the axis's own properties and its own rules outrank it. A `"grid": false` in a style
+  block, for one, takes the gridlines off before there is an axis to put them on, so the whole grid
+  axis is never written. Two specifications in the wild corpus differ for that. A configuration
+  family may name style blocks too — `config.axisX.style` — and those are the *last* word rather
+  than the first, behind everything the families themselves state.
+
 - **A mark is clipped because the scale under it is driven by a selection, and only where one is.**
   `scaleClip` asks the position scales whether they carry a `selectionExtent`; this engine asked the
   *selection* whether it was bound to the scales. The two part company when the binding is
