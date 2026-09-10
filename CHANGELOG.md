@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **Only a derived grid comes off the second of two independent axes.** Two sets of gridlines across
+  one plot measure different things and say neither, so upstream keeps the first — but its test is
+  `!axisCmpt.explicit.grid`, and a layer that writes `"axis": {"grid": true}` has *asked* for
+  gridlines and gets them however busy the result reads. A `config.axis.grid` that happens to
+  produce the same answer is not asking, `isExplicit` ending in `value === axis[property]`. This
+  took them off regardless, so a dual-axis chart whose layers each asked for gridlines was drawn
+  with one layer's.
+
 - **An axis one layer switches off is switched off for the scale.** `parseAxis` keeps a disabled
   axis as a component rather than answering nothing, because `"axis": null` is an *explicit*
   decision and an explicit value beats every sibling's in the merge. This returned nothing for such

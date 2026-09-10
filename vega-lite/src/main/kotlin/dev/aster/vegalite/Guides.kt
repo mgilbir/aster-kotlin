@@ -150,6 +150,16 @@ internal object Guides {
      */
     var explicitOrient: Boolean = false
 
+    /**
+     * Whether the specification asked for these gridlines by name.
+     *
+     * Only a **derived** grid is taken off the second of two independent axes — upstream's test is
+     * `!axisCmpt.explicit.grid`, and a property is explicit when the value matches what the axis
+     * block itself stated. Two layers that each ask for gridlines get two sets, however oddly that
+     * reads; two that merely happen to have them get one.
+     */
+    var explicitGrid: Boolean = false
+
     fun set(name: String, value: VegaValue?) {
       if (value != null && !properties.containsKey(name)) properties[name] = value
     }
@@ -231,6 +241,10 @@ internal object Guides {
     if (grid && hasOtherPosition)
       axis.set("gridScale", str(view.scale(if (channel == "x") "y" else "x")))
     axis.set("grid", bool(grid))
+    // `isExplicit` ends in `value === axis[property]`: stating `"grid": true` on the channel's own
+    // axis block is asking for the gridlines, and a `config.axis.grid` that happens to produce the
+    // same answer is not.
+    axis.explicitGrid = def.axis?.fields?.get("grid") == VegaValue.Bool(grid)
 
     // A ranged position is titled by *both* of its fields — `start, end` — because the axis is
     // measuring the span rather than either end of it. Unless one of them says what it is called:

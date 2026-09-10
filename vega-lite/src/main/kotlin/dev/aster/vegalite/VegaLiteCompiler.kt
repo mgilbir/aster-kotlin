@@ -3364,6 +3364,7 @@ private class Compilation(
           // merge it arrives on: `mergeValuesWithExplicit` keeps the explicit `disable` and there
           // is no tie-breaker that could put it back.
           if (parsed.disabled) merged.disabled = true
+          if (parsed.explicitGrid) merged.explicitGrid = true
           when {
             // An explicit title wins outright rather than joining: a layer that names its axis has
             // said what the axis measures, and the other layer's derived name adds nothing.
@@ -3453,8 +3454,18 @@ private class Compilation(
         }
         counts[orient] = (counts[orient] ?: 0) + 1
       }
+      // `if (index > 0 && !!axisCmpt.get('grid') && !axisCmpt.explicit.grid)` — only a **derived**
+      // grid is taken away. Two layers that each write `"axis": {"grid": true}` have each asked for
+      // gridlines and get them, however busy that reads; two that merely happen to have them,
+      // because a quantitative position has them by default or a theme turned them on, get one set
+      // between them. Taking them off regardless left a dual-axis chart with one layer's gridlines
+      // where its specification had asked for three.
       for ((index, axis) in onChannel.withIndex()) {
-        if (index > 0 && (axis.properties["grid"] as? VegaValue.Bool)?.value == true) {
+        if (
+          index > 0 &&
+            (axis.properties["grid"] as? VegaValue.Bool)?.value == true &&
+            !axis.explicitGrid
+        ) {
           axis.override("grid", bool(false))
         }
       }
