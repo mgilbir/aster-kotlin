@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A lookup produces the columns it brings in, so nothing loads them.** `ancestorParse` records what
+  each transform produces as it walks the list, and a produced column is dropped from the implicit
+  parse below it: it is not in the table being loaded, so asking the loader to read it as a date
+  names a column that source has never had. This engine looked for the brought-in columns under the
+  transform's own `lookup` property — which is the column of *this* table the lookup matches on, and
+  is a string — so it found none, and a date column arriving through a lookup had the loader asked to
+  parse it in a table it is not in. One specification in the wild corpus joins a table that way. The
+  names are the secondary table's `from.fields`, or the `as` that renames them, and it is one or the
+  other: a column renamed on the way in leaves the name it had free.
+
 - **A filter's comparison says nothing about its column when the comparison is falsy.**
   `getImplicitFromFilterTransform` gates the whole reading on `if (val)`, so `{"gt": 0}` — the
   commonest filter there is, *keep the rows that have a value* — leaves the column loaded as it was

@@ -705,8 +705,23 @@ internal class Transforms(
           (entry as? VegaValue.Obj)?.string("as")?.let { produced += it }
         }
       }
-      transform.obj("lookup")?.let {
-        produced += it.array("fields").orEmpty().mapNotNull { f -> (f as? VegaValue.Str)?.value }
+      // ```js
+      // public producedFields() {
+      //   return new Set(this.transform.as ? array(this.transform.as) :
+      // this.transform.from.fields);
+      // }
+      // ```
+      //
+      // A lookup's `lookup` names the column of *this* table it matches on; the columns it brings
+      // in are named by the **secondary** table — `from.fields` — or by the `as` that renames them.
+      // Reading them off the `lookup` property found nothing, since that property is a string, so a
+      // column brought in by a lookup was read as one the source table had: a date column arriving
+      // that way had the loader asked to parse it, in a table it is not in.
+      if (transform.has("lookup") && stated == null) {
+        produced +=
+          transform.obj("from")?.array("fields").orEmpty().mapNotNull { f ->
+            (f as? VegaValue.Str)?.value
+          }
       }
       transform.string("extent")?.let { produced += transform.string("param") ?: it }
     }
