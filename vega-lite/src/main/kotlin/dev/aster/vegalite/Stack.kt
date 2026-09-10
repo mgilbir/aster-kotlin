@@ -115,7 +115,17 @@ internal object Stack {
    * carry the aggregate in a `transform` and encode the summarised columns directly, so they are
    * not aggregating encodings and a tick among them still takes a scatter's reduced opacity.
    */
-  fun isAggregate(spec: UnitSpec): Boolean = spec.encoding.values.any { it.aggregate != null }
+  fun isAggregate(spec: UnitSpec): Boolean =
+    // `isAggregate` spreads a list channel like every other reader of an encoding:
+    //
+    //     if (isArray(channelDef)) {
+    //       return some(channelDef, (fieldDef) => !!fieldDef.aggregate);
+    //     }
+    //
+    // so a `tooltip` whose second entry asks for a mean makes the view an aggregating one.
+    spec.encoding.values.any { def ->
+      (listOf(def) + def.siblings + def.conditions).any { it.aggregate != null }
+    }
 
   private fun isPathMark(mark: String): Boolean =
     mark == "line" || mark == "area" || mark == "trail"

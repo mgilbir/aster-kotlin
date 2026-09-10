@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **The last four readers of an encoding now spread a list channel too.** `forEachFieldDef` and
+  `reduceFieldDef` spread an array before they call, so a `tooltip` naming four columns is four
+  definitions to every pass that walks the encoding. The same shape had been fixed in five separate
+  places; these are the four that were left, found by sweeping for the pattern rather than waiting
+  for a specification to hit them: a `bin` on such an entry is compiled, a `sort` array gets its
+  index column, an `aggregate` makes the view aggregate, and `isAggregate` sees it — so a scatter
+  whose tooltip asks for a mean is no longer faded as though it had overlapping points.
+
 - **An instant bucketed on one entry of a list channel is bucketed.** `TimeUnitNode.makeFromEncoding`
   folds the encoding with `reduceFieldDef`, which spreads an array before it folds, so a `tooltip`
   naming four columns is four definitions. Reading only the channel's own definition left the

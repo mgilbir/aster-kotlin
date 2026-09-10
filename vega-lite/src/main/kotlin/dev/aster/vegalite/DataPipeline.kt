@@ -425,8 +425,9 @@ internal class DataPipeline(
     // `forEachFieldDef` walks the facet as it was **written**, which is what orders the two
     // formulas a crossed grid needs.
     val channels =
-      view.spec.encoding.entries.map { it.key to it.value } +
-        if (belowFacet) emptyList() else view.facetDeclared.map { it.channel to it }
+      view.spec.encoding.entries.flatMap { (channel, def) ->
+        (listOf(def) + def.siblings + def.conditions).map { channel to it }
+      } + if (belowFacet) emptyList() else view.facetDeclared.map { it.channel to it }
     val transforms = channels.mapNotNull { (channel, def) ->
       val order = def.sort as? VegaValue.Arr ?: return@mapNotNull null
       val field = def.field ?: return@mapNotNull null
@@ -461,57 +462,63 @@ internal class DataPipeline(
       // The **facet's** own channels first, as with the time units: a trellis broken down by
       // buckets of a column has to bucket that column, and the facet's encoding was lifted out of
       // the cell's before anything else looked at it.
-      (view.facetDefs + view.spec.encoding.values).mapNotNull { def ->
-        val bin = def.bin as? Binning.Bin ?: return@mapNotNull null
-        val field = def.field ?: return@mapNotNull null
-        val key = "${Fields.binToString(bin.params)}_$field"
-        // A facet's bucketing belongs to the **facet** model, which sits above the cell: its
-        // signals are named plainly where a cell's carry the cell's prefix. And it needs no range
-        // formula — `binRequiresRange` asks about a *scale* channel, and a facet has no scale.
-        val facetted = def in view.facetDefs
-        // `parseSelectionExtent`: an extent naming a **selection** is not an extent Vega
-        // understands. The bucketing keeps the data's own, and how wide one bucket is becomes a
-        // `span` read off the brush — so dragging the brush narrower cuts finer buckets over the
-        // same range. The column is the one the selection projects onto, since that is the one the
-        // brush's numbers are in.
-        val selected = (bin.params.fields["extent"] as? VegaValue.Obj)?.string("param")
-        val span = selected?.let { name ->
-          val selection = view.selections.firstOrNull { it.name == name }
-          val on =
-            (bin.params.fields["extent"] as? VegaValue.Obj)?.string("field")
-              ?: selection?.owner?.let { owner ->
-                selection.projections(owner).firstOrNull()?.second
-              }
-              ?: field
-          "${Fields.varName(name)}[${quoted(on)}]"
+      (view.facetDefs +
+          view.spec.encoding.values.flatMap { listOf(it) + it.siblings + it.conditions })
+        .mapNotNull { def ->
+          val bin = def.bin as? Binning.Bin ?: return@mapNotNull null
+          val field = def.field ?: return@mapNotNull null
+          val key = "${Fields.binToString(bin.params)}_$field"
+          // A facet's bucketing belongs to the **facet** model, which sits above the cell: its
+          // signals are named plainly where a cell's carry the cell's prefix. And it needs no range
+          // formula — `binRequiresRange` asks about a *scale* channel, and a facet has no scale.
+          val facetted = def in view.facetDefs
+          // `parseSelectionExtent`: an extent naming a **selection** is not an extent Vega
+          // understands. The bucketing keeps the data's own, and how wide one bucket is becomes a
+          // `span` read off the brush — so dragging the brush narrower cuts finer buckets over the
+          // same range. The column is the one the selection projects onto, since that is the one
+          // the
+          // brush's numbers are in.
+          val selected = (bin.params.fields["extent"] as? VegaValue.Obj)?.string("param")
+          val span = selected?.let { name ->
+            val selection = view.selections.firstOrNull { it.name == name }
+            val on =
+              (bin.params.fields["extent"] as? VegaValue.Obj)?.string("field")
+                ?: selection?.owner?.let { owner ->
+                  selection.projections(owner).firstOrNull()?.second
+                }
+                ?: field
+            "${Fields.varName(name)}[${quoted(on)}]"
+          }
+          BinComponent(
+            field = field,
+            params = bin.params,
+            span = span,
+            output =
+              listOf(
+                Fields.vgField(def, forAs = true),
+                Fields.vgField(def, suffix = "end", forAs = true),
+              ),
+            signal = if (facetted) "${key}_bins" else view.prefixed("${key}_bins"),
+            extentSignal = if (facetted) "${key}_extent" else view.prefixed("${key}_extent"),
+            extent = bin.params.fields["extent"]?.takeIf { selected == null },
+            // `binRequiresRange`: a binned field the specification forced onto a **discrete** scale
+            // needs its range written out as text, because that text is what the axis labels and
+            // the
+            // legend entries then read — there is no numeric axis left to derive them from.
+            rangeFormula =
+              if (
+                !facetted && (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL)
+              ) {
+                val start = Fields.datumAccess(def)
+                val end = Fields.datumAccess(def, suffix = "end")
+                val format = (def.format as? VegaValue.Str)?.value ?: view.config.numberFormat ?: ""
+                "!isValid($start) || !isFinite(+$start) ? \"null\" : " +
+                  "format($start, \"$format\") + \" – \" + format($end, \"$format\")"
+              } else {
+                null
+              },
+          )
         }
-        BinComponent(
-          field = field,
-          params = bin.params,
-          span = span,
-          output =
-            listOf(
-              Fields.vgField(def, forAs = true),
-              Fields.vgField(def, suffix = "end", forAs = true),
-            ),
-          signal = if (facetted) "${key}_bins" else view.prefixed("${key}_bins"),
-          extentSignal = if (facetted) "${key}_extent" else view.prefixed("${key}_extent"),
-          extent = bin.params.fields["extent"]?.takeIf { selected == null },
-          // `binRequiresRange`: a binned field the specification forced onto a **discrete** scale
-          // needs its range written out as text, because that text is what the axis labels and the
-          // legend entries then read — there is no numeric axis left to derive them from.
-          rangeFormula =
-            if (!facetted && (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL)) {
-              val start = Fields.datumAccess(def)
-              val end = Fields.datumAccess(def, suffix = "end")
-              val format = (def.format as? VegaValue.Str)?.value ?: view.config.numberFormat ?: ""
-              "!isValid($start) || !isFinite(+$start) ? \"null\" : " +
-                "format($start, \"$format\") + \" – \" + format($end, \"$format\")"
-            } else {
-              null
-            },
-        )
-      }
     return if (bins.isEmpty()) null else BinNode(bins.distinctBy { it.signal })
   }
 
@@ -740,7 +747,7 @@ internal class DataPipeline(
   private fun aggregateNode(): AggregateNode? {
     if (
       view.spec.encoding.values.none { def ->
-        (listOf(def) + def.conditions).any { it.aggregate != null }
+        (listOf(def) + def.siblings + def.conditions).any { it.aggregate != null }
       }
     ) {
       return null
