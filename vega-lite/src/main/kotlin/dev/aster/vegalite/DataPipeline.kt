@@ -1138,6 +1138,27 @@ internal class DataPipeline(
     return ordinals
   }
 
+  /**
+   * The date parse a `timeUnit` transform's input needs, inserted above the transform itself.
+   *
+   * ```js
+   * } else if (isTimeUnit(t)) {
+   *   const parsedAs = ancestorParse.getWithExplicit(t.field);
+   *   if (parsedAs.value === undefined) {
+   *     head = new ParseNode(head, {[t.field]: 'date'});
+   *     ancestorParse.set(t.field, 'date', false);
+   *   }
+   *   transformNode = head = TimeUnitNode.makeFromTransform(head, t);
+   * }
+   * ```
+   */
+  private fun timeUnitInputParse(transform: VegaValue, index: Int): ParseNode? {
+    val transforms = Transforms(diagnostics, selections = view.selections)
+    val earlier = transforms.producedFields(view.spec.transforms.take(index), view.spec.data)
+    val field = transforms.timeUnitInput(transform, earlier) ?: return null
+    return ParseNode(linkedMapOf(field to "date"))
+  }
+
   private fun userTransforms(head: DataNode, which: Written = Written.ALL): DataNode {
     var last = head
     val lookupOrdinals = lookupOrdinals()
@@ -1164,6 +1185,11 @@ internal class DataPipeline(
       // filters on that brush has to have a `month_date` to be tested against — which it does not,
       // unless it buckets one, however little its own encoding has to do with months.
       selectionTimeUnits(transform)?.let { last = last.then(it) }
+      // "Create parse node because the input to time unit is always date." The parse belongs
+      // **above** the transform, which is what lets a `{"field": "ts", "timeUnit": …, "as": "ts"}`
+      // work at all: read as text the bucketing has nothing to bucket, and a parse written below
+      // the transform is a parse of the transform's own output.
+      timeUnitInputParse(transform, index)?.let { last = last.then(it) }
       for (emitted in transforms.translateAt(transform, path)) {
         // An `aggregate` a specification *states* is the same node as one an encoding asks for —
         // `AggregateNode.makeFromTransform` beside `makeFromEncoding` — and being the same node is

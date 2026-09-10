@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **A `timeUnit` transform reads its input as a date, above the transform rather than below it.**
+  `parseTransformArray` inserts the parse before the transform node — "create parse node because the
+  input to time unit is always date" — and only then records what the transform wrote. The order is
+  the whole of it: `{"field": "ts", "timeUnit": …, "as": "ts"}` reads a column and writes it back
+  under its own name, so taking the transform's output as derived took the parse with it and the
+  bucketing ran over text. The parse that was emitted landed *below* the transform, where it parses
+  the transform's own output.
+
 - **Every entry of a list channel is parsed, not just the first.** `getImplicitFromEncoding` walks
   the encoding with `forEachFieldDef`, which iterates entry by entry — a `tooltip` naming four
   columns is four definitions — and reaches into a `condition` for its field. This read only the

@@ -650,16 +650,24 @@ internal class Transforms(
   fun implicitParses(transforms: List<VegaValue>): Map<String, String> {
     val parses = LinkedHashMap<String, String>()
     for (transform in transforms) {
-      // A `timeUnit` transform reads an *instant*, so the column it names is a date whatever the
-      // loader would otherwise have made of it — the same rule a temporal encoding follows.
-      if (transform.has("timeUnit")) {
-        transform.string("field")?.let { parses[it] = "date" }
-        continue
-      }
+      // A `timeUnit` transform's own input is parsed **above the transform** rather than here —
+      // see `parsedBeforeProducing` and the node the pipeline inserts from it.
+      if (transform.has("timeUnit")) continue
       if (!transform.has("filter")) continue
       collectParses(transform["filter"], parses)
     }
     return parses
+  }
+
+  /**
+   * The column a `timeUnit` transform reads, where nothing above it has settled that column's type.
+   *
+   * `ancestorParse.getWithExplicit(t.field)` is the guard: a column an earlier transform produced
+   * has the type that transform gave it and is not read again as text.
+   */
+  fun timeUnitInput(transform: VegaValue, alreadyProduced: Set<String>): String? {
+    if (!transform.has("timeUnit")) return null
+    return transform.string("field")?.takeIf { it !in alreadyProduced }
   }
 
   /**
