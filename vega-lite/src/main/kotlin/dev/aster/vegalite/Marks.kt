@@ -1507,7 +1507,14 @@ internal object Marks {
       // definition stated no format of its own: `pow(datum["a"], "1.0")` rather than `format(…)`.
       def.type == MeasureType.QUANTITATIVE && stated == null && config.numberFormatType != null ->
         "${config.numberFormatType}($accessor, \"$number\")"
-      def.type == MeasureType.QUANTITATIVE || stated != null -> "format($accessor, \"$number\")"
+      // `} else if (format || channelDefType(fieldOrDatumDef) === 'quantitative') {` — the format
+      // is
+      // tested for **truth**, and `numberFormat` hands a stated `""` straight back. So a column
+      // with no type and `"format": ""` is read as text, not run through `format()`: an empty
+      // format is no format, and a tooltip entry written that way is how a document says "leave
+      // this one alone".
+      def.type == MeasureType.QUANTITATIVE || !stated.isNullOrEmpty() ->
+        "format($accessor, \"$number\")"
       !arrays -> "isValid($accessor) ? $accessor : \"\"+$accessor"
       else -> {
         // `addLineBreaksToTooltip` builds this one from the **column's own name** rather than from

@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **An empty format is no format.** `formatSignalRef` tests the format for *truth* — `format ||
+  channelDefType(…) === 'quantitative'` — and `numberFormat` hands a stated `""` straight back, so a
+  column with no type and `"format": ""` is read as text rather than run through `format()`. Writing
+  `"format": ""` beside a real format on the entry that needs one is how a document says "leave this
+  one alone"; testing only whether a format had been written turned such a column into
+  `format(datum["Item"], "")`, which reads a word as `NaN`. A quantitative column still formats with
+  an empty format, its type carrying that arm on its own.
+
 - **The encoding says whether a plot is projected, and one projected member makes it the layer's.**
   `parseUnitProjection` runs `if (model.hasProjection)`, which is a `geoshape` mark or a geographic
   position channel and nothing else — a projection stated at the top of a chart does not make a plot
