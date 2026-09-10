@@ -255,7 +255,22 @@ internal object SelectionCompat {
   private fun conditionEntry(node: VegaValue, empties: Map<String, Boolean>): VegaValue {
     val entry = channelDef(node, empties) as? VegaValue.Obj ?: return node
     if (entry.has("param")) return entry
-    if (!entry.has("selection")) return entry
+    // Upstream asks nothing else — `return param ? c : {...cond, test: normalizePredicate(c)}` —
+    // and `normalizePredicate` reads the entry's own `selection` **or** walks a `test` holding one:
+    //
+    //     return op.selection
+    //       ? normalizeSelectionComposition(op.selection)
+    //       : normalizeLogicalComposition(op.test || op.filter, (o) =>
+    //           o.selection ? normalizeSelectionComposition(o.selection) : o);
+    //
+    // `{"condition": {"test": {"selection": "brush"}, "value": 60}}` is the second arm, and it is
+    // how Vega-Lite 4 wrote a condition that tests a selection *inside* a predicate. Returning
+    // early for an entry with no `selection` of its own left the selection reference in place, and
+    // the condition was dropped for testing something Vega-Lite 5 has never heard of.
+    //
+    // An entry with neither is not a condition at all and is left alone: there is no predicate to
+    // normalise, and writing an empty `test` over it would break a `{"value": …}` fallback.
+    if (!entry.has("selection") && !entry.has("test") && !entry.has("filter")) return entry
     val rest = LinkedHashMap(entry.fields)
     rest.remove("selection")
     rest.remove("param")

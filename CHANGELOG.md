@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **A Vega-Lite 4 selection tested *inside* a predicate is compiled.** `normalizePredicate` reads a
+  condition's own `selection` **or** walks a `test` holding one, and
+  `{"condition": {"test": {"selection": "brush"}, "value": 60}}` is the second arm — how Vega-Lite 4
+  wrote a conditional value gated on a selection when it wanted a predicate rather than a bare name.
+  Returning early for an entry with no `selection` of its own left the reference in place, and the
+  condition was dropped for testing something Vega-Lite 5 has never heard of, so the chart lost the
+  half of its encoding that responds to the pointer.
+
 - **An empty format is no format.** `formatSignalRef` tests the format for *truth* — `format ||
   channelDefType(…) === 'quantitative'` — and `numberFormat` hands a stated `""` straight back, so a
   column with no type and `"format": ""` is read as text rather than run through `format()`. Writing

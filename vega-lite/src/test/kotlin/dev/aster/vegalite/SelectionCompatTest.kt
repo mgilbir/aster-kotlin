@@ -163,6 +163,49 @@ class SelectionCompatTest {
     assertEquals(VegaValue.Str("red"), path(condition, "value"), "the rest of the entry survives")
   }
 
+  /**
+   * A selection tested **inside** a predicate, which is the second arm of `normalizePredicate`:
+   * ```js
+   * return op.selection
+   *   ? normalizeSelectionComposition(op.selection)
+   *   : normalizeLogicalComposition(op.test || op.filter, (o) =>
+   *       o.selection ? normalizeSelectionComposition(o.selection) : o);
+   * ```
+   *
+   * `{"condition": {"test": {"selection": "s"}, "value": 60}}` is how Vega-Lite 4 wrote a
+   * conditional value gated on a selection when it wanted a predicate rather than a bare name. The
+   * entry has no `selection` of its own, and returning early for that left the reference in place —
+   * so the condition was dropped for testing something Vega-Lite 5 has never heard of, and the
+   * chart lost the half of its encoding that responds to the pointer.
+   */
+  @Test
+  fun `a selection tested inside a predicate becomes a param predicate`() {
+    val spec =
+      normalized(
+        """{"mark":"point","selection":{"s":{"type":"interval"}},
+           "encoding":{"size":{"condition":{"test":{"selection":"s"},"value":60},"value":30}}}"""
+      )
+    val condition = path(spec, "encoding", "size", "condition")
+    assertEquals(VegaValue.Str("s"), path(condition, "test", "param"))
+    assertEquals(VegaValue.Bool(true), path(condition, "test", "empty"))
+    assertEquals(VegaValue.Num(60.0), path(condition, "value"), "the rest of the entry survives")
+    assertNull(path(spec, "encoding", "size", "condition", "selection"))
+  }
+
+  /** An ordinary expression `test` is not a selection and comes through as it was. */
+  @Test
+  fun `an expression test is left exactly as it was`() {
+    val spec =
+      normalized(
+        """{"mark":"point",
+           "encoding":{"size":{"condition":{"test":"datum.a > 1","value":60},"value":30}}}"""
+      )
+    assertEquals(
+      VegaValue.Str("datum.a > 1"),
+      path(spec, "encoding", "size", "condition", "test"),
+    )
+  }
+
   @Test
   fun `a condition already written with param is left alone`() {
     val spec =
