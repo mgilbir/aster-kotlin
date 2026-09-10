@@ -294,7 +294,7 @@ internal class Facet(
 
   /** `column_domain` — the facet's distinct values, which the layout counts and headers title. */
   val domainData: String =
-    listOf(prefix, "${channel}_domain").filter { it.isNotEmpty() }.joinToString("_")
+    Fields.varName(listOf(prefix, "${channel}_domain").filter { it.isNotEmpty() }.joinToString("_"))
 
   fun domainDataset(
     source: String,
@@ -596,7 +596,7 @@ internal class FacetGrid(
 ) : FacetLayout {
 
   override fun named(suffix: String): String =
-    listOf(prefix, suffix).filter { it.isNotEmpty() }.joinToString("_")
+    Fields.varName(listOf(prefix, suffix).filter { it.isNotEmpty() }.joinToString("_"))
 
   /** Row before column, which is the order upstream groups, sorts and crosses by. */
   override val fields: List<String> = listOfNotNull(row, column).flatMap { it.groupingFields }
@@ -1037,7 +1037,7 @@ internal class FacetWrap(
 ) : FacetLayout {
 
   override fun named(suffix: String): String =
-    listOf(prefix, suffix).filter { it.isNotEmpty() }.joinToString("_")
+    Fields.varName(listOf(prefix, suffix).filter { it.isNotEmpty() }.joinToString("_"))
 
   /** The column the cells are ordered by, the operation over it, and what it is written as. */
   private fun sortField(): Triple<String, String, String>? {

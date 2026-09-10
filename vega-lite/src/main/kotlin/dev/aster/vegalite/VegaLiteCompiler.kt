@@ -1623,7 +1623,10 @@ private class Compilation(
           // copies come out `child__b` rather than `concat_0`: upstream's model takes `spec.name`
           // over the name its parent offered it. Below the first level the names compose.
           val here =
-            entry.name ?: listOf(name, "concat_$index").filter { it.isNotEmpty() }.joinToString("_")
+            entry.name
+              ?: Fields.varName(
+                listOf(name, "concat_$index").filter { it.isNotEmpty() }.joinToString("_")
+              )
           // A concatenation's own transforms belong to *it*, not to each plot below it: they are
           // one chain in upstream's tree, forking at the plots, and naming them for each plot in
           // turn would leave three copies of one chain with nothing to fold them by.
@@ -1642,10 +1645,14 @@ private class Compilation(
     // which is one `child` per level: that is what makes its plots `child_concat_0` rather than
     // `concat_0`, and their scales and sizes follow the name.
     val root =
-      listOf(spec.string("name").orEmpty())
-        .plus(List(cellLevels.size) { "child" })
-        .filter { it.isNotEmpty() }
-        .joinToString("_")
+      if (cellLevels.isEmpty()) spec.string("name").orEmpty()
+      else
+        Fields.varName(
+          listOf(spec.string("name").orEmpty())
+            .plus(List(cellLevels.size) { "child" })
+            .filter { it.isNotEmpty() }
+            .joinToString("_")
+        )
     plotTree =
       build(
         root,
@@ -2151,14 +2158,16 @@ private class Compilation(
         above +
           List((part.array("transform").orEmpty().size - above.size).coerceAtLeast(0)) { prefix }
       return parts.flatMap { (name, part) ->
-        val here = listOf(prefix, name).filter { it.isNotEmpty() }.joinToString("_")
+        val here = Fields.varName(listOf(prefix, name).filter { it.isNotEmpty() }.joinToString("_"))
         val overlaid = normalize.pathOverlay(part)
         if (overlaid == null) {
           listOf(Triple(here, part, owners(part)))
         } else {
           overlaid.mapIndexed { index, view ->
             Triple(
-              listOf(here, "layer_$index").filter { it.isNotEmpty() }.joinToString("_"),
+              Fields.varName(
+                listOf(here, "layer_$index").filter { it.isNotEmpty() }.joinToString("_")
+              ),
               view,
               owners(view),
             )
@@ -2220,7 +2229,9 @@ private class Compilation(
           // `layer` relies on: its copies are `child__layer_b`, not `layer_0`.
           val here =
             child.string("name")
-              ?: listOf(prefix, "layer_$index").filter { it.isNotEmpty() }.joinToString("_")
+              ?: Fields.varName(
+                listOf(prefix, "layer_$index").filter { it.isNotEmpty() }.joinToString("_")
+              )
           val here2 = "$path.layer[$index]"
           // A transform belongs to the model it was **written on**, and that model's name is what
           // names the signals it publishes: a `bin` above a layer is the layer's, so its bounds are
@@ -2406,9 +2417,11 @@ private class Compilation(
           // `child` under the chart's own name and above the layer's: a named trellis of layers
           // reads `trellis_child_layer_0`, because the name belongs to the model the cell hangs
           // from and the layer's index to the view inside it.
-          listOf(named, "child", view.name.removePrefix(named).trimStart('_'))
-            .filter { it.isNotEmpty() }
-            .joinToString("_"),
+          Fields.varName(
+            listOf(named, "child", view.name.removePrefix(named).trimStart('_'))
+              .filter { it.isNotEmpty() }
+              .joinToString("_")
+          ),
           parentIsLayer = view.parentIsLayer,
         )
         .also {

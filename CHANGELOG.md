@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A name derived from a model's own is a variable name.** `getName` puts the whole joined string
+  through `varName` — `varName((this.name ? `${this.name}_` : '') + text)` — and it is how every
+  dataset, signal, scale and mark group is named, so a chart called `Amount Bar Chart` has a layer
+  called `Amount_Bar_Chart_layer_0`. This joined the parts and left them, and a chart whose name held
+  a space or a hyphen came out with names Vega cannot read as identifiers: a trellis's bands and the
+  dataset its headers are titled from, a concatenation's plots, a composite mark's parts, and the
+  expression a selection stores its unit under. `this.name` itself is *not* cleaned — `spec.name ??
+  parentGivenName` — so the `unit` a selection records is the name as written, spaces and all, which
+  is the other half of the same rule.
+
 - **A `field` is read as JavaScript reads it.** It is a string in the grammar and nothing upstream
   checks that: the name is spelled into a template — `` `${expr}["${channelDef.field}"]` `` — and
   into `vgField`'s regular expressions, both of which coerce whatever they are given. So `"field":
