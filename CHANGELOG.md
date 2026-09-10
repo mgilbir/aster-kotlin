@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A legend is read by asking it for the properties legends have.** `parseLegendForChannel` walks
+  `LEGEND_COMPONENT_PROPERTIES` and asks the `legend` block for each entry, so a block holding
+  anything else is never looked at. This copied the block's own keys and forwarded them, so a
+  `labxelExpr` written for `labelExpr` reached Vega — which reported `PARSE_UNKNOWN_PROPERTY` two
+  stages downstream and drew the labels untruncated. Three specifications in the wild corpus contain
+  that exact misspelling. It is the same rule as the mark's and fails the same way: a denylist
+  cannot be finished.
+
+  A `disable` written **inside** the block is honoured with it. It is one of the properties read off
+  the block, and `assembleLegend` answers nothing for a disabled component; dropping it as an
+  internal without honouring it first left the key drawn.
+
 - **A `timeUnit` transform reads its input as a date, above the transform rather than below it.**
   `parseTransformArray` inserts the parse before the transform node — "create parse node because the
   input to time unit is always date" — and only then records what the transform wrote. The order is

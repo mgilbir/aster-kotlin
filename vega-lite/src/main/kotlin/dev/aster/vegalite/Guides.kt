@@ -818,6 +818,97 @@ internal object Guides {
   // Legends
   // ---------------------------------------------------------------------------------------------
 
+  /**
+   * `LEGEND_COMPONENT_PROPERTIES`: every property a legend has, less the three that never reach
+   * Vega.
+   *
+   * `parseLegendForChannel` walks this list and asks the `legend` block for each entry, so a block
+   * holding anything else — a word from a newer Vega-Lite, or a misspelling such as `labxelExpr`
+   * for `labelExpr` — is never looked at. Reading the block's own keys instead forwarded them, and
+   * Vega reported `PARSE_UNKNOWN_PROPERTY` two stages downstream.
+   *
+   * `disable`, `selections` and `labelExpr` are component-internal and destructured away by
+   * `assembleLegend` — `const {disable, labelExpr, selections, ...legend} = legendCmpt.combine()`.
+   * `labelExpr` is applied further down, after the encode parts are assembled.
+   */
+  private val LEGEND_PROPERTIES =
+    setOf(
+      "aria",
+      "clipHeight",
+      "columnPadding",
+      "columns",
+      "cornerRadius",
+      "description",
+      "direction",
+      "fillColor",
+      "format",
+      "formatType",
+      "gradientLength",
+      "gradientOpacity",
+      "gradientStrokeColor",
+      "gradientStrokeWidth",
+      "gradientThickness",
+      "gridAlign",
+      "labelAlign",
+      "labelBaseline",
+      "labelColor",
+      "labelFont",
+      "labelFontSize",
+      "labelFontStyle",
+      "labelFontWeight",
+      "labelLimit",
+      "labelOffset",
+      "labelOpacity",
+      "labelOverlap",
+      "labelPadding",
+      "labelSeparation",
+      "legendX",
+      "legendY",
+      "offset",
+      "orient",
+      "padding",
+      "rowPadding",
+      "strokeColor",
+      "symbolDash",
+      "symbolDashOffset",
+      "symbolFillColor",
+      "symbolLimit",
+      "symbolOffset",
+      "symbolOpacity",
+      "symbolSize",
+      "symbolStrokeColor",
+      "symbolStrokeWidth",
+      "symbolType",
+      "tickCount",
+      "tickMinStep",
+      "title",
+      "titleAlign",
+      "titleAnchor",
+      "titleBaseline",
+      "titleColor",
+      "titleFont",
+      "titleFontSize",
+      "titleFontStyle",
+      "titleFontWeight",
+      "titleLimit",
+      "titleLineHeight",
+      "titleOpacity",
+      "titleOrient",
+      "titlePadding",
+      "type",
+      "values",
+      "zindex",
+      // The channel scales a legend may be driven by, and its own encode block.
+      "opacity",
+      "shape",
+      "stroke",
+      "fill",
+      "size",
+      "strokeWidth",
+      "strokeDash",
+      "encode",
+    )
+
   /** The legend a scaled non-position channel produces, or null when it produces none. */
   fun legend(view: UnitView, channel: String, def: ChannelDef, type: String): VegaValue? {
     if (def.legendDisabled) return null
@@ -831,6 +922,11 @@ internal object Guides {
     ) {
       return null
     }
+    // And `disable` written **inside** the block. It is one of `LEGEND_COMPONENT_PROPERTIES` and is
+    // read off the block like any other, then destructured away by `assembleLegend`, which answers
+    // nothing for a disabled component. Dropping it as an internal without honouring it first left
+    // the key drawn.
+    if (def.legend?.fields?.get("disable").isTruthy()) return null
     val filled = view.markDef.filled
     // `getLegendDefWithScale`: a trail's legend names two channels differently from every other
     // mark's. Its swatch is a short stroke, so colour goes on the `stroke` however the mark is
@@ -942,7 +1038,7 @@ internal object Guides {
       // from. Applied below, after the encode parts are assembled, which is where upstream applies
       // it too.
       def.legend?.fields?.forEach { (key, value) ->
-        if (key != "labelExpr") put(key, asSignal(value))
+        if (key in LEGEND_PROPERTIES) put(key, asSignal(value))
       }
       if (gradient) {
         // A ramp is painted at the mark's own opacity, so a legend beside a chart of translucent
