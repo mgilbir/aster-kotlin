@@ -8,6 +8,11 @@ section here does not get released.
 
 ### Fixed
 
+- **A title of no words is no title.** `assembleTitle` guards everything it does with
+  `if (title.text)`, and the empty string is falsy, so `""` produces nothing. This wrote it out and
+  reserved the space above the chart for a heading that says nothing — `""` being what a
+  specification written by a tool that always emits the key leaves behind.
+
 - **Only a derived grid comes off the second of two independent axes.** Two sets of gridlines across
   one plot measure different things and say neither, so upstream keeps the first — but its test is
   `!axisCmpt.explicit.grid`, and a layer that writes `"axis": {"grid": true}` has *asked* for

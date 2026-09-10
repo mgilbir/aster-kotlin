@@ -104,6 +104,22 @@ class LayerTitleTest {
     )
   }
 
+  /**
+   * A title of **no words** is no title either: `if (title.text)` is falsy for the empty string,
+   * and writing one out reserved the space above the chart for it. `""` is what a specification
+   * written by a tool that always emits the key leaves behind, and three in the wild corpus do.
+   */
+  @Test
+  fun `a title of no words is not written at all`() {
+    val empty =
+      """{"data":{"values":[{"a":1,"b":2}]},"mark":"point","title":%s,
+         "encoding":{"x":{"field":"a","type":"quantitative"},
+                     "y":{"field":"b","type":"quantitative"}}}"""
+    assertNull(title(empty.format("\"\"")), "an empty string")
+    assertNull(title(empty.format("""{"text":""}""")), "an empty text")
+    assertNull(title(empty.format("[]")), "an empty list of lines")
+  }
+
   /** The same rule at the top: a block of title properties with no text is not a title. */
   @Test
   fun `a title with no text is not written at all`() {

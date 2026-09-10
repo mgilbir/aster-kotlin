@@ -2873,7 +2873,10 @@ private class Compilation(
         ?: declared.takeIf {
           it is VegaValue.Str || (it as? VegaValue.Arr)?.values?.firstOrNull() is VegaValue.Str
         }
-    if (text == null) return null
+    // `if (title.text)`, and the empty string is falsy: a title of no words is no title, and
+    // writing one out reserved the space above the chart for it. `""` is what a specification
+    // written by a tool that always emits the key leaves behind.
+    if (text == null || !text.isTruthy()) return null
     // `{...nonMarkTitleProperties, ...titleNoEncoding, ...(encoding ? {encode: …} : {})}`, and in
     // that order: what the title itself states outranks what the theme did.
     val title = LinkedHashMap<String, VegaValue>(nonMarkTitleProperties())
