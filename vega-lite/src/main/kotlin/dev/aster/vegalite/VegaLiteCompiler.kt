@@ -908,7 +908,16 @@ private class Compilation(
       put("background", spec.fields["background"] ?: config.background)
       // A chart's own padding beats the theme's, as its background does: a specification stating
       // one is overriding what the configuration settled, not the other way about.
-      put("padding", spec.fields["padding"] ?: config.padding)
+      //
+      // The theme's is taken only where it is **truthy**, which is the one place the two differ: a
+      // `config: {"padding": 0}` reaches Vega as no padding at all, where a `"padding": 0` written
+      // on the chart itself reaches it as a zero. Upstream drops the falsy one while merging the
+      // configuration and takes the specification's as written, and this wrote a `padding: 0` that
+      // upstream does not.
+      put(
+        "padding",
+        spec.fields["padding"] ?: config.padding.takeIf { it.isTruthy() },
+      )
       autosize(views)?.let { put("autosize", it) }
       put("width", mergedSize("width") ?: if (concat == null) root.width else null)
       put("height", mergedSize("height") ?: if (concat == null) root.height else null)

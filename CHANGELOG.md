@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **A padding the theme sets to nothing is no padding; one the chart sets to nothing is a zero.**
+  `getTopLevelProperties` spreads the configuration's top-level properties and then the
+  specification's, and the asymmetry is upstream of that: a falsy `padding` does not survive the
+  configuration merge, while the specification's is copied on a plain presence test. So
+  `config: {"padding": 0}` reaches Vega as no padding — leaving Vega's own default of five — and
+  `"padding": 0` on the chart reaches it as a zero. This took the theme's as written, and put a
+  `padding: 0` into five of the wild corpus's charts that upstream leaves alone.
+
 - **A scale keeps only the properties its type has.** `parseScaleProperty` asks
   `scaleTypeSupportProperty` of every property it is given, derived or stated, and drops the rest
   with a warning — a `base` belongs to a logarithm, an `exponent` to a power, a `constant` to a
