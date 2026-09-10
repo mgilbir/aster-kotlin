@@ -746,8 +746,23 @@ internal class Transforms(
           listOf("equal", "lte", "lt", "gt", "gte").firstNotNullOfOrNull { predicate.fields[it] }
             ?: (predicate.fields["range"] as? VegaValue.Arr)?.values?.firstOrNull()
             ?: (predicate.fields["oneOf"] as? VegaValue.Arr)?.values?.firstOrNull()
+        // ```js
+        // if (val) {
+        //   if (isDateTime(val)) implicit[filter.field] = 'date';
+        //   else if (isNumber(val)) implicit[filter.field] = 'number';
+        //   else if (isString(val)) implicit[filter.field] = 'string';
+        // }
+        // if (filter.timeUnit) implicit[filter.field] = 'date';
+        // ```
+        //
+        // `if (val)` is **truthiness**, so a comparison against zero or against the empty string
+        // says nothing about the column's type: `{"gt": 0}` is the commonest filter there is — keep
+        // the rows that have a value — and it left this compiler asking the loader to read a column
+        // upstream leaves as it found it. The `timeUnit` is asked outside that gate and so is asked
+        // here whatever the comparison was.
         when {
           predicate.string("timeUnit") != null -> into[field] = "date"
+          !value.isTruthy() -> Unit
           value is VegaValue.Obj -> into[field] = "date"
           value is VegaValue.Num -> into[field] = "number"
           value is VegaValue.Str -> into[field] = "string"

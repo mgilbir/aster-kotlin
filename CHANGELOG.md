@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **A filter's comparison says nothing about its column when the comparison is falsy.**
+  `getImplicitFromFilterTransform` gates the whole reading on `if (val)`, so `{"gt": 0}` — the
+  commonest filter there is, *keep the rows that have a value* — leaves the column loaded as it was
+  found, and so do a comparison against the empty string and one against `false`. This engine asked
+  what kind the comparison was and got an answer for all three, so it asked the loader to parse a
+  column upstream leaves alone. One specification in the wild corpus filters that way. The
+  `timeUnit` is asked outside that gate and still settles the column whatever the comparison was.
+
 - **A stated `"title": null` on any layer takes the caption off the whole axis.** Two layers over one
   axis each contribute a title and upstream joins them with a comma — a shared axis says what it is
   showing — but a **null** is not a contribution to join: it is the statement that this axis has no
