@@ -8,6 +8,12 @@ section here does not get released.
 
 ### Fixed
 
+- **A repetition variable standing in a list channel is resolved.** `replaceRepeaterInMapping` maps
+  over an array channel rather than passing it along, so `{"field": {"repeat": "repeat"}}` written
+  as one entry of a `tooltip` resolves per repetition. This passed the array along, leaving the
+  entry naming a column that is an object rather than a name — dropped for having no field, so the
+  tooltip showed every column except the one the chart repeats over.
+
 - **An offset of nothing is no offset.** `positionOffset` writes one only where the stated value is
   truthy, so a `"thetaOffset": 0` — what a chart written by a tool that always emits the key leaves
   behind — moves nothing and is not written. An offset written as an expression is an object, and

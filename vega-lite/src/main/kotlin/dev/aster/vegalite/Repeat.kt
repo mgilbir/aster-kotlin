@@ -181,6 +181,17 @@ internal object Repeat {
   }
 
   private fun resolveChannel(def: VegaValue, bound: Map<String, String>): VegaValue {
+    // A **list** channel is a list of definitions, and a repetition variable may stand in any of
+    // them — `replaceRepeaterInMapping` maps over the array rather than passing it along:
+    //
+    //     if (isArray(channelDef)) {
+    //       out[channel] = channelDef.map((cd) => replaceRepeaterInChannelDef(cd, repeater))…
+    //
+    // Passing it along left `{"field": {"repeat": "repeat"}}` unresolved in a tooltip, which then
+    // named a column called `[object Object]` and was dropped for having no field.
+    (def as? VegaValue.Arr)?.let { list ->
+      return arr(list.values.map { resolveChannel(it, bound) })
+    }
     val obj = def as? VegaValue.Obj ?: return def
     return obj {
       obj.fields.forEach { (key, value) ->
