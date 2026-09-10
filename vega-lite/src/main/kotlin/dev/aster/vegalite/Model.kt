@@ -311,6 +311,106 @@ internal object Channels {
   /** The channels that name a place on the globe rather than a position on the page. */
   val GEO_POSITION_CHANNELS = setOf("longitude", "latitude", "longitude2", "latitude2")
 
+  /** The primitive marks — `Mark` in `mark.ts`, which is what a support table is indexed by. */
+  val MARKS =
+    setOf(
+      "arc",
+      "area",
+      "bar",
+      "circle",
+      "geoshape",
+      "image",
+      "line",
+      "rule",
+      "point",
+      "rect",
+      "square",
+      "trail",
+      "text",
+      "tick",
+    )
+
+  /**
+   * `getSupportedMark`: whether a channel means anything for a mark, and when.
+   *
+   * `"always"`, `"binned"` or nothing at all. Most channels apply to every mark — a colour, a
+   * tooltip, an order — and the rest are only meaningful for the marks that have the thing they
+   * set: only a `text` mark has text, only an `image` has a URL, only a `point` or a `geoshape` has
+   * a shape to choose. A channel a mark has no use for is **dropped from the encoding**, and
+   * dropping it is not cosmetic: it would otherwise group an aggregate, name a scale and appear in
+   * the chart's spoken description.
+   *
+   * `"binned"` is the second edge of an interval on a mark that draws a **point** rather than a
+   * span: a `point` gets an `x2` only to say where the bin it sits in ends, so the primary channel
+   * has to be one whose data arrived binned. Anywhere else there is nothing for a second edge to
+   * mean.
+   */
+  fun supportsMark(channel: String, mark: String): String? =
+    when (channel) {
+      // `ALL_MARKS`, which is every mark there is.
+      "color",
+      "fill",
+      "stroke",
+      "description",
+      "detail",
+      "key",
+      "tooltip",
+      "href",
+      "order",
+      "opacity",
+      "fillOpacity",
+      "strokeOpacity",
+      "strokeWidth",
+      "facet",
+      "row",
+      "column" -> "always"
+      // A `geoshape` is placed by its projection and not by a position channel.
+      "x",
+      "y",
+      "xOffset",
+      "yOffset",
+      "latitude",
+      "longitude",
+      "time" -> if (mark == "geoshape") null else "always"
+      "x2",
+      "y2",
+      "latitude2",
+      "longitude2" ->
+        when (mark) {
+          "area",
+          "bar",
+          "image",
+          "rect",
+          "rule" -> "always"
+          "circle",
+          "point",
+          "square",
+          "tick",
+          "line",
+          "trail" -> "binned"
+          else -> null
+        }
+      "size" ->
+        if (
+          mark in setOf("point", "tick", "rule", "circle", "square", "bar", "text", "line", "trail")
+        )
+          "always"
+        else null
+      "strokeDash" ->
+        if (mark in setOf("line", "point", "tick", "rule", "circle", "square", "bar", "geoshape"))
+          "always"
+        else null
+      "shape" -> if (mark == "point" || mark == "geoshape") "always" else null
+      "text" -> if (mark == "text") "always" else null
+      "angle" -> if (mark in setOf("point", "square", "text")) "always" else null
+      "url" -> if (mark == "image") "always" else null
+      "theta",
+      "radius" -> if (mark == "text" || mark == "arc") "always" else null
+      "theta2",
+      "radius2" -> if (mark == "arc") "always" else null
+      else -> null
+    }
+
   /**
    * `getPositionChannelFromLatLong`: the position a place ends up drawn at.
    *

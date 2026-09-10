@@ -8,6 +8,23 @@ section here does not get released.
 
 ### Fixed
 
+- **A channel the mark has nothing to set from is dropped from the encoding.** `initEncoding` drops
+  four kinds before anything else reads one: a channel `markChannelCompatible` says the mark has no
+  use for — a `text` on a line, a `shape` on a bar, a position on a `geoshape`, a second edge on a
+  mark that draws a point rather than a span — a `size` that *aggregates* on a `line`, which is one
+  path of one thickness; a `color` beside whichever of `fill` and `stroke` that mark would have
+  painted with; and an offset nested inside a **continuous** position, there being no band to offset
+  within.
+
+  Dropping them is not cosmetic: a channel that stays groups an aggregate, names a scale of its own,
+  and appears in the chart's spoken description and its tooltip. A `line` whose shared layer states
+  the `text` its sibling label draws described every point by a column the line does not show. 11
+  specifications in the wild corpus differed for that family of reasons.
+
+  An `angle` on an `arc` is read as `theta` — the slice, not the rotation of a glyph that has none —
+  and the rewrite has to run **first**, since an `arc` supports no `angle` and a compatibility check
+  running before it would drop the very channel that carries the chart.
+
 - **An error bar's own channels now ask its summary for what they aggregate.** `errorBarParams`
   hands the encoding to `extractTransformsFromEncoding` before anything is drawn from it, and the
   measures that walk finds are the *first* entries of the summary — `[...oldAggregate,

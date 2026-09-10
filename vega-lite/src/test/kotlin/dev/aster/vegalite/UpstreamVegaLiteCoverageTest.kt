@@ -86,7 +86,7 @@ class UpstreamVegaLiteCoverageTest {
                           "x": {"field": "c", "type": "nominal"},
                           "$channel": {"field": "b", "type": "quantitative"}}"""
         else ->
-          """"mark": "point",
+          """"mark": "${markSupporting(channel)}",
              "encoding": {"$channel": {"field": "a", "type": "quantitative"}}"""
       }
     return """
@@ -96,14 +96,42 @@ class UpstreamVegaLiteCoverageTest {
       .trimIndent()
   }
 
-  private fun markSpec(mark: String) =
-    """
-    {"data": {"values": [{"a": 1, "b": 2}]},
-     "mark": "$mark",
-     "encoding": {"x": {"field": "a", "type": "quantitative"},
-                  "y": {"field": "b", "type": "quantitative"}}}
-    """
+  /**
+   * One mark, encoded the way that mark is encoded.
+   *
+   * A **`geoshape`** is placed by its projection rather than by a position channel, so `x` and `y`
+   * are dropped for it — the probe would then be reporting its own choice of encoding as a refused
+   * mark. It is given a colour instead, which every mark takes.
+   */
+  private fun markSpec(mark: String): String {
+    val encoding =
+      if (Channels.supportsMark("x", mark) == null) {
+        """{"color": {"field": "a", "type": "quantitative"}}"""
+      } else {
+        """{"x": {"field": "a", "type": "quantitative"},
+           "y": {"field": "b", "type": "quantitative"}}"""
+      }
+    return """
+      {"data": {"values": [{"a": 1, "b": 2}]},
+       "mark": "$mark",
+       "encoding": $encoding}
+      """
       .trimIndent()
+  }
+
+  /**
+   * A mark the channel means something for — `supportMark`, asked rather than assumed.
+   *
+   * `initEncoding` drops a channel the mark has no use for, so probing every channel on a `point`
+   * measures the probe's own choice of mark: a `text` or a `url` or a second edge on a point is
+   * dropped for being meaningless there, not for being unimplemented. Ten channels reported
+   * themselves refused for exactly that reason, which is the mistake this file's own note about the
+   * error channels describes.
+   */
+  private fun markSupporting(channel: String): String =
+    listOf("point", "text", "arc", "bar", "image", "geoshape").firstOrNull {
+      Channels.supportsMark(channel, it) == "always"
+    } ?: "point"
 
   /** One transform of each kind, with the required keys its schema entry names. */
   private val transformBodies =
