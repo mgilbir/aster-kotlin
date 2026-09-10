@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **The stack is computed before its order is aligned with the colour domain.** `UnitModel`'s
+  constructor runs `this.stack = stack(mark, encoding)` and only then
+  `alignStackOrderWithColorDomain()`, which may write an `order` channel of its own — so `stackBy`
+  was settled without it, and the `_«field»_sort_index` column that rule adds is not one of the
+  stack's own dimensions however much `order` counts as a non-position channel. A stacked **area**
+  is where it shows, `stackby` being the `impute` transform's groupby: counting the sort index
+  filled each colour's missing values per index instead of per colour. An order channel the
+  specification wrote still contributes, having been there when the stack was computed.
+
 - **`config.title` survives, holding its subtitle properties.** "Subtitle part can stay in
   `config.title` since header titles do not use subtitle" — the paint has become the `group-title`
   style, the placement the `group-subtitle` one and the six non-mark properties went onto the title

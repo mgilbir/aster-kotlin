@@ -169,7 +169,9 @@ internal class Parse(
       put("sort", direction)
     }
     return Aligned(
-      encoding + ("order" to channelDef("order", orderDef, "$.encoding.order")!!),
+      encoding +
+        ("order" to
+          channelDef("order", orderDef, "$.encoding.order")!!.copy(addedAfterStack = true)),
       listOf(calculate),
     )
   }

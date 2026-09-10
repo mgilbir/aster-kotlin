@@ -70,6 +70,11 @@ internal object Stack {
       Channels.NONPOSITION_CHANNELS.mapNotNull { channel ->
         if (channel == "tooltip") return@mapNotNull null
         val def = spec.encoding[channel]?.takeIf { it.isFieldDef } ?: return@mapNotNull null
+        // `stack()` runs before `alignStackOrderWithColorDomain`, so a channel that rule added is
+        // not one of the stack's own dimensions — see [ChannelDef.addedAfterStack]. Counting it
+        // put the sort-index column into the `impute` a stacked area is given, and every colour's
+        // missing values were then filled per index rather than per colour.
+        if (def.addedAfterStack) return@mapNotNull null
         if (def.aggregate != null) return@mapNotNull null
         val name = Fields.vgField(def)
         if (name.isEmpty() || name !in groupbyFields) def else null

@@ -68,6 +68,19 @@ internal data class ChannelDef(
   val stack: VegaValue? = null,
   val explicitTitle: VegaValue? = null,
   /**
+   * Whether this definition was **added after the stack was computed**.
+   *
+   * `UnitModel`'s constructor runs `this.stack = stack(mark, encoding)` and only then
+   * `this.alignStackOrderWithColorDomain()`, which may write an `order` channel of its own. So the
+   * `stackBy` list — the channels that split a column into segments — was settled without it, and
+   * the sort-index column it names is not one of the stack's own dimensions however much `order`
+   * counts as a non-position channel.
+   *
+   * The ordering is the whole rule, and this flag is how a one-pass compiler says it: everything
+   * else reads the encoding as it finally stands.
+   */
+  val addedAfterStack: Boolean = false,
+  /**
    * `condition` — the definitions that apply only when their own test passes, in order.
    *
    * Each is an ordinary channel definition with a [test] beside it, because a condition may name a
