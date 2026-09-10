@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A composite mark's parts are named by their position among the parts actually drawn.** Upstream
+  builds the layer array from the enabled parts and every name follows the array, so a box plot with
+  its box switched off has its median at `layer_1_layer_0`, taking the box's place rather than
+  keeping its own. This wrote the names out by hand, so a part switched off left a hole and every
+  dataset, signal and mark name below it was one index too high. Two specifications in the wild
+  corpus switch a part off that way. The two *groups* keep their indices even where one comes out
+  empty; `outliers: false` is the one exception, and it is upstream's — with no outlier layer the
+  whiskers are the first group and every name below loses a level.
+
 - **A trellis's caption is written the way the column is typed, and the way its header says.**
   `assembleLabelTitle` reads a `format` and a `formatType` off the header chain and hands them to
   `formatSignalRef` — the same function a tooltip line goes through, whose third arm is `format ||

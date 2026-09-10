@@ -757,64 +757,69 @@ internal class Composite(
         )
     // With no outlier layer the whiskers *are* the first layer, so every name below loses a level.
     val whiskerPrefix = if (wantsOutliers) "layer_0_layer_1" else "layer_0"
+    // Each group is numbered by **position among the parts actually drawn**: upstream builds the
+    // layer array from the enabled parts and the names follow the array, so a box plot with its box
+    // switched off has its median at `layer_1_layer_0` rather than keeping the box's old slot.
     val whiskers =
       listOfNotNull(
-        part(
-          "rule",
-          "${whiskerPrefix}_layer_0",
-          listOf(quartiles, inside, whiskerSummary),
-          rule(),
-          "lower_whisker",
-          "lower_box",
-          tooltip = whiskerTooltip,
-        ),
-        part(
-          "rule",
-          "${whiskerPrefix}_layer_1",
-          listOf(quartiles, inside, whiskerSummary),
-          rule(),
-          "upper_box",
-          "upper_whisker",
-          tooltip = whiskerTooltip,
-        ),
-        part(
-          "ticks",
-          "${whiskerPrefix}_layer_2",
-          listOf(quartiles, inside, whiskerSummary),
-          tick("black"),
-          "lower_whisker",
-          tooltip = whiskerTooltip,
-        ),
-        part(
-          "ticks",
-          "${whiskerPrefix}_layer_3",
-          listOf(quartiles, inside, whiskerSummary),
-          tick("black"),
-          "upper_whisker",
-          tooltip = whiskerTooltip,
-        ),
-      )
+          part(
+            "rule",
+            "",
+            listOf(quartiles, inside, whiskerSummary),
+            rule(),
+            "lower_whisker",
+            "lower_box",
+            tooltip = whiskerTooltip,
+          ),
+          part(
+            "rule",
+            "",
+            listOf(quartiles, inside, whiskerSummary),
+            rule(),
+            "upper_box",
+            "upper_whisker",
+            tooltip = whiskerTooltip,
+          ),
+          part(
+            "ticks",
+            "",
+            listOf(quartiles, inside, whiskerSummary),
+            tick("black"),
+            "lower_whisker",
+            tooltip = whiskerTooltip,
+          ),
+          part(
+            "ticks",
+            "",
+            listOf(quartiles, inside, whiskerSummary),
+            tick("black"),
+            "upper_whisker",
+            tooltip = whiskerTooltip,
+          ),
+        )
+        .mapIndexed { index, (_, spec) -> "${whiskerPrefix}_layer_$index" to spec }
     val boxes =
       listOfNotNull(
-        part(
-          "box",
-          "layer_1_layer_0",
-          listOf(boxSummary),
-          box,
-          "lower_box",
-          "upper_box",
-          tooltip = fiveNumber,
-        ),
-        part(
-          "median",
-          "layer_1_layer_1",
-          listOf(boxSummary),
-          median,
-          "mid_box",
-          tooltip = fiveNumber,
-          colour = medianColour,
-        ),
-      )
+          part(
+            "box",
+            "",
+            listOf(boxSummary),
+            box,
+            "lower_box",
+            "upper_box",
+            tooltip = fiveNumber,
+          ),
+          part(
+            "median",
+            "",
+            listOf(boxSummary),
+            median,
+            "mid_box",
+            tooltip = fiveNumber,
+            colour = medianColour,
+          ),
+        )
+        .mapIndexed { index, (_, spec) -> "layer_1_layer_$index" to spec }
     return listOfNotNull(outliers) + whiskers + boxes
   }
 
