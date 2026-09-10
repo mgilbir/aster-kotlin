@@ -2,6 +2,7 @@ package dev.aster.vegalite
 
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.canonicalNumberString
 
 /**
  * Reads a Vega-Lite specification into [UnitSpec], filling in what the grammar leaves implicit.
@@ -514,6 +515,60 @@ internal class Parse(
     return out
   }
 
+  /**
+   * The column a definition names, read as **JavaScript** reads it.
+   *
+   * `field` is a string in the grammar and nothing upstream checks that: it is spelled into a
+   * template — `` `${expr}["${channelDef.field}"]` `` — and into `vgField`'s regular expressions,
+   * both of which coerce whatever they are given. So `"field": ["2021"]` names the column `2021`, a
+   * one-element array stringifying to its element, and `"field": 2021` names it too.
+   *
+   * This read the property as a string and answered nothing for anything else, which makes the
+   * definition not a field definition at all: the channel then had no scale, and a map coloured by
+   * a column written that way was drawn in one flat colour. Two specifications in the wild corpus
+   * write the array form.
+   *
+   * An object or a `null` is refused rather than coerced — `[object Object]` and `null` are columns
+   * no table has, and a chart naming one is a chart with a mistake in it worth reporting.
+   */
+  private fun fieldName(value: VegaValue.Obj, path: String): String? {
+    val stated = value.fields["field"] ?: return null
+    val coerced = jsString(stated)
+    if (coerced == null) {
+      diagnostics.warn(
+        VegaLiteDiagnostics.INVALID_ENCODING,
+        "A `field` names a column, so it has to be text; this one is neither text nor a number, " +
+          "and the channel is read as naming no column at all.",
+        jsonPath = "$path.field",
+      )
+      return null
+    }
+    if (stated !is VegaValue.Str) {
+      diagnostics.warn(
+        VegaLiteDiagnostics.INVALID_ENCODING,
+        "A `field` names a column, so it should be written as text. Upstream reads this one as " +
+          "`$coerced` — JavaScript's own string coercion — and so does this compiler.",
+        jsonPath = "$path.field",
+      )
+    }
+    return coerced
+  }
+
+  /** `String(value)` for the values a `field` may have been written as, and null for the rest. */
+  private fun jsString(value: VegaValue): String? =
+    when (value) {
+      is VegaValue.Str -> value.value
+      is VegaValue.Num -> canonicalNumberString(value.value)
+      is VegaValue.Bool -> value.value.toString()
+      // `Array.prototype.toString`: the elements coerced in turn and joined with a comma, which is
+      // why a **one-element** array is indistinguishable from its element.
+      is VegaValue.Arr -> {
+        val parts = value.values.map { jsString(it) ?: return null }
+        parts.joinToString(",")
+      }
+      else -> null
+    }
+
   private fun channelDef(channel: String, value: VegaValue, path: String): ChannelDef? {
     if (value !is VegaValue.Obj) {
       diagnostics.error(
@@ -524,7 +579,7 @@ internal class Parse(
       return null
     }
 
-    val field = value.string("field")
+    val field = fieldName(value, path)
     // `{"aggregate": {"argmax": "US Gross"}}` — an aggregate that answers with a whole *row*
     // rather than a number, named by the column it maximises. The op and that column are two
     // separate things and everything downstream needs both.

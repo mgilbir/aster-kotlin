@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A `field` is read as JavaScript reads it.** It is a string in the grammar and nothing upstream
+  checks that: the name is spelled into a template — `` `${expr}["${channelDef.field}"]` `` — and
+  into `vgField`'s regular expressions, both of which coerce whatever they are given. So `"field":
+  ["2021"]` names the column `2021`, `["a", "b"]` names one called `a,b`, and a number or a boolean
+  names itself. This read the property as a string and answered nothing for anything else, which
+  makes the definition not a field definition at all: the channel had no scale, and a map coloured
+  by a column written that way was drawn in one flat colour. Two specifications in the wild corpus
+  write the array form. An object is still refused rather than coerced, `[object Object]` being a
+  column no table has.
+
 - **`"parse": {"«field»": null}` says *do not* parse a column, and takes the implied parse with it.**
   The stated `parse` belongs to the parse node rather than to the source — `format = data.format ?
   {...omit(data.format, ['parse'])} : {}` — and the node decides where its work lands: back onto
