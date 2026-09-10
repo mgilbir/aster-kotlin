@@ -949,7 +949,7 @@ private class Compilation(
         "padding",
         spec.fields["padding"] ?: config.padding.takeIf { it.isTruthy() },
       )
-      autosize(views)?.let { put("autosize", it) }
+      autosize(views, root)?.let { put("autosize", it) }
       put("width", mergedSize("width") ?: if (concat == null) root.width else null)
       put("height", mergedSize("height") ?: if (concat == null) root.height else null)
       // `cell` is the bordered plotting area; a chart with no Cartesian position — a pie — has no
@@ -2855,18 +2855,33 @@ private class Compilation(
    * `normalizeAutoSize` and `getTopLevelProperties`, which settle the same property in two places.
    *
    * A chart says nothing about sizing and gets `pad`, which is Vega's own default and so is written
-   * as nothing at all. Two things change that. A size of **`"container"`** asks the page for it, so
-   * the chart is *fitted* along that direction — and `contains: "padding"` with it, because the
-   * element's width includes the padding the chart would otherwise add outside it. And an axis
-   * whose orientation is driven by a **parameter** needs `resize`, since the drawing is re-laid out
-   * when the axis moves from one side to the other and a padded surface would keep the old extent.
+   * as nothing at all. Four things change that.
+   *
+   * A size of **`"container"`** asks the page for it, so the chart is *fitted* along that direction
+   * — and `contains: "padding"` with it, because the element's width includes the padding the chart
+   * would otherwise add outside it. A theme may state the sizing its document's charts share, which
+   * the chart's own then overrides property by property. An axis whose orientation is driven by a
+   * **parameter** needs `resize`, since the drawing is re-laid out when the axis moves from one
+   * side to the other and a padded surface would keep the old extent — and that one is added only
+   * where nothing else settled the sizing, `getTopLevelProperties` reaching it under `autosize ===
+   * undefined`.
+   *
+   * And a fit is given up where there is nothing to fit. Only a single view or a layer *has* one
+   * plotting area to stretch; and a plotting area derived from a **step** per category has a size
+   * of its own, so stretching it to the surface would contradict the step. Where one direction is
+   * stepped and the other is not, the fit survives along the other — a bar chart as wide as its
+   * bars is still fitted vertically.
    */
-  private fun autosize(views: List<UnitView>): VegaValue? {
+  private fun autosize(views: List<UnitView>, root: LayoutSize): VegaValue? {
+    // `isFitCompatible`: a grid or a row of plots is laid out from its parts, and none of them is
+    // the thing a fit would stretch.
+    val single = facet == null && concat == null
     val declared = spec.fields["autosize"]
-    val stated = (declared as? VegaValue.Str)?.let { obj { put("type", it.value) } } ?: declared
+    val stated = normalizedAutoSize(declared)
+    // A `"container"` size on a composition is discarded rather than fitted.
     val responsive =
       listOf("width" to "fit-x", "height" to "fit-y").filter {
-        spec.fields[it.first] == VegaValue.Str("container")
+        single && spec.fields[it.first] == VegaValue.Str("container")
       }
     val fitted =
       when {
@@ -2874,22 +2889,87 @@ private class Compilation(
         responsive.size == 1 -> responsive.single().second
         else -> null
       }
-    val resize = views.any { view -> Guides.hasSignalOrient(view) }
     val merged = obj {
       put("type", "pad")
       if (fitted != null) {
         put("type", fitted)
         put("contains", "padding")
       }
-      if (resize) put("resize", VegaValue.Bool(true))
-      (stated as? VegaValue.Obj)?.fields?.forEach { (key, value) -> put(key, value) }
+      normalizedAutoSize(config.autosize)?.fields?.forEach { (key, value) -> put(key, value) }
+      stated?.fields?.forEach { (key, value) -> put(key, value) }
     }
+    // A `"fit"` asks for the whole surface, which only a single view or a layer has one of.
+    val normalized =
+      if (merged.string("type") == "fit" && !single) {
+        obj {
+          merged.fields.forEach { (key, value) -> put(key, value) }
+          put("type", "pad")
+        }
+      } else {
+        merged
+      }
+    // Where all of that settles on Vega's own default, `normalize` has nothing to say and leaves
+    // the property the specification wrote **unnormalized** — it spreads its answer over the
+    // specification only when it has one. So a `"fit"` on a facet reaches the assembly as it was
+    // written, having been turned into a `pad` and then forgotten: the warning is the whole of what
+    // upstream does about it.
+    val settled = if (normalized.fields == PADDED) declared else normalized
+    val resize = views.any { view -> Guides.hasSignalOrient(view) }
+    val top =
+      when {
+        settled == null ->
+          obj {
+            put("type", "pad")
+            if (resize) put("resize", VegaValue.Bool(true))
+          }
+        // Anything but a name or a block is passed through as it stands: `keys` of a number is
+        // empty, so there is no type to read and nothing to settle.
+        else -> normalizedAutoSize(settled) ?: return settled
+      }
+    val fitting = droppedFit(top.string("type"), single, root)
+    val emitted =
+      if (fitting == null) top
+      else
+        obj {
+          top.fields.forEach { (key, value) -> put(key, value) }
+          put("type", fitting)
+        }
     // Vega's own default is written as nothing; a type on its own is written as the bare string.
-    if (merged.fields.keys == setOf("type")) {
-      val type = merged.string("type")
-      return if (type == "pad") null else VegaValue.Str(type.orEmpty())
+    val type = emitted.string("type")
+    if (emitted.fields.keys == setOf("type") && !type.isNullOrEmpty()) {
+      return if (type == "pad") null else VegaValue.Str(type)
     }
-    return merged
+    return emitted
+  }
+
+  /** `_normalizeAutoSize`: a name is the block that states only that name. */
+  private fun normalizedAutoSize(autosize: VegaValue?): VegaValue.Obj? =
+    when (autosize) {
+      null -> null
+      is VegaValue.Str -> obj { put("type", autosize.value) }
+      is VegaValue.Obj -> autosize
+      else -> null
+    }
+
+  /**
+   * The fit a **stepped** plotting area leaves, or null where the stated one stands.
+   *
+   * A size derived from a step per category is a size the data settles, so a fit along that
+   * direction is a contradiction: upstream drops it, and where only one direction is stepped it
+   * drops that half of the fit rather than the whole — `getFitType(inverseSizeType)`.
+   */
+  private fun droppedFit(type: String?, single: Boolean, root: LayoutSize): String? {
+    if (type !in setOf("fit", "fit-x", "fit-y")) return null
+    // A composition's own layout size is never settled — `parseChildrenLayoutSize` sizes the
+    // children and leaves the parent's alone — and the rule asks for both.
+    if (!single) return null
+    val stepped =
+      listOf("x" to "width", "y" to "height").filter { (channel, size) ->
+        root.values[channel] == null && spec.fields[size] != VegaValue.Str("container")
+      }
+    if (stepped.size == 2) return "pad"
+    val step = stepped.singleOrNull() ?: return null
+    return if (step.first == "x") "fit-y" else "fit-x"
   }
 
   /**
@@ -3963,6 +4043,14 @@ private class Compilation(
      */
     /** The Vega-Lite major version these rules implement, and the fixtures are checked against. */
     const val VEGA_LITE_MAJOR_VERSION = 6
+
+    /**
+     * `{type: 'pad'}` — the sizing Vega does anyway, which upstream compares against by value.
+     *
+     * `deepEqual(autosize, {type: 'pad'})` is how `normalizeAutoSize` decides it has nothing to
+     * say: a chart that asks to be padded and nothing else has asked for the default.
+     */
+    val PADDED = mapOf("type" to VegaValue.Str("pad"))
 
     /** `https://vega.github.io/schema/vega-lite/v6.json` — the major version out of the URL. */
     val SCHEMA_VERSION_PATTERN = Regex("""vega-lite/v(\d+)""")

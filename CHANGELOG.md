@@ -8,6 +8,21 @@ section here does not get released.
 
 ### Fixed
 
+- **How a chart is sized is settled twice, and the second pass knows what the first cannot.**
+  `normalizeAutoSize` runs before anything is compiled and knows the *shape* of the chart —
+  whether there is one plotting area a fit could stretch — while `getTopLevelProperties` runs last
+  and knows the *size* it came out as. Only the second can drop a fit that a **step** per category
+  has already settled: a bar chart as wide as its bars has a width of its own, and stretching it to
+  the surface would contradict the step. Where one direction is stepped and the other is not, the
+  fit survives along the other — `getFitType(inverseSizeType)`. This engine ran one merge and
+  neither rule, so such a chart asked Vega for both at once; one specification in the wild corpus
+  differs for that. Three more rules of the same pair were missing: a `"container"` size on a
+  composition is *discarded* rather than fitted, since a grid has no one area to fill; a theme's
+  `config.autosize` is read between the container default and the chart's own, which then overrides
+  it property by property; and the `resize` an axis oriented by a parameter needs is added only
+  where nothing else settled the sizing, which is the one branch `getTopLevelProperties` reaches
+  under `autosize === undefined`.
+
 - **A domain's sort is settled where the domains are merged.** Every view a shared scale is built
   from contributes a domain carrying the sort its own encoding asked for, and Vega takes one sort
   for the whole scale — sorting the parts and concatenating them is a different answer from sorting

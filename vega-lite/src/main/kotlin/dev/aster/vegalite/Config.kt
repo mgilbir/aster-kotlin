@@ -37,6 +37,16 @@ internal class Config(
 
   val padding: VegaValue = user.fields["padding"] ?: VegaValue.Num(5.0)
 
+  /**
+   * How a themed chart is sized, which `normalizeAutoSize` reads between the two it settles.
+   *
+   * A theme states the sizing behaviour a document's charts share — `{"autosize": "fit-x"}` for a
+   * column of charts that fill the page — and a chart of its own overrides it, property by property
+   * rather than whole: a theme's `contains: "padding"` survives a chart asking to be padded instead
+   * of fitted.
+   */
+  val autosize: VegaValue? = user.fields["autosize"]
+
   val timeFormat: String = user.string("timeFormat") ?: "%b %d, %Y"
 
   val countTitle: String = user.string("countTitle") ?: "Count of Records"
