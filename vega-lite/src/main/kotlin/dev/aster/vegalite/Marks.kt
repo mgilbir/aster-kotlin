@@ -1150,17 +1150,74 @@ internal object Marks {
     // channel, and it is how a composite mark hides its own scaffolding — an error bar's two caps
     // are read as part of the bar, not as three separate objects.
     if (view.markDef.raw.fields["aria"] == VegaValue.Bool(false)) return@obj
-    // `config.aria: false` says the same thing about the **whole chart**: there is no accessibility
-    // tree to describe anything to, so neither the role nor the summary is written.
-    if (view.config.raw.fields["aria"] == VegaValue.Bool(false)) return@obj
     val mark = view.spec.mark
-    // A mark may say what it *is* rather than what it is drawn with: a box plot's box is a rect,
-    // and calling it a rect to a screen reader is naming the tool instead of the thing.
-    val stated = view.markDef.raw.fields["ariaRoleDescription"]
-    if (stated != null) put("ariaRoleDescription", obj { put("value", stated) })
-    else if (mark !in VG_MARK_NAMES) put("ariaRoleDescription", obj { put("value", mark) })
-    val description = descriptionSignal(view)
-    if (description != null) put("description", signalRef(description))
+    // `config.aria: false` says there is no accessibility tree to describe anything *to*, and
+    // `ariaRoleDescription` is skipped for the whole chart by it. Upstream tests it separately in
+    // each of the two functions rather than once at the top, and the difference shows below: a
+    // description the specification **asked for** is still written under it.
+    if (view.config.raw.fields["aria"] != VegaValue.Bool(false)) {
+      // A mark may say what it *is* rather than what it is drawn with: a box plot's box is a rect,
+      // and calling it a rect to a screen reader is naming the tool instead of the thing.
+      val stated = view.markDef.raw.fields["ariaRoleDescription"]
+      if (stated != null) put("ariaRoleDescription", obj { put("value", stated) })
+      else if (mark !in VG_MARK_NAMES) put("ariaRoleDescription", obj { put("value", mark) })
+    }
+    description(view)?.let { put("description", it) }
+  }
+
+  /**
+   * `description()` in `encode/aria.ts`: what a mark is read out as, in four arms.
+   *
+   * ```js
+   * if (channelDef) return wrapCondition({model, channelDef, vgChannel: 'description', …});
+   * const descriptionValue = getMarkPropOrConfig('description', markDef, config);
+   * if (descriptionValue != null) return {description: signalOrValueRef(descriptionValue)};
+   * if (config.aria === false) return {};
+   * const data = tooltipData(encoding, stack, config);
+   * ```
+   *
+   * Only the last of the four was implemented here, so a `description` **channel** — the whole
+   * point of which is to say what a mark should be read out as — was ignored, and the summary
+   * assembled from every encoded field was spoken in its place. A `description` on the mark itself
+   * was dropped outright: it is kept out of the mark's own properties precisely because it belongs
+   * here, and nothing then wrote it.
+   *
+   * The two stated arms come **before** the `config.aria` test, so a chart that has switched the
+   * accessibility tree off still gets a description it asked for by name.
+   */
+  /**
+   * `textRef` for one description: a literal where the channel names a value, and the field spoken
+   * the way its own guide would write it where it names a column.
+   *
+   * `arrays = false`, because this is the single-value form — `formatSignalRef` rather than the
+   * tooltip's joined one. A description reads `datum["ward"]` and not a `join` of it.
+   */
+  private fun descriptionRef(view: UnitView, def: ChannelDef): VegaValue.Obj =
+    if (def.isValueDef) obj { literalRef(def.value)?.let { (key, value) -> put(key, value) } }
+    else obj { put("signal", fieldExpression(view, def, arrays = false)) }
+
+  private fun description(view: UnitView): VegaValue? {
+    // The channel, formatted as its own guide would format it — `textRef`, which is the single
+    // value form rather than the tooltip's joined one.
+    view.spec.encoding["description"]?.let { def ->
+      // `wrapCondition`: a channel with conditions becomes a production rule, each entry built by
+      // the same reference builder as the unconditional part.
+      val rules =
+        def.conditions.map { condition ->
+          obj {
+            put("test", condition.test)
+            putAll(descriptionRef(view, condition))
+          }
+        }
+      val main = descriptionRef(view, def)
+      return if (rules.isEmpty()) main else arr(rules + main)
+    }
+    // The mark's own, or the theme's, as it stands: a value, or a signal where it is an `expr`.
+    styled(view, "description")?.let {
+      return markProperty(it)
+    }
+    if (view.config.raw.fields["aria"] == VegaValue.Bool(false)) return null
+    return descriptionSignal(view)?.let { signalRef(it) }
   }
 
   /**

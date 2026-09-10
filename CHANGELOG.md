@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A `description` channel says what a mark is read out as.** `description()` has four arms — the
+  channel, the mark's own or the theme's, `config.aria: false`, and only then the summary assembled
+  from every encoded field. Just the last was implemented here, so a channel written precisely to
+  say what a screen reader should announce was ignored and the assembled summary spoken over it, and
+  a `description` on the mark was dropped outright — it is kept out of the mark's own properties
+  because it belongs here, and nothing then wrote it.
+
+  The two stated arms come **before** the `config.aria` test, which had been at the top of the whole
+  function. A chart that switches the accessibility tree off still gets a description it asked for by
+  name; only the derived summary goes. A conditional description becomes a production rule like any
+  other channel's.
+
 - **A trellis's captions take their styling from the theme.** `getHeaderProperty` reads three places
   in order — the facet's own `header` block, then `config.headerRow`/`headerColumn`/`headerFacet`,
   then `config.header` — so a facet that writes no header block at all still takes the theme's. This
