@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **The controls a chart is driven by come out in reverse order of declaration.**
+  `inputBindings.topLevelSignals` *unshifts* a signal for each of a selection's projections —
+  `signals.unshift({name: sgname, …})` — and `assembleTopLevelSignals` walks the selections in
+  declaration order, so the last parameter's control is written first and a selection projecting
+  onto two fields writes the second one first. `bindLegend` unshifts the same way. This wrote them
+  in declaration order; Vega renders bound inputs in the order it is given them, so a reader looking
+  down a column of drop-downs saw them in the wrong one. Four specifications in the wild corpus
+  differed for it.
+
 - **A legend one layer switches off stays off for the merged legend.** `parseLegendForChannel` builds
   a component for a disabled legend rather than none, and records its `disable` as *explicit*
   whenever the channel wrote a `legend` at all — `legendCmpt.set('disable', disable, legend !==

@@ -800,8 +800,14 @@ private class Compilation(
         // A selection's **controls** are part of the page rather than of the drawing, so they sit
         // at
         // the top with `unit` and before the signal the tests read.
+        // In **reverse** order of declaration, each control being *unshifted* onto the list as the
+        // selections are walked: `signals.unshift({name: sgname, …})` in `inputBindings` and in
+        // `bindLegend` alike. So a chart with a control per parameter writes the last one's first,
+        // which is not a detail of the output — a reader looking down a column of drop-downs sees
+        // them in the order Vega lists them.
         selections
           .distinctBy { it.name }
+          .reversed()
           .flatMap {
             it.inputSignals(it.owner ?: views.firstOrNull()) +
               it.legendSignals(it.owner ?: views.firstOrNull())
