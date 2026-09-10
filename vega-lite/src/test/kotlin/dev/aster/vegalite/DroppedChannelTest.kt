@@ -133,16 +133,16 @@ class DroppedChannelTest {
    * An `angle` on an `arc` is the **slice**, and is read as `theta` — at the place the `angle` was
    * written, which is what puts the colour before it in the description.
    *
-   * The *scale* order for this one is asserted a commit later: the rewrite is the first thing to
-   * put a polar position anywhere but its own slot, and it uncovered that this engine assembles its
-   * scales in encoding order where upstream assembles them in `SCALE_CHANNELS` order. The set of
-   * scales is the rewrite's own claim, and is checked here.
+   * The rewrite is the first thing to put a polar position anywhere but its own slot, and it
+   * uncovered that this engine assembled its scales in encoding order where upstream assembles them
+   * in `SCALE_CHANNELS` order — `[color, theta]` against upstream's `[theta, color]`. That is
+   * `ScaleOrderTest`'s subject, and the order is asserted here too.
    */
   @Test
   fun `an angle on an arc is read as theta`() {
     val colour = """"color":{"field":"t","type":"nominal"}"""
     val angle = """"angle":{"field":"a","type":"quantitative"}"""
-    assertEquals(setOf("theta", "color"), scales("arc", """$angle,$colour""").toSet())
+    assertEquals(listOf("theta", "color"), scales("arc", """$angle,$colour"""))
     assertEquals(listOf("t", "a"), described("arc", """$angle,$colour"""))
     // With a `theta` of its own there is nothing to rewrite, and an `arc` has no angle to set.
     assertEquals(

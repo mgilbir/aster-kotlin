@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **The scales come out in `SCALE_CHANNELS` order rather than in the order the encoding was
+  written.** `parseUnitScaleCore` walks that list and fills a dictionary keyed by channel, and
+  `assembleScales` reads it back in insertion order; the list is `x, y`, then the polar positions,
+  then the offsets, then every non-position channel in `UNIT_CHANNELS` order. This walked the
+  encoding instead, which agrees for every chart that writes its channels where they belong and
+  parts company the moment one is **moved** — a pie whose slice is written as an `angle` is read as
+  `theta` at the place the angle was written, and came out with its colour scale before its slice's.
+  `Channels.SCALE_CHANNELS` itself had `theta` and `radius` last and was missing `time`, which went
+  unnoticed because it had only ever been read as a set.
+
 - **A channel the mark has nothing to set from is dropped from the encoding.** `initEncoding` drops
   four kinds before anything else reads one: a channel `markChannelCompatible` says the mark has no
   use for — a `text` on a line, a `shape` on a bar, a position on a `geoshape`, a second edge on a

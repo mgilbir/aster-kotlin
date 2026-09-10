@@ -427,30 +427,48 @@ internal object Channels {
       else -> null
     }
 
-  /** Every channel that can own a scale, in the order upstream iterates them. */
+  /**
+   * Every channel that can own a scale, **in the order upstream iterates them**.
+   *
+   * ```js
+   * const SCALE_CHANNEL_INDEX = {
+   *   ...POSITION_SCALE_CHANNEL_INDEX,      // x, y
+   *   ...POLAR_POSITION_SCALE_CHANNEL_INDEX,// theta, radius
+   *   ...OFFSET_SCALE_CHANNEL_INDEX,        // xOffset, yOffset
+   *   ...NONPOSITION_SCALE_CHANNEL_INDEX,   // the rest, in UNIT_CHANNELS order
+   * };
+   * ```
+   *
+   * The order is the order the scales are **assembled** in, `parseUnitScaleCore` filling the
+   * component dictionary by walking this list. It is also read as a set in five places, which is
+   * why being wrong here went unnoticed: a polar position sits in its own slot in every chart that
+   * writes one, so encoding order and this order only part company when something *moves* a channel
+   * — an `angle` on an `arc`, which is read as `theta` at the place the angle was written.
+   *
+   * The clock a chart is **animated** by is a scale like any other: a band over the column the
+   * frames run through, stepped at the frame rate. Nothing is drawn with it — it is read by the
+   * signals that advance the frame — and it sits where `UNIT_CHANNELS` puts it, after the stroke.
+   */
   val SCALE_CHANNELS =
     listOf(
       "x",
       "y",
+      "theta",
+      "radius",
       "xOffset",
       "yOffset",
       "color",
       "fill",
       "stroke",
+      "time",
       "opacity",
       "fillOpacity",
       "strokeOpacity",
       "strokeWidth",
-      "size",
-      "shape",
       "strokeDash",
+      "size",
       "angle",
-      "theta",
-      "radius",
-      // The clock a chart is **animated** by is a scale like any other: a band over the column the
-      // frames run through, stepped at the frame rate. Nothing is drawn with it — it is read by the
-      // signals that advance the frame — which is why it is last, and why it has no guide.
-      "time",
+      "shape",
     )
 
   /**
