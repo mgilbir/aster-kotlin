@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A scale keeps only the properties its type has.** `parseScaleProperty` asks
+  `scaleTypeSupportProperty` of every property it is given, derived or stated, and drops the rest
+  with a warning — a `base` belongs to a logarithm, an `exponent` to a power, a `constant` to a
+  symlog, and the ends of a domain and a `clamp` need a continuous domain to be the ends of. The
+  gate existed here but half of upstream's cases were missing from it, and the pass that copies
+  *stated* scale properties wrote them straight into the component, going round it entirely. A
+  `{"zero": false}` on a temporal scale therefore reached Vega, which has no zero on a time scale;
+  fourteen of the wild corpus's specifications state a `base` on a scale that is not a logarithm.
+
 - **A title of no words is no title.** `assembleTitle` guards everything it does with
   `if (title.text)`, and the empty string is falsy, so `""` produces nothing. This wrote it out and
   reserved the space above the chart for a heading that says nothing — `""` being what a

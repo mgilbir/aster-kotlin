@@ -831,6 +831,19 @@ internal object Scales {
       "nice" -> continuous || type == "quantize" || type == "threshold"
       "zero" ->
         hasContinuousDomain(type) && type !in setOf("log", "time", "utc", "threshold", "quantile")
+      // The rest of `scaleTypeSupportProperty`, which had been left out. A `base` is a logarithm's
+      // and an `exponent` a power's; the ends of a domain and a `clamp` need a continuous one to be
+      // ends of.
+      "rangeMin",
+      "rangeMax" -> continuous || type in setOf("point", "band")
+      "domainMin",
+      "domainMid",
+      "domainMax",
+      "domainRaw",
+      "clamp" -> continuous
+      "exponent" -> type == "pow"
+      "base" -> type == "log"
+      "constant" -> type == "symlog"
       else -> true
     }
   }
@@ -957,8 +970,14 @@ internal object Scales {
 
     zero(view, channel, def, type, specifiedDomain)?.let { set("zero", bool(it)) }
 
-    // Anything else the specification stated on the scale passes through untouched.
+    // Anything else the specification stated on the scale passes through — as long as the scale's
+    // **type** has such a property. `parseScaleProperty` asks `scaleTypeSupportProperty` of every
+    // property it is given, stated or derived, and drops the ones that do not apply with a warning:
+    // `x-scale's "zero" is dropped as it does not work with time scale`. Passing them through
+    // instead put a `zero` on a time scale and a `base` on a linear one, which Vega ignores here
+    // and honours there.
     user?.fields?.forEach { (key, value) ->
+      if (!supportsProperty(type, key)) return@forEach
       // …except a **bound** on a temporal domain, which is an instant like any other end of one
       // and has to be written as the expression that builds it.
       if ((key == "domainMin" || key == "domainMax") && measuresTime(def)) {
