@@ -3384,6 +3384,7 @@ private class Compilation(
           else component.name()
         val existing = components[key]
         if (existing == null) {
+          parsed.explicitProperties += def.axis?.fields?.keys.orEmpty()
           components[key] = channel to parsed
         } else {
           val merged = existing.second
@@ -3413,7 +3414,18 @@ private class Compilation(
           // lifts its bucketing out into a transform, so its own axis says nothing about buckets,
           // while the line's still asks for a `%Y` format and a tick step a year wide. Taking the
           // first layer's answer for everything dropped both.
-          parsed.properties.forEach { (name, value) -> merged.set(name, value) }
+          //
+          // And a property the specification **stated** beats one this compiler derived, whichever
+          // layer states it. Filling only the gaps meant a layer writing `"axis": {"grid": false}`
+          // lost to an earlier layer that never mentioned gridlines — a quantitative position has
+          // them by default, so the earlier layer's silence became a decision.
+          val statedHere = def.axis?.fields?.keys.orEmpty()
+          parsed.properties.forEach { (name, value) ->
+            if (name in statedHere && name !in merged.explicitProperties) {
+              merged.override(name, value)
+              merged.explicitProperties += name
+            } else merged.set(name, value)
+          }
         }
       }
     }

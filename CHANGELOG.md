@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **An axis property one layer states settles the shared axis, whichever layer states it.**
+  `mergeAxisComponent` folds a shared axis property by property with `mergeValuesWithExplicit`, and
+  an explicit value beats a derived one; between two stated values the first still wins. Filling
+  only the gaps is right for two derived values and wrong the moment one was asked for — a layer
+  writing `"axis": {"grid": false}` lost to an earlier layer that never mentioned gridlines, whose
+  **silence** became a decision because a quantitative position has them by default.
+
 - **Every entry of a list channel breaks a composite mark's summary down by its own column.**
   `extractTransformsFromEncoding` walks the encoding with `forEach`, which spreads an array before
   it calls, so a `tooltip` naming four columns contributes four groupings. Reading only the

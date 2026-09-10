@@ -170,6 +170,17 @@ internal object Guides {
      */
     var explicitGrid: Boolean = false
 
+    /**
+     * The properties some view **stated**, which settle them for the merged axis.
+     *
+     * `mergeAxisComponent` folds a shared axis property by property with `mergeValuesWithExplicit`,
+     * and an explicit value beats a derived one whichever layer it arrives on. Filling only the
+     * gaps meant a layer that turns its gridlines off lost to an earlier layer that never mentioned
+     * them — a quantitative position has them by default, so the earlier layer's silence became a
+     * decision.
+     */
+    val explicitProperties: MutableSet<String> = mutableSetOf()
+
     fun set(name: String, value: VegaValue?) {
       if (value != null && !properties.containsKey(name)) properties[name] = value
     }
