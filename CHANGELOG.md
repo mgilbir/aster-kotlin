@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A scale and an axis are read by asking them for the properties scales and axes have.** Upstream
+  walks `NON_TYPE_DOMAIN_RANGE_VEGA_SCALE_PROPERTIES` and `AXIS_COMPONENT_PROPERTIES` and asks the
+  stated block for each, so a block holding anything else is never looked at. This copied the
+  block's own keys and forwarded them — the third and fourth time that shape has been found here,
+  after the mark's and the legend's property lists, and it fails the same way: a denylist cannot be
+  finished because what it has to exclude is every word nobody has written yet. What the wild corpus
+  carries is words from **older versions**, a `rangeStep` inside a scale (Vega-Lite 2) and an
+  `axisWidth` inside an axis (Vega-Lite 1), and one `{"scale": {"legend": false}}` — a legend
+  property misplaced inside the scale. Vega reported `PARSE_UNKNOWN_PROPERTY` for all three.
+
 - **A brush's two signals per channel are named from one set of claimed names.** `signalName` takes
   the *data* name from the field and the *visual* one from the channel, claims the data name first,
   and appends the first free counter to a name already taken. So the `_1` is not a property of the

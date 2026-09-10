@@ -837,6 +837,35 @@ internal object Scales {
    * output grows properties that Vega ignores on some scales and honours on others, which is the
    * worst of both: harmless here, wrong there, and invisible until it is wrong.
    */
+  /**
+   * `NON_TYPE_DOMAIN_RANGE_VEGA_SCALE_PROPERTIES`: every scale property read off the stated block.
+   *
+   * `SCALE_PROPERTIES` without the six that are settled elsewhere — the `type`, the `domain`, the
+   * `range` and its two ends, and the `scheme` — which is what upstream walks when it copies a
+   * scale's stated properties onto the component.
+   */
+  private val NON_TYPE_DOMAIN_RANGE_PROPERTIES =
+    listOf(
+      "domainMax",
+      "domainMin",
+      "domainMid",
+      "domainRaw",
+      "align",
+      "bins",
+      "reverse",
+      "round",
+      "clamp",
+      "nice",
+      "base",
+      "exponent",
+      "constant",
+      "interpolate",
+      "zero",
+      "padding",
+      "paddingInner",
+      "paddingOuter",
+    )
+
   private fun supportsProperty(type: String, property: String): Boolean {
     val continuous = type in setOf("linear", "log", "pow", "sqrt", "symlog", "time", "utc")
     return when (property) {
@@ -990,13 +1019,23 @@ internal object Scales {
 
     zero(view, channel, def, type, specifiedDomain)?.let { set("zero", bool(it)) }
 
-    // Anything else the specification stated on the scale passes through — as long as the scale's
-    // **type** has such a property. `parseScaleProperty` asks `scaleTypeSupportProperty` of every
-    // property it is given, stated or derived, and drops the ones that do not apply with a warning:
-    // `x-scale's "zero" is dropped as it does not work with time scale`. Passing them through
-    // instead put a `zero` on a time scale and a `base` on a linear one, which Vega ignores here
-    // and honours there.
-    user?.fields?.forEach { (key, value) ->
+    // The rest of what the specification stated on the scale, **asked for by name**:
+    //
+    //     for (const prop of NON_TYPE_DOMAIN_RANGE_VEGA_SCALE_PROPERTIES) {
+    //       parseScaleProperty(model, prop);
+    //     }
+    //
+    // and then only where the scale's *type* has such a property — `parseScaleProperty` asks
+    // `scaleTypeSupportProperty` of every property it is given, stated or derived, and drops the
+    // ones that do not apply with a warning: `x-scale's "zero" is dropped as it does not work with
+    // time scale`.
+    //
+    // Reading the block's **own keys** instead forwarded whatever else was written there. A
+    // `{"scale": {"legend": false}}` — a legend property misplaced inside the scale — reached Vega
+    // as a scale property, and so did `rangeStep`, which Vega-Lite had in version 2 and has not
+    // had since. Two specifications in the wild corpus carry one of those.
+    NON_TYPE_DOMAIN_RANGE_PROPERTIES.forEach { key ->
+      val value = user?.fields?.get(key) ?: return@forEach
       if (!supportsProperty(type, key)) return@forEach
       // …except a **bound** on a temporal domain, which is an instant like any other end of one
       // and has to be written as the expression that builds it.
@@ -1004,13 +1043,11 @@ internal object Scales {
         component.properties[key] = signalRef(instantExpression(value))
         return@forEach
       }
-      if (key !in setOf("type", "domain", "range", "scheme", "rangeMin", "rangeMax")) {
-        // `{"expr": …}` is a signal to Vega, which has no `expr` — a `domainRaw` written that way
-        // was read as an object and the scale left at its own domain.
-        val expression = (value as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }
-        component.properties[key] =
-          if (expression != null) signalRef(expression.string("expr").orEmpty()) else value
-      }
+      // `{"expr": …}` is a signal to Vega, which has no `expr` — a `domainRaw` written that way
+      // was read as an object and the scale left at its own domain.
+      val expression = (value as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }
+      component.properties[key] =
+        if (expression != null) signalRef(expression.string("expr").orEmpty()) else value
     }
   }
 

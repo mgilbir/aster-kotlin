@@ -464,7 +464,15 @@ internal object Guides {
 
     // `replaceExprRef`: an `{"expr": …}` written on a guide is a *signal* to Vega, which has no
     // `expr`. Passing it through left the property unread and the guide at its default.
-    user?.fields?.forEach { (key, value) ->
+    // What the specification stated on the axis, **asked for by name** — `for (const property of
+    // AXIS_COMPONENT_PROPERTIES) { … isAxisProperty(property) ? axis[property] : undefined }`. A
+    // block holding anything else is never looked at, so a word from an older Vega-Lite — an
+    // `axisWidth`, which version 1 had — is not forwarded to a Vega that has never heard of it.
+    // Reading the block's own keys did forward it: the same fault the mark's and the legend's
+    // property lists were fixed for, and a denylist cannot be finished because what it has to
+    // exclude is every word nobody has written yet.
+    for (key in AXIS_PROPERTIES) {
+      val value = user?.fields?.get(key) ?: continue
       // `normalizeAngle`: a turn is measured from zero, so a label the specification wrote at
       // minus forty-five degrees is a label at three hundred and fifteen.
       axis.properties[key] =
@@ -703,6 +711,98 @@ internal object Guides {
    * theme that writes either of them has written something Vega will not read. Upstream's list is
    * longer — `grid`, `format`, `tickCount` and the rest are here as rules of their own instead.
    */
+  /**
+   * `AXIS_PROPERTIES`: the properties an axis is **asked** for, in `AXIS_COMPONENT_PROPERTIES`
+   * order.
+   *
+   * `COMMON_AXIS_PROPERTIES_INDEX` together with the three Vega-Lite adds — `style`, `labelExpr`
+   * and `encoding` — and the loop that reads a stated axis walks exactly this list. It is an
+   * allowlist for the reason the mark's and the legend's are: a `gridCap` this compiler has never
+   * heard of still reaches Vega, and an `axisWidth` from Vega-Lite version 1 does not.
+   */
+  private val AXIS_PROPERTIES =
+    listOf(
+      "orient",
+      "aria",
+      "bandPosition",
+      "description",
+      "domain",
+      "domainCap",
+      "domainColor",
+      "domainDash",
+      "domainDashOffset",
+      "domainOpacity",
+      "domainWidth",
+      "format",
+      "formatType",
+      "grid",
+      "gridCap",
+      "gridColor",
+      "gridDash",
+      "gridDashOffset",
+      "gridOpacity",
+      "gridWidth",
+      "labelAlign",
+      "labelAngle",
+      "labelBaseline",
+      "labelBound",
+      "labelColor",
+      "labelFlush",
+      "labelFlushOffset",
+      "labelFont",
+      "labelFontSize",
+      "labelFontStyle",
+      "labelFontWeight",
+      "labelLimit",
+      "labelLineHeight",
+      "labelOffset",
+      "labelOpacity",
+      "labelOverlap",
+      "labelPadding",
+      "labels",
+      "labelSeparation",
+      "maxExtent",
+      "minExtent",
+      "offset",
+      "position",
+      "tickBand",
+      "tickCap",
+      "tickColor",
+      "tickCount",
+      "tickDash",
+      "tickDashOffset",
+      "tickExtra",
+      "tickMinStep",
+      "tickOffset",
+      "tickOpacity",
+      "tickRound",
+      "ticks",
+      "tickSize",
+      "tickWidth",
+      "title",
+      "titleAlign",
+      "titleAnchor",
+      "titleAngle",
+      "titleBaseline",
+      "titleColor",
+      "titleFont",
+      "titleFontSize",
+      "titleFontStyle",
+      "titleFontWeight",
+      "titleLimit",
+      "titleLineHeight",
+      "titleOpacity",
+      "titlePadding",
+      "titleX",
+      "titleY",
+      "translate",
+      "values",
+      "zindex",
+      "style",
+      "labelExpr",
+      "encoding",
+    )
+
   private val VL_ONLY_AXIS_PROPERTIES = listOf("labelExpr") + CONDITIONAL_AXIS_PARTS.keys
 
   /** Moves every conditional property onto the encode block of the part it paints. */
