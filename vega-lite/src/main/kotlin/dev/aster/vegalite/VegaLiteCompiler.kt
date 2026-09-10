@@ -3256,8 +3256,23 @@ private class Compilation(
         val contributed = ScaleComponent(channel, component.type, component.name())
         Scales.range(view, channel, def, component.type)?.let { contributed.set("range", it) }
         Scales.properties(view, channel, def, component.type, contributed)
+        // Which of them this view **stated**. A range is explicit where any of the four words that
+        // settle one was written: `parseScaleRange` records the whole property as explicit for
+        // `scheme` and the two ends as much as for `range` itself.
+        val statedKeys = def.scale?.fields?.keys.orEmpty()
+        val stated =
+          statedKeys +
+            if (statedKeys.any { it in setOf("range", "scheme", "rangeMin", "rangeMax") })
+              setOf("range")
+            else emptySet()
         contributed.properties.forEach { (key, value) ->
-          if (key !in component.properties) component.properties[key] = value
+          val explicitHere = key in stated
+          // `mergeValuesWithExplicit`: an explicit value beats a derived one whichever layer it
+          // arrives on, and between two of the same kind the first still wins.
+          if (explicitHere && key !in component.explicitProperties) {
+            component.properties[key] = value
+            component.explicitProperties += key
+          } else if (key !in component.properties) component.properties[key] = value
         }
         component.domainHasZero = Scales.domainHasZero(component)
       }

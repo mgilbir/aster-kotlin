@@ -25,6 +25,16 @@ internal class ScaleComponent(val channel: String, val type: String, private val
   var explicitDomain: Boolean = false
 
   /**
+   * The properties some view **stated**, which settle them for the whole scale.
+   *
+   * The same rule as [explicitDomain] and the same function behind it — `parseNonUnitScaleProperty`
+   * folds each property with `mergeValuesWithExplicit`, and an explicit value beats a derived one
+   * whichever layer it arrives on. Taking the first layer's answer for everything meant a colour
+   * range listed on the *second* member of a layer lost to the first member's default scheme.
+   */
+  val explicitProperties: MutableSet<String> = mutableSetOf()
+
+  /**
    * Whether the domain includes zero — `definitely`, `definitely-not`, or `maybe`.
    *
    * Three answers rather than two, because the third is the common one and it is *not* the same as

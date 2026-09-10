@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **A scale property one layer states settles the shared scale, whichever layer states it.**
+  `parseNonUnitScaleProperty` folds a shared scale property by property with
+  `mergeValuesWithExplicit`, and an explicit value beats a derived one; between two of the same kind
+  the first still wins. This took the first layer's answer for everything, so a colour range listed
+  on the **second** member of a layer lost to the first member's default scheme and the chart was
+  drawn in category colours the specification had replaced. A `scheme` counts as stating the range,
+  as do `rangeMin` and `rangeMax`.
+
 - **A weekday written beside a year and a month is dropped, and no longer moves the date.**
   `dateTimeParts` deletes a `day` whenever the object holds anything else, before it reads any of
   the rest — upstream's comment is "day only works as a standalone unit", a weekday being a position
