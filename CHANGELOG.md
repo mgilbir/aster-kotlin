@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A trellis's caption is written the way the column is typed, and the way its header says.**
+  `assembleLabelTitle` reads a `format` and a `formatType` off the header chain and hands them to
+  `formatSignalRef` — the same function a tooltip line goes through, whose third arm is `format ||
+  channelDefType === 'quantitative'`. This engine had the bucketed and temporal arms and not the
+  number one, so a grid split by a *measured* column captioned its cells with the raw value where
+  upstream writes `format(…, "")`; three specifications in the wild corpus. A stated format pulls
+  any column into that arm however it is typed, the specifier falls to `config.numberFormat`, and a
+  **custom** format type is the first arm of all — it calls the function the page registered rather
+  than `format`, with a specifier only where there is one to pass.
+
 - **A band scale's range is a step only where the size it is measured against is one.**
   `getDiscretePositionSize` is the specification's own `width` where it states one and the theme's
   discrete size otherwise, and `defaultRange` returns `{step}` only when that answer *is* a step. So

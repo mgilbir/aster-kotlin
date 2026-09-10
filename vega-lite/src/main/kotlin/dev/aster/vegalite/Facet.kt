@@ -51,6 +51,35 @@ private fun headerText(def: ChannelDef, field: String, config: Config? = null): 
       else Fields.fullDateSpecifier(locale)
     return "${prefix}Format($accessor, $specifier)"
   }
+  // `formatSignalRef` asks the header for a `format` and a `formatType` first —
+  // `getHeaderProperties(['format', 'formatType', …], facetFieldDef.header, config, channel)` — so
+  // a caption is written the way the header says however the column is typed.
+  //
+  // A **custom** format type is the name of a function the page registered rather than a specifier,
+  // and it is the first arm of all: `if (isCustomFormatType(formatType)) return
+  // formatCustomType(…)`.
+  val header = def.raw.obj("header")
+  val statedFormat =
+    (headerProperty(header, config, def.channel, "format") as? VegaValue.Str)?.value
+  val custom = (headerProperty(header, config, def.channel, "formatType") as? VegaValue.Str)?.value
+  if (custom != null) {
+    return if (statedFormat != null) "$custom($accessor, ${quoted(statedFormat)})"
+    else "$custom($accessor)"
+  }
+  // `} else if (format || channelDefType(fieldOrDatumDef) === 'quantitative') {` — a measured
+  // column is a number and is written as one, and so is any column the header states a format for.
+  // The specifier falls to `config.numberFormat`, and `config.numberFormatType` names a function to
+  // call instead of `format` — which is called *without* a specifier where there is none, a custom
+  // function taking one only if it was given.
+  if (statedFormat != null || def.type == MeasureType.QUANTITATIVE) {
+    val specifier = statedFormat ?: config?.numberFormat
+    val write = config?.numberFormatType
+    return when {
+      write != null && specifier != null -> "$write($accessor, ${quoted(specifier)})"
+      write != null -> "$write($accessor)"
+      else -> "format($accessor, ${quoted(specifier.orEmpty())})"
+    }
+  }
   return "isValid($accessor) ? $accessor : \"\"+$accessor"
 }
 
