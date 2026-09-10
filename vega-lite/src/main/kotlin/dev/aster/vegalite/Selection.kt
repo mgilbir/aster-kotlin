@@ -1631,6 +1631,14 @@ internal class Selection(
     // A change of *scale* rewrites the brush rather than clearing it: the trigger fires whenever a
     // scale it reads is rebuilt, and every channel whose data extent no longer matches its pixels
     // pushes the pixels back into step.
+    //
+    // The **visual** signal is the one inverted, and its name is [IntervalProjection]'s rather than
+    // the channel's: where the field and the channel are called the same thing — a brush over
+    // columns named `x` and `y`, which a hand-written specification often has — the data name is
+    // claimed first and the visual one becomes `«name»_x_1`. Spelling the name out here read the
+    // *data* signal through `invert`, so the trigger compared a data extent with itself and never
+    // fired, and a brush kept its pixels while the scale under it moved.
+    val named = intervalProjections(view).associateBy { it.channel }
     out += obj {
       put("name", "${name}_scale_trigger")
       put("value", VegaValue.EmptyObject)
@@ -1646,8 +1654,8 @@ internal class Selection(
               put(
                 "update",
                 projected.joinToString(" && ") { (channel, field) ->
-                  val data = "${name}_${Fields.varName(field)}"
-                  val pixels = "${name}_$channel"
+                  val data = named[channel]?.data ?: Fields.varName("${name}_$field")
+                  val pixels = named[channel]?.visual ?: "${name}_$channel"
                   val scale = quoted(view.scale(channel))
                   // The `+` coerces the two sides to numbers, which is only meaningful — and only
                   // correct — where the scale's domain is numeric: a band scale inverts to a
@@ -1730,7 +1738,10 @@ internal class Selection(
   ): List<VegaValue> {
     val out = mutableListOf<VegaValue>()
     for ((channel, field) in projected) {
-      val data = "${name}_${Fields.varName(field)}"
+      // `varName(`${name}_${suffix}`)` — the **join** is cleaned, not the field on its own. A
+      // column called `2020_21` starts with a digit, so cleaning it alone prefixes an underscore
+      // and the joined name comes out `grid__2020_21` where upstream writes `grid_2020_21`.
+      val data = Fields.varName("${name}_$field")
       val size = if (channel == "x") view.widthSignal else view.heightSignal
       val domain = "domain(${quoted(view.scale(channel))})"
       val type = view.scaleType(channel)
@@ -1938,15 +1949,38 @@ internal class Selection(
     val original = written.filter { channel ->
       view.spec.fieldDef(channel)?.let { it.aggregate == null && it.field != null } == true
     }
+    // `signalName` claims the names from **one** set as it walks, the data name of each projection
+    // before its visual one, and appends the first free counter to a name already taken:
+    //
+    //     let sg = varName(`${name}_${suffix}`);
+    //     for (let counter = 1; signals.has(sg); counter++) {
+    //       sg = varName(`${name}_${suffix}_${counter}`);
+    //     }
+    //
+    // So the suffix is not a property of the *visual* name at all: a brush over columns named `x`
+    // and `y` gives `brush_x` to the data and `brush_x_1` to the pixels, and a brush whose **y**
+    // reads a column called `x` gives `brush_x` to the x channel's pixels and `brush_x_1` to the y
+    // channel's data. Comparing each projection's two names to each other caught the first and not
+    // the second, and the chart then had two signals of one name.
+    val claimed = mutableSetOf<String>()
+    fun claim(suffix: String): String {
+      var chosen = Fields.varName("${name}_$suffix")
+      var counter = 1
+      while (!claimed.add(chosen)) {
+        chosen = Fields.varName("${name}_${suffix}_$counter")
+        counter++
+      }
+      return chosen
+    }
     return remapped.mapIndexed { index, (channel, field) ->
       val written = original.getOrNull(index) ?: channel
-      val data = Fields.varName("${name}_$field")
-      val visual = Fields.varName("${name}_$written")
+      val data = claim(field)
+      val visual = claim(written)
       IntervalProjection(
         channel = channel,
         written = written,
         field = field,
-        visual = if (visual == data) "${visual}_1" else visual,
+        visual = visual,
         data = if (geo) null else data,
       )
     }

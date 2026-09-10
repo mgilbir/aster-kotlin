@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **A brush's two signals per channel are named from one set of claimed names.** `signalName` takes
+  the *data* name from the field and the *visual* one from the channel, claims the data name first,
+  and appends the first free counter to a name already taken. So the `_1` is not a property of the
+  visual signal: a brush over columns called `x` and `y` gives `br_x` to the data and `br_x_1` to
+  the pixels, while a brush whose **y** reads a column called `x` gives `br_x` to the x channel's
+  pixels and `br_x_1` to the y channel's data. Comparing each projection's two names to each other
+  caught the first shape and not the second, so such a chart had two signals of one name. The scale
+  trigger also spelled the pixel name out by hand, so it inverted the *data* signal and compared an
+  extent with itself — the brush kept its pixels while the scale under it moved. Two specifications
+  in the wild corpus differ for that. A selection **bound to the scales** names its signals from the
+  same join, and cleaned the field alone: a column called `2020_21` starts with a digit, so the name
+  came out `grid__2020_21` where upstream writes `grid_2020_21`.
+
 - **A tooltip's lines come out in the order JavaScript iterates an object's keys.** `tooltipData`
   collects them into a plain object keyed by the caption, and both the tooltip and the chart's
   description read it back with `entries(data)` — `Object.keys`, whose order is *not* insertion
