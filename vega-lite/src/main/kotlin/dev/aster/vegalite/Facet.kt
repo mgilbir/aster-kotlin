@@ -95,6 +95,50 @@ internal fun headerProperty(
   return config?.raw?.obj("header")?.fields?.get(property)
 }
 
+/**
+ * `HEADER_TITLE_PROPERTIES_MAP` and its label twin: a header names its properties `titleFontSize`
+ * and a Vega title names them `fontSize`, so what reaches the caption is a **rename per part**.
+ *
+ * The two maps hold the same thirteen properties under their two prefixes, which is why they are
+ * one table here and asked for by prefix. `Padding` is the one whose new name is not its old one
+ * with the prefix taken off: a caption's padding is the title's `offset`, and it *replaces* the
+ * default offset rather than adding to it.
+ */
+internal val HEADER_PROPERTIES_MAP =
+  linkedMapOf(
+    "Align" to "align",
+    "Anchor" to "anchor",
+    "Angle" to "angle",
+    "Baseline" to "baseline",
+    "Color" to "color",
+    "Font" to "font",
+    "FontSize" to "fontSize",
+    "FontStyle" to "fontStyle",
+    "FontWeight" to "fontWeight",
+    "Limit" to "limit",
+    "LineHeight" to "lineHeight",
+    "Orient" to "orient",
+    "Padding" to "offset",
+  )
+
+/**
+ * `assembleHeaderProperties`: what a `header` block says about one part of a caption, renamed.
+ *
+ * @param part `"title"` for the heading over the grid, `"label"` for the caption on each cell.
+ */
+internal fun headerProperties(
+  header: VegaValue.Obj?,
+  config: Config?,
+  channel: String,
+  part: String,
+): Map<String, VegaValue> {
+  val out = LinkedHashMap<String, VegaValue>()
+  for ((suffix, name) in HEADER_PROPERTIES_MAP) {
+    headerProperty(header, config, channel, "$part$suffix")?.let { out[name] = it }
+  }
+  return out
+}
+
 internal class Facet(
   val channel: String,
   val def: ChannelDef,
@@ -129,30 +173,8 @@ internal class Facet(
   /** Whether this channel's captions belong to the trailing band rather than the leading one. */
   fun captionsInFooter(): Boolean = headerOrient("label") in setOf("bottom", "right")
 
-  fun headerProperties(part: String): Map<String, VegaValue> {
-    val header = def.raw.obj("header")
-    val renamed =
-      mapOf(
-        "Align" to "align",
-        "Anchor" to "anchor",
-        "Angle" to "angle",
-        "Baseline" to "baseline",
-        "Color" to "color",
-        "Font" to "font",
-        "FontSize" to "fontSize",
-        "FontStyle" to "fontStyle",
-        "FontWeight" to "fontWeight",
-        "Limit" to "limit",
-        "LineHeight" to "lineHeight",
-        "Orient" to "orient",
-        "Padding" to "offset",
-      )
-    val out = LinkedHashMap<String, VegaValue>()
-    for ((suffix, name) in renamed) {
-      headerProperty(header, config, channel, "$part$suffix")?.let { out[name] = it }
-    }
-    return out
-  }
+  fun headerProperties(part: String): Map<String, VegaValue> =
+    headerProperties(def.raw.obj("header"), config, channel, part)
 
   /** `column` grids horizontally, `row` vertically. */
   val isColumn: Boolean = channel == "column"
@@ -1012,29 +1034,21 @@ internal class FacetWrap(
 
   private val field: String = Fields.vgField(def)
 
-  /** `header.label…` as a text property: the caption on each cell is a header's label. */
-  private fun labelProperties(): Map<String, VegaValue> {
-    val header = def.raw.obj("header")
-    val renamed =
-      mapOf(
-        "labelAlign" to "align",
-        "labelAnchor" to "anchor",
-        "labelAngle" to "angle",
-        "labelBaseline" to "baseline",
-        "labelColor" to "color",
-        "labelFont" to "font",
-        "labelFontSize" to "fontSize",
-        "labelFontStyle" to "fontStyle",
-        "labelFontWeight" to "fontWeight",
-        "labelLimit" to "limit",
-        "labelLineHeight" to "lineHeight",
-      )
-    val out = LinkedHashMap<String, VegaValue>()
-    for ((stated, name) in renamed) {
-      headerProperty(header, config, "facet", stated)?.let { out[name] = it }
-    }
-    return out
-  }
+  /**
+   * `header.label…` as a text property: the caption on each cell is a header's label.
+   *
+   * The whole map, `labelOrient` and `labelPadding` included — the second of which is the caption's
+   * own `offset` and replaces the default. This held eleven of the thirteen and a wrapped trellis
+   * whose header moved its captions or spaced them out was drawn as though it had not.
+   */
+  private fun labelProperties(): Map<String, VegaValue> =
+    headerProperties(def.raw.obj("header"), config, "facet", "label")
+
+  /**
+   * `header.title…`: the heading over the whole grid, which takes the same map by its own prefix.
+   */
+  private fun titleProperties(): Map<String, VegaValue> =
+    headerProperties(def.raw.obj("header"), config, "facet", "title")
 
   private val domainData: String = named("facet_domain")
 
@@ -1163,7 +1177,17 @@ internal class FacetWrap(
               obj {
                 put("text", title.value)
                 put("style", "guide-title")
-                put("offset", num(titleOffset))
+                // `assembleHeaderProperties(config, facetFieldDef, channel,
+                // HEADER_TITLE_PROPERTIES,
+                // …)`: the heading is styled by the header's `title…` properties exactly as each
+                // cell's caption is by its `label…` ones. This wrote none of them, so a trellis
+                // sizing or colouring its heading — or `config.header.titleFontSize`, which sizes
+                // every heading in a document at once — was drawn with the default.
+                val properties = titleProperties()
+                properties.forEach { (key, value) -> put(key, value) }
+                // `config.header.titlePadding: 10`, carried here as a fallback rather than in a
+                // default configuration object, so a stated `titlePadding` stands instead of it.
+                if (!properties.containsKey("offset")) put("offset", num(titleOffset))
               },
             )
           }
@@ -1310,8 +1334,11 @@ internal class FacetWrap(
         put("frame", "group")
         // A wrapped facet captions its **cells**, so the header's *label* properties belong on the
         // cell's own title — a grid captions its bands with them instead.
-        labelProperties().forEach { (key, value) -> put(key, value) }
-        put("offset", num(titleOffset))
+        val properties = labelProperties()
+        properties.forEach { (key, value) -> put(key, value) }
+        // `config.header.labelPadding: 10`, which this compiler carries as a fallback rather than
+        // in a default configuration object — so a stated `labelPadding` is not overwritten by it.
+        if (!properties.containsKey("offset")) put("offset", num(titleOffset))
       },
     )
     put("style", style)

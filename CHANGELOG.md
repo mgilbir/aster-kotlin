@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A wrapped trellis's heading is styled by its header's `title…` properties.** `assembleTitleGroup`
+  ends with `assembleHeaderProperties(config, facetFieldDef, channel, HEADER_TITLE_PROPERTIES, …)`,
+  exactly as each cell's caption ends with the `label…` half of the same table. This wrote the
+  heading's text and offset and nothing else, so a trellis sizing or colouring its heading — or a
+  document setting `config.header.titleFontSize` to size every heading at once — was drawn with the
+  default. Three specifications in the wild corpus differed for it.
+
+  The two maps are the same thirteen properties under two prefixes and are now one table. The cell
+  caption's half was missing `labelOrient` and `labelPadding`, which are the two that *move* a
+  caption rather than restyle it, and the padding was being overwritten by the built-in default of
+  ten rather than standing instead of it.
+
 - **A tooltip line reads the column as written, not the column the aggregate wrote.**
   `addLineBreaksToTooltip` spells the definition's own field into the expression —
   `${expr}["${channelDef.field}"]` — and for an `order` channel that *counts* the rows there is no
