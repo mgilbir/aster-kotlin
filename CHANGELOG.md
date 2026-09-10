@@ -8,6 +8,12 @@ section here does not get released.
 
 ### Fixed
 
+- **`config.title` survives, holding its subtitle properties.** "Subtitle part can stay in
+  `config.title` since header titles do not use subtitle" — the paint has become the `group-title`
+  style, the placement the `group-subtitle` one and the six non-mark properties went onto the title
+  directive, and these seven stay for Vega's own title to read. This consumed the whole block, so a
+  theme setting `subtitleFont` had nowhere to say it and the subtitle was drawn in the title's face.
+
 - **`config.font` and `config.title` reach the styles they name.** `initConfig` lifts `font` out of
   the configuration and merges `fontConfig(font)` in its place — `text`, `guide-label`,
   `guide-title`, `group-title` and `group-subtitle` — *under* everything the specification wrote.

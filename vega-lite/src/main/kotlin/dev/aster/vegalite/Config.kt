@@ -240,6 +240,14 @@ internal class Config(
           subtitleStyle(value)?.let {
             styles["group-subtitle"] = merged(styles["group-subtitle"], it)
           }
+          // "subtitle part can stay in config.title since header titles do not use subtitle":
+          //
+          //     if (!isEmpty(subtitle)) { config.title = subtitle; } else { delete config.title; }
+          //
+          // So `config.title` **survives**, holding those seven properties and nothing else. This
+          // consumed the whole block, and a theme that set `subtitleFont` had nowhere to say it —
+          // the subtitle was drawn in the title's face.
+          subtitleProperties(value)?.let { out["title"] = it }
         }
         // `config.view` becomes the **`cell`** style, not a `view` one: "View's default style is
         // `cell`" — `stripAndRedirectConfig` renames it on the way through, and a chart that told
@@ -251,6 +259,31 @@ internal class Config(
 
     if (styles.isNotEmpty()) out["style"] = VegaValue.Obj(styles)
     return if (out.isEmpty()) null else VegaValue.Obj(out)
+  }
+
+  /**
+   * The `subtitle` half of `extractTitleConfig`: the seven properties that stay in `config.title`.
+   *
+   * A **header** title has no subtitle, which is why these are the part that does not become a
+   * style — Vega's title directive reads them from the configuration itself. Each is kept only
+   * where it is truthy, `...(subtitleColor ? {subtitleColor} : {})`.
+   */
+  private fun subtitleProperties(value: VegaValue): VegaValue.Obj? {
+    val block = value as? VegaValue.Obj ?: return null
+    val fields = LinkedHashMap<String, VegaValue>()
+    for (key in
+      listOf(
+        "subtitleColor",
+        "subtitleFont",
+        "subtitleFontSize",
+        "subtitleFontStyle",
+        "subtitleFontWeight",
+        "subtitleLineHeight",
+        "subtitlePadding",
+      )) {
+      block.fields[key]?.takeIf { it.isTruthy() }?.let { fields[key] = it }
+    }
+    return if (fields.isEmpty()) null else VegaValue.Obj(fields)
   }
 
   /** `mergeConfig`, for one style block: what the specification wrote wins, key by key. */
