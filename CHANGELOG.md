@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A theme naming the side a legend sits on decides which way it runs.** `getDirection` is
+  `legend.direction ?? legendConfig[…] ?? defaultDirection(orient, legendType)` with `orient` being
+  `legend.orient || config.legend.orient || 'right'`, so `config.legend.orient: "top"` turns every
+  key in the document horizontal — and a ramp's length follows the width rather than the height.
+  This read the channel's own orient alone, so such a chart came out with its keys stacked
+  vertically along the top edge; four specifications in the wild corpus. Two quirks are reproduced
+  rather than repaired: `legendType` is `'symbol'` or `'gradient'` and both are truthy, so the
+  ternary always reads `gradientDirection` and `symbolDirection` is never consulted at all; and
+  `config.legend.direction` takes no part in the direction measured here, settling only what Vega
+  draws from its own config block.
+
 - **A condition that states no value is still a rule, and falls to the mark's own.** `wrapCondition`
   builds one value ref per condition and spreads whatever the reference function answers into it —
   `{test: conditionalTest(c, …), ...conditionValueRef}` — and for a non-position channel that

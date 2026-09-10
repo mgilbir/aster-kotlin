@@ -526,21 +526,35 @@ internal object Guides {
    * sits: along the top or the bottom it runs horizontally, and a **gradient** does so in the inner
    * corners too. Everywhere else it is vertical, which is Vega's own default and so goes unsaid.
    */
-  private fun legendDirection(view: UnitView, def: ChannelDef, gradient: Boolean): String {
-    val stated =
-      def.legend?.string("direction") ?: view.config.raw.obj("legend")?.string("direction")
-    if (stated != null) return stated
-    val orient =
-      def.legend?.string("orient") ?: view.config.raw.obj("legend")?.string("orient") ?: "right"
-    return when (orient) {
-      "top",
-      "bottom" -> "horizontal"
-      "left",
-      "right",
-      "none" -> "vertical"
-      else -> if (gradient) "horizontal" else "vertical"
-    }
-  }
+  private fun legendDirection(
+    view: UnitView,
+    def: ChannelDef,
+    gradient: Boolean,
+    orient: String,
+  ): String? =
+    def.legend?.string("direction")
+      // `legendConfig[legendType ? 'gradientDirection' : 'symbolDirection']` — and `legendType` is
+      // `'symbol'` or `'gradient'`, **both truthy**, so the ternary always reads
+      // `gradientDirection` and `symbolDirection` is never consulted at all. A theme that turns its
+      // swatch columns sideways has to say `gradientDirection` to do it. Reproduced rather than
+      // repaired, this being what upstream emits.
+      //
+      // `config.legend.direction` is *not* one of the places asked: it settles the direction Vega
+      // draws the legend in, from Vega's own config block, and takes no part in the length measured
+      // here.
+      ?: view.config.raw.obj("legend")?.string("gradientDirection")
+      // `defaultDirection`: along the top or the bottom of a chart a legend runs horizontally, and
+      // everywhere else it keeps Vega's own vertical — which is why this answers **null** rather
+      // than `"vertical"`. An *inner* legend, one at a corner, is laid out compactly "like
+      // Tableau", but only as a ramp: a column of swatches is compact already.
+      ?: when (orient) {
+        "top",
+        "bottom" -> "horizontal"
+        "left",
+        "right",
+        "none" -> null
+        else -> if (gradient) "horizontal" else null
+      }
 
   /**
    * `defaultLabelAlign`, written out for an angle nobody can read yet.
@@ -1011,6 +1025,12 @@ internal object Guides {
     // *derived* value here as well would settle it for this legend alone and beat the theme with a
     // default. A value the specification stated on the channel is explicit and still wins.
     val themed = view.config.raw.obj("legend")?.fields.orEmpty()
+    // The side the legend sits on — `legend.orient || config.legend.orient || 'right'`, which is
+    // what `getDirection` and `defaultGradientLength` are both measured against.
+    val legendOrient =
+      def.legend?.string("orient") ?: view.config.raw.obj("legend")?.string("orient") ?: "right"
+    /** Which way the legend runs — [legendDirection], asked once for both the uses it has. */
+    val legendRuns = legendDirection(view, def, gradient, legendOrient)
     return obj {
       /** A value this compiler worked out, which the theme outranks. */
       fun derived(key: String, value: VegaValue) {
@@ -1076,10 +1096,8 @@ internal object Guides {
         // A horizontal ramp beside the plot, or placed by hand with `orient: "none"`, has no width
         // to follow — it is simply the shortest a horizontal ramp may be. A vertical one follows
         // the height wherever it sits, there being a height either way.
-        val horizontal = legendDirection(view, def, gradient) == "horizontal"
-        val orient =
-          def.legend?.string("orient") ?: view.config.raw.obj("legend")?.string("orient") ?: "right"
-        val alongThePlot = !horizontal || orient == "top" || orient == "bottom"
+        val horizontal = legendRuns == "horizontal"
+        val alongThePlot = !horizontal || legendOrient == "top" || legendOrient == "bottom"
         val measure = if (horizontal) view.sizeSignal("x") else view.sizeSignal("y")
         val shortest = if (horizontal) 100 else 64
         if (alongThePlot) derived("gradientLength", signalRef("clamp($measure, $shortest, 200)"))
@@ -1098,19 +1116,23 @@ internal object Guides {
       // theme that turns captions off.
       val titled = def.legend?.fields?.get("title") != null || def.explicitTitle != null
       Fields.title(def, view.config)?.let { if (titled) put("title", it) else derived("title", it) }
+      // `getDirection`:
+      //
+      //     legend.direction
+      //       ?? legendConfig[legendType ? 'gradientDirection' : 'symbolDirection']
+      //       ?? defaultDirection(orient, legendType)
+      //
       // A legend along the top or bottom of a chart runs **horizontally**; Vega's own default is
-      // vertical, and every other orientation keeps it — `defaultDirection`, with the inner
-      // corners taking it only for a gradient.
-      // Written out only where the *legend itself* settles it: a direction the configuration
-      // states is already in Vega's own config block, and repeating it here would say it twice.
-      when (def.legend?.string("orient")) {
-        "top",
-        "bottom" -> derived("direction", str("horizontal"))
-        "left",
-        "right",
-        "none",
-        null -> Unit
-        else -> if (gradient) derived("direction", str("horizontal"))
+      // vertical, and left, right and `none` keep it. An *inner* legend — one at a corner — is laid
+      // out compactly "like Tableau", but only as a ramp, a column of swatches being compact
+      // already.
+      //
+      // The side is [legendOrient]: the channel's, then the **theme's**, then Vega's own right.
+      // Reading only the channel's left a chart whose theme says `config.legend.orient: "top"` with
+      // its keys stacked vertically along the top edge, which is four specifications in the wild
+      // corpus.
+      if (def.legend?.fields?.get("direction") == null) {
+        legendRuns?.let { derived("direction", str(it)) }
       }
       // `labelExpr` is **not** a Vega legend property, exactly as it is not a Vega axis property:
       // upstream's `assembleLegend` destructures it out of the component and writes
