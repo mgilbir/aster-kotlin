@@ -1173,16 +1173,15 @@ internal class DataAssembler {
 
   /** The format the source node holds of its own accord, before anything is merged into it. */
   private fun ownFormat(data: VegaValue): VegaValue.Obj? {
-    // A stated `parse` is not the *loader's* work on a table written out in the specification:
-    // Vega has already ingested those rows, so the parse joins the flow's own and becomes a
-    // formula there. Only what is left of the format block belongs on the source.
+    // `format = data.format ? {...omit(data.format, ['parse'])} : {}` — the stated `parse` is
+    // **never** the source node's, whatever the table is. It belongs to the parse node, which
+    // decides where its work lands: back onto `format.parse` where it sits directly under the
+    // source, and into a formula where a transform stands between. Copied across instead, a null
+    // entry — the way a specification says *do not* parse a column — reached Vega as an instruction
+    // to parse it as `null`.
     val declared =
       data.obj("format")?.let { format ->
-        if (data.string("url") != null) format
-        else
-          VegaValue.Obj(format.fields.filterKeys { it != "parse" }).takeIf {
-            it.fields.isNotEmpty()
-          }
+        VegaValue.Obj(format.fields.filterKeys { it != "parse" }).takeIf { it.fields.isNotEmpty() }
       }
     val url = data.string("url") ?: return declared
     val type =

@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **`"parse": {"«field»": null}` says *do not* parse a column, and takes the implied parse with it.**
+  The stated `parse` belongs to the parse node rather than to the source — `format = data.format ?
+  {...omit(data.format, ['parse'])} : {}` — and the node decides where its work lands: back onto
+  `format.parse` where it sits directly under the source, into a formula where a transform stands
+  between. This copied a url's `format` across whole, so a `null` entry reached Vega as an
+  instruction to parse a column *as null*. The null is not merely dropped either: it is kept in the
+  ancestor's record so nothing below adds a parse for that field, and only then left out of the
+  node, so a temporal column told not to be parsed is not parsed at all. Three specifications in the
+  wild corpus write one.
+
 - **A trellis's stated `bounds`, `align` and `center` outrank the defaults computed beside them.**
   `assembleLayout` is `{padding: spacing, ...this.assembleDefaultLayout(), ...layout}`, where
   `layout` is `extractCompositionLayout(spec, 'facet', config)` — so `"bounds": "flush"` gets it,

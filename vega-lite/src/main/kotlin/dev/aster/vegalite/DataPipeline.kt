@@ -360,12 +360,31 @@ internal class DataPipeline(
     // and an explicit parse wins over one this compiler inferred — `Split(explicit, implicit)`.
     // On a table written out in the specification Vega has already ingested the rows, so this is
     // a formula like any other rather than an instruction to the loader.
-    view.spec.data
-      ?.takeIf { it.string("url") == null }
-      ?.obj("format")
-      ?.obj("parse")
-      ?.fields
-      ?.forEach { (field, kind) -> (kind as? VegaValue.Str)?.let { parse[field] = it.value } }
+    //
+    // For a table read from a **url** as much as for one written out: `ParseNode.makeExplicit`
+    // asks `model.data.format.parse` whatever the table is, and the node then decides where its
+    // work lands — `format.parse` on the loader where it sits directly under the source, a formula
+    // where it does not. The source node itself carries `omit(data.format, ['parse'])`, so a url's
+    // parse reaches Vega through the node rather than by being copied across.
+    view.spec.data?.obj("format")?.obj("parse")?.fields?.forEach { (field, kind) ->
+      when (kind) {
+        is VegaValue.Str -> parse[field] = kind.value
+        // `"parse": {"«field»": null}` is how a specification says **do not** parse a column.
+        // Upstream keeps the null in the ancestor's record — so nothing below adds a parse for
+        // that field — and then copies only the non-null parses into the node itself:
+        // ```js
+        // // copy only non-null parses
+        // for (const key of keys(parse.combine())) {
+        //   const val = parse.get(key);
+        //   if (val !== null) { p[key] = val; }
+        // }
+        // ```
+        // Written out, it asked Vega's loader to parse a column as `null`, which it reported and
+        // then ignored.
+        VegaValue.Null -> parse.remove(field)
+        else -> {}
+      }
+    }
     // A column a transform computed is *derived*: it has the type its transform gave it, and the
     // loader has never seen it.
     parse.keys.removeAll(
