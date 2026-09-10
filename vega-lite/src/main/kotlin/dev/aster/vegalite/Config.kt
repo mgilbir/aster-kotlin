@@ -138,6 +138,32 @@ internal class Config(
    * the rest, since Vega has never heard of them and would apply nothing.
    */
   fun axisConfigChain(channel: String, scaleType: String, orient: String): List<VegaValue.Obj> {
+    val (vegaLiteOnly, vega) = axisConfigFamilies(channel, scaleType, orient)
+    return vegaLiteOnly + vega
+  }
+
+  /**
+   * [axisConfigChain], split into the two families `getAxisConfigs` keeps apart.
+   *
+   * ```js
+   * const vlOnlyConfigTypes = [...typeBasedConfigTypes, ...typeBasedConfigTypes.map((c) => axisChannel + c.substr(4))];
+   * const vgConfigTypes = ['axis', axisOrient, axisChannel];
+   * ```
+   *
+   * The distinction decides what reaches the axis. A property stated in a block **Vega** knows —
+   * `config.axis`, `config.axisX`, `config.axisBottom` — is left off the axis so that Vega applies
+   * it from its own config block, which is the only way it can settle every axis at once. One
+   * stated in a block only *Vega-Lite* knows — `config.axisQuantitative` and its per-direction
+   * twins, named after a kind of scale rather than a place — has to be written onto the axis, since
+   * nothing downstream would apply it.
+   *
+   * @return the Vega-Lite-only blocks first, then Vega's own; each most specific first.
+   */
+  fun axisConfigFamilies(
+    channel: String,
+    scaleType: String,
+    orient: String,
+  ): Pair<List<VegaValue.Obj>, List<VegaValue.Obj>> {
     val typeBased =
       when {
         scaleType == "band" -> listOf("Band", "Discrete")
@@ -147,11 +173,9 @@ internal class Config(
         else -> emptyList()
       }
     val axisChannel = if (channel == "x") "axisX" else "axisY"
-    val names =
-      typeBased.map { axisChannel + it } +
-        typeBased.map { "axis$it" } +
-        listOf(axisChannel, "axis${orient.replaceFirstChar { it.uppercase() }}", "axis")
-    return names.mapNotNull { user.obj(it) }
+    val vegaLiteOnly = typeBased.map { axisChannel + it } + typeBased.map { "axis$it" }
+    val vega = listOf(axisChannel, "axis${orient.replaceFirstChar { it.uppercase() }}", "axis")
+    return vegaLiteOnly.mapNotNull { user.obj(it) } to vega.mapNotNull { user.obj(it) }
   }
 
   /** `config.style.<name>`, which a mark's `style` list pulls in as well as its own block. */

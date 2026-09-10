@@ -238,14 +238,39 @@ internal object Guides {
     // ones Vega has never heard of, so a theme that turns its horizontal labels upright or takes
     // every caption off is read here and not just where a conditional value is.
     val configuredSide = user?.string("orient") ?: if (channel == "x") "bottom" else "left"
-    val axisConfigs = view.config.axisConfigChain(channel, type, configuredSide)
+    val (vegaLiteOnlyConfigs, vegaConfigs) =
+      view.config.axisConfigFamilies(channel, type, configuredSide)
+    val axisConfigs = vegaLiteOnlyConfigs + vegaConfigs
     fun configured(name: String): VegaValue? = axisConfigs.firstNotNullOfOrNull { it.fields[name] }
+    // `configFrom === 'vgAxisConfig'`: a property the theme states in a block **Vega** knows is
+    // left off the axis, so that Vega applies it from its own config block — writing a *derived*
+    // value here as well would settle it for this axis alone, and settle it with a default. One
+    // stated in a Vega-Lite-only block has to be written out instead, there being nothing else to
+    // apply it, and so does one of `propsToAlwaysIncludeConfig`.
+    fun themedByVega(name: String): Boolean =
+      vegaLiteOnlyConfigs.none { it.fields.containsKey(name) } &&
+        vegaConfigs.any { it.fields.containsKey(name) }
     // `config.axis.disable` turns every axis off at once, which is how a chart made of shapes
     // rather
     // than of measurements says it has no axes at all. A channel's own `axis` block is the explicit
     // statement and outranks it either way.
     if (def.axis == null && configured("disable") == VegaValue.Bool(true)) return null
     val axis = AxisComponent(channel)
+
+    /**
+     * A value this compiler worked out, which a theme Vega can read outranks — see [themedByVega].
+     */
+    fun derived(name: String, value: VegaValue) {
+      val themed = configured(name)
+      when {
+        themed == null -> axis.set(name, value)
+        // `else if (!(configFrom === 'vgAxisConfig')) axisComponent.set(property, configValue,
+        // false)`: a block only Vega-Lite knows has to be written **out**, there being nothing
+        // downstream that would apply it.
+        !themedByVega(name) -> axis.set(name, asSignal(themed))
+        else -> Unit
+      }
+    }
 
     axis.set("scale", str(view.scale(channel)))
     axis.explicitOrient = user?.fields?.get("orient") != null
@@ -352,7 +377,8 @@ internal object Guides {
       // `normalizeAngle`: an angle is a turn from zero, so a label at minus forty-five degrees is
       // a label at three hundred and fifteen — the two draw alike and compare as different numbers.
       val angle = ((labelAngle % 360) + 360) % 360
-      if (statedAngle != null || themeAngle == null) axis.set("labelAngle", num(angle))
+      if (statedAngle != null) axis.set("labelAngle", num(angle))
+      else derived("labelAngle", num(angle))
       // An **orient** the specification drives from a parameter cannot be compared here either: the
       // side the axis will be drawn on is not known until the reader picks it, so the alignment is
       // written as the comparison and handed to Vega, on the labels' own encode block.
@@ -372,23 +398,20 @@ internal object Guides {
         // the component. It is what stops a layer beside it — one whose labels are turned, and so
         // aligned to their right — from supplying an alignment for the whole axis. `assembleAxis`
         // then drops it rather than writing it out.
-        axis.set(
-          "labelAlign",
-          labelAlign(angle, channel, side)?.let { str(it) } ?: VegaValue.Null,
-        )
+        derived("labelAlign", labelAlign(angle, channel, side)?.let { str(it) } ?: VegaValue.Null)
       }
       // The **normalised** angle, as `defaultLabelAngle` hands it to both of these: the label at
       // minus ninety degrees that is written out as two hundred and seventy has to be *compared* as
       // two hundred and seventy too. `225 < angle && angle < 315` is how a vertical label on the
       // bottom axis earns `baseline: "middle"`, and minus ninety satisfies neither that nor the
       // arm above it, so such a label was anchored by its top instead.
-      labelBaseline(angle, channel, side)?.let { axis.set("labelBaseline", str(it)) }
+      labelBaseline(angle, channel, side)?.let { derived("labelBaseline", str(it)) }
     }
 
     if (
       channel == "x" && (def.type == MeasureType.QUANTITATIVE || def.type == MeasureType.TEMPORAL)
     ) {
-      axis.set("labelFlush", bool(true))
+      derived("labelFlush", bool(true))
     }
 
     // A continuous axis may drop labels that would overlap; a nominal one may not, because a reader
@@ -405,7 +428,7 @@ internal object Guides {
       def.timeUnit != null && def.sort !is VegaValue.Obj && def.sort !is VegaValue.Arr
     if (timeUnitLabels || (def.type != MeasureType.NOMINAL && def.type != MeasureType.ORDINAL)) {
       val greedy = type == "log" || type == "symlog"
-      axis.set("labelOverlap", if (greedy) str("greedy") else bool(true))
+      derived("labelOverlap", if (greedy) str("greedy") else bool(true))
     }
 
     // Labels for a bucketed instant, and a tick step no finer than the bucket.
@@ -436,7 +459,7 @@ internal object Guides {
     // `isDiscrete` counts a **binned** field too: its buckets are categories, and a binned heatmap
     // fills them as completely as a categorical one does.
     if (view.spec.mark == "rect" && (def.type?.isDiscrete == true || def.bin != null)) {
-      axis.set("zindex", num(1))
+      derived("zindex", num(1))
     }
 
     // `replaceExprRef`: an `{"expr": …}` written on a guide is a *signal* to Vega, which has no

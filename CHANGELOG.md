@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **An axis property the theme states in a block Vega knows is left off the axis.** `config.axis`,
+  `config.axisX` and `config.axisBottom` all go out in Vega's own config block and Vega applies them
+  from there to every axis at once, so writing a *derived* value onto this axis as well would settle
+  the property for it alone — and settle it with a default. A theme asking for `labelOverlap: false`
+  was overruled by the `true` this compiler had worked out. The **Vega-Lite-only** blocks are the
+  other half: `config.axisQuantitative` and its per-direction twins are named after a kind of scale
+  rather than a place, Vega has never heard of them, and their values are therefore written onto the
+  axis instead. That is the axis half of the legend rule above. One arm is still not ported —
+  `propsToAlwaysIncludeConfig` has the theme's value written out even from a Vega block, where this
+  compiler writes its own derived one.
+
 - **A legend property the theme states is not written onto the legend at all.**
   `parseLegendForChannel` guards every property it sets with `if (explicit || config.legend[property]
   === undefined)`: `config.legend` goes out beside the chart in Vega's own config block and Vega
