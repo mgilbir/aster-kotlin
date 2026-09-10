@@ -1927,9 +1927,16 @@ private class Compilation(
       // A plot inside a composition is still a unit or a layer, so its own title frames the group
       // — unless it is a **grid**, which is a composition itself and anchors its title to the
       // start rather than framing a plotting area it does not have.
-      plot.spec.fields["title"]?.let {
-        put("title", titleFor(it, composed = plot.facet != null))
-      }
+      //
+      // And a plot that is a **layer** promotes a title from one of its members, exactly as the
+      // chart does: `LayerModel.assembleTitle` is the same function whether the layer is the whole
+      // chart or one plot of a concatenation. Reading only the plot's own title left a
+      // concatenation of layers untitled, cell by cell, with the captions written on the layers
+      // that carry the text marks.
+      val title =
+        plot.spec.fields["title"]?.let { titleFor(it, composed = plot.facet != null) }
+          ?: layerTitle(plot.spec)
+      title?.let { put("title", it) }
       if (plot.facet == null) put("style", style(plot.views))
       // A **grid** has no plotting area to size: its layout places the cells, and the size the
       // plot's name carries is one cell's.

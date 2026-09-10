@@ -8,6 +8,12 @@ section here does not get released.
 
 ### Fixed
 
+- **A plot that is a layer titles its group from one of its members.** `LayerModel.assembleTitle` is
+  the same function whether the layer is the whole chart or one plot of a concatenation, so a
+  concatenated layer whose caption sits on the member carrying the text mark is captioned by it.
+  Reading only the plot's own title left a small-multiples chart untitled cell by cell — which is how
+  Altair writes one.
+
 - **A bucketed column reads as its span wherever it is read.** `formatSignalRef` works the far edge
   of a bin out itself rather than being handed one, so no caller has to say so. A `tooltip` written
   as a **list** goes through a different path here from the channels' own, and that path passed
