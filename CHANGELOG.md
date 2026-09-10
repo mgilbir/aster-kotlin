@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **`align`, `baseline` and `theta` belong to a mark made of words.** Every mark compiler hands
+  `baseEncodeEntry` an `ignore` argument, and across all thirteen of them these three are the only
+  entries that differ: `text.ts` says `include` and the other twelve say `ignore`, a mark that is
+  not words having nothing to anchor. This applied only the arc's `theta` exception and forwarded
+  the rest, so a hand-written `{"type": "line", "align": false}` reached Vega as a channel a line has
+  no use for. `radius` is nobody's exception and still goes out on any mark.
+
 - **A `sort` upstream does not recognise orders nothing.** `domainSort` is a chain of arms — an
   array, a sort field, a sort by encoding, `"descending"`, then `ascending`-or-nothing — and
   anything failing all of them falls out of the bottom as `undefined`, leaving the domain in

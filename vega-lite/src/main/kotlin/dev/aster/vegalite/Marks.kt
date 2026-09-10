@@ -759,10 +759,16 @@ internal object Marks {
       // would forward `fontsize` verbatim to a Vega that has never heard of it.
       if (key !in VG_MARK_PROPERTIES) continue
       if (key in VL_ONLY_MARK_PROPERTIES) continue
-      // An **arc** ignores `theta` — `baseEncodeEntry(model, {theta: 'ignore'})` — and Vega has no
-      // `theta2` or `radius2` on any mark, so those three are written above under Vega's own names
-      // instead. `radius` is a Vega property and goes out under its own name as well.
-      if (view.spec.mark == "arc" && key in setOf("theta", "theta2", "radius2")) continue
+      // The per-mark `ignore` argument every mark compiler passes to `baseEncodeEntry`. Across all
+      // thirteen of them `align`, `baseline` and `theta` are `'include'` on a **text** mark and
+      // `'ignore'` everywhere else — text is the only mark with words to anchor — so
+      // `{"type": "line", "align": false}` puts a channel on a line that Vega has no use for.
+      //
+      // This covers the arc's `theta`, which upstream also ignores and which is written out under
+      // Vega's own `startAngle` instead. `theta2` and `radius2` need no arm here: Vega has them on
+      // no mark at all, so [VG_MARK_PROPERTIES] never lets them through. `radius` is a Vega
+      // property on every mark and goes out under its own name.
+      if (key in TEXT_ONLY_MARK_PROPERTIES && view.spec.mark != "text") continue
       // `{"expr": …}` is Vega-Lite's way of writing a signal, and Vega's is `{"signal": …}` — and
       // a signal is a *reference*, not a value, so it replaces the whole entry rather than sitting
       // inside one.
@@ -863,6 +869,16 @@ internal object Marks {
       "url",
       "smooth",
     )
+
+  /**
+   * `align`, `baseline`, `theta`: the three the mark compilers include for **text** and ignore for
+   * everything else.
+   *
+   * Each of the thirteen compilers passes `baseEncodeEntry` an `ignore` argument, and these are the
+   * only entries that differ between them — `text.ts` alone says `'include'`. A mark that is not
+   * words has nothing to anchor, and Vega has no use for the channel on one.
+   */
+  private val TEXT_ONLY_MARK_PROPERTIES = setOf("align", "baseline", "theta")
 
   private val VL_ONLY_MARK_PROPERTIES =
     setOf(
