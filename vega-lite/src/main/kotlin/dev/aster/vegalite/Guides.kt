@@ -133,6 +133,23 @@ internal object Guides {
     }
 
     /**
+     * Whether some view **stated** that this axis has no caption.
+     *
+     * ```js
+     * if (v1Val == null || v2Val === null) {
+     *   return {explicit: v1.explicit, value: null};
+     * }
+     * ```
+     *
+     * A stated title outranks a derived one — `mergeValuesWithExplicit` prefers the explicit side —
+     * and a stated `null` outranks another stated title as well: `mergeTitleComponent` answers
+     * `null` for either side being it, whatever the other says. So one layer of a chart saying its
+     * axis has no caption takes the caption off the axis, and not merely off its own contribution
+     * to it, which is how a layer added to a titled chart leaves the titling to the chart.
+     */
+    var nulledTitle: Boolean = false
+
+    /**
      * Whether the specification named this axis's title itself.
      *
      * An **explicit** title short-circuits the merge, across layers as well as across the two ends
@@ -331,6 +348,7 @@ internal object Guides {
       if (guideTitle != null) listOf(guideTitle)
       else if (themeTitle != null) listOfNotNull(themeTitle.takeIf { it !is VegaValue.Null })
       else listOfNotNull(def.explicitTitle, secondary?.explicitTitle)
+    if (guideTitle is VegaValue.Null) axis.nulledTitle = true
     if (themeTitle is VegaValue.Null) {
       axis.explicitTitle = true
     } else if (stated.isNotEmpty()) {
@@ -989,7 +1007,8 @@ internal object Guides {
         // to. Two layers naming one column differently, one bucketed and one not, say its name
         // twice, and upstream writes it twice.
         val lines = axis.lines
-        if (lines != null) put("title", lines)
+        if (axis.nulledTitle) Unit
+        else if (lines != null) put("title", lines)
         else
           axis.titles
             .filter { it.isNotEmpty() }

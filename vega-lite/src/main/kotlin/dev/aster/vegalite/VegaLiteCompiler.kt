@@ -3723,6 +3723,10 @@ private class Compilation(
           // is no tie-breaker that could put it back.
           if (parsed.disabled) merged.disabled = true
           if (parsed.explicitGrid) merged.explicitGrid = true
+          // A layer stating that the axis has no caption says so for the axis, whichever side of
+          // the merge it arrives on — `mergeTitleComponent` answers `null` for either side being
+          // it, whatever the other side says.
+          if (parsed.nulledTitle) merged.nulledTitle = true
           when {
             // An explicit title wins outright rather than joining: a layer that names its axis has
             // said what the axis measures, and the other layer's derived name adds nothing.

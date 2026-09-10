@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **A stated `"title": null` on any layer takes the caption off the whole axis.** Two layers over one
+  axis each contribute a title and upstream joins them with a comma — a shared axis says what it is
+  showing — but a **null** is not a contribution to join: it is the statement that this axis has no
+  caption, and `mergeTitleComponent` answers `null` for either side being it, whatever the other
+  says. That is how a layer added to a titled chart leaves the titling to the chart. This engine took
+  the null as its own view's contribution and kept the sibling's, so such an axis came out captioned
+  with the other layer's field. One specification in the wild corpus differs for that.
+
 - **An axis reads the style blocks it names.** `getAxisConfig` asks `config.style` for the blocks the
   axis named *before* any configuration family, which is how a document keeps its axis styling in one
   place and points an axis at it by name — and the only way to reach a property no family can state,
