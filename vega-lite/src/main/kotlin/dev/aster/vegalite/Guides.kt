@@ -191,7 +191,16 @@ internal object Guides {
     hasOtherPosition: Boolean,
     diagnostics: DiagnosticCollector,
   ): AxisComponent? {
-    if (def.axisDisabled) return null
+    // A disabled axis is still a **component**, and still takes part in the merge:
+    //
+    //     const disable = axis !== undefined ? !axis : getAxisConfig('disable', …).configValue;
+    //     axisComponent.set('disable', disable, axis !== undefined);
+    //     if (disable) { return axisComponent; }
+    //
+    // `axis !== undefined` makes a stated `"axis": null` an *explicit* decision, and an explicit
+    // value beats every sibling's. One layer of a chart turning an axis off turns it off for the
+    // scale, and returning nothing at all here let the other layers put it back.
+    if (def.axisDisabled) return AxisComponent(channel).also { it.disabled = true }
     val user = def.axis
     // The blocks a theme may write this axis in, most specific first — `config.axisX` as much as
     // `config.axis`. `getAxisConfig` asks the same chain for **every** axis property, not only the

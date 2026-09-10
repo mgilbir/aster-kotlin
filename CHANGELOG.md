@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **An axis one layer switches off is switched off for the scale.** `parseAxis` keeps a disabled
+  axis as a component rather than answering nothing, because `"axis": null` is an *explicit*
+  decision and an explicit value beats every sibling's in the merge. This returned nothing for such
+  a layer, so it did not contribute and the other layers put the axis back — a chart whose first
+  layer draws its own time axis and whose later layers share the scale came out with an axis
+  upstream does not draw.
+
 - **A `description` channel says what a mark is read out as.** `description()` has four arms — the
   channel, the mark's own or the theme's, `config.aria: false`, and only then the summary assembled
   from every encoded field. Just the last was implemented here, so a channel written precisely to

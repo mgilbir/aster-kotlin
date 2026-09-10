@@ -3360,6 +3360,10 @@ private class Compilation(
           components[key] = channel to parsed
         } else {
           val merged = existing.second
+          // An axis one layer switched off is switched off for the scale, whichever side of the
+          // merge it arrives on: `mergeValuesWithExplicit` keeps the explicit `disable` and there
+          // is no tie-breaker that could put it back.
+          if (parsed.disabled) merged.disabled = true
           when {
             // An explicit title wins outright rather than joining: a layer that names its axis has
             // said what the axis measures, and the other layer's derived name adds nothing.
@@ -3385,6 +3389,9 @@ private class Compilation(
         }
       }
     }
+    // `if (disable) return axisComponent`, read on the way out: the component took part in the
+    // merge and has nothing to assemble.
+    components.entries.removeAll { it.value.second.disabled }
     faceOff(components.values.toList())
     // Which axes will fall back to a *name* for the extent they draw their grid across:
     // `assembleAxisSignals` asks each component without a `gridScale`, and a plot inside a
