@@ -314,7 +314,13 @@ internal class DataPipeline(
     parse.putAll(
       Transforms(diagnostics, selections = view.selections).implicitParses(view.spec.transforms)
     )
-    for ((_, def) in view.spec.encoding) {
+    // `forEach(this.getMapping(), …)` walks a **list** channel entry by entry — a tooltip naming
+    // four columns is four definitions, not one — and `getFieldDef` reaches into a `condition`.
+    // Reading only the channel's own definition left every column after the first unparsed, so a
+    // tooltip's second nested field was looked for under a name no row has.
+    val everyDefinition =
+      view.spec.encoding.values.flatMap { listOf(it) + it.siblings + it.conditions }
+    for (def in everyDefinition) {
       val field = def.field
       if (!def.isFieldDef || field == null) continue
       // A time unit buckets a *date*, so the column still has to be read as one first — and a time

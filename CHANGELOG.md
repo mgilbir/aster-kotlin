@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **Every entry of a list channel is parsed, not just the first.** `getImplicitFromEncoding` walks
+  the encoding with `forEachFieldDef`, which iterates entry by entry — a `tooltip` naming four
+  columns is four definitions — and reaches into a `condition` for its field. This read only the
+  channel's own definition, so a tooltip's **second** nested field was never flattened into a column
+  of its own and Vega looked for it under a name no row has, leaving that line of the tooltip empty.
+  A date or a number in the same position went unparsed for the same reason.
+
 - **An axis caption may be several lines.** `assembleTitle` passes a title through untouched unless
   it is an array that is *not* text — the list of field definitions a shared axis's merged titles
   are, which it joins with commas. A list of **strings** is already text, and Vega draws it one line
