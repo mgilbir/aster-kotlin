@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **A colour ramp follows the plot only where it lies along the measure it would follow.** A
+  horizontal ramp is as long as the plot is wide when it sits above or below it, and otherwise
+  simply the shortest a horizontal ramp may be — one *beside* the plot has no width to follow, and
+  one placed by hand with `orient: "none"` has no side at all. A vertical ramp follows the height
+  wherever it sits. This clamped in every case, so a ramp laid out by hand grew and shrank with a
+  plot it is not beside.
+
 - **A scale property one layer states settles the shared scale, whichever layer states it.**
   `parseNonUnitScaleProperty` folds a shared scale property by property with
   `mergeValuesWithExplicit`, and an explicit value beats a derived one; between two of the same kind

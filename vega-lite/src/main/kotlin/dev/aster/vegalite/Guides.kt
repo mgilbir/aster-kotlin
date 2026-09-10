@@ -999,10 +999,29 @@ internal object Guides {
         // The *view's* own size signal, not the plain name: inside a concatenation the plotting
         // area is `concat_0_childHeight` and `height` is either something else or nothing at all,
         // so a ramp measured against it came out the wrong length or not at all.
+        // And only where the ramp lies **along** the measure it would follow:
+        //
+        //     if (direction === 'horizontal') {
+        //       if (orient === 'top' || orient === 'bottom') {
+        //         return gradientLengthSignal(model, 'width', min, max);
+        //       } else {
+        //         return gradientHorizontalMinLength;
+        //       }
+        //     } else {
+        //       return gradientLengthSignal(model, 'height', min, max);
+        //     }
+        //
+        // A horizontal ramp beside the plot, or placed by hand with `orient: "none"`, has no width
+        // to follow — it is simply the shortest a horizontal ramp may be. A vertical one follows
+        // the height wherever it sits, there being a height either way.
         val horizontal = legendDirection(view, def, gradient) == "horizontal"
+        val orient =
+          def.legend?.string("orient") ?: view.config.raw.obj("legend")?.string("orient") ?: "right"
+        val alongThePlot = !horizontal || orient == "top" || orient == "bottom"
         val measure = if (horizontal) view.sizeSignal("x") else view.sizeSignal("y")
         val shortest = if (horizontal) 100 else 64
-        put("gradientLength", signalRef("clamp($measure, $shortest, 200)"))
+        if (alongThePlot) put("gradientLength", signalRef("clamp($measure, $shortest, 200)"))
+        else put("gradientLength", num(shortest.toDouble()))
       } else {
         // The type is written only where it *disagrees* with what Vega would pick: a symbol legend
         // over a continuous colour scale has to say so, and everywhere else a symbol is already
