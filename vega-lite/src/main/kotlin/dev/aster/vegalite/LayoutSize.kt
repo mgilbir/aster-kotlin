@@ -225,7 +225,21 @@ internal class LayoutSize(
       // *discrete* size for it, which is a step. That is what makes a one-dimensional chart — a
       // strip of ticks, a bar chart of one measure — twenty units deep rather than three hundred,
       // and it is the single most common way a gallery example came out the wrong size.
-      if (scale == null && views.none { it.spec.mark == "arc" }) {
+      // `defaultUnitSize`'s third arm, which this had only half of:
+      //
+      //     } else if (model.hasProjection || model.mark === 'arc') {
+      //       // arc should use continuous size by default otherwise the pie is extremely small
+      //       return getViewConfigContinuousSize(config.view, sizeType);
+      //
+      // A **map** is as tall as a continuous plot for the same reason a pie is. `hasProjection` is
+      // a `geoshape` mark or a geographic position channel, and a chart drawn that way has no
+      // position scale on either channel — so falling to the discrete size made it twenty units
+      // deep, which is a strip rather than a map.
+      val projected = views.any { view ->
+        view.spec.mark == "geoshape" ||
+          view.spec.encoding.keys.any { it in Channels.GEO_POSITION_CHANNELS }
+      }
+      if (scale == null && !projected && views.none { it.spec.mark == "arc" }) {
         val discrete =
           if (channel == "x") config.discreteWidth ?: config.step
           else config.discreteHeight ?: config.step

@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **A map is as tall as a continuous plot.** `defaultUnitSize`'s third arm is
+  `model.hasProjection || model.mark === 'arc'`, and this had only the `arc` half of it. A chart
+  drawn through a projection has no position scale on either channel, so it fell to the *discrete*
+  size and came out twenty units deep — a strip rather than a map. `hasProjection` is a `geoshape`
+  mark or a geographic position channel, so a point placed by latitude and longitude counts as much
+  as an outline does.
+
 - **A legend is read by asking it for the properties legends have.** `parseLegendForChannel` walks
   `LEGEND_COMPONENT_PROPERTIES` and asks the `legend` block for each entry, so a block holding
   anything else is never looked at. This copied the block's own keys and forwarded them, so a
