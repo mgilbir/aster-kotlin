@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **A bucketed column reads as its span wherever it is read.** `formatSignalRef` works the far edge
+  of a bin out itself rather than being handed one, so no caller has to say so. A `tooltip` written
+  as a **list** goes through a different path here from the channels' own, and that path passed
+  nothing — so a bucket in a tooltip printed its lower edge as a bare number where the axis beside
+  it read `0 – 10`. A pre-binned column still needs its caller, its far edge being the secondary
+  channel's own field.
+
 - **An axis property one layer states settles the shared axis, whichever layer states it.**
   `mergeAxisComponent` folds a shared axis property by property with `mergeValuesWithExplicit`, and
   an explicit value beats a derived one; between two stated values the first still wins. Filling

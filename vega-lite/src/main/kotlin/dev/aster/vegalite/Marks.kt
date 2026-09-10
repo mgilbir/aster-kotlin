@@ -1447,6 +1447,22 @@ internal object Marks {
       }
     val number =
       stated ?: if (normalizeStack) config.normalizedNumberFormat else config.numberFormat ?: ""
+    // `formatSignalRef` works out the far edge itself rather than being handed one:
+    //
+    //     if (isFieldDef(fieldOrDatumDef) && isBinning(fieldOrDatumDef.bin)) {
+    //       const endField = vgField(fieldOrDatumDef, {expr, binSuffix: 'end'});
+    //       return {signal: binFormatExpression(field, endField, format, formatType, config)};
+    //     }
+    //
+    // A bucketed column reads as its **span** wherever it is read, and no caller has to say so. A
+    // `tooltip` written as a list goes through a different path from the channels' own, and that
+    // path passed nothing — so a bucket in a tooltip printed its lower edge as a bare number where
+    // the axis beside it read `0 – 10`.
+    //
+    // A **pre-binned** column still needs the caller: its far edge is the secondary channel's own
+    // field, which the definition alone cannot name.
+    val farEdge =
+      binEnd ?: if (def.bin is Binning.Bin) Fields.datumAccess(def, suffix = "end") else null
     return when {
       // An **outline** is not text and is never joined: it is one object, and `isArray` on it would
       // spell a country out as a list of its own coordinates.
@@ -1480,12 +1496,12 @@ internal object Marks {
           else -> "${prefix}Format($accessor, \"${config.timeFormat}\")"
         }
       }
-      def.bin != null && binEnd != null -> {
+      def.bin != null && farEdge != null -> {
         // Both edges through the custom format type where one is configured, as the single value
         // below goes: a bucket reads `1 – 2` whichever function writes the numbers.
         val write = if (stated == null) config.numberFormatType ?: "format" else "format"
         "!isValid($accessor) || !isFinite(+$accessor) ? \"null\" : " +
-          "$write($accessor, \"$number\") + \" $BIN_RANGE_DELIMITER \" + $write($binEnd, \"$number\")"
+          "$write($accessor, \"$number\") + \" $BIN_RANGE_DELIMITER \" + $write($farEdge, \"$number\")"
       }
       // The same custom format type the guides use, where the configuration named one and this
       // definition stated no format of its own: `pow(datum["a"], "1.0")` rather than `format(…)`.
