@@ -3456,78 +3456,127 @@ private class Compilation(
     component.properties.forEach { (key, value) -> if (key != "range") put(key, value) }
   }
 
-  /** One domain passes through; several become a `fields` union, which is what a layer needs. */
+  /**
+   * `mergeDomains` in `compile/scale/domain.ts`: one domain passes through, several become a
+   * `fields` union, and the *sort* is settled here rather than by each contributor.
+   *
+   * Settling it here is the point. Every view a scale is shared by contributes a domain carrying
+   * the sort its own encoding asked for, and Vega takes one sort for the whole scale: sorting the
+   * parts separately and concatenating them is a different answer from sorting the union. So the
+   * contributors' sorts are collected, the ones a union cannot express are given up, and what
+   * survives is written once — never inside a part.
+   */
   private fun domainValue(component: ScaleComponent): VegaValue? {
     val domains = component.domains
-    if (domains.isEmpty()) return null
-    if (domains.size == 1) {
-      val only = domains.first() as? VegaValue.Obj ?: return domains.first()
-      val sort = simplifySort(only["sort"], only.string("field")) ?: return only
+    // Two views may name the same column and disagree only about the order: that is one domain
+    // with two sorts, not two domains, and the sort is what the disagreement is settled over.
+    val uniqueDomains = domains.map { withoutSort(it) }.distinct()
+    val sorts = domains.mapNotNull { normalizedSort(it) }.distinct()
+    if (uniqueDomains.isEmpty()) return null
+
+    if (uniqueDomains.size == 1) {
+      val only = domains.first()
+      if (!isDataRef(only) || sorts.isEmpty()) return only
       return obj {
-        only.fields.forEach { (key, value) -> if (key != "sort") put(key, value) }
-        put("sort", sort.takeUnless { it == VegaValue.Bool(true) && only["sort"] == null })
+        (only as VegaValue.Obj).fields.forEach { (key, value) ->
+          if (key != "sort") put(key, value)
+        }
+        put("sort", settledSort(sorts, only.string("field")))
       }
     }
 
-    // A sort every entry agrees on belongs to the union rather than to each of its parts: sorting
-    // the pieces separately and concatenating them is a different answer from sorting the whole.
-    val sorts = domains.map { simplifySort(it["sort"], null) ?: it["sort"] }.distinct()
-    val sharedSort = if (sorts.size == 1) sorts.single() else null
-    val entries =
-      if (sharedSort == null) {
-        domains
-      } else {
-        domains.map { entry ->
-          obj { (entry as VegaValue.Obj).fields.forEach { (k, v) -> if (k != "sort") put(k, v) } }
+    // A union sorts by an aggregate Vega can compute *across* datasets, which is only the three
+    // that need no more than one pass over each: a `sum` would have to be re-totalled over the
+    // whole union and there is nothing to re-total it from, so the request is given up and the
+    // domain sorts naturally.
+    val unionSorts =
+      sorts
+        .map { sort ->
+          if (sort !is VegaValue.Obj || !sort.has("op")) sort
+          else if (sort.string("op") in UNION_DOMAIN_SORT_OPS) sort else VegaValue.Bool(true)
         }
+        .distinct()
+    // Sorts that disagree cannot be reconciled either, and the natural order is the answer that
+    // does not privilege one of them.
+    val sort =
+      when {
+        unionSorts.size == 1 -> unionSorts.single()
+        unionSorts.size > 1 -> VegaValue.Bool(true)
+        else -> null
       }
 
     // Several fields of one dataset collapse further, into one reference with a field list.
-    val sameData = entries.all {
-      it is VegaValue.Obj && it.string("data") == entries.first().string("data") && it.has("field")
-    }
-    return if (sameData) {
+    val data = domains.map { if (isDataRef(it)) it.string("data") else null }.distinct()
+    return if (data.size == 1 && data.single() != null) {
       obj {
-        put("data", entries.first().string("data"))
-        put("fields", strings(entries.map { it.string("field")!! }))
-        put("sort", sharedSort)
+        put("data", data.single())
+        put("fields", strings(uniqueDomains.map { it.string("field")!! }))
+        put("sort", sort)
       }
     } else {
       obj {
-        put("fields", arr(entries))
-        put("sort", sharedSort)
+        put("fields", arr(uniqueDomains))
+        put("sort", sort)
       }
     }
   }
 
   /**
-   * The three ways a domain sort says less than it was built with — `assembleDomain` in
-   * `compile/scale/domain.ts`.
+   * The sort a single domain settles on, of the [sorts] its contributors asked for.
    *
-   * Each removes something that is either implied or meaningless: a `count` has no field to count
-   * *of*, `ascending` is the default order, and a sort on the domain's own field is the natural
-   * order with at most a direction to it. They matter because the output is compared property by
-   * property, and a sort saying the same thing twice is a different specification.
-   *
-   * @param domainField the field this domain is *of*, or null where several are being merged and no
-   *   single one is.
-   * @return the simplified sort, or null when there was nothing to simplify.
+   * One sort is taken as it stands, but for two the op is what tells them apart: a `min` is the
+   * default a plain `"descending"` expands into, so a single non-`min` request among them is a
+   * choice somebody made and the others are defaults it outranks. Anything less clear-cut than that
+   * is left to the natural order.
    */
-  private fun simplifySort(sort: VegaValue?, domainField: String?): VegaValue? {
-    val obj = sort as? VegaValue.Obj ?: return null
-    var simplified = obj
-    if (obj.string("op") == "count" && obj.has("field")) {
-      simplified = obj { simplified.fields.forEach { (k, v) -> if (k != "field") put(k, v) } }
+  private fun settledSort(sorts: List<VegaValue>, domainField: String?): VegaValue {
+    if (sorts.size > 1) {
+      val stated = sorts.filter { it is VegaValue.Obj && it.has("op") && it.string("op") != "min" }
+      val allAggregate = sorts.all { it is VegaValue.Obj && it.has("op") }
+      return if (allAggregate && stated.size == 1) stated.single() else VegaValue.Bool(true)
     }
-    if (simplified.string("order") == "ascending") {
-      simplified = obj { simplified.fields.forEach { (k, v) -> if (k != "order") put(k, v) } }
+    val sort = sorts.single()
+    // Sorting a domain by its own column is the natural order with at most a direction to it: the
+    // aggregate picks one value of a column out of the rows that all carry the same one.
+    if (sort is VegaValue.Obj && sort.has("field") && sort.string("field") == domainField) {
+      val order = sort.string("order") ?: return VegaValue.Bool(true)
+      return obj { put("order", order) }
     }
-    if (domainField != null && simplified.string("field") == domainField) {
-      val order = simplified.string("order")
-      simplified = if (order == null) return VegaValue.Bool(true) else obj { put("order", order) }
-    }
-    return if (simplified.fields == obj.fields) null else simplified
+    return sort
   }
+
+  /**
+   * A contributor's sort as it counts towards the merge, or null where it asked for none.
+   *
+   * A `count` counts rows rather than values, so the field it was written beside says nothing, and
+   * `ascending` is the order a sort has anyway. Both are dropped before the sorts are compared, so
+   * that two contributors spelling the same request differently are seen to agree.
+   */
+  private fun normalizedSort(domain: VegaValue): VegaValue? {
+    val sort = (domain as? VegaValue.Obj)?.get("sort") ?: return null
+    val stated = sort as? VegaValue.Obj ?: return sort
+    val dropped =
+      setOfNotNull(
+        "field".takeIf { stated.string("op") == "count" },
+        "order".takeIf { stated.string("order") == "ascending" },
+      )
+    if (dropped.isEmpty()) return stated
+    return obj { stated.fields.forEach { (key, value) -> if (key !in dropped) put(key, value) } }
+  }
+
+  /** The domain without its sort, which is what makes two contributors the same domain. */
+  private fun withoutSort(domain: VegaValue): VegaValue {
+    if (!isDataRef(domain)) return domain
+    return obj {
+      (domain as VegaValue.Obj).fields.forEach { (key, value) ->
+        if (key != "sort") put(key, value)
+      }
+    }
+  }
+
+  /** `isDataRefDomain`: a reference to a column of a dataset, rather than a list or a signal. */
+  private fun isDataRef(domain: VegaValue): Boolean =
+    domain is VegaValue.Obj && domain.has("field") && domain.has("data")
 
   // -----------------------------------------------------------------------------------------
   // Guides
@@ -3917,6 +3966,15 @@ private class Compilation(
 
     /** `https://vega.github.io/schema/vega-lite/v6.json` — the major version out of the URL. */
     val SCHEMA_VERSION_PATTERN = Regex("""vega-lite/v(\d+)""")
+
+    /**
+     * `MULTIDOMAIN_SORT_OP_INDEX` — the aggregates a **unioned** domain can be sorted by.
+     *
+     * Each of the three is a running answer: a union's count is the counts added up, its minimum
+     * the smallest of the minima. An op that has to see all the rows at once — a `sum` per
+     * category, a `mean` — has no such answer once the categories come from several datasets.
+     */
+    val UNION_DOMAIN_SORT_OPS = setOf("count", "min", "max")
 
     val TOP_LEVEL_PROPERTIES =
       setOf(

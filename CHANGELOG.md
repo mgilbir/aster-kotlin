@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **A domain's sort is settled where the domains are merged.** Every view a shared scale is built
+  from contributes a domain carrying the sort its own encoding asked for, and Vega takes one sort
+  for the whole scale — sorting the parts and concatenating them is a different answer from sorting
+  the union. `mergeDomains` therefore collects the contributors' sorts and gives up what a union
+  cannot express: an aggregate other than `count`, `min` or `max` has no running answer across
+  several datasets, and sorts that disagree are settled by the natural order rather than by
+  privileging one of them. This engine kept both, so a scale shared by two layers came out asking
+  Vega to total a column *across* two tables, and a disagreement came out as a sort inside each part
+  of the union — which sorts the pieces. Two specifications in the wild corpus differ for that. Two
+  contributors that name the same column and differ only in their sort are also **one** domain, not
+  a union of two, and a single stated aggregate among them outranks the `min` a plain
+  `"descending"` expands into.
+
 - **A scale and an axis are read by asking them for the properties scales and axes have.** Upstream
   walks `NON_TYPE_DOMAIN_RANGE_VEGA_SCALE_PROPERTIES` and `AXIS_COMPONENT_PROPERTIES` and asks the
   stated block for each, so a block holding anything else is never looked at. This copied the
