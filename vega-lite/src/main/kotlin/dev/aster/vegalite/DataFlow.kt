@@ -304,6 +304,49 @@ internal sealed class DataNode {
   }
 
   /**
+   * `RemoveUnnecessaryIdentifierNodes`: an identifier survives only where new rows were **made**.
+   *
+   * ```js
+   * if (node instanceof IdentifierNode) {
+   *   // Only preserve IdentifierNodes if we have default discrete selections
+   *   // in our model tree, and if the nodes come after tuple producing nodes.
+   *   if (!(this.requiresSelectionId &&
+   *         (isDataSourceNode(node.parent) || node.parent instanceof AggregateNode || node.parent instanceof ParseNode))) {
+   *     node.remove();
+   *   }
+   * }
+   * ```
+   *
+   * Upstream writes one at the head of every flow and takes it out again here, so the question is
+   * only ever *what is above it*: a table, an aggregate or a parse — the three steps after which a
+   * row is a new row without an identity of its own. Anywhere else the rows already carry one.
+   *
+   * It matters where a **fork** has moved: a chart that joins against the table it also draws from
+   * has a named point on that table, and `MergeOutputs` then hangs the drawing's own steps *below*
+   * that point rather than beside it. The identifier at the head of those steps no longer sits on
+   * the table, so upstream drops it and the rows are identified by the copy on the table's own
+   * branch.
+   */
+  fun pruneIdentifiers() {
+    children.toList().forEach { it.pruneIdentifiers() }
+    children
+      .filter { it.isIdentifier && !makesNewRows() }
+      .toList()
+      .forEach { spare ->
+        children.remove(spare)
+        children += spare.children
+      }
+  }
+
+  /** Whether this node is the `identifier` transform and nothing else. */
+  private val isIdentifier: Boolean
+    get() = this is PassThroughNode && transforms.singleOrNull()?.string("type") == "identifier"
+
+  /** `isDataSourceNode(node) || node instanceof AggregateNode || node instanceof ParseNode`. */
+  private fun makesNewRows(): Boolean =
+    this is SourceNode || this is AggregateNode || this is ParseNode
+
+  /**
    * Whether a bucketing may climb above this step — `moveBinsUp` in `MergeBins`.
    *
    * A **filter** is the one that matters: a bucketing measures the extent of the rows it can see,

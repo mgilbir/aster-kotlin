@@ -3192,6 +3192,10 @@ private class Compilation(
         if (settled == previous) return@repeat
         previous = settled
       }
+      // Last, because it asks what each identifier's **parent** is and the folds above are what
+      // decide that: `RemoveUnnecessaryIdentifierNodes` is the one optimizer upstream runs after
+      // the loop rather than inside it.
+      root.pruneIdentifiers()
     }
     val datasets =
       DataAssembler()

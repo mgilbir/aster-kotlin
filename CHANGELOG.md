@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **An `identifier` survives only where new rows were made.** `RemoveUnnecessaryIdentifierNodes`
+  keeps one whose parent is a table, an aggregate or a parse — the three steps after which a row is a
+  new row with no identity of its own — and removes every other, upstream writing one at the head of
+  each flow and taking it out again there. It tells where a **fork** has moved: a chart that joins
+  against the table it also draws from gets a named point on that table, and `MergeOutputs` then
+  hangs the drawing's own steps below that point, so the identifier at their head is no longer on
+  the table. This kept it, and the extra transform was the only difference in two specifications of
+  the wild corpus.
+
 - **A swatch takes the mark's opacity as it stands, and only where that opacity is truthy.** `const
   opacity = getMaxValue(encoding.opacity) ?? markDef.opacity; if (opacity) { out.opacity = {value:
   opacity} }` — so a mark saying `"opacity": "1"`, a string a hand-written specification may well
