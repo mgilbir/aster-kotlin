@@ -488,16 +488,26 @@ private class Compilation(
         return failed()
       }
     }
-    // A **projection** belongs to the unit whose places it puts on the page. A view with a
-    // geographic channel has one whether or not the specification stated any properties for it, and
-    // one that states properties has one whether or not it has drawn anything yet.
+    // A **projection** belongs to the unit whose places it puts on the page, and it is the
+    // *encoding* that says so:
+    //
+    //     function parseUnitProjection(model: UnitModel): ProjectionComponent {
+    //       if (model.hasProjection) { … }
+    //       return undefined;
+    //     }
+    //
+    // `hasProjection` is a `geoshape` mark or a geographic position channel — nothing else. A
+    // projection stated at the top of a chart does not make a plot that draws in `x` and `y`
+    // projected, and treating it as if it did put that plot's table into the `fit`: a map layered
+    // under a scatter of ordinary positions was scaled to cover both, so the map came out the
+    // wrong size.
     for (plot in plots) {
       for (view in plot.views) {
         val stated = view.spec.projection ?: plot.spec.obj("projection") ?: spec.obj("projection")
         val geographic =
           view.spec.encoding.keys.any { it in Channels.GEO_POSITION_CHANNELS } ||
             view.spec.mark == "geoshape"
-        if (!geographic && stated == null) continue
+        if (!geographic) continue
         view.projection = obj {
           config.raw.obj("projection")?.fields?.forEach { (key, value) -> put(key, value) }
           stated?.fields?.forEach { (key, value) -> put(key, value) }
@@ -528,8 +538,20 @@ private class Compilation(
       // `parseNonUnitProjections` runs for any composition, a **facet** as much as a layer: a grid
       // whose cells are maps has one projection, named for the grid and not for the cell, so every
       // cell is drawn at the same scale.
+      // A member with **no** projection does not stop the merge — `every` returns true for it:
+      //
+      //     const mergable = every(model.children, (child) => {
+      //       const projection = child.component.projection;
+      //       if (!projection) return true;          // child layer does not use a projection
+      //       …
+      //     });
+      //
+      // so one map under a scatter of ordinary positions is still a *layer's* projection, named for
+      // the layer. Requiring two geographic members left it named for the member, and the mark that
+      // reads it named the member's too.
       if (
-        (geographic.size > 1 || (plot.facet != null && geographic.isNotEmpty())) &&
+        (plot.views.size > 1 || plot.facet != null) &&
+          geographic.isNotEmpty() &&
           geographic.all { it.projection == geographic.first().projection }
       ) {
         val name =

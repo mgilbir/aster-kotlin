@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **The encoding says whether a plot is projected, and one projected member makes it the layer's.**
+  `parseUnitProjection` runs `if (model.hasProjection)`, which is a `geoshape` mark or a geographic
+  position channel and nothing else — a projection stated at the top of a chart does not make a plot
+  drawing in `x` and `y` projected. Treating it as though it did put that plot's table into the
+  `fit`, so a map layered under a scatter of ordinary positions was scaled to cover both. And a
+  member with no projection does not stop the merge, so one map under such a scatter still has a
+  *layer's* projection, named for the layer; requiring two projected members named it for the member
+  instead, and the mark that reads it named the member's too.
+
 - **A swatch takes the opacity the mark took.** By the time a legend reads it, the reduced scatter
   opacity is just `markDef.opacity`, which `initMarkDef` settles from *both* opacities — a mark
   stating its `fillOpacity` has answered the question, so its swatch is not faded either. The legend
