@@ -598,7 +598,7 @@ internal class Parse(
 
     return ChannelDef(
       channel = channel,
-      raw = value,
+      raw = withHeaderOrients(value),
       field = field,
       datum = value.fields["datum"],
       value = value.fields["value"],
@@ -612,6 +612,38 @@ internal class Parse(
       explicitTitle = value.fields["title"],
       conditions = conditions,
     )
+  }
+
+  /**
+   * `normalizeFieldDef`: a header's `orient` is a **shortcut** for both of its orients.
+   *
+   * ```js
+   * const {orient, ...rest} = header;
+   * if (orient) {
+   *   return {...fieldDef, header: {...rest, labelOrient: header.labelOrient || orient,
+   *                                          titleOrient: header.titleOrient || orient}};
+   * }
+   * ```
+   *
+   * Expanding it once, here, is what lets everything downstream ask for the part it is drawing —
+   * the caption's side or the heading's — rather than each reader remembering the shortcut. And the
+   * expansion is what a *reader* of the header sees: the `orient` itself is dropped, so the
+   * property rename that carries a header's styling onto the caption carries the side with it.
+   */
+  private fun withHeaderOrients(value: VegaValue.Obj): VegaValue.Obj {
+    val header = value.obj("header") ?: return value
+    val orient = header.fields["orient"] ?: return value
+    return obj {
+      putAll(value)
+      put(
+        "header",
+        obj {
+          header.fields.forEach { (key, entry) -> if (key != "orient") put(key, entry) }
+          put("labelOrient", header.fields["labelOrient"] ?: orient)
+          put("titleOrient", header.fields["titleOrient"] ?: orient)
+        },
+      )
+    }
   }
 
   /**

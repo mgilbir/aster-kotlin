@@ -8,6 +8,20 @@ section here does not get released.
 
 ### Fixed
 
+- **The side a header hangs off decides which band of the grid it is in.** `getHeaderChannel` asks
+  the header's own orientation, not the channel it captions: a column facet whose header is moved to
+  the right is a **row** header, running down the side of the grid, and its heading is roled, turned
+  and anchored as a row's. This engine read the channel, so such a heading was laid out across a
+  grid it runs down. Two consequences of the same reading were wrong with it. A caption whose side
+  points *across* its own band is not drawn in that band — there is one caption per band and nowhere
+  along a band running the other way to put it — and `assembleLabelTitle` moves it onto the **cell**
+  instead; this engine drew it in the band and left the cells uncaptioned. And a heading moved to a
+  trailing side is anchored at the end of the band it moved into, which is asked of the *heading's*
+  own side rather than the captions': a header may move its captions and leave its heading where it
+  was. Two specifications in the wild corpus differ for that. `header.orient` — the shortcut that
+  sets both sides at once — is now expanded into `labelOrient` and `titleOrient` where
+  `normalizeFieldDef` expands it, which is also what carries the side onto the caption.
+
 - **How a chart is sized is settled twice, and the second pass knows what the first cannot.**
   `normalizeAutoSize` runs before anything is compiled and knows the *shape* of the chart —
   whether there is one plotting area a fit could stretch — while `getTopLevelProperties` runs last

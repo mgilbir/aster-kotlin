@@ -151,6 +151,27 @@ internal val HEADER_PROPERTIES_MAP =
   )
 
 /**
+ * `getHeaderChannel`: which of the grid's two bands a header belongs to.
+ *
+ * A band is horizontal or vertical, and which one a header is *in* is settled by the side it hangs
+ * off rather than by the channel it captions. A column facet whose header is moved to the right is
+ * a **row** header: it runs down the side of the grid, one caption per band, and its heading is
+ * turned and anchored as a row's is. Reading the channel instead titled it as a column's, so the
+ * heading was laid out across a grid it runs down.
+ *
+ * @param orient the side the header **states**, or null where it states none and the channel's own
+ *   default stands. A wrapped facet defaults to a column's, its cells being captioned above.
+ */
+internal fun headerChannel(channel: String, orient: String?): String =
+  when (orient) {
+    "top",
+    "bottom" -> "column"
+    "left",
+    "right" -> "row"
+    else -> if (channel == "row") "row" else "column"
+  }
+
+/**
  * `assembleHeaderProperties`: what a `header` block says about one part of a caption, renamed.
  *
  * @param part `"title"` for the heading over the grid, `"label"` for the caption on each cell.
@@ -191,12 +212,63 @@ internal class Facet(
    * otherwise; `"bottom"` and `"right"` move them to the *footer* band, which is a different group
    * with a different name rather than the same one moved.
    */
-  fun headerOrient(part: String): String {
-    val header = def.raw.obj("header")
-    val stated =
-      (headerProperty(header, config, channel, "${part}Orient") as? VegaValue.Str)?.value
-        ?: header?.string("orient")
-    return stated ?: if (isColumn) "top" else "left"
+  fun headerOrient(part: String): String = statedOrient(part) ?: if (isColumn) "top" else "left"
+
+  /**
+   * The side the header **states** for a part, before the channel's own default.
+   *
+   * `getHeaderChannel` and the layout's `titleAnchor` both ask what was stated rather than what it
+   * came out as: the default is the side the channel already implies, and implying it is not the
+   * same as moving the header there.
+   */
+  fun statedOrient(part: String): String? =
+    (headerProperty(def.raw.obj("header"), config, channel, "${part}Orient") as? VegaValue.Str)
+      ?.value
+
+  /** Which band this part of the header is in — [headerChannel] through the stated side. */
+  fun headerChannel(part: String): String = headerChannel(channel, statedOrient(part))
+
+  /**
+   * Whether a caption on this channel is drawn at all.
+   *
+   * `assembleHeaderGroup` includes it only where the side it hangs off **aligns with the channel**:
+   * a caption on the right of a *column* band would run down a band that runs across, with one
+   * caption per column and nowhere along the band to put it. The heading over the grid still moves
+   * there — that is what [headerChannel] settles — and the captions are simply not drawn.
+   */
+  fun captionsAlignWithBand(): Boolean = headerChannel("label") == channel
+
+  /**
+   * `assembleLabelTitle`: the caption naming one value of this channel.
+   *
+   * It is the same title wherever it is drawn — in the band of its own channel, or, where its side
+   * points across that band, on the **cell** itself.
+   */
+  fun captionTitle(offset: Double): VegaValue = obj {
+    put("text", signalRef(headerLabel(def, field, config)))
+    if (!isColumn) put("orient", "left")
+    put("style", "guide-label")
+    put("frame", "group")
+    put("offset", num(offset))
+    // A caption in the trailing band hangs off the other side of its cell.
+    headerOrient("label").takeIf { it != "top" }?.let { put("orient", it) }
+    // `defaultHeaderGuideAlign`/`defaultHeaderGuideBaseline` both open with "if the angle is
+    // stated" — a caption left at whatever angle the renderer chooses is left at whatever anchor it
+    // chooses too. State one and the caption has to be turned to face its cell: a **row**'s runs
+    // down the side of the grid, so it is right-aligned against the cells and centred on them.
+    // Which band it is in is what decides that, and a moved header changes it.
+    val angle = def.raw.obj("header")?.number("labelAngle")
+    if (angle != null && headerChannel("label") == "row") {
+      // `defaultLabelAlign` through the band's own orientation, a row's captions being
+      // `left`/`y`: a caption turned a *quarter* turn is **centred** rather than pushed to one
+      // side, its own length now running across the band rather than along it, so there is no side
+      // left to push it to.
+      val turned = ((angle % 360) + 360) % 360
+      put("baseline", "middle")
+      put("align", Guides.labelAlign(turned, "y", "left"))
+      put("angle", num(angle))
+    }
+    headerProperties("label").forEach { (key, value) -> put(key, value) }
   }
 
   /** Whether this channel's captions belong to the trailing band rather than the leading one. */
@@ -382,7 +454,9 @@ internal class Facet(
   fun titleGroup(title: String, offset: Double): VegaValue = obj {
     put("name", "$channel-title")
     put("type", "group")
-    put("role", "$channel-title")
+    // The **band** the heading is in, which a moved header changes; the group's own name still
+    // says which channel it captions.
+    put("role", "${headerChannel("title")}-title")
     put(
       "title",
       obj {
@@ -714,12 +788,16 @@ internal class FacetGrid(
         },
       )
     }
-    // `titleAnchor`: a heading over a *trailing* band is anchored at the end of the grid rather
-    // than the start, which is where the band it names now sits.
+    // `titleAnchor`: a heading on a *trailing* side is anchored at the end of the grid rather than
+    // the start, which is where the side it was moved to now is. It is the **heading's** own side
+    // that says so — a header may move its captions and leave its heading where it was — and the
+    // anchor is keyed by the band the heading is in rather than by the channel it captions.
     val anchors =
-      listOfNotNull(row, column).filter { it.channel in titled && it.captionsInFooter() }
+      listOfNotNull(row, column).filter {
+        it.channel in titled && it.statedOrient("title") in setOf("right", "bottom")
+      }
     if (anchors.isNotEmpty()) {
-      put("titleAnchor", obj { anchors.forEach { put(it.channel, "end") } })
+      put("titleAnchor", obj { anchors.forEach { put(it.headerChannel("title"), "end") } })
     }
     when {
       // A **nested** column grid counts its columns per cell, off the group's own field, so there
@@ -764,7 +842,11 @@ internal class FacetGrid(
     // `"header": null` takes the *caption* off, not the band: the band is also where a shared axis
     // is drawn, and that axis is still wanted. A band with neither is the one that disappears.
     val wanted = if (facet?.captionsInFooter() == true) kind == "footer" else kind == "header"
-    val captions = wanted && facet != null && facet.def.raw.fields["header"] != VegaValue.Null
+    val captions =
+      wanted &&
+        facet != null &&
+        facet.def.raw.fields["header"] != VegaValue.Null &&
+        facet.captionsAlignWithBand()
     if (axes.isEmpty() && !captions) return null
     return obj {
       put("name", named("${channel}_$kind"))
@@ -779,44 +861,7 @@ internal class FacetGrid(
             put("order", facet.order)
           },
         )
-        if (captions) {
-          put(
-            "title",
-            obj {
-              put(
-                "text",
-                signalRef(headerLabel(facet.def, facet.field, config)),
-              )
-              if (!isColumn) put("orient", "left")
-              put("style", "guide-label")
-              put("frame", "group")
-              put("offset", num(titleOffset))
-              // A caption in the trailing band hangs off the other side of its cell.
-              facet.headerOrient("label").takeIf { it != "top" }?.let { put("orient", it) }
-              // `defaultHeaderGuideBaseline`/`defaultHeaderGuideAlign`: a **row**'s captions run
-              // down the side of the grid, so each is turned to face its cell — right-aligned
-              // against the cells and centred on them. A column's sit above and need neither,
-              // which upstream expresses by leaving their angle undefined.
-              // `defaultHeaderGuideAlign`/`defaultHeaderGuideBaseline` both open with "if the
-              // angle is stated" — a caption left at whatever angle the renderer chooses is left
-              // at whatever anchor it chooses too. State one and the caption has to be turned to
-              // face its cell: a **row**'s runs down the side of the grid, so it is right-aligned
-              // against the cells and centred on them.
-              val angle = facet.def.raw.obj("header")?.number("labelAngle")
-              if (angle != null && !facet.isColumn) {
-                // `defaultLabelAlign` through the header's own orientation, a row's captions
-                // being `left`/`y`: a caption turned a *quarter* turn is **centred** rather than
-                // pushed to one side, its own length now running across the band rather than
-                // along it, so there is no side left to push it to.
-                val turned = ((angle % 360) + 360) % 360
-                put("baseline", "middle")
-                put("align", Guides.labelAlign(turned, "y", "left"))
-                put("angle", num(angle))
-              }
-              facet.headerProperties("label").forEach { (key, value) -> put(key, value) }
-            },
-          )
-        }
+        if (captions) put("title", facet.captionTitle(titleOffset))
       }
       // `makeHeaderComponent` states the size only where the child *has* one —
       // `child.component.layoutSize.get(sizeType)`. A level whose child is another grid has none to
@@ -1011,6 +1056,12 @@ internal class FacetGrid(
   ): VegaValue = obj {
     put("name", named("cell"))
     put("type", "group")
+    // `assembleLabelTitle`: a caption whose side points **across** its own band is drawn on the
+    // cell instead of in the band — there is one caption per band and nowhere along a band running
+    // the other way to put it. Row before column, and the first such channel is the one drawn.
+    listOfNotNull(row, column)
+      .firstOrNull { !it.captionsAlignWithBand() }
+      ?.let { put("title", it.captionTitle(titleOffset)) }
     put("style", style)
     put("from", partition(dataName, counted))
     put("sort", cellSort())
@@ -1094,6 +1145,18 @@ internal class FacetWrap(
   private fun titleProperties(): Map<String, VegaValue> =
     headerProperties(def.raw.obj("header"), config, "facet", "title")
 
+  /**
+   * Which band the heading over the grid is in — `getHeaderChannel('facet', titleOrient)`.
+   *
+   * A wrapped facet captions its cells above them, so its heading is a column's unless the header
+   * moves it to a side, where it becomes a row's and is laid out down the grid instead.
+   */
+  private fun titleBand(): String = headerChannel("facet", statedTitleOrient())
+
+  /** The side the header states for its heading, before a wrapped facet's own default. */
+  private fun statedTitleOrient(): String? =
+    (headerProperty(def.raw.obj("header"), config, "facet", "titleOrient") as? VegaValue.Str)?.value
+
   private val domainData: String = named("facet_domain")
 
   override val fields: List<String> =
@@ -1172,6 +1235,11 @@ internal class FacetWrap(
     insideFacet: Boolean,
   ): VegaValue = obj {
     put("padding", spacing)
+    // A heading moved to a trailing side is anchored at the end of the grid, keyed by the band it
+    // is now in — `assembleLayoutTitleBand` runs over every facet channel, this one included.
+    if (statedTitleOrient() in setOf("right", "bottom")) {
+      put("titleAnchor", obj { put(titleBand(), "end") })
+    }
     put("bounds", "full")
     // `assembleDefaultLayout` with neither a row nor a column: a wrapped facet has no direction
     // whose cells share a scale by construction, so a direction resolved **independently** leaves
@@ -1215,7 +1283,7 @@ internal class FacetWrap(
           obj {
             put("name", "facet-title")
             put("type", "group")
-            put("role", "column-title")
+            put("role", "${titleBand()}-title")
             put(
               "title",
               obj {
