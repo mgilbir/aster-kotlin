@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A condition that states no value is still a rule, and falls to the mark's own.** `wrapCondition`
+  builds one value ref per condition and spreads whatever the reference function answers into it —
+  `{test: conditionalTest(c, …), ...conditionValueRef}` — and for a non-position channel that
+  function carries the mark's own value as its default. So `{"condition": {"test": {"param": "p"}},
+  "value": 0}` reads *"whatever the mark draws it at while the box is ticked, and invisible
+  otherwise"*, which is how a chart hides its labels behind a checkbox; where the mark has no such
+  default the ref is the test alone. This dropped a condition it could get no value out of, so the
+  rule came out as the unconditional arm by itself and the checkbox did nothing. The default is the
+  mark's own property, then the theme's block for that mark type, then the faded 0.7 `initMarkdef`
+  writes onto a point-like mark — and the unconditional arm ends at the same value, `wrapCondition`
+  building both with the one function. Two specifications in the wild corpus are written that way.
+
 - **An axis property the theme states in a block Vega knows is left off the axis.** `config.axis`,
   `config.axisX` and `config.axisBottom` all go out in Vega's own config block and Vega applies them
   from there to every axis at once, so writing a *derived* value onto this axis as well would settle

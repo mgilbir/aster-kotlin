@@ -993,13 +993,26 @@ internal object Marks {
     defaultRef: VegaValue? = null,
   ): VegaValue.Obj {
     val def = view.spec.encoding[channel] ?: return markDefault(view, channel, vgChannel)
+    // `mainRefFn(cDef)` is called with a `defaultRef` behind it, so a condition that states **no**
+    // value takes the mark's own — a text label hidden unless a checkbox is ticked says only when
+    // it is *not* shown, and what it is shown at is whatever the mark draws it at. Where the mark
+    // has no such default the rule is the test alone, which leaves the property unset for the rows
+    // the test picks; dropping the condition instead left the chart with no rule at all, so the
+    // checkbox did nothing.
+    //
+    // `ignoreVgConfig: true`, this being the default `nonPosition` builds for its conditions: the
+    // Vega-Lite mark config answers, and Vega's own is left to Vega.
+    val conditionFallback =
+      if (def.conditions.isEmpty()) null
+      else
+        (markDefault(view, channel, vgChannel, ignoreVgConfig = false)[vgChannel] as? VegaValue.Obj)
+          ?: reducedOpacityRef(view, channel)
     val rules =
-      def.conditions.mapNotNull { condition ->
-        valueRef(view, channel, condition)?.let { ref ->
-          obj {
-            put("test", condition.test)
-            putAll(ref)
-          }
+      def.conditions.map { condition ->
+        val ref = valueRef(view, channel, condition) ?: conditionFallback
+        obj {
+          put("test", condition.test)
+          ref?.let { putAll(it) }
         }
       }
     // With conditions but no unconditional part, the *mark* supplies the fallback — a median tick
@@ -1009,6 +1022,10 @@ internal object Marks {
       valueRef(view, channel, def)
         ?: markDefault(view, channel, vgChannel, ignoreVgConfig = def.conditions.isEmpty())[
           vgChannel]
+        // The same default the conditions fall through to: `wrapCondition` builds its
+        // unconditional arm with `mainRefFn(channelDef)` as well, so a channel written *only* as a
+        // condition ends its rule at the mark's own value rather than at nothing.
+        ?: conditionFallback
         ?: defaultRef
     // A non-position channel gets the same invalid arm a position does under the `show` mode —
     // `nonposition.ts` asks for one too. A size scaled from a column with nulls in it draws those
@@ -1035,6 +1052,23 @@ internal object Marks {
    * the rule's last arm even though the style block already says it — the style block is what Vega
    * applies when the property is absent, and a production rule that reaches its end is not absent.
    */
+  /**
+   * The **faded** opacity a point-like mark is drawn at, as a value ref for a condition to fall to.
+   *
+   * `initMarkdef` writes `markDef.opacity = opacity(markDef.type, encoding)` before any encode
+   * block is built, so a point's 0.7 is on the mark by the time `nonPosition` asks it for the
+   * default its conditions fall through to. It is written onto the mark itself elsewhere here — and
+   * not where the chart states an `opacity` encoding, which is exactly the case a condition is.
+   */
+  private fun reducedOpacityRef(view: UnitView, channel: String): VegaValue.Obj? {
+    /** The same 0.7 `opacity(markDef.type, encoding)` writes onto the mark itself. */
+    if (channel != "opacity") return null
+    if (view.spec.mark !in setOf("point", "tick", "circle", "square")) return null
+    if (Stack.isAggregate(view.spec)) return null
+    if (styled(view, "opacity") != null || styled(view, "fillOpacity") != null) return null
+    return obj { put("value", REDUCED_OPACITY) }
+  }
+
   private fun markDefault(
     view: UnitView,
     channel: String,
@@ -1535,6 +1569,12 @@ internal object Marks {
   }
 
   /** The en dash upstream puts between a bin's two edges. */
+  /**
+   * The faded opacity a point-like mark is drawn at — `opacity(markDef.type, encoding)`, which is
+   * 0.7 for the four marks whose glyphs overlap.
+   */
+  private const val REDUCED_OPACITY = 0.7
+
   private const val BIN_RANGE_DELIMITER = "–"
 
   /**
