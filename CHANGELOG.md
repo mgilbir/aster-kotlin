@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A legend property the theme states is not written onto the legend at all.**
+  `parseLegendForChannel` guards every property it sets with `if (explicit || config.legend[property]
+  === undefined)`: `config.legend` goes out beside the chart in Vega's own config block and Vega
+  applies it from there to every legend at once, so writing a *derived* value onto this legend as
+  well would settle the property for it alone — and settle it with a default. `"config": {"legend":
+  {"title": false}}` therefore came out with every caption still drawn, the derived caption
+  outranking the theme that had turned captions off. A value the specification stated on the channel
+  is explicit and still wins, and for a caption that includes one written on the definition rather
+  than in its `legend` block. Two specifications in the wild corpus turn their captions off that
+  way.
+
 - **A name derived from a model's own is a variable name.** `getName` puts the whole joined string
   through `varName` — `varName((this.name ? `${this.name}_` : '') + text)` — and it is how every
   dataset, signal, scale and mark group is named, so a chart called `Amount Bar Chart` has a layer

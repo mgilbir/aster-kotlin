@@ -982,7 +982,17 @@ internal object Guides {
     val namedUnits = def.timeUnit in setOf("quarter", "month", "day")
     val gradient = channel in setOf("color", "fill", "stroke") && continuous && !namedUnits
 
+    // `if (explicit || config.legend[property] === undefined)`: a property the **theme** states is
+    // not written onto the component at all. It is already in the Vega `config.legend` block that
+    // goes out beside the chart, and Vega applies it from there to every legend at once; writing a
+    // *derived* value here as well would settle it for this legend alone and beat the theme with a
+    // default. A value the specification stated on the channel is explicit and still wins.
+    val themed = view.config.raw.obj("legend")?.fields.orEmpty()
     return obj {
+      /** A value this compiler worked out, which the theme outranks. */
+      fun derived(key: String, value: VegaValue) {
+        if (key !in themed) put(key, value)
+      }
       put(scaleChannel, view.scale(channel))
       // `config.aria: false` takes the whole chart out of the accessibility tree, and a guide says
       // so on itself: there is nothing to read a key out to. A legend that states its own `aria`
@@ -996,18 +1006,20 @@ internal object Guides {
       // A legend labels a bucketed instant the same way an axis does, and for the same reason: the
       // swatch beside a colour ramp of months should read `Jan`, not the month's number.
       if (def.timeUnit != null) {
-        put("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit, view.config.locale)))
+        derived("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit, view.config.locale)))
       } else if (def.type == MeasureType.TEMPORAL) {
         // `omitTimeFormatConfig` is true for an axis and **false** for a legend: an axis chooses
         // its own granularity from the span it is showing, where a legend's entries stand alone
         // and take the configured date format.
-        put("format", str(view.config.timeFormat))
+        derived("format", str(view.config.timeFormat))
       }
-      formatType(def, type)?.let { put("formatType", it) }
+      formatType(def, type)?.let { derived("formatType", str(it)) }
       // `defaultLabelOverlap` for a legend, which is a shorter list than an axis's: a scale whose
       // entries are unevenly spaced drops labels *greedily*, keeping the first of each collision
       // rather than every other one, because parity would thin the crowded end alone.
-      if (type in setOf("quantile", "threshold", "log", "symlog")) put("labelOverlap", "greedy")
+      if (type in setOf("quantile", "threshold", "log", "symlog")) {
+        derived("labelOverlap", str("greedy"))
+      }
       // A **custom** format type is a function the page registered rather than a specifier, so the
       // entry's label is written out as an expression calling it — the same rule the axes follow.
       val customLabel =
@@ -1047,18 +1059,22 @@ internal object Guides {
         val alongThePlot = !horizontal || orient == "top" || orient == "bottom"
         val measure = if (horizontal) view.sizeSignal("x") else view.sizeSignal("y")
         val shortest = if (horizontal) 100 else 64
-        if (alongThePlot) put("gradientLength", signalRef("clamp($measure, $shortest, 200)"))
-        else put("gradientLength", num(shortest.toDouble()))
+        if (alongThePlot) derived("gradientLength", signalRef("clamp($measure, $shortest, 200)"))
+        else derived("gradientLength", num(shortest.toDouble()))
       } else {
         // The type is written only where it *disagrees* with what Vega would pick: a symbol legend
         // over a continuous colour scale has to say so, and everywhere else a symbol is already
         // the default and saying it again is noise.
         if (namedUnits && continuous && channel in setOf("color", "fill", "stroke")) {
-          put("type", "symbol")
+          derived("type", str("symbol"))
         }
-        put("symbolType", defaultSymbolType(view, channel))
+        derived("symbolType", str(defaultSymbolType(view, channel)))
       }
-      Fields.title(def, view.config)?.let { put("title", it) }
+      // `if (property === 'title' && value === fieldDef?.title) { explicit = true }` — a caption
+      // the *definition* wrote is explicit as much as one its `legend` block wrote, so it beats a
+      // theme that turns captions off.
+      val titled = def.legend?.fields?.get("title") != null || def.explicitTitle != null
+      Fields.title(def, view.config)?.let { if (titled) put("title", it) else derived("title", it) }
       // A legend along the top or bottom of a chart runs **horizontally**; Vega's own default is
       // vertical, and every other orientation keeps it — `defaultDirection`, with the inner
       // corners taking it only for a gradient.
@@ -1066,12 +1082,12 @@ internal object Guides {
       // states is already in Vega's own config block, and repeating it here would say it twice.
       when (def.legend?.string("orient")) {
         "top",
-        "bottom" -> put("direction", "horizontal")
+        "bottom" -> derived("direction", str("horizontal"))
         "left",
         "right",
         "none",
         null -> Unit
-        else -> if (gradient) put("direction", "horizontal")
+        else -> if (gradient) derived("direction", str("horizontal"))
       }
       // `labelExpr` is **not** a Vega legend property, exactly as it is not a Vega axis property:
       // upstream's `assembleLegend` destructures it out of the component and writes
