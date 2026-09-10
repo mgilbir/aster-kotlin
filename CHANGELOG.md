@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A `view` block names the style its plotting area is drawn with.** `assembleGroupStyle` asks the
+  view for its `view.style` before deciding anything, `cell` being a default like any other: a chart
+  writing `{"view": {"style": "myStyle"}}` is asking for its own style block instead, which is how a
+  document paints the paper behind one chart of a row differently from its neighbours. This engine
+  derived `cell` or `view` from the encoding and never asked, so such a chart was drawn with the
+  default and its style block applied to nothing. One specification in the wild corpus is a row of
+  three plots, the last of which names two styles of its own — and several is what a cell of a
+  trellis may now be drawn with too, its style having been narrowed to a single name on the way in.
+
 - **A mark may ask not to be sorted, and says so on the mark.** A path is drawn along its own
   dimension by default, or nothing would keep it from doubling back; a chart whose path is a
   *route* — a trail whose width tells a story about a journey — has to be drawn in the order its

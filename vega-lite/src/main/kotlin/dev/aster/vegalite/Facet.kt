@@ -671,8 +671,13 @@ internal interface FacetLayout {
     widthSignal: String,
     heightSignal: String,
     titleOffset: Double,
-    /** `cell` or `view`, by the same rule the chart's own group follows. */
-    style: String,
+    /**
+     * The style the cell is drawn with, by the same rule the chart's own group follows.
+     *
+     * A `VegaValue` rather than a name: a view may name **several** styles, and a cell is styled by
+     * whatever its view asked for.
+     */
+    style: VegaValue,
     /**
      * The columns each cell counts its own categories in, where it sizes itself.
      *
@@ -1064,7 +1069,7 @@ internal class FacetGrid(
     widthSignal: String,
     heightSignal: String,
     titleOffset: Double,
-    style: String,
+    style: VegaValue,
     counted: Map<String, String>,
     scales: List<VegaValue>,
     viewEncode: VegaValue?,
@@ -1442,7 +1447,7 @@ internal class FacetWrap(
     widthSignal: String,
     heightSignal: String,
     titleOffset: Double,
-    style: String,
+    style: VegaValue,
     counted: Map<String, String>,
     scales: List<VegaValue>,
     viewEncode: VegaValue?,

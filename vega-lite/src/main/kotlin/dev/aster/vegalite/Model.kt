@@ -246,6 +246,16 @@ internal class UnitSpec(
    * The `projection` this view's places are put on the page by, where it states or inherits one.
    */
   val projection: VegaValue.Obj? = null,
+  /**
+   * The `view` block this view states, of which only the **style** is read from here.
+   *
+   * `assembleGroupStyle` asks the unit for its `view.style` before deciding anything: a view that
+   * names its own styles is drawn with those instead of the `cell` a plotting area gets by default.
+   * The rest of the block is painted onto the group that owns the plotting area, which in a layer
+   * is the layer's rather than the member's — so it is read from the model being assembled and this
+   * one is only asked for the style.
+   */
+  val viewBackground: VegaValue.Obj? = null,
 ) {
   val mark: String
     get() = markDef.type

@@ -256,6 +256,7 @@ internal class UnitView(
           height = spec.height,
           params = spec.params,
           projection = spec.projection,
+          viewBackground = spec.viewBackground,
         ),
         config,
         name,

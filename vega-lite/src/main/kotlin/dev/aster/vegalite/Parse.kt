@@ -89,6 +89,7 @@ internal class Parse(
       // A **projection** belongs to the unit that draws through it. A layer may state one of its
       // own, and a chart's own is handed down to the members that did not.
       projection = spec.obj("projection"),
+      viewBackground = spec.obj("view"),
     )
   }
 

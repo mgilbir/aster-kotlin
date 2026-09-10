@@ -1467,8 +1467,21 @@ private class Compilation(
   private fun style(views: List<UnitView>): VegaValue? {
     val styles = LinkedHashSet<String>()
     for (view in views) {
-      styles +=
-        if (view.spec.encoding["x"] != null || view.spec.encoding["y"] != null) "cell" else "view"
+      // `assembleGroupStyle` asks the view's own `view` block first: a chart that names its styles
+      // is drawn with **those**, and the `cell` a plotting area gets by default is a default like
+      // any other. A layer unions its members' answers, so a member naming one style and a member
+      // naming none come out as that style beside `cell`.
+      when (val stated = view.spec.viewBackground?.fields?.get("style")) {
+        null ->
+          styles +=
+            if (view.spec.encoding["x"] != null || view.spec.encoding["y"] != null) "cell"
+            else "view"
+        is VegaValue.Str -> styles += stated.value
+        is VegaValue.Arr -> styles += stated.values.mapNotNull { (it as? VegaValue.Str)?.value }
+        // A `"style": null` names no style and asks for no default either: `style !== undefined`
+        // is what the question is, and Vega is handed nothing.
+        else -> Unit
+      }
     }
     return when (styles.size) {
       0 -> null
@@ -2443,6 +2456,9 @@ private class Compilation(
             transforms = view.spec.transforms,
             width = view.spec.width,
             height = view.spec.height,
+            // A cell has a plotting area of its own, so what the view block says about styling it
+            // is the cell's — `assembleGroupStyle` is asked of the child model, which is this one.
+            viewBackground = view.spec.viewBackground,
           ),
           config,
           // `child` under the chart's own name and above the layer's: a named trellis of layers
@@ -2667,7 +2683,7 @@ private class Compilation(
           // A cell is styled by the same rule the chart's own group is: `cell` where it has a
           // Cartesian position to border, `view` where it has none. A trellis of pies has no
           // plotting area in any of its cells.
-          (style(views) as? VegaValue.Str)?.value ?: "cell",
+          style(views) ?: VegaValue.Str("cell"),
           cellCardinality,
           cellScales,
           viewEncode(),
