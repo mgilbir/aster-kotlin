@@ -8,6 +8,12 @@ section here does not get released.
 
 ### Fixed
 
+- **An instant bucketed on one entry of a list channel is bucketed.** `TimeUnitNode.makeFromEncoding`
+  folds the encoding with `reduceFieldDef`, which spreads an array before it folds, so a `tooltip`
+  naming four columns is four definitions. Reading only the channel's own definition left the
+  transform unwritten, and the tooltip then read a column no step in the flow produces — an empty
+  line where a date should be.
+
 - **The stack is computed before its order is aligned with the colour domain.** `UnitModel`'s
   constructor runs `this.stack = stack(mark, encoding)` and only then
   `alignStackOrderWithColorDomain()`, which may write an `order` channel of its own — so `stackBy`

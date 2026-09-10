@@ -706,21 +706,27 @@ internal class DataPipeline(
   private fun timeUnitNode(): TimeUnitNode? {
     // The facet's own channels first: their transform belongs to the facet model, which sits above
     // the cell's, so a trellis broken down by year buckets the year before it buckets the quarter.
-    val units =
-      (view.facetDefs + view.spec.encoding.entries.map { it.value }).mapNotNull { def ->
-        val timeUnit =
-          def.timeUnit?.takeIf { !Fields.isBinnedTimeUnit(it) } ?: return@mapNotNull null
-        val field = def.field ?: return@mapNotNull null
-        val channel = view.spec.encoding.entries.firstOrNull { it.value === def }?.key
-        TimeUnitComponent(
-          field,
-          Fields.timeUnitParts(timeUnit),
-          Fields.vgField(def, forAs = true),
-          step = Fields.timeUnitStep(timeUnit),
-          utc = timeUnit.startsWith("utc"),
-          offsettedRect = channel?.let { offsettedRectFormulas(def, it) }.orEmpty(),
-        )
-      }
+    // `model.reduceFieldDef` spreads a **list** channel before it folds — a `tooltip` naming four
+    // columns is four definitions — so an instant bucketed on the second entry of one is bucketed.
+    // Reading only the channel's own definition left the transform unwritten, and the tooltip then
+    // read a column no step in the flow produces.
+    val defs =
+      view.facetDefs.map { null to it } +
+        view.spec.encoding.entries.flatMap { (channel, def) ->
+          (listOf(def) + def.siblings + def.conditions).map { channel to it }
+        }
+    val units = defs.mapNotNull { (channel, def) ->
+      val timeUnit = def.timeUnit?.takeIf { !Fields.isBinnedTimeUnit(it) } ?: return@mapNotNull null
+      val field = def.field ?: return@mapNotNull null
+      TimeUnitComponent(
+        field,
+        Fields.timeUnitParts(timeUnit),
+        Fields.vgField(def, forAs = true),
+        step = Fields.timeUnitStep(timeUnit),
+        utc = timeUnit.startsWith("utc"),
+        offsettedRect = channel?.let { offsettedRectFormulas(def, it) }.orEmpty(),
+      )
+    }
     // Two channels bucketing one column the same way are one bucket: an x and a tooltip over
     // `yearmonthdate(date)` write the same column, and writing it twice is the same transform
     // emitted twice. `TimeUnitNode`'s components are a set upstream, keyed by what they produce.
