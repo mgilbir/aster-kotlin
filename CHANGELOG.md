@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A tooltip line reads the column as written, not the column the aggregate wrote.**
+  `addLineBreaksToTooltip` spells the definition's own field into the expression —
+  `${expr}["${channelDef.field}"]` — and for an `order` channel that *counts* the rows there is no
+  field to spell, so the description Vega is given reads `datum["undefined"]`. This read
+  `datum["__count"]` instead, which is the sensible thing and not what upstream emits. Reproduced
+  rather than repaired: the reason the discrete form is reached at all is that `initFieldDef` gives
+  an `order` definition no type, and `add` in `tooltip.ts` falls back to the main channel's — which
+  for an `order`, held as an array, is undefined. Two specifications in the wild corpus write an
+  order that way.
+
 - **The controls a chart is driven by come out in reverse order of declaration.**
   `inputBindings.topLevelSignals` *unshifts* a signal for each of a selection's projections —
   `signals.unshift({name: sgname, …})` — and `assembleTopLevelSignals` walks the selections in

@@ -1521,7 +1521,14 @@ internal object Marks {
         // what the aggregate wrote: `datum["<field>"]`, spelled out. It tells on an `argmin`, whose
         // value lives inside the row the aggregate kept — upstream reads the bare column there and
         // this reads what upstream reads.
-        val plain = def.field?.let { "datum[${quoted(it)}]" } ?: accessor
+        //
+        // A definition naming **no** column reads the word JavaScript prints for one: a `count` has
+        // nothing to be a count of, and `${expr}["${channelDef.field}"]` interpolates `undefined`.
+        // An `order` channel is where it happens — `initFieldDef` gives it no type, so `add` in
+        // `tooltip.ts` falls back to `encoding[mainChannel].type` and finds an *array* there, whose
+        // `type` is undefined — and the entry then reads a column no row has. Reproduced rather
+        // than repaired, the description this writes being the one Vega is given.
+        val plain = "datum[${quoted(def.field ?: "undefined")}]"
         "isValid($plain) ? isArray($plain) ? join($plain, '$separator') : $plain : \"\"+$plain"
       }
     }
