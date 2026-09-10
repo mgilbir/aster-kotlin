@@ -643,7 +643,7 @@ internal object Marks {
    * The mark's own wins; failing that, the *last* style block that names it, styles being applied
    * in order; failing that, the mark type's own configuration.
    */
-  private fun styled(view: UnitView, property: String): VegaValue? {
+  internal fun styled(view: UnitView, property: String): VegaValue? {
     view.markDef.raw.fields[property]?.let {
       return it
     }

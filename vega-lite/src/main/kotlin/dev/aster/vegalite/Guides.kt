@@ -1361,9 +1361,18 @@ internal object Guides {
     }
     return (def?.value as? VegaValue.Num)?.value
       ?: view.markDef.number("opacity")
+      // The reduced scatter opacity, which is `markDef.opacity` by the time a legend reads it:
+      // `initMarkDef` has already settled it, and it settles it from **both** opacities —
+      // `specifiedOpacity === undefined && specifiedFillOpacity === undefined`. A mark that says
+      // how solid its fill is has answered the question, so its swatch is not faded either, and
+      // the two are read through the mark, its styles and the configuration alike. Asking a
+      // narrower question here than the mark asks is how a swatch came out fainter than the mark
+      // beside it.
       ?: if (
         view.spec.mark in setOf("point", "tick", "circle", "square") &&
-          !Stack.isAggregate(view.spec)
+          !Stack.isAggregate(view.spec) &&
+          Marks.styled(view, "opacity") == null &&
+          Marks.styled(view, "fillOpacity") == null
       ) {
         0.7
       } else {

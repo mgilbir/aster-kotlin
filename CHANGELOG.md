@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **A swatch takes the opacity the mark took.** By the time a legend reads it, the reduced scatter
+  opacity is just `markDef.opacity`, which `initMarkDef` settles from *both* opacities — a mark
+  stating its `fillOpacity` has answered the question, so its swatch is not faded either. The legend
+  asked a narrower question than the mark: no `fillOpacity`, and the mark alone rather than the
+  mark, its styles and the configuration. The two now ask through the same lookup rather than
+  through two copies of it, which is what let them drift apart.
+
 - **A plot that is a layer titles its group from one of its members.** `LayerModel.assembleTitle` is
   the same function whether the layer is the whole chart or one plot of a concatenation, so a
   concatenated layer whose caption sits on the member carrying the text mark is captioned by it.
