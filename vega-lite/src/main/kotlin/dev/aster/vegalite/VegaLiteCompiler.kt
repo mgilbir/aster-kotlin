@@ -282,8 +282,11 @@ private class Compilation(
     }
     val view = selection.owner ?: views.firstOrNull() ?: return emptyList()
     val unit = selection.unitName(views.firstOrNull().takeIf { facet != null }, facet)
-    return selection.intervalSignals(view, selection.initial) +
-      selection.intervalTail(view, unit = unit, initial = selection.initial)
+    return selection.intervalSignals(
+      view,
+      selection.initial,
+      pushesOutward = pushesOutward(view),
+    ) + selection.intervalTail(view, unit = unit, initial = selection.initial)
   }
 
   /**
@@ -1233,11 +1236,35 @@ private class Compilation(
    * its store, because every unit writes a tuple and the state is whichever unit moved last. The
    * signals themselves carry it instead, declared at the top and written from inside.
    */
+  /**
+   * `model.parent && !isTopLevelLayer(model)`: whether a view's bound-scale state is pushed
+   * outward.
+   *
+   * ```js
+   * function isTopLevelLayer(model: Model): boolean {
+   *   return model.parent && isLayerModel(model.parent) && (!model.parent.parent || isTopLevelLayer(model.parent.parent));
+   * }
+   * ```
+   *
+   * A view drawn by itself has nothing above it, and a member of a **single** layer at the root of
+   * the chart is drawn in the chart's own group — so in neither case is there an outer signal to
+   * push into. Everything else has one: a plot of a concatenation, a cell of a trellis, and a
+   * member of a *nested* layer, which is what a composite mark and a layer of layers both are.
+   *
+   * The nesting is read off the view's name, this compiler having no model tree to walk:
+   * `layer_0_layer_1` is a member of a layer inside a layer, where `layer_0` is a member of the
+   * chart's own.
+   */
+  private fun pushesOutward(view: UnitView): Boolean {
+    if (concat != null || facet != null) return true
+    return Regex("(^|_)layer_\\d+").findAll(view.name).count() >= 2
+  }
+
   private fun boundOutward(
     selection: Selection,
     views: List<UnitView>,
   ): List<Pair<String, String>> {
-    if (!selection.bindsScales || (concat == null && facet == null)) return emptyList()
+    if (!selection.bindsScales) return emptyList()
     // Every view that declares it, not just the one that owns the component. `topLevelSignals` is
     // called once per unit and **appends** the mappings it does not already have — "no single
     // selCmpt has a global view" — so a repeated plot's bound signal names every field any of its
@@ -1248,6 +1275,10 @@ private class Compilation(
       Selection.from(view.spec.params).any { it.name == selection.name }
     }
     val over = (listOfNotNull(selection.owner) + declaring).distinct().ifEmpty { views.take(1) }
+    // `if (!model.parent || isTopLevelLayer(model) || bound.length === 0) return signals` — a chart
+    // whose views push nothing outward has nothing to push *into*, and the state is read from the
+    // one view's own signals.
+    if (over.none { pushesOutward(it) }) return emptyList()
     val out = LinkedHashMap<String, String>()
     for (view in over) {
       selection.intervalChannels(view).forEach { (_, field) ->

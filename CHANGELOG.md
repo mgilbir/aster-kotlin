@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A view inside a nested layer pushes its bound-scale state outward, as a plot of a concatenation
+  does.** `vlSelectionResolve` knows nothing about bound scales, so in a chart of several views the
+  state is reassembled from what each view pushes into an empty signal declared above it —
+  `model.parent && !isTopLevelLayer(model)`, where a *top-level* layer is one whose members are
+  drawn in the chart's own group. A view drawn by itself and a member of a single layer at the root
+  push nothing; everything else does, and a **nested** layer is what a layer of layers and a
+  composite mark both are. This did it for a concatenation and a trellis only, so a nested layer
+  whose members pan and zoom their own axes was missing both the outer declaration and the
+  `push: "outer"` on its own signal. Two specifications in the wild corpus differ by exactly those
+  eight signals.
+
 - **An `identifier` survives only where new rows were made.** `RemoveUnnecessaryIdentifierNodes`
   keeps one whose parent is a table, an aggregate or a parse — the three steps after which a row is a
   new row with no identity of its own — and removes every other, upstream writing one at the head of

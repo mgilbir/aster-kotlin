@@ -1459,11 +1459,15 @@ internal class Selection(
     }
   }
 
-  fun intervalSignals(view: UnitView, initial: VegaValue?): List<VegaValue> {
+  fun intervalSignals(
+    view: UnitView,
+    initial: VegaValue?,
+    pushesOutward: Boolean = false,
+  ): List<VegaValue> {
     val out = mutableListOf<VegaValue>()
     val projected = intervalChannels(view)
     if (projected.isEmpty()) return out
-    if (bindsScales) return boundScaleSignals(view, projected)
+    if (bindsScales) return boundScaleSignals(view, projected, pushesOutward)
     val dragStreams = dragStreams()
     val items = intervalProjections(view)
     val geo = throughProjection()
@@ -1703,6 +1707,26 @@ internal class Selection(
   private fun boundScaleSignals(
     view: UnitView,
     projected: List<Pair<String, String>>,
+    /**
+     * Whether this view's state is **pushed outward** to a signal standing above it.
+     *
+     * ```js
+     * // Nested signals need only push to top-level signals with multiview displays.
+     * if (model.parent && !isTopLevelLayer(model)) {
+     *   for (const proj of selCmpt.scales) {
+     *     const signal: any = signals.find((s) => s.name === proj.signals.data);
+     *     signal.push = 'outer';
+     *     delete signal.value;
+     *     delete signal.update;
+     *   }
+     * }
+     * ```
+     *
+     * `vlSelectionResolve` knows nothing about bound scales, so in a chart of several views the
+     * state has to be reassembled from what each view pushes out — and the empty signal it pushes
+     * into is [VegaLiteCompiler.boundOutward]'s.
+     */
+    pushesOutward: Boolean,
   ): List<VegaValue> {
     val out = mutableListOf<VegaValue>()
     for ((channel, field) in projected) {
@@ -1740,6 +1764,7 @@ internal class Selection(
       val sign = if (channel == "x") "-" else ""
       out += obj {
         put("name", data)
+        if (pushesOutward) put("push", "outer")
         put(
           "on",
           arr(
