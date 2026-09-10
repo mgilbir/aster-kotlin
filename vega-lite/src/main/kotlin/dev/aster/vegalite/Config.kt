@@ -178,6 +178,29 @@ internal class Config(
     val out = LinkedHashMap<String, VegaValue>()
     val styles = LinkedHashMap<String, VegaValue>()
 
+    // `initConfig` lifts `font` out of the configuration and merges a derived block in its place,
+    // **under** everything the specification wrote:
+    //
+    //     const {color, font, fontSize, selection, ...restConfig} = specifiedConfig;
+    //     const mergedConfig = mergeConfig({}, duplicate(defaultConfig),
+    //       font ? fontConfig(font) : {}, …, restConfig || {});
+    //
+    //     export function fontConfig(font: string): Config {
+    //       return {text: {font}, style: {'guide-label': {font}, 'guide-title': {font},
+    //                                     'group-title': {font}, 'group-subtitle': {font}}};
+    //     }
+    //
+    // Vega has no top-level `config.font`, so a theme that names one and nothing else reached the
+    // renderer with the font in a place nothing reads: the whole chart was drawn in the default
+    // face. Seeded here rather than written at the end, because the specification's own style
+    // blocks merge *over* it — a `guide-label` that names a colour keeps this font beside it.
+    (user.fields["font"] as? VegaValue.Str)?.let { font ->
+      val block = obj { put("font", font) }
+      for (name in listOf("text", "guide-label", "guide-title", "group-title", "group-subtitle")) {
+        styles[name] = block
+      }
+    }
+
     for ((key, value) in user.fields) {
       when {
         key in VEGA_LITE_ONLY -> Unit
@@ -190,7 +213,10 @@ internal class Config(
               (v as? VegaValue.Obj)?.let { block ->
                 VegaValue.Obj(block.fields.filterKeys { it !in VEGA_LITE_ONLY_MARK })
               } ?: v
-            if (kept !is VegaValue.Obj || kept.fields.isNotEmpty()) styles[k] = kept
+            // `mergeConfig` is a deep merge over the derived blocks above, so a style that names
+            // one property keeps the seeded font beside it rather than replacing the block.
+            if (kept !is VegaValue.Obj || kept.fields.isNotEmpty())
+              styles[k] = merged(styles[k], kept)
           }
         // `config.mark` survives, minus the properties only Vega-Lite understands — `color` and
         // `filled` are resolved into a mark's own fill and stroke long before Vega sees anything.
@@ -208,18 +234,59 @@ internal class Config(
               VegaValue.Obj(block.fields.filterKeys { it !in drop })
             }
             ?.takeIf { it.fields.isNotEmpty() }
-            ?.let { styles[key] = it }
-        key == "title" -> titleStyle(value)?.let { styles["group-title"] = it }
+            ?.let { styles[key] = merged(styles[key], it) }
+        key == "title" -> {
+          titleStyle(value)?.let { styles["group-title"] = merged(styles["group-title"], it) }
+          subtitleStyle(value)?.let {
+            styles["group-subtitle"] = merged(styles["group-subtitle"], it)
+          }
+        }
         // `config.view` becomes the **`cell`** style, not a `view` one: "View's default style is
         // `cell`" — `stripAndRedirectConfig` renames it on the way through, and a chart that told
         // its plotting area not to draw a border was otherwise still drawing one.
-        key == "view" -> viewStyle(value)?.let { styles["cell"] = it }
+        key == "view" -> viewStyle(value)?.let { styles["cell"] = merged(styles["cell"], it) }
         else -> out[key] = value
       }
     }
 
     if (styles.isNotEmpty()) out["style"] = VegaValue.Obj(styles)
     return if (out.isEmpty()) null else VegaValue.Obj(out)
+  }
+
+  /** `mergeConfig`, for one style block: what the specification wrote wins, key by key. */
+  private fun merged(seeded: VegaValue?, stated: VegaValue): VegaValue {
+    val under = (seeded as? VegaValue.Obj)?.fields ?: return stated
+    val over = (stated as? VegaValue.Obj)?.fields ?: return stated
+    val fields = LinkedHashMap(under)
+    fields.putAll(over)
+    return VegaValue.Obj(fields)
+  }
+
+  /**
+   * `subtitleMarkConfig`: the five properties a chart's **subtitle** inherits from its title.
+   *
+   * ```js
+   * const subtitleMarkConfig = pick(titleConfig, ['align', 'baseline', 'dx', 'dy', 'limit']);
+   * …
+   * if (!isEmpty(subtitleMarkConfig)) {
+   *   config.style['group-subtitle'] = {...config.style['group-subtitle'], ...subtitleMarkConfig};
+   * }
+   * ```
+   *
+   * A subtitle sits under the title and is nudged with it, so the placement carries over while the
+   * type does not — `fontSize` and `fontWeight` stay the title's alone, and the subtitle's own
+   * `subtitleFontSize` and its kin are left in `config.title` for the title directive to read.
+   *
+   * Writing only the `group-title` style left a chart that had moved its title fifty units across
+   * with a subtitle still at the origin, under nothing.
+   */
+  private fun subtitleStyle(value: VegaValue): VegaValue.Obj? {
+    val block = value as? VegaValue.Obj ?: return null
+    val fields = LinkedHashMap<String, VegaValue>()
+    for (key in listOf("align", "baseline", "dx", "dy", "limit")) {
+      block.fields[key]?.let { fields[key] = it }
+    }
+    return if (fields.isEmpty()) null else VegaValue.Obj(fields)
   }
 
   /** `config.title` names its colour `color`; a style block names it `fill`. */
@@ -289,6 +356,7 @@ internal class Config(
       setOf(
         "scale",
         "color",
+        "font",
         "fontSize",
         "background",
         "padding",

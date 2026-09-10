@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **`config.font` and `config.title` reach the styles they name.** `initConfig` lifts `font` out of
+  the configuration and merges `fontConfig(font)` in its place — `text`, `guide-label`,
+  `guide-title`, `group-title` and `group-subtitle` — *under* everything the specification wrote.
+  Vega has no top-level `config.font`, so a theme naming one reached the renderer with the font
+  where nothing reads it and the whole chart was drawn in the default face. `config.title`
+  contributes a `group-subtitle` style as well as a `group-title` one, from
+  `pick(titleConfig, ['align', 'baseline', 'dx', 'dy', 'limit'])`: a chart that moved its title
+  fifty units across had left its subtitle at the origin, under nothing.
+
+  Every style block now **merges** over what these contribute rather than replacing it, which is
+  what `mergeConfig` does — a `guide-label` that names a colour keeps the configured font beside it.
+
 - **A Vega-Lite 4 selection tested *inside* a predicate is compiled.** `normalizePredicate` reads a
   condition's own `selection` **or** walks a `test` holding one, and
   `{"condition": {"test": {"selection": "brush"}, "value": 60}}` is the second arm — how Vega-Lite 4
