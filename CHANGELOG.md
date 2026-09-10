@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A header may ask for its bands without their captions.** `"header": {"labels": false}` takes the
+  captions off and keeps the heading over the grid, where `"header": null` — the only shape this
+  engine read — takes both. The band itself stays either way: it is also where a shared axis is
+  drawn, and `if (title || hasAxes)` is what decides whether there is a band at all. So a grid whose
+  cells name themselves, a small-multiples chart whose colour legend already says which row is
+  which, was captioned twice. Two specifications in the wild corpus ask for it. The flag is read
+  from the header and from `config.header` and from nowhere else: it is the one header property that
+  does not go through `getHeaderProperty`, so a theme naming one direction alone does not turn them
+  off.
+
 - **The side a header hangs off decides which band of the grid it is in.** `getHeaderChannel` asks
   the header's own orientation, not the channel it captions: a column facet whose header is moved to
   the right is a **row** header, running down the side of the grid, and its heading is roled, turned

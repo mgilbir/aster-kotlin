@@ -239,6 +239,27 @@ internal class Facet(
   fun captionsAlignWithBand(): Boolean = headerChannel("label") == channel
 
   /**
+   * Whether this channel's bands are captioned at all — `makeHeaderComponent`'s `labels`.
+   *
+   * ```js
+   * const labels =
+   *   fieldDef.header !== null ? getFirstDefined(fieldDef.header?.labels, config.header.labels, true) : false;
+   * ```
+   *
+   * A grid whose cells name themselves — a small-multiples chart whose colours already say which
+   * cell is which — asks for the bands without the captions, and the bands are still where a shared
+   * axis is drawn. Note the two places asked: the header's own `labels` and the theme's, and *not*
+   * `config.headerRow`/`headerColumn`, which this one property is not read from.
+   */
+  fun wantsCaptions(): Boolean {
+    if (def.raw.fields["header"] == VegaValue.Null) return false
+    val stated =
+      def.raw.obj("header")?.fields?.get("labels")
+        ?: config?.raw?.obj("header")?.fields?.get("labels")
+    return (stated as? VegaValue.Bool)?.value ?: true
+  }
+
+  /**
    * `assembleLabelTitle`: the caption naming one value of this channel.
    *
    * It is the same title wherever it is drawn — in the band of its own channel, or, where its side
@@ -842,11 +863,7 @@ internal class FacetGrid(
     // `"header": null` takes the *caption* off, not the band: the band is also where a shared axis
     // is drawn, and that axis is still wanted. A band with neither is the one that disappears.
     val wanted = if (facet?.captionsInFooter() == true) kind == "footer" else kind == "header"
-    val captions =
-      wanted &&
-        facet != null &&
-        facet.def.raw.fields["header"] != VegaValue.Null &&
-        facet.captionsAlignWithBand()
+    val captions = wanted && facet != null && facet.wantsCaptions() && facet.captionsAlignWithBand()
     if (axes.isEmpty() && !captions) return null
     return obj {
       put("name", named("${channel}_$kind"))
