@@ -88,12 +88,18 @@ internal class Composite(
    * column is not a request to break the summary down by that column.
    */
   private fun groupbyOf(shared: Map<String, VegaValue>): List<String> =
-    shared.entries
+    shared.values
+      // A **list** channel is a list of definitions, and each is a grouping of its own. `forEach`
+      // in `encoding.ts` — which is what `extractTransformsFromEncoding` walks the encoding with —
+      // spreads an array before it calls: `if (isArray(el)) for (const channelDef of el) f(…)`.
+      // A `tooltip` naming four columns breaks the summary down by all four, and reading only the
+      // channel's own definition summarised across every one of them.
+      .flatMap { value -> (value as? VegaValue.Arr)?.values ?: listOf(value) }
       // A channel that **aggregates** is a measure, not a grouping: `extractTransformsFromEncoding`
       // pushes it onto the aggregate list instead, so a tooltip asking for a mean of the column
       // being summarised does not also break the summary down by that column.
-      .filterNot { (_, value) -> (value as? VegaValue.Obj)?.has("aggregate") == true }
-      .mapNotNull { (_, value) -> (value as? VegaValue.Obj)?.string("field") }
+      .filterNot { value -> (value as? VegaValue.Obj)?.has("aggregate") == true }
+      .mapNotNull { value -> (value as? VegaValue.Obj)?.string("field") }
 
   /** The marks this handles. Anything else is not a composite mark. */
   fun handles(type: String): Boolean =

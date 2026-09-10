@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **Every entry of a list channel breaks a composite mark's summary down by its own column.**
+  `extractTransformsFromEncoding` walks the encoding with `forEach`, which spreads an array before
+  it calls, so a `tooltip` naming four columns contributes four groupings. Reading only the
+  channel's own definition summarised across all of them — an error bar meant to draw one interval
+  per category drew one interval for everything. A box plot stays the exception, taking its tooltip
+  out of the encoding before the grouping is read.
+
 - **A repetition variable standing in a list channel is resolved.** `replaceRepeaterInMapping` maps
   over an array channel rather than passing it along, so `{"field": {"repeat": "repeat"}}` written
   as one entry of a `tooltip` resolves per repetition. This passed the array along, leaving the
