@@ -8,6 +8,22 @@ section here does not get released.
 
 ### Fixed
 
+- **An error bar's own channels now ask its summary for what they aggregate.** `errorBarParams`
+  hands the encoding to `extractTransformsFromEncoding` before anything is drawn from it, and the
+  measures that walk finds are the *first* entries of the summary — `[...oldAggregate,
+  ...errorBarSpecificAggregate]` — with the channel rewritten to read the column the summary writes.
+  This left the request on the channel, so a tooltip asking for a mean made the part view summarise
+  the summary, grouped by the interval's own bounds. The channel also carries the title it was asked
+  by, so such a line reads `Mean of Body Mass (g)` rather than `mean_Body Mass (g)`.
+
+  Two details of the upstream walk decide the answer. `forEach` spreads a **list** channel, so every
+  entry contributes its grouping or its measure — but the rewrite writes the *channel*, so only the
+  **last** entry is left standing and a two-column tooltip over an error bar reads one line; where
+  that last entry asks for nothing derived, upstream writes the list back whole instead, aggregating
+  entries and all, and the part view really does summarise twice. Both are kept as upstream has
+  them. The `bin` arm of that walk is still not ported: a bucketed channel of an error bar is
+  carried through as written and groups the summary by the raw column.
+
 - **A legend's label expression is applied to the merged legend, and no longer costs the swatch.**
   `assembleLegend` destructures `labelExpr` off the component and applies it at assembly. The place
   matters: a line with a point overlay is two layers, and only the point's legend has a swatch
