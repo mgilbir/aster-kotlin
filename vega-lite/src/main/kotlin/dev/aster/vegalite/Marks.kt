@@ -472,7 +472,18 @@ internal object Marks {
    */
   private fun sortOrder(view: UnitView): VegaValue? {
     val order = view.spec.encoding["order"]
-    if (order != null && order.isValueDef && order.value == VegaValue.Null) return null
+    // ```js
+    // (!isArray(order) && isValueDef(order) && isNullOrFalse(order.value)) ||
+    // (!order && isNullOrFalse(getMarkPropOrConfig('order', markDef, config)))
+    // ```
+    //
+    // Two ways to ask for the items in the order the table holds them, and this engine read half of
+    // one: a `null` written on the **channel**. The other half is `false`, which says the same
+    // thing; and the other way is to write it on the **mark**, which is where a chart that wants no
+    // sorting at all says so — a trail whose width tells a story about a route has to be drawn in
+    // the order the route was travelled, not left to right.
+    if (order != null && order.isValueDef && order.value.isNullOrFalse()) return null
+    if (order == null && Marks.styled(view, "order").isNullOrFalse()) return null
     val ordering = listOfNotNull(order) + order?.siblings.orEmpty()
     if (ordering.any { it.isFieldDef } && view.stack == null) {
       return obj {

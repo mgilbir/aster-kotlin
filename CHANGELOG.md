@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A mark may ask not to be sorted, and says so on the mark.** A path is drawn along its own
+  dimension by default, or nothing would keep it from doubling back; a chart whose path is a
+  *route* — a trail whose width tells a story about a journey — has to be drawn in the order its
+  table holds, and `{"mark": {"type": "trail", "order": false}}` is how it asks. `getSort` reads
+  that through `getMarkPropOrConfig`, so a style or the theme may ask for it too. This engine read
+  only half of the other way to say it, a `null` written on the `order` **channel**, where upstream
+  reads `isNullOrFalse` there and on the mark both — so such a chart was sorted left to right and
+  its route came out re-drawn. One specification in the wild corpus is that chart.
+
 - **A header may ask for its bands without their captions.** `"header": {"labels": false}` takes the
   captions off and keeps the heading over the grid, where `"header": null` — the only shape this
   engine read — takes both. The band itself stays either way: it is also where a shared axis is

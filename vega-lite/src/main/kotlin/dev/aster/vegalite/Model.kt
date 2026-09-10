@@ -191,6 +191,16 @@ internal data class ChannelDef(
  * An empty object and an empty array are **truthy**, which is what makes `"axis": {}` a guide with
  * no properties rather than no guide.
  */
+/**
+ * `isNullOrFalse`: the two ways a property says "not this", which is narrower than falsiness.
+ *
+ * `order: false` and `order: null` both ask for the items unsorted, and `order: 0` — a number, and
+ * falsy — is not that request at all. Upstream tells the two questions apart, and the properties
+ * asked this one are the switches: an *absent* property has not answered it.
+ */
+internal fun VegaValue?.isNullOrFalse(): Boolean =
+  this == VegaValue.Null || this == VegaValue.Bool(false)
+
 internal fun VegaValue?.isTruthy(): Boolean =
   when (this) {
     null,
