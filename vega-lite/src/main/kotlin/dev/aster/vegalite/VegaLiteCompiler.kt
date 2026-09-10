@@ -1541,8 +1541,8 @@ private class Compilation(
         wrappedFacetLayout(level, it),
       )
     }
-    val row = channels["row"]?.let { Facet("row", it, owner) }
-    val column = channels["column"]?.let { Facet("column", it, owner) }
+    val row = channels["row"]?.let { Facet("row", it, owner, config) }
+    val column = channels["column"]?.let { Facet("column", it, owner, config) }
     if (row == null && column == null) {
       diagnostics.fatal(
         VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
@@ -2274,7 +2274,7 @@ private class Compilation(
     fun through(suffix: String) =
       Fields.varName(if (named.isEmpty()) suffix else "${named}_$suffix")
     fun channel(name: String) = views.firstNotNullOfOrNull { view ->
-      view.spec.encoding[name]?.takeIf { it.isFieldDef }?.let { Facet(name, it, named) }
+      view.spec.encoding[name]?.takeIf { it.isFieldDef }?.let { Facet(name, it, named, config) }
     }
     val row = channel("row")
     val column = channel("column")

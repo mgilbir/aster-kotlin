@@ -60,11 +60,48 @@ private fun headerText(def: ChannelDef, field: String, config: Config? = null): 
  * @see FacetGrid, which is what a chart actually has — `row` and `column` are two of these, and a
  *   chart may carry either or both.
  */
+/**
+ * `getHeaderProperty`: what a header says about a caption, and what the theme says where it is
+ * silent.
+ *
+ * ```js
+ * const headerSpecificConfig =
+ *   channel === 'row' ? config.headerRow : channel === 'column' ? config.headerColumn : config.headerFacet;
+ * return getFirstDefined((header || {})[prop], headerSpecificConfig[prop], config.header[prop]);
+ * ```
+ *
+ * Three places, most specific first, and a facet definition that writes no `header` block at all
+ * still takes the theme's. Reading only the definition's own block left `config.header` — which is
+ * how a document sets the type size of every trellis caption at once — with nothing to apply to.
+ */
+internal fun headerProperty(
+  header: VegaValue.Obj?,
+  config: Config?,
+  channel: String,
+  property: String,
+): VegaValue? {
+  header?.fields?.get(property)?.let {
+    return it
+  }
+  val specific =
+    when (channel) {
+      "row" -> "headerRow"
+      "column" -> "headerColumn"
+      else -> "headerFacet"
+    }
+  config?.raw?.obj(specific)?.fields?.get(property)?.let {
+    return it
+  }
+  return config?.raw?.obj("header")?.fields?.get(property)
+}
+
 internal class Facet(
   val channel: String,
   val def: ChannelDef,
   /** The chart's own name, where it has one: every dataset it makes is named under it. */
   private val prefix: String = "",
+  /** Kept because a header's captions take their styling from the theme as well as from itself. */
+  private val config: Config? = null,
 ) {
 
   /**
@@ -83,7 +120,9 @@ internal class Facet(
    */
   fun headerOrient(part: String): String {
     val header = def.raw.obj("header")
-    val stated = header?.string("${part}Orient") ?: header?.string("orient")
+    val stated =
+      (headerProperty(header, config, channel, "${part}Orient") as? VegaValue.Str)?.value
+        ?: header?.string("orient")
     return stated ?: if (isColumn) "top" else "left"
   }
 
@@ -91,7 +130,7 @@ internal class Facet(
   fun captionsInFooter(): Boolean = headerOrient("label") in setOf("bottom", "right")
 
   fun headerProperties(part: String): Map<String, VegaValue> {
-    val header = def.raw.obj("header") ?: return emptyMap()
+    val header = def.raw.obj("header")
     val renamed =
       mapOf(
         "Align" to "align",
@@ -110,7 +149,7 @@ internal class Facet(
       )
     val out = LinkedHashMap<String, VegaValue>()
     for ((suffix, name) in renamed) {
-      header.fields["$part$suffix"]?.let { out[name] = it }
+      headerProperty(header, config, channel, "$part$suffix")?.let { out[name] = it }
     }
     return out
   }
@@ -975,7 +1014,7 @@ internal class FacetWrap(
 
   /** `header.label…` as a text property: the caption on each cell is a header's label. */
   private fun labelProperties(): Map<String, VegaValue> {
-    val header = def.raw.obj("header") ?: return emptyMap()
+    val header = def.raw.obj("header")
     val renamed =
       mapOf(
         "labelAlign" to "align",
@@ -991,7 +1030,9 @@ internal class FacetWrap(
         "labelLineHeight" to "lineHeight",
       )
     val out = LinkedHashMap<String, VegaValue>()
-    for ((stated, name) in renamed) header.fields[stated]?.let { out[name] = it }
+    for ((stated, name) in renamed) {
+      headerProperty(header, config, "facet", stated)?.let { out[name] = it }
+    }
     return out
   }
 

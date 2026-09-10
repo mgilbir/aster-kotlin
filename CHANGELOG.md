@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **A trellis's captions take their styling from the theme.** `getHeaderProperty` reads three places
+  in order — the facet's own `header` block, then `config.headerRow`/`headerColumn`/`headerFacet`,
+  then `config.header` — so a facet that writes no header block at all still takes the theme's. This
+  read the facet's own block and gave up where there was none, leaving `config.header.titleFontSize`
+  — how a document sets the type size of every trellis caption at once — with nothing to apply to.
+  The wrapped facet's cell captions read the same chain.
+
 - **`align`, `baseline` and `theta` belong to a mark made of words.** Every mark compiler hands
   `baseEncodeEntry` an `ignore` argument, and across all thirteen of them these three are the only
   entries that differ: `text.ts` says `include` and the other twelve say `ignore`, a mark that is
