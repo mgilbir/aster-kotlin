@@ -517,6 +517,37 @@ internal class SourceNode(val data: VegaValue, val name: String? = null) : DataN
 
   val isNamed: Boolean =
     data.string("name") != null && !isUrl && !isGenerator && data["values"] == null
+
+  /**
+   * Whether a **second** view was found to read this same table — `findSource` in `parseRoot`.
+   *
+   * It is observable, and for a reason that reads like an accident because it is one:
+   * ```js
+   * const existingSource = findSource(model.data, sources);
+   * if (existingSource) {
+   *   if (!isGenerator(model.data)) {
+   *     existingSource.data.format = mergeDeep({}, model.data.format, existingSource.data.format);
+   *   }
+   * ```
+   *
+   * The assignment is unconditional, so a shared table whose specification says nothing about its
+   * format is written out with an **empty** `format` object where an unshared one has none at all —
+   * `mergeDeep({}, undefined, undefined)` being `{}`. Vega ignores it, and a comparison against
+   * upstream does not: 14 specifications in the wild corpus differ on that key alone.
+   *
+   * The merge also reinstates a `parse` the source node had stripped, that being on `model.data`
+   * rather than on the node's own copy.
+   *
+   * A **lookup** sharing a table does not merge: `LookupNode.make` calls the same `findSource` and
+   * only reuses what it finds.
+   */
+  var shared: Boolean = false
+    private set
+
+  /** Called where `parseRoot` finds this source already standing. */
+  fun sharedAgain() {
+    if (!isGenerator) shared = true
+  }
 }
 
 /**
@@ -1083,7 +1114,7 @@ internal class DataAssembler {
           values =
             data["values"] ?: data["sphere"]?.let { arr(listOf(obj { put("type", "Sphere") })) },
           url = data.string("url"),
-          format = sourceFormat(data),
+          format = sourceFormat(data, shared = root is SourceNode && root.shared),
           transform = generatorTransform(data),
         )
       if (root is SourceNode) walk(root, dataset) else datasets += dataset
@@ -1121,7 +1152,27 @@ internal class DataAssembler {
     )
   }
 
-  private fun sourceFormat(data: VegaValue): VegaValue.Obj? {
+  /**
+   * @param shared whether a second view reads this same table, which [SourceNode.shared] explains:
+   *   the format is then `mergeDeep({}, model.data.format, existingSource.data.format)`, assigned
+   *   whatever it comes to — an empty object where neither says anything, and the specification's
+   *   own `parse` reinstated where it does.
+   */
+  private fun sourceFormat(data: VegaValue, shared: Boolean = false): VegaValue.Obj? {
+    val own = ownFormat(data)
+    if (!shared) return own
+    // `mergeDeep({}, model.data.format, existingSource.data.format)`: the specification's own block
+    // first — which is what reinstates a `parse` the source node had stripped — and the node's own
+    // format over it. Assigned whatever it comes to, so two views reading one table that says
+    // nothing about its format leave an empty object behind.
+    return obj {
+      data.obj("format")?.fields?.forEach { (key, value) -> put(key, value) }
+      own?.fields?.forEach { (key, value) -> put(key, value) }
+    }
+  }
+
+  /** The format the source node holds of its own accord, before anything is merged into it. */
+  private fun ownFormat(data: VegaValue): VegaValue.Obj? {
     // A stated `parse` is not the *loader's* work on a table written out in the specification:
     // Vega has already ingested those rows, so the parse joins the flow's own and becomes a
     // formula there. Only what is left of the format block belongs on the source.

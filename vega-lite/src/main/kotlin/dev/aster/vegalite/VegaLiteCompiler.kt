@@ -2940,6 +2940,31 @@ private class Compilation(
   // -----------------------------------------------------------------------------------------
   // Data
 
+  /**
+   * How many **models** name each table, counted over the specification as written.
+   *
+   * `parseRoot` runs for the root and for every model that states its own `data`, and nowhere else:
+   * a layer member with no `data` block of its own reads its parent's flow rather than looking for
+   * a source. So this counts the `data` blocks in the tree, and a table two of them name is one
+   * `findSource` finds already standing — which [SourceNode.shared] explains is observable.
+   *
+   * A **`lookup`**'s joined table is not one of them: `LookupNode.make` calls the same `findSource`
+   * and only reuses what it finds, so a `transform` is not walked into.
+   */
+  private fun countStatedTables(node: VegaValue, into: MutableMap<VegaValue, Int>) {
+    when (node) {
+      is VegaValue.Obj -> {
+        node.fields["data"]?.let { into[it] = (into[it] ?: 0) + 1 }
+        for ((key, value) in node.fields) {
+          if (key == "data" || key == "datasets" || key == "transform") continue
+          countStatedTables(value, into)
+        }
+      }
+      is VegaValue.Arr -> node.values.forEach { countStatedTables(it, into) }
+      else -> {}
+    }
+  }
+
   private fun assembleData(views: List<UnitView>): List<VegaValue> {
     if (views.any { it.spec.data == null }) {
       diagnostics.error(
@@ -2962,6 +2987,10 @@ private class Compilation(
     // chart's table `source_0`. It is left out where nothing hangs off it, as an unused subtree is.
     spec.fields["data"]?.let { own -> if (views.any { it.spec.data == own }) order += own }
     val roots = LinkedHashMap<VegaValue, SourceNode>()
+    // How many **models** name each table, which is how many times `parseRoot` runs on it and
+    // therefore how many times it can be *found* already standing. See [SourceNode.shared].
+    val statedBy = LinkedHashMap<VegaValue, Int>()
+    countStatedTables(spec, statedBy)
     // Which selections are read as a **table** rather than as a test. `materializeSelections`
     // builds one for every selection upstream and lets its ref counting drop the unread ones; the
     // same answer is reached here by asking first, since an output nobody reads still costs a
@@ -3060,7 +3089,15 @@ private class Compilation(
           materialized = materialized,
           lookupOutputs = lookupOutputs,
         )
-        .build(roots.getOrPut(data) { SourceNode(data) })
+        // `parseRoot`: a source already standing is **found** rather than made, and finding one is
+        // observable — see [SourceNode.shared].
+        .build(
+          roots
+            .getOrPut(data) { SourceNode(data) }
+            .also {
+              if ((statedBy[data] ?: 0) >= 2) it.sharedAgain()
+            }
+        )
     }
     // Every view built its own chain onto its source, so a shared tree forks there; the shared
     // parse is hoisted above the fork before the tree is named and flattened.

@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A table two models name is written out with a `format` block, whatever it comes to.** `parseRoot`
+  runs for the root and for every model that states its own `data`; where it finds a source already
+  standing it assigns `mergeDeep({}, model.data.format, existingSource.data.format)`
+  unconditionally, and that is `{}` when neither says anything. So two layers reading one table
+  leave an **empty** format behind where one layer leaves none at all — Vega ignores it, and a
+  comparison against upstream does not: 14 specifications in the wild corpus differed on that key
+  alone, five of them on nothing else. The merge reads the specification's own block rather than the
+  source node's stripped copy, so it also reinstates a `parse` the node had taken off an inline
+  table. A model that states no `data` never calls `parseRoot`, and a `lookup` reading the same
+  table reuses the source without merging.
+
 - **The scales come out in `SCALE_CHANNELS` order rather than in the order the encoding was
   written.** `parseUnitScaleCore` walks that list and fills a dictionary keyed by channel, and
   `assembleScales` reads it back in insertion order; the list is `x, y`, then the polar positions,
