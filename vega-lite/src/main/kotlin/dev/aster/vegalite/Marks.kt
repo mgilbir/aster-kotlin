@@ -1311,6 +1311,32 @@ internal object Marks {
     return null
   }
 
+  /**
+   * A field-keyed object's entries in the order **JavaScript** iterates them.
+   *
+   * `tooltipData` collects its lines into a plain object keyed by the caption, and both the tooltip
+   * and the chart's description read it back with `entries(data)` — `Object.keys`, whose order is
+   * *not* insertion order. A key that is the canonical decimal form of an **array index** comes
+   * first, in ascending numeric order, and everything else follows in the order it was written.
+   *
+   * A column called `2020` is such a key, so a chart of yearly columns describes itself starting
+   * with the years however its encoding was written. `01`, `-1` and `1.5` are not — a leading zero,
+   * a sign and a fraction all make the key an ordinary string — which is what makes this a rule
+   * about the *canonical* form rather than about looking numeric.
+   */
+  private fun <V> Map<String, V>.inJavaScriptKeyOrder(): List<Pair<String, V>> {
+    val (indices, rest) = entries.partition { isArrayIndex(it.key) }
+    return (indices.sortedBy { it.key.toLong() } + rest).map { it.key to it.value }
+  }
+
+  /** Whether a key is an array index: a canonical decimal integer below 2³²−1. */
+  private fun isArrayIndex(key: String): Boolean {
+    if (key.isEmpty() || key.length > 10) return false
+    if (key.any { it !in '0'..'9' }) return false
+    if (key.length > 1 && key[0] == '0') return false
+    return key.toLong() < 4294967295L
+  }
+
   /** `{"title": expression, …}` — the object a tooltip of several fields is. */
   private fun tooltipObject(view: UnitView, defs: List<ChannelDef>?): VegaValue? {
     val pairs =
@@ -1338,14 +1364,19 @@ internal object Marks {
         out
       }
     if (pairs.isEmpty()) return null
-    return signalRef(pairs.entries.joinToString(", ", "{", "}") { "\"${it.key}\": ${it.value}" })
+    return signalRef(
+      pairs.inJavaScriptKeyOrder().joinToString(", ", "{", "}") { (key, value) ->
+        "\"$key\": $value"
+      }
+    )
   }
 
   private fun descriptionSignal(view: UnitView): String? {
     val parts = tooltipData(view)
     if (parts.isEmpty()) return null
-    return parts.entries
-      .filterNot { it.key.startsWith("_") }
+    return parts
+      .inJavaScriptKeyOrder()
+      .filterNot { it.first.startsWith("_") }
       .mapIndexed { index, (key, value) ->
         // The title goes *inside* a JSON string in an expression, so a quotation mark in it has to
         // be escaped or the expression ends early and the rest is a syntax error.

@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A tooltip's lines come out in the order JavaScript iterates an object's keys.** `tooltipData`
+  collects them into a plain object keyed by the caption, and both the tooltip and the chart's
+  description read it back with `entries(data)` — `Object.keys`, whose order is *not* insertion
+  order: a key that is the canonical decimal form of an **array index** comes first, in ascending
+  numeric order, and everything else follows as written. A column called `2020` is such a key, so a
+  chart of yearly columns describes itself starting with the years however its encoding was written;
+  two specifications in the wild corpus are tables with a year per column. `01`, `-1` and `1.5` are
+  not indices — a leading zero, a sign and a fraction each make the key an ordinary string — which
+  is what makes this a rule about the canonical form rather than about looking numeric.
+
 - **A view inside a nested layer pushes its bound-scale state outward, as a plot of a concatenation
   does.** `vlSelectionResolve` knows nothing about bound scales, so in a chart of several views the
   state is reassembled from what each view pushes into an empty signal declared above it —
