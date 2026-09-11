@@ -8,6 +8,20 @@ section here does not get released.
 
 ### Fixed
 
+- **A trellis caption is written the way the header says to write it.**
+  `assembleHeaderTitle` reads `format` and `formatType` off the header and hands them to the same
+  `formatSignalRef` a mark's text goes through. This compiler read them too, but only after it had
+  already answered: a date was captioned by the clock and a bucket by its two edges before the
+  question was asked. A trellis of months written `{"format": "%b %y", "formatType": "time"}` was
+  therefore captioned `%b %d, %Y`, and one of buckets written `{"format": ".2f"}` with no specifier
+  at all. The order is now upstream's — a custom format type first, being the name of a function
+  the embedding page registered; then the theme's own writer, and only where the header asked for
+  neither of its own; then the clock, where a stated specifier beats the bucketing; then the
+  number, where the theme's format applies to a measured column alone. A bucket asks for the
+  theme's writer itself, since a grid wrapped on one is a `facet` channel and its default type is
+  `nominal` however the field is measured. One specification in the wild corpus captions a trellis
+  of months that way.
+
 - **A stated scale type is checked against its channel and its field before it is used.**
   `scaleType` asks two questions of a `scale: {"type": …}` and drops it for the default on either
   refusal: whether the **channel** can carry such a scale — there is no band of colour, and a shape

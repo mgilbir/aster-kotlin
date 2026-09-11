@@ -26,18 +26,70 @@ private fun headerLabel(def: ChannelDef, field: String, config: Config? = null):
 
 private fun headerText(def: ChannelDef, field: String, config: Config? = null): String {
   val accessor = "parent[${quoted(field)}]"
+  val end = "parent[${quoted("${field}_end")}]"
+  // `getHeaderProperties(['format', 'formatType', …], facetFieldDef.header, config, channel)`: what
+  // the header says about writing the value, and what the theme says where it is silent.
+  val header = def.raw.obj("header")
+  val statedFormat =
+    (headerProperty(header, config, def.channel, "format") as? VegaValue.Str)?.value
+  val statedType =
+    (headerProperty(header, config, def.channel, "formatType") as? VegaValue.Str)?.value
+
+  /** `customFormatExpr`: a specifier is passed only where there is one to pass. */
+  fun call(write: String, value: String, specifier: String?) =
+    if (specifier != null) "$write($value, ${quoted(specifier)})" else "$write($value)"
+
+  /** `formatExpr`: `format` always takes a specifier, empty where none was settled. */
+  fun number(value: String, specifier: String?) = "format($value, ${quoted(specifier.orEmpty())})"
+
   // A **bucketed** column is captioned by the bucket rather than by its near edge: `binFormat`
   // writes both ends with an en dash between them, and says `"null"` where the row had no value —
   // an empty bucket is a real cell of the grid and has to be captioned as one.
-  if (def.bin is Binning.Bin) {
-    val end = "parent[${quoted("${field}_end")}]"
-    // The same custom format type the guides use, where the configuration named one.
-    val number = config?.numberFormatType?.let { "$it(" } ?: "format("
-    val specifier = if (config?.numberFormatType != null) config.numberFormat.orEmpty() else ""
+  val binned = def.bin is Binning.Bin
+
+  /**
+   * `binFormatExpression`: both edges, written the same way.
+   *
+   * The theme's own writer is asked for **here** as well as above, and without asking the column's
+   * type: a grid wrapped on a bucket is a `facet` channel, whose default type is `nominal` however
+   * the field is measured, so the arm above never sees it.
+   */
+  fun bucket(specifier: String?, write: String?): String {
+    if (specifier == null && write == null && config?.numberFormatType != null) {
+      return bucket(config.numberFormat, config.numberFormatType)
+    }
+    val edge = { value: String ->
+      if (write != null && write != "number" && write != "time") call(write, value, specifier)
+      else number(value, specifier ?: config?.numberFormat)
+    }
     return "!isValid($accessor) || !isFinite(+$accessor) ? \"null\" : " +
-      "$number$accessor, \"$specifier\") + \" – \" + $number$end, \"$specifier\")"
+      "${edge(accessor)} + \" – \" + ${edge(end)}"
   }
+
+  // `isCustomFormatType`: `formatType && formatType !== 'number' && formatType !== 'time'`. The two
+  // Vega knows are not custom types at all but a statement of which of the built-in ways to write
+  // the value, which the arms below answer anyway; anything else names a function the embedding
+  // page registered, and it is the **first** arm of `formatSignalRef` — before the clock, before
+  // the bucket.
+  val custom = statedType?.takeIf { it != "number" && it != "time" }
+  if (custom != null) {
+    return if (binned) bucket(statedFormat, custom) else call(custom, accessor, statedFormat)
+  }
+
+  // `if (format === undefined && formatType === undefined && config.customFormatTypes)`: the
+  // theme's own writer, and only where the header has asked for neither of its own — a stated
+  // specifier is a statement that `format` is to write it. [Config.numberFormatType] folds in the
+  // flag that says whether such a name may be honoured at all.
+  if (statedFormat == null && statedType == null && def.type == MeasureType.QUANTITATIVE) {
+    config?.numberFormatType?.let { write ->
+      return if (binned) bucket(config.numberFormat, write)
+      else call(write, accessor, config.numberFormat)
+    }
+  }
+
   val timeUnit = def.timeUnit
+  // `isFieldOrDatumDefForTimeFormat` reads the **field's** own format type, not the header's, so a
+  // header writing `"formatType": "time"` over a category is written as a number all the same.
   if (def.type == MeasureType.TEMPORAL || timeUnit != null) {
     val utc = timeUnit?.contains("utc") == true || def.scale.string("type") == "utc"
     val prefix = if (utc) "utc" else "time"
@@ -46,40 +98,28 @@ private fun headerText(def: ChannelDef, field: String, config: Config? = null): 
     // defensible as parity, since upstream has no locale to ask, but it meant a grid split by a
     // bucketed field followed the reader's language and a grid split by a plain date did not.
     val locale = config?.locale ?: VegaLocale.EnglishUS
+    // `timeFormatExpression`: `if (!timeUnit || format)`. A specifier the header **states** writes
+    // the caption whatever the bucketing — a trellis of months captioned `"%b %y"` says so — and
+    // the bucket's own specifier, which Vega resolves at render time, is for the case where the
+    // header states none.
     val specifier =
-      if (timeUnit != null) Fields.timeUnitSpecifier(timeUnit, locale)
-      else Fields.fullDateSpecifier(locale)
+      when {
+        statedFormat != null -> quoted(statedFormat)
+        timeUnit != null -> Fields.timeUnitSpecifier(timeUnit, locale)
+        else -> Fields.fullDateSpecifier(locale)
+      }
     return "${prefix}Format($accessor, $specifier)"
   }
-  // `formatSignalRef` asks the header for a `format` and a `formatType` first —
-  // `getHeaderProperties(['format', 'formatType', …], facetFieldDef.header, config, channel)` — so
-  // a caption is written the way the header says however the column is typed.
-  //
-  // A **custom** format type is the name of a function the page registered rather than a specifier,
-  // and it is the first arm of all: `if (isCustomFormatType(formatType)) return
-  // formatCustomType(…)`.
-  val header = def.raw.obj("header")
-  val statedFormat =
-    (headerProperty(header, config, def.channel, "format") as? VegaValue.Str)?.value
-  val custom = (headerProperty(header, config, def.channel, "formatType") as? VegaValue.Str)?.value
-  if (custom != null) {
-    return if (statedFormat != null) "$custom($accessor, ${quoted(statedFormat)})"
-    else "$custom($accessor)"
-  }
+
+  // `numberFormat`: a stated specifier is taken only where it is a string, and the theme's own
+  // number format applies to a **measured** column alone — "we only apply the default if the field
+  // is quantitative".
+  val specifier =
+    statedFormat ?: config?.numberFormat?.takeIf { def.type == MeasureType.QUANTITATIVE }
+  if (binned) return bucket(specifier, statedType)
   // `} else if (format || channelDefType(fieldOrDatumDef) === 'quantitative') {` — a measured
   // column is a number and is written as one, and so is any column the header states a format for.
-  // The specifier falls to `config.numberFormat`, and `config.numberFormatType` names a function to
-  // call instead of `format` — which is called *without* a specifier where there is none, a custom
-  // function taking one only if it was given.
-  if (statedFormat != null || def.type == MeasureType.QUANTITATIVE) {
-    val specifier = statedFormat ?: config?.numberFormat
-    val write = config?.numberFormatType
-    return when {
-      write != null && specifier != null -> "$write($accessor, ${quoted(specifier)})"
-      write != null -> "$write($accessor)"
-      else -> "format($accessor, ${quoted(specifier.orEmpty())})"
-    }
-  }
+  if (specifier != null || def.type == MeasureType.QUANTITATIVE) return number(accessor, specifier)
   return "isValid($accessor) ? $accessor : \"\"+$accessor"
 }
 
