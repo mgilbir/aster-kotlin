@@ -2,6 +2,7 @@ package dev.aster.vegalite
 
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.canonicalNumberString
 
 /**
  * Axes and legends: the guides Vega-Lite writes for you.
@@ -560,10 +561,13 @@ internal object Guides {
       // `normalizeAngle`: a turn is measured from zero, so a label the specification wrote at
       // minus forty-five degrees is a label at three hundred and fifteen.
       axis.properties[key] =
-        if (key == "labelAngle") {
-          (value as? VegaValue.Num)?.let { num(((it.value % 360) + 360) % 360) } ?: asSignal(value)
-        } else {
-          asSignal(value)
+        when {
+          key == "labelAngle" ->
+            (value as? VegaValue.Num)?.let { num(((it.value % 360) + 360) % 360) }
+              ?: asSignal(value)
+          // The ticks a guide was **told** to draw, each made into what Vega can read.
+          key == "values" && value is VegaValue.Arr -> valueArray(def, value)
+          else -> asSignal(value)
         }
     }
     // A property Vega has no name for cannot be left in the configuration for Vega to apply: it
@@ -1063,6 +1067,85 @@ internal object Guides {
   private fun timeFormatted(def: ChannelDef): Boolean =
     def.type == MeasureType.TEMPORAL || def.timeUnit != null
 
+  /**
+   * `LOCAL_SINGLE_TIMEUNIT_INDEX`: the units that name **one** field of a date rather than several.
+   */
+  private val SINGLE_TIME_UNITS =
+    setOf(
+      "year",
+      "quarter",
+      "month",
+      "week",
+      "day",
+      "dayofyear",
+      "date",
+      "hours",
+      "minutes",
+      "seconds",
+      "milliseconds",
+    )
+
+  /**
+   * `valueArray`: the ticks a guide was **told** to draw, each one made into what Vega can read.
+   *
+   * ```js
+   * export function valueArray(fieldOrDatumDef, values) {
+   *   const {type} = fieldOrDatumDef;
+   *   return values.map((v) => {
+   *     const timeUnit = isFieldDef(fieldOrDatumDef) && !isBinnedTimeUnit(fieldOrDatumDef.timeUnit)
+   *       ? fieldOrDatumDef.timeUnit : undefined;
+   *     const expr = valueExpr(v, {timeUnit, type, undefinedIfExprNotRequired: true});
+   *     if (expr !== undefined) { return {signal: expr}; }
+   *     return v;
+   *   });
+   * }
+   * ```
+   *
+   * An **instant** is not a value Vega can be handed: `{"year": 2019, "month": "Jan"}` is a way of
+   * writing a date down and not a number, and a date written as text is text until something builds
+   * it. Every one of them becomes a signal that does — which is the same `datetime()` a domain over
+   * instants is built from. Written out as they stood, Vega read an object where it wanted a number
+   * and drew no ticks at all where the specification had listed them.
+   *
+   * A tick on a guide over a **single** unit is a reading of that unit rather than a date: `4` on
+   * an axis of hours is four o'clock, `"Jan"` on an axis of months is January.
+   * `isLocalSingleTimeUnit` is that rule, and upstream tells a reading from a date by asking
+   * whether the runtime can parse it. A number under ten thousand is a reading; so is a string with
+   * no digit in it, which is every name there is to write. (A string that holds digits and is still
+   * not a date — `"12:00"` — parts company there, and is a tick nothing could have drawn either
+   * way.)
+   */
+  private fun valueArray(def: ChannelDef, values: VegaValue.Arr): VegaValue {
+    // `isBinnedTimeUnit`: a bucketed column's values are the bucket's own edges and not a clock
+    // reading, so the unit is not one to build a date from.
+    val unit = def.timeUnit?.takeIf { !it.startsWith("binned") }
+    val instants = unit != null || def.type == MeasureType.TEMPORAL
+    // `normalizeTimeUnit` reads the `utc` out of the unit's *name* before asking whether it is a
+    // single one, so an axis of `utcmonth` is an axis of months: the reading is built into a local
+    // `datetime()` exactly as `month`'s is, the zone being the scale's business and not the tick's.
+    val single = unit?.removePrefix("utc")?.takeIf { it in SINGLE_TIME_UNITS }
+    fun expression(raw: VegaValue.Obj) =
+      signalRef(Transforms(DiagnosticCollector()).dateTimeExpression(raw))
+    return arr(
+      values.values.map { value ->
+        val reading =
+          when (value) {
+            is VegaValue.Num -> value.value < 10000
+            is VegaValue.Str -> value.value.none { it.isDigit() }
+            else -> false
+          }
+        when {
+          value is VegaValue.Obj && Scales.looksLikeADateTime(value) -> expression(value)
+          !instants -> value
+          single != null && reading -> expression(obj { put(single, value) })
+          value is VegaValue.Num -> signalRef("datetime(${canonicalNumberString(value.value)})")
+          value is VegaValue.Str -> signalRef("datetime(${quoted(value.value)})")
+          else -> value
+        }
+      }
+    )
+  }
+
   /** A themed value Vega cannot read from its own configuration: a signal, or a conditional. */
   private fun conditionalOrSignal(value: VegaValue): Boolean =
     value is VegaValue.Obj && (value.has("signal") || value.has("expr") || value.has("condition"))
@@ -1436,7 +1519,9 @@ internal object Guides {
       // from. Applied below, after the encode parts are assembled, which is where upstream applies
       // it too.
       def.legend?.fields?.forEach { (key, value) ->
-        if (key in LEGEND_PROPERTIES) put(key, asSignal(value))
+        if (key !in LEGEND_PROPERTIES) return@forEach
+        if (key == "values" && value is VegaValue.Arr) put(key, valueArray(def, value))
+        else put(key, asSignal(value))
       }
       if (gradient) {
         // A ramp is painted at the mark's own opacity, so a legend beside a chart of translucent

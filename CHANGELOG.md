@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **The ticks a guide was told to draw are made into something Vega can read.**
+  An instant is not a value Vega can be handed: `{"year": 2019, "month": "Jan"}` is a way of writing
+  a date down and not a number, and a date written as text is text until something builds it.
+  `valueArray` turns every one of them into the signal that does — the same `datetime()` a domain
+  over instants is built from. This compiler copied a stated `values` list through as it stood, so
+  Vega was handed an object where it wanted a number and drew no ticks at all where the
+  specification had listed them. A tick on a guide over a **single** unit is a reading of that unit
+  rather than a date — `4` on an axis of hours is four o'clock, `"Jan"` on an axis of months is
+  January — and `utcmonth` is a month for this, the zone being the scale's business and not the
+  tick's. Axes and legends alike. Three specifications in the wild corpus list their ticks that way,
+  and agreement with upstream goes from 1925 to 1928 of 1981.
+
 - **A step the partition is walked past is grouped by the grid's own columns as well as its own.**
   `moveFacetDown` walks the partition down past the cell's chain one node at a time, and each of the
   four nodes that group — an aggregate, a stack, a window, a join-aggregate — picks up the facet's
