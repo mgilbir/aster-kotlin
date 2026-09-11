@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A size a row of plots merges on may be `"container"`, and then it is a signal.** The hoist
+  upstream does at the end of assembly is for a signal *carrying a value*: a plain number named
+  `width` is the chart's width and is written as one, while a `"container"` size has no number to
+  hoist — the page has to be measured first — so it stays a signal, measured at first render and
+  again on every resize. `parseUnitLayoutSize` keeps the string as the layout size, which is what a
+  level above compares when it merges its children: two plots asking the page for their width agree,
+  and what they agree on is to ask the page. This engine answered with the view's own default
+  instead, merged them on that number and wrote it out as the chart's width — so such a chart had a
+  width of its own and never measured the element it was drawn in. Four specifications in the wild
+  corpus are a column of plots each asking the page for its width.
+
 - **A legend that states the colour of its swatches takes the mark's paint off them.** A swatch
   cannot resolve a *scaled* paint — a size legend's swatches are all one colour, size being what
   they show — so it is drawn in a base colour at the mark's opacity. Unless the legend named a

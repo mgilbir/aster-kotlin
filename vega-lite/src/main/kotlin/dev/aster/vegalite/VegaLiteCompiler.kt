@@ -976,8 +976,17 @@ private class Compilation(
         spec.fields["padding"] ?: config.padding.takeIf { it.isTruthy() },
       )
       autosize(views, root)?.let { put("autosize", it) }
-      put("width", mergedSize("width") ?: if (concat == null) root.width else null)
-      put("height", mergedSize("height") ?: if (concat == null) root.height else null)
+      // A merged size that is a **`"container"`** is a signal rather than a property: there is no
+      // number to write, the page having to be measured first. `assembleTopLevelModel` moves only
+      // the signals that carry a `value`.
+      put(
+        "width",
+        mergedSize("width") as? VegaValue.Num ?: if (concat == null) root.width else null,
+      )
+      put(
+        "height",
+        mergedSize("height") as? VegaValue.Num ?: if (concat == null) root.height else null,
+      )
       // `cell` is the bordered plotting area; a chart with no Cartesian position — a pie — has no
       // plotting area to border, and upstream styles it as a plain `view` instead. A faceted chart
       // has no plotting area of its own at all: each of its cells carries the style, and neither
@@ -1965,28 +1974,43 @@ private class Compilation(
           .mapNotNull { (channel, kind) ->
             node.owns[channel]?.takeIf { it == "${node.prefix()}$kind" }
           }
-          // A merged size called plainly `width` or `height` is a top-level *property*, not a
-          // signal, which is upstream's own last step in `assembleTopLevelModel`.
-          .filter { it != "width" && it != "height" }
-          .mapNotNull { name ->
-            merged[name]?.let { value ->
-              obj {
-                put("name", name)
-                put("value", value)
-              }
-            }
-          } + node.children.flatMap { sizeSignalsFor(it) }
+          .mapNotNull { name -> merged[name]?.let { mergedSizeSignal(name, it) } } +
+          node.children.flatMap { sizeSignalsFor(it) }
     }
 
   private fun mergedSizeSignals(): List<VegaValue> =
-    merged.entries
-      .filter { it.key != "width" && it.key != "height" }
-      .map { (name, value) ->
-        obj {
-          put("name", name)
-          put("value", value)
-        }
-      }
+    merged.entries.mapNotNull { (name, value) -> mergedSizeSignal(name, value) }
+
+  /**
+   * The signal a merged size writes, or null where it is a top-level property instead.
+   *
+   * ```js
+   * layoutSignals = layoutSignals.filter((signal) => {
+   *   if ((signal.name === 'width' || signal.name === 'height') && signal.value !== undefined) {
+   *     topLevelProperties[signal.name] = +signal.value;
+   *     return false;
+   *   }
+   *   return true;
+   * });
+   * ```
+   *
+   * The hoist upstream does at the end is for a signal **carrying a value**: a plain number named
+   * `width` is the chart's width and is written as one. A `"container"` size has no number to hoist
+   * — the page has to be measured first — so it stays a signal, and this compiler wrote the view's
+   * default out as a property instead. Four specifications in the wild corpus are a column of plots
+   * each asking the page for its width.
+   */
+  private fun mergedSizeSignal(name: String, value: VegaValue): VegaValue? {
+    val channel = if (name.endsWith("width", ignoreCase = true)) "x" else "y"
+    if (value == VegaValue.Str("container")) {
+      return LayoutSize.containerSignal(name, channel, config)
+    }
+    if (name == "width" || name == "height") return null
+    return obj {
+      put("name", name)
+      put("value", value)
+    }
+  }
 
   // -----------------------------------------------------------------------------------------
   // Concatenated plots

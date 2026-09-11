@@ -206,6 +206,37 @@ internal class LayoutSize(
   }
 
   companion object {
+
+    /**
+     * The signal a **`"container"`** size is: the element measured at first render and again on
+     * every resize, with the view's own default where there is nothing to measure.
+     *
+     * A chart rendered outside a browser still has to have a width, which is what the fallback is
+     * for. Written here rather than only inside a plot's own sizing because a *concatenation* may
+     * merge its children onto it, and then the signal belongs to the level that settled it.
+     */
+    fun containerSignal(name: String, channel: String, config: Config): VegaValue {
+      val measured = if (channel == "x") "containerSize()[0]" else "containerSize()[1]"
+      val fallback =
+        Decimals.jsString(if (channel == "x") config.continuousWidth else config.continuousHeight)
+      val expression = "isFinite($measured) ? $measured : $fallback"
+      return obj {
+        put("name", name)
+        put("init", expression)
+        put(
+          "on",
+          arr(
+            listOf(
+              obj {
+                put("events", "window:resize")
+                put("update", expression)
+              }
+            )
+          ),
+        )
+      }
+    }
+
     /**
      * The plain number a channel's size comes out as, or null where it is derived from a step.
      *
@@ -224,6 +255,13 @@ internal class LayoutSize(
         spec.fields[if (channel == "x") "width" else "height"]
           ?: views.firstOrNull()?.spec?.let { if (channel == "x") it.width else it.height }
       if (declared is VegaValue.Num) return declared
+      // `component.layoutSize.set(sizeType, isStep(specifiedSize) ? 'step' : specifiedSize, true)`:
+      // a **`"container"`** size is the layout size, as a number is. It is what a level above
+      // compares when it merges its children — two plots asking the page for their width agree,
+      // and what they agree on is to ask the page — and answering with the view's own default
+      // instead merged them on a number and wrote that number out. The chart then had a width of
+      // its own and never measured the element it was drawn in.
+      if (declared == VegaValue.Str("container")) return declared
       val scale = scales[channel]
       if (scale != null && (scale.type == "band" || scale.type == "point")) return null
       // A channel with **no scale at all** is not a continuous one: `defaultUnitSize` falls to the
