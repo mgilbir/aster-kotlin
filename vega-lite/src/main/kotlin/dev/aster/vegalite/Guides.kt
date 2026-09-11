@@ -588,8 +588,14 @@ internal object Guides {
       if (axis.properties.containsKey(property)) continue
       val themed = configured(property) ?: continue
       // A themed **signal** or conditional is written out from any block: Vega can read neither
-      // from its own configuration, and a conditional is not a Vega property at all.
-      if (themedByVega(property) && !conditionalOrSignal(themed)) continue
+      // from its own configuration, and a conditional is not a Vega property at all. So is one of
+      // `propsToAlwaysIncludeConfig` — `(propsToAlwaysIncludeConfig.has(property) &&
+      // hasConfigValue)` stands beside the block's own source in upstream's condition, and it
+      // stands here for the same reason: Vega either has no such property or means something else
+      // by it. A theme asking every date axis for five ticks was read and dropped, `tickCount`
+      // being one of the nine and `config.axisX` a block Vega knows.
+      if (themedByVega(property) && property !in ALWAYS_FROM_CONFIG && !conditionalOrSignal(themed))
+        continue
       axis.properties[property] = asSignal(themed)
     }
     conditionalToEncode(axis, diagnostics)

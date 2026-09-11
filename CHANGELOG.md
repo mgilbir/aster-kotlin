@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A themed value of one of the nine is written onto the axis whatever block it came from.**
+  `(propsToAlwaysIncludeConfig.has(property) && hasConfigValue)` stands beside the block's own
+  source in upstream's condition: `grid`, `translate`, `format`, `formatType`, `orient`,
+  `labelExpr`, `tickCount`, `position` and `tickMinStep` are written out even from a block Vega
+  knows, because Vega either has no such property or means something else by it. This engine
+  applied that rule only where the property also had a rule with something to say, so a theme
+  asking every date axis for five ticks was read and dropped — `tickCount` has no rule on a band
+  scale, there being no continuum to count along, and `config.axisX` is a block Vega knows. A
+  property that is not one of the nine is still left to Vega. One specification in the wild corpus
+  themes its tick count that way, and agreement with upstream goes from 1912 to 1913 of 1981.
+
 - **A mark that switches its tooltip off says so, and stops being reachable.** `tooltip` is one of
   Vega's own mark properties, so `markDefProperties` writes whatever the mark definition states as
   a value — `null` and `false` included — and the tooltip encoder that runs afterwards overwrites
