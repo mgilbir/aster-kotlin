@@ -924,7 +924,13 @@ internal class FacetGrid(
         // writes nothing for a falsy title — and the room the layout was keeping for it goes with
         // it. That is not the same as leaving the heading out: the band of captions stays either
         // way, since the captions are what name the cells.
-        val stated = facet.def.raw.obj("header")?.fields?.get("title")
+        // Asked of the header, of the family for this channel and of `config.header` in turn —
+        // `getHeaderProperty`, the same chain every other header property is read through. A theme
+        // that says `{"header": {"title": null}}` takes the heading off **every** grid in a
+        // document, which is how a chart whose cells caption themselves says so once; reading only
+        // the definition's own block left such a chart with a heading over each grid and the room
+        // the layout keeps for one. Six specifications in the wild corpus theme it that way.
+        val stated = headerProperty(facet.def.raw.obj("header"), config, facet.channel, "title")
         val text =
           if (stated != null) (stated as? VegaValue.Str)?.value
           else (Fields.title(facet.def, config) as? VegaValue.Str)?.value

@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A theme may take the heading off every grid in a document.** A header's `title` is read through
+  `getHeaderProperty` like every other header property — the header's own block, then the family for
+  its channel, then `config.header` — so `{"config": {"header": {"title": null}}}` says once what a
+  chart whose cells caption themselves would otherwise say on each of its grids. The heading goes,
+  and so does the room the layout was keeping for it. This engine read the definition's own block
+  alone, so such a chart came out with a heading over every grid and a `columnTitle` offset holding
+  space for it; six specifications in the wild corpus theme it that way, and each of them differs
+  from upstream in a second place this does not touch.
+
 - **A size a row of plots merges on may be `"container"`, and then it is a signal.** The hoist
   upstream does at the end of assembly is for a signal *carrying a value*: a plain number named
   `width` is the chart's width and is written as one, while a `"container"` size has no number to
