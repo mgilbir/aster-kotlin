@@ -968,7 +968,23 @@ private class Compilation(
       // The chart's own `background` beats the configured one: `config.background` is a theme's
       // default and a specification that states one is overriding the theme, not being overridden
       // by it.
-      put("background", spec.fields["background"] ?: config.background)
+      // ```js
+      // const outputConfig: Config<SignalRef> = omit(mergedConfig, configPropsWithExpr);
+      //
+      // for (const prop of ['background', 'lineBreak', 'padding'] as const) {
+      //   if (mergedConfig[prop]) {
+      //     (outputConfig as any)[prop] = signalRefOrValue(mergedConfig[prop]);
+      //   }
+      // }
+      // ```
+      //
+      // The theme's is taken only where it is **truthy**, as its padding is: `initConfig` takes all
+      // three of these off the configuration and puts back only the ones that are. A theme saying
+      // `{"background": null}` — a document whose charts are drawn on whatever is behind them — is
+      // a theme with no background at all, and this wrote the null out as the chart's own. A
+      // background the **chart** states is written as it stands, null included: that one is not the
+      // theme's to drop.
+      put("background", spec.fields["background"] ?: config.background.takeIf { it.isTruthy() })
       // A chart's own padding beats the theme's, as its background does: a specification stating
       // one is overriding what the configuration settled, not the other way about.
       //

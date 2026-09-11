@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **A theme's background is taken only where it is truthy, as its padding is.** `initConfig` takes
+  `background`, `lineBreak` and `padding` off the configuration and puts back only the ones that
+  are truthy, so a theme saying `{"background": null}` — a document whose charts are drawn on
+  whatever is behind them — is a theme with no background at all. This engine wrote the null out as
+  the chart's own background, and an empty string likewise. A background the **chart** states is
+  still written as it stands, null included: that one is not the theme's to drop. One specification
+  in the wild corpus themes it away, and agreement with upstream goes from 1910 to 1911 of 1981.
+
 - **Whatever a specification states as a size is the size, a step object aside.**
   `parseUnitLayoutSize` puts the specified size into the layout component without asking what kind
   of value it is — `isStep(specifiedSize) ? 'step' : specifiedSize` — so a chart written
