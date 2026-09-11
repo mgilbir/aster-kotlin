@@ -55,6 +55,26 @@ internal class DataPipeline(
    * it numbers the tables after that grid one higher than a chart without.
    */
   private val facetTail: FacetNode? = null,
+  /**
+   * Whether the partition is a **fork**: more than one view hangs below it.
+   *
+   * ```ts
+   * if (node.numChildren() === 1 && !(node.children[0] instanceof OutputNode)) {
+   *   // move down until we hit a fork or output node
+   * ```
+   *
+   * `moveFacetDown` hoists the chain below the partition above it one node at a time, and the walk
+   * runs while the partition has a **single** child. A cell of one view is that: its own steps —
+   * its buckets, its instants, the columns its marks are ordered by — climb above the partition
+   * until they meet the named point the scales read, and the split is there. A cell of several is
+   * not: the walk stops at the fork, so every member's own steps stay below, where they are
+   * computed over the rows one cell was handed.
+   *
+   * The fold that makes two members' identical steps one node runs **after** the walk — it is in
+   * the second pass, and the facet is moved between the two — so a step both members write is
+   * folded below the partition and not hoisted above it.
+   */
+  private val facetForked: Boolean = false,
   /** The selections some `lookup` reads as a table, which are the ones worth materialising. */
   private val materialized: Set<String> = emptySet(),
   /** Where each materialised selection's output node is recorded, for the join to be named from. */
@@ -102,12 +122,10 @@ internal class DataPipeline(
     facetSplit
       ?.takeIf { it.attached }
       ?.let { shared ->
-        val inside = cellChain(headChain(shared, belowFacet = true), emptyList())
-        val outside = cellChain(headChain(shared.main!!, belowFacet = true), view.facetFields)
+        val inside = cellChain(headChain(shared, Scope.OWN), emptyList())
+        val outside = cellChain(headChain(shared.main!!, Scope.OWN), view.facetFields)
         return Outputs(outside.raw, outside.main, outside.scales, inside.main, shared)
       }
-
-    val head = headChain(source)
 
     // Where the flow **splits into cells**. `moveFacetDown` hoists the cell's chain above the facet
     // wherever it can, adding the facet's own fields to every grouping it passes — which is what
@@ -122,7 +140,13 @@ internal class DataPipeline(
       // stands between the table and the partition — a second, raw one would spend a dataset name
       // that upstream's numbering never spends.
       val facetMain = OutputNode(view.prefixed("facet_main"))
-      head.then(facetMain)
+      // At a **fork** the facet model's own pass and nothing of the cell's: what a member writes
+      // for itself is written below the partition, in every cell, exactly as a *later* member's
+      // is. Hoisting the first member's own steps instead put its sort index — or its buckets, or
+      // its instants — above a partition the others' stayed below, which is a cell computing one
+      // member's columns over rows it shares with the whole grid. Where one view hangs below, its
+      // own steps do climb: that is the walk, and there is no fork to stop it. See [facetForked].
+      headChain(source, if (facetForked) Scope.FACET else Scope.WHOLE).then(facetMain)
       // Every level's partition in turn, the outermost reading the table and each cutting the piece
       // the one above handed it.
       var above: DataNode = facetMain
@@ -132,44 +156,81 @@ internal class DataPipeline(
       }
       above.then(facetNode)
       facetNode.attachedTo(facetMain)
-      val inside = cellChain(facetNode, emptyList())
-      val outside = cellChain(facetMain, view.facetFields)
+      val inside =
+        cellChain(if (facetForked) headChain(facetNode, Scope.OWN) else facetNode, emptyList())
+      val outside =
+        cellChain(
+          if (facetForked) headChain(facetMain, Scope.OWN) else facetMain,
+          view.facetFields,
+        )
       return Outputs(outside.raw, outside.main, outside.scales, inside.main, facetNode)
     }
 
-    val chain = cellChain(head, view.facetFields)
+    val chain = cellChain(headChain(source), view.facetFields)
     facetTail?.let { chain.main.then(it) }
     return chain
   }
 
+  /**
+   * Which model's steps a chain is being built from, where a partition stands between two of them.
+   *
+   * `parseData` runs per model: a facet's own pass writes its transforms, its buckets and the
+   * columns its cells are ordered by, and the partition goes in at the end of it; its child's pass
+   * then writes the child's, below the partition. Where nothing splits there is one chain and one
+   * scope — [WHOLE] — because the two models' steps stand in the same table either way.
+   */
+  private enum class Scope {
+    /** The facet model's own: what stands **above** the partition. */
+    FACET,
+    /** The cell's own: what hangs below it. */
+    OWN,
+    /** Both, in the order the two passes wrote them. */
+    WHOLE;
+
+    val facet: Boolean
+      get() = this != OWN
+
+    val own: Boolean
+      get() = this != FACET
+  }
+
   /** Everything a view does **before** it aggregates: its transforms, its buckets, its instants. */
-  private fun headChain(parent: DataNode, belowFacet: Boolean = false): DataNode {
+  private fun headChain(parent: DataNode, scope: Scope = Scope.WHOLE): DataNode {
     var head: DataNode = parent
     if (needsIdentity && parent is SourceNode) head = head.then(identifierNode())
 
-    // A layer's member buckets its field before **its own** transforms: upstream calls it a hack
-    // "equivalent for merging bin extent for union scale", and it is what lets two layers over one
-    // binned field share a bin. Below a filter the two bins are no longer siblings and neither the
-    // extent nor the bin width can be merged, so each layer buckets what it can see. What an
-    // *ancestor* wrote still stands above it — that model's pass ran first — and a bucketing of a
-    // column an ancestor computes cannot climb above the step that computes it.
-    if (!belowFacet) head = userTransforms(head, Written.ANCESTOR)
-    if (view.parentIsLayer) binNode()?.let { head = head.then(it) }
+    // What an **ancestor** wrote — a facet's own transforms above its cell's — stands first: that
+    // model's pass ran first, and a step of the cell's cannot climb above one that computes the
+    // column it reads.
+    if (scope.facet) head = userTransforms(head, Written.ANCESTOR)
+    // The **facet's** own bucketing stands with the rest of the facet model's pass, above the
+    // partition: the values its cells are cut by are those buckets, so the column has to be there
+    // before the cut is made.
+    if (scope == Scope.FACET) binNode(scope)?.let { head = head.then(it) }
+    if (scope.own) {
+      // A layer's member buckets its field before **its own** transforms: upstream calls it a hack
+      // "equivalent for merging bin extent for union scale", and it is what lets two layers over
+      // one binned field share a bin. Below a filter the two bins are no longer siblings and
+      // neither the extent nor the bin width can be merged, so each layer buckets what it can see.
+      // What an *ancestor* wrote still stands above it — that model's pass ran first — and a
+      // bucketing of a column an ancestor computes cannot climb above the step that computes it.
+      if (view.parentIsLayer) binNode(scope)?.let { head = head.then(it) }
 
-    head = userTransforms(head, Written.OWN)
-    implicitParse()?.let { head = head.then(it) }
-    // A place on the globe is not a position on the page until a **projection** has been asked
-    // where it lands. `GeoJSONNode` gathers the pairs into a feature collection the projection can
-    // be fitted to, and `GeoPointNode` then asks it, writing the two pixels onto every row.
-    geoJsonNodes().forEach { head = head.then(it) }
-    geoPointNodes().forEach { head = head.then(it) }
-    if (!view.parentIsLayer) binNode()?.let { head = head.then(it) }
-    timeUnitNode()?.let { head = head.then(it) }
-    binnedTimeUnitNode()?.let { head = head.then(it) }
-    sortIndexNode(belowFacet)?.let { head = head.then(it) }
+      head = userTransforms(head, Written.OWN)
+      implicitParse()?.let { head = head.then(it) }
+      // A place on the globe is not a position on the page until a **projection** has been asked
+      // where it lands. `GeoJSONNode` gathers the pairs into a feature collection the projection
+      // can be fitted to, and `GeoPointNode` then asks it, writing the two pixels onto every row.
+      geoJsonNodes().forEach { head = head.then(it) }
+      geoPointNodes().forEach { head = head.then(it) }
+      if (!view.parentIsLayer) binNode(scope)?.let { head = head.then(it) }
+    }
+    timeUnitNode(scope)?.let { head = head.then(it) }
+    if (scope.own) binnedTimeUnitNode()?.let { head = head.then(it) }
+    sortIndexNode(scope)?.let { head = head.then(it) }
     // The key a crossed grid's cells are ordered by is written onto every row *above* the facet,
     // where every cell's rows can still be seen at once — never again below it.
-    if (!belowFacet)
+    if (scope.facet)
       facetSortKeys()?.let {
         head = head.then(it)
       }
@@ -436,7 +497,7 @@ internal class DataPipeline(
     return if (transforms.isEmpty()) null else PassThroughNode(transforms)
   }
 
-  private fun sortIndexNode(belowFacet: Boolean = false): PassThroughNode? {
+  private fun sortIndexNode(scope: Scope = Scope.WHOLE): PassThroughNode? {
     val predicates = Transforms(diagnostics, selections = view.selections)
     // The **facet's** own channels as well as the encoding's: a trellis whose rows are listed in a
     // stated order needs the same index column, and the facet channel was lifted out of the
@@ -450,10 +511,12 @@ internal class DataPipeline(
     // are a trellis whose columns and whose marks are both listed in a stated order, and every one
     // of their three formulas came out in the wrong place.
     val channels =
-      (if (belowFacet) emptyList() else view.facetDeclared.map { it.channel to it }) +
-        view.spec.encoding.entries.flatMap { (channel, def) ->
-          (listOf(def) + def.siblings + def.conditions).map { channel to it }
-        }
+      (if (scope.facet) view.facetDeclared.map { it.channel to it } else emptyList()) +
+        (if (!scope.own) emptyList()
+        else
+          view.spec.encoding.entries.flatMap { (channel, def) ->
+            (listOf(def) + def.siblings + def.conditions).map { channel to it }
+          })
     val transforms = channels.mapNotNull { (channel, def) ->
       val order = def.sort as? VegaValue.Arr ?: return@mapNotNull null
       val field = def.field ?: return@mapNotNull null
@@ -483,13 +546,14 @@ internal class DataPipeline(
     return if (transforms.isEmpty()) null else PassThroughNode(transforms)
   }
 
-  private fun binNode(): BinNode? {
+  private fun binNode(scope: Scope = Scope.WHOLE): BinNode? {
     val bins =
       // The **facet's** own channels first, as with the time units: a trellis broken down by
       // buckets of a column has to bucket that column, and the facet's encoding was lifted out of
       // the cell's before anything else looked at it.
-      (view.facetDefs +
-          view.spec.encoding.values.flatMap { listOf(it) + it.siblings + it.conditions })
+      ((if (scope.facet) view.facetDefs else emptyList()) +
+          (if (!scope.own) emptyList()
+          else view.spec.encoding.values.flatMap { listOf(it) + it.siblings + it.conditions }))
         .mapNotNull { def ->
           val bin = def.bin as? Binning.Bin ?: return@mapNotNull null
           val field = def.field ?: return@mapNotNull null
@@ -736,7 +800,7 @@ internal class DataPipeline(
     return if (formulas.isEmpty()) null else PassThroughNode(formulas, timeUnit = true)
   }
 
-  private fun timeUnitNode(): TimeUnitNode? {
+  private fun timeUnitNode(scope: Scope = Scope.WHOLE): TimeUnitNode? {
     // The facet's own channels first: their transform belongs to the facet model, which sits above
     // the cell's, so a trellis broken down by year buckets the year before it buckets the quarter.
     // `model.reduceFieldDef` spreads a **list** channel before it folds — a `tooltip` naming four
@@ -744,10 +808,12 @@ internal class DataPipeline(
     // Reading only the channel's own definition left the transform unwritten, and the tooltip then
     // read a column no step in the flow produces.
     val defs =
-      view.facetDefs.map { null to it } +
-        view.spec.encoding.entries.flatMap { (channel, def) ->
-          (listOf(def) + def.siblings + def.conditions).map { channel to it }
-        }
+      (if (scope.facet) view.facetDefs.map { null to it } else emptyList()) +
+        (if (!scope.own) emptyList()
+        else
+          view.spec.encoding.entries.flatMap { (channel, def) ->
+            (listOf(def) + def.siblings + def.conditions).map { channel to it }
+          })
     val units = defs.mapNotNull { (channel, def) ->
       val timeUnit = def.timeUnit?.takeIf { !Fields.isBinnedTimeUnit(it) } ?: return@mapNotNull null
       val field = def.field ?: return@mapNotNull null

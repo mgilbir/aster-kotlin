@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **What a member of a trellis's cell writes for itself is written below the partition.**
+  `moveFacetDown` hoists a cell's chain above the partition one node at a time, and the walk runs
+  while the partition has a **single** child: a cell of one view is that, and its own steps climb
+  until they meet the named point the scales read; a cell of several is not, so the walk stops at
+  the fork and every member's own steps stay below, computed over the rows that cell was handed.
+  The fold that makes two members' identical steps one node runs after the walk — it is in the
+  second pass, with the facet moved between the two — so a step both members write is folded below
+  the partition rather than hoisted above it. This engine built the whole of the **first** member's
+  chain above the partition and every later member's below it, so one member's sort index, buckets
+  or instants stood above a cut the others' stayed below. The facet model's own pass is the only
+  one that ends above it, and its transforms, its buckets and the columns its cells are ordered by
+  still stand there. Agreement with upstream goes from 1894 to 1895 of 1981.
+
 - **A key a trellis resolves per cell stands in the cell, not beside the grid.** `parseNonUnitLegend`
   merges a child's key up into the composition only where the resolve says shared, and
   `parseGuideResolve` answers `independent` for any channel whose scale is independent. A key is a

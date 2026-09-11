@@ -3505,6 +3505,9 @@ private class Compilation(
                 },
           // Where the flow does not split, the grid is still a node in it, and a node takes a name.
           facetTail = if (!partitioned) null else plotOfView(view)?.tail,
+          // Whether the partition is a fork, which is what stops the hoisting — see
+          // [DataPipeline.facetForked].
+          facetForked = plotOfView(view)?.let { viewsBelow(it).size > 1 } ?: false,
           materialized = materialized,
           lookupOutputs = lookupOutputs,
         )
