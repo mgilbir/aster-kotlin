@@ -66,18 +66,44 @@ internal object Stack {
       }
     }
 
+    // ```js
+    // if (channel !== 'tooltip' && channelHasField(encoding, channel)) {
+    //   const channelDef = encoding[channel];
+    //   for (const cDef of array(channelDef)) {
+    //     const fieldDef = getFieldDef(cDef);
+    // ```
+    //
+    // `channelHasField` counts a **conditional** field def, and `getFieldDef` then reaches into the
+    // condition for it: a colour that names a column only where a row was picked, and a value
+    // otherwise, is a dimension of the stack like any other and orders it. Reading the
+    // unconditional part alone left such a chart's stack sorted by nothing.
+    //
+    // Every entry of a channel written as a **list**, not the first alone — a series split by two
+    // columns is split by both. The guard reads those entries differently from a lone definition,
+    // and faithfully so: `some(channelDef, fieldDef => !!fieldDef.field)` asks each entry for a
+    // field of its **own**, so a list of conditions names no column at all where a single one does.
     val stackBy =
-      Channels.NONPOSITION_CHANNELS.mapNotNull { channel ->
-        if (channel == "tooltip") return@mapNotNull null
-        val def = spec.encoding[channel]?.takeIf { it.isFieldDef } ?: return@mapNotNull null
-        // `stack()` runs before `alignStackOrderWithColorDomain`, so a channel that rule added is
-        // not one of the stack's own dimensions — see [ChannelDef.addedAfterStack]. Counting it
-        // put the sort-index column into the `impute` a stacked area is given, and every colour's
-        // missing values were then filled per index rather than per colour.
-        if (def.addedAfterStack) return@mapNotNull null
-        if (def.aggregate != null) return@mapNotNull null
-        val name = Fields.vgField(def)
-        if (name.isEmpty() || name !in groupbyFields) def else null
+      Channels.NONPOSITION_CHANNELS.flatMap { channel ->
+        if (channel == "tooltip") return@flatMap emptyList()
+        val written = spec.encoding[channel] ?: return@flatMap emptyList()
+        val entries = listOf(written) + written.siblings
+        val namesAColumn =
+          if (written.isList) entries.any { it.field != null }
+          else written.isFieldDef || written.conditions.any { it.isFieldDef }
+        if (!namesAColumn) return@flatMap emptyList()
+        entries.mapNotNull inner@{ entry ->
+          val def =
+            (if (entry.isFieldDef) entry else entry.conditions.firstOrNull { it.isFieldDef })
+              ?: return@inner null
+          // `stack()` runs before `alignStackOrderWithColorDomain`, so a channel that rule added is
+          // not one of the stack's own dimensions — see [ChannelDef.addedAfterStack]. Counting it
+          // put the sort-index column into the `impute` a stacked area is given, and every colour's
+          // missing values were then filled per index rather than per colour.
+          if (entry.addedAfterStack) return@inner null
+          if (def.aggregate != null) return@inner null
+          val name = Fields.vgField(def)
+          if (name.isEmpty() || name !in groupbyFields) def else null
+        }
       }
 
     val offset =

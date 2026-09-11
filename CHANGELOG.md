@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A channel that names a column only under a test is a dimension of the stack all the same.**
+  `channelHasField` counts a conditional field def and `getFieldDef` then reaches into the condition
+  for it, so a colour that is a measure where a row was picked and grey otherwise orders the stack
+  exactly as an unconditional one would. This engine read the unconditional part alone, so such a
+  chart came out stacked in no order at all — `sort: {"field": [], "order": []}` where upstream
+  sorts by the column the condition names. Every entry of a channel written as a list now counts as
+  well, not the first alone; the guard reads those entries differently from a lone definition, and
+  faithfully so — `some(channelDef, fieldDef => !!fieldDef.field)` asks each entry for a field of
+  its own, so a list of conditions names no column where a single condition does. Two
+  specifications in the wild corpus stack by a condition, and agreement with upstream goes from
+  1890 to 1892 of 1981.
+
 - **A channel summarised by a word that is no operation is summarised by nothing.** `initFieldDef`
   reads `AGGREGATE_OP_INDEX` for the word as written and **deletes** what it does not find, so
   `"Mean"` is no more an operation than `"null"` is. The channel is then the plain column it names:
