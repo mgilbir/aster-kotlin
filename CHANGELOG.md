@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **The column a grid is split by is read before it is cut.**
+  `getImplicitFromEncoding` is asked of a facet model as much as of a unit, and its answer goes in
+  between that model's transforms and its bucketing — `parseData` runs the same sequence for every
+  model there is. A cell's encoding no longer mentions the column a grid is split by, a facet
+  saying nothing about what a cell looks like, so this compiler built the parse from the cell's
+  encoding alone and never asked for it. The column stayed as it arrived, and a `timeunit`
+  bucketing text found nothing to bucket: every cell of such a grid was cut from a date that was
+  never a date. The grid's own columns are read first, its model's pass running before its child's,
+  and where the flow forks below the partition the parse stands above it with the rest of that
+  pass. Two specifications in the wild corpus split a grid by a column stated as an instant, and
+  agreement with upstream goes from 1917 to 1919 of 1981.
+
 - **A trellis caption is written the way the header says to write it.**
   `assembleHeaderTitle` reads `format` and `formatType` off the header and hands them to the same
   `formatSignalRef` a mark's text goes through. This compiler read them too, but only after it had

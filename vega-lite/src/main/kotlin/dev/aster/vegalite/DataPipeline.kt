@@ -205,8 +205,12 @@ internal class DataPipeline(
     if (scope.facet) head = userTransforms(head, Written.ANCESTOR)
     // The **facet's** own bucketing stands with the rest of the facet model's pass, above the
     // partition: the values its cells are cut by are those buckets, so the column has to be there
-    // before the cut is made.
-    if (scope == Scope.FACET) binNode(scope)?.let { head = head.then(it) }
+    // before the cut is made — and so does the parse the bucketing reads, which `parseData` puts
+    // between the transforms and the bin for every model alike.
+    if (scope == Scope.FACET) {
+      implicitParse(scope)?.let { head = head.then(it) }
+      binNode(scope)?.let { head = head.then(it) }
+    }
     if (scope.own) {
       // A layer's member buckets its field before **its own** transforms: upstream calls it a hack
       // "equivalent for merging bin extent for union scale", and it is what lets two layers over
@@ -217,7 +221,7 @@ internal class DataPipeline(
       if (view.parentIsLayer) binNode(scope)?.let { head = head.then(it) }
 
       head = userTransforms(head, Written.OWN)
-      implicitParse()?.let { head = head.then(it) }
+      implicitParse(scope)?.let { head = head.then(it) }
       // A place on the globe is not a position on the page until a **projection** has been asked
       // where it lands. `GeoJSONNode` gathers the pairs into a feature collection the projection
       // can be fitted to, and `GeoPointNode` then asks it, writing the two pixels onto every row.
@@ -368,19 +372,29 @@ internal class DataPipeline(
    * otherwise be made between strings: a time axis sorting its dates alphabetically, a `min` over
    * "10" and "9" answering "10", a line joining its points in the order 1, 10, 2.
    */
-  private fun implicitParse(): ParseNode? {
+  private fun implicitParse(scope: Scope = Scope.WHOLE): ParseNode? {
     val parse = LinkedHashMap<String, String>()
     // A filter's comparisons say what type its column holds, and that has to be settled before the
     // filter runs — so these parses belong with the encoding's, not after them.
-    parse.putAll(
-      Transforms(diagnostics, selections = view.selections).implicitParses(view.spec.transforms)
-    )
+    if (scope.own) {
+      parse.putAll(
+        Transforms(diagnostics, selections = view.selections).implicitParses(view.spec.transforms)
+      )
+    }
     // `forEach(this.getMapping(), …)` walks a **list** channel entry by entry — a tooltip naming
     // four columns is four definitions, not one — and `getFieldDef` reaches into a `condition`.
     // Reading only the channel's own definition left every column after the first unparsed, so a
     // tooltip's second nested field was looked for under a name no row has.
+    //
+    // The **facet's** own channels first: `getImplicitFromEncoding` is asked of a facet model as
+    // much as of a unit — `if (isUnitModel(model) || isFacetModel(model))` — and a grid split by a
+    // date has to read that column as a date before it can be cut by the month it falls in. The
+    // cell's encoding no longer mentions the column, so nothing here asked for it and the cut was
+    // made on text. A facet model's pass runs first, which is what puts its columns first.
     val everyDefinition =
-      view.spec.encoding.values.flatMap { listOf(it) + it.siblings + it.conditions }
+      (if (scope.facet) view.facetDeclared else emptyList()) +
+        (if (!scope.own) emptyList()
+        else view.spec.encoding.values.flatMap { listOf(it) + it.siblings + it.conditions })
     for (def in everyDefinition) {
       val field = def.field
       if (!def.isFieldDef || field == null) continue
@@ -410,7 +424,7 @@ internal class DataPipeline(
     // sorted first — and sorting numerals held as text draws the line through them in the wrong
     // order. Upstream skips this when an `order` channel says how to join them instead, which is
     // how a connected scatter plot is written (`getImplicitFromEncoding`, `data/formatparse.ts`).
-    if (view.spec.mark in PATH_MARKS && view.spec.encoding["order"] == null) {
+    if (scope.own && view.spec.mark in PATH_MARKS && view.spec.encoding["order"] == null) {
       val def = view.spec.encoding[if (view.markDef.orient == "horizontal") "y" else "x"]
       val field = def?.field
       if (def != null && def.isFieldDef && field != null && def.type == MeasureType.QUANTITATIVE) {
@@ -442,11 +456,13 @@ internal class DataPipeline(
     // it does not. The source node carries `omit(data.format, ['parse'])`, so a url's parse reaches
     // Vega through the node rather than by being copied across.
     val stated = LinkedHashMap<String, String?>()
-    view.spec.data?.obj("format")?.obj("parse")?.fields?.forEach { (field, kind) ->
-      when (kind) {
-        is VegaValue.Str -> stated[field] = kind.value
-        VegaValue.Null -> stated[field] = null
-        else -> {}
+    if (scope.own) {
+      view.spec.data?.obj("format")?.obj("parse")?.fields?.forEach { (field, kind) ->
+        when (kind) {
+          is VegaValue.Str -> stated[field] = kind.value
+          VegaValue.Null -> stated[field] = null
+          else -> {}
+        }
       }
     }
     if (stated.isEmpty()) return if (parse.isEmpty()) null else ParseNode(parse)
