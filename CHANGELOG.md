@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A grid's own transforms run as well as its cell's, and above them.**
+  `parseData` runs once per model, and a faceted chart has one model per level plus the cell's: the
+  grid's pass writes its transforms and then the partition, and the cell's writes its own below. A
+  chart that computes a column and grids a view that filters on it is two passes, not a choice
+  between them. This compiler folded a grid's properties into its cell and let the cell's own win
+  — right for a `data` or a `width`, wrong for a `transform` — so the grid's were dropped outright
+  wherever the cell wrote any of its own, and such a chart filtered on a column nothing had written
+  and came out empty. A grid whose cells are grids is the same rule at every level, outermost
+  first. No wild corpus specification writes both, so the count stays at 1924 of 1981.
+
 - **A layer is as wide as its first member, and as wide as itself where no member says.**
   A member's own size overrides the one the level above handed it — `{...parentGivenSize,
   ...(spec.width !== undefined ? {width: spec.width} : {})}` is the whole of that rule — and
