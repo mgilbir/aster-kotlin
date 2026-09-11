@@ -2547,6 +2547,22 @@ private class Compilation(
   )
 
   /**
+   * `isFieldOrDatumDef`: whether a channel definition **names** something to measure.
+   *
+   * ```js
+   * export function isFieldDef(channelDef) {
+   *   return hasProperty(channelDef, 'field') || channelDef?.aggregate === 'count';
+   * }
+   * ```
+   *
+   * A count is the one aggregate that names no column of its own — it counts rows — so it is asked
+   * for by name here rather than through a `field`. A `datum` is a literal standing where a column
+   * would, and it is a definition of the same kind for this purpose.
+   */
+  private fun namesAColumn(def: VegaValue.Obj): Boolean =
+    def.has("field") || def.has("datum") || def.string("aggregate") == "count"
+
+  /**
    * A layer's own definition over the chart's.
    *
    * A layer inherits the chart's data, size, transforms and *encoding* unless it states its own.
@@ -2576,10 +2592,12 @@ private class Compilation(
     put("transform", if (inheritedTransforms.isEmpty()) null else arr(inheritedTransforms))
     val shared = spec.obj("encoding")
     if (shared != null) {
-      // Channel by channel, and **property by property within a channel**: `mergeEncoding` spreads
-      // the parent's channel def under the child's, so a shared `x` stating the type and a layer's
-      // `x` naming only the field come out as one definition with both. Replacing the whole channel
-      // instead loses the type, and a quantitative measure is then spoken as a category.
+      // Channel by channel, and **property by property within a channel** — but only where the two
+      // are definitions of the same kind. `mergeEncoding` spreads the parent's channel def under
+      // the child's when the child's *names a column*, so a shared `x` stating the type and a
+      // layer's `x` naming only the field come out as one definition with both; replacing the whole
+      // channel there would lose the type, and a quantitative measure would be spoken as a
+      // category. Anything else replaces it outright.
       put(
         "encoding",
         obj {
@@ -2588,14 +2606,40 @@ private class Compilation(
           for (channel in channels) {
             val parent = shared.fields[channel] as? VegaValue.Obj
             val mine = own?.fields?.get(channel)
+            // `hasConditionalFieldOrDatumDef`: a single condition that names a column, which is the
+            // half of such a channel the parent's definition belongs under.
+            val condition = (mine as? VegaValue.Obj)?.obj("condition")
             put(
               channel,
-              if (parent != null && mine is VegaValue.Obj) {
-                obj {
-                  putAll(parent)
-                  putAll(mine)
-                }
-              } else mine ?: shared.fields[channel],
+              when {
+                parent == null || mine !is VegaValue.Obj -> mine ?: shared.fields[channel]
+                // "Field/Datum Def can inherit properties from its parent."
+                namesAColumn(mine) ->
+                  obj {
+                    putAll(parent)
+                    putAll(mine)
+                  }
+                condition != null && namesAColumn(condition) ->
+                  obj {
+                    putAll(mine)
+                    put(
+                      "condition",
+                      obj {
+                        putAll(parent)
+                        putAll(condition)
+                      },
+                    )
+                  }
+                // `} else if (channelDef || channelDef === null) { merged[channel] = channelDef; }`
+                // — a definition that names no column **replaces** the parent's rather than
+                // inheriting from it. A member drawing its label at the corner of the plot writes
+                // `{"value": "width"}` for its `x`, and spreading the chart's own `x` under it left
+                // that member still measuring a column: placed against a scale it had said it did
+                // not want, filtered for rows that column had no value in, described by a field it
+                // does not show, and contributing to a colour domain it takes no part in. An empty
+                // `{}` is such a definition too, and is how a member says it has no `x` at all.
+                else -> mine
+              },
             )
           }
         },

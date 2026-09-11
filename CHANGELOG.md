@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A layer member's channel replaces the chart's unless it names something to measure.**
+  `mergeEncoding` spreads the chart's definition under the member's only where the member's is a
+  field or datum def — that is what lets a shared `x` state the type and a member's `x` name only
+  the column — and everything else takes the channel over outright. This compiler spread any two
+  objects together, so a member drawing its label at the corner of the plot, `{"value": "width"}`
+  for its `x`, came out still measuring a column: placed against a scale it had said it did not
+  want, filtered for the rows that column had no value in, described by a field it does not show,
+  and contributing to a colour domain it takes no part in. A `condition` that names a column
+  inherits into the condition rather than into the channel, and an empty `{}` is how a member says
+  it has no such channel at all. Four specifications in the wild corpus write a layer that way, and
+  agreement with upstream goes from 1919 to 1923 of 1981.
+
 - **The column a grid is split by is read before it is cut.**
   `getImplicitFromEncoding` is asked of a facet model as much as of a unit, and its answer goes in
   between that model's transforms and its bucketing — `parseData` runs the same sequence for every
