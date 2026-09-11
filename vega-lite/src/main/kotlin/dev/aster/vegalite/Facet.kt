@@ -709,6 +709,13 @@ internal interface FacetLayout {
     cellData: List<VegaValue> = emptyList(),
     /** The sizes the cell's own axes fall back to by name, aliased to the cell's own. */
     cellSignals: List<VegaValue> = emptyList(),
+    /**
+     * The keys a **cell** owns, which stand in the group beside the scales they explain.
+     *
+     * A key is a reading of one scale — its swatches are that scale's colours — so a trellis whose
+     * cells colour themselves has a key per cell rather than one beside the grid.
+     */
+    legends: List<VegaValue> = emptyList(),
   ): VegaValue
 }
 
@@ -1081,6 +1088,7 @@ internal class FacetGrid(
     viewEncode: VegaValue?,
     cellData: List<VegaValue>,
     cellSignals: List<VegaValue>,
+    legends: List<VegaValue>,
   ): VegaValue = obj {
     put("name", named("cell"))
     put("type", "group")
@@ -1113,6 +1121,7 @@ internal class FacetGrid(
     put("marks", arr(marks))
     if (axes.isNotEmpty()) put("axes", arr(axes))
     if (scales.isNotEmpty()) put("scales", arr(scales))
+    if (legends.isNotEmpty()) put("legends", arr(legends))
   }
 }
 
@@ -1459,6 +1468,7 @@ internal class FacetWrap(
     viewEncode: VegaValue?,
     cellData: List<VegaValue>,
     cellSignals: List<VegaValue>,
+    legends: List<VegaValue>,
   ): VegaValue = obj {
     put("name", named("cell"))
     put("type", "group")
@@ -1504,5 +1514,6 @@ internal class FacetWrap(
     put("marks", arr(marks))
     if (axes.isNotEmpty()) put("axes", arr(axes))
     if (scales.isNotEmpty()) put("scales", arr(scales))
+    if (legends.isNotEmpty()) put("legends", arr(legends))
   }
 }

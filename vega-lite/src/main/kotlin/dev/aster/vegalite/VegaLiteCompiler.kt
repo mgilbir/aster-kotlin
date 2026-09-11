@@ -756,12 +756,14 @@ private class Compilation(
     // each plot, because two keys standing for different scales cannot be one.
     val legendScale = mutableMapOf<String, String>()
     val legendPlot = mutableMapOf<String, String>()
+    /** The channel each key explains, which is what its **resolution** is asked about. */
+    val legendChannel = mutableMapOf<String, String>()
     // Every model in upstream's hierarchy carries its own `resolve`, and a legend is settled by the
     // composition it belongs to: a `resolve` written on one plot of a concatenation governs the
     // layers inside *that* plot and nothing else.
     val resolveOf =
       plots.flatMap { plot -> plot.views.map { it to Resolve(plot.spec.obj("resolve")) } }.toMap()
-    val allLegends = assembleLegends(views, legendScale, legendPlot, resolveOf)
+    val allLegends = assembleLegends(views, legendScale, legendPlot, legendChannel, resolveOf)
     // A legend the specification resolves **independently** belongs to the plot that raised it even
     // where the scale is shared: `resolve: {"legend": {"color": "independent"}}` is how a
     // concatenation puts a key inside the plot it explains rather than beside the whole chart.
@@ -772,10 +774,14 @@ private class Compilation(
         if (concat == null) emptyList()
         else allLegends.filterKeys { ownedBy(it, plot) }.values.toList()
     }
+    // A key explaining a scale the **cell** owns stands in the cell, as the scale does — see
+    // [cellOwnsLegend].
+    cellLegends = allLegends.filterKeys { cellOwnsLegend(legendChannel[it]) }.values.toList()
     val legends =
       allLegends
         .filterKeys { key ->
-          concat == null || (legendPlot[key] == null && owner[legendScale[key]] == null)
+          !cellOwnsLegend(legendChannel[key]) &&
+            (concat == null || (legendPlot[key] == null && owner[legendScale[key]] == null))
         }
         .values
         .toList()
@@ -2671,6 +2677,43 @@ private class Compilation(
    */
   private var cellScales: List<VegaValue> = emptyList()
 
+  /** The keys a facet's cells own, which stand inside the cell as their scales do. */
+  private var cellLegends: List<VegaValue> = emptyList()
+
+  /**
+   * Whether the key explaining [scale] belongs **in the cell** rather than beside the grid.
+   *
+   * ```js
+   * resolve.legend[channel] = parseGuideResolve(model.component.resolve, channel);
+   *
+   * if (resolve.legend[channel] === 'shared') {
+   *   legends[channel] = mergeLegendComponent(legends[channel], child.component.legends[channel]);
+   * ```
+   *
+   * `parseNonUnitLegend` merges a child's key up into the composition only where the resolve says
+   * **shared**, and `parseGuideResolve` answers `independent` for any channel whose *scale* is
+   * independent. A key is a reading of one scale — its swatches are that scale's colours — so a
+   * trellis whose cells colour themselves has a key per cell, and it stands in the cell group where
+   * the scale it reads does.
+   *
+   * Asked of the **channel**, not of the scale: `{"legend": {"color": "independent"}}` is a key per
+   * cell for a scale every cell shares, which is a reader's answer to a grid too crowded to carry
+   * one key beside it. Reading the scale's own name instead would have missed exactly that.
+   *
+   * This engine placed a key by the composition alone — inside a plot of a concatenation, and
+   * otherwise beside the chart — so a trellis's own key was written beside the grid, one key for a
+   * scale there is one of per cell, drawn from a scale that does not exist at the level it was
+   * written on.
+   */
+  private fun cellOwnsLegend(channel: String?): Boolean =
+    facet != null &&
+      concat == null &&
+      channel != null &&
+      resolve.guideIsIndependent(
+        channel,
+        resolve.scaleIsIndependent(channel, defaultIndependent = false),
+      )
+
   /** The sizes a cell's own axes fall back to by name, aliased to the cell's own. */
   private var cellSignals: List<VegaValue> = emptyList()
 
@@ -2860,6 +2903,7 @@ private class Compilation(
           // other scale falls back to `width` or `height` by name, and inside the cell those names
           // mean the whole chart until the cell aliases them to its own.
           cellSignals,
+          cellLegends,
         )
     if (above.isEmpty()) return inner
 
@@ -4029,6 +4073,8 @@ private class Compilation(
     scaleOf: MutableMap<String, String> = mutableMapOf(),
     /** Which plot a legend belongs to, where the composition resolves that legend per plot. */
     plotOf: MutableMap<String, String> = mutableMapOf(),
+    /** Which channel each legend explains, which is what a guide's resolution is asked about. */
+    channelOf: MutableMap<String, String> = mutableMapOf(),
     /** The `resolve` of the composition each view sits in, which may not be the chart's own. */
     resolveOf: Map<UnitView, Resolve> = emptyMap(),
   ): LinkedHashMap<String, VegaValue> {
@@ -4106,6 +4152,7 @@ private class Compilation(
           val entry = legends.getOrPut(key) { LinkedHashMap() }
           if (key !in scaleOf) {
             scaleOf[key] = component.name()
+            channelOf[key] = channel
             ownPlot?.let { plotOf[key] = it }
           }
           // `putIfAbsent` is a JVM extension, and this file is compiled for five targets.
@@ -4123,6 +4170,7 @@ private class Compilation(
         if (existing == null) {
           legends[key] = LinkedHashMap(built.fields)
           scaleOf[key] = component.name()
+          channelOf[key] = channel
           ownPlot?.let { plotOf[key] = it }
           if (titled) explicitlyTitled += key
         } else {

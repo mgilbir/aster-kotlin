@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A key a trellis resolves per cell stands in the cell, not beside the grid.** `parseNonUnitLegend`
+  merges a child's key up into the composition only where the resolve says shared, and
+  `parseGuideResolve` answers `independent` for any channel whose scale is independent. A key is a
+  reading of one scale — its swatches are that scale's colours — so a trellis whose cells colour
+  themselves has a key per cell, written in the cell group beside the scale it reads. It is the
+  **channel** that is asked and not the scale: `{"legend": {"color": "independent"}}` is a key per
+  cell for a scale every cell shares, which is a reader's answer to a grid too crowded to carry one
+  key beside it. This engine placed a key by the composition alone — inside a plot of a
+  concatenation, and otherwise beside the chart — so a trellis's own key was written beside the
+  grid, drawn from a scale that does not exist at the level it was written on. Two specifications in
+  the wild corpus are that chart, and agreement with upstream goes from 1892 to 1894 of 1981.
+
 - **A channel that names a column only under a test is a dimension of the stack all the same.**
   `channelHasField` counts a conditional field def and `getFieldDef` then reaches into the condition
   for it, so a colour that is a measure where a row was picked and grey otherwise orders the stack
