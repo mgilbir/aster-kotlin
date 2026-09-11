@@ -990,7 +990,9 @@ private class Compilation(
           selections
             .distinctBy { it.name }
             .sortedByDescending { views.indexOf(it.owner) }
-            .map { it.storeData(it.owner ?: views.firstOrNull(), it.initial, timeZone) } + data
+            .map {
+              it.storeData(it.owner ?: views.firstOrNull(), it.initial, timeZone, facet)
+            } + data
         ),
       )
       if (sizeSignals.isNotEmpty()) put("signals", arr(sizeSignals))

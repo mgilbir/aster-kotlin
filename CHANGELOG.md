@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A row a selection opens with says which cell of the grid it was picked in.** Inside a facet the
+  `unit` a tuple records is not a name but the cell's name and the values that cell holds, since
+  every cell is the same model drawn once per value — `unitName` spells the grid's channels into it.
+  This engine wrote the declaring view's plain name into the store, so a trellis opening with one of
+  its cells brushed had that row belong to no cell at all, and every test of the selection compared
+  it against a unit that never matched. Four specifications in the wild corpus open that way. The
+  store's copy is the one place the name is *not* quoted: a row already in the store is data, where
+  every other use of the name is spelled into an expression a signal computes.
+
 - **A grid's sort index is written above its cells'.** `model.parse()` walks the tree top-down, so a
   facet model parses its data before its child does and `parseAllForSortIndex` writes the grid's
   index above the cell's chain; below it, the cell's own channels are indexed in the order the

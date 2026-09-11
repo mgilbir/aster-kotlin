@@ -114,8 +114,20 @@ internal class Selection(
    * Inside a facet that is not a *name* but an expression: every cell of the grid is the same model
    * drawn once per value, so the unit is the cell's name and the values it holds. `unitName`.
    */
-  fun unitName(cell: UnitView? = null, grid: FacetLayout? = null): String {
-    val base = quoted(cell?.name ?: owner?.name ?: "")
+  fun unitName(
+    cell: UnitView? = null,
+    grid: FacetLayout? = null,
+    /**
+     * Whether the name is quoted, which says whether it is being written into an **expression**.
+     *
+     * `unitName(model, {escape: false})` for the store's own rows: a tuple already in the store is
+     * data, and its `unit` is the name itself. Everywhere else the name is spelled into an
+     * expression a signal computes, where it has to be a string literal.
+     */
+    escape: Boolean = true,
+  ): String {
+    val name = cell?.name ?: owner?.name ?: ""
+    val base = if (escape) quoted(name) else name
     if (grid == null) return base
     return base +
       grid.byChannel.joinToString("") { (channel, field) ->
@@ -393,8 +405,19 @@ internal class Selection(
    *   store carries a millisecond rather than an expression, so this is the one place in a
    *   selection where the zone has to be settled at compile time.
    */
-  fun storeData(view: UnitView?, initial: VegaValue?, timeZone: TimeZone? = null): VegaValue = obj {
+  fun storeData(
+    view: UnitView?,
+    initial: VegaValue?,
+    timeZone: TimeZone? = null,
+    /** The grid the declaring view is a cell of, whose values name the cell a row was picked in. */
+    grid: FacetLayout? = null,
+  ): VegaValue = obj {
     put("name", store)
+    // `unitName(model, {escape: false})`: inside a grid the unit is not a name but the cell's name
+    // and the values that cell holds, since every cell is the same model drawn once per value. A
+    // row the chart **opens** with has to say which cell it was picked in, or it is a pick in no
+    // cell at all: a trellis opening with one of its cells brushed had the brush belong to nothing.
+    val unit = unitName(view.takeIf { grid != null }, grid, escape = false)
     // A stated starting extent is a row **already** in the store: the chart opens with the brush
     // drawn and everything reading it already filtered, rather than opening empty and waiting for a
     // drag that has in effect already happened.
@@ -412,7 +435,7 @@ internal class Selection(
         arr(
           picked.map { row ->
             obj {
-              put("unit", owner?.name ?: "")
+              put("unit", unit)
               put(
                 "fields",
                 arr(
@@ -457,7 +480,7 @@ internal class Selection(
         arr(
           listOf(
             obj {
-              put("unit", owner?.name ?: "")
+              put("unit", unit)
               put(SELECTION_ID, arr(initial.array(first.written).orEmpty()))
             }
           )
@@ -469,7 +492,7 @@ internal class Selection(
         arr(
           listOf(
             obj {
-              put("unit", owner?.name ?: "")
+              put("unit", unit)
               put(
                 "fields",
                 arr(
