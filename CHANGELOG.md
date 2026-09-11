@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **The pre-aggregation table exists where a domain reads it, not merely where a sort could.**
+  Upstream builds a raw output node for every unit and its optimizer removes the ones nothing asked
+  for, so the count is of *requests*. A scale whose domain the specification **states** never reads
+  any table at all, whatever its sort says, and neither does one taken from a `datum`, a stack or a
+  bin's own extent. This compiler asked the sort alone, so such a chart kept a raw table nothing
+  read: it costs nothing to compute, the node having no transforms, but a named point in the flow
+  spends a dataset name — every table the chart derived afterwards came out one number high, and
+  every mark and domain that named one named the wrong table. A **bin** on a discrete scale is
+  ordered by its own start, and that order is written on the domain entry rather than answered by
+  `domainSort`: which table to read is that function's question, and a bin ordered by its own start
+  still reads the table being drawn. One specification in the wild corpus is fixed, and agreement
+  with upstream goes from 1940 to 1941 of 1981.
+
 - **A line given a second position is a `rule`.**
   A line is drawn through its points and has one position per row; a second position asks for a
   segment, and a segment is what a rule is. `RuleForRangedLineNormalizer` rewrites the mark and says

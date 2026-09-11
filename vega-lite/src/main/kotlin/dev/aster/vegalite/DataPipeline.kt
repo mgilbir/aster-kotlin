@@ -363,23 +363,19 @@ internal class DataPipeline(
     fun needsRawTable(view: UnitView): Boolean =
       view.scaledChannels().any { (channel, def) ->
         val type = view.scaleType(channel) ?: return@any false
-        def.sort != null &&
-          Scales.hasDiscreteDomain(type) &&
-          Scales.sortsFromRawTable(Scales.settledSort(view, channel, def, type))
+        Scales.readsRawTable(view, channel, def, type)
       }
   }
 
-  private fun needsRawTable(): Boolean =
-    view.scaledChannels().any { (channel, def) ->
-      val type = view.scaleType(channel) ?: return@any false
-      // A sort the *specification* stated may read a column the aggregation removes, and that is
-      // what the pre-aggregation table is for. One this compiler derived — a binned domain
-      // ordered by its own bin's start — is built from columns the grouping keeps, so it reads
-      // the same table everything else does.
-      def.sort != null &&
-        Scales.hasDiscreteDomain(type) &&
-        Scales.sortsFromRawTable(Scales.settledSort(view, channel, def, type))
-    }
+  /**
+   * Whether anything **reads** the pre-aggregation table, which is what decides that it exists.
+   *
+   * A sort the *specification* stated may read a column the aggregation removes, and that is what
+   * the pre-aggregation table is for. Whether it is actually read is [Scales.readsRawTable]'s
+   * question, not this one's: a scale whose domain is stated outright reads no table at all,
+   * however it says to sort.
+   */
+  private fun needsRawTable(): Boolean = needsRawTable(view)
 
   /**
    * A field arrives as text and has to become what the encoding says it is before anything orders

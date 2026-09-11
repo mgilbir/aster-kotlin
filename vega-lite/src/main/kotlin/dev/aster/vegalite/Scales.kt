@@ -333,6 +333,8 @@ internal object Scales {
     def: ChannelDef,
     type: String,
     dataName: String,
+    /** The **pre-aggregation** table's name, for the one domain shape that reads it. */
+    rawName: String = view.rawData,
   ): List<VegaValue> {
     // `{"domain": {"unionWith": [...]}}` widens the domain the data would have given rather than
     // replacing it: the stated values come first and the derived domain follows them, both in the
@@ -471,7 +473,7 @@ internal object Scales {
     val sort = domainSort(view, channel, def, type)
     // Sorting by an aggregate of some *other* field has to be computed independently of the
     // aggregation being drawn, so upstream reads the pre-aggregation table for it.
-    val source = if (sortsFromRawTable(sort)) view.rawData else dataName
+    val source = if (sortsFromRawTable(sort)) rawName else dataName
     // A binned field forced onto a discrete scale is a domain of *labels*, not of bin starts: the
     // `_range` column the bin wrote is what the axis reads, and it is what has to be listed.
     val binnedLabels =
@@ -480,7 +482,27 @@ internal object Scales {
       obj {
         put("data", source)
         put("field", Fields.vgField(def, suffix = if (binnedLabels) "range" else null))
-        put("sort", sort)
+        // ```js
+        // // we have to use a sort object if sort = true to make the sort correct by bin start
+        // sort: sort === true || !isObject(sort) ? {field: model.vgField(channel, {}), op: 'min'} :
+        // sort,
+        // ```
+        //
+        // A domain of **labels** does not sort itself into numeric order — `"1.0 – 2.0"` sorts
+        // before `"9.0 – 10.0"` alphabetically — so the bin's own start orders them. It is written
+        // *here*, on the entry, and not answered by `domainSort`: which table the domain reads is
+        // that function's answer, and a bin ordered by its own start still reads the table being
+        // drawn. Answered there instead, such a scale asked for a pre-aggregation table nothing
+        // else wanted, and every dataset the chart derived afterwards came out one number high.
+        put(
+          "sort",
+          if (binnedLabels && sort !is VegaValue.Obj)
+            obj {
+              put("field", Fields.vgField(def))
+              put("op", "min")
+            }
+          else sort,
+        )
       }
     )
   }
@@ -501,6 +523,40 @@ internal object Scales {
    * the rows themselves. Testing the written form instead misses the string spelling, which is the
    * one a population pyramid uses to run its ages downwards.
    */
+  /**
+   * Whether this channel's domain is read off the **pre-aggregation** table.
+   *
+   * ```js
+   * public isRequired(): boolean {
+   *   return !!this.refCounts[this._name];
+   * }
+   * ```
+   *
+   * Upstream builds a raw output node for every unit and its optimizer then removes the ones
+   * nothing asked for — the count is of *requests*, so the question is not "could this sort read
+   * the raw table" but "does the domain this channel ends up with read it". A scale whose domain
+   * the specification **states** never reads any table at all, whatever its sort says, and neither
+   * does one taken from a `datum`, a stack, a bin's own extent or a bucket's two edges: each is a
+   * different arm of [domain], and every one of them returns before the sort is consulted.
+   *
+   * Asking the sort alone left a raw table standing in the flow with nothing reading it. It cost
+   * nothing to compute — the node has no transforms — but a named point in the flow **spends a
+   * dataset name**, so every table the chart derived afterwards came out one number high.
+   */
+  fun readsRawTable(view: UnitView, channel: String, def: ChannelDef, type: String): Boolean {
+    val raw = "\u0000raw"
+    fun mentions(value: VegaValue): Boolean =
+      when (value) {
+        is VegaValue.Str -> value.value == raw
+        is VegaValue.Obj -> value.fields.values.any { mentions(it) }
+        is VegaValue.Arr -> value.values.any { mentions(it) }
+        else -> false
+      }
+    return domain(view, channel, def, type, dataName = "\u0000main", rawName = raw).any {
+      mentions(it)
+    }
+  }
+
   fun sortsFromRawTable(sort: VegaValue?): Boolean =
     sort != null && sort != VegaValue.Null && sort !is VegaValue.Bool
 
@@ -516,20 +572,7 @@ internal object Scales {
     override: VegaValue? = null,
   ): VegaValue? {
     if (!hasDiscreteDomain(type)) return null
-    // A binned field on a discrete scale is a domain of *labels*, and labels do not sort
-    // themselves into numeric order — `"1.0 – 2.0"` sorts before `"9.0 – 10.0"` alphabetically.
-    // The bin's own start is what orders them.
-    if (
-      override == null &&
-        def.sort == null &&
-        def.bin is Binning.Bin &&
-        (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL)
-    ) {
-      return obj {
-        put("field", Fields.vgField(def))
-        put("op", "min")
-      }
-    }
+
     return when (val sort = override ?: def.sort) {
       null -> bool(true)
       is VegaValue.Str ->
