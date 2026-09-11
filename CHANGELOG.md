@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **Two layers' projections merge when one of them said nothing.** `mergeIfNoConflict` treats a
+  member that stated nothing as agreeing with one that did, and takes the one that spoke. This
+  engine compared the two specifications for equality, so a map layered under another map where only
+  the upper one names its kind came out with a projection each — and two projections fitted to two
+  different sets of outlines draw the same country at two sizes. Six specifications in the wild
+  corpus layer their maps that way. The *order* of what a merged projection is fitted to follows from
+  how upstream builds it: the component starts as a copy of the fold's own data — whichever child the
+  fold ended on — and every fitted child is appended after it, so the child that spoke is fitted
+  first. Where the two disagree, or where one is placed by hand and the other fitted, each member
+  keeps its own.
+
 - **A themed axis property beats a derived one, and who applies it decides whether it is written
   out.** Three rules in one place, all of them `parseAxis`'s. A value this compiler derived is used
   only where the theme said nothing, so a themed `format` replaces the specifier a time unit would

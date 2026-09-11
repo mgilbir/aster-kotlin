@@ -552,18 +552,28 @@ private class Compilation(
       // so one map under a scatter of ordinary positions is still a *layer's* projection, named for
       // the layer. Requiring two geographic members left it named for the member, and the mark that
       // reads it named the member's too.
-      if (
-        (plot.views.size > 1 || plot.facet != null) &&
-          geographic.isNotEmpty() &&
-          geographic.all { it.projection == geographic.first().projection }
-      ) {
+      val agreed = if (geographic.isEmpty()) null else agreedProjection(geographic)
+      if ((plot.views.size > 1 || plot.facet != null) && agreed != null) {
+        val (spoke, merged) = agreed
         val name =
           Fields.varName(
             listOf(plot.name, "projection").filter { it.isNotEmpty() }.joinToString("_")
           )
         geographic.forEachIndexed { index, view ->
           view.projectionName = name
-          if (index == 0) view.projectionFitViews = geographic else view.projectionMerged = true
+          if (index == 0) {
+            // The merged component is built from what the children **agreed**, which may be what
+            // one of them said and the others left alone: `new ProjectionComponent(name,
+            // nonUnitProjection.specifiedProjection, …, duplicate(nonUnitProjection.data))`.
+            //
+            // That copy is why the **fold's** own outlines come first in the fit and the children's
+            // after it: the merged component starts with the data of whichever child the fold ended
+            // on, and then every fitted child is appended in order.
+            view.projection = merged
+            view.projectionFitViews = listOf(spoke) + geographic
+          } else {
+            view.projectionMerged = true
+          }
         }
       }
     }
@@ -1389,7 +1399,7 @@ private class Compilation(
         is Node.Nest -> node.children.flatMap { elevateProjection(it) }
       }
     if (geographic.isEmpty()) return emptyList()
-    if (geographic.any { it.projection != geographic.first().projection }) return emptyList()
+    val (spoke, merged) = agreedProjection(geographic) ?: return emptyList()
     // A leaf has merged already, in the pass over the plots: this is the level *above* it.
     if (node !is Node.Nest) return geographic
     val name =
@@ -1397,12 +1407,62 @@ private class Compilation(
     geographic.forEachIndexed { index, view ->
       view.projectionName = name
       view.projectionMerged = index != 0
+      if (index == 0) view.projection = merged
       // The merge carries the fit, and only the one that carries it: a view that was the first of
       // its own plot's merge is not the first of this one, and would otherwise write a second
       // projection fitted to a subset of what the chart draws.
-      view.projectionFitViews = if (index == 0) geographic else emptyList()
+      view.projectionFitViews = if (index == 0) listOf(spoke) + geographic else emptyList()
     }
     return geographic
+  }
+
+  /**
+   * `mergeIfNoConflict`: the one projection a level's children agree on, or null where they do not.
+   *
+   * ```js
+   * const allPropertiesShared = every(PROJECTION_PROPERTIES, (prop) => {
+   *   if (!hasOwnProperty(first.explicit, prop) && !hasOwnProperty(second.explicit, prop)) return true;
+   *   if (hasOwnProperty(first.explicit, prop) && hasOwnProperty(second.explicit, prop) &&
+   *       deepEqual(first.get(prop), second.get(prop))) return true;
+   *   return false;
+   * });
+   *
+   * const size = deepEqual(first.size, second.size);
+   * if (size) {
+   *   if (allPropertiesShared) return first;
+   *   else if (deepEqual(first.explicit, {})) return second;
+   *   else if (deepEqual(second.explicit, {})) return first;
+   * }
+   * return null;
+   * ```
+   *
+   * A member that **said nothing** agrees with one that did: the merge takes the one that spoke.
+   * Comparing the specifications for equality instead left a map layered under another map, where
+   * only the upper one names its kind, with a projection each — and two projections fitted to two
+   * different sets of outlines draw the same country at two sizes.
+   *
+   * The sizes have to agree too, which here is whether each is **fitted**: a projection that states
+   * its own `scale` or `translate` has been placed by hand and has no size to compare.
+   */
+  private fun agreedProjection(views: List<UnitView>): Pair<UnitView, VegaValue.Obj>? {
+    fun fitted(spec: VegaValue.Obj) =
+      spec.fields["scale"] == null && spec.fields["translate"] == null
+    var winner = views.first()
+    var merged = winner.projection ?: return null
+    for (view in views.drop(1)) {
+      val own = view.projection ?: return null
+      if (fitted(merged) != fitted(own)) return null
+      when {
+        merged.fields == own.fields -> Unit
+        merged.fields.isEmpty() -> {
+          winner = view
+          merged = own
+        }
+        own.fields.isEmpty() -> Unit
+        else -> return null
+      }
+    }
+    return winner to merged
   }
 
   /** The plot a view belongs to, where the compiler has been told about it. */
