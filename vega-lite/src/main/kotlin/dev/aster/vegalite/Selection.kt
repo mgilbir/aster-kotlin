@@ -319,9 +319,52 @@ internal class Selection(
             is VegaValue.Obj -> (select.string("type") ?: return@mapNotNull null) to select
             else -> return@mapNotNull null
           }
-        val encodings =
+        val statedChannels =
           options.array("encodings").orEmpty().mapNotNull { (it as? VegaValue.Str)?.value }
-        val fields = options.array("fields").orEmpty().mapNotNull { (it as? VegaValue.Str)?.value }
+        val statedFields =
+          options.array("fields").orEmpty().mapNotNull { (it as? VegaValue.Str)?.value }
+        // ```js
+        // // If no explicit projection (either fields or encodings) is specified, set some
+        // defaults.
+        // // If an initial value is set, try to infer projections.
+        // if (!fields && !encodings && init) {
+        //   for (const initVal of init) {
+        //     if (!isObject(initVal)) { continue; }
+        //     for (const key of keys(initVal)) {
+        //       if (isSingleDefUnitChannel(key)) { (encodings ||= []).push(key); }
+        //       else { (fields ??= []).push(key); }
+        //     }
+        //   }
+        // }
+        // ```
+        //
+        // A selection given a **starting value** and told nothing else about what it projects onto
+        // is projected onto whatever that value names: a slider bound to `maxReported` remembers a
+        // `maxReported`, and a click started at `{"x": 5}` remembers the column `x` is drawn from.
+        // With neither read, such a selection fell back to remembering rows by *identity* — so it
+        // had no field signal for the control to write into, no `tuple_fields` to say what it
+        // stored, and a store that began empty however the specification had started it.
+        //
+        // A **scalar** value is not a projection: it is the identity of a row, and `isObject`
+        // passes over it.
+        //
+        // An **interval** is the same rule seen from the other side: a brush started over a range
+        // of `y` is dragged along `y` alone, where without this it was projected onto both
+        // positions and opened as a rectangle. A key that names no channel contributes no channel,
+        // and [channelProjections] then falls back to the two positions — which is what upstream's
+        // own interval arm does after warning about the key.
+        val inferred =
+          if (statedChannels.isNotEmpty() || statedFields.isNotEmpty()) emptyList()
+          else
+            when (val initial = param.fields["value"]) {
+                is VegaValue.Arr -> initial.values
+                null -> emptyList()
+                else -> listOf(initial)
+              }
+              .filterIsInstance<VegaValue.Obj>()
+              .flatMap { it.fields.keys }
+        val encodings = statedChannels + inferred.filter { it in Channels.SINGLE_DEF_UNIT_CHANNELS }
+        val fields = statedFields + inferred.filterNot { it in Channels.SINGLE_DEF_UNIT_CHANNELS }
         val bind = param.fields["bind"]
         Selection(
           name = name,

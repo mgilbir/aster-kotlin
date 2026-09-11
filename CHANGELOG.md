@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **A selection told what it starts with and nothing else is projected onto whatever that names.**
+  "If no explicit projection (either fields or encodings) is specified, set some defaults. If an
+  initial value is set, try to infer projections." A slider bound to `maxReported` remembers a
+  `maxReported`, and a click started at `{"x": 5}` remembers the column `x` is drawn from. With
+  neither read, such a selection fell back to remembering rows by identity: it had no field signal
+  for the control to write into, no `tuple_fields` to say what it stored, and a store that began
+  empty however the specification had started it — so a chart whose sliders were meant to filter it
+  from the first frame filtered nothing until the reader moved one. An interval is the same rule
+  seen from the other side: a brush started over a range of `y` is dragged along `y` alone, where
+  before it was projected onto both positions and opened as a rectangle. A scalar starting value is
+  not a projection, being the identity of a row. Three specifications in the wild corpus are
+  written that way, and agreement with upstream goes from 1928 to 1931 of 1981.
+
 - **The ticks a guide was told to draw are made into something Vega can read.**
   An instant is not a value Vega can be handed: `{"year": 2019, "month": "Jan"}` is a way of writing
   a date down and not a number, and a date written as text is text until something builds it.

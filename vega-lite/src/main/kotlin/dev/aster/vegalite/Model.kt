@@ -328,6 +328,15 @@ internal object Channels {
       "description",
     )
 
+  /**
+   * `SINGLE_DEF_UNIT_CHANNELS`: the channels that cannot hold a **list** of definitions.
+   *
+   * "The only two channels that can have an array of channelDefs are `detail` and `order`" —
+   * `tooltip` is the third the index leaves out, and a selection cannot be projected onto any of
+   * them because there is no one definition to project.
+   */
+  val SINGLE_DEF_UNIT_CHANNELS = UNIT_CHANNELS.toSet() - setOf("order", "detail", "tooltip")
+
   /** The channels that name a place on the globe rather than a position on the page. */
   val GEO_POSITION_CHANNELS = setOf("longitude", "latitude", "longitude2", "latitude2")
 
