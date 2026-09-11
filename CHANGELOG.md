@@ -8,6 +8,20 @@ section here does not get released.
 
 ### Fixed
 
+- **A parameter belongs to the mark that was written, not to what it expands into.** A line that
+  draws its own points is two marks, and the parameters go on the **first** of them alone: they
+  were declared on the mark the specification wrote, and the overlay is something the normalizer
+  added. This engine handed them to every member, so one declaration was claimed twice — invisible
+  until a second plot declares the same name, because that plot then found its own declaration
+  already taken and reacted to nothing at all. A **composite** mark takes none at all: its
+  normalizer lifts the parameters off the specification and does nothing with them, so the summary
+  is drawn and nothing reacts. Upstream says so in a warning and has an issue open about it — what a
+  click on one of the five marks a box plot draws would pick is the question it has not answered —
+  and this engine built the whole selection, drawing a chart that reacts where upstream's does not.
+  It is reported rather than dropped in silence. Two specifications in the wild corpus are a
+  concatenation whose plots both declare one name, and agreement with upstream goes from 1906 to
+  1908 of 1981.
+
 - **A view that writes both spellings keeps only what its `selection` block converts to.** The
   compatibility normalizer spreads the rest of the unit and then writes `params:` after it, so what
   the unit already had is **overwritten** rather than added to: a chart that mixes a version 4

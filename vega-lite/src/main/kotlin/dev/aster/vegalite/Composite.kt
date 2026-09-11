@@ -192,6 +192,25 @@ internal class Composite(
       .filterNot { value -> (value as? VegaValue.Obj)?.has("aggregate") == true }
       .mapNotNull { value -> (value as? VegaValue.Obj)?.string("field") }
 
+  /**
+   * The specification without the parameters it declared — a composite mark takes none.
+   *
+   * ```js
+   * const {mark, encoding: _encoding, params, projection: _p, ...outerSpec} = spec;
+   * ...
+   * // TODO(https://github.com/vega/vega-lite/issues/3702): add selection support
+   * if (params) {
+   *   log.warn(log.message.selectionNotSupported('boxplot'));
+   * }
+   * ```
+   *
+   * `params` is taken off the specification and **nothing is done with it**: the summary is drawn
+   * and the parameter is not built at all. Reported where the selections are collected, which is
+   * before any of this runs — see `Selection.of`.
+   */
+  private fun withoutParameters(outer: VegaValue.Obj): VegaValue.Obj =
+    if (!outer.has("params")) outer else VegaValue.Obj(outer.fields.filterKeys { it != "params" })
+
   /** The marks this handles. Anything else is not a composite mark. */
   fun handles(type: String): Boolean =
     type == "errorbar" || type == "errorband" || type == "boxplot"
@@ -275,7 +294,10 @@ internal class Composite(
     // Rows that already carry their own interval are not summarised, so there is nothing to group.
     val groupby = if (ranged == null) extracted.groupby else emptyList()
 
-    val outer = VegaValue.Obj(unit.fields.filterKeys { it != "mark" && it != "encoding" })
+    val outer =
+      VegaValue.Obj(unit.fields.filterKeys { it != "mark" && it != "encoding" }).let {
+        withoutParameters(it)
+      }
     // `[...oldAggregate, ...errorBarSpecificAggregate]`: what the *encoding* asked the summary for
     // comes first, and the interval's own measures after it.
     val measures =
@@ -448,7 +470,10 @@ internal class Composite(
         put("type", aggregatedTooltip.string("type") ?: "quantitative")
       }
     }
-    val outer = VegaValue.Obj(unit.fields.filterKeys { it != "mark" && it != "encoding" })
+    val outer =
+      VegaValue.Obj(unit.fields.filterKeys { it != "mark" && it != "encoding" }).let {
+        withoutParameters(it)
+      }
     val declared = unit.array("transform") ?: emptyList()
 
     /** `Max of v`, `Q3 of v`, … — what resting on a part of the box says. */

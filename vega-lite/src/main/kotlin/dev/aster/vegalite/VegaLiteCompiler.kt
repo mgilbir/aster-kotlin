@@ -413,7 +413,7 @@ private class Compilation(
     // a chart is — and it has to be normalised *after* the grids are peeled off, because until then
     // it is not the thing being compiled.
     if (spec.has("repeat")) spec = Repeat.normalize(spec, diagnostics) ?: return failed()
-    selections = Selection.of(spec)
+    selections = Selection.of(spec, diagnostics)
     // The grids are built straight from the levels rather than lifted out of an encoding: there is
     // no encoding here to lift them from. Everything they publish runs through the name the level
     // above gave its cell — `child`, then `child_child` — exactly as a lifted one does.

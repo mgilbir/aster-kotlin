@@ -246,7 +246,13 @@ internal class Selection(
      * than the chart: the whole tree is walked so that a condition anywhere can be resolved against
      * a selection defined anywhere, and the views then claim the ones they declared.
      */
-    fun of(spec: VegaValue.Obj): List<Selection> {
+    /** The marks that stand for a layer of others, which take no parameters of their own. */
+    private val COMPOSITE_MARKS = setOf("errorbar", "errorband", "boxplot")
+
+    fun of(
+      spec: VegaValue.Obj,
+      diagnostics: DiagnosticCollector? = null,
+    ): List<Selection> {
       val found = mutableListOf<Selection>()
       // `UnitModel.hasProjection`, asked of the unit each selection is **declared on** and asked
       // here rather than of the view later: a condition testing the selection is compiled while the
@@ -258,7 +264,36 @@ internal class Selection(
         val geography =
           node["mark"].let { it == VegaValue.Str("geoshape") || it.string("type") == "geoshape" } ||
             channels.any { it in Channels.GEO_POSITION_CHANNELS }
-        found += from(node.array("params").orEmpty()).onEach { it.onGeography = geography }
+        // ```js
+        // const {mark, encoding: _encoding, params, projection: _p, ...outerSpec} = spec;
+        // ...
+        // // TODO(https://github.com/vega/vega-lite/issues/3702): add selection support
+        // if (params) {
+        //   log.warn(log.message.selectionNotSupported('boxplot'));
+        // }
+        // ```
+        //
+        // A **composite mark** takes none: its normalizer lifts the parameters off the
+        // specification and does nothing with them, so the summary is drawn and nothing reacts.
+        // Upstream says so in a warning and has an issue open about it — what a click on one of
+        // the five marks a box plot draws would pick is the question it has not answered — and a
+        // compiler that built the parameter anyway draws a chart that reacts where upstream's does
+        // not.
+        val composite =
+          node["mark"].let { it.string("type") ?: (it as? VegaValue.Str)?.value } in COMPOSITE_MARKS
+        val declared = node.array("params").orEmpty()
+        if (composite && declared.isNotEmpty()) {
+          diagnostics?.error(
+            VegaLiteDiagnostics.UNSUPPORTED_PARAMETER,
+            "A composite mark takes no parameters, so " +
+              declared.mapNotNull { it.string("name") }.joinToString(", ") { "`$it`" } +
+              " is not built and the chart does not react. Upstream drops it with the same " +
+              "warning. A parameter on a layer *around* the composite mark is built as any " +
+              "other is.",
+            jsonPath = "$.params",
+          )
+        }
+        if (!composite) found += from(declared).onEach { it.onGeography = geography }
         for (composition in listOf("layer", "hconcat", "vconcat", "concat")) {
           node.array(composition).orEmpty().forEach {
             (it as? VegaValue.Obj)?.let { child -> walk(child, channels) }
