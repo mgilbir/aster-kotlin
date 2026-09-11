@@ -69,17 +69,16 @@ internal object Guides {
       "labelPadding",
       "labels",
       "labelSeparation",
+      "maxExtent",
+      "minExtent",
       "orient",
+      "position",
       "tickCap",
       "tickColor",
       "tickDash",
       "tickDashOffset",
-      "tickExtra",
-      "tickOffset",
       "tickOpacity",
-      "tickRound",
       "tickSize",
-      "tickWidth",
       "ticks",
       "title",
       "titleAlign",
@@ -531,23 +530,31 @@ internal object Guides {
         axis.properties[property] = asSignal(value)
       }
     }
-    // A property a **style block** settles has to be written out: this compiler resolves the block
-    // rather than forwarding its name, so nothing downstream would apply it. Upstream writes out
-    // every property whose `configFrom` is not `vgAxisConfig` — for a style block that is what
-    // keeps a `gridColor` kept in `config.style` on the axis that names it.
+    // ```js
+    // const {configValue = undefined, configFrom = undefined} =
+    //   isAxisProperty(property) && property !== 'values'
+    //     ? getAxisConfig(property, config.style, axis.style, axisConfigs)
+    //     : {};
+    // ...
+    // } else if (hasConfigValue && configFrom !== 'vgAxisConfig') {
+    //   // Add config value to axis component if there is no explicit value and the value is not
+    //   // from a Vega config
+    //   axisComponent.set(property, configValue, false);
+    // }
+    // ```
+    //
+    // A configuration Vega cannot apply has to be resolved **here**, onto this axis, or nothing
+    // acts on it at all — and that is every source but a Vega one: a style block this compiler has
+    // already resolved, and a family named after a *scale* (`config.axisQuantitative`,
+    // `config.axisTemporal`) which Vega has never heard of. This engine wrote out only the
+    // properties it had a rule for, so a theme colouring every measured axis orange or turning its
+    // labels to a stated font was read and dropped. Five specifications in the wild corpus theme
+    // their axes that way. A family Vega *does* know is still left to Vega: writing a derived value
+    // beside it would settle the property for this axis alone and beat the theme with a default.
     for (property in AXIS_PROPERTIES) {
       if (axis.properties.containsKey(property)) continue
-      // Only where a **style** is what settled it. A family's own property is left for Vega to
-      // apply where Vega knows the family — `configFrom === 'vgAxisConfig'` — and a family's style
-      // block is behind every family, so it is read only where none of them spoke.
-      val quiet =
-        vegaLiteOnlyConfigs.none { it.fields.containsKey(property) } &&
-          vegaConfigs.none { it.fields.containsKey(property) }
-      val value =
-        styleConfigs.firstNotNullOfOrNull { it.fields[property] }
-          ?: familyStyles.takeIf { quiet }?.firstNotNullOfOrNull { it.fields[property] }
-          ?: continue
-      axis.properties[property] = asSignal(value)
+      if (themedByVega(property)) continue
+      axis.properties[property] = asSignal(configured(property) ?: continue)
     }
     conditionalToEncode(axis, diagnostics)
 

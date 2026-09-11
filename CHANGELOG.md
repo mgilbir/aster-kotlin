@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A themed axis property Vega cannot apply is written onto the axis, on the parts it belongs to.**
+  A configuration family named after a *scale* — `config.axisQuantitative`, `config.axisTemporal` —
+  is Vega-Lite's own, and Vega has never heard of it, so a property found there has to be resolved
+  onto the axis or nothing acts on it: upstream writes out every property whose `configFrom` is not
+  `vgAxisConfig`. This engine wrote out only the handful it had a rule for, so a theme colouring
+  every measured axis or turning its labels to a stated font was read and dropped. Five
+  specifications in the wild corpus theme their axes that way. Which *part* each property lands on
+  is `AXIS_PROPERTY_TYPE`, and four of its `both` entries were being treated as the axis proper's
+  alone — `tickOffset` among them, which upstream's comment says is "needed to be applied to grid
+  axis too, so the grid will align with ticks".
+
 - **A row a selection opens with says which cell of the grid it was picked in.** Inside a facet the
   `unit` a tuple records is not a name but the cell's name and the values that cell holds, since
   every cell is the same model drawn once per value — `unitName` spells the grid's channels into it.
