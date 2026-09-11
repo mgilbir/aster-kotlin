@@ -541,6 +541,22 @@ internal object Guides {
     // exclude is every word nobody has written yet.
     for (key in AXIS_PROPERTIES) {
       val value = user?.fields?.get(key) ?: continue
+      // ```js
+      // export function numberFormat({type, specifiedFormat, config, normalizeStack}) {
+      //   // Specified format in axis/legend has higher precedence than fieldDef.format
+      //   if (isString(specifiedFormat)) {
+      //     return specifiedFormat;
+      //   }
+      // ```
+      //
+      // A **number** format is taken only where it is a string: `numberFormat` asks `isString` and
+      // falls through to the configured one otherwise, so an axis written `{"format": {"condition":
+      // …}}` over a measure has no format at all — Vega has no conditional format, and there is
+      // nothing else for such an object to mean. A **time** format is taken on its truthiness
+      // instead — `if (specifiedFormat) return specifiedFormat` — so the same object written over
+      // an instant is passed through as it stands. One specification in the wild corpus writes one
+      // over a measure.
+      if (key == "format" && value !is VegaValue.Str && !timeFormatted(def)) continue
       // `normalizeAngle`: a turn is measured from zero, so a label the specification wrote at
       // minus forty-five degrees is a label at three hundred and fifteen.
       axis.properties[key] =
@@ -1035,6 +1051,17 @@ internal object Guides {
       "position",
       "tickMinStep",
     )
+
+  /**
+   * Whether this definition's guide is formatted as a **time**, which decides how its `format` is
+   * read.
+   *
+   * `isFieldOrDatumDefForTimeFormat`: a temporal field, or one whose time unit makes it an instant
+   * however its type was written — a month named on an ordinal scale is still a date to the
+   * formatter.
+   */
+  private fun timeFormatted(def: ChannelDef): Boolean =
+    def.type == MeasureType.TEMPORAL || def.timeUnit != null
 
   /** A themed value Vega cannot read from its own configuration: a signal, or a conditional. */
   private fun conditionalOrSignal(value: VegaValue): Boolean =

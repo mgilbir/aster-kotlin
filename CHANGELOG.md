@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A number format is taken only where it is a string; a time format on its truthiness.**
+  `numberFormat` asks `isString` of the stated format and falls through to the configured one
+  otherwise, so an axis written `{"format": {"condition": …}}` over a measure has no format at all —
+  Vega has no conditional format, and there is nothing else for such an object to mean. `timeFormat`
+  asks only `if (specifiedFormat)`, so the same object written over an instant is passed through as
+  it stands. This engine copied whatever was stated onto the axis, so the object reached Vega and
+  the theme's own number format never got its turn. One specification in the wild corpus writes one
+  over a measure, and agreement with upstream goes from 1914 to 1915 of 1981.
+
 - **A column whose name holds a dot is written with that dot escaped.** `replacePathInField` splits
   the access path, escapes what is inside each step and joins them with an escaped dot, because
   Vega reads an unescaped one as a step into a nested object. A column called `properties.NAME` is
