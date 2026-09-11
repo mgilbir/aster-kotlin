@@ -751,7 +751,11 @@ internal object Scales {
       "x",
       "y" -> {
         if (type == "point" || type == "band") {
-          val declared = if (channel == "x") view.spec.width else view.spec.height
+          // `model.size`, which is the size the model was **given**: a layer hands its members its
+          // own, and a member that states nothing is measured against that rather than against the
+          // theme. See [UnitView.statedSize].
+          val declared =
+            view.statedSize[channel] ?: if (channel == "x") view.spec.width else view.spec.height
           val step = (declared as? VegaValue.Obj)?.number("step")
           // `getDiscretePositionSize`: the specification's own size where it states one, and the
           // **theme's** discrete size otherwise — which is a step only where the theme states no

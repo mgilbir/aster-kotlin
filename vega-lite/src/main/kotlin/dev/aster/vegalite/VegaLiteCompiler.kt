@@ -482,6 +482,7 @@ private class Compilation(
       plot.views.forEach {
         plotNames[it] = plot.name
         plotResolves[it] = Resolve(plot.spec.obj("resolve"))
+        it.statedSize = LayoutSize.statedSizes(plot.views, plot.spec)
       }
       // The **chart's** grid is the one it lays out itself. A faceted plot inside a concatenation
       // lays out its own cells within its group, and everything the chart does about a facet —
@@ -1841,6 +1842,7 @@ private class Compilation(
         plot.views.forEach {
           plotNames[it] = plot.name
           plotResolves[it] = Resolve(plot.spec.obj("resolve"))
+          it.statedSize = LayoutSize.statedSizes(plot.views, plot.spec)
         }
         leaves += plot
         return Node.Leaf(plot)

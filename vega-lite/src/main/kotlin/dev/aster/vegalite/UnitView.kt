@@ -124,6 +124,25 @@ internal class UnitView(
   var facetFields: List<String> = emptyList()
 
   /**
+   * The size the **level this view belongs to** settled on, per channel — its own or a sibling's.
+   *
+   * ```js
+   * function getDiscretePositionSize(channel, size, viewConfig) {
+   *   const sizeValue = size[channel === X ? 'width' : 'height'];
+   *   if (sizeValue !== undefined) { return sizeValue; }
+   *   return getViewConfigDiscreteSize(viewConfig, sizeChannel);
+   * }
+   * ```
+   *
+   * `model.size` is the size the model was **given**, and a layer hands its members its own. Read
+   * as this view's own instead, a member that states nothing was measured against the theme where
+   * its sibling had already said the level is one step per category — so a band chart whose second
+   * layer asks for a step of thirteen came out stretched across a themed width. See
+   * [LayoutSize.declaredSize], which settles it the same way for the layout itself.
+   */
+  var statedSize: Map<String, VegaValue?> = emptyMap()
+
+  /**
    * The definitions the facet channels were lifted out of, for the steps that still need them.
    *
    * The cell's encoding no longer mentions them — a facet says nothing about what a cell looks like

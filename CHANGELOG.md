@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A band's range is measured against the size the level settled on, not the view's own.**
+  `model.size` is the size a model was **given**, and a layer hands its members its own — which is
+  its first member's, by the rule that settles a layer's size. Read as this view's own instead, a
+  member that states nothing fell through to the theme where its sibling had already said the level
+  is one step per category: a band chart whose second layer asks for a step of thirteen came out
+  stretched across a themed width, with its bands as wide as the plot divided by their number. The
+  theme still answers where nothing states a size, which is what makes a document that sizes every
+  plot with `config.view.discreteWidth` size them. One specification in the wild corpus writes such
+  a layer, and agreement with upstream goes from 1932 to 1933 of 1981.
+
 - **A `resolve` written on a plot of a concatenation speaks about the layers inside that plot.**
   Every model in upstream's hierarchy carries a `resolve` of its own and each speaks about its own
   children: the chart's is about the concatenation's plots, and a plot's is about the layers within

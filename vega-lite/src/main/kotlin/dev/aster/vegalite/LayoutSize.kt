@@ -274,6 +274,10 @@ internal class LayoutSize(
      * A member that states nothing carries the level's own here, `inherited` having put it there,
      * so the first member answers for both cases at once.
      */
+    /** [declaredSize] for both channels, which is what a level hands the views inside it. */
+    fun statedSizes(views: List<UnitView>, spec: VegaValue.Obj): Map<String, VegaValue?> =
+      mapOf("x" to declaredSize(views, spec, "x"), "y" to declaredSize(views, spec, "y"))
+
     private fun declaredSize(views: List<UnitView>, spec: VegaValue.Obj, channel: String) =
       views.firstNotNullOfOrNull { if (channel == "x") it.spec.width else it.spec.height }
         ?: spec.fields[if (channel == "x") "width" else "height"]
