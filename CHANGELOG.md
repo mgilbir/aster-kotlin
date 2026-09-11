@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **A wrapped grid whose values are listed is ordered by the place each cell holds in that list.**
+  The list is a stated sequence and a cell's place in it cannot be read off the column being
+  faceted on, so the place is computed onto every row and the grid takes the greatest of each
+  cell's — every row of a cell carrying the same number. Both the grid's own value list and the
+  partition it cuts have to carry it up. This compiler wrote the column and then ordered the grid
+  by the faceted column anyway: the two places that carry it were written for an aggregate `sort`
+  and answered nothing for a list, so a wrapped trellis with a stated order came out with its cells
+  in whatever order their column happened to come in. The index is carried under the name it
+  already has, where an aggregate's is suffixed with the faceted column — it is computed once above
+  the grid rather than a second time per cell, so there is no second column for it to collide with.
+  Four specifications in the wild corpus are that trellis, and agreement with upstream goes from
+  1899 to 1903 of 1981.
+
 - **A caption turned to a stated angle is anchored through its band's own axis.**
   `defaultHeaderGuideAlign` and `defaultHeaderGuideBaseline` both open with "if the angle is
   stated" — a caption left at whatever angle the renderer chooses is left at whatever anchor it

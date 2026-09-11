@@ -1195,6 +1195,31 @@ internal class FacetWrap(
     return Triple(source, op, if (sort.string("op") != null) "${op}_$source" else source)
   }
 
+  /**
+   * `sortArrayIndexField`: the column a grid ordered by a **list** is really ordered by.
+   *
+   * ```js
+   * } else if (isArray(sort)) {
+   *   const outputName = sortArrayIndexField(fieldDef, channel);
+   *   fields.push(outputName);
+   *   ops.push('max');
+   *   as.push(outputName);
+   * }
+   * ```
+   *
+   * The list is a stated sequence and a cell's place in it cannot be read off the column being
+   * faceted on, so the place is computed onto every row first and the grid takes the **greatest**
+   * of each cell's — every row of a cell carrying the same number. Both the grid's own value list
+   * and the partition have to carry it up, or the cells are left in the order their column happens
+   * to come in.
+   *
+   * Written under the name it already has, where an aggregate's is suffixed with the faceted
+   * column: the index is computed once above the grid rather than a second time per cell, so there
+   * is no second column for it to collide with.
+   */
+  private val sortIndex: String? =
+    (def.sort as? VegaValue.Arr)?.let { Fields.sortIndexField("facet", def, forAs = true) }
+
   private val field: String = Fields.vgField(def)
 
   /**
@@ -1271,6 +1296,14 @@ internal class FacetWrap(
                 put("ops", strings(listOf(op)))
                 put("as", strings(listOf(name)))
               }
+              // A grid ordered by a **list** carries the place each cell holds in it — see
+              // [sortIndex].
+              if (sortField() == null)
+                sortIndex?.let {
+                  put("fields", strings(listOf(it)))
+                  put("ops", strings(listOf("max")))
+                  put("as", strings(listOf(it)))
+                }
             }
           ),
         )
@@ -1430,7 +1463,7 @@ internal class FacetWrap(
     // The **near** edge alone orders a bucketed grid: a bucket's far edge follows from its near
     // one, so sorting on both says the same thing twice. `facetSortFields` answers with one name:
     // the key a stated `sort` had the cell measure, and the facet's own column otherwise.
-    val key = sortField()?.let { (_, _, name) -> "${name}_by_$field" } ?: field
+    val key = sortField()?.let { (_, _, name) -> "${name}_by_$field" } ?: sortIndex ?: field
     put("field", strings(listOf("datum[${quoted(key)}]")))
     // `facetSortOrder`: a `sort` object says which way in its `order`, a bare `"descending"` says
     // it by itself, and anything else runs up.
@@ -1460,6 +1493,19 @@ internal class FacetWrap(
             },
           )
         }
+        // The place each cell holds in a stated list, carried up under its own name — see
+        // [sortIndex].
+        if (sortField() == null)
+          sortIndex?.let {
+            put(
+              "aggregate",
+              obj {
+                put("fields", strings(listOf(it)))
+                put("ops", strings(listOf("max")))
+                put("as", strings(listOf(it)))
+              },
+            )
+          }
       },
     )
   }
