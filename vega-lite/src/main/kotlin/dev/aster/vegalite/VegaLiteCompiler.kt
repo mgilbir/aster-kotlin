@@ -479,7 +479,10 @@ private class Compilation(
       // Lifting a facet builds the cell's views anew, so the plot each belongs to has to be
       // recorded again: a scale resolved per plot is named for the plot that owns it, and a view
       // nothing knows the plot of is named as though it stood alone.
-      plot.views.forEach { plotNames[it] = plot.name }
+      plot.views.forEach {
+        plotNames[it] = plot.name
+        plotResolves[it] = Resolve(plot.spec.obj("resolve"))
+      }
       // The **chart's** grid is the one it lays out itself. A faceted plot inside a concatenation
       // lays out its own cells within its group, and everything the chart does about a facet —
       // the split in the data flow, the cell's scales, the machinery in its signals — belongs to
@@ -1247,6 +1250,25 @@ private class Compilation(
           if (concat != null) channel in Channels.POSITION_SCALE_CHANNELS || channel == "theta"
           else facet != null && channel == "theta",
       )
+    // A `resolve` written on a **plot** of a concatenation speaks about the layers inside it, where
+    // the chart's own speaks about the plots — two levels, each about its own children. The
+    // innermost level to ask for independence is the one that settles the name, because it divides
+    // what the level above it had already divided: `concat_0_layer_0_y` beside `concat_0_layer_1_y`
+    // rather than one `concat_0_y`, which is what makes the two of them two axes and two extents.
+    //
+    // Only where the plot's own children **are** its layers. A plot that grids its cell has the
+    // cell between the two, and a `resolve` there speaks about the cells: the layers inside one are
+    // a single model to the grid, and two scales there would be two axes over the same picture.
+    // And only where the plot **has** children to divide: a single view named nothing of its own is
+    // the whole plot, and a `resolve` written over it has nothing to resolve — upstream leaves such
+    // a chart's scales called `x` and `y`, which is what they are.
+    if (
+      view.childName.isNotEmpty() &&
+        plotOfView(view)?.facets.isNullOrEmpty() &&
+        plotResolves[view]?.scaleIsIndependent(channel, defaultIndependent = false) == true
+    ) {
+      return Fields.varName("${view.childName}_$channel")
+    }
     if (!independent) return prefixed(channel)
     val owner = independenceOwner(view)
     return if (owner.isEmpty()) channel else "${owner}_$channel"
@@ -1591,6 +1613,16 @@ private class Compilation(
 
   private val plotNames = mutableMapOf<UnitView, String>()
 
+  /**
+   * The `resolve` each view's **own plot** states, which speaks about the layers inside that plot.
+   *
+   * Every model in upstream's hierarchy carries one and each speaks about its own children: the
+   * chart's is about the concatenation's plots, and a plot's is about the layers within it. Reading
+   * only the chart's left a plot that measures its layers apart sharing one scale between them —
+   * two lines on one axis where the specification had asked for two.
+   */
+  private val plotResolves = mutableMapOf<UnitView, Resolve>()
+
   /** Every plot the chart was built from, so a view can be asked which grid it belongs to. */
   private var allPlots: List<Plot> = emptyList()
 
@@ -1806,7 +1838,10 @@ private class Compilation(
         val plot = Plot(name, child)
         plot.nestedFacets = nestedFacets
         plot.views = views(plot.spec, plot.name, above) ?: return null
-        plot.views.forEach { plotNames[it] = plot.name }
+        plot.views.forEach {
+          plotNames[it] = plot.name
+          plotResolves[it] = Resolve(plot.spec.obj("resolve"))
+        }
         leaves += plot
         return Node.Leaf(plot)
       }

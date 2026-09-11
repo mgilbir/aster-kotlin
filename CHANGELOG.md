@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **A `resolve` written on a plot of a concatenation speaks about the layers inside that plot.**
+  Every model in upstream's hierarchy carries a `resolve` of its own and each speaks about its own
+  children: the chart's is about the concatenation's plots, and a plot's is about the layers within
+  it. The innermost level to ask for independence settles the name, because it divides what the
+  level above had already divided — `concat_0_layer_0_y` beside `concat_0_layer_1_y` rather than one
+  `concat_0_y`. This compiler read the chart's `resolve` alone, so a plot that measures its two
+  lines apart shared one scale between them: one axis where the specification had asked for two,
+  and both series drawn against an extent that is neither's. Two levels bound the rule — a plot that
+  **grids** its cell has the cell between it and its layers, and a `resolve` there speaks about the
+  cells; a plot that is a single view has no children to divide at all. One specification in the
+  wild corpus writes such a plot and another is brought most of the way, and agreement with upstream
+  goes from 1931 to 1932 of 1981.
+
 - **What a selection opens with is a row already in its store, written the way that store is.**
   Two arms of `assembleInit` were missing here. A selection that remembers rows **by identity** and
   was told which rows to start with says so the same way its store will — one row per identity,
