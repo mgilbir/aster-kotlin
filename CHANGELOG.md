@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **A selection's value may be a scalar, and then it settles every projection.** A tuple names the
+  channel a projection is over or the column it reads; a scalar names neither — `{"value": "US"}`
+  beside `"fields": ["cont"]` — and upstream calls it smoothing the gradient from a variable
+  parameter to a point selection. This engine read every value as a tuple, so a scalar one found
+  nothing in it: the chart opened with nothing picked and, where a control was bound to the
+  selection, with the control empty. Five specifications in the wild corpus open that way, all of
+  them a picker over one column.
+
 - **A mark's fill and stroke are read under their own Vega names, not only under `color`.** `color`
   answers for the one the colour *is* — the fill of a filled mark, the stroke of a hollow one — and
   each of the two is looked up under its Vega name whatever the mark is filled with. So a theme that

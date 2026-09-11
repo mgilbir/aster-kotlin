@@ -135,6 +135,28 @@ internal class Selection(
       }
   }
 
+  /**
+   * One projection's share of a value tuple — `parseSelectionProject`'s own reading.
+   *
+   * ```js
+   * return proj.items.map((p) =>
+   *   isObject(v) ? (v[p.geoChannel || p.channel] !== undefined ? v[p.geoChannel || p.channel] : v[p.field]) : v,
+   * );
+   * ```
+   *
+   * A tuple names the channel a projection is over or the column it reads; a **scalar** names
+   * neither and settles every projection at once, which upstream calls smoothing the gradient from
+   * a variable parameter to a point selection — `{"value": "US"}` is what a chart bound to a picker
+   * writes, and there is only one thing it could mean. Reading a scalar as a tuple found nothing in
+   * it, so such a chart opened picking nothing.
+   */
+  private fun projectedValue(tuple: VegaValue?, channel: String?, field: String): VegaValue? =
+    when (tuple) {
+      null -> null
+      is VegaValue.Obj -> channel?.let { tuple.fields[it] } ?: tuple.fields[field]
+      else -> tuple
+    }
+
   /** Whether the pointer becomes a hand over a mark: a *hover* selection is not clicked. */
   val showsPointer: Boolean
     get() =
@@ -456,10 +478,7 @@ internal class Selection(
                 "values",
                 arr(
                   pointProjection.map { (channel, field) ->
-                    val stated =
-                      (row as? VegaValue.Obj)?.let { own ->
-                        channel?.let { own.fields[it] } ?: own.fields[field]
-                      } ?: (row as? VegaValue.Obj)?.fields?.get(field)
+                    val stated = projectedValue(row, channel, field)
                     if (stated == null) VegaValue.Null else asStoredValue(stated, timeZone)
                   }
                 ),
@@ -967,15 +986,14 @@ internal class Selection(
     // compatibility pass hands it over as the parameter's `value` unchanged. Reading only the list
     // form left such a control starting at nothing, which is a chart that opens showing every row
     // where the specification asked for one.
-    val started = ((initial as? VegaValue.Arr)?.values?.firstOrNull() ?: initial) as? VegaValue.Obj
+    val started = (initial as? VegaValue.Arr)?.values?.firstOrNull() ?: initial
     return projected
       .map { (channel, field) ->
         obj {
           put("name", Fields.varName("${name}_$field"))
-          // `v[p.geoChannel || p.channel] !== undefined ? v[…] : v[p.field]`: a tuple may name
-          // the channel it starts on rather than the column, which is how a selection over a
-          // renamed or bucketed field says where it opens.
-          val start = channel?.let { started?.fields?.get(it) } ?: started?.fields?.get(field)
+          // A tuple may name the channel it starts on rather than the column, and a scalar names
+          // neither — see [projectedValue].
+          val start = projectedValue(started, channel, field)
           if (start != null) put("init", literal(start)) else put("value", VegaValue.Null)
           // The control is written **into** by the chart as well as by the reader: a pick still
           // moves the widget. `disableDirectManipulation` takes the pointer streams off unless the
