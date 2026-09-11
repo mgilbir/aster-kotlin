@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A transform that was not told what to call its outputs still writes columns.** A parse cannot
+  climb past a step that produces what it reads — and the intersection is taken over path
+  *prefixes*, so a step producing `properties` blocks a parse of `properties.name`. This engine
+  asked each step only for its `as`, so a `lookup` that brings the secondary table's columns in
+  under their own names looked like a step that writes nothing: the flatten formula climbed above
+  the lookup and read a column the source table has never had. **Seven** specifications in the wild
+  corpus join a table that way and then name a path inside what it brought in — a world map looking
+  up a country's shape and captioning it by `properties.name`. The names a transform gives itself
+  are upstream's, one per node class: a lookup's are the secondary table's `values`, a fold's are
+  `key` and `value`, a density's are `value` and `density`.
+
 - **A selection bound to a control opens at the value it was given.** The value is a *list* of tuples
   — `array(selDef.value)` in `parseSelectionProject` — of which a bound control shows the first, and
   a lone tuple is a list of one. That is how a Vega-Lite 4 selection arrives: its `init` is a single

@@ -179,6 +179,35 @@ internal sealed class DataNode {
   private fun producesUnknownFields(): Boolean =
     this is PassThroughNode && transforms.any { (it as? VegaValue.Obj)?.string("type") == "pivot" }
 
+  /**
+   * The columns one **Vega** transform writes — the answer upstream keeps per node class.
+   *
+   * A transform that was not told what to call its outputs names them by convention, and those
+   * columns are as real as any `as`: a `lookup` brings the secondary table's own columns in under
+   * their own names, a `fold` writes a `key` and a `value`. Reading only the `as` left such a step
+   * looking like one that writes nothing, so a parse of a column it brings in climbed above the
+   * step that brings it — and was asked of a table that has no such column.
+   */
+  private fun producedBy(transform: VegaValue): List<String> {
+    val vega = transform as? VegaValue.Obj ?: return emptyList()
+    val stated =
+      when (val named = vega.fields["as"]) {
+        is VegaValue.Str -> listOf(named.value)
+        is VegaValue.Arr -> named.values.mapNotNull { (it as? VegaValue.Str)?.value }
+        else -> emptyList()
+      }
+    if (stated.isNotEmpty()) return stated
+    return when (vega.string("type")) {
+      "lookup" -> vega.array("values").orEmpty().mapNotNull { (it as? VegaValue.Str)?.value }
+      "fold" -> listOf("key", "value")
+      "density" -> listOf("value", "density")
+      "quantile" -> listOf("prob", "value")
+      "regression",
+      "loess" -> listOfNotNull(vega.string("x"), vega.string("y"))
+      else -> emptyList()
+    }
+  }
+
   /** The columns a step writes, which is what a parse cannot climb past. */
   private fun producedFields(): Set<String> =
     when (this) {
@@ -188,11 +217,7 @@ internal sealed class DataNode {
       is AggregateNode -> outputs.toSet()
       is StackNode -> output.toSet()
       is ImputeNode -> setOf(field)
-      is PassThroughNode ->
-        transforms.mapNotNull { (it as? VegaValue.Obj)?.string("as") }.toSet() +
-          transforms
-            .flatMap { (it as? VegaValue.Obj)?.array("as").orEmpty() }
-            .mapNotNull { (it as? VegaValue.Str)?.value }
+      is PassThroughNode -> transforms.flatMap { producedBy(it) }.toSet()
       else -> emptySet()
     }
 
