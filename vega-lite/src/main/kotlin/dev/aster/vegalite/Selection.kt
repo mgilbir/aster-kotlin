@@ -498,7 +498,8 @@ internal class Selection(
                 arr(
                   pointProjection.map { (channel, field) ->
                     obj {
-                      put("field", field)
+                      // The path is escaped — see the tuple-fields signal below.
+                      put("field", Fields.replacePathInField(field))
                       channel?.let { put("channel", it) }
                       put("type", if (view != null) projectionType(view, channel) else "E")
                     }
@@ -552,7 +553,7 @@ internal class Selection(
                 arr(
                   projected.map { (channel, field) ->
                     obj {
-                      put("field", field)
+                      put("field", Fields.replacePathInField(field))
                       put("channel", channel)
                       put("type", projectionType(view, channel))
                     }
@@ -693,7 +694,7 @@ internal class Selection(
           arr(
             projected.map { (channel, field) ->
               obj {
-                put("field", field)
+                put("field", Fields.replacePathInField(field))
                 put("channel", channel)
                 put("type", projectionType(view, channel))
               }
@@ -1368,7 +1369,20 @@ internal class Selection(
           arr(
             projected.map { (channel, field) ->
               obj {
-                put("field", field)
+                // ```js
+                // export function assembleProjection(proj: SelectionProjection) {
+                //   const {signals, hasLegend, index, ...rest} = proj;
+                //   rest.field = replacePathInField(rest.field);
+                //   return rest;
+                // }
+                // ```
+                //
+                // The name a selection remembers a value **by**, with its path escaped: a column
+                // called `properties.NAME` is a name with a dot in it, not a path into
+                // `properties`, and the store compares what it was given against what the row
+                // holds under that name. Written unescaped, Vega looks a level in, finds nothing,
+                // and nothing ever matches.
+                put("field", Fields.replacePathInField(field))
                 // A projection made through a **channel** records which channel, because a test
                 // has to know what the value was compared against; one made on a bare field does
                 // not, there being no channel it came from.

@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A column whose name holds a dot is written with that dot escaped.** `replacePathInField` splits
+  the access path, escapes what is inside each step and joins them with an escaped dot, because
+  Vega reads an unescaped one as a step into a nested object. A column called `properties.NAME` is
+  a name with a dot in it — a GeoJSON feature's flattened property is the usual way to get one —
+  and written bare it tells Vega to look a level in and find nothing. Two places wrote it bare: the
+  field a **selection** remembers a value by, where the store then compares against a value no row
+  has and nothing ever matches; and the field a **`timeunit`** transform buckets, where the bucket
+  is cut from undefined on every row. `vgField` already escaped it everywhere else, which is why
+  the encoding read the column correctly in the same chart. One specification in the wild corpus
+  picks countries out of a map that way, and agreement with upstream goes from 1913 to 1914 of 1981.
+
 - **A themed value of one of the nine is written onto the axis whatever block it came from.**
   `(propsToAlwaysIncludeConfig.has(property) && hasConfigValue)` stands beside the block's own
   source in upstream's condition: `grid`, `translate`, `format`, `formatType`, `orient`,

@@ -799,7 +799,10 @@ internal class TimeUnitNode(units: List<TimeUnitComponent>) : DataNode() {
     listOf(
       obj {
         put("type", "timeunit")
-        put("field", it.field)
+        // `field: replacePathInField(field)` — a column called `t.s` is a name with a dot in it,
+        // not a path into `t`, and an unescaped one tells Vega to look a level in and find
+        // nothing. The bucket would then be cut from undefined on every row.
+        put("field", Fields.replacePathInField(it.field))
         put("units", strings(it.units))
         it.step?.let { step -> put("step", step) }
         // Which calendar the bucket is cut against. A `utcmonth` says so and a `month` says

@@ -388,7 +388,7 @@ internal object Fields {
    * column may be called `source.reco` — a name with a dot in it, not a path into `source` — and
    * writing it unescaped tells Vega to look one level in and find nothing.
    */
-  private fun replacePathInField(path: String): String =
+  fun replacePathInField(path: String): String =
     splitAccessPath(path).joinToString("\\.") { step ->
       step.map { if (it in "[].'\"") "\\$it" else "$it" }.joinToString("")
     }
