@@ -84,25 +84,8 @@ internal class LayoutSize(
       // follows it as the window changes, with the view's own default where there is nothing to
       // measure — a chart rendered outside a browser still has to have a width.
       if (declared == VegaValue.Str("container")) {
-        val measured = if (channel == "x") "containerSize()[0]" else "containerSize()[1]"
-        val fallback =
-          number(if (channel == "x") config.continuousWidth else config.continuousHeight)
-        val expression = "isFinite($measured) ? $measured : $fallback"
-        emitted += obj {
-          put("name", sizeName)
-          put("init", expression)
-          put(
-            "on",
-            arr(
-              listOf(
-                obj {
-                  put("events", "window:resize")
-                  put("update", expression)
-                }
-              )
-            ),
-          )
-        }
+        // Which dimension is measured follows the **signal's name** — see [containerSignal].
+        emitted += containerSignal(sizeName, channel, config)
         sizes[channel] = null
         continue
       }
@@ -214,9 +197,23 @@ internal class LayoutSize(
      * merge its children onto it, and then the signal belongs to the level that settled it.
      */
     fun containerSignal(name: String, channel: String, config: Config): VegaValue {
-      val measured = if (channel == "x") "containerSize()[0]" else "containerSize()[1]"
+      // ```js
+      // const isWidth = name.endsWith('width');
+      // const expr = isWidth ? 'containerSize()[0]' : 'containerSize()[1]';
+      // const defaultValue = getViewConfigContinuousSize(model.config.view, isWidth ? 'width' :
+      // 'height');
+      // ```
+      //
+      // Which dimension is measured is asked of the **signal's name**, not of the channel — and the
+      // name a *cell* carries is `childWidth`, whose capital W the test does not match. So a cell
+      // told to fill its container measures the container's **height** for its width, and takes the
+      // themed height where there is nothing to measure. It is upstream's own slip and it is what
+      // upstream emits, so it is what this has to emit: a chart drawn against a different answer
+      // would lay out differently from the one the specification's author is looking at.
+      val isWidth = name.endsWith("width")
+      val measured = if (isWidth) "containerSize()[0]" else "containerSize()[1]"
       val fallback =
-        Decimals.jsString(if (channel == "x") config.continuousWidth else config.continuousHeight)
+        Decimals.jsString(if (isWidth) config.continuousWidth else config.continuousHeight)
       val expression = "isFinite($measured) ? $measured : $fallback"
       return obj {
         put("name", name)

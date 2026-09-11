@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **Which dimension a `"container"` size measures is asked of the signal's name.**
+  `const isWidth = name.endsWith('width')` — and the name a **cell** carries is `childWidth`, whose
+  capital W the test does not match, so a cell told to fill its container measures the container's
+  *height* for its width and takes the themed height where there is nothing to measure. It is
+  upstream's own slip, and it is what upstream emits: a chart drawn against a different answer would
+  lay out differently from the one the specification's author is looking at. This compiler asked the
+  channel instead, so a responsive concatenation measured the wrong way about. One specification in
+  the wild corpus is a row of container-sized plots.
+
 - **The pre-aggregation table exists where a domain reads it, not merely where a sort could.**
   Upstream builds a raw output node for every unit and its optimizer removes the ones nothing asked
   for, so the count is of *requests*. A scale whose domain the specification **states** never reads
