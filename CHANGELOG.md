@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A channel whose legend is switched off still names its scale in the legend it merges into.** A
+  `LegendComponent` is built with `getLegendDefWithScale(model, channel)` *before* the disable is
+  read, and `assembleLegends` merges components by field whatever their disable says — so a chart
+  telling its lines apart by colour **and** by dash pattern keeps one key, and that key shows both:
+  the dashes' own `"legend": null` says only that there is no *second* key for them. This engine
+  passed over a disabled channel entirely, so such a key came out showing colours alone and the
+  dashed line in it was drawn solid. One specification in the wild corpus is that chart. Which
+  legend survives is settled as every merged property is, so the same two channels with nothing
+  stated on the colour still lose the key altogether.
+
 - **The far end of a position takes the base channel's nudge, unless the far end was spoken of.** A
   mark nudged round the circle by a `thetaOffset` is nudged at *both* ends of its wedge, or the
   wedge is drawn a different size rather than in a different place. This engine asked each end for

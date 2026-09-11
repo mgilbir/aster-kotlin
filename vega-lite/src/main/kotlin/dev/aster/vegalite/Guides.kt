@@ -1163,20 +1163,34 @@ internal object Guides {
     return (stated as? VegaValue.Obj)?.fields?.get("disable").isTruthy() to true
   }
 
+  /**
+   * `getLegendDefWithScale`: the property a legend draws this channel's swatches from.
+   *
+   * A trail's legend names two channels differently from every other mark's. Its swatch is a short
+   * stroke, so colour goes on the `stroke` however the mark is filled, and its `size` — a width
+   * along the path — is a `strokeWidth` rather than an area.
+   *
+   * It is asked of a **disabled** channel too. `new LegendComponent({},
+   * getLegendDefWithScale(model, channel))` runs before the disable is read, so a channel switched
+   * off still tells the legend it merges into which scale draws its swatches: a chart whose lines
+   * are told apart by colour *and* by dash pattern keeps one key, and that key shows both however
+   * the dashes' own legend was switched off.
+   */
+  fun legendScaleChannel(view: UnitView, channel: String): String {
+    val filled = view.markDef.filled
+    return when {
+      view.spec.mark == "trail" && channel == "color" -> "stroke"
+      view.spec.mark == "trail" && channel == "size" -> "strokeWidth"
+      channel == "color" -> if (filled) "fill" else "stroke"
+      else -> channel
+    }
+  }
+
   /** The legend a scaled non-position channel produces, or null when it produces none. */
   fun legend(view: UnitView, channel: String, def: ChannelDef, type: String): VegaValue? {
     if (legendDisable(view, def).first) return null
     val filled = view.markDef.filled
-    // `getLegendDefWithScale`: a trail's legend names two channels differently from every other
-    // mark's. Its swatch is a short stroke, so colour goes on the `stroke` however the mark is
-    // filled, and its `size` — a width along the path — is a `strokeWidth` rather than an area.
-    val scaleChannel =
-      when {
-        view.spec.mark == "trail" && channel == "color" -> "stroke"
-        view.spec.mark == "trail" && channel == "size" -> "strokeWidth"
-        channel == "color" -> if (filled) "fill" else "stroke"
-        else -> channel
-      }
+    val scaleChannel = legendScaleChannel(view, channel)
 
     // `isContinuousToContinuous` includes the two **time** scales: a colour ramp over instants is
     // still a ramp, and reading it as discrete drew a row of square swatches over a continuum.

@@ -3923,7 +3923,23 @@ private class Compilation(
         } else if (!standing.second && explicitDisable) {
           disableOf[key] = disabled to true
         }
-        if (disabled) continue
+        // A disabled legend is still a **component**, and a component carries its scale from the
+        // moment it is made: `new LegendComponent({}, getLegendDefWithScale(model, channel))` runs
+        // before the disable is read. So a channel switched off still tells the legend it merges
+        // into which scale draws its swatches — a chart telling its lines apart by colour and by
+        // dash pattern keeps one key, and that key shows both dashes and colours however the
+        // dashes' own legend was refused.
+        if (disabled) {
+          val entry = legends.getOrPut(key) { LinkedHashMap() }
+          if (key !in scaleOf) {
+            scaleOf[key] = component.name()
+            ownPlot?.let { plotOf[key] = it }
+          }
+          // `putIfAbsent` is a JVM extension, and this file is compiled for five targets.
+          val scaled = Guides.legendScaleChannel(view, channel)
+          if (scaled !in entry) entry[scaled] = str(component.name())
+          continue
+        }
         val built = Guides.legend(view, channel, def, component.type) as? VegaValue.Obj ?: continue
         // `mergeValuesWithExplicit` settles a property before any tie-breaker runs: a value the
         // specification stated beats one this compiler derived. A field encoded as both a colour
