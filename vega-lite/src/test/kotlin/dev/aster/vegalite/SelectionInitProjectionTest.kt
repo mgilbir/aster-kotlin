@@ -112,13 +112,16 @@ class SelectionInitProjectionTest {
     )
   }
 
-  /** A **scalar** is the identity of a row and names no column, so there is nothing to infer. */
+  /**
+   * A **scalar** is the identity of a row and names no column, so there is nothing to infer — and
+   * the row it names is what the store opens with, written as that identity.
+   */
   @Test
   fun `a scalar starting value is no projection`() {
     assertEquals(
       "unit,p,p_tuple,p_toggle,p_modify | " +
-        """{"name": "p_store","transform": [{"type": "collect","sort": """ +
-        """{"field": "_vgsid_"}}]}""",
+        """{"name": "p_store","values": [{"unit": "","_vgsid_": 7}],""" +
+        """"transform": [{"type": "collect","sort": {"field": "_vgsid_"}}]}""",
       selection("""{"name":"p","value":7,"select":{"type":"point"}}"""),
     )
   }

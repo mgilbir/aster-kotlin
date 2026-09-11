@@ -609,16 +609,48 @@ internal class Selection(
               // Emitting the `{"year": …, "month": …}` object raw left the initial filtering
               // comparing a column of milliseconds against an object — false for every row — until
               // the reader's first drag replaced the store with real numbers.
+              // `assembleInit` maps a **list** element by element and hands anything else back as
+              // it stands, so a channel the extent says nothing about is `null` rather than an
+              // empty extent: an empty one is a brush of no width, which filters everything out,
+              // where a null is the absence Vega reads as "not brushed along this channel".
               put(
                 "values",
                 arr(
                   projected.map { (channel, _) ->
-                    arr(initial.array(channel).orEmpty().map { asStoredValue(it, timeZone) })
+                    when (val stated = (initial as? VegaValue.Obj)?.fields?.get(channel)) {
+                      null -> VegaValue.Null
+                      is VegaValue.Arr -> arr(stated.values.map { asStoredValue(it, timeZone) })
+                      else -> asStoredValue(stated, timeZone)
+                    }
                   }
                 ),
               )
             }
           )
+        ),
+      )
+    }
+    // ```js
+    // init.values = selCmpt.project.hasSelectionId
+    //   ? selCmpt.init.map((v) => ({unit: unitName(...), [SELECTION_ID]: assembleInit(v,
+    // false)[0]}))
+    //   : selCmpt.init.map((v) => ({unit: ..., fields, values: assembleInit(v, false)}));
+    // ```
+    //
+    // A selection that remembers rows **by identity** and was told which rows to start with says so
+    // the same way its store will: one row per identity, with no projection to name. Left out, such
+    // a chart opened with nothing picked however the specification had started it.
+    if (type != "interval" && initial != null && pointProjection.isEmpty() && byIdentity) {
+      val picked = (initial as? VegaValue.Arr)?.values ?: listOf(initial)
+      put(
+        "values",
+        arr(
+          picked.map { row ->
+            obj {
+              put("unit", unit)
+              put(SELECTION_ID, asStoredValue(row, timeZone))
+            }
+          }
         ),
       )
     }

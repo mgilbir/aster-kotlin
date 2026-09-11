@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **What a selection opens with is a row already in its store, written the way that store is.**
+  Two arms of `assembleInit` were missing here. A selection that remembers rows **by identity** and
+  was told which rows to start with says so the same way its store will — one row per identity,
+  with no projection to name — and left out, such a chart opened with nothing picked however the
+  specification had started it. And `assembleInit` maps a list element by element and hands
+  anything else back as it stands, so a channel a brush's extent says nothing about is `null`
+  rather than an empty extent: an empty one is a brush of no width, which filters every row out,
+  where a null is the absence Vega reads as "not brushed along this channel". No wild corpus
+  specification writes either, so the count stays at 1931 of 1981; both were found while reading
+  `assembleUnitSelectionData` beside this compiler's own store.
+
 - **A selection told what it starts with and nothing else is projected onto whatever that names.**
   "If no explicit projection (either fields or encodings) is specified, set some defaults. If an
   initial value is set, try to infer projections." A slider bound to `maxReported` remembers a
