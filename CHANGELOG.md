@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **`unit` is unshifted after one view's selections, so a later view's controls go in front of it.**
+  `assembleTopLevelSignals` runs once per view on one accumulating array: a view's controls are
+  unshifted onto the front as its selections are walked, and `unit` is unshifted after that loop —
+  but only where it is not there already. So `unit` lands in front of the first selection-bearing
+  view's controls and behind every later view's, which go on being unshifted past it. This compiler
+  wrote `unit` first always, so a concatenation whose *second* plot binds a legend listed the two
+  the other way about. One specification in the wild corpus binds a legend that way, and agreement
+  with upstream goes from 1941 to 1942 of 1981.
+
 - **Which dimension a `"container"` size measures is asked of the signal's name.**
   `const isWidth = name.endsWith('width')` — and the name a **cell** carries is `childWidth`, whose
   capital W the test does not match, so a cell told to fill its container measures the container's
