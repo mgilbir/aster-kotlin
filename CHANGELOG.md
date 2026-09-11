@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A view that writes both spellings keeps only what its `selection` block converts to.** The
+  compatibility normalizer spreads the rest of the unit and then writes `params:` after it, so what
+  the unit already had is **overwritten** rather than added to: a chart that mixes a version 4
+  `selection` with a version 5 parameter is drawn with the converted selections and nothing else.
+  This engine appended, so such a chart came out with machinery upstream never builds — a store,
+  the tuple and modify signals that follow it, and the cell signals beside them. The chart's **own**
+  parameters are the exception, and only those that select nothing: `extractTopLevelProperties`
+  reads them off the specification as written, before any normalizer runs, so a slider declared
+  beside a `selection` at the top of a chart is still a slider and one that selects is not. Three
+  specifications in the wild corpus mix the two spellings on one view, and agreement with upstream
+  goes from 1903 to 1906 of 1981.
+
 - **A wrapped grid whose values are listed is ordered by the place each cell holds in that list.**
   The list is a stated sequence and a cell's place in it cannot be read off the column being
   faceted on, so the place is computed onto every row and the grid takes the greatest of each

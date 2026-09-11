@@ -55,7 +55,7 @@ internal object SelectionCompat {
   fun normalize(spec: VegaValue.Obj): VegaValue.Obj {
     val empties = HashMap<String, Boolean>()
     collectEmpties(spec, empties)
-    return rewrite(spec, empties) as VegaValue.Obj
+    return rewrite(spec, empties, root = true) as VegaValue.Obj
   }
 
   // MARK: pass one — what every definition says about emptiness
@@ -82,14 +82,22 @@ internal object SelectionCompat {
 
   // MARK: pass two — the rewrite
 
-  private fun rewrite(node: VegaValue, empties: Map<String, Boolean>): VegaValue =
+  private fun rewrite(
+    node: VegaValue,
+    empties: Map<String, Boolean>,
+    root: Boolean = false,
+  ): VegaValue =
     when (node) {
       is VegaValue.Arr -> arr(node.values.map { rewrite(it, empties) })
-      is VegaValue.Obj -> rewriteObject(node, empties)
+      is VegaValue.Obj -> rewriteObject(node, empties, root)
       else -> node
     }
 
-  private fun rewriteObject(node: VegaValue.Obj, empties: Map<String, Boolean>): VegaValue.Obj {
+  private fun rewriteObject(
+    node: VegaValue.Obj,
+    empties: Map<String, Boolean>,
+    root: Boolean,
+  ): VegaValue.Obj {
     var fields = LinkedHashMap(node.fields)
 
     // 1. The definition. Emitted where the `selection` stood, so a unit inside a layer keeps its
@@ -99,10 +107,31 @@ internal object SelectionCompat {
     if (definition != null) {
       fields.remove("selection")
       val declared = definition.fields.map { (name, body) -> parameter(name, body) }
-      // Appended to any `params` already present rather than replacing them: a specification may
-      // mix the two spellings, and upstream's spread leaves an existing `params` in place.
+      // ```js
+      // const {selection, ...rest} = spec as any;
+      // if (selection) {
+      //   return {
+      //     ...rest,
+      //     params: entries(selection).map(([name, selDef]) => {
+      // ```
+      //
+      // What the unit already had is **replaced**, not added to. The spread carries the old
+      // `params` into the object and the `params:` written after it overwrites them, so a unit that
+      // mixes the two spellings keeps only what its `selection` block converts to. A chart with a
+      // hover parameter beside a version 4 `selection` is the shape: upstream draws it with no
+      // hover at all, and appending gave it machinery for a selection upstream never built —
+      // a store, its signals, and the cell signals that follow.
+      //
+      // The **chart's own** parameters are the exception, and only the ones that select nothing:
+      // `extractTopLevelProperties(inputSpec, true)` reads them off the specification as written,
+      // before any of this, so a slider declared beside a `selection` at the top of a chart is
+      // still a slider. One that selects is not: the unit is where a selection is built, and the
+      // unit's list is the one being replaced.
       val existing = (fields["params"] as? VegaValue.Arr)?.values.orEmpty()
-      fields["params"] = arr(existing + declared)
+      val kept =
+        if (!root) emptyList()
+        else existing.filterNot { (it as? VegaValue.Obj)?.has("select") == true }
+      fields["params"] = arr(kept + declared)
     }
 
     // 2, 3, 4. The transform forms.
