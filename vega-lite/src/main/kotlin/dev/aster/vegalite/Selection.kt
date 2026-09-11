@@ -937,12 +937,22 @@ internal class Selection(
   fun inputSignals(view: UnitView?): List<VegaValue> {
     val bind = inputs ?: return emptyList()
     val projected = view?.let { projections(it) } ?: fields.map { null to it }
-    val started = (initial as? VegaValue.Arr)?.values?.firstOrNull() as? VegaValue.Obj
+    // `const init = array(selDef.value)` in `parseSelectionProject`, and `selCmpt.init?.[0]` here:
+    // the value a selection opens with is a **list** of tuples, of which a bound control shows the
+    // first — "can only exist on single selections (one initial value)". A lone tuple is a list of
+    // one, which is how a Vega-Lite 4 selection arrives: its `init` is a single object and the
+    // compatibility pass hands it over as the parameter's `value` unchanged. Reading only the list
+    // form left such a control starting at nothing, which is a chart that opens showing every row
+    // where the specification asked for one.
+    val started = ((initial as? VegaValue.Arr)?.values?.firstOrNull() ?: initial) as? VegaValue.Obj
     return projected
       .map { (channel, field) ->
         obj {
           put("name", Fields.varName("${name}_$field"))
-          val start = started?.fields?.get(field)
+          // `v[p.geoChannel || p.channel] !== undefined ? v[…] : v[p.field]`: a tuple may name
+          // the channel it starts on rather than the column, which is how a selection over a
+          // renamed or bucketed field says where it opens.
+          val start = channel?.let { started?.fields?.get(it) } ?: started?.fields?.get(field)
           if (start != null) put("init", literal(start)) else put("value", VegaValue.Null)
           // The control is written **into** by the chart as well as by the reader: a pick still
           // moves the widget. `disableDirectManipulation` takes the pointer streams off unless the

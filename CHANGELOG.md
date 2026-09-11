@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A selection bound to a control opens at the value it was given.** The value is a *list* of tuples
+  — `array(selDef.value)` in `parseSelectionProject` — of which a bound control shows the first, and
+  a lone tuple is a list of one. That is how a Vega-Lite 4 selection arrives: its `init` is a single
+  object, and the compatibility pass hands it over as the parameter's `value` unchanged. This engine
+  read only the list form, so such a control started at nothing — a chart that opens showing every
+  row where the specification asked for one, which is a different chart before anybody touches it.
+  **Six** specifications in the wild corpus open that way. The tuple is read by channel first and
+  then by column, which is how a selection over a renamed or bucketed field says where it opens.
+
 - **A channel whose legend is switched off still names its scale in the legend it merges into.** A
   `LegendComponent` is built with `getLegendDefWithScale(model, channel)` *before* the disable is
   read, and `assembleLegends` merges components by field whatever their disable says — so a chart
