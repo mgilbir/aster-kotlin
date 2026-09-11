@@ -1108,6 +1108,11 @@ internal class FacetNode(
     data = name
     at = position
   }
+
+  /** Moved along by the tables the assembler's hoist carried past this partition. */
+  fun shiftedBy(places: Int) {
+    at += places
+  }
 }
 
 /** A named point in the flow that something else reads: a mark's source, a scale's domain. */
@@ -1133,6 +1138,9 @@ internal class DataAssembler {
 
   /** Whether the fork this walk passed had to name the table it forked at. See [walk]. */
   private var forkNamedTheTable = false
+
+  /** Every partition this walk passed, each of which recorded where it stood. */
+  private val partitions = mutableListOf<FacetNode>()
 
   private class MutableDataset(
     var name: String?,
@@ -1191,6 +1199,19 @@ internal class DataAssembler {
     // derives from nothing and does nothing is a table the chart was handed, and Vega has to have
     // it before whatever joins against it. Stable, so the numbering still reads in order.
     val (plain, derived) = datasets.partition { it.source == null && it.transform.isEmpty() }
+    // A partition's own value lists are written the moment the walk reaches it — `data.push(…node
+    // .assemble())` — and this hoist runs afterwards, over a list those lists are already in. A
+    // place counted during the walk is therefore short by however many tables the hoist carried
+    // from behind the partition to in front of it, which is what a chart whose layers read tables
+    // of their own has: the grid's chain is walked first and theirs afterwards.
+    for (node in partitions) {
+      if (node.at < 0) continue
+      node.shiftedBy(
+        datasets.withIndex().count { (index, dataset) ->
+          index >= node.at && dataset.source == null && dataset.transform.isEmpty()
+        }
+      )
+    }
     return (plain + derived).map { it.build() }
   }
 
@@ -1325,6 +1346,7 @@ internal class DataAssembler {
         } else {
           node.readsFrom(dataset.source!!, datasets.size)
         }
+        partitions += node
         // A partition **inside** this one still takes a name from the chart's own numbering, even
         // though what hangs below it is assembled into a cell group with a numbering of its own. A
         // grid whose cells are grids is where it tells: leaving the inner partition unnamed here

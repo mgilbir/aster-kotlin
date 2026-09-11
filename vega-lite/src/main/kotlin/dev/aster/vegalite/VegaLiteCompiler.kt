@@ -1475,6 +1475,23 @@ private class Compilation(
   }
 
   /** The plot a view belongs to, where the compiler has been told about it. */
+  /**
+   * The views whose chains hang **below** [plot]'s grid, which is every one reading no table of its
+   * own.
+   *
+   * `parseRoot` hands a child the partition only where the child states no `data` of its own; one
+   * that states its own starts a root instead, so it is no child of the facet — it cannot be the
+   * fork that stops `moveFacetDown`, the facet's fields group nothing of its, and its marks read
+   * its own chain in every cell alike.
+   *
+   * Where a cell holds nothing else — every layer in it reading a table of its own — the grid still
+   * has to partition something, and it partitions the first of them as it always did. Upstream
+   * partitions the chain the *facet model* computes for itself, which nothing here builds: no view
+   * stands for it.
+   */
+  private fun viewsBelow(plot: Plot): List<UnitView> =
+    plot.views.filter { !it.ownsSource }.ifEmpty { plot.views.take(1) }
+
   private fun plotOfView(view: UnitView): Plot? =
     plotNames[view]?.let { name -> allPlots.firstOrNull { it.name == name } }
 
@@ -1617,6 +1634,15 @@ private class Compilation(
     var split: FacetNode? = null
 
     var splitAbove: List<FacetNode> = emptyList()
+
+    /**
+     * The partition where the flow does **not** split at it, which is the other of the two shapes.
+     *
+     * A node in the flow either way, and a node in the flow takes a name and stands somewhere: the
+     * grid's own value lists are written at the point it stands, so the node has to be kept to be
+     * asked where the assembler passed it.
+     */
+    var tail: FacetNode? = null
 
     /** The datasets this plot's innermost cell computes for itself, where the flow splits. */
     var groupData: List<VegaValue> = emptyList()
@@ -2280,6 +2306,14 @@ private class Compilation(
     namePrefix: String,
     /** The model each of the chart's own transforms belongs to, from the levels above. */
     above: List<String> = emptyList(),
+    /**
+     * Whether this specification itself reads a table of its own — see [UnitView.ownsSource].
+     *
+     * False for a plot, which is either the chart or a cell whose `data` the levels above it wrote:
+     * a **cell** that states its own table is the one shape this does not carry, its grid then
+     * partitioning a chain no view here represents.
+     */
+    ownsSource: Boolean = false,
   ): List<UnitView>? {
     val mineHere = owning(spec, above, namePrefix)
     fun named(suffix: String) =
@@ -2325,7 +2359,7 @@ private class Compilation(
       // Each declared layer may itself normalize into more than one — a line that draws its own
       // points is two marks — so the list is expanded first and only then numbered. The numbering
       // is what names `layer_0_marks`, so it has to count the views that actually exist.
-      val units = mutableListOf<Pair<Triple<String, VegaValue.Obj, String>, String>>()
+      val units = mutableListOf<Member>()
       /** The model each collected view's transforms was written on, in the same order. */
       val owners = mutableMapOf<VegaValue.Obj, List<String>>()
 
@@ -2345,6 +2379,8 @@ private class Compilation(
         path: String,
         /** The model each of the parent's own transforms belongs to. */
         above: List<String>,
+        /** Whether a level above these members already read a table of its own. */
+        ownsAbove: Boolean,
       ) {
         parent.array("layer").orEmpty().forEachIndexed { index, layer ->
           val child = layer as? VegaValue.Obj ?: return@forEachIndexed
@@ -2387,17 +2423,22 @@ private class Compilation(
           val mine =
             if (child.has("data")) List(child.array("transform").orEmpty().size) { here }
             else above + List(child.array("transform").orEmpty().size) { here }
+          // A member that states its own `data` reads a table of its own, and so does every member
+          // of a layer that states one: `parseRoot` starts a root for it rather than descending
+          // from the level above, and the whole chain below it hangs there. See
+          // [UnitView.ownsSource].
+          val ownsHere = ownsAbove || child.has("data")
           if (child.has("layer")) {
-            collect(merged, here, owner ?: here, here2, mine)
+            collect(merged, here, owner ?: here, here2, mine, ownsHere)
           } else {
             expand(merged, here, mine).forEach {
               owners[it.second] = it.third
-              units += Triple(it.first, it.second, owner ?: here) to here2
+              units += Member(it.first, it.second, owner ?: here, here2, ownsHere)
             }
           }
         }
       }
-      collect(spec, namePrefix, null, "$", mineHere)
+      collect(spec, namePrefix, null, "$", mineHere, ownsSource)
 
       // A member the parser could not read is **dropped**, and the rest of the layer is drawn.
       // Upstream throws on the same document, which takes the whole chart with it; keeping the
@@ -2405,20 +2446,20 @@ private class Compilation(
       // with the one that did not — `parser.unit` reports before it answers null. What was missing
       // is the fact that a layer came back smaller than it was written, which a reader counting
       // marks would otherwise have to work out.
-      return units.mapNotNull { (named, path) ->
-        val (name, unit, child) = named
-        val parsed = parser.unit(unit, path)
+      return units.mapNotNull { member ->
+        val parsed = parser.unit(member.unit, member.path)
         if (parsed == null) {
           diagnostics.error(
             VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
             "This layer member could not be read, so the layer is drawn without it. The " +
               "diagnostic above says what was wrong with it.",
-            jsonPath = path,
+            jsonPath = member.path,
           )
           return@mapNotNull null
         }
-        UnitView(parsed, config, name, child, parentIsLayer = true).also { view ->
-          view.transformOwners = owners[unit].orEmpty()
+        UnitView(parsed, config, member.name, member.child, parentIsLayer = true).also { view ->
+          view.transformOwners = owners[member.unit].orEmpty()
+          view.ownsSource = member.ownsSource
         }
       }
     }
@@ -2444,14 +2485,31 @@ private class Compilation(
         parser.unit(unit, "$")?.let {
           UnitView(it, config, name, name, parentIsLayer = true).also { view ->
             view.transformOwners = owned
+            view.ownsSource = ownsSource
           }
         }
       }
     }
 
     val unit = parser.unit(spec, "$") ?: return null
-    return listOf(UnitView(unit, config, namePrefix).also { it.transformOwners = mineHere })
+    return listOf(
+      UnitView(unit, config, namePrefix).also {
+        it.transformOwners = mineHere
+        it.ownsSource = ownsSource
+      }
+    )
   }
+
+  /** One member a `layer` collected, with everything the view built from it needs to know. */
+  private class Member(
+    val name: String,
+    val unit: VegaValue.Obj,
+    /** The outermost member it belongs to, which is what a top-level `resolve` speaks about. */
+    val child: String,
+    val path: String,
+    /** Whether it reads a table of its own — see [UnitView.ownsSource]. */
+    val ownsSource: Boolean,
+  )
 
   /**
    * A layer's own definition over the chart's.
@@ -2580,15 +2638,23 @@ private class Compilation(
           it.transformOwners = view.transformOwners
           it.widthSignal = through("child_width")
           it.heightSignal = through("child_height")
-          it.facetFields = found.fields
-          it.facetDefs = found.defs
-          it.facetDeclared =
-            view.spec.encoding.entries
-              .filter { entry -> entry.key in Channels.FACET_CHANNELS }
-              .map { entry -> entry.value }
-          // The cell's marks read the partition Vega facets out for them, named `facet`; the
-          // scales still read the whole table, so every cell is scaled alike.
-          it.markData = found.named("facet")
+          it.ownsSource = view.ownsSource
+          // A view that reads a table of its own is **not** below the partition: its chain hangs
+          // beside the grid, off its own root, so the facet's fields group nothing of its and the
+          // facet's own columns are none of its business. Its marks read that chain's output and
+          // draw the same rows in every cell, which is what such a layer is written for — a grid
+          // of outlines over a map, say, drawn the same over each. See [UnitView.ownsSource].
+          if (!view.ownsSource) {
+            it.facetFields = found.fields
+            it.facetDefs = found.defs
+            it.facetDeclared =
+              view.spec.encoding.entries
+                .filter { entry -> entry.key in Channels.FACET_CHANNELS }
+                .map { entry -> entry.value }
+            // The cell's marks read the partition Vega facets out for them, named `facet`; the
+            // scales still read the whole table, so every cell is scaled alike.
+            it.markData = found.named("facet")
+          }
         }
     } to found
   }
@@ -3311,18 +3377,26 @@ private class Compilation(
     // itself whether its cells compute their own rows.
     for (plot in allPlots) {
       val grid = plot.facet ?: continue
+      // The views that hang **below** the partition, which are the ones the walk counts: a layer
+      // that reads a table of its own is a root of its own, so it is no child of the facet at all
+      // and cannot be the fork that stops the walk. A cell of three layers, two of them with their
+      // own tables, is therefore one child and hoists its chain like a single mark would.
+      val below = viewsBelow(plot)
       plot.split =
         grid
           .takeIf {
-            plot.views.size > 1 ||
+            below.size > 1 ||
               plot.facets.size > 1 ||
-              plot.views.any { view -> DataPipeline.needsRawTable(view) }
+              below.any { view -> DataPipeline.needsRawTable(view) }
           }
           ?.let { FacetNode(it.named("facet")) }
       // The levels above the split, whose partitions the chain passes through on the way down.
       plot.splitAbove =
         if (plot.split == null) emptyList()
         else plot.facets.dropLast(1).map { FacetNode(it.named("facet")) }
+      // One node for the grid either way, kept rather than made where it is used: the assembler
+      // fills in what it read and where it stood, and the grid's value lists are written there.
+      plot.tail = if (plot.split != null) null else FacetNode(grid.named("facet"))
     }
     val split = if (concat == null) allPlots.singleOrNull()?.split else null
     // One partition for the whole cell, however many plots stand in it: they share the cell, so
@@ -3355,6 +3429,7 @@ private class Compilation(
     val outputs = views.map { view ->
       val data = view.spec.data!!
       if (data !in order) order += data
+      val partitioned = plotOfView(view)?.let { view in viewsBelow(it) } ?: !view.ownsSource
       // `requiresSelectionId(model)` asks the **unit**, not the chart: the identity column is
       // written where a selection that remembers rows by identity was declared, and nowhere else. A
       // layer of two bars, one of them hovered over, is the case — the hovered one needs a
@@ -3370,19 +3445,22 @@ private class Compilation(
           // scales read. The pre-aggregation table a sorted domain asks for is such a point, and
           // where there is one the chain stays below the facet and a copy of it — with the facet's
           // own fields added to every grouping — is hung beside it for the scales to measure.
-          facetSplit = plotOfView(view)?.split ?: cellSplit,
+          // Only for a view that hangs below the grid: one reading a table of its own has a chain
+          // beside the grid rather than under it, so no partition stands anywhere in it. See
+          // [viewsBelow].
+          facetSplit = if (!partitioned) null else plotOfView(view)?.split ?: cellSplit,
           facetAbove =
-            plotOfView(view)
-              ?.split
-              ?.let { plotOfView(view)?.splitAbove }
-              .orEmpty()
-              .ifEmpty {
-                if (plotOfView(view)?.split == null) cellSplitAbove else emptyList()
-              },
+            if (!partitioned) emptyList()
+            else
+              plotOfView(view)
+                ?.split
+                ?.let { plotOfView(view)?.splitAbove }
+                .orEmpty()
+                .ifEmpty {
+                  if (plotOfView(view)?.split == null) cellSplitAbove else emptyList()
+                },
           // Where the flow does not split, the grid is still a node in it, and a node takes a name.
-          facetTail =
-            if (plotOfView(view)?.split != null) null
-            else plotOfView(view)?.facet?.let { FacetNode(it.named("facet")) },
+          facetTail = if (!partitioned) null else plotOfView(view)?.tail,
           materialized = materialized,
           lookupOutputs = lookupOutputs,
         )
@@ -3447,6 +3525,15 @@ private class Compilation(
       val read = plot.splitAbove.firstOrNull() ?: own
       plot.reads = read.data
       plot.domainsAt = read.at
+    }
+    // Where nothing splits, the grid's value lists still stand at the point the partition does —
+    // `data.push(...node.assemble())` the moment the walk reaches it, and then the walk turns back.
+    // Written at the end instead they came after a table a *later* root derived, which is the shape
+    // a layer reading a table of its own makes: its chain is walked after the grid's.
+    for (plot in allPlots) {
+      val tail = plot.tail?.takeIf { it.at >= 0 } ?: continue
+      plot.reads = tail.data
+      plot.domainsAt = tail.at
     }
     // "now fix the from references in lookup transforms": a join names the *output node* while the
     // flow is being built, because the dataset that node ends up being is not known until the tree

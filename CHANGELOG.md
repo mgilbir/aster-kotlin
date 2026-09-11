@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **A layer that reads a table of its own is no child of the grid it is drawn in.** `parseRoot`
+  hands a child the partition its parent cut only where the child states no `data`; one that states
+  its own starts a root of its own, so its chain stands *beside* the grid rather than below it. Two
+  things follow, and this engine had neither. Its marks read that chain — the same rows in every
+  cell, which is what such a layer is written for — where they were being drawn from the rows the
+  cell was handed. And `moveFacetDown` counts the partition's *children*, so a cell of three layers
+  two of which read their own tables is **one** child: the cell's own chain hoists above the grid
+  as a single mark's would, and the grid's own value lists stand where the walk reached it rather
+  than at the end of the list. Eight specifications in the wild corpus are that shape — a trellis
+  of maps, a choropleth in each cell and the same outlines over every one of them — and agreement
+  with upstream goes from 1880 to 1888 of 1981. A facet whose **cell** states its own table is the
+  one shape of this still outstanding: the grid then partitions a chain no view here stands for.
+
 - **A theme may take the heading off every grid in a document.** A header's `title` is read through
   `getHeaderProperty` like every other header property — the header's own block, then the family for
   its channel, then `config.header` — so `{"config": {"header": {"title": null}}}` says once what a

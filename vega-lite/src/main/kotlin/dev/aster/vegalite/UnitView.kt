@@ -97,6 +97,25 @@ internal class UnitView(
   var scaleComponents: Map<String, ScaleComponent> = emptyMap()
 
   /**
+   * Whether this view reads a table of its **own** rather than the one above it derives.
+   *
+   * ```ts
+   * } else {
+   *   // If we don't have a source defined (overriding parent's data), use the parent's facet root or main.
+   *   return model.parent.component.data.facetRoot
+   *     ? model.parent.component.data.facetRoot
+   *     : model.parent.component.data.main;
+   * }
+   * ```
+   *
+   * `parseRoot` reads the parent's partition only for a view that states no `data`. One that states
+   * its own starts a root of its own instead, so its chain stands *beside* the grid rather than
+   * below it: the rows it draws are its whole table, the same in every cell, and nothing about the
+   * facet reaches them. What the marks read is then that chain's own output and not the partition.
+   */
+  var ownsSource: Boolean = false
+
+  /**
    * The fields this view is faceted by, which every grouping in its data flow has to carry.
    *
    * A stack accumulated without them would run across the cells rather than within each, which is
