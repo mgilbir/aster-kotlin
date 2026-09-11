@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A stated scale type is checked against its channel and its field before it is used.**
+  `scaleType` asks two questions of a `scale: {"type": …}` and drops it for the default on either
+  refusal: whether the **channel** can carry such a scale — there is no band of colour, and a shape
+  chooses between symbols so only a scale whose range is a list can drive one — and whether the
+  **field** can sit on it, a `threshold` over a list of country names having no extent to cut into
+  pieces. This compiler took whatever was written, so a chart asking for a threshold scale over its
+  nominal `shape` handed Vega a scale it could make nothing of, and drew a second legend besides. A
+  `datum` skips the second question, a literal carrying no measurement to disagree with. The
+  refusal is reported rather than silent. One specification in the wild corpus states such a scale,
+  and agreement with upstream goes from 1916 to 1917 of 1981.
+
 - **A position stated on the mark is a value ref like any other, expression and all.**
   `{"mark": {"type": "bar", "x": {"expr": "childWidth + 5"}}}` places a bar relative to a size the
   chart computes — five units past the plot it stands beside — and `signalOrValueRef` turns that

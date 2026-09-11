@@ -3738,6 +3738,10 @@ private class Compilation(
             def,
             view.spec.mark,
             hasOffset = offsetChannelFor(channel)?.let { view.spec.encoding[it] != null } == true,
+            // Reported **here** and not from `findIncompatibleScales`, which asks the same question
+            // earlier to see whether two views can share a scale: a refused type is one fact about
+            // the specification, and saying it twice would be a report of two.
+            diagnostics = diagnostics,
           )
         val key = name(view, channel)
         val existing = scales[key]

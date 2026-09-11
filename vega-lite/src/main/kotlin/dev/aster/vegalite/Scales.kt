@@ -56,6 +56,23 @@ internal object Scales {
 
   private val COLOR_CHANNELS = setOf("color", "fill", "stroke")
   private val DISCRETE_RANGE_CHANNELS = setOf("shape", "strokeDash")
+  private val OFFSET_CHANNELS = setOf("xOffset", "yOffset")
+
+  /** The channels whose range is a **magnitude**: a size, a width, a transparency, an angle. */
+  private val MAGNITUDE_CHANNELS =
+    setOf("size", "strokeWidth", "opacity", "fillOpacity", "strokeOpacity", "angle")
+
+  /**
+   * `CONTINUOUS_TO_CONTINUOUS_SCALES`: a number in, a number out, everything between interpolated.
+   */
+  private val CONTINUOUS_TO_CONTINUOUS =
+    setOf("linear", "log", "pow", "sqrt", "symlog", "time", "utc")
+
+  /** `CONTINUOUS_TO_DISCRETE_SCALES`: an extent cut into pieces, one listed value out of each. */
+  private val CONTINUOUS_TO_DISCRETE = setOf("quantile", "quantize", "threshold")
+
+  /** `QUANTITATIVE_SCALES`: the continuous ones that measure a number rather than an instant. */
+  private val QUANTITATIVE_SCALES = setOf("linear", "log", "pow", "sqrt", "symlog")
 
   /**
    * Scale types with a discrete domain, where a band or a point is looked up rather than mapped.
@@ -141,6 +158,50 @@ internal object Scales {
         "threshold",
       )
 
+  /**
+   * `channelSupportScaleType`: whether a channel can carry a scale of this type at all.
+   *
+   * A position is a span or a place along an axis, so it takes anything continuous, a band or a
+   * point — but not a scale that answers one of a handful of values, there being nowhere for the
+   * points between the pieces to go. Colour takes everything except a band, a band of colour not
+   * being a thing. A shape or a dash chooses between a fixed set of symbols, so only the scales
+   * whose *range* is a list can drive one.
+   */
+  fun channelSupports(channel: String, type: String): Boolean =
+    when {
+      channelIsPosition(channel) || channelIsPolar(channel) || channel in OFFSET_CHANNELS ->
+        // Upstream asks this **without** the nested-offset flag, even though it has one to hand:
+        // the question is what the channel can carry, not what this particular chart would have
+        // defaulted to, so a stated `point` on a position with an offset nested in it is kept.
+        type in CONTINUOUS_TO_CONTINUOUS || type == "band" || type == "point"
+      channel == "time" -> type == "linear" || type == "band"
+      channel in MAGNITUDE_CHANNELS ->
+        type in CONTINUOUS_TO_CONTINUOUS ||
+          type in CONTINUOUS_TO_DISCRETE ||
+          type == "band" ||
+          type == "point" ||
+          type == "ordinal"
+      channel in COLOR_CHANNELS -> type != "band"
+      channel in DISCRETE_RANGE_CHANNELS -> type == "ordinal" || type in CONTINUOUS_TO_DISCRETE
+      // `isScaleChannel`: a channel with no scale of its own supports no scale type either.
+      else -> false
+    }
+
+  /**
+   * `scaleTypeSupportDataType`: whether the *field's* own measurement can sit on this scale.
+   *
+   * A category has no order to interpolate along, so only a discrete domain can hold one; an
+   * instant is a clock; and a number is either measured continuously or cut into pieces.
+   */
+  fun typeSupports(type: String, measure: MeasureType?): Boolean =
+    when (measure) {
+      MeasureType.NOMINAL,
+      MeasureType.ORDINAL -> hasDiscreteDomain(type)
+      MeasureType.TEMPORAL -> type == "time" || type == "utc"
+      MeasureType.QUANTITATIVE -> type in QUANTITATIVE_SCALES || type in CONTINUOUS_TO_DISCRETE
+      else -> true
+    }
+
   /** `scaleType()` in `compile/scale/type.ts`, for the channels this compiler scales. */
   fun scaleType(
     channel: String,
@@ -148,10 +209,41 @@ internal object Scales {
     mark: String,
     /** Whether an offset scale is nested inside this position, which makes it a band. */
     hasOffset: Boolean = false,
+    diagnostics: DiagnosticCollector? = null,
   ): String {
-    def.scale?.string("type")?.let {
-      return it
+    val default = defaultScaleType(channel, def, mark, hasOffset)
+    val stated = def.scale?.string("type") ?: return default
+    // A stated type is **checked**, not obeyed. Upstream refuses one the channel cannot carry and
+    // one the field's own measurement cannot sit on, warns, and falls back to the default it would
+    // have picked anyway — a `threshold` over a list of country names has no extent to threshold,
+    // so the scale it asks Vega for would have no domain to speak of.
+    if (!channelSupports(channel, stated)) {
+      diagnostics?.warn(
+        VegaLiteDiagnostics.INVALID_ENCODING,
+        "Channel \"$channel\" does not work with a \"$stated\" scale. Using \"$default\" instead.",
+      )
+      return default
     }
+    // A **datum** is not a field: a literal carries no measurement to disagree with, and upstream
+    // asks `isFieldDef` before this second question for exactly that reason.
+    if (def.isFieldDef && !typeSupports(stated, def.type)) {
+      diagnostics?.warn(
+        VegaLiteDiagnostics.INVALID_ENCODING,
+        "A \"${def.type?.jsonName}\" field does not work with a \"$stated\" scale. " +
+          "Using \"$default\" instead.",
+      )
+      return default
+    }
+    return stated
+  }
+
+  /** `defaultType()`: the scale a channel takes where the specification states none. */
+  private fun defaultScaleType(
+    channel: String,
+    def: ChannelDef,
+    mark: String,
+    hasOffset: Boolean,
+  ): String {
     return when (def.type) {
       // An outline is not measured against anything: the projection draws it, and there is no
       // scale between the column and the page.
