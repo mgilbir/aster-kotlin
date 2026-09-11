@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A mark given a size of its own is placed by the edge its alignment names.**
+  `vgAlignedPositionChannel` reads the mark's `align` and `baseline` and answers with the Vega
+  channel that edge is: `x`, `xc` or `x2`, and `y`, `yc` or `y2`. This compiler asked only whether
+  the mark was centred in its band, so every such mark was written with an `xc` — a picture aligned
+  to the right and tucked into the corner of a plot was drawn half outside it, and one aligned to
+  the left half a width too far along. A word the map has no key for is answered by the bare
+  channel, which is what `BASELINED_Y_CHANNEL[…] ?? channel` comes to: a `"line-top"` baseline is a
+  top for this even though the map does not list it. One specification in the wild corpus puts a
+  picture in a corner that way, and agreement with upstream goes from 1938 to 1939 of 1981.
+
 - **A compound time unit is taken apart by filtering the parts, not by reading the name.**
   Three names live inside another name: `milliseconds` holds `seconds`, and `dayofyear` holds both
   `day` and `year`. `containsTimeUnit` writes those three out by hand, and `getTimeUnitParts`

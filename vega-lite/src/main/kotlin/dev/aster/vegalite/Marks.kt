@@ -809,6 +809,47 @@ internal object Marks {
     else obj { put("value", value) }
   }
 
+  /**
+   * `vgAlignedPositionChannel`: which edge of the mark the position it is given names.
+   *
+   * ```js
+   * const ALIGNED_X_CHANNEL = {left: 'x', center: 'xc', right: 'x2'};
+   * const BASELINED_Y_CHANNEL = {top: 'y', middle: 'yc', bottom: 'y2'};
+   * ...
+   * if (channel === 'x') {
+   *   return ALIGNED_X_CHANNEL[alignExcludingSignal || (defaultAlign === 'top' ? 'left' : 'center')];
+   * } else {
+   *   return BASELINED_Y_CHANNEL[alignExcludingSignal || defaultAlign];
+   * }
+   * ```
+   *
+   * A picture aligned to the **right** is placed by its right edge, so the position it is handed is
+   * an `x2` and the width runs back from it. Written as an `xc` instead — this compiler asked only
+   * whether the mark was centred in its band — an image tucked into the corner of a plot was drawn
+   * half outside it, and one aligned to the left was drawn half a width too far along.
+   *
+   * A word the map has no key for is answered by the **bare** channel, which is what
+   * `BASELINED_Y_CHANNEL[…] ?? channel` comes to: a `"line-top"` baseline is a top for this even
+   * though the map does not list it. So is an `{"expr": …}`, which upstream refuses by name — an
+   * alignment settled at render time cannot decide which channel to write at compile time.
+   */
+  private fun alignedPositionChannel(view: UnitView, channel: String, centred: Boolean): String {
+    val stated =
+      (styled(view, if (channel == "x") "align" else "baseline") as? VegaValue.Str)?.value
+    val fallback =
+      if (channel == "x") (if (centred) "center" else "left")
+      else (if (centred) "middle" else "top")
+    return when (stated ?: fallback) {
+      "left" -> "x"
+      "center" -> "xc"
+      "right" -> "x2"
+      "top" -> "y"
+      "middle" -> "yc"
+      "bottom" -> "y2"
+      else -> channel
+    }
+  }
+
   /** `isRectBasedMark`: the marks whose size along a channel is a *band* rather than a symbol. */
   private val RECT_BASED_MARKS = setOf("rect", "bar", "image", "arc", "tick")
 
@@ -2079,7 +2120,10 @@ internal object Marks {
     val sizeChannel = if (channel == "x") "width" else if (channel == "y") "height" else null
     val stated = sizeChannel?.let { view.markDef.raw.fields[it] }
     if (view.spec.encoding[channel2] == null && stated != null) {
-      val centred = if (channel == "x") "xc" else "yc"
+      // Which **edge** that size runs from is the mark's own alignment — see
+      // [alignedPositionChannel]. A picture aligned to the right is placed by its right edge, and
+      // the width runs back from it; centred was only the default.
+      val centred = alignedPositionChannel(view, channel, centred = true)
       return obj {
         putAll(pointPosition(view, channel, defaultPos, centred))
         put(sizeChannel, markProperty(stated))
@@ -2338,7 +2382,7 @@ internal object Marks {
     // nominal scale with `"width": 20`, where a mark left to fill the band gets `x` and a
     // bandwidth.
     val centred = bandingType != "band" || sizeWasHonoured || markSizeChannel != null
-    val vgChannel = if (centred) if (channel == "x") "xc" else "yc" else channel
+    val vgChannel = alignedPositionChannel(view, channel, centred)
 
     val posRef =
       if (def != null) {
