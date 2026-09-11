@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **A grid's sort index is written above its cells'.** `model.parse()` walks the tree top-down, so a
+  facet model parses its data before its child does and `parseAllForSortIndex` writes the grid's
+  index above the cell's chain; below it, the cell's own channels are indexed in the order the
+  encoding lists them. This engine lifted the facet channels out of the encoding and appended their
+  indices, so the formulas came out the other way about — four specifications in the wild corpus are
+  a trellis whose columns *and* whose marks are listed in stated orders, and every one of their
+  formulas was in the wrong place.
+
 - **The parse a specification stated is read before the one this compiler inferred.**
   `ParseNode.makeExplicit` runs before the transforms and the implicit parse from the encoding after
   them, so where the two meet the stated half is the one above — and the formulas a parse writes come

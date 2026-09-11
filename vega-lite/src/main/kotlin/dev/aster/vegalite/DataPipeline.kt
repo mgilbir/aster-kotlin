@@ -444,10 +444,16 @@ internal class DataPipeline(
     // model, though, so below the partition the column is already there and is not written again.
     // `forEachFieldDef` walks the facet as it was **written**, which is what orders the two
     // formulas a crossed grid needs.
+    // The **grid's** own index is written first: `model.parse()` is top-down, so a facet model
+    // parses its data before its child's and its sort index lands above the cell's chain. Appending
+    // it instead ordered the formulas the other way about — four specifications in the wild corpus
+    // are a trellis whose columns and whose marks are both listed in a stated order, and every one
+    // of their three formulas came out in the wrong place.
     val channels =
-      view.spec.encoding.entries.flatMap { (channel, def) ->
-        (listOf(def) + def.siblings + def.conditions).map { channel to it }
-      } + if (belowFacet) emptyList() else view.facetDeclared.map { it.channel to it }
+      (if (belowFacet) emptyList() else view.facetDeclared.map { it.channel to it }) +
+        view.spec.encoding.entries.flatMap { (channel, def) ->
+          (listOf(def) + def.siblings + def.conditions).map { channel to it }
+        }
     val transforms = channels.mapNotNull { (channel, def) ->
       val order = def.sort as? VegaValue.Arr ?: return@mapNotNull null
       val field = def.field ?: return@mapNotNull null
