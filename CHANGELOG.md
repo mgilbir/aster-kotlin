@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A layer is as wide as its first member, and as wide as itself where no member says.**
+  A member's own size overrides the one the level above handed it — `{...parentGivenSize,
+  ...(spec.width !== undefined ? {width: spec.width} : {})}` is the whole of that rule — and
+  `parseNonUnitLayoutSizeForChannel` then merges the members', the first of them winning a
+  disagreement. So a chart written `"width": "container"` whose layers are each 600 wide is 600
+  wide: the members were handed the container and then said otherwise, and there is nothing left
+  for the page to settle. This compiler read the chart's own size first, so the layers' width was
+  never consulted and such a chart measured the element it was drawn in instead — a responsive
+  width where the specification had asked for a fixed one. One specification in the wild corpus is
+  written that way, and agreement with upstream goes from 1923 to 1924 of 1981.
+
 - **A datum is placed the way a column is, half-band and all.**
   `valueRefForFieldOrDatumDef` writes a `value` where the definition is a literal and a `field`
   where it names a column, and everything after that is written the same way for both — including

@@ -67,9 +67,7 @@ internal class LayoutSize(
 
     for (channel in listOf("x", "y")) {
       val sizeName = names.getValue(channel)
-      val declared =
-        spec.fields[if (channel == "x") "width" else "height"]
-          ?: views.firstOrNull()?.spec?.let { if (channel == "x") it.width else it.height }
+      val declared = declaredSize(views, spec, channel)
       val scale = scales[channel]
       // The step signal is named after the **scale**, which inside a facet that resolves the
       // channel independently is the cell's own — `child_x_step`, not `x_step`.
@@ -253,6 +251,33 @@ internal class LayoutSize(
      */
     fun VegaValue?.isStatedSize(): Boolean = this is VegaValue.Num || this is VegaValue.Str
 
+    /**
+     * The size a level takes: its **first member's**, and the level's own where no member has one.
+     *
+     * ```js
+     * size: isFrameMixins(spec)
+     *   ? {...parentGivenSize, ...(spec.width !== undefined ? {width: spec.width} : {}), ...}
+     *   : parentGivenSize,
+     * ```
+     * ```js
+     * mergedSize = mergeValuesWithExplicit(mergedSize, childSize, sizeType, '', defaultTieBreaker);
+     * ```
+     *
+     * A member's own size overrides the one the level above handed it — that spread is the whole of
+     * it — and `parseNonUnitLayoutSizeForChannel` then merges the members', the first of them
+     * winning a disagreement with a warning. So a chart written `"width": "container"` whose layers
+     * are each 600 wide is 600 wide: the members were handed the container and then said otherwise,
+     * and there is nothing left for the page to settle. Read the other way round — the chart's own
+     * first — the layers' width was never consulted at all, and such a chart measured the element
+     * it was drawn in instead.
+     *
+     * A member that states nothing carries the level's own here, `inherited` having put it there,
+     * so the first member answers for both cases at once.
+     */
+    private fun declaredSize(views: List<UnitView>, spec: VegaValue.Obj, channel: String) =
+      views.firstNotNullOfOrNull { if (channel == "x") it.spec.width else it.spec.height }
+        ?: spec.fields[if (channel == "x") "width" else "height"]
+
     fun value(
       views: List<UnitView>,
       scales: Map<String, ScaleComponent>,
@@ -260,9 +285,7 @@ internal class LayoutSize(
       spec: VegaValue.Obj,
       channel: String,
     ): VegaValue? {
-      val declared =
-        spec.fields[if (channel == "x") "width" else "height"]
-          ?: views.firstOrNull()?.spec?.let { if (channel == "x") it.width else it.height }
+      val declared = declaredSize(views, spec, channel)
       // ```js
       // component.layoutSize.set(sizeType, isStep(specifiedSize) ? 'step' : specifiedSize, true);
       // ```
