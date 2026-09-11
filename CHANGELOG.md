@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A mark's fill and stroke are read under their own Vega names, not only under `color`.** `color`
+  answers for the one the colour *is* — the fill of a filled mark, the stroke of a hollow one — and
+  each of the two is looked up under its Vega name whatever the mark is filled with. So a theme that
+  strokes every point black, `config.point.stroke`, strokes a **filled** point too, and a
+  `config.mark.fill` fills a line that is not filled at all. This engine read `color` alone, so such
+  a theme was read and dropped; five specifications in the wild corpus theme their marks that way.
+  The style blocks are deliberately not in that chain: a style block is something *Vega* applies,
+  the mark carrying its names in `style`, so only a `color` written in one — a name Vega has never
+  heard of — is resolved here.
+
 - **A themed axis property Vega cannot apply is written onto the axis, on the parts it belongs to.**
   A configuration family named after a *scale* — `config.axisQuantitative`, `config.axisTemporal` —
   is Vega-Lite's own, and Vega has never heard of it, so a property found there has to be resolved

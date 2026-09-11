@@ -948,10 +948,6 @@ internal object Marks {
   fun colorEncode(view: UnitView, filledOverride: Boolean? = null): VegaValue.Obj {
     val filled = filledOverride ?: view.markDef.filled
     val markConfig = view.config.markConfig(view.spec.mark)
-    val declaredColor =
-      view.markDef.raw.fields["color"] ?: view.markDef.raw.fields[if (filled) "fill" else "stroke"]
-    val defaultColor = declaredColor ?: markConfig.fields["color"]
-
     val transparentIfNeeded =
       // A **geoshape** is on the list too: an outline drawn but not filled still wants a hit area,
       // and a transparent fill is what gives one — the same reason a hollow point has one.
@@ -959,8 +955,38 @@ internal object Marks {
         VegaValue.Str("transparent")
       else null
 
-    val defaultFill = if (filled) defaultColor else transparentIfNeeded
-    val defaultStroke = if (!filled) defaultColor else null
+    // ```js
+    // const defaultFill =
+    //   getMarkPropOrConfig(filled === true ? 'color' : undefined, markDef, config, {vgChannel:
+    // 'fill'}) ??
+    //   markDef.fill ?? config.mark.fill ?? transparentIfNeeded;
+    // const defaultStroke =
+    //   getMarkPropOrConfig(filled === false ? 'color' : undefined, markDef, config, {vgChannel:
+    // 'stroke'}) ??
+    //   markDef.stroke ?? config.mark.stroke;
+    // ```
+    //
+    // Each of the two is looked up under its **own Vega name** whatever the mark is filled with,
+    // and under `color` only for the one the colour *is*. So a theme that strokes every point black
+    // — `config.point.stroke` — strokes a filled point too, and this compiler read `color` alone:
+    // such a theme was read and dropped. Five specifications in the wild corpus theme their marks
+    // that way.
+    //
+    // The **style blocks** are not part of this chain. `getMarkConfig` consults them for `color`
+    // and not for `fill` or `stroke`, which is exactly right: a style block is something *Vega*
+    // applies, the mark carrying its names in `style`, so a `stroke` kept in one needs no help.
+    // A colour written there does, `color` being a name Vega has never heard of.
+    val byColorName =
+      view.markDef.raw.fields["color"] ?: styled(view, "color") ?: markConfig.fields["color"]
+    val defaultFill =
+      view.markDef.raw.fields["fill"]
+        ?: (if (filled) byColorName else null)
+        ?: markConfig.fields["fill"]
+        ?: transparentIfNeeded
+    val defaultStroke =
+      view.markDef.raw.fields["stroke"]
+        ?: (if (!filled) byColorName else null)
+        ?: markConfig.fields["stroke"]
 
     return obj {
       if (defaultFill != null) put("fill", obj { put("value", defaultFill) })
