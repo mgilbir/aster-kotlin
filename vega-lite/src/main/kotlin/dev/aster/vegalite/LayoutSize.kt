@@ -115,7 +115,7 @@ internal class LayoutSize(
       val themedDiscrete = if (channel == "x") config.discreteWidth else config.discreteHeight
       val value: VegaValue? =
         when {
-          !discrete || declared is VegaValue.Num -> value(views, scales, config, spec, channel)
+          !discrete || declared.isStatedSize() -> value(views, scales, config, spec, channel)
           declared == null && themedDiscrete != null -> num(themedDiscrete)
           else -> {
             val padding = (scale.properties["padding"] as? VegaValue.Num)?.value
@@ -244,6 +244,15 @@ internal class LayoutSize(
      * depends on whether its plots agree; and the answer needs nothing but the declared size and
      * the kind of scale, both of which are settled long before a padding is.
      */
+    /**
+     * Whether this is a size the specification **stated**, rather than one to be worked out.
+     *
+     * A number or a string, `{"step": …}` aside: `isStep(specifiedSize) ? 'step' : specifiedSize`
+     * asks only that one question of it and takes anything else as written. `"container"` is a
+     * stated size too — the page settles what it comes to — and is answered before this is asked.
+     */
+    fun VegaValue?.isStatedSize(): Boolean = this is VegaValue.Num || this is VegaValue.Str
+
     fun value(
       views: List<UnitView>,
       scales: Map<String, ScaleComponent>,
@@ -254,7 +263,16 @@ internal class LayoutSize(
       val declared =
         spec.fields[if (channel == "x") "width" else "height"]
           ?: views.firstOrNull()?.spec?.let { if (channel == "x") it.width else it.height }
-      if (declared is VegaValue.Num) return declared
+      // ```js
+      // component.layoutSize.set(sizeType, isStep(specifiedSize) ? 'step' : specifiedSize, true);
+      // ```
+      //
+      // **Whatever was stated** is the layout size, a step object aside: `parseUnitLayoutSize` puts
+      // the specified size into the component without asking what kind of value it is. A chart
+      // written `"width": "1024"` is 1024 wide, not 300 — the string is the size, and the only
+      // place it stops being one is the hoist to the top of the chart, which coerces it. Two
+      // specifications in the wild corpus state a size as a string.
+      if (declared.isStatedSize()) return declared
       // `component.layoutSize.set(sizeType, isStep(specifiedSize) ? 'step' : specifiedSize, true)`:
       // a **`"container"`** size is the layout size, as a number is. It is what a level above
       // compares when it merges its children — two plots asking the page for their width agree,

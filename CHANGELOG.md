@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **Whatever a specification states as a size is the size, a step object aside.**
+  `parseUnitLayoutSize` puts the specified size into the layout component without asking what kind
+  of value it is — `isStep(specifiedSize) ? 'step' : specifiedSize` — so a chart written
+  `{"width": "1024"}` is 1024 wide. This engine read a number and nothing else, so such a chart came
+  out at the view's own default of three hundred, and on a discrete scale the step arithmetic ran
+  where a stated size should have stopped it. The string stops being one at the **hoist**:
+  `topLevelProperties[signal.name] = +signal.value` coerces what moves to the top of the chart, so
+  the chart's own width is a number while the signal a plot of a concatenation keeps carries the
+  string as written. Two specifications in the wild corpus state a size as a string, one of each
+  kind, and agreement with upstream goes from 1908 to 1910 of 1981.
+
 - **A parameter belongs to the mark that was written, not to what it expands into.** A line that
   draws its own points is two marks, and the parameters go on the **first** of them alone: they
   were declared on the mark the specification wrote, and the overlay is something the normalizer

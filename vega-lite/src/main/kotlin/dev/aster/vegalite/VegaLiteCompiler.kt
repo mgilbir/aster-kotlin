@@ -985,14 +985,8 @@ private class Compilation(
       // A merged size that is a **`"container"`** is a signal rather than a property: there is no
       // number to write, the page having to be measured first. `assembleTopLevelModel` moves only
       // the signals that carry a `value`.
-      put(
-        "width",
-        mergedSize("width") as? VegaValue.Num ?: if (concat == null) root.width else null,
-      )
-      put(
-        "height",
-        mergedSize("height") as? VegaValue.Num ?: if (concat == null) root.height else null,
-      )
+      put("width", hoisted(mergedSize("width") ?: if (concat == null) root.width else null))
+      put("height", hoisted(mergedSize("height") ?: if (concat == null) root.height else null))
       // `cell` is the bordered plotting area; a chart with no Cartesian position — a pie — has no
       // plotting area to border, and upstream styles it as a plain `view` instead. A faceted chart
       // has no plotting area of its own at all: each of its cells carries the style, and neither
@@ -2032,6 +2026,25 @@ private class Compilation(
    * default out as a property instead. Four specifications in the wild corpus are a column of plots
    * each asking the page for its width.
    */
+  /**
+   * The chart's own size, from the merged one — `topLevelProperties[signal.name] = +signal.value`.
+   *
+   * A **number** either way: the hoist coerces what it moves, so a chart written `"width": "1024"`
+   * is 1024 wide at the top even though the signal a *plot* of a concatenation keeps carries the
+   * string as it was written. Coerced as JavaScript's unary plus does it — a string of digits is
+   * its number, the empty string is zero — and a string that is no number at all is left where it
+   * was rather than written out as a `NaN` Vega cannot read.
+   */
+  private fun hoisted(merged: VegaValue?): VegaValue? =
+    when (merged) {
+      is VegaValue.Num -> merged
+      is VegaValue.Str ->
+        (if (merged.value.isBlank()) 0.0 else merged.value.trim().toDoubleOrNull())?.let {
+          VegaValue.Num(it)
+        }
+      else -> null
+    }
+
   private fun mergedSizeSignal(name: String, value: VegaValue): VegaValue? {
     val channel = if (name.endsWith("width", ignoreCase = true)) "x" else "y"
     if (value == VegaValue.Str("container")) {
