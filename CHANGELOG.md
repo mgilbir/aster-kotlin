@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **Axes come out gridlines first and horizontals before verticals, in both passes.**
+  `assembleAxes` reads a map keyed by channel and takes the two keys in turn, so the order an axis
+  was *discovered* in never reaches the output. This compiler wrote them in that discovery order,
+  so a chart whose first layer draws only a baseline listed that layer's `y` before the `x` the
+  layer above it brought, and the two came out the other way round. The order is what Vega paints
+  in: the gridlines of both channels stand behind every axis, and an axis behind the one after it.
+  Four specifications in the wild corpus are layered that way, and agreement with upstream goes
+  from 1933 to 1937 of 1981.
+
 - **A band's range is measured against the size the level settled on, not the view's own.**
   `model.size` is the size a model was **given**, and a layer hands its members its own — which is
   its first member's, by the rule that settles a layer's size. Read as this view's own instead, a

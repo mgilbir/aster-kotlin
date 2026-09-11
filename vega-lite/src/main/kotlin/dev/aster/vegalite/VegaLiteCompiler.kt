@@ -4126,10 +4126,27 @@ private class Compilation(
     // `assembleAxisSignals` asks each component without a `gridScale`, and a plot inside a
     // composition then aliases that name to its own size.
     plot.gridlessAxes = components.values.map { it.first }
-    val ordered = components.values.map { it.second }
-    // Gridlines first, so they are painted behind every mark, then the axes themselves.
-    return ordered.mapNotNull { Guides.assembleAxis(it, "grid") } +
-      ordered.mapNotNull { Guides.assembleAxis(it, "main") }
+    // ```js
+    // const {x = [], y = []} = axisComponents;
+    // return [
+    //   ...x.map((a) => assembleAxis(a, 'grid', config)),
+    //   ...y.map((a) => assembleAxis(a, 'grid', config)),
+    //   ...x.map((a) => assembleAxis(a, 'main', config)),
+    //   ...y.map((a) => assembleAxis(a, 'main', config)),
+    // ].filter((a) => a);
+    // ```
+    //
+    // Gridlines first, so they are painted behind every mark, then the axes themselves — and within
+    // each pass the **horizontals before the verticals**, because `axisComponents` is a map keyed
+    // by channel and upstream reads the two keys in turn. Written in the order the components were
+    // discovered, a chart whose first layer draws only a baseline listed that layer's `y` before
+    // the `x` the layer above it brought, and the two came out the other way round.
+    fun each(channel: String) = components.values.filter { it.first == channel }.map { it.second }
+    val (xs, ys) = each("x") to each("y")
+    return xs.mapNotNull { Guides.assembleAxis(it, "grid") } +
+      ys.mapNotNull { Guides.assembleAxis(it, "grid") } +
+      xs.mapNotNull { Guides.assembleAxis(it, "main") } +
+      ys.mapNotNull { Guides.assembleAxis(it, "main") }
   }
 
   /**
