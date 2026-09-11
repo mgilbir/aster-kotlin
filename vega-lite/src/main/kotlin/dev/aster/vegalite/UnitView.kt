@@ -133,6 +133,25 @@ internal class UnitView(
   var facetDefs: List<ChannelDef> = emptyList()
 
   /**
+   * Where this view's **own** transforms begin, the ones before it having been written by a grid.
+   *
+   * ```ts
+   * if (child instanceof AggregateNode || child instanceof StackNode ||
+   *     child instanceof WindowTransformNode || child instanceof JoinAggregateTransformNode) {
+   *   child.addDimensions(node.fields);
+   * }
+   * child.swapWithParent();
+   * ```
+   *
+   * `moveFacetDown` walks the partition down past the cell's chain one node at a time, and a node
+   * that **groups** picks up the facet's own fields on the way: a cell's count is a count within
+   * that cell, and the copy of the chain that stands beside the grid for the scales is grouped the
+   * same way — `cloneSubtree` adds them there too. A grid's *own* transforms are none of that: the
+   * partition is appended after them and never moves past them.
+   */
+  var gridTransforms: Int = Int.MAX_VALUE
+
+  /**
    * The same definitions in the order the specification **wrote** them.
    *
    * `forEachFieldDef` walks a model's encoding as it stands, and a crossed grid that names its

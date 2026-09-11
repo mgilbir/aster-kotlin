@@ -122,8 +122,9 @@ internal class DataPipeline(
     facetSplit
       ?.takeIf { it.attached }
       ?.let { shared ->
-        val inside = cellChain(headChain(shared, Scope.OWN), emptyList())
-        val outside = cellChain(headChain(shared.main!!, Scope.OWN), view.facetFields)
+        val inside = cellChain(headChain(shared, Scope.OWN, emptyList()), emptyList())
+        val outside =
+          cellChain(headChain(shared.main!!, Scope.OWN, view.facetFields), view.facetFields)
         return Outputs(outside.raw, outside.main, outside.scales, inside.main, shared)
       }
 
@@ -146,7 +147,8 @@ internal class DataPipeline(
       // its instants — above a partition the others' stayed below, which is a cell computing one
       // member's columns over rows it shares with the whole grid. Where one view hangs below, its
       // own steps do climb: that is the walk, and there is no fork to stop it. See [facetForked].
-      headChain(source, if (facetForked) Scope.FACET else Scope.WHOLE).then(facetMain)
+      headChain(source, if (facetForked) Scope.FACET else Scope.WHOLE, view.facetFields)
+        .then(facetMain)
       // Every level's partition in turn, the outermost reading the table and each cutting the piece
       // the one above handed it.
       var above: DataNode = facetMain
@@ -157,16 +159,22 @@ internal class DataPipeline(
       above.then(facetNode)
       facetNode.attachedTo(facetMain)
       val inside =
-        cellChain(if (facetForked) headChain(facetNode, Scope.OWN) else facetNode, emptyList())
+        cellChain(
+          if (facetForked) headChain(facetNode, Scope.OWN, emptyList()) else facetNode,
+          emptyList(),
+        )
       val outside =
         cellChain(
-          if (facetForked) headChain(facetMain, Scope.OWN) else facetMain,
+          if (facetForked) headChain(facetMain, Scope.OWN, view.facetFields) else facetMain,
           view.facetFields,
         )
       return Outputs(outside.raw, outside.main, outside.scales, inside.main, facetNode)
     }
 
-    val chain = cellChain(headChain(source), view.facetFields)
+    // The partition hangs off the **end** of the chain here: nothing of the cell's is below it, so
+    // everything the view states was walked past and is grouped by the grid's columns as well as
+    // its own. A chart with no grid at all has no such columns, and this is the same call.
+    val chain = cellChain(headChain(source, Scope.WHOLE, view.facetFields), view.facetFields)
     facetTail?.let { chain.main.then(it) }
     return chain
   }
@@ -195,14 +203,24 @@ internal class DataPipeline(
   }
 
   /** Everything a view does **before** it aggregates: its transforms, its buckets, its instants. */
-  private fun headChain(parent: DataNode, scope: Scope = Scope.WHOLE): DataNode {
+  private fun headChain(
+    parent: DataNode,
+    scope: Scope = Scope.WHOLE,
+    /**
+     * The facet's fields, where **this** chain is one the partition was walked past.
+     *
+     * Empty for the copy that hangs below the partition, whose steps are computed over the rows one
+     * cell was handed and have nothing to add. See [UnitView.gridTransforms].
+     */
+    hoistedOver: List<String> = emptyList(),
+  ): DataNode {
     var head: DataNode = parent
     if (needsIdentity && parent is SourceNode) head = head.then(identifierNode())
 
     // What an **ancestor** wrote — a facet's own transforms above its cell's — stands first: that
     // model's pass ran first, and a step of the cell's cannot climb above one that computes the
     // column it reads.
-    if (scope.facet) head = userTransforms(head, Written.ANCESTOR)
+    if (scope.facet) head = userTransforms(head, Written.ANCESTOR, hoistedOver)
     // The **facet's** own bucketing stands with the rest of the facet model's pass, above the
     // partition: the values its cells are cut by are those buckets, so the column has to be there
     // before the cut is made — and so does the parse the bucketing reads, which `parseData` puts
@@ -220,7 +238,7 @@ internal class DataPipeline(
       // bucketing of a column an ancestor computes cannot climb above the step that computes it.
       if (view.parentIsLayer) binNode(scope)?.let { head = head.then(it) }
 
-      head = userTransforms(head, Written.OWN)
+      head = userTransforms(head, Written.OWN, hoistedOver)
       implicitParse(scope)?.let { head = head.then(it) }
       // A place on the globe is not a position on the page until a **projection** has been asked
       // where it lands. `GeoJSONNode` gathers the pairs into a feature collection the projection
@@ -1285,7 +1303,40 @@ internal class DataPipeline(
     return ParseNode(linkedMapOf(field to "date"))
   }
 
-  private fun userTransforms(head: DataNode, which: Written = Written.ALL): DataNode {
+  /**
+   * A step the partition was walked past, grouped by the facet's own fields as well as its own.
+   *
+   * ```ts
+   * if (child instanceof AggregateNode || child instanceof StackNode ||
+   *     child instanceof WindowTransformNode || child instanceof JoinAggregateTransformNode) {
+   *   child.addDimensions(node.fields);
+   * }
+   * ```
+   *
+   * Those four are the nodes that **group**, and `moveFacetDown` gives each of them the facet's
+   * fields as it swaps the partition below it — a count a cell states is a count within that cell,
+   * and hoisted above the grid without the grid's own columns it counted the whole table instead.
+   * Every other kind of step is per-row and has nothing to group by.
+   */
+  private fun regrouped(transform: VegaValue, facetFields: List<String>): VegaValue {
+    if (facetFields.isEmpty()) return transform
+    val obj = transform as? VegaValue.Obj ?: return transform
+    if (obj.string("type") !in GROUPING_TRANSFORMS) return transform
+    val existing = obj.array("groupby").orEmpty()
+    val added = facetFields.filterNot { field -> existing.any { text(it) == field } }
+    if (added.isEmpty()) return transform
+    return VegaValue.Obj(
+      LinkedHashMap(obj.fields).also {
+        it["groupby"] = arr(existing + added.map { field -> VegaValue.Str(field) })
+      }
+    )
+  }
+
+  private fun userTransforms(
+    head: DataNode,
+    which: Written = Written.ALL,
+    hoistedOver: List<String> = emptyList(),
+  ): DataNode {
     var last = head
     val lookupOrdinals = lookupOrdinals()
     view.spec.transforms.forEachIndexed { index, transform ->
@@ -1323,8 +1374,9 @@ internal class DataPipeline(
         // its own aggregate and the point drawn over it asks for a `mean`, both grouped the same
         // way, and upstream computes the grouping once. Carried as an opaque transform, the
         // grouping is computed twice into two datasets.
+        val grouped = if (index < view.gridTransforms) emitted else regrouped(emitted, hoistedOver)
         val node =
-          aggregateFrom(emitted) ?: timeUnitFrom(emitted) ?: PassThroughNode(listOf(emitted))
+          aggregateFrom(grouped) ?: timeUnitFrom(grouped) ?: PassThroughNode(listOf(grouped))
         node.fromAncestor = inherited
         last = last.then(node)
         // An aggregate's output rows are not the rows that went in and have no identity yet, so a

@@ -625,6 +625,14 @@ internal val RECT_BASED_MARKS = setOf("rect", "bar", "image", "arc", "tick")
 internal val MIN_MAX_OPS = setOf("min", "max")
 
 /**
+ * The Vega transforms that **group**, and so take the facet's fields when a partition moves past.
+ *
+ * `AggregateNode`, `StackNode`, `WindowTransformNode` and `JoinAggregateTransformNode` upstream —
+ * the four `moveFacetDown` and `cloneSubtree` call `addDimensions` on.
+ */
+internal val GROUPING_TRANSFORMS = setOf("aggregate", "stack", "window", "joinaggregate")
+
+/**
  * The aggregates that count rather than measure, and so cannot produce an invalid value.
  *
  * `COUNTING_OPS` in `aggregate.ts`. Each answers with how many rows met a condition, which is a

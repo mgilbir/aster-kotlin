@@ -356,6 +356,25 @@ private class Compilation(
    */
   private var cellLevels: List<VegaValue.Obj> = emptyList()
 
+  /**
+   * Where the **cell's** own transforms begin in the specification's array.
+   *
+   * Everything before it was written by a grid and stands above the partition for good; everything
+   * from it on is the cell's, which `moveFacetDown` walks the partition past — adding the facet's
+   * own fields to every grouping it passes. See [FacetOperator.Peeled.gridTransforms].
+   *
+   * The default is **every** transform, because a facet written in the *encoding* keeps them:
+   * ```ts
+   * const {mark, width, projection, height, view, params, encoding: _, ...outerSpec} = spec;
+   * return this.mapFacet({...outerSpec, ...layout, facet: facetMapping, spec: {…, mark, encoding}});
+   * ```
+   *
+   * `mapFacetedUnit` moves the mark and the encoding into the cell and leaves everything else on
+   * the grid — a `transform` among it. Only the operator form has a cell that wrote its own, and
+   * the peel says how many of the array came from the grids above it.
+   */
+  private var gridTransforms: Int = Int.MAX_VALUE
+
   /** The grids [cellLevels] describes, made once the selections are known. */
   private var cellGrids: List<FacetLayout> = emptyList()
 
@@ -401,6 +420,7 @@ private class Compilation(
       val peeled = FacetOperator.normalize(spec, diagnostics) ?: return failed()
       spec = peeled.spec
       nestedFacets = peeled.inner
+      gridTransforms = peeled.gridTransforms
       // A cell that is a **concatenation** is compiled the other way about. There is no encoding to
       // lift a facet channel out of, so the concatenation is built as the chart — under the name
       // the
@@ -2725,6 +2745,7 @@ private class Compilation(
           // of outlines over a map, say, drawn the same over each. See [UnitView.ownsSource].
           if (!view.ownsSource) {
             it.facetFields = found.fields
+            it.gridTransforms = gridTransforms
             it.facetDefs = found.defs
             it.facetDeclared =
               view.spec.encoding.entries

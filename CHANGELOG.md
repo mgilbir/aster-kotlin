@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **A step the partition is walked past is grouped by the grid's own columns as well as its own.**
+  `moveFacetDown` walks the partition down past the cell's chain one node at a time, and each of the
+  four nodes that group — an aggregate, a stack, a window, a join-aggregate — picks up the facet's
+  fields on the way. A count a cell states is a count within that cell; hoisted above the grid
+  without the grid's own columns it counts the whole table instead, and every cell of the trellis
+  then draws the same number. This compiler did that for the aggregate an *encoding* asks for and
+  not for one a `transform` states, so a confusion matrix computed per revision came out computed
+  once over every revision at once. A grid's own transforms keep the grouping they were written
+  with, the partition being appended after them and never moving past them — and a facet written in
+  the *encoding* keeps them all, `mapFacetedUnit` moving the mark and the encoding down and leaving
+  everything else where it was. One specification in the wild corpus states such a transform, and
+  agreement with upstream goes from 1924 to 1925 of 1981.
+
 - **A grid's own transforms run as well as its cell's, and above them.**
   `parseData` runs once per model, and a faceted chart has one model per level plus the cell's: the
   grid's pass writes its transforms and then the partition, and the cell's writes its own below. A

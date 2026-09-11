@@ -45,7 +45,22 @@ internal object FacetOperator {
      * outermost level folded into its encoding, and [inner] holds the rest.
      */
     val cellIsComposition: Boolean = false,
+    /**
+     * How many of [spec]'s transforms were written by the **grids** rather than by the cell.
+     *
+     * The peel lays the levels' transforms end to end and the cell's after them, so this is where
+     * the cell's begin. It matters because the two sides of that line are hoisted differently: the
+     * partition is moved down past the cell's steps and adds its own fields to every grouping it
+     * passes, and is appended after the grids' own, which it never moves past.
+     */
+    val gridTransforms: Int = 0,
   )
+
+  /** The grids' transforms and then the cell's, in the order their models' passes run. */
+  private fun transforms(above: List<VegaValue>, leaf: VegaValue.Obj): VegaValue? {
+    val all = above + leaf.array("transform").orEmpty()
+    return if (all.isEmpty()) null else arr(all)
+  }
 
   /**
    * The equivalent view with the outermost facet's channels in its encoding, or null where it
@@ -55,12 +70,6 @@ internal object FacetOperator {
    * `columnsNotSupportByRowCol` does: the grid's width is the number of columns the facet has, so a
    * second answer to that question can only disagree with the first.
    */
-  /** The grids' transforms and then the cell's, in the order their models' passes run. */
-  private fun transforms(above: List<VegaValue>, leaf: VegaValue.Obj): VegaValue? {
-    val all = above + leaf.array("transform").orEmpty()
-    return if (all.isEmpty()) null else arr(all)
-  }
-
   fun normalize(spec: VegaValue.Obj, diagnostics: DiagnosticCollector): Peeled? {
     if (!spec.has("facet")) return Peeled(spec, emptyList())
     // Every level down to the view that is actually drawn, and that view with what it inherited.
@@ -126,6 +135,7 @@ internal object FacetOperator {
         emptyList(),
         levels,
         cellIsComposition = true,
+        gridTransforms = above.size,
       )
     }
     val outermost = levels.first()
@@ -167,6 +177,7 @@ internal object FacetOperator {
       },
       levels.drop(1),
       levels,
+      gridTransforms = above.size,
     )
   }
 }
