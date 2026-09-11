@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A position stated on the mark is a value ref like any other, expression and all.**
+  `{"mark": {"type": "bar", "x": {"expr": "childWidth + 5"}}}` places a bar relative to a size the
+  chart computes — five units past the plot it stands beside — and `signalOrValueRef` turns that
+  expression into a signal. Every other mark property already went through this compiler's own
+  `literalRef`; the two positions did not, so such a mark was handed an object where Vega wants a
+  number and drawn at nothing at all. A number is still a value and the words `width` and `height`
+  are still a reference to the enclosing group's own size. One specification in the wild corpus
+  places a bar that way, and agreement with upstream goes from 1915 to 1916 of 1981.
+
 - **A number format is taken only where it is a string; a time format on its truthiness.**
   `numberFormat` asks `isString` of the stated format and falls through to the configured one
   otherwise, so an axis written `{"format": {"condition": …}}` over a measure has no format at all —

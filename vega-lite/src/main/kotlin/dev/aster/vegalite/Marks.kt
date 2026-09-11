@@ -1997,7 +1997,12 @@ internal object Marks {
     view.markDef.raw.fields[channel]?.let {
       if (it == VegaValue.Str("width")) return obj { put("field", obj { put("group", "width") }) }
       if (it == VegaValue.Str("height")) return obj { put("field", obj { put("group", "height") }) }
-      return obj { put("value", it) }
+      // `signalOrValueRef`, as every other mark property is built: a position written `{"expr": …}`
+      // is a **signal**, which is how a mark is placed relative to a size the chart computes —
+      // `{"x": {"expr": "childWidth + 5"}}` puts a bar five units past the plot it stands beside.
+      // Written out as a value, Vega is handed an object where a number belongs and the mark is
+      // placed at nothing.
+      return obj { literalRef(it)?.let { (key, resolved) -> put(key, resolved) } }
     }
     return when (defaultPos) {
       "zeroOrMin",
