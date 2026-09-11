@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A line given a second position is a `rule`.**
+  A line is drawn through its points and has one position per row; a second position asks for a
+  segment, and a segment is what a rule is. `RuleForRangedLineNormalizer` rewrites the mark and says
+  so. Left a line, such a view kept the mark and lost the second position with it: the far end of
+  every segment was dropped, and a map of great circles came out as a line from each origin to
+  nowhere. A column that arrived already binned is a span in itself, and its `x2` is the far edge of
+  that span rather than the far end of a segment — so such a line stays a line. One specification in
+  the wild corpus draws its routes that way, and agreement with upstream goes from 1939 to 1940 of
+  1981.
+
 - **A grid inside a concatenation reads its own plot's `resolve`, not the chart's.**
   A concatenation's plot that grids its cell is a facet model, and everything a facet model decides
   about its cells is decided from the `resolve` written on it. Two of those decisions were read off

@@ -678,5 +678,11 @@ internal fun mainChannel(channel: String): String =
     "y2" -> "y"
     "theta2" -> "theta"
     "radius2" -> "radius"
+    "latitude2" -> "latitude"
+    "longitude2" -> "longitude"
     else -> channel
   }
+
+/** `SECONDARY_RANGE_CHANNEL`: the channels that name the **far end** of a position. */
+internal val SECONDARY_RANGE_CHANNELS =
+  listOf("x2", "y2", "latitude2", "longitude2", "theta2", "radius2")

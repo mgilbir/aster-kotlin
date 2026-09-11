@@ -19,7 +19,70 @@ internal class Parse(
   private val selections: List<Selection> = emptyList(),
 ) {
 
-  fun unit(spec: VegaValue.Obj, path: String): UnitSpec? {
+  /**
+   * `RuleForRangedLineNormalizer`: a **line** given a second position is a `rule`.
+   *
+   * ```js
+   * if (mark === 'line' || (isMarkDef(mark) && mark.type === 'line')) {
+   *   for (const channel of SECONDARY_RANGE_CHANNEL) {
+   *     const mainChannel = getMainRangeChannel(channel);
+   *     const mainChannelDef = encoding[mainChannel];
+   *     if (encoding[channel]) {
+   *       if ((isFieldDef(mainChannelDef) && !isBinned(mainChannelDef.bin)) || isDatumDef(mainChannelDef)) {
+   *         return true;
+   *       }
+   *     }
+   *   }
+   * }
+   * ```
+   *
+   * A line is drawn *through* its points and has one position per row; a second position asks for a
+   * segment, and a segment is what a rule is. Upstream rewrites the mark and says so. Left a line,
+   * such a view kept the mark but lost the second position with it — the far end of every segment
+   * was dropped, and a map of great circles drawn as a line from each origin to nowhere.
+   */
+  private fun rangedLineIsARule(spec: VegaValue.Obj, path: String): VegaValue.Obj {
+    val mark = spec.fields["mark"]
+    val type =
+      when (mark) {
+        is VegaValue.Str -> mark.value
+        is VegaValue.Obj -> mark.string("type")
+        else -> null
+      }
+    if (type != "line") return spec
+    val encoding = spec.obj("encoding") ?: return spec
+    val ranged = SECONDARY_RANGE_CHANNELS.any { channel ->
+      if (encoding.fields[channel] == null) return@any false
+      // The **main** channel has to be something a segment can run from: a column or a literal.
+      // A column that arrived already binned is a span in itself, and its `x2` is the far edge of
+      // that span rather than the far end of a segment.
+      val main = encoding.obj(mainChannel(channel)) ?: return@any false
+      val binned = main.fields["bin"] == VegaValue.Str("binned")
+      (main.fields["field"] != null && !binned) || main.fields["datum"] != null
+    }
+    if (!ranged) return spec
+    diagnostics.warn(
+      VegaLiteDiagnostics.UNSUPPORTED_ENCODING_PROPERTY,
+      "A `line` is drawn through its points and has one position per row; this one states a " +
+        "second position, which asks for a segment. It is drawn as a `rule`.",
+      jsonPath = "$path.mark",
+    )
+    return VegaValue.Obj(
+      LinkedHashMap(spec.fields).also {
+        it["mark"] =
+          when (mark) {
+            is VegaValue.Obj ->
+              VegaValue.Obj(
+                LinkedHashMap(mark.fields).also { m -> m["type"] = VegaValue.Str("rule") }
+              )
+            else -> VegaValue.Str("rule")
+          }
+      }
+    )
+  }
+
+  fun unit(rawSpec: VegaValue.Obj, path: String): UnitSpec? {
+    val spec = rangedLineIsARule(rawSpec, path)
     val markValue = spec.fields["mark"]
     if (markValue == null) {
       diagnostics.error(
