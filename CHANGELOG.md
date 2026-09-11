@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **The far end of a position takes the base channel's nudge, unless the far end was spoken of.** A
+  mark nudged round the circle by a `thetaOffset` is nudged at *both* ends of its wedge, or the
+  wedge is drawn a different size rather than in a different place. This engine asked each end for
+  its own offset, so a donut rotated that way came out with its slices starting where they were
+  asked to and ending where they were not; one specification in the wild corpus is that donut, and a
+  stacked bar with an `xOffset` is the same shape in Cartesian coordinates. Upstream's test is for
+  the **channel** and not for its offset — `channel in encoding || channel in markDef` — so a
+  `theta2Offset` alone does not claim the far end.
+
 - **A `text` channel may be written as a condition, and goes through `wrapCondition` like every
   other channel.** Its conditions are built by the same reference builder as its unconditional part
   and become a Vega production rule — an array whose entries are tried in order, the last of them

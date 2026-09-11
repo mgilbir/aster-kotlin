@@ -1861,6 +1861,13 @@ internal object Marks {
     channel: String,
     def: ChannelDef,
     scaleType: String?,
+    /**
+     * The nudge the **caller** settled, where it is not this channel's own.
+     *
+     * `midPoint` takes an `offset` rather than looking one up, and the far end of a position is
+     * given the base channel's — see [position2Ref].
+     */
+    visualOffset: VegaValue? = null,
   ): VegaValue {
     if (def.isValueDef) {
       val value = def.value
@@ -1945,7 +1952,7 @@ internal object Marks {
       // from an encoding.
       if (scaleType == "band" && offset == null) put("band", num(0.5))
       // A mark's own `xOffset` is a plain nudge and applies wherever the position lands.
-      (offset ?: markOffset(view, channel))?.let { put("offset", it) }
+      (offset ?: visualOffset ?: markOffset(view, channel))?.let { put("offset", it) }
     }
   }
 
@@ -2066,14 +2073,31 @@ internal object Marks {
   ): VegaValue? {
     val stack = view.stack
     val def = view.spec.encoding[channel]
+    // ```js
+    // const {offset} =
+    //   channel in encoding || channel in markDef
+    //     ? positionOffset({channel, markDef, encoding, model})
+    //     : positionOffset({channel: baseChannel, markDef, encoding, model});
+    // ```
+    //
+    // The far end takes its **own** offset only where the specification speaks about that end, and
+    // otherwise takes the base channel's: a mark nudged round the circle is nudged at both ends of
+    // its wedge, or the wedge is drawn a different size rather than in a different place. A donut
+    // rotated by a `thetaOffset` is where it tells — its slices came out starting where they were
+    // asked to and ending where they were not.
+    val offset =
+      if (view.spec.encoding.containsKey(channel2) || view.markDef.raw.has(channel2))
+        markOffset(view, channel2)
+      else markOffset(view, channel)
     if (def != null && stack != null && channel == stack.fieldChannel) {
       return obj {
         put("scale", scaleName(view, channel))
         put("field", Fields.vgField(def, suffix = "start"))
+        offset?.let { put("offset", it) }
       }
     }
     view.spec.encoding[channel2]?.let {
-      return midPoint(view, channel2, it, view.scaleType(channel))
+      return midPoint(view, channel2, it, view.scaleType(channel), visualOffset = offset)
     }
     // The mark's own property, named the way *Vega* names the channel: a donut states its hole as
     // `innerRadius`, which is `radius2` here and has no Vega-Lite name of its own.
