@@ -273,20 +273,51 @@ internal class Facet(
     put("offset", num(offset))
     // A caption in the trailing band hangs off the other side of its cell.
     headerOrient("label").takeIf { it != "top" }?.let { put("orient", it) }
+    // ```js
+    // export function defaultHeaderGuideBaseline(angle: number, channel: FacetChannel) {
+    //   const baseline = defaultLabelBaseline(angle, channel === 'row' ? 'left' : 'top',
+    //                                         channel === 'row' ? 'y' : 'x', true);
+    //   return baseline ? {baseline} : {};
+    // }
+    // ```
+    //
     // `defaultHeaderGuideAlign`/`defaultHeaderGuideBaseline` both open with "if the angle is
     // stated" — a caption left at whatever angle the renderer chooses is left at whatever anchor it
-    // chooses too. State one and the caption has to be turned to face its cell: a **row**'s runs
-    // down the side of the grid, so it is right-aligned against the cells and centred on them.
-    // Which band it is in is what decides that, and a moved header changes it.
-    val angle = def.raw.obj("header")?.number("labelAngle")
-    if (angle != null && headerChannel("label") == "row") {
-      // `defaultLabelAlign` through the band's own orientation, a row's captions being
-      // `left`/`y`: a caption turned a *quarter* turn is **centred** rather than pushed to one
-      // side, its own length now running across the band rather than along it, so there is no side
-      // left to push it to.
-      val turned = ((angle % 360) + 360) % 360
-      put("baseline", "middle")
-      put("align", Guides.labelAlign(turned, "y", "left"))
+    // chooses too. State one and the caption has to be turned to face its cell.
+    //
+    // Both are asked through the **band's** own axis, not the caption's own side: a row's captions
+    // run down the side of the grid and are read as a `y` axis's labels are, a column's along the
+    // top and read as an `x` axis's. A column's caption at no angle at all therefore sits on its
+    // baseline — `bottom` — which this compiler wrote for no column at all, having asked the
+    // question only of rows and answered the baseline with a flat `middle`.
+    val angle =
+      (headerProperty(def.raw.obj("header"), config, channel, "labelAngle") as? VegaValue.Num)
+        ?.value
+    if (angle != null) {
+      val band = headerChannel("label")
+      val axis = if (band == "row") "y" else "x"
+      val side = if (band == "row") "left" else "top"
+      // The angle **as written**, negatives and all: neither rule normalises a number — only the
+      // expression form of one, through `normalizeAngleExpr` — so a caption turned to `-90` is
+      // anchored by the arm of the rule that reads `angle <= 45`, and turning it into `270` first
+      // sends it down a different one. A caption turned a *quarter* turn is **centred** rather than
+      // pushed to one side, its own length now running across the band rather than along it, so
+      // there is no side left to push it to: `alwaysIncludeMiddle`, which a header asks for and an
+      // axis does not.
+      Guides.labelBaseline(angle, axis, side, alwaysIncludeMiddle = true)?.let {
+        put("baseline", it)
+      }
+      // `defaultHeaderGuideAlign` opens on the **anchor**: a caption anchored to one end of its
+      // band is pushed to that end whatever angle it is at, and only an unanchored one is aligned
+      // by the turn.
+      when (
+        (headerProperty(def.raw.obj("header"), config, channel, "labelAnchor") as? VegaValue.Str)
+          ?.value
+      ) {
+        "start" -> put("align", "left")
+        "end" -> put("align", "right")
+        else -> Guides.labelAlign(angle, axis, side)?.let { put("align", it) }
+      }
       put("angle", num(angle))
     }
     headerProperties("label").forEach { (key, value) -> put(key, value) }

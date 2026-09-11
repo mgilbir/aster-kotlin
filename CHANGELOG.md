@@ -8,6 +8,21 @@ section here does not get released.
 
 ### Fixed
 
+- **A caption turned to a stated angle is anchored through its band's own axis.**
+  `defaultHeaderGuideAlign` and `defaultHeaderGuideBaseline` both open with "if the angle is
+  stated" — a caption left at whatever angle the renderer chooses is left at whatever anchor it
+  chooses too — and which way a stated one turns is the **band's** question. A row's captions run
+  down the side of the grid and are anchored as a `y` axis's labels are; a column's run along the
+  top and are anchored as an `x` axis's. This compiler asked it of rows alone and answered the
+  baseline with a flat `middle`, so a column's caption never had a baseline at all — one at no angle
+  sits on `bottom` — and a row's turned a quarter of a turn was centred where upstream puts it on
+  `top`. A caption anchored to one end of its band is pushed to that end whatever angle it is at,
+  and the angle is read through the theme as every other header property is. The angle is read as
+  **written**, negatives and all: neither rule normalises a number — only the expression form of
+  one — so a caption turned to `-90` is anchored by the arm of the rule that reads `angle <= 45`,
+  and turning it into `270` first sends it down another. Four specifications in the wild corpus
+  state a column caption's angle, and agreement with upstream goes from 1895 to 1899 of 1981.
+
 - **The column a stated order writes is a node of its own, one per channel.** Each is its own
   `CalculateNode` upstream, and a node is what the fold works on: two members of a cell that order
   their marks by the same list write the same calculate, so those two fold into one and whatever
