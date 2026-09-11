@@ -1908,23 +1908,6 @@ internal object Marks {
       }
       return obj { literalRef(value)?.let { (key, it) -> put(key, it) } }
     }
-    if (def.datum != null) {
-      return obj {
-        put("scale", scaleName(view, mainChannel(channel)))
-        // A datum written as a **date** is the expression that builds the instant, not an object:
-        // Vega has no `{year: 2006}`, and passing one through scaled a mark by an object.
-        val datum = def.datum
-        if (
-          def.type == MeasureType.TEMPORAL &&
-            datum is VegaValue.Obj &&
-            Scales.looksLikeADateTime(datum)
-        ) {
-          put("signal", Transforms(DiagnosticCollector()).dateTimeExpression(datum))
-        } else {
-          literalRef(datum)?.let { (key, it) -> put(key, it) }
-        }
-      }
-    }
     // A **bucket** is placed by a point inside it rather than at its near edge, and a bucketed
     // *instant* is a bucket too — `isBinning(bin) || (bandPosition && timeUnit && type ===
     // TEMPORAL)`. A label over a month asked for the middle of the month sits in the middle of it,
@@ -1933,8 +1916,11 @@ internal object Marks {
     // end of somebody else's — upstream reaches it as a `SecondaryFieldDef`, which carries no type
     // and so never takes the bucketed branch — and reading it as a bucket of its own put a rect's
     // far edge halfway into a bucket that does not exist.
+    // A **datum** is a literal standing where a column would: there is nothing of it to bucket, so
+    // only the last arm — the one `valueRefForFieldOrDatumDef` shares between the two — answers it.
     val bucketed =
-      channel == mainChannel(channel) &&
+      def.datum == null &&
+        channel == mainChannel(channel) &&
         (def.bin is Binning.Bin ||
           (def.timeUnit != null &&
             def.type == MeasureType.TEMPORAL &&
@@ -1966,12 +1952,27 @@ internal object Marks {
     }
     return obj {
       put("scale", scaleName(view, mainChannel(channel)))
-      // A binned field on a discrete scale is placed by its **label**: that is what the domain
-      // lists, so the bin's start would name a category the scale has never heard of.
-      val binnedLabels =
-        def.bin is Binning.Bin &&
-          (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL)
-      put("field", Fields.vgField(def, suffix = if (binnedLabels) "range" else null))
+      val datum = def.datum
+      if (datum != null) {
+        // A datum written as a **date** is the expression that builds the instant, not an object:
+        // Vega has no `{year: 2006}`, and passing one through scaled a mark by an object.
+        if (
+          def.type == MeasureType.TEMPORAL &&
+            datum is VegaValue.Obj &&
+            Scales.looksLikeADateTime(datum)
+        ) {
+          put("signal", Transforms(DiagnosticCollector()).dateTimeExpression(datum))
+        } else {
+          literalRef(datum)?.let { (key, it) -> put(key, it) }
+        }
+      } else {
+        // A binned field on a discrete scale is placed by its **label**: that is what the domain
+        // lists, so the bin's start would name a category the scale has never heard of.
+        val binnedLabels =
+          def.bin is Binning.Bin &&
+            (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL)
+        put("field", Fields.vgField(def, suffix = if (binnedLabels) "range" else null))
+      }
       // `positionOffset` runs for every position, not only a rect's: a label over a grouped bar
       // has to move into the same lane the bar did, or it sits over the middle of the group.
       val offset = offsetRef(view, mainChannel(channel), centred = true)

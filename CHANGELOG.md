@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A datum is placed the way a column is, half-band and all.**
+  `valueRefForFieldOrDatumDef` writes a `value` where the definition is a literal and a `field`
+  where it names a column, and everything after that is written the same way for both — including
+  the half-band that puts a mark in the middle of its band rather than on its edge. This compiler
+  answered a datum from a branch of its own and stopped there, so a rule drawn at a named category
+  stood on the boundary between two bands instead of through the middle of one. The bucketing
+  branches stay a column's: `isTypedFieldDef` gates them on the definition naming one, so a literal
+  written with a `timeUnit` or a `bin` is placed at the literal, which is what it says. No wild
+  corpus specification places a datum that way; the divergence was found while reading the two
+  branches side by side.
+
 - **A layer member's channel replaces the chart's unless it names something to measure.**
   `mergeEncoding` spreads the chart's definition under the member's only where the member's is a
   field or datum def — that is what lets a shared `x` state the type and a member's `x` name only
