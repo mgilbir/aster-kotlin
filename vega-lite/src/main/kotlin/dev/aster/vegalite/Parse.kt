@@ -570,6 +570,43 @@ internal class Parse(
       else -> null
     }
 
+  /**
+   * The operation a channel is summarised by, or null where it names one there is no such thing as.
+   *
+   * ```js
+   * // Drop invalid aggregate
+   * if (!compositeMark && aggregate && !isAggregateOp(aggregate) && !isArgmaxDef(aggregate) && !isArgminDef(aggregate)) {
+   *   log.warn(log.message.invalidAggregate(aggregate));
+   *   delete fieldDef.aggregate;
+   * }
+   * ```
+   *
+   * `initFieldDef` **deletes** it, so the channel is the plain column it names and everything
+   * downstream reads it as one: the field keeps its own name, the axis its own title, and a bar
+   * whose measure is no longer summarised stacks, a stack being what an unsummarised measure over a
+   * category is. Kept instead, `{"aggregate": "null"}` reached Vega as an `aggregate` transform
+   * asking for an operation called `null` — one chart in the wild corpus writes exactly that — and
+   * every column the summary would have produced was named after it: `null_Salary` under an axis
+   * reading `Null of Salary`.
+   *
+   * Before the type is inferred, because the type a channel is inferred to have depends on whether
+   * it counts rows: `initFieldDef` drops the operation and settles the type underneath it.
+   *
+   * A **composite** mark's own channels are not asked — `!compositeMark` — and they are not asked
+   * here either, a box plot's parts being normalised out of the specification before it is parsed.
+   */
+  private fun aggregate(stated: String?, path: String): String? {
+    if (stated == null || stated in AGGREGATE_OPS) return stated
+    diagnostics.error(
+      VegaLiteDiagnostics.INVALID_ENCODING,
+      "`$stated` is not an aggregation operator, so the channel is summarised by nothing and " +
+        "draws the column as it stands. Upstream drops it with the same warning. The operators " +
+        "are ${AGGREGATE_OPS.sorted().joinToString(", ")}.",
+      jsonPath = "$path.aggregate",
+    )
+    return null
+  }
+
   private fun channelDef(channel: String, value: VegaValue, path: String): ChannelDef? {
     if (value !is VegaValue.Obj) {
       diagnostics.error(
@@ -586,8 +623,11 @@ internal class Parse(
     // separate things and everything downstream needs both.
     val aggregateObject = value.obj("aggregate")
     val aggregate =
-      value.string("aggregate")
-        ?: aggregateObject?.fields?.keys?.firstOrNull { it == "argmin" || it == "argmax" }
+      aggregate(
+        value.string("aggregate")
+          ?: aggregateObject?.fields?.keys?.firstOrNull { it == "argmin" || it == "argmax" },
+        path,
+      )
     val argumentField = aggregate?.let { aggregateObject?.string(it) }
     val timeUnit = value.string("timeUnit") ?: timeUnitName(value.obj("timeUnit"))
     val bin = binning(value.fields["bin"], path, channel)
@@ -889,6 +929,44 @@ internal class Parse(
      */
     /** The two aggregates that answer with a whole row rather than a number. */
     private val ARGMINMAX = setOf("argmin", "argmax")
+
+    /**
+     * `AGGREGATE_OP_INDEX` — every operation a channel may be summarised by, and no other.
+     *
+     * An **allowlist**, and read exactly: `hasOwnProperty(AGGREGATE_OP_INDEX, a)` asks the index
+     * for the word as written, so `"Mean"` is no more an operation than `"null"` is. What a
+     * specification writes here reaches Vega as an `aggregate` transform, and a word Vega does not
+     * know is not a summary but an error in the middle of a chart — which is why the one thing that
+     * must not happen is passing it through. See [aggregate].
+     */
+    private val AGGREGATE_OPS =
+      setOf(
+        "argmax",
+        "argmin",
+        "average",
+        "count",
+        "distinct",
+        "exponential",
+        "exponentialb",
+        "product",
+        "max",
+        "mean",
+        "median",
+        "min",
+        "missing",
+        "q1",
+        "q3",
+        "ci0",
+        "ci1",
+        "stderr",
+        "stdev",
+        "stdevp",
+        "sum",
+        "valid",
+        "values",
+        "variance",
+        "variancep",
+      )
 
     /**
      * `autoMaxBins`: how many buckets a `bin: true` asks for, which depends on the channel.

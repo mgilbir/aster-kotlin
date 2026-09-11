@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A channel summarised by a word that is no operation is summarised by nothing.** `initFieldDef`
+  reads `AGGREGATE_OP_INDEX` for the word as written and **deletes** what it does not find, so
+  `"Mean"` is no more an operation than `"null"` is. The channel is then the plain column it names:
+  the field keeps its own name, the axis its own title, and a bar whose measure is no longer
+  summarised stacks — a stack being what an unsummarised measure over a category is. This engine
+  passed the word through, so `{"aggregate": "null"}` reached Vega as an `aggregate` transform
+  asking for an operation called `null`, and every column that summary would have produced was
+  named after it: `null_Salary` beneath an axis reading `Null of Salary`. The word is dropped before
+  the channel is asked whether it has anything left to draw and before its type is settled, both of
+  which upstream decides underneath the deletion. Two specifications in the wild corpus write one,
+  and agreement with upstream goes from 1888 to 1890 of 1981.
+
 - **A layer that reads a table of its own is no child of the grid it is drawn in.** `parseRoot`
   hands a child the partition its parent cut only where the child states no `data`; one that states
   its own starts a root of its own, so its chain stands *beside* the grid rather than below it. Two
