@@ -275,13 +275,23 @@ private class Compilation(
           .filter { it.type == "interval" && it.owner === selection.owner }
           .map { "${it.name}_brush" }
       return selection.signals(
-        unit = selection.unitName(views.firstOrNull().takeIf { facet != null }, facet),
+        unit =
+          selection.unitName(
+            views.firstOrNull().takeIf { facet != null },
+            facet,
+            fallback = views.firstOrNull(),
+          ),
         brushes = brushes,
         view = selection.owner ?: views.firstOrNull(),
       )
     }
     val view = selection.owner ?: views.firstOrNull() ?: return emptyList()
-    val unit = selection.unitName(views.firstOrNull().takeIf { facet != null }, facet)
+    val unit =
+      selection.unitName(
+        views.firstOrNull().takeIf { facet != null },
+        facet,
+        fallback = views.firstOrNull(),
+      )
     return selection.intervalSignals(
       view,
       selection.initial,
@@ -912,9 +922,7 @@ private class Compilation(
         // pointer against one cell's scales, and there is one of each per cell rather than one for
         // the grid. What stays here is what a cell cannot own — the store, the signal the store
         // resolves into, and whatever a binding writes from outside the chart.
-        selections
-          .filter { facet == null && (concat == null || it.owner == null) }
-          .flatMap { machinery(it, views) } +
+        selections.filter { facet == null && concat == null }.flatMap { machinery(it, views) } +
         // A control's own signals stand at the top even where everything else about the selection
         // is written inside a cell: one widget for the chart, not one per cell.
         selections
@@ -2349,7 +2357,12 @@ private class Compilation(
       val local =
         localSizeSignals(plot) +
           selections
-            .filter { it.owner in plot.views }
+            // A selection declared **above** the concatenation belongs to every plot in it:
+            // `assembleUnitSelectionSignals` runs per unit model and a parameter written on the
+            // chart is inherited by each, so each writes its own machinery in its own group. Kept
+            // at the top instead, one set of signals watched marks in two plots at once — and the
+            // pointer over either of them wrote the same tuple.
+            .filter { it.owner == null || it.owner in plot.views }
             .flatMap { selection ->
               val pushed = boundOutward(selection, plot.views).map { it.second }.toSet()
               machinery(selection, plot.views).map { signal ->
@@ -3654,7 +3667,12 @@ private class Compilation(
           diagnostics,
           register,
           Selection.needsIdentity(selections),
-          Selection.needsIdentity(selections.filter { it.owner === view }),
+          // `requiresSelectionId(model)` asks the **unit model**, and a parameter declared above a
+          // composition is part of every unit model below it — inherited, not the chart's alone. So
+          // a view under a chart-level selection needs the identifier after its aggregate as much
+          // as one that declared its own: the rows an aggregate makes are not the rows that went
+          // in, and a selection that remembers by identity has nothing to remember them by.
+          Selection.needsIdentity(selections.filter { it.owner === view || it.owner == null }),
           // `moveFacetDown` hoists a cell's chain above the facet until it meets a named point the
           // scales read. The pre-aggregation table a sorted domain asks for is such a point, and
           // where there is one the chain stays below the facet and a copy of it — with the facet's

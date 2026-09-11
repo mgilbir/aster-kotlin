@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **A selection declared above a concatenation belongs to every plot in it.**
+  `assembleUnitSelectionSignals` runs per unit model, and a parameter written on the chart is
+  inherited by each of them rather than being the chart's alone. Three things follow, and this
+  compiler had all three the other way. The machinery is written in each plot's own group, where the
+  marks it watches are — kept at the top instead, one set of signals watched the marks of two plots
+  at once and the pointer over either of them wrote the same tuple. The unit each tuple records is
+  that plot's name — recorded empty, every plot's tuples claimed to come from the same unit and a
+  selection resolved per plot could not tell them apart. And each view needs the identifier after
+  its aggregate, `requiresSelectionId(model)` asking the unit model: the rows an aggregate makes are
+  not the rows that went in, and a selection that remembers by identity has nothing to remember them
+  by. One specification in the wild corpus picks rows that way from a row of plots, and agreement
+  with upstream goes from 1942 to 1943 of 1981.
+
 - **`unit` is unshifted after one view's selections, so a later view's controls go in front of it.**
   `assembleTopLevelSignals` runs once per view on one accumulating array: a view's controls are
   unshifted onto the front as its selections are walked, and `unit` is unshifted after that loop —

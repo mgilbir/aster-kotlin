@@ -125,8 +125,18 @@ internal class Selection(
      * expression a signal computes, where it has to be a string literal.
      */
     escape: Boolean = true,
+    /**
+     * The view whose group this is being written into, where the selection owns none of its own.
+     *
+     * `unitName(model)` is `model.getName('')` — the name of the model the signal is being written
+     * for. A parameter declared **above** a concatenation owns no view, and its machinery is
+     * written once in each plot: the name each copy records is that plot's, not the empty string
+     * the chart itself carries. Recorded empty, every plot's tuples claimed to come from the same
+     * unit, and a selection resolved per plot could not tell them apart.
+     */
+    fallback: UnitView? = null,
   ): String {
-    val name = cell?.name ?: owner?.name ?: ""
+    val name = cell?.name ?: owner?.name ?: fallback?.name ?: ""
     val base = if (escape) quoted(name) else name
     if (grid == null) return base
     return base +
