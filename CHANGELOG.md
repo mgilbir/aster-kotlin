@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A window over the whole partition, computing nothing a window alone can compute, is a
+  join-aggregate.** Every row of the partition gets the same answer, and Vega has a transform that
+  says exactly that — upstream switches to it "when the window does not rely on any particular
+  window ops or frame". `[null, null]` is how a specification asks for the whole partition, the
+  commonest window there is (*this row against the median of all of them*), and this compiler wrote
+  a window transform instead: a `sort`, a `frame` and a list of nulls for parameters no operation
+  there takes. Three specifications in the wild corpus ask for it. A stated `sort` changes nothing,
+  there being nothing for an order to do over a whole partition; an operation only a window can
+  compute, a one-sided frame, or no frame at all leaves it a window.
+
 - **Two layers' projections merge when one of them said nothing.** `mergeIfNoConflict` treats a
   member that stated nothing as agreeing with one that did, and takes the one that spoke. This
   engine compared the two specifications for equality, so a map layered under another map where only

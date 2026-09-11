@@ -292,6 +292,40 @@ internal class Transforms(
           }
         )
 
+      // ```js
+      // if (frame && frame[0] === null && frame[1] === null && ops.every((o) => isAggregateOp(o)))
+      // {
+      //   // when the window does not rely on any particular window ops or frame, switch to a
+      //   // simpler and more efficient joinaggregate
+      //   return {type: 'joinaggregate', as, ops, fields, ...(groupby !== undefined ? {groupby} :
+      // {})};
+      // }
+      // ```
+      //
+      // A window over the **whole** partition, computing nothing a window alone can compute, is a
+      // join-aggregate: every row of the partition gets the same answer, and Vega has a transform
+      // that says exactly that. `[null, null]` is how a specification asks for the whole partition
+      // — the commonest window there is, *this row against the median of all of them* — and the
+      // window transform this compiler wrote instead carried a `sort`, a `frame` and a list of
+      // nulls for parameters no operation here takes. Three specifications in the wild corpus ask
+      // for it.
+      transform.has("window") && unframedAggregates(transform) ->
+        listOf(
+          obj {
+            val entries = transform.array("window").orEmpty()
+            put("type", "joinaggregate")
+            put("as", strings(entries.map { it.string("as") ?: "" }))
+            put("ops", strings(entries.map { it.string("op") ?: "" }))
+            put(
+              "fields",
+              arr(entries.map { entry -> entry.string("field")?.let(::str) ?: VegaValue.Null }),
+            )
+            if (transform.has("groupby")) {
+              put("groupby", strings(fieldList(transform["groupby"])))
+            }
+          }
+        )
+
       transform.has("window") ->
         listOf(
           obj {
@@ -748,6 +782,36 @@ internal class Transforms(
       }
       else -> stated
     }
+
+  /**
+   * `isAggregateOp`, read from the other side: the operations only a **window** can compute.
+   *
+   * Every other operation answers for a set of rows rather than for a row's place among them, and a
+   * window over the whole partition asking for one of those is a join-aggregate.
+   */
+  private val WINDOW_ONLY_OPS =
+    setOf(
+      "row_number",
+      "rank",
+      "dense_rank",
+      "percent_rank",
+      "cume_dist",
+      "ntile",
+      "lag",
+      "lead",
+      "first_value",
+      "last_value",
+      "nth_value",
+    )
+
+  /** Whether a window states the whole partition as its frame and computes only aggregates. */
+  private fun unframedAggregates(transform: VegaValue): Boolean {
+    val frame = transform.array("frame") ?: return false
+    if (frame.size != 2 || frame.any { it != VegaValue.Null }) return false
+    return transform.array("window").orEmpty().all {
+      (it.string("op") ?: "") !in WINDOW_ONLY_OPS
+    }
+  }
 
   private fun collectParses(predicate: VegaValue?, into: MutableMap<String, String>) {
     when {
