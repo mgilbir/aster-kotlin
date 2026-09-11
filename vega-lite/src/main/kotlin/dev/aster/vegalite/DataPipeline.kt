@@ -227,7 +227,7 @@ internal class DataPipeline(
     }
     timeUnitNode(scope)?.let { head = head.then(it) }
     if (scope.own) binnedTimeUnitNode()?.let { head = head.then(it) }
-    sortIndexNode(scope)?.let { head = head.then(it) }
+    sortIndexNodes(scope).forEach { head = head.then(it) }
     // The key a crossed grid's cells are ordered by is written onto every row *above* the facet,
     // where every cell's rows can still be seen at once — never again below it.
     if (scope.facet)
@@ -497,7 +497,7 @@ internal class DataPipeline(
     return if (transforms.isEmpty()) null else PassThroughNode(transforms)
   }
 
-  private fun sortIndexNode(scope: Scope = Scope.WHOLE): PassThroughNode? {
+  private fun sortIndexNodes(scope: Scope = Scope.WHOLE): List<PassThroughNode> {
     val predicates = Transforms(diagnostics, selections = view.selections)
     // The **facet's** own channels as well as the encoding's: a trellis whose rows are listed in a
     // stated order needs the same index column, and the facet channel was lifted out of the
@@ -543,7 +543,12 @@ internal class DataPipeline(
         put("as", Fields.sortIndexField(channel, def, forAs = true))
       }
     }
-    return if (transforms.isEmpty()) null else PassThroughNode(transforms)
+    // One node per column, not one node carrying them all: `sortArrayIndexField` builds a
+    // `CalculateNode` per channel, and a node is what the fold works on. Two members of a cell that
+    // order their marks by the same list write the same calculate, and folding *those* two leaves
+    // whatever else each of them writes where it was — which a single node holding both columns
+    // cannot do, being equal to neither of the others.
+    return transforms.map { PassThroughNode(listOf(it)) }
   }
 
   private fun binNode(scope: Scope = Scope.WHOLE): BinNode? {

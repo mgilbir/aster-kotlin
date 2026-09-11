@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **The column a stated order writes is a node of its own, one per channel.** Each is its own
+  `CalculateNode` upstream, and a node is what the fold works on: two members of a cell that order
+  their marks by the same list write the same calculate, so those two fold into one and whatever
+  else either of them writes stays below the fold. This engine wrote a view's columns as a single
+  node carrying them all, which is equal to neither of the others — so nothing folded, and the
+  member that ordered only its bars was handed the column that ordered the other's colours as well.
+  Four specifications in the wild corpus are that trellis. They are one difference from agreement
+  after this, not none, so the corpus count is unchanged at 1895 of 1981. Nothing changes for a
+  chart whose columns have nothing between them: those are still written in one table, the split
+  being in the flow rather than in the writing.
+
 - **What a member of a trellis's cell writes for itself is written below the partition.**
   `moveFacetDown` hoists a cell's chain above the partition one node at a time, and the walk runs
   while the partition has a **single** child: a cell of one view is that, and its own steps climb
