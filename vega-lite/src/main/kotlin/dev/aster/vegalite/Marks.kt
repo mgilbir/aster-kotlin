@@ -1677,13 +1677,51 @@ internal object Marks {
 
   private fun textChannel(view: UnitView): VegaValue? {
     val def = view.spec.encoding["text"] ?: return null
-    if (def.isValueDef) return obj { literalRef(def.value)?.let { (key, it) -> put(key, it) } }
-    if (!def.isFieldDef) return null
+    // `text` goes through `wrapCondition` like every other channel — its **conditions** are built
+    // by the same reference builder as its unconditional part, and become a Vega production rule.
+    // Reading only the unconditional part left a label written entirely as a condition — a
+    // percentage shown on the first cell of a trellis and nowhere else — with no text at all, and
+    // a label whose condition a selection drives showing its fallback whatever was picked.
+    val rules =
+      def.conditions.map { condition ->
+        obj {
+          put("test", condition.test)
+          textRef(view, condition)?.let { (key, value) -> put(key, value) }
+        }
+      }
+    val main = textRef(view, def)?.let { (key, value) -> obj { put(key, value) } }
+    val entries = rules + listOfNotNull(main)
+    // ```js
+    // if (valueRefs.length > 1 || (valueRefs.length === 1 && Boolean(valueRefs[0].test))) {
+    //   return {[vgChannel]: valueRefs};
+    // }
+    // ```
+    //
+    // A lone entry that carries a **test** still goes out as a list, upstream's own comment saying
+    // why: "we must use array form valueRefs if test exists, otherwise Vega won't execute the
+    // test". A production rule is a list; an object is a value, and Vega would draw the test.
+    return when {
+      entries.isEmpty() -> null
+      entries.size > 1 || entries.single().has("test") -> arr(entries)
+      else -> entries.single()
+    }
+  }
+
+  /**
+   * `textRef`: what one entry of a text channel says, as a value or as a signal.
+   *
+   * A value passes through — an `{"expr": …}` among them being a signal, as everywhere else — and a
+   * column is *formatted*: text is read rather than scaled, so what a label says is the number
+   * written the way the specification asked for it.
+   */
+  private fun textRef(view: UnitView, def: ChannelDef): Pair<String, VegaValue>? {
+    if (def.isValueDef) return literalRef(def.value)
+    if (!def.isFieldDef && def.datum == null) return null
     // A **bucketed** column is spoken as the bucket, not as its near edge: `binFormatExpression`
     // writes both ends with an en dash between them and says "null" where the row had none. A text
     // mark labelling the slices of a radial histogram is where it shows.
     val binEnd = if (def.bin is Binning.Bin) Fields.datumAccess(def, suffix = "end") else null
-    return signalRef(fieldExpression(view, def, binEnd = binEnd, arrays = false))
+    return "signal" to str(fieldExpression(view, def, binEnd = binEnd, arrays = false))
   }
 
   // ---------------------------------------------------------------------------------------------

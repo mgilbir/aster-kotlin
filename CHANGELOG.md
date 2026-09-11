@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A `text` channel may be written as a condition, and goes through `wrapCondition` like every
+  other channel.** Its conditions are built by the same reference builder as its unconditional part
+  and become a Vega production rule — an array whose entries are tried in order, the last of them
+  untested. This engine read the unconditional part alone, so a label written *entirely* as a
+  condition came out with no text at all, and a label whose condition a selection drives came out
+  showing its fallback whatever was picked. Two specifications in the wild corpus label a chart that
+  way. A lone entry carrying a test is written as a list even so, upstream's own comment saying why:
+  "we must use array form valueRefs if test exists, otherwise Vega won't execute the test".
+
 - **A lookup produces the columns it brings in, so nothing loads them.** `ancestorParse` records what
   each transform produces as it walks the list, and a produced column is dropped from the implicit
   parse below it: it is not in the table being loaded, so asking the loader to read it as a date
