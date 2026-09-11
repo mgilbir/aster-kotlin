@@ -8,6 +8,20 @@ section here does not get released.
 
 ### Fixed
 
+- **A themed axis property beats a derived one, and who applies it decides whether it is written
+  out.** Three rules in one place, all of them `parseAxis`'s. A value this compiler derived is used
+  only where the theme said nothing, so a themed `format` replaces the specifier a time unit would
+  have produced and a themed `tickCount` replaces `ceil(width/40)` — this engine settled `format`,
+  `formatType`, `tickCount` and `tickMinStep` without asking the theme at all. Where the theme did
+  speak and Vega can apply it itself, the axis says nothing: a `config.axisX.title` reaches the chart
+  through the Vega configuration written beside it, and writing it out named the axis twice. And a
+  property on `propsToAlwaysIncludeConfig` — `grid`, `translate`, `format`, `formatType`, `orient`,
+  `labelExpr`, `tickCount`, `position`, `tickMinStep` — or a themed value that is a **signal** or a
+  conditional is written out even from a block Vega knows, Vega being unable to apply those from its
+  own configuration. Four specifications in the wild corpus theme their axes that way. A caption the
+  *channel* states is explicit, as `isExplicit` says in as many words, so it is taken before the
+  theme is asked.
+
 - **A selection's value may be a scalar, and then it settles every projection.** A tuple names the
   channel a projection is over or the column it reads; a scalar names neither — `{"value": "US"}`
   beside `"fields": ["cont"]` — and upstream calls it smoothing the gradient from a variable

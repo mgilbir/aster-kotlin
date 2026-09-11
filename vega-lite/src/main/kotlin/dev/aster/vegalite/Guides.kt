@@ -298,6 +298,20 @@ internal object Guides {
       val themed = configured(name)
       when {
         themed == null -> axis.set(name, value)
+        // ```js
+        // (propsToAlwaysIncludeConfig.has(property) && hasConfigValue) ||
+        // isConditionalAxisValue(configValue) ||
+        // isSignalRef(configValue)
+        // ```
+        //
+        // `propsToAlwaysIncludeConfig` is the list of properties whose themed value has to be
+        // written out **even from a block Vega knows**, because Vega does not apply them the way
+        // Vega-Lite means them: `grid` decides whether there is a second axis at all, `translate`
+        // has a default of its own in Vega, and the rest are Vega-Lite's own names. A themed value
+        // that is a *signal* or a conditional is written out for the same reason — Vega can read
+        // neither from its own configuration.
+        name in ALWAYS_FROM_CONFIG || conditionalOrSignal(themed) ->
+          axis.set(name, asSignal(themed))
         // `else if (!(configFrom === 'vgAxisConfig')) axisComponent.set(property, configValue,
         // false)`: a block only Vega-Lite knows has to be written **out**, there being nothing
         // downstream that would apply it.
@@ -343,12 +357,34 @@ internal object Guides {
     // and **null** is the useful value: it is how a chart whose columns explain themselves takes
     // every caption off at once, rather than writing `"title": null` on each of them.
     val themeTitle = if (guideTitle != null) null else configured("title")
+    // A themed caption follows the rule every themed property follows: written out where Vega
+    // could not apply it, and **left to Vega** where it could. `title` is not one of
+    // `propsToAlwaysIncludeConfig`, so a `config.axisX.title` reaches the chart through the Vega
+    // configuration this compiler emits beside it, and the axis itself says nothing about its
+    // caption — which is also what a themed `null` says. Writing it out named such an axis twice,
+    // and four specifications in the wild corpus theme their captions that way.
+    val writtenOut = themeTitle?.takeIf { !themedByVega("title") || conditionalOrSignal(it) }
+    // ```js
+    // case 'title':
+    //   if (value === getFieldDefTitle(model, channel)) {
+    //     return true; // name specified as fieldTitle in the field def is considered explicit
+    //   }
+    // ```
+    //
+    // A caption the **channel** states is explicit, exactly as one stated on the axis is, and an
+    // explicit value is taken before the theme is asked at all. Asking the theme first let a
+    // `config.axisY.title` — left to Vega, as it should be — take the place of the name the
+    // channel had written down, and the axis came out with no caption.
+    val fieldTitles = listOfNotNull(def.explicitTitle, secondary?.explicitTitle)
     val stated =
-      if (guideTitle != null) listOf(guideTitle)
-      else if (themeTitle != null) listOfNotNull(themeTitle.takeIf { it !is VegaValue.Null })
-      else listOfNotNull(def.explicitTitle, secondary?.explicitTitle)
+      when {
+        guideTitle != null -> listOf(guideTitle)
+        fieldTitles.any { it !is VegaValue.Null } -> fieldTitles
+        themeTitle != null -> listOfNotNull(writtenOut?.takeIf { it !is VegaValue.Null })
+        else -> fieldTitles
+      }
     if (guideTitle is VegaValue.Null) axis.nulledTitle = true
-    if (themeTitle is VegaValue.Null) {
+    if (themeTitle != null && stated.isEmpty() && fieldTitles.none { it !is VegaValue.Null }) {
       axis.explicitTitle = true
     } else if (stated.isNotEmpty()) {
       axis.explicitTitle = true
@@ -468,26 +504,23 @@ internal object Guides {
 
     // Labels for a bucketed instant, and a tick step no finer than the bucket.
     if (def.timeUnit != null) {
-      axis.set("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit, view.config.locale)))
-      Fields.timeUnitDuration(def.timeUnit)?.let { axis.set("tickMinStep", signalRef(it)) }
+      derived("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit, view.config.locale)))
+      Fields.timeUnitDuration(def.timeUnit)?.let { derived("tickMinStep", signalRef(it)) }
     }
     // `guideFormatType`: a specifier is a *time* specifier, and Vega has to be told so wherever the
     // scale itself does not already say it. A time or utc scale formats instants by nature; a band
     // scale of month names does not, and without this its labels come out as raw numbers.
-    formatType(def, type)?.let { axis.set("formatType", str(it)) }
+    formatType(def, type)?.let { derived("formatType", str(it)) }
 
     // A normalized stack is a proportion, so its axis is a percentage —
     // `config.normalizedNumberFormat`,
     // which defaults to `.0%`. Left off, the labels read 0, 0.2, 0.4 for what the chart draws as
     // fifths of a whole.
     if (view.stack?.offset == "normalize" && channel == view.stack.fieldChannel) {
-      axis.set(
-        "format",
-        str(view.config.normalizedNumberFormat),
-      )
+      derived("format", str(view.config.normalizedNumberFormat))
     }
 
-    tickCount(view, channel, def, type)?.let { axis.set("tickCount", it) }
+    tickCount(view, channel, def, type)?.let { derived("tickCount", it) }
 
     // A heatmap's axis is drawn *over* its cells: the rects fill their bands completely, so an axis
     // painted underneath would be hidden by them.
@@ -553,8 +586,11 @@ internal object Guides {
     // beside it would settle the property for this axis alone and beat the theme with a default.
     for (property in AXIS_PROPERTIES) {
       if (axis.properties.containsKey(property)) continue
-      if (themedByVega(property)) continue
-      axis.properties[property] = asSignal(configured(property) ?: continue)
+      val themed = configured(property) ?: continue
+      // A themed **signal** or conditional is written out from any block: Vega can read neither
+      // from its own configuration, and a conditional is not a Vega property at all.
+      if (themedByVega(property) && !conditionalOrSignal(themed)) continue
+      axis.properties[property] = asSignal(themed)
     }
     conditionalToEncode(axis, diagnostics)
 
@@ -972,6 +1008,32 @@ internal object Guides {
   }
 
   /** Splits one component into the gridline axis and the axis proper, in that order. */
+  /**
+   * `propsToAlwaysIncludeConfig`: the themed properties that are written onto the axis even where
+   * the block they came from is one Vega reads for itself.
+   *
+   * Upstream's own reasons: `grid` decides whether there is a second axis at all, so this compiler
+   * has to know its value rather than leave it to Vega; `translate` has a default of its own in
+   * Vega and a theme overriding it has to be seen; and the rest are Vega-Lite's names for things
+   * Vega either calls something else or does not have.
+   */
+  private val ALWAYS_FROM_CONFIG =
+    setOf(
+      "grid",
+      "translate",
+      "format",
+      "formatType",
+      "orient",
+      "labelExpr",
+      "tickCount",
+      "position",
+      "tickMinStep",
+    )
+
+  /** A themed value Vega cannot read from its own configuration: a signal, or a conditional. */
+  private fun conditionalOrSignal(value: VegaValue): Boolean =
+    value is VegaValue.Obj && (value.has("signal") || value.has("expr") || value.has("condition"))
+
   /** `labelAlign`/`labelBaseline` of null are decisions the axis keeps and Vega is not shown. */
   private val NULLABLE_LABEL_PROPERTIES = setOf("labelAlign", "labelBaseline")
 
