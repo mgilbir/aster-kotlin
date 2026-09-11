@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A legend that states the colour of its swatches takes the mark's paint off them.** A swatch
+  cannot resolve a *scaled* paint — a size legend's swatches are all one colour, size being what
+  they show — so it is drawn in a base colour at the mark's opacity. Unless the legend named a
+  colour for them, and then `symbols` deletes the fill outright: the base colour this compiler wrote
+  would be painted over by the legend's own and the opacity beside it applied twice. Three
+  specifications in the wild corpus state one, each a size legend beside a colour legend. The same
+  is true of the outline, where a stated `symbolStrokeColor` takes the mark's off — as a scaled
+  outline does, the swatch having no way to resolve one.
+
 - **A window over the whole partition, computing nothing a window alone can compute, is a
   join-aggregate.** Every row of the partition gets the same answer, and Vega has a transform that
   says exactly that — upstream switches to it "when the window does not rely on any particular

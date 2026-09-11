@@ -1539,6 +1539,17 @@ internal object Guides {
     }
   }
 
+  /**
+   * `legendCmpt.get('symbolFillColor') ?? config.legend.symbolFillColor` — the colour a legend
+   * states for its own swatches.
+   *
+   * Stated on the legend or settled for every legend by the theme; either way the swatches are that
+   * colour and the mark's own paint has nothing left to say about them.
+   */
+  private fun symbolColour(view: UnitView, channel: String, property: String): VegaValue? =
+    view.spec.fieldDef(channel)?.legend?.fields?.get(property)
+      ?: view.config.raw.obj("legend")?.fields?.get(property)
+
   /** The glyph a legend entry draws: a line's legend shows a stroke, a bar's shows a square. */
   private fun defaultSymbolType(view: UnitView, channel: String): String {
     if (channel != "shape") {
@@ -1610,15 +1621,37 @@ internal object Guides {
       if (property == "stroke" && (channel == "stroke" || (!filled && channel == "color"))) continue
       markConfig.fields[property]?.let { fields[property] = obj { put("value", it) } }
     }
+    // ```js
+    // } else if (hasProperty(out.fill, 'field')) {
+    //   // For others, set fill to some opaque value (or nothing if a color is already set)
+    //   if (symbolFillColor) {
+    //     delete out.fill;
+    //   } else {
+    //     out.fill = signalOrValueRef(config.legend.symbolBaseFillColor ?? 'black');
+    //     out.fillOpacity = signalOrValueRef(opacity ?? 1);
+    //   }
+    // }
+    // ```
+    //
+    // A legend that states the colour its swatches are painted in has said what they look like, so
+    // the mark's own paint is taken off them — the base colour this compiler would otherwise write
+    // would be painted *over* by the legend's own and the opacity beside it would be applied twice.
+    // Three specifications in the wild corpus state one: a size legend beside a colour legend,
+    // whose swatches are all one colour because size is what they are showing.
+    val symbolFillColor = symbolColour(view, channel, "symbolFillColor")
+    val symbolStrokeColor = symbolColour(view, channel, "symbolStrokeColor")
     val fill = colors["fill"]
     if (fill != null && !(channel == "fill" || (filled && channel == "color"))) {
       when {
         // A swatch cannot resolve a *scaled* paint, so it is drawn in the legend's own base colour
-        // at the mark's opacity.
-        fill is VegaValue.Obj && fill.fields.containsKey("field") -> {
-          fields["fill"] = obj { put("value", "black") }
-          fields["fillOpacity"] = obj { put("value", symbolOpacity(view) ?: 1.0) }
-        }
+        // at the mark's opacity — unless the legend named a colour, and then it is drawn in that.
+        fill is VegaValue.Obj && fill.fields.containsKey("field") ->
+          if (symbolFillColor != null) {
+            fields.remove("fill")
+          } else {
+            fields["fill"] = obj { put("value", "black") }
+            fields["fillOpacity"] = obj { put("value", symbolOpacity(view) ?: 1.0) }
+          }
         // A **conditional** paint is a rule array, and the swatch takes the arm that is a plain
         // colour: a chart whose points are their category's colour only while picked is grey the
         // rest of the time, and grey is what the other legend's swatches are.
@@ -1630,7 +1663,10 @@ internal object Guides {
     val stroke = colors["stroke"]
     if (stroke != null && !(channel == "stroke" || (!filled && channel == "color"))) {
       when {
-        stroke is VegaValue.Obj && stroke.fields.containsKey("field") -> Unit
+        // `hasProperty(out.stroke, 'field') || symbolStrokeColor`: a scaled outline the swatch
+        // cannot resolve, or one the legend has named for itself. Either way the mark's is dropped.
+        stroke is VegaValue.Obj && stroke.fields.containsKey("field") -> fields.remove("stroke")
+        symbolStrokeColor != null -> fields.remove("stroke")
         stroke is VegaValue.Arr ->
           firstConditionValue(view, "stroke")?.let { fields["stroke"] = obj { put("value", it) } }
         else -> fields["stroke"] = stroke
