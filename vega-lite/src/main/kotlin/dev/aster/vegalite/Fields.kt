@@ -290,31 +290,57 @@ internal object Fields {
     return "${wrap(expr(end))} - ${wrap(expr(start))}"
   }
 
+  /**
+   * `TIMEUNIT_PARTS`, in the order `LOCAL_SINGLE_TIMEUNIT_INDEX` lists them.
+   *
+   * The order is the output's: `getTimeUnitParts` **filters** this list rather than reading the
+   * name left to right, so the parts of a unit come out in it however the name was spelled.
+   */
+  private val TIME_UNIT_PARTS =
+    listOf(
+      "year",
+      "quarter",
+      "month",
+      "week",
+      "day",
+      "dayofyear",
+      "date",
+      "hours",
+      "minutes",
+      "seconds",
+      "milliseconds",
+    )
+
+  /**
+   * `containsTimeUnit`: whether a compound unit holds this part, with the three names that are
+   * **inside** another name written out.
+   *
+   * ```js
+   * // exclude milliseconds
+   * if (index > 0 && timeUnit === 'seconds' && fullTimeUnit.charAt(index - 1) === 'i') return false;
+   * // exclude dayofyear
+   * if (fullTimeUnit.length > index + 3 && timeUnit === 'day' && fullTimeUnit.charAt(index + 3) === 'o') return false;
+   * if (index > 0 && timeUnit === 'year' && fullTimeUnit.charAt(index - 1) === 'f') return false;
+   * ```
+   *
+   * `milliseconds` holds `seconds`, and `dayofyear` holds both `day` and `year` — which is the one
+   * this compiler had wrong. Reading the name left to right and taking the first unit that fits,
+   * `yeardayofyear` came out as a year and a `day`, so the transform bucketed the day of the week
+   * rather than the day of the year and the caption said so.
+   */
+  private fun holdsPart(timeUnit: String, part: String): Boolean {
+    val index = timeUnit.indexOf(part)
+    if (index < 0) return false
+    if (index > 0 && part == "seconds" && timeUnit[index - 1] == 'i') return false
+    if (timeUnit.length > index + 3 && part == "day" && timeUnit[index + 3] == 'o') return false
+    if (index > 0 && part == "year" && timeUnit[index - 1] == 'f') return false
+    return true
+  }
+
   /** `yearmonth` reads as `year-month` in a title. */
   fun timeUnitParts(rawTimeUnit: String): List<String> {
-    val timeUnit = rawTimeUnit.removePrefix("binned")
-    val units =
-      listOf(
-        "year",
-        "quarter",
-        "month",
-        "date",
-        "week",
-        "day",
-        "dayofyear",
-        "hours",
-        "minutes",
-        "seconds",
-        "milliseconds",
-      )
-    var rest = timeUnit.removePrefix("utc")
-    val parts = mutableListOf<String>()
-    while (rest.isNotEmpty()) {
-      val match = units.firstOrNull { rest.startsWith(it) } ?: break
-      parts += match
-      rest = rest.substring(match.length)
-    }
-    return parts
+    val timeUnit = rawTimeUnit.removePrefix("binned").removePrefix("utc")
+    return TIME_UNIT_PARTS.filter { holdsPart(timeUnit, it) }
   }
 
   private fun titleCase(text: String): String =

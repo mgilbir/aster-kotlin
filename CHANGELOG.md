@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A compound time unit is taken apart by filtering the parts, not by reading the name.**
+  Three names live inside another name: `milliseconds` holds `seconds`, and `dayofyear` holds both
+  `day` and `year`. `containsTimeUnit` writes those three out by hand, and `getTimeUnitParts`
+  filters the index rather than scanning, so the parts come back in the order the index lists them
+  however the unit was spelled. This compiler read the name left to right and took the first unit
+  that fitted, so `yeardayofyear` came out as a year and a **day**: the transform bucketed the day
+  of the week rather than the day of the year, and the caption said so. One specification in the
+  wild corpus buckets that way, and agreement with upstream goes from 1937 to 1938 of 1981.
+
 - **Axes come out gridlines first and horizontals before verticals, in both passes.**
   `assembleAxes` reads a map keyed by channel and takes the two keys in turn, so the order an axis
   was *discovered* in never reaches the output. This compiler wrote them in that discovery order,
