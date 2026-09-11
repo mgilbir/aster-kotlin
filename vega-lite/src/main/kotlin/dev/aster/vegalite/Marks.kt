@@ -409,7 +409,11 @@ internal object Marks {
             // a click on a country whether or not that layer declared the selection.
             view.spec.mark == "geoshape" ||
             view.spec.encoding.containsKey("tooltip") ||
-            view.markDef.raw.fields.containsKey("tooltip")
+            // `!!model.markDef.tooltip` — the **truthiness** of it, so a mark that says
+            // `{"tooltip": null}` is one the pointer has no business reaching. Asking whether the
+            // property was stated instead made a mark that switched its tooltip off the one mark
+            // in the layer that swallowed the click.
+            view.markDef.raw.fields["tooltip"].isTruthy()
         put("interactive", VegaValue.Bool(own))
       }
       if (view.markDef.raw.fields["aria"] == VegaValue.Bool(false)) {
@@ -910,7 +914,6 @@ internal object Marks {
       "timeUnitBandSize",
       "timeUnitBandPosition",
       "invalid",
-      "tooltip",
       // Resolved into two of Vega's four corner properties, which end depending on the
       // orientation; and into an `offset` on the position, Vega having no `xOffset` on a mark.
       "cornerRadiusEnd",

@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A mark that switches its tooltip off says so, and stops being reachable.** `tooltip` is one of
+  Vega's own mark properties, so `markDefProperties` writes whatever the mark definition states as
+  a value — `null` and `false` included — and the tooltip encoder that runs afterwards overwrites
+  it wherever it has something to say. This engine took the property off that pass entirely and let
+  the encoder answer alone, so a mark written `{"tooltip": null}` came out with no tooltip entry at
+  all. And `interactive` reads the **truthiness** of it: asking whether the property was stated
+  made such a mark the one in a layer that swallowed the click, where upstream leaves it
+  `interactive: false` so the click falls through to the layer whose selection it belongs to. One
+  specification in the wild corpus switches a tooltip off that way, and agreement with upstream goes
+  from 1911 to 1912 of 1981.
+
 - **A theme's background is taken only where it is truthy, as its padding is.** `initConfig` takes
   `background`, `lineBreak` and `padding` off the configuration and puts back only the ones that
   are truthy, so a theme saying `{"background": null}` — a document whose charts are drawn on
