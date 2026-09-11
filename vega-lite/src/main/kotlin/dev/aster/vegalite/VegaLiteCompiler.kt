@@ -764,7 +764,7 @@ private class Compilation(
           plot.spec,
           plot.sizeNames,
           plot.prefix,
-          cellCardinality,
+          if (concat == null) cellCardinality else cardinalityOf(plot),
         )
       // Where a cell sizes itself, the *expression* takes the place of the signal's name: it is
       // read in a `{"signal": …}` everywhere a size is read, so nothing else has to know.
@@ -936,7 +936,7 @@ private class Compilation(
       val reads = plot.reads ?: plot.views.first().mainData
       val domains =
         current.domainDatasets(
-          counted = emptyMap(),
+          counted = cardinalityOf(plot),
           source = reads,
           vertical = (bands - across.toSet()).isNotEmpty(),
           horizontal = across.isNotEmpty(),
@@ -1292,6 +1292,37 @@ private class Compilation(
 
   /** Per channel, the column a cell counts its own categories in — empty for every other chart. */
   private var cellCardinality: Map<String, String> = emptyMap()
+
+  /**
+   * The same for one **plot** of a concatenation, whose grid is the plot's own.
+   *
+   * `getCardinalityAggregateForChild` is asked of the facet model, and a concatenation's plot that
+   * grids its cell is one — the chart's own `facet` is null there, so the chart-level answer is
+   * empty and a grid inside a row of plots was left sizing its cells from a shared width that does
+   * not exist. Its cells then laid out as though every one held the same categories.
+   */
+  /**
+   * The `resolve` the composition **these views belong to** states, which is the chart's where the
+   * views are the chart's own — see [plotResolves].
+   */
+  private fun resolveFor(views: List<UnitView>): Resolve =
+    views.firstOrNull()?.let { plotResolves[it] } ?: resolve
+
+  private fun cardinalityOf(plot: Plot): Map<String, String> {
+    if (plot.facet == null) return emptyMap()
+    val view = plot.views.firstOrNull() ?: return emptyMap()
+    val resolveHere = Resolve(plot.spec.obj("resolve"))
+    return setOf("x", "y")
+      .filter { channel ->
+        resolveHere.scaleIsIndependent(channel, defaultIndependent = false) &&
+          view.scaleType(channel)?.let { Scales.hasDiscreteDomain(it) } == true &&
+          LayoutSize.value(plot.views, plot.byChannel(), config, plot.spec, channel) == null
+      }
+      .mapNotNull { channel ->
+        view.spec.fieldDef(channel)?.let { channel to "distinct_${Fields.vgField(it)}" }
+      }
+      .toMap()
+  }
 
   /** Channels whose views disagree about the scale type, and so cannot share one. */
   private val incompatibleChannels = mutableSetOf<String>()
@@ -2344,7 +2375,9 @@ private class Compilation(
               HEADER_OFFSET,
               config,
               setOf("x", "y")
-                .filter { resolve.scaleIsIndependent(it, defaultIndependent = false) }
+                .filter {
+                  resolveFor(plot.views).scaleIsIndependent(it, defaultIndependent = false)
+                }
                 .toSet(),
               headings = if (plot.facets.size > 1) headingsPerLevel(plot.facets).first() else null,
               childHasSize = plot.facets.size == 1,
@@ -2989,7 +3022,7 @@ private class Compilation(
     // several different extents. `parseGuideResolve` says the same thing about the guide.
     val independent =
       setOf("x", "y").filter { channel ->
-        resolve.scaleIsIndependent(channel, defaultIndependent = false)
+        resolveFor(views).scaleIsIndependent(channel, defaultIndependent = false)
       }
     fun cellsOwn(axis: VegaValue): Boolean = cellOwnsAxis(axis, ofFacet = true)
     val gridAxes = axes.filter { (it["grid"] as? VegaValue.Bool)?.value == true || cellsOwn(it) }

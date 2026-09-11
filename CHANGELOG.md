@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A grid inside a concatenation reads its own plot's `resolve`, not the chart's.**
+  A concatenation's plot that grids its cell is a facet model, and everything a facet model decides
+  about its cells is decided from the `resolve` written on it. Two of those decisions were read off
+  the chart instead, where a concatenation's own `resolve` speaks about its plots and says nothing
+  about anybody's cells: the **count** a cell sizes itself by — a cell whose discrete position is
+  its own has no width for the grid to share, so it counts its own categories — and whether the
+  cells can be **aligned**, which cells of different sizes cannot be. Such a grid sized every cell
+  from a width that does not exist and lined them up against it. No wild corpus specification is
+  fixed outright by this — the three that write such a plot differ in other ways too — but each of
+  them loses two of its differences.
+
 - **A mark given a size of its own is placed by the edge its alignment names.**
   `vgAlignedPositionChannel` reads the mark's `align` and `baseline` and answers with the Vega
   channel that edge is: `x`, `xc` or `x2`, and `y`, `yc` or `y2`. This compiler asked only whether
