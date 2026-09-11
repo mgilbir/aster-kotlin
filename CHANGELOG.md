@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **The parse a specification stated is read before the one this compiler inferred.**
+  `ParseNode.makeExplicit` runs before the transforms and the implicit parse from the encoding after
+  them, so where the two meet the stated half is the one above — and the formulas a parse writes come
+  out in its insertion order. This engine added the stated half last, so a table stating how to read
+  one column and leaving another to be inferred read them in the opposite order to upstream. It shows
+  on a table written *out* in the specification, where Vega has already ingested the rows and a parse
+  is a formula rather than an instruction to the loader; one specification in the wild corpus carries
+  such a table. The two halves settle the same column as `Split(explicit, implicit)` does: the stated
+  one wins, and a stated `null` denies the inferred parse altogether.
+
 - **A transform that was not told what to call its outputs still writes columns.** A parse cannot
   climb past a step that produces what it reads — and the intersection is taken over path
   *prefixes*, so a step producing `properties` blocks a parse of `properties.name`. This engine
