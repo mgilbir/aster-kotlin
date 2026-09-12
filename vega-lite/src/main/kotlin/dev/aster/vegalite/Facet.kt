@@ -1097,22 +1097,32 @@ internal class FacetGrid(
             obj {
               if (row != null && column != null) put("cross", VegaValue.Bool(true))
               if (sorted.isNotEmpty() || cardinal.isNotEmpty()) {
+                // ```ts
+                // const {fields, ops, as} = this.getCardinalityAggregateForChild();
+                // ...
+                // fields.push(outputName); ops.push('max'); as.push(outputName);
+                // ```
+                //
+                // What the **cells count for themselves** comes first: `assembleFacet` starts from
+                // the cardinality aggregate and pushes the sort's own onto it. Written the other
+                // way about, a grid that both sizes its cells from their own categories and orders
+                // them by a column listed the two aggregates in the wrong order.
                 put(
                   "fields",
                   strings(
-                    sorted.map { it.cellSortSource(crossed) } +
-                      cardinal.map { it.value.removePrefix("distinct_") }
+                    cardinal.map { it.value.removePrefix("distinct_") } +
+                      sorted.map { it.cellSortSource(crossed) }
                   ),
                 )
                 put(
                   "ops",
                   strings(
-                    sorted.map { it.cellSortOperation(crossed) } + cardinal.map { "distinct" }
+                    cardinal.map { "distinct" } + sorted.map { it.cellSortOperation(crossed) }
                   ),
                 )
                 put(
                   "as",
-                  strings(sorted.map { it.cellSortAggregate!! } + cardinal.map { it.value }),
+                  strings(cardinal.map { it.value } + sorted.map { it.cellSortAggregate!! }),
                 )
               }
             },

@@ -8,6 +8,20 @@ section here does not get released.
 
 ### Fixed
 
+- **A plot's grid is a grid: its cell is the unit, and what a unit carries is carried there.**
+  `assembleUnitSelectionSignals` runs on the unit model, and inside a grid the unit is the cell: the
+  marks a selection watches are drawn there, the scales it reads are the cell's, and the `facet`
+  signal beside it says which cell the pointer is in. The cell's own name carries that too —
+  `unitName` of a cell is its name *and the value it holds* — so that a pick made in one cell is told
+  from the same pick made in another. This compiler wrote a gridded plot's machinery on the plot's
+  group: one set of signals watched every cell at once, the pointer over any of them wrote the same
+  tuple, and nothing said which cell it came from. Three more things were the chart's where they
+  should have been the plot's — the name of the partition a cell scale measures, the columns the
+  cells count for themselves, and the cell's own size signals. And what the cells count now comes
+  first in the partition's aggregate, `assembleFacet` starting from `getCardinalityAggregateForChild`
+  and pushing the sort's own onto it. Three specifications in the wild corpus grid a plot and select
+  inside it; each needs one further fix to agree, so the count is unchanged.
+
 - **`columns` belongs to the level that wrote the facet, which may be a plot rather than the chart.**
   A wrapped grid has no direction of its own, so the number of cells to put in a row is written
   beside the facet and `getFacetMappingAndLayout` lifts it from there onto the layout — along with

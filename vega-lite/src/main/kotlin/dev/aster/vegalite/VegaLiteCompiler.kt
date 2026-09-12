@@ -254,7 +254,19 @@ private class Compilation(
    * These live beside the marks they react to — at the top of a chart that is one plot, and inside
    * the plot's group in a concatenation — because the events they listen for are scoped to a group.
    */
-  private fun machinery(selection: Selection, views: List<UnitView>): List<VegaValue> {
+  private fun machinery(
+    selection: Selection,
+    views: List<UnitView>,
+    /**
+     * The grid the signals are being written inside, where they are written inside one.
+     *
+     * `unitName(model)` of a cell is the cell's name **and the value it holds** — the suffix
+     * `'__facet_row_' + (facet["…"])` — so that a pick made in one cell is told from the same pick
+     * made in another. The chart's own grid is [facet]; a plot of a concatenation has its own, and
+     * reading only the chart's left every cell of such a plot claiming to be the same unit.
+     */
+    grid: FacetLayout? = facet,
+  ): List<VegaValue> {
     if (selection.type != "interval") {
       // A click on another selection's **brush** is not a pick: the rectangle belongs to the brush
       // that owns it, and a click on it would otherwise pick whatever row lies under the drag.
@@ -277,8 +289,8 @@ private class Compilation(
       return selection.signals(
         unit =
           selection.unitName(
-            views.firstOrNull().takeIf { facet != null },
-            facet,
+            views.firstOrNull().takeIf { grid != null },
+            grid,
             fallback = views.firstOrNull(),
           ),
         brushes = brushes,
@@ -288,8 +300,8 @@ private class Compilation(
     val view = selection.owner ?: views.firstOrNull() ?: return emptyList()
     val unit =
       selection.unitName(
-        views.firstOrNull().takeIf { facet != null },
-        facet,
+        views.firstOrNull().takeIf { grid != null },
+        grid,
         fallback = views.firstOrNull(),
       )
     return selection.intervalSignals(
@@ -1121,66 +1133,7 @@ private class Compilation(
       // where they are written.
       val grid = facet
       if (grid != null && concat == null) {
-        // `assembleAxisSignals` on the **cell**: an axis inside it that draws its grid across no
-        // other scale falls back to `width` or `height` by name, and inside the cell those names
-        // mean the whole chart until the cell aliases them to its own.
-        val own = selections.distinctBy { it.name }
-        cellSignals =
-          // `assembleFacetSignals`: a cell whose child declares a selection carries the datum of
-          // the cell the pointer is in, so that a pick made anywhere in the grid is attributed to
-          // the right one. A grid nothing is selected in needs no such signal.
-          (if (own.isEmpty()) emptyList()
-          else
-            listOf(
-              obj {
-                put("name", "facet")
-                put("value", VegaValue.EmptyObject)
-                put(
-                  "on",
-                  arr(
-                    listOf(
-                      obj {
-                        put(
-                          "events",
-                          arr(
-                            listOf(
-                              obj {
-                                put("source", "scope")
-                                put("type", "pointermove")
-                              }
-                            )
-                          ),
-                        )
-                        put(
-                          "update",
-                          "isTuple(facet) ? facet : group(${quoted(grid.named("cell"))}).datum",
-                        )
-                      }
-                    )
-                  ),
-                )
-              }
-            )) +
-            localSizeSignals(plots.single()) +
-            own.flatMap { selection ->
-              // A signal the top level declares is *written* here and read there — `push: "outer"`
-              // is how Vega says which of the two directions this one goes — and one a **control**
-              // writes is not written here at all: it belongs beside the widget, outside the grid.
-              val pushed = boundOutward(selection, views).map { it.second }.toSet()
-              val outside = boundInward(selection, views).toSet()
-              machinery(selection, views).mapNotNull { signal ->
-                val named = (signal as? VegaValue.Obj)?.string("name")
-                when {
-                  named in outside -> null
-                  named !in pushed -> signal
-                  else ->
-                    obj {
-                      (signal as VegaValue.Obj).fields.forEach { (key, value) -> put(key, value) }
-                      put("push", "outer")
-                    }
-                }
-              }
-            }
+        cellSignals = cellSignalsFor(grid, plots.single(), views)
         cellScales =
           allScales.values
             .filter { it.name() != prefixed(it.channel) }
@@ -2562,29 +2515,34 @@ private class Compilation(
           },
         )
       }
+      // A plot that **grids** its cell writes none of this on its own group: the cell is the unit
+      // the selection belongs to, and both the machinery and the sizes its axes fall back to are
+      // written there — see [cellSignalsFor].
       val local =
-        localSizeSignals(plot) +
-          selections
-            // A selection declared **above** the concatenation belongs to every plot in it:
-            // `assembleUnitSelectionSignals` runs per unit model and a parameter written on the
-            // chart is inherited by each, so each writes its own machinery in its own group. Kept
-            // at the top instead, one set of signals watched marks in two plots at once — and the
-            // pointer over either of them wrote the same tuple.
-            .filter { it.owner == null || it.owner in plot.views }
-            .flatMap { selection ->
-              val pushed = boundOutward(selection, plot.views).map { it.second }.toSet()
-              machinery(selection, plot.views).map { signal ->
-                // A signal the top level declares is *written* here and read there — `push:
-                // "outer"`
-                // is how Vega says which of the two directions this one goes.
-                if ((signal as? VegaValue.Obj)?.string("name") !in pushed) signal
-                else
-                  obj {
-                    (signal as VegaValue.Obj).fields.forEach { (key, value) -> put(key, value) }
-                    put("push", "outer")
-                  }
+        if (plot.facets.isNotEmpty()) emptyList()
+        else
+          localSizeSignals(plot) +
+            selections
+              // A selection declared **above** the concatenation belongs to every plot in it:
+              // `assembleUnitSelectionSignals` runs per unit model and a parameter written on the
+              // chart is inherited by each, so each writes its own machinery in its own group. Kept
+              // at the top instead, one set of signals watched marks in two plots at once — and the
+              // pointer over either of them wrote the same tuple.
+              .filter { it.owner == null || it.owner in plot.views }
+              .flatMap { selection ->
+                val pushed = boundOutward(selection, plot.views).map { it.second }.toSet()
+                machinery(selection, plot.views).map { signal ->
+                  // A signal the top level declares is *written* here and read there — `push:
+                  // "outer"`
+                  // is how Vega says which of the two directions this one goes.
+                  if ((signal as? VegaValue.Obj)?.string("name") !in pushed) signal
+                  else
+                    obj {
+                      (signal as VegaValue.Obj).fields.forEach { (key, value) -> put(key, value) }
+                      put("push", "outer")
+                    }
+                }
               }
-            }
       if (local.isNotEmpty()) put("signals", arr(local))
       // A **faceted** plot lays its own cells out inside its group: the grid is this plot's, not
       // the chart's, so its headers and its cell stand here and the axes are already inside them.
@@ -3138,6 +3096,95 @@ private class Compilation(
   /** The sizes a cell's own axes fall back to by name, aliased to the cell's own. */
   private var cellSignals: List<VegaValue> = emptyList()
 
+  /**
+   * The signals a grid's **cell** carries: what a selection inside it needs, and the sizes its own
+   * axes fall back to.
+   *
+   * ```js
+   * export function assembleFacetSignals(model: FacetModel, signals: Signal[]) {
+   *   if (model.component.selection && keys(model.component.selection).length > 0) {
+   *     const name = stringValue(model.getName('cell'));
+   *     signals.unshift({
+   *       name: 'facet',
+   *       value: {},
+   *       on: [{events: [{source: 'scope', type: 'pointermove'}],
+   *             update: `isTuple(facet) ? facet : group(${name}).datum`}],
+   *     });
+   *   }
+   *   return assembleTopLevelSignals(model, signals);
+   * }
+   * ```
+   *
+   * `assembleUnitSelectionSignals` runs on the **unit** model, and inside a grid the unit is the
+   * cell: the marks a selection watches are drawn there, the scales it reads are the cell's, and
+   * the `facet` signal beside it says which cell the pointer is in so that a pick made anywhere in
+   * the grid is attributed to the right one. A grid nothing is selected in needs no such signal.
+   *
+   * Written on the **plot's** group instead — which is where this compiler wrote a gridded plot's —
+   * one set of signals watched every cell at once, the pointer over any of them wrote the same
+   * tuple, and nothing said which cell it came from.
+   */
+  private fun cellSignalsFor(
+    grid: FacetLayout,
+    plot: Plot,
+    views: List<UnitView>,
+  ): List<VegaValue> {
+    val own =
+      selections.filter { it.owner == null || it.owner in plot.views }.distinctBy { it.name }
+    return (if (own.isEmpty()) emptyList()
+    else
+      listOf(
+        obj {
+          put("name", "facet")
+          put("value", VegaValue.EmptyObject)
+          put(
+            "on",
+            arr(
+              listOf(
+                obj {
+                  put(
+                    "events",
+                    arr(
+                      listOf(
+                        obj {
+                          put("source", "scope")
+                          put("type", "pointermove")
+                        }
+                      )
+                    ),
+                  )
+                  put(
+                    "update",
+                    "isTuple(facet) ? facet : group(${quoted(grid.named("cell"))}).datum",
+                  )
+                }
+              )
+            ),
+          )
+        }
+      )) +
+      localSizeSignals(plot) +
+      own.flatMap { selection ->
+        // A signal the top level declares is *written* here and read there — `push: "outer"` is
+        // how Vega says which of the two directions this one goes — and one a **control** writes
+        // is not written here at all: it belongs beside the widget, outside the grid.
+        val pushed = boundOutward(selection, views).map { it.second }.toSet()
+        val outside = boundInward(selection, views).toSet()
+        machinery(selection, views, grid).mapNotNull { signal ->
+          val named = (signal as? VegaValue.Obj)?.string("name")
+          when {
+            named in outside -> null
+            named !in pushed -> signal
+            else ->
+              obj {
+                (signal as VegaValue.Obj).fields.forEach { (key, value) -> put(key, value) }
+                put("push", "outer")
+              }
+          }
+        }
+      }
+  }
+
   /** Where the flow splits at the facet: each outer dataset's counterpart inside the cell. */
   private val cellDataFor = mutableMapOf<String, String>()
 
@@ -3158,10 +3205,14 @@ private class Compilation(
   private fun cellOwnsScale(plot: Plot, name: String): Boolean =
     concat != null && plot.facets.isNotEmpty() && name.startsWith("${plot.name}_child_")
 
-  private fun withinCell(scale: VegaValue): VegaValue {
+  private fun withinCell(scale: VegaValue, partition: String = "facet"): VegaValue {
     val block = scale as? VegaValue.Obj ?: return scale
     val domain = block.obj("domain") ?: return scale
-    fun inside(name: VegaValue) = cellDataFor[(name as? VegaValue.Str)?.value] ?: "facet"
+    // The **partition** is what a cell sees where no chain of its own was computed, and it is named
+    // for the grid that cut it: the chart's own is `facet`, and a plot of a concatenation cuts its
+    // own `concat_0_facet`. Falling back to the bare name left a plot's cell scale measuring a
+    // dataset that does not exist at that level.
+    fun inside(name: VegaValue) = cellDataFor[(name as? VegaValue.Str)?.value] ?: partition
     // A domain measured over **several** datasets — two layers of one cell — names each of them,
     // and where the flow splits at the facet each already has a counterpart computed inside the
     // cell. Those are the tables to measure; the partition itself is what a chain that could not
@@ -3336,7 +3387,11 @@ private class Compilation(
           // Cartesian position to border, `view` where it has none. A trellis of pies has no
           // plotting area in any of its cells.
           style(views) ?: VegaValue.Str("cell"),
-          cellCardinality,
+          // The columns this plot's own cells count for themselves, where the plot is one of a
+          // concatenation: `getCardinalityAggregateForChild` is asked of the grid, and a plot's
+          // grid is one — see [cardinalityOf].
+          if (owner != null && concat != null && owner.facets.isNotEmpty()) cardinalityOf(owner)
+          else cellCardinality,
           // The scales this plot's own cells own, where the plot is one of a concatenation: the
           // chart's own grid hands them down in [cellScales], and a plot's grid keeps its in the
           // plot.
@@ -3344,14 +3399,17 @@ private class Compilation(
             ?.scales
             ?.values
             ?.filter { cellOwnsScale(owner, it.name()) }
-            ?.map { withinCell(assembleScale(it)) }
+            ?.map { withinCell(assembleScale(it), current.named("facet")) }
             ?.takeIf { it.isNotEmpty() } ?: cellScales,
           viewEncode(),
           groupData,
           // `assembleAxisSignals` on the **cell**: an axis inside it that draws its grid across no
           // other scale falls back to `width` or `height` by name, and inside the cell those names
-          // mean the whole chart until the cell aliases them to its own.
-          cellSignals,
+          // mean the whole chart until the cell aliases them to its own. A plot of a concatenation
+          // that grids its cell carries its own there — see [cellSignalsFor].
+          if (owner != null && concat != null && owner.facets.isNotEmpty())
+            cellSignalsFor(current, owner, views)
+          else cellSignals,
           cellLegends,
         )
     if (above.isEmpty()) return inner
