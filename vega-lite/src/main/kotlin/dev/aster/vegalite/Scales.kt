@@ -372,6 +372,58 @@ internal object Scales {
       return values.map { signalRef("{data: ${instantExpression(it)}}") }
     }
 
+    // ```js
+    // if (channel === 'x' && getFieldOrDatumDef(encoding.x2)) {
+    //   if (getFieldOrDatumDef(encoding.x)) {
+    //     return mergeValuesWithExplicit(
+    //       parseSingleChannelDomain(scaleType, domain, model, 'x'),
+    //       parseSingleChannelDomain(scaleType, domain, model, 'x2'), ...);
+    //   }
+    // ```
+    //
+    // A ranged position contributes **both** of its ends, and the union happens a level above the
+    // per-channel answer: whatever the channel's own domain came out as, the second channel's is
+    // merged with it. Read as one of the per-channel shapes instead, it stood behind the earlier
+    // ones — so a **bucketed** position with a second column of its own contributed the bin's
+    // extent alone and the scale stopped at the last bucket's start, and a position given as a
+    // `datum` with a column beyond it contributed the constant alone.
+    //
+    // The far end asks for no **sort** of its own: a second position is a column and nothing else,
+    // with no type and no order written on it, so `parseSingleChannelDomain` reaches its tail with
+    // nothing to sort by. The near end's sort then stands for the union — `mergeDomains` lifts a
+    // sort no part contradicts — which is the answer a lane drawn between two categorical bounds
+    // needs: sorting each end separately and concatenating them is a different answer.
+    val secondaryChannel = secondaryChannel(channel)
+    val secondary = secondaryChannel?.let { view.spec.encoding[it] }
+    if (secondary != null && (secondary.isFieldDef || secondary.datum != null)) {
+      val far =
+        // A ranged position whose far end is a **datum** contributes that constant, not a column:
+        // an area drawn down to zero has to cover zero whether or not any row holds it.
+        if (secondary.isFieldDef)
+          obj {
+            put("data", dataName)
+            put("field", Fields.vgField(secondary))
+          }
+        else arr(listOf(secondary.datum!!))
+      return singleChannelDomain(view, channel, def, type, dataName, rawName) + far
+    }
+    return singleChannelDomain(view, channel, def, type, dataName, rawName)
+  }
+
+  /**
+   * `parseSingleChannelDomain`: the domain **one** channel contributes, before any union.
+   *
+   * What the second position of a ranged mark adds is settled by [domain], the level above this,
+   * exactly as upstream settles it in `parseDomainForChannel`.
+   */
+  private fun singleChannelDomain(
+    view: UnitView,
+    channel: String,
+    def: ChannelDef,
+    type: String,
+    dataName: String,
+    rawName: String,
+  ): List<VegaValue> {
     val stack = view.stack
     if (stack != null && channel == stack.fieldChannel) {
       if (stack.offset == "normalize") return listOf(arr(num(0), num(1)))
@@ -409,48 +461,12 @@ internal object Scales {
       }
     }
 
-    // A ranged position contributes *both* of its fields: the scale has to cover the whole span,
-    // not the ends the first channel happens to name.
-    val secondaryChannel = secondaryChannel(channel)
-    val secondary = secondaryChannel?.let { view.spec.fieldDef(it) }
-    if (secondary != null) {
-      // Each end carries the channel's own sort, which on a **discrete** scale is a plain `true`.
-      // The two then agree and the union takes it — a lane drawn between two categorical bounds is
-      // sorted as a whole, where sorting each end separately and concatenating them is a different
-      // answer. `mergeDomains` lifts a sort every part agrees on for exactly that reason.
-      val ranged = domainSort(view, channel, def, type)
-      return listOf(
-        obj {
-          put("data", dataName)
-          put("field", Fields.vgField(def))
-          put("sort", ranged)
-        },
-        obj {
-          put("data", dataName)
-          put("field", Fields.vgField(secondary))
-          put("sort", ranged)
-        },
-      )
-    }
-    // A ranged position whose far end is a **datum** contributes that constant, not a column: an
-    // area drawn down to zero has to cover zero whether or not any row holds it.
-    val secondaryDatum = secondaryChannel?.let { view.spec.encoding[it] }?.datum
-    if (secondaryDatum != null) {
-      return listOf(
-        obj {
-          put("data", dataName)
-          put("field", Fields.vgField(def))
-        },
-        arr(listOf(secondaryDatum)),
-      )
-    }
-
     // A `timeUnit` buckets an instant into a span, and the scale covers the span: the bucket's
     // start and the end the transform computed beside it — but only for a mark that *occupies* the
     // span. Upstream decides that by whether the mark has a `timeUnitBandPosition`, which only the
     // rect-shaped configurations define, so a bar over months reaches the end of December and a
     // point over the same months sits on the first of it.
-    if (def.timeUnit != null && (type == "time" || type == "utc") && bandEnd(view, def)) {
+    if (def.timeUnit != null && (type == "time" || type == "utc") && bandEnd(view, channel, def)) {
       // A rect shifted off the middle of its bucket covers the *interpolated* edges instead, so
       // those are the columns the scale has to reach.
       val shifted = view.offsettedRectPosition(def, channel) != null
@@ -1326,7 +1342,19 @@ internal object Scales {
    * define (`defaultRectConfig`), so the question answers itself by mark type without a list of
    * mark types anywhere.
    */
-  private fun bandEnd(view: UnitView, def: ChannelDef): Boolean =
-    def.raw.number("bandPosition") != null ||
-      view.config.markConfig(view.spec.mark).fields["timeUnitBandPosition"] != null
+  private fun bandEnd(view: UnitView, channel: String, def: ChannelDef): Boolean {
+    if (def.raw.number("bandPosition") != null) return true
+    // ```js
+    // if (timeUnit && !fieldDef2) {
+    //   return getMarkConfig('timeUnitBandPosition', mark, config);
+    // }
+    // ```
+    //
+    // A position given a **second** one of its own spans what the two of them name, not the bucket
+    // the first sits in: `getBandPosition` answers nothing for it, so there is no band to reach the
+    // end of. The bucket's own end is what a rect over one column covers, and a rect drawn between
+    // two columns covers the second.
+    if (secondaryChannel(channel)?.let { view.spec.encoding[it] } != null) return false
+    return view.config.markConfig(view.spec.mark).fields["timeUnitBandPosition"] != null
+  }
 }

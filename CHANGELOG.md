@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A ranged position's two ends are unioned above the per-channel domain, not instead of it.**
+  `parseDomainForChannel` merges whatever the channel's own domain came out as with whatever its
+  second channel's did. This compiler read the union as one of the per-channel shapes, so it stood
+  behind the earlier ones: a bucketed position with a second column of its own contributed the bin's
+  extent alone and the scale stopped at the last bucket's start, and a position given as a `datum`
+  with a column beyond it contributed the constant alone. And once the union is read where upstream
+  reads it, the band it unions with has to be the one upstream computes — `getBandPosition` answers
+  nothing for a position given a second one of its own, there being no bucket to reach the end of
+  when the mark spans what the two of them name, while a `bandPosition` the specification states is
+  still a band. One specification in the wild corpus draws bars between a bucket's edges and a
+  column of its own; it needs one further fix to agree, so the count is unchanged.
+
 - **A bar is turned by a column that arrived bucketed, not by one it is about to bucket.**
   `orient` asks `isBinned(x.bin)` — `"binned"` or `{binned: true}`, a pair of edges the data came
   with, which the bar spans and which settles the orientation on its own. A bin the chart is
