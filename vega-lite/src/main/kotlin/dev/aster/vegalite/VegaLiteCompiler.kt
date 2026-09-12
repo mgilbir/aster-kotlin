@@ -465,7 +465,7 @@ private class Compilation(
     // Each plot's own grid, where it has one: a concatenation may hold a faceted plot beside a
     // plain one, and the cells then belong inside that plot's group rather than to the chart.
     for (plot in plots) {
-      var lifted = liftFacet(plot.views, plot.name)
+      var lifted = liftFacet(plot.views, plot.name, plot.spec)
       plot.views = lifted.first
       lifted.second?.let { plot.facets += it }
       // A grid whose cells are grids: each further level is lifted in turn, and each lift is the
@@ -482,7 +482,12 @@ private class Compilation(
         // The level's channels never reached any encoding, so they are put back into one for the
         // lift to read and take out again — the same path the outermost level took.
         val channels = Parse(config, diagnostics, selections).facetChannels(level, "$.facet")
-        lifted = liftFacet(plot.views.map { it.withEncoding(it.spec.encoding + channels) }, owner)
+        lifted =
+          liftFacet(
+            plot.views.map { it.withEncoding(it.spec.encoding + channels) },
+            owner,
+            plot.spec,
+          )
         plot.views = lifted.first
         lifted.second?.let { plot.facets += it }
       }
@@ -2965,7 +2970,19 @@ private class Compilation(
    * Their marks are then named `child_marks` and their sizes `child_width`/`child_height`, which is
    * upstream's naming and is load-bearing: `width` still exists and means the whole grid.
    */
-  private fun liftFacet(views: List<UnitView>, owner: String): Pair<List<UnitView>, FacetLayout?> {
+  private fun liftFacet(
+    views: List<UnitView>,
+    owner: String,
+    /**
+     * The specification the grid was written on — the chart's, or a plot's where the plot grids.
+     *
+     * `columns` is written beside the facet, so it belongs to whichever level wrote the facet:
+     * `getFacetMappingAndLayout` lifts it from there onto the layout. Read off the chart's
+     * specification alone, a wrapped grid written on a *plot* of a concatenation found no number to
+     * wrap at and laid its cells out in one long row.
+     */
+    owning: VegaValue.Obj = spec,
+  ): Pair<List<UnitView>, FacetLayout?> {
     // The model the grid belongs to: the chart itself, or — inside a concatenation — the plot that
     // holds it. Everything the grid names runs through it, so a faceted plot beside a plain one
     // reads `concat_0_cell` rather than `cell`.
@@ -2990,10 +3007,10 @@ private class Compilation(
       if (wrapped != null)
         FacetWrap(
           wrapped,
-          (spec.number("columns") ?: wrapped.raw.number("columns"))?.toInt(),
+          (owning.number("columns") ?: wrapped.raw.number("columns"))?.toInt(),
           named,
           config,
-          wrappedFacetLayout(spec, wrapped),
+          wrappedFacetLayout(owning, wrapped),
         )
       else FacetGrid(row, column, named, crossedFacetLayout(spec, row?.def, column?.def))
 

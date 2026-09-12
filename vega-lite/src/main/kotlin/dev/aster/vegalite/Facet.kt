@@ -1412,15 +1412,15 @@ internal class FacetWrap(
     // `!row`/`!column` guards let only one of them through.
     val unalignable = "x" in independent || "y" in independent
     put("align", if (unalignable) "none" else "all")
-    // Only where the specification said so: with no `columns`, the whole facet is one row and the
-    // layout has no number to write down.
-    columns?.let { put("columns", num(it.toDouble())) }
     // `{...this.assembleDefaultLayout(), ...layout}`: what the specification stated outranks the
     // default computed beside it. `getFacetMappingAndLayout` lifts these off the facet definition,
     // so a wrapped facet states them where it is written.
     for (key in listOf("bounds", "align", "center")) {
       declared.fields[key]?.let { put(key, it) }
     }
+    // Last of all, and only where the specification said so: `columns` is spread in after the rest
+    // — with none, the whole facet is one row and the layout has no number to write down.
+    columns?.let { put("columns", num(it.toDouble())) }
   }
 
   override fun headings(config: Config): Map<String, String> = emptyMap()

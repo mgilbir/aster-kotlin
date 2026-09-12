@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **`columns` belongs to the level that wrote the facet, which may be a plot rather than the chart.**
+  A wrapped grid has no direction of its own, so the number of cells to put in a row is written
+  beside the facet and `getFacetMappingAndLayout` lifts it from there onto the layout — along with
+  the `bounds` and `center` written beside it. A plot of a concatenation that grids its cell writes
+  all of them in the same place. This compiler read them off the chart's specification alone, so a
+  wrapped grid written on a plot found nothing to wrap at and laid its cells out in one long row, as
+  wide as the data happened to be and however narrow the plot beside it. `columns` is also written
+  last now, after the properties the specification stated, which is where upstream spreads it. Two
+  specifications in the wild corpus wrap a grid inside a plot; each needs further fixes to agree, so
+  the count is unchanged.
+
 - **A `resolve` on a plot that grids its cell speaks about the cells.**
   Every model carries its own `resolve` and each speaks about its own children, and a plot of a
   concatenation that lays out a grid has the *cell* between it and the layers. A channel it resolves
