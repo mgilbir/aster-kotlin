@@ -331,20 +331,84 @@ private class Compilation(
     }
   }
 
-  /** The brush a selection is dragged as, drawn around the marks of the plot that declared it. */
+  /**
+   * The model whose marks a brush is drawn around — `assembleUnitSelectionMarks`'s caller.
+   *
+   * ```js
+   * public assembleMarks() {
+   *   let marks = this.component.mark ?? [];
+   *   if (!this.parent || !isLayerModel(this.parent)) {
+   *     marks = assembleUnitSelectionMarks(this, marks);
+   *   }
+   * ```
+   * ```js
+   * export function assembleLayerSelectionMarks(model: LayerModel, marks: any[]): any[] {
+   *   for (const child of model.children) {
+   *     if (isUnitModel(child)) {
+   *       marks = assembleUnitSelectionMarks(child, marks);
+   *     }
+   *   }
+   * ```
+   *
+   * A unit inside a layer does not wrap its own marks; its **layer** does, around everything that
+   * layer assembled — and only for the children that are units, a layer inside a layer having
+   * wrapped its own already. So a brush declared in the inner layer of `layer[layer[a, b], c]` is
+   * drawn around `a` and `b` and *under* `c`, which is the whole of what this answers.
+   *
+   * The name is the model tree: a member of a layer is `<its layer>_layer_<n>`, so the layer that
+   * wraps it is what is left when that last segment is taken off. A view that is no layer's member
+   * carries no such segment, and wraps its own marks — which for a plot of one view is the plot.
+   */
+  private fun brushScope(owner: UnitView): String = owner.name.replace(Regex("_?layer_\\d+$"), "")
+
+  /** The brush a selection is dragged as, drawn around the marks of the model that assembles it. */
   private fun brushed(views: List<UnitView>, marks: List<VegaValue>): List<VegaValue> {
     val own = selections.filter { it.owner == null || it.owner in views }
-    val view = views.firstOrNull() ?: return marks
-    // Each brush **wraps** the list rather than joining it: upstream's `marks` hook returns
+    if (views.isEmpty()) return marks
+    if (own.isEmpty()) return withVoronoi(views, marks)
+    // Once per **unit that carries the selection**, which is what `assembleUnitSelectionMarks`
+    // being called per unit amounts to. A selection declared above the composition is owned by no
+    // view and pushed into every unit below it, so a chart that declares one brush over a layer of
+    // two draws that brush twice — each wrap around the marks of its own unit's model, each
+    // recording its own unit's name. It is upstream's own reading and it is what upstream emits.
+    val carried = own.flatMap { selection ->
+      (selection.owner?.let { listOf(it) } ?: views).map { selection to it }
+    }
+    // Every mark under the name of the view that drew it. No view's name is a prefix of another's —
+    // a layer that holds a layer is not itself a view — so the first match is the only one. A mark
+    // this inserts is labelled with the scope it wraps, so a brush already drawn around an inner
+    // layer sits inside the range of the layer above it and outside the range of that layer's
+    // siblings.
+    val labelled =
+      withVoronoi(views, marks)
+        .map { mark ->
+          val name = mark.string("name").orEmpty()
+          views
+            .firstOrNull { it.name.isNotEmpty() && name.startsWith("${it.name}_") }
+            ?.name
+            .orEmpty() to mark
+        }
+        .toMutableList()
+    // Each brush **wraps** the range rather than joining it: upstream's `marks` hook returns
     // `[background, ...marks, brush]`, so a second selection's background lands outside the first's
     // and its outline outside that one's. Two brushes over one plot are drawn in opposite orders
     // above and below the marks, and that is why.
-    return own.fold(withVoronoi(views, marks)) { inner, selection ->
-      val where = selection.owner ?: view
-      selection.brushMarks(where, selection.unitName(), background = true) +
-        inner +
-        selection.brushMarks(where, selection.unitName(), background = false)
+    for ((selection, where) in carried) {
+      val scope = brushScope(where)
+      fun inScope(label: String) =
+        scope.isEmpty() || label == scope || label.startsWith("${scope}_")
+      val first = labelled.indexOfFirst { inScope(it.first) }
+      val last = labelled.indexOfLast { inScope(it.first) }
+      if (first < 0) continue
+      // The unit the brush is drawn for, which is the one whose tuple it shows: a brush resolved
+      // across the chart is hidden unless the store's row came from *this* unit.
+      val unit = selection.unitName(fallback = where)
+      val background = selection.brushMarks(where, unit, background = true)
+      val foreground = selection.brushMarks(where, unit, background = false)
+      labelled.addAll(last + 1, foreground.map { scope to it })
+      labelled.addAll(first, background.map { scope to it })
     }
+    return labelled.map { it.second }
   }
 
   /** Which of a composition's scales and guides its children share, and which they do not. */

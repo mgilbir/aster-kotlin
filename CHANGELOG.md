@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A brush is drawn around the marks of the model that assembles it, once per unit that carries
+  the selection.** A unit inside a layer does not wrap its own marks: `assembleLayerSelectionMarks`
+  wraps for it, around everything that layer assembled, and only for the children that are *units* —
+  a layer inside a layer has wrapped its own already. So a brush declared in the inner layer of
+  `layer[layer[a, b], c]` is drawn around `a` and `b` and **under** `c`. This compiler wrapped the
+  whole plot whatever declared the brush, so a layer drawn over a brushed one came out beneath the
+  brush: a rule that should cross the highlighted region was covered by it. A selection declared
+  *above* the composition is owned by no view and pushed into every unit below it, so one such
+  declaration over a layer of two draws the brush twice, each wrap around its own unit's model and
+  each hidden unless the store's row came from that unit — upstream's own reading, and what upstream
+  emits. One specification in the wild corpus layers a rule over a brushed pair, in five plots.
 - **A binding declared above a composition drives every plot in it.** `scaleBindings.parse` runs
   once per unit, and a parameter written at the top of a chart is pushed into every unit below it:
   every plot's position scale carries the extent, reads it back as `domainRaw`, and is clipped by
