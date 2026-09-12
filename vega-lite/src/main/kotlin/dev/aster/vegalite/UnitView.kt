@@ -171,6 +171,18 @@ internal class UnitView(
   var gridTransforms: Int = Int.MAX_VALUE
 
   /**
+   * The **cell model's** own name — the model the partition stops at, where this view is a cell of
+   * a grid and something forks below it.
+   *
+   * `moveFacetDown` walks the partition down until the node it is at has more than one child, so
+   * what climbs above the cut is what the cell model itself wrote and what the grids above it did.
+   * A layer *inside* the cell wrote its transforms below that fork, and they stay there — which is
+   * the whole difference between a cell that is a layer of two units and one whose second member is
+   * a layer of its own.
+   */
+  var cellOwner: String = ""
+
+  /**
    * The same definitions in the order the specification **wrote** them.
    *
    * `forEachFieldDef` walks a model's encoding as it stands, and a crossed grid that names its

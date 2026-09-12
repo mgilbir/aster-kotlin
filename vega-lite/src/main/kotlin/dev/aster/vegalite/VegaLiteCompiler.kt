@@ -3171,6 +3171,7 @@ private class Compilation(
           // facet's own columns are none of its business. Its marks read that chain's output and
           // draw the same rows in every cell, which is what such a layer is written for — a grid
           // of outlines over a map, say, drawn the same over each. See [UnitView.ownsSource].
+          it.cellOwner = owner
           if (!view.ownsSource) {
             it.facetFields = found.fields
             it.gridTransforms = gridTransforms

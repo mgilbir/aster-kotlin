@@ -237,7 +237,20 @@ internal class DataPipeline(
     // What an **ancestor** wrote — a facet's own transforms above its cell's — stands first: that
     // model's pass ran first, and a step of the cell's cannot climb above one that computes the
     // column it reads.
-    if (scope.facet) head = userTransforms(head, Written.ANCESTOR, hoistedOver)
+    if (scope.facet)
+      head =
+        userTransforms(
+          head,
+          Written.ANCESTOR,
+          hoistedOver,
+          // **The grid's own**, and only those, where the flow is cut here. A layer inside the cell
+          // is an ancestor of its members and no part of the grid above them: its transforms were
+          // written in a pass that runs below the partition, not above it. Taken for the grid's,
+          // they were written above a cut they belong below — where the chain above is built from
+          // one view and knows nothing of them, so they were written nowhere at all and the rows a
+          // member filters for itself were drawn by every mark in the cell.
+          ofGrid = if (scope == Scope.FACET) true else null,
+        )
     // The **facet's** own bucketing stands with the rest of the facet model's pass, above the
     // partition: the values its cells are cut by are those buckets, so the column has to be there
     // before the cut is made — and so does the parse the bucketing reads, which `parseData` puts
@@ -252,6 +265,10 @@ internal class DataPipeline(
     // trellis whose columns are years listed its `timeunit` after a `calculate` the cell asked for.
     if (scope.facet) timeUnitNode(Scope.FACET)?.let { head = head.then(it) }
     if (scope.own) {
+      // Below the partition, what a **layer inside the cell** wrote stands first: that model's pass
+      // ran before its members', exactly as it does with no grid around them.
+      if (scope == Scope.OWN)
+        head = userTransforms(head, Written.ANCESTOR, hoistedOver, ofGrid = false)
       // A layer's member buckets its field before **its own** transforms: upstream calls it a hack
       // "equivalent for merging bin extent for union scale", and it is what lets two layers over
       // one binned field share a bin. Below a filter the two bins are no longer siblings and
@@ -1350,10 +1367,47 @@ internal class DataPipeline(
     )
   }
 
+  /**
+   * Whether one of this view's transforms stands **above** the partition — `moveFacetDown`.
+   *
+   * ```js
+   * export function moveFacetDown(node: DataFlowNode) {
+   *   if (isFacetNode(node)) {
+   *     …
+   *     if (node.numChildren() === 1 && !isOutputNode(node.children[0])) {
+   *       const child = node.children[0];
+   *       if (child instanceof AggregateNode || …) child.addDimensions(node.fields);
+   *       child.swapWithParent();
+   *       moveFacetDown(node);
+   * ```
+   *
+   * The partition walks down one node at a time and stops where the flow **forks**, so what climbs
+   * past it is what the grids above wrote and what the cell model itself wrote — one chain, no fork
+   * in it. A layer *inside* the cell wrote its transforms below that fork, and they stay there:
+   * that is the whole difference between a cell that is a layer of two units, whose own transforms
+   * are computed once for the grid, and one whose second member is a layer of its own, whose
+   * transforms are computed in every cell.
+   *
+   * Judged by who **owns** the transform rather than by the view that carries a copy of it: a
+   * member's copy of its layer's step is that layer's, and the layer is below the cut.
+   */
+  private fun climbsAboveTheCut(index: Int): Boolean {
+    val owner = view.transformOwners.getOrNull(index) ?: return false
+    // The cell model's own, or one of the models **above** it — a chart's transforms stand above
+    // every partition in it, however deep the plot that grids. A name is the model tree, so an
+    // ancestor's is this one's with something taken off the end; the chart's own is empty.
+    return owner == view.cellOwner || owner.isEmpty() || view.cellOwner.startsWith("${owner}_")
+  }
+
   private fun userTransforms(
     head: DataNode,
     which: Written = Written.ALL,
     hoistedOver: List<String> = emptyList(),
+    /**
+     * Whether to write the transforms that climb **above** the partition or the rest, or `null` for
+     * both. See [climbsAboveTheCut].
+     */
+    ofGrid: Boolean? = null,
   ): DataNode {
     var last = head
     val lookupOrdinals = lookupOrdinals()
@@ -1365,6 +1419,7 @@ internal class DataPipeline(
       val inherited = view.transformOwners.getOrNull(index)?.let { it != view.name } == true
       if (which == Written.OWN && inherited) return@forEachIndexed
       if (which == Written.ANCESTOR && !inherited) return@forEachIndexed
+      if (ofGrid != null && climbsAboveTheCut(index) != ofGrid) return@forEachIndexed
       val transforms =
         Transforms(
           diagnostics,

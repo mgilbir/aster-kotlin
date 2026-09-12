@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A transform climbs above a grid's partition only as far as the fork below it.** `moveFacetDown`
+  walks the partition down one node at a time and stops where the flow forks, so what climbs past it
+  is what the models *at or above the cell* wrote — one chain, no fork in it. A layer **inside** the
+  cell wrote its transforms below that fork, and they stay there, computed once per cell. This
+  compiler asked instead whether the transform belonged to the view carrying a copy of it; a
+  member's copy of its own layer's step is that layer's, so it counted as the grid's and was written
+  above the cut — where the chain is built from one view of the cell and knows nothing of it, so it
+  was written nowhere at all. A layer that filters itself down to one series had that filter dropped,
+  and every mark in the cell drew every row. One specification in the wild corpus layers a filtered
+  line inside a gridded cell.
 - **An expression in a theme is a signal, and a theme's parameters are the document's signals.**
   `initConfig` rewrites `{"expr": …}` as `{"signal": …}` once, as the configuration is read, so
   everything downstream sees a signal; `stripAndRedirectConfig` then moves `config.params` to
