@@ -254,7 +254,19 @@ private class Compilation(
    * These live beside the marks they react to — at the top of a chart that is one plot, and inside
    * the plot's group in a concatenation — because the events they listen for are scoped to a group.
    */
-  private fun machinery(selection: Selection, views: List<UnitView>): List<VegaValue> {
+  private fun machinery(
+    selection: Selection,
+    views: List<UnitView>,
+    /**
+     * The grid the signals are being written inside, where they are written inside one.
+     *
+     * `unitName(model)` of a cell is the cell's name **and the value it holds** — the suffix
+     * `'__facet_row_' + (facet["…"])` — so that a pick made in one cell is told from the same pick
+     * made in another. The chart's own grid is [facet]; a plot of a concatenation has its own, and
+     * reading only the chart's left every cell of such a plot claiming to be the same unit.
+     */
+    grid: FacetLayout? = facet,
+  ): List<VegaValue> {
     if (selection.type != "interval") {
       // A click on another selection's **brush** is not a pick: the rectangle belongs to the brush
       // that owns it, and a click on it would otherwise pick whatever row lies under the drag.
@@ -275,13 +287,23 @@ private class Compilation(
           .filter { it.type == "interval" && it.owner === selection.owner }
           .map { "${it.name}_brush" }
       return selection.signals(
-        unit = selection.unitName(views.firstOrNull().takeIf { facet != null }, facet),
+        unit =
+          selection.unitName(
+            views.firstOrNull().takeIf { grid != null },
+            grid,
+            fallback = views.firstOrNull(),
+          ),
         brushes = brushes,
         view = selection.owner ?: views.firstOrNull(),
       )
     }
     val view = selection.owner ?: views.firstOrNull() ?: return emptyList()
-    val unit = selection.unitName(views.firstOrNull().takeIf { facet != null }, facet)
+    val unit =
+      selection.unitName(
+        views.firstOrNull().takeIf { grid != null },
+        grid,
+        fallback = views.firstOrNull(),
+      )
     return selection.intervalSignals(
       view,
       selection.initial,
@@ -309,20 +331,84 @@ private class Compilation(
     }
   }
 
-  /** The brush a selection is dragged as, drawn around the marks of the plot that declared it. */
+  /**
+   * The model whose marks a brush is drawn around — `assembleUnitSelectionMarks`'s caller.
+   *
+   * ```js
+   * public assembleMarks() {
+   *   let marks = this.component.mark ?? [];
+   *   if (!this.parent || !isLayerModel(this.parent)) {
+   *     marks = assembleUnitSelectionMarks(this, marks);
+   *   }
+   * ```
+   * ```js
+   * export function assembleLayerSelectionMarks(model: LayerModel, marks: any[]): any[] {
+   *   for (const child of model.children) {
+   *     if (isUnitModel(child)) {
+   *       marks = assembleUnitSelectionMarks(child, marks);
+   *     }
+   *   }
+   * ```
+   *
+   * A unit inside a layer does not wrap its own marks; its **layer** does, around everything that
+   * layer assembled — and only for the children that are units, a layer inside a layer having
+   * wrapped its own already. So a brush declared in the inner layer of `layer[layer[a, b], c]` is
+   * drawn around `a` and `b` and *under* `c`, which is the whole of what this answers.
+   *
+   * The name is the model tree: a member of a layer is `<its layer>_layer_<n>`, so the layer that
+   * wraps it is what is left when that last segment is taken off. A view that is no layer's member
+   * carries no such segment, and wraps its own marks — which for a plot of one view is the plot.
+   */
+  private fun brushScope(owner: UnitView): String = owner.name.replace(Regex("_?layer_\\d+$"), "")
+
+  /** The brush a selection is dragged as, drawn around the marks of the model that assembles it. */
   private fun brushed(views: List<UnitView>, marks: List<VegaValue>): List<VegaValue> {
     val own = selections.filter { it.owner == null || it.owner in views }
-    val view = views.firstOrNull() ?: return marks
-    // Each brush **wraps** the list rather than joining it: upstream's `marks` hook returns
+    if (views.isEmpty()) return marks
+    if (own.isEmpty()) return withVoronoi(views, marks)
+    // Once per **unit that carries the selection**, which is what `assembleUnitSelectionMarks`
+    // being called per unit amounts to. A selection declared above the composition is owned by no
+    // view and pushed into every unit below it, so a chart that declares one brush over a layer of
+    // two draws that brush twice — each wrap around the marks of its own unit's model, each
+    // recording its own unit's name. It is upstream's own reading and it is what upstream emits.
+    val carried = own.flatMap { selection ->
+      (selection.owner?.let { listOf(it) } ?: views).map { selection to it }
+    }
+    // Every mark under the name of the view that drew it. No view's name is a prefix of another's —
+    // a layer that holds a layer is not itself a view — so the first match is the only one. A mark
+    // this inserts is labelled with the scope it wraps, so a brush already drawn around an inner
+    // layer sits inside the range of the layer above it and outside the range of that layer's
+    // siblings.
+    val labelled =
+      withVoronoi(views, marks)
+        .map { mark ->
+          val name = mark.string("name").orEmpty()
+          views
+            .firstOrNull { it.name.isNotEmpty() && name.startsWith("${it.name}_") }
+            ?.name
+            .orEmpty() to mark
+        }
+        .toMutableList()
+    // Each brush **wraps** the range rather than joining it: upstream's `marks` hook returns
     // `[background, ...marks, brush]`, so a second selection's background lands outside the first's
     // and its outline outside that one's. Two brushes over one plot are drawn in opposite orders
     // above and below the marks, and that is why.
-    return own.fold(withVoronoi(views, marks)) { inner, selection ->
-      val where = selection.owner ?: view
-      selection.brushMarks(where, selection.unitName(), background = true) +
-        inner +
-        selection.brushMarks(where, selection.unitName(), background = false)
+    for ((selection, where) in carried) {
+      val scope = brushScope(where)
+      fun inScope(label: String) =
+        scope.isEmpty() || label == scope || label.startsWith("${scope}_")
+      val first = labelled.indexOfFirst { inScope(it.first) }
+      val last = labelled.indexOfLast { inScope(it.first) }
+      if (first < 0) continue
+      // The unit the brush is drawn for, which is the one whose tuple it shows: a brush resolved
+      // across the chart is hidden unless the store's row came from *this* unit.
+      val unit = selection.unitName(fallback = where)
+      val background = selection.brushMarks(where, unit, background = true)
+      val foreground = selection.brushMarks(where, unit, background = false)
+      labelled.addAll(last + 1, foreground.map { scope to it })
+      labelled.addAll(first, background.map { scope to it })
     }
+    return labelled.map { it.second }
   }
 
   /** Which of a composition's scales and guides its children share, and which they do not. */
@@ -355,6 +441,25 @@ private class Compilation(
    * is that shape, reached by building the concatenation as the chart and wrapping it.
    */
   private var cellLevels: List<VegaValue.Obj> = emptyList()
+
+  /**
+   * Where the **cell's** own transforms begin in the specification's array.
+   *
+   * Everything before it was written by a grid and stands above the partition for good; everything
+   * from it on is the cell's, which `moveFacetDown` walks the partition past — adding the facet's
+   * own fields to every grouping it passes. See [FacetOperator.Peeled.gridTransforms].
+   *
+   * The default is **every** transform, because a facet written in the *encoding* keeps them:
+   * ```ts
+   * const {mark, width, projection, height, view, params, encoding: _, ...outerSpec} = spec;
+   * return this.mapFacet({...outerSpec, ...layout, facet: facetMapping, spec: {…, mark, encoding}});
+   * ```
+   *
+   * `mapFacetedUnit` moves the mark and the encoding into the cell and leaves everything else on
+   * the grid — a `transform` among it. Only the operator form has a cell that wrote its own, and
+   * the peel says how many of the array came from the grids above it.
+   */
+  private var gridTransforms: Int = Int.MAX_VALUE
 
   /** The grids [cellLevels] describes, made once the selections are known. */
   private var cellGrids: List<FacetLayout> = emptyList()
@@ -401,6 +506,7 @@ private class Compilation(
       val peeled = FacetOperator.normalize(spec, diagnostics) ?: return failed()
       spec = peeled.spec
       nestedFacets = peeled.inner
+      gridTransforms = peeled.gridTransforms
       // A cell that is a **concatenation** is compiled the other way about. There is no encoding to
       // lift a facet channel out of, so the concatenation is built as the chart — under the name
       // the
@@ -413,7 +519,7 @@ private class Compilation(
     // a chart is — and it has to be normalised *after* the grids are peeled off, because until then
     // it is not the thing being compiled.
     if (spec.has("repeat")) spec = Repeat.normalize(spec, diagnostics) ?: return failed()
-    selections = Selection.of(spec)
+    selections = Selection.of(spec, diagnostics)
     // The grids are built straight from the levels rather than lifted out of an encoding: there is
     // no encoding here to lift them from. Everything they publish runs through the name the level
     // above gave its cell — `child`, then `child_child` — exactly as a lifted one does.
@@ -435,7 +541,7 @@ private class Compilation(
     // Each plot's own grid, where it has one: a concatenation may hold a faceted plot beside a
     // plain one, and the cells then belong inside that plot's group rather than to the chart.
     for (plot in plots) {
-      var lifted = liftFacet(plot.views, plot.name)
+      var lifted = liftFacet(plot.views, plot.name, plot.spec)
       plot.views = lifted.first
       lifted.second?.let { plot.facets += it }
       // A grid whose cells are grids: each further level is lifted in turn, and each lift is the
@@ -452,14 +558,23 @@ private class Compilation(
         // The level's channels never reached any encoding, so they are put back into one for the
         // lift to read and take out again — the same path the outermost level took.
         val channels = Parse(config, diagnostics, selections).facetChannels(level, "$.facet")
-        lifted = liftFacet(plot.views.map { it.withEncoding(it.spec.encoding + channels) }, owner)
+        lifted =
+          liftFacet(
+            plot.views.map { it.withEncoding(it.spec.encoding + channels) },
+            owner,
+            plot.spec,
+          )
         plot.views = lifted.first
         lifted.second?.let { plot.facets += it }
       }
       // Lifting a facet builds the cell's views anew, so the plot each belongs to has to be
       // recorded again: a scale resolved per plot is named for the plot that owns it, and a view
       // nothing knows the plot of is named as though it stood alone.
-      plot.views.forEach { plotNames[it] = plot.name }
+      plot.views.forEach {
+        plotNames[it] = plot.name
+        plotResolves[it] = Resolve(plot.spec.obj("resolve"))
+        it.statedSize = LayoutSize.statedSizes(plot.views, plot.spec)
+      }
       // The **chart's** grid is the one it lays out itself. A faceted plot inside a concatenation
       // lays out its own cells within its group, and everything the chart does about a facet —
       // the split in the data flow, the cell's scales, the machinery in its signals — belongs to
@@ -552,18 +667,28 @@ private class Compilation(
       // so one map under a scatter of ordinary positions is still a *layer's* projection, named for
       // the layer. Requiring two geographic members left it named for the member, and the mark that
       // reads it named the member's too.
-      if (
-        (plot.views.size > 1 || plot.facet != null) &&
-          geographic.isNotEmpty() &&
-          geographic.all { it.projection == geographic.first().projection }
-      ) {
+      val agreed = if (geographic.isEmpty()) null else agreedProjection(geographic)
+      if ((plot.views.size > 1 || plot.facet != null) && agreed != null) {
+        val (spoke, merged) = agreed
         val name =
           Fields.varName(
             listOf(plot.name, "projection").filter { it.isNotEmpty() }.joinToString("_")
           )
         geographic.forEachIndexed { index, view ->
           view.projectionName = name
-          if (index == 0) view.projectionFitViews = geographic else view.projectionMerged = true
+          if (index == 0) {
+            // The merged component is built from what the children **agreed**, which may be what
+            // one of them said and the others left alone: `new ProjectionComponent(name,
+            // nonUnitProjection.specifiedProjection, …, duplicate(nonUnitProjection.data))`.
+            //
+            // That copy is why the **fold's** own outlines come first in the fit and the children's
+            // after it: the merged component starts with the data of whichever child the fold ended
+            // on, and then every fitted child is appended in order.
+            view.projection = merged
+            view.projectionFitViews = listOf(spoke) + geographic
+          } else {
+            view.projectionMerged = true
+          }
         }
       }
     }
@@ -627,12 +752,25 @@ private class Compilation(
     // domain a pan or a zoom has arrived at, and Vega prefers it over the computed one whenever the
     // signal is not null — which is what makes the plot itself the thing being dragged.
     for (selection in selections.filter { it.bindsScales }) {
-      val view = selection.owner ?: views.firstOrNull() ?: continue
-      for ((channel, field) in selection.intervalChannels(view)) {
-        val scale = allScales.values.firstOrNull { it.name() == view.scale(channel) } ?: continue
-        // Only a continuous scale can be panned: there is no halfway between two categories.
-        if (!Selection.isContinuous(scale.type)) continue
-        scale.properties["domainRaw"] = signalRef("${selection.name}[${quoted(field)}]")
+      // ```js
+      // const scale = model.getScaleComponent(channel);
+      // …
+      // scale.set('selectionExtent', {param: selCmpt.name, field: proj.field}, true);
+      // ```
+      //
+      // `scaleBindings.parse` runs **per unit**, and a parameter declared above a composition is
+      // pushed into every unit below it — so every plot's scale carries the extent, and every plot
+      // is dragged by the one binding. Answering for the first plot alone left the rest of a
+      // dashboard reading their computed domains: one plot panned and the others stood still,
+      // which is the opposite of what a binding declared over all of them is written for.
+      val bound = selection.owner?.let { listOf(it) } ?: views
+      for (view in bound) {
+        for ((channel, field) in selection.intervalChannels(view)) {
+          val scale = allScales.values.firstOrNull { it.name() == view.scale(channel) } ?: continue
+          // Only a continuous scale can be panned: there is no halfway between two categories.
+          if (!Selection.isContinuous(scale.type)) continue
+          scale.properties["domainRaw"] = signalRef("${selection.name}[${quoted(field)}]")
+        }
       }
     }
     // A scale domain may also name a selection outright — `{"domain": {"param": "brush"}}` — which
@@ -730,7 +868,7 @@ private class Compilation(
           plot.spec,
           plot.sizeNames,
           plot.prefix,
-          cellCardinality,
+          if (concat == null) cellCardinality else cardinalityOf(plot),
         )
       // Where a cell sizes itself, the *expression* takes the place of the signal's name: it is
       // read in a `{"signal": …}` everywhere a size is read, so nothing else has to know.
@@ -746,12 +884,14 @@ private class Compilation(
     // each plot, because two keys standing for different scales cannot be one.
     val legendScale = mutableMapOf<String, String>()
     val legendPlot = mutableMapOf<String, String>()
+    /** The channel each key explains, which is what its **resolution** is asked about. */
+    val legendChannel = mutableMapOf<String, String>()
     // Every model in upstream's hierarchy carries its own `resolve`, and a legend is settled by the
     // composition it belongs to: a `resolve` written on one plot of a concatenation governs the
     // layers inside *that* plot and nothing else.
     val resolveOf =
       plots.flatMap { plot -> plot.views.map { it to Resolve(plot.spec.obj("resolve")) } }.toMap()
-    val allLegends = assembleLegends(views, legendScale, legendPlot, resolveOf)
+    val allLegends = assembleLegends(views, legendScale, legendPlot, legendChannel, resolveOf)
     // A legend the specification resolves **independently** belongs to the plot that raised it even
     // where the scale is shared: `resolve: {"legend": {"color": "independent"}}` is how a
     // concatenation puts a key inside the plot it explains rather than beside the whole chart.
@@ -762,10 +902,14 @@ private class Compilation(
         if (concat == null) emptyList()
         else allLegends.filterKeys { ownedBy(it, plot) }.values.toList()
     }
+    // A key explaining a scale the **cell** owns stands in the cell, as the scale does — see
+    // [cellOwnsLegend].
+    cellLegends = allLegends.filterKeys { cellOwnsLegend(legendChannel[it]) }.values.toList()
     val legends =
       allLegends
         .filterKeys { key ->
-          concat == null || (legendPlot[key] == null && owner[legendScale[key]] == null)
+          !cellOwnsLegend(legendChannel[key]) &&
+            (concat == null || (legendPlot[key] == null && owner[legendScale[key]] == null))
         }
         .values
         .toList()
@@ -813,24 +957,30 @@ private class Compilation(
     // Upstream's order: the layout's own sizes, then `unit`, then what each selection *resolves*
     // to — because a variable parameter may read one — then the variables, then the machinery that
     // writes the stores.
+    // A selection's **controls** are part of the page rather than of the drawing, so they sit at
+    // the top with `unit` and before the signal the tests read.
+    //
+    // In **reverse** order of declaration, each control being *unshifted* onto the list as the
+    // selections are walked: `signals.unshift({name: sgname, …})` in `inputBindings` and in
+    // `bindLegend` alike. So a chart with a control per parameter writes the last one's first,
+    // which is not a detail of the output — a reader looking down a column of drop-downs sees them
+    // in the order Vega lists them.
+    //
+    // `unit` is unshifted too, but **after** the loop over one view's selections and only where it
+    // is not already there. So it lands in front of the first selection-bearing view's controls and
+    // behind every later view's, which go on being unshifted past it. A concatenation whose second
+    // plot binds a legend is where it tells: that plot's control stands ahead of `unit` and the
+    // first plot's stands behind it.
+    fun controls(selection: Selection) =
+      selection.inputSignals(selection.owner ?: views.firstOrNull()) +
+        selection.legendSignals(selection.owner ?: views.firstOrNull())
+    val declared = selections.distinctBy { it.name }
+    val firstOwner = declared.firstOrNull()?.owner
     val sizeSignals =
       sizeSignalsFor(plotTree).distinctBy { it.string("name") } +
+        declared.filter { it.owner !== firstOwner }.reversed().flatMap { controls(it) } +
         selectionSignals +
-        // A selection's **controls** are part of the page rather than of the drawing, so they sit
-        // at
-        // the top with `unit` and before the signal the tests read.
-        // In **reverse** order of declaration, each control being *unshifted* onto the list as the
-        // selections are walked: `signals.unshift({name: sgname, …})` in `inputBindings` and in
-        // `bindLegend` alike. So a chart with a control per parameter writes the last one's first,
-        // which is not a detail of the output — a reader looking down a column of drop-downs sees
-        // them in the order Vega lists them.
-        selections
-          .distinctBy { it.name }
-          .reversed()
-          .flatMap {
-            it.inputSignals(it.owner ?: views.firstOrNull()) +
-              it.legendSignals(it.owner ?: views.firstOrNull())
-          } +
+        declared.filter { it.owner === firstOwner }.reversed().flatMap { controls(it) } +
         selections
           .distinctBy { it.name }
           .flatMap { selection ->
@@ -866,9 +1016,7 @@ private class Compilation(
         // pointer against one cell's scales, and there is one of each per cell rather than one for
         // the grid. What stays here is what a cell cannot own — the store, the signal the store
         // resolves into, and whatever a binding writes from outside the chart.
-        selections
-          .filter { facet == null && (concat == null || it.owner == null) }
-          .flatMap { machinery(it, views) } +
+        selections.filter { facet == null && concat == null }.flatMap { machinery(it, views) } +
         // A control's own signals stand at the top even where everything else about the selection
         // is written inside a cell: one widget for the chart, not one per cell.
         selections
@@ -890,13 +1038,19 @@ private class Compilation(
       // The **outermost** level's values stand beside the plot's table; a level inside one breaks
       // that level's partition down further, so its values are computed inside that level's cell.
       val current = plot.facets.first()
+      // Asked of the **plot's own** resolve, which is the same reading `assembleFacetMarks` uses to
+      // decide which bands to draw. The two have to agree: a band reads the counting sequence these
+      // datasets carry, and one drawn without them names a dataset the chart never wrote.
+      val here = resolveFor(plot.views)
       val bands =
-        plot.axes.filter { (it["grid"] as? VegaValue.Bool)?.value != true && !cellOwnsAxis(it) }
+        plot.axes.filter {
+          (it["grid"] as? VegaValue.Bool)?.value != true && !cellOwnsAxis(it, here)
+        }
       val across = bands.filter { it.string("orient") == "bottom" || it.string("orient") == "top" }
       val reads = plot.reads ?: plot.views.first().mainData
       val domains =
         current.domainDatasets(
-          counted = emptyMap(),
+          counted = cardinalityOf(plot),
           source = reads,
           vertical = (bands - across.toSet()).isNotEmpty(),
           horizontal = across.isNotEmpty(),
@@ -952,7 +1106,23 @@ private class Compilation(
       // The chart's own `background` beats the configured one: `config.background` is a theme's
       // default and a specification that states one is overriding the theme, not being overridden
       // by it.
-      put("background", spec.fields["background"] ?: config.background)
+      // ```js
+      // const outputConfig: Config<SignalRef> = omit(mergedConfig, configPropsWithExpr);
+      //
+      // for (const prop of ['background', 'lineBreak', 'padding'] as const) {
+      //   if (mergedConfig[prop]) {
+      //     (outputConfig as any)[prop] = signalRefOrValue(mergedConfig[prop]);
+      //   }
+      // }
+      // ```
+      //
+      // The theme's is taken only where it is **truthy**, as its padding is: `initConfig` takes all
+      // three of these off the configuration and puts back only the ones that are. A theme saying
+      // `{"background": null}` — a document whose charts are drawn on whatever is behind them — is
+      // a theme with no background at all, and this wrote the null out as the chart's own. A
+      // background the **chart** states is written as it stands, null included: that one is not the
+      // theme's to drop.
+      put("background", spec.fields["background"] ?: config.background.takeIf { it.isTruthy() })
       // A chart's own padding beats the theme's, as its background does: a specification stating
       // one is overriding what the configuration settled, not the other way about.
       //
@@ -966,8 +1136,11 @@ private class Compilation(
         spec.fields["padding"] ?: config.padding.takeIf { it.isTruthy() },
       )
       autosize(views, root)?.let { put("autosize", it) }
-      put("width", mergedSize("width") ?: if (concat == null) root.width else null)
-      put("height", mergedSize("height") ?: if (concat == null) root.height else null)
+      // A merged size that is a **`"container"`** is a signal rather than a property: there is no
+      // number to write, the page having to be measured first. `assembleTopLevelModel` moves only
+      // the signals that carry a `value`.
+      put("width", hoisted(mergedSize("width") ?: if (concat == null) root.width else null))
+      put("height", hoisted(mergedSize("height") ?: if (concat == null) root.height else null))
       // `cell` is the bordered plotting area; a chart with no Cartesian position — a pie — has no
       // plotting area to border, and upstream styles it as a plain `view` instead. A faceted chart
       // has no plotting area of its own at all: each of its cells carries the style, and neither
@@ -990,7 +1163,15 @@ private class Compilation(
           selections
             .distinctBy { it.name }
             .sortedByDescending { views.indexOf(it.owner) }
-            .map { it.storeData(it.owner ?: views.firstOrNull(), it.initial, timeZone) } + data
+            .map {
+              val where = it.owner ?: views.firstOrNull()
+              // The grid the declaring view is a **cell of**, which for a plot of a concatenation
+              // is that plot's rather than the chart's — the chart has none. A row the store opens
+              // with names the cell it was picked in, and named with the cell's bare name it was a
+              // pick in no cell at all: the brush a faceted plot opened with belonged to nothing.
+              val grid = facet ?: where?.let { view -> plotOfView(view)?.facet }
+              it.storeData(where, it.initial, timeZone, grid)
+            } + data
         ),
       )
       if (sizeSignals.isNotEmpty()) put("signals", arr(sizeSignals))
@@ -1041,66 +1222,7 @@ private class Compilation(
       // where they are written.
       val grid = facet
       if (grid != null && concat == null) {
-        // `assembleAxisSignals` on the **cell**: an axis inside it that draws its grid across no
-        // other scale falls back to `width` or `height` by name, and inside the cell those names
-        // mean the whole chart until the cell aliases them to its own.
-        val own = selections.distinctBy { it.name }
-        cellSignals =
-          // `assembleFacetSignals`: a cell whose child declares a selection carries the datum of
-          // the cell the pointer is in, so that a pick made anywhere in the grid is attributed to
-          // the right one. A grid nothing is selected in needs no such signal.
-          (if (own.isEmpty()) emptyList()
-          else
-            listOf(
-              obj {
-                put("name", "facet")
-                put("value", VegaValue.EmptyObject)
-                put(
-                  "on",
-                  arr(
-                    listOf(
-                      obj {
-                        put(
-                          "events",
-                          arr(
-                            listOf(
-                              obj {
-                                put("source", "scope")
-                                put("type", "pointermove")
-                              }
-                            )
-                          ),
-                        )
-                        put(
-                          "update",
-                          "isTuple(facet) ? facet : group(${quoted(grid.named("cell"))}).datum",
-                        )
-                      }
-                    )
-                  ),
-                )
-              }
-            )) +
-            localSizeSignals(plots.single()) +
-            own.flatMap { selection ->
-              // A signal the top level declares is *written* here and read there — `push: "outer"`
-              // is how Vega says which of the two directions this one goes — and one a **control**
-              // writes is not written here at all: it belongs beside the widget, outside the grid.
-              val pushed = boundOutward(selection, views).map { it.second }.toSet()
-              val outside = boundInward(selection, views).toSet()
-              machinery(selection, views).mapNotNull { signal ->
-                val named = (signal as? VegaValue.Obj)?.string("name")
-                when {
-                  named in outside -> null
-                  named !in pushed -> signal
-                  else ->
-                    obj {
-                      (signal as VegaValue.Obj).fields.forEach { (key, value) -> put(key, value) }
-                      put("push", "outer")
-                    }
-                }
-              }
-            }
+        cellSignals = cellSignalsFor(grid, plots.single(), views)
         cellScales =
           allScales.values
             .filter { it.name() != prefixed(it.channel) }
@@ -1109,14 +1231,27 @@ private class Compilation(
       // The projections a chart's places are put on the page by, which stand before the marks that
       // read them — `assembleProjections`, walking the model tree.
       projections(views).takeIf { it.isNotEmpty() }?.let { put("projections", arr(it)) }
-      // Shared scales first, then each plot's own, which is the order upstream's assembly walks the
-      // model tree in: the composition's own components before it recurses into its children.
+      // Shared scales first, then each level's own, which is the order upstream's assembly walks
+      // the model tree in: a composition's own components before it recurses into its children.
+      //
+      // By **level**, not by plot. A nested concatenation is a level of its own and may own a
+      // scale — one its plots share while the chart's other children do not — and ordering by the
+      // plots alone put such a scale among the scales of the first plot under it, which is after
+      // the level that owns it rather than before.
       val scales =
-        (allScales.values.filter { owner[it.name()] == null } +
-            plots.flatMap { plot -> allScales.values.filter { owner[it.name()] === plot } })
+        allScales.values
+          // A level's **own** scale stands before one named for something inside it: upstream
+          // assembles a model's own components and only then recurses, so a plot that resolves its
+          // `y` writes that before the layers below it write the `x` they could not share.
+          .sortedWith(
+            compareBy({ levelOfScale(it.name(), it.channel) }, { depthOfScale(it.name()) })
+          )
           // A facet's independently resolved scales are built inside its cells, where the rows
-          // they measure are, so they are not written beside the grid as well.
+          // they measure are, so they are not written beside the grid as well. A **plot** that
+          // grids its cell does the same within its own group, and a scale named for that cell is
+          // the one to move: nothing else in the chart can read it.
           .filterNot { facet != null && concat == null && it.name() != prefixed(it.channel) }
+          .filterNot { scale -> allPlots.any { cellOwnsScale(it, scale.name()) } }
       // A cell holding **plots** keeps those plots' own scales: each is measured over the rows the
       // partition handed one cell, so it is built there and not once beside the grid. What a
       // composition *shares* — a colour key covering every plot — is still the chart's. Settled
@@ -1150,7 +1285,7 @@ private class Compilation(
       if (legends.isNotEmpty()) put("legends", arr(legends))
       // The theme, as Vega takes it. Without this a chart's guides are drawn in the engine's own
       // colours however carefully the specification restyled them.
-      config.forVega()?.let { put("config", it) }
+      config.forVega(diagnostics)?.let { put("config", it) }
       // `usermeta` is carried through to the Vega specification, last, which is where upstream's
       // `assemble` puts it — verified against the pinned compiler rather than read off its
       // documentation. It is the one top-level property whose whole purpose is to survive
@@ -1179,9 +1314,8 @@ private class Compilation(
     // across the grid.
     // A channel whose children disagree about the *kind* of scale it is resolves independently
     // whatever the resolve says, because there is no one scale for them to share.
-    if (channel in incompatibleChannels) {
-      val owner = independenceOwner(view)
-      return if (owner.isEmpty()) channel else "${owner}_$channel"
+    forcedScaleOwners[view to channel]?.let { owner ->
+      return if (owner.isEmpty()) channel else Fields.varName("${owner}_$channel")
     }
     val independent =
       resolve.scaleIsIndependent(
@@ -1190,8 +1324,43 @@ private class Compilation(
           if (concat != null) channel in Channels.POSITION_SCALE_CHANNELS || channel == "theta"
           else facet != null && channel == "theta",
       )
+    // A `resolve` written on a **plot** of a concatenation speaks about the layers inside it, where
+    // the chart's own speaks about the plots — two levels, each about its own children. The
+    // innermost level to ask for independence is the one that settles the name, because it divides
+    // what the level above it had already divided: `concat_0_layer_0_y` beside `concat_0_layer_1_y`
+    // rather than one `concat_0_y`, which is what makes the two of them two axes and two extents.
+    //
+    // Only where the plot's own children **are** its layers. A plot that grids its cell has the
+    // cell between the two, and a `resolve` there speaks about the cells: the layers inside one are
+    // a single model to the grid, and two scales there would be two axes over the same picture.
+    // And only where the plot **has** children to divide: a single view named nothing of its own is
+    // the whole plot, and a `resolve` written over it has nothing to resolve — upstream leaves such
+    // a chart's scales called `x` and `y`, which is what they are.
+    if (
+      view.childName.isNotEmpty() &&
+        plotOfView(view)?.facets.isNullOrEmpty() &&
+        plotResolves[view]?.scaleIsIndependent(channel, defaultIndependent = false) == true
+    ) {
+      return Fields.varName("${view.childName}_$channel")
+    }
+    // A `resolve` on a plot that **grids** its cell speaks about the cells, not about the layers
+    // inside one: the layers are a single model to the grid. A channel it resolves independently is
+    // therefore the cell's own scale, named for the cell the plot hangs its grid from.
+    plotOfView(view)
+      ?.takeIf { concat != null }
+      ?.let { plot ->
+        if (
+          plot.facets.isNotEmpty() &&
+            plotResolves[view]?.scaleIsIndependent(
+              channel,
+              defaultIndependent = channel == "theta",
+            ) == true
+        ) {
+          return Fields.varName("${plot.name}_child_$channel")
+        }
+      }
     if (!independent) return prefixed(channel)
-    val owner = independenceOwner(view)
+    val owner = declaredIndependenceOwner(view, channel)
     return if (owner.isEmpty()) channel else "${owner}_$channel"
   }
 
@@ -1202,6 +1371,21 @@ private class Compilation(
    * concatenation's plots or a facet's single cell — never the layers *inside* one. A trellis of
    * layers that measures its `x` per cell has one `child_x`, not one scale per layer: the layers
    * are one model to the facet, and two scales there would be two axes over the same picture.
+   *
+   * ```js
+   * resolve.scale[channel] ??= defaultScaleResolve(channel, model);
+   * if (resolve.scale[channel] === 'shared') { ... merge ... }
+   * ```
+   *
+   * And every level asks **its own** `resolve`, `parseScaleCore` running per model down the tree. A
+   * concatenation of concatenations is two levels, and a channel the chart resolves independently
+   * may still be shared by the level below: colour defaults to shared everywhere, so a chart that
+   * states `"resolve": {"scale": {"color": "independent"}}` over a column whose second entry is a
+   * row of plots gives that row **one** colour scale, not one per plot in it. Positions default to
+   * independent at every level and so do go all the way down.
+   *
+   * Named from the innermost plot regardless, such a chart came out with a colour scale — and a
+   * legend — for every plot in the row, where the specification asked for one for the row.
    */
   private fun independenceOwner(view: UnitView): String =
     when {
@@ -1210,21 +1394,165 @@ private class Compilation(
       else -> view.childName
     }
 
+  /**
+   * The same, for independence the specification **declares** rather than one forced on it.
+   *
+   * Every level asks its own `resolve`, `parseScaleCore` running per model down the tree, so a
+   * concatenation of concatenations is two questions. A channel the chart resolves independently
+   * may still be shared by the level below: colour defaults to shared everywhere, so a chart that
+   * states `"resolve": {"scale": {"color": "independent"}}` over a column whose second entry is a
+   * row of plots gives that row **one** colour scale, not one per plot in it. Positions default to
+   * independent at every level and so do go all the way down.
+   *
+   * Named from the innermost plot regardless, such a chart came out with a colour scale — and a
+   * legend — for every plot in the row, where the specification asked for one for the row.
+   *
+   * Independence a **disagreement** forces is not this: there the owner is the child of the level
+   * whose children disagreed, whatever any `resolve` says, and [independenceOwner] answers for it.
+   */
+  private fun declaredIndependenceOwner(view: UnitView, channel: String): String {
+    if (concat == null) return independenceOwner(view)
+    var owner = ""
+    // The chart's own `resolve` settles the first level; below it, each level's own does.
+    var here = resolve
+    for ((name, below) in levelsTo(view)) {
+      // `defaultScaleResolve` for a concatenation: a plot measures its own positions and its own
+      // polar extents, and shares everything else.
+      val defaultIndependent =
+        channel in Channels.POSITION_SCALE_CHANNELS || channel == "theta" || channel == "radius"
+      if (!here.scaleIsIndependent(channel, defaultIndependent)) break
+      owner = name
+      here = Resolve(below.obj("resolve"))
+    }
+    return owner
+  }
+
+  /**
+   * Every level of the chart, in the order upstream's assembly walks them: a level before its
+   * children. The chart itself is first and is named by the empty string.
+   */
+  private fun levelNames(node: Node = plotTree): List<String> =
+    when (node) {
+      is Node.Leaf -> listOf(node.plot.name)
+      is Node.Nest -> listOf(node.name) + node.children.flatMap { levelNames(it) }
+    }
+
+  /**
+   * Which level a scale belongs to, as a place in that walk.
+   *
+   * Read off the **name**, which is where the answer already is: a scale a level owns is called
+   * after it. The longest level name the scale's own begins with is the one that owns it, so
+   * `concat_1_concat_0_x` belongs to the plot and `concat_1_color` to the row above it, and a scale
+   * still called by its plain channel belongs to the chart.
+   */
+  /** How far below its level a scale's name reaches, which orders two scales of one level. */
+  private fun depthOfScale(name: String): Int = name.count { it == '_' }
+
+  private fun levelOfScale(name: String, channel: String): Int {
+    // The chart's own, which stands before every level of it.
+    if (name == prefixed(channel)) return -1
+    val levels = levelNames()
+    return levels
+      .withIndex()
+      .filter { (_, level) -> level.isNotEmpty() && name.startsWith("${level}_") }
+      .maxByOrNull { it.value.length }
+      ?.index
+      // A scale named for something that is not a level of the composition — a **layer** inside a
+      // plot, which the composition does not see — keeps its place after the levels, in the order
+      // the scales were built.
+      ?: levels.size
+  }
+
+  /**
+   * The levels from the chart down to this view's plot: each one's name and the spec it was built
+   * from, which is where that level's own `resolve` is written.
+   */
+  private fun levelsTo(view: UnitView): List<Pair<String, VegaValue.Obj>> {
+    val target = plotOf(view)
+    fun walk(node: Node): List<Pair<String, VegaValue.Obj>>? =
+      when (node) {
+        is Node.Leaf -> if (node.plot.name == target) emptyList() else null
+        is Node.Nest ->
+          node.children.firstNotNullOfOrNull { child ->
+            walk(child)?.let { below ->
+              val name = if (child is Node.Nest) child.name else (child as Node.Leaf).plot.name
+              val spec = if (child is Node.Nest) child.spec else (child as Node.Leaf).plot.spec
+              listOf(name to spec) + below
+            }
+          }
+      }
+    return walk(plotTree).orEmpty()
+  }
+
   /** Per channel, the column a cell counts its own categories in — empty for every other chart. */
   private var cellCardinality: Map<String, String> = emptyMap()
 
-  /** Channels whose views disagree about the scale type, and so cannot share one. */
-  private val incompatibleChannels = mutableSetOf<String>()
+  /**
+   * The same for one **plot** of a concatenation, whose grid is the plot's own.
+   *
+   * `getCardinalityAggregateForChild` is asked of the facet model, and a concatenation's plot that
+   * grids its cell is one — the chart's own `facet` is null there, so the chart-level answer is
+   * empty and a grid inside a row of plots was left sizing its cells from a shared width that does
+   * not exist. Its cells then laid out as though every one held the same categories.
+   */
+  /**
+   * The `resolve` the composition **these views belong to** states, which is the chart's where the
+   * views are the chart's own — see [plotResolves].
+   */
+  private fun resolveFor(views: List<UnitView>): Resolve =
+    views.firstOrNull()?.let { plotResolves[it] } ?: resolve
+
+  private fun cardinalityOf(plot: Plot): Map<String, String> {
+    if (plot.facet == null) return emptyMap()
+    val view = plot.views.firstOrNull() ?: return emptyMap()
+    val resolveHere = Resolve(plot.spec.obj("resolve"))
+    return setOf("x", "y")
+      .filter { channel ->
+        resolveHere.scaleIsIndependent(channel, defaultIndependent = false) &&
+          view.scaleType(channel)?.let { Scales.hasDiscreteDomain(it) } == true &&
+          LayoutSize.value(plot.views, plot.byChannel(), config, plot.spec, channel) == null
+      }
+      .mapNotNull { channel ->
+        view.spec.fieldDef(channel)?.let { channel to "distinct_${Fields.vgField(it)}" }
+      }
+      .toMap()
+  }
 
   /**
-   * `parseNonUnitScaleCore`: a shared channel is forced independent when the types cannot merge.
+   * What a channel a disagreement forced apart is called, per view — see [findIncompatibleScales].
+   */
+  private val forcedScaleOwners = mutableMapOf<Pair<UnitView, String>, String>()
+
+  /**
+   * `parseNonUnitScaleCore`: a shared channel is forced independent **at the level whose children
+   * disagree**, and nowhere else.
    *
-   * The check is per **name**, not per channel outright: a concatenation that already resolves `x`
-   * per plot has nothing to disagree about, and two layers that would share a colour scale — one a
-   * ramp over counts, one a pair of named colours — have everything.
+   * ```js
+   * if (scaleCompatible(explicitScaleType.value, childScaleType.value)) {
+   *   scaleTypeWithExplicitIndex[channel] = mergeValuesWithExplicit(...);
+   * } else {
+   *   resolve.scale[channel] = 'independent';
+   *   delete scaleTypeWithExplicitIndex[channel];
+   * }
+   * ```
+   *
+   * The check runs per model, bottom-up. A model whose children disagree marks the channel
+   * independent and offers nothing upward, so the level *above* has nothing to merge and leaves the
+   * names its children settled on. Two layers inside one plot of a concatenation are where it
+   * tells: a colour ramp over counts beside a pair of named colours cannot be one scale, the layer
+   * model says so, and each layer keeps `concat_0_layer_0_color` — while the concatenation above,
+   * whose other plot agrees with itself, is none the wiser.
+   *
+   * Asked of the whole chart at once and answered with the *plot* that holds the disagreement, such
+   * a chart came out with one colour scale for the plot rather than one per layer: two layers
+   * measuring different things were drawn from one scale that is neither, and the key beside them
+   * explained a scale nothing is drawn with.
+   *
+   * The check is per **name** to begin with, not per channel outright: a concatenation that already
+   * resolves `x` per plot has nothing to disagree about.
    */
   private fun findIncompatibleScales(views: List<UnitView>) {
-    val byName = mutableMapOf<String, MutableList<Pair<String, String>>>()
+    val byName = LinkedHashMap<String, MutableList<Triple<UnitView, String, String>>>()
     for (view in views) {
       for ((channel, def) in view.scaledChannels()) {
         val type =
@@ -1234,15 +1562,62 @@ private class Compilation(
             view.spec.mark,
             hasOffset = offsetChannelFor(channel)?.let { view.spec.encoding[it] != null } == true,
           )
-        byName.getOrPut(scaleName(view, channel)) { mutableListOf() } += channel to type
+        byName.getOrPut(scaleName(view, channel)) { mutableListOf() } += Triple(view, channel, type)
       }
     }
-    for ((_, entries) in byName) {
-      val types = entries.map { it.second }
-      if (types.any { one -> types.any { !Scales.compatible(one, it) } }) {
-        incompatibleChannels += entries.first().first
-      }
+    for ((_, entries) in byName) forceApart(entries, prefix = "")
+  }
+
+  /**
+   * The type one level offers the level above, or null where its children could not agree.
+   *
+   * Walked a name at a time, because the names are the tree: `concat_1_layer_0_layer_2` is a layer
+   * of a layer of a plot, and each step of the name is a model upstream asked the question of. The
+   * walk is **bottom-up**, as `parseNonUnitScaleCore` is: a level whose children disagree names
+   * each of them after itself and offers nothing upward, so the level above has nothing to merge
+   * from it and goes on merging the children that did agree. A plot whose two layers cannot share a
+   * colour therefore takes no colour scale of its own, and the plot beside it keeps the chart's.
+   */
+  private fun forceApart(entries: List<Triple<UnitView, String, String>>, prefix: String): String? {
+    if (entries.size == 1) return entries.single().third
+    val groups = LinkedHashMap<String, MutableList<Triple<UnitView, String, String>>>()
+    for (entry in entries) {
+      // Nowhere further to go: what disagrees is one model, which upstream cannot split either.
+      val step = nextLevel(entry.first.name, prefix) ?: return entries.first().third
+      groups.getOrPut(step) { mutableListOf() } += entry
     }
+    val offered = groups.map { (step, members) ->
+      val owner = if (prefix.isEmpty()) step else "${prefix}_$step"
+      Triple(owner, members, forceApart(members, owner))
+    }
+    val types = offered.mapNotNull { it.third }
+    // Everything still on offer agrees, so this level merges it and nothing is forced apart here.
+    if (types.all { one -> types.all { Scales.compatible(one, it) } }) return types.firstOrNull()
+    for ((owner, members, type) in offered) if (type != null) assign(members, owner)
+    return null
+  }
+
+  private fun assign(entries: List<Triple<UnitView, String, String>>, owner: String) {
+    for ((view, channel, _) in entries) forcedScaleOwners[view to channel] = owner
+  }
+
+  /**
+   * The next step of a view's name below [prefix], or null where the name ends there.
+   *
+   * A step is a word and, where one follows it, the number that numbers it: `concat_0`, `layer_1`,
+   * `child`. A name a specification gave itself is one word, which is one step.
+   */
+  private fun nextLevel(name: String, prefix: String): String? {
+    val rest =
+      when {
+        prefix.isEmpty() -> name
+        name == prefix -> return null
+        else -> name.removePrefix("${prefix}_").takeIf { it != name } ?: return null
+      }
+    if (rest.isEmpty()) return null
+    val tokens = rest.split("_")
+    val numbered = tokens.size > 1 && tokens[1].isNotEmpty() && tokens[1].all { it.isDigit() }
+    return tokens.take(if (numbered) 2 else 1).joinToString("_")
   }
 
   /**
@@ -1290,14 +1665,33 @@ private class Compilation(
     val declaring = views.filter { view ->
       Selection.from(view.spec.params).any { it.name == selection.name }
     }
-    val over = (listOfNotNull(selection.owner) + declaring).distinct().ifEmpty { views.take(1) }
+    // A parameter declared **above** the composition is declared by no view and owned by none, and
+    // is pushed into every unit below it: the state at the top is assembled from all of them, which
+    // is what `topLevelSignals` appending per unit amounts to. Reading the first plot's projections
+    // alone left a dashboard bound over all its plots publishing only the fields the first one
+    // happens to scale by.
+    val over = (listOfNotNull(selection.owner) + declaring).distinct().ifEmpty { views }
     // `if (!model.parent || isTopLevelLayer(model) || bound.length === 0) return signals` — a chart
     // whose views push nothing outward has nothing to push *into*, and the state is read from the
     // one view's own signals.
     if (over.none { pushesOutward(it) }) return emptyList()
     val out = LinkedHashMap<String, String>()
     for (view in over) {
-      selection.intervalChannels(view).forEach { (_, field) ->
+      selection.intervalChannels(view).forEach { (channel, field) ->
+        // ```js
+        // if (!scale || !hasContinuousDomain(scaleType)) {
+        //   log.warn(log.message.SCALE_BINDINGS_CONTINUOUS);
+        //   continue;
+        // }
+        // ```
+        //
+        // A binding binds only what can be **panned**: `scaleBindings.parse` keeps a projection
+        // only where its scale has a continuous domain, there being no halfway between two
+        // categories to drag to. A channel it leaves out is still projected — the selection
+        // remembers what was picked along it — but it publishes no signal of its own and pushes
+        // nothing outward. Bound regardless, a chart binding a categorical axis declared a signal
+        // at the top that nothing ever wrote, and pushed the cell's own out to meet it.
+        if (view.scaleType(channel)?.let { Selection.isContinuous(it) } != true) return@forEach
         out.getOrPut(field) { Fields.varName("${selection.name}_$field") }
       }
     }
@@ -1387,7 +1781,7 @@ private class Compilation(
         is Node.Nest -> node.children.flatMap { elevateProjection(it) }
       }
     if (geographic.isEmpty()) return emptyList()
-    if (geographic.any { it.projection != geographic.first().projection }) return emptyList()
+    val (spoke, merged) = agreedProjection(geographic) ?: return emptyList()
     // A leaf has merged already, in the pass over the plots: this is the level *above* it.
     if (node !is Node.Nest) return geographic
     val name =
@@ -1395,15 +1789,107 @@ private class Compilation(
     geographic.forEachIndexed { index, view ->
       view.projectionName = name
       view.projectionMerged = index != 0
+      if (index == 0) view.projection = merged
       // The merge carries the fit, and only the one that carries it: a view that was the first of
       // its own plot's merge is not the first of this one, and would otherwise write a second
       // projection fitted to a subset of what the chart draws.
-      view.projectionFitViews = if (index == 0) geographic else emptyList()
+      view.projectionFitViews = if (index == 0) listOf(spoke) + geographic else emptyList()
     }
     return geographic
   }
 
+  /**
+   * `mergeIfNoConflict`: the one projection a level's children agree on, or null where they do not.
+   *
+   * ```js
+   * const allPropertiesShared = every(PROJECTION_PROPERTIES, (prop) => {
+   *   if (!hasOwnProperty(first.explicit, prop) && !hasOwnProperty(second.explicit, prop)) return true;
+   *   if (hasOwnProperty(first.explicit, prop) && hasOwnProperty(second.explicit, prop) &&
+   *       deepEqual(first.get(prop), second.get(prop))) return true;
+   *   return false;
+   * });
+   *
+   * const size = deepEqual(first.size, second.size);
+   * if (size) {
+   *   if (allPropertiesShared) return first;
+   *   else if (deepEqual(first.explicit, {})) return second;
+   *   else if (deepEqual(second.explicit, {})) return first;
+   * }
+   * return null;
+   * ```
+   *
+   * A member that **said nothing** agrees with one that did: the merge takes the one that spoke.
+   * Comparing the specifications for equality instead left a map layered under another map, where
+   * only the upper one names its kind, with a projection each — and two projections fitted to two
+   * different sets of outlines draw the same country at two sizes.
+   *
+   * The sizes have to agree too, which here is whether each is **fitted**: a projection that states
+   * its own `scale` or `translate` has been placed by hand and has no size to compare.
+   */
+  /**
+   * `PROJECTION_PROPERTIES`: what a projection **is**, as against where it was put.
+   *
+   * ```js
+   * export const PROJECTION_PROPERTIES = [
+   *   'type', 'clipAngle', 'clipExtent', 'center', 'rotate', 'precision', 'reflectX', 'reflectY',
+   *   'coefficient', 'distance', 'fraction', 'lobes', 'parallel', 'radius', 'ratio', 'spacing',
+   *   'tilt',
+   * ];
+   * ```
+   *
+   * `mergeIfNoConflict` walks that list and no other, so `scale` and `translate` — where the map
+   * was placed on the page — say nothing about whether two members are drawing the same projection.
+   * Two layers of one map that state the same kind and place it differently are one projection, and
+   * the first of them settles the placing.
+   *
+   * Compared over the whole specification instead, such layers were two projections: each was
+   * written out, each mark read its own, and the outlines drawn over a map were placed by a
+   * projection the map underneath knew nothing about.
+   */
+  private fun sharesProjectionProperties(first: VegaValue.Obj, second: VegaValue.Obj): Boolean =
+    PROJECTION_PROPERTIES.all { property ->
+      first.fields[property] == second.fields[property]
+    }
+
+  private fun agreedProjection(views: List<UnitView>): Pair<UnitView, VegaValue.Obj>? {
+    fun fitted(spec: VegaValue.Obj) =
+      spec.fields["scale"] == null && spec.fields["translate"] == null
+    var winner = views.first()
+    var merged = winner.projection ?: return null
+    for (view in views.drop(1)) {
+      val own = view.projection ?: return null
+      if (fitted(merged) != fitted(own)) return null
+      when {
+        sharesProjectionProperties(merged, own) -> Unit
+        merged.fields.isEmpty() -> {
+          winner = view
+          merged = own
+        }
+        own.fields.isEmpty() -> Unit
+        else -> return null
+      }
+    }
+    return winner to merged
+  }
+
   /** The plot a view belongs to, where the compiler has been told about it. */
+  /**
+   * The views whose chains hang **below** [plot]'s grid, which is every one reading no table of its
+   * own.
+   *
+   * `parseRoot` hands a child the partition only where the child states no `data` of its own; one
+   * that states its own starts a root instead, so it is no child of the facet — it cannot be the
+   * fork that stops `moveFacetDown`, the facet's fields group nothing of its, and its marks read
+   * its own chain in every cell alike.
+   *
+   * Where a cell holds nothing else — every layer in it reading a table of its own — the grid still
+   * has to partition something, and it partitions the first of them as it always did. Upstream
+   * partitions the chain the *facet model* computes for itself, which nothing here builds: no view
+   * stands for it.
+   */
+  private fun viewsBelow(plot: Plot): List<UnitView> =
+    plot.views.filter { !it.ownsSource }.ifEmpty { plot.views.take(1) }
+
   private fun plotOfView(view: UnitView): Plot? =
     plotNames[view]?.let { name -> allPlots.firstOrNull { it.name == name } }
 
@@ -1466,6 +1952,16 @@ private class Compilation(
   private fun plotOf(view: UnitView): String = plotNames[view] ?: ""
 
   private val plotNames = mutableMapOf<UnitView, String>()
+
+  /**
+   * The `resolve` each view's **own plot** states, which speaks about the layers inside that plot.
+   *
+   * Every model in upstream's hierarchy carries one and each speaks about its own children: the
+   * chart's is about the concatenation's plots, and a plot's is about the layers within it. Reading
+   * only the chart's left a plot that measures its layers apart sharing one scale between them —
+   * two lines on one axis where the specification had asked for two.
+   */
+  private val plotResolves = mutableMapOf<UnitView, Resolve>()
 
   /** Every plot the chart was built from, so a view can be asked which grid it belongs to. */
   private var allPlots: List<Plot> = emptyList()
@@ -1546,6 +2042,15 @@ private class Compilation(
     var split: FacetNode? = null
 
     var splitAbove: List<FacetNode> = emptyList()
+
+    /**
+     * The partition where the flow does **not** split at it, which is the other of the two shapes.
+     *
+     * A node in the flow either way, and a node in the flow takes a name and stands somewhere: the
+     * grid's own value lists are written at the point it stands, so the node has to be kept to be
+     * asked where the assembler passed it.
+     */
+    var tail: FacetNode? = null
 
     /** The datasets this plot's innermost cell computes for itself, where the flow splits. */
     var groupData: List<VegaValue> = emptyList()
@@ -1673,7 +2178,11 @@ private class Compilation(
         val plot = Plot(name, child)
         plot.nestedFacets = nestedFacets
         plot.views = views(plot.spec, plot.name, above) ?: return null
-        plot.views.forEach { plotNames[it] = plot.name }
+        plot.views.forEach {
+          plotNames[it] = plot.name
+          plotResolves[it] = Resolve(plot.spec.obj("resolve"))
+          it.statedSize = LayoutSize.statedSizes(plot.views, plot.spec)
+        }
         leaves += plot
         return Node.Leaf(plot)
       }
@@ -1903,28 +2412,62 @@ private class Compilation(
           .mapNotNull { (channel, kind) ->
             node.owns[channel]?.takeIf { it == "${node.prefix()}$kind" }
           }
-          // A merged size called plainly `width` or `height` is a top-level *property*, not a
-          // signal, which is upstream's own last step in `assembleTopLevelModel`.
-          .filter { it != "width" && it != "height" }
-          .mapNotNull { name ->
-            merged[name]?.let { value ->
-              obj {
-                put("name", name)
-                put("value", value)
-              }
-            }
-          } + node.children.flatMap { sizeSignalsFor(it) }
+          .mapNotNull { name -> merged[name]?.let { mergedSizeSignal(name, it) } } +
+          node.children.flatMap { sizeSignalsFor(it) }
     }
 
   private fun mergedSizeSignals(): List<VegaValue> =
-    merged.entries
-      .filter { it.key != "width" && it.key != "height" }
-      .map { (name, value) ->
-        obj {
-          put("name", name)
-          put("value", value)
+    merged.entries.mapNotNull { (name, value) -> mergedSizeSignal(name, value) }
+
+  /**
+   * The signal a merged size writes, or null where it is a top-level property instead.
+   *
+   * ```js
+   * layoutSignals = layoutSignals.filter((signal) => {
+   *   if ((signal.name === 'width' || signal.name === 'height') && signal.value !== undefined) {
+   *     topLevelProperties[signal.name] = +signal.value;
+   *     return false;
+   *   }
+   *   return true;
+   * });
+   * ```
+   *
+   * The hoist upstream does at the end is for a signal **carrying a value**: a plain number named
+   * `width` is the chart's width and is written as one. A `"container"` size has no number to hoist
+   * — the page has to be measured first — so it stays a signal, and this compiler wrote the view's
+   * default out as a property instead. Four specifications in the wild corpus are a column of plots
+   * each asking the page for its width.
+   */
+  /**
+   * The chart's own size, from the merged one — `topLevelProperties[signal.name] = +signal.value`.
+   *
+   * A **number** either way: the hoist coerces what it moves, so a chart written `"width": "1024"`
+   * is 1024 wide at the top even though the signal a *plot* of a concatenation keeps carries the
+   * string as it was written. Coerced as JavaScript's unary plus does it — a string of digits is
+   * its number, the empty string is zero — and a string that is no number at all is left where it
+   * was rather than written out as a `NaN` Vega cannot read.
+   */
+  private fun hoisted(merged: VegaValue?): VegaValue? =
+    when (merged) {
+      is VegaValue.Num -> merged
+      is VegaValue.Str ->
+        (if (merged.value.isBlank()) 0.0 else merged.value.trim().toDoubleOrNull())?.let {
+          VegaValue.Num(it)
         }
-      }
+      else -> null
+    }
+
+  private fun mergedSizeSignal(name: String, value: VegaValue): VegaValue? {
+    val channel = if (name.endsWith("width", ignoreCase = true)) "x" else "y"
+    if (value == VegaValue.Str("container")) {
+      return LayoutSize.containerSignal(name, channel, config)
+    }
+    if (name == "width" || name == "height") return null
+    return obj {
+      put("name", name)
+      put("value", value)
+    }
+  }
 
   // -----------------------------------------------------------------------------------------
   // Concatenated plots
@@ -2105,24 +2648,34 @@ private class Compilation(
           },
         )
       }
+      // A plot that **grids** its cell writes none of this on its own group: the cell is the unit
+      // the selection belongs to, and both the machinery and the sizes its axes fall back to are
+      // written there — see [cellSignalsFor].
       val local =
-        localSizeSignals(plot) +
-          selections
-            .filter { it.owner in plot.views }
-            .flatMap { selection ->
-              val pushed = boundOutward(selection, plot.views).map { it.second }.toSet()
-              machinery(selection, plot.views).map { signal ->
-                // A signal the top level declares is *written* here and read there — `push:
-                // "outer"`
-                // is how Vega says which of the two directions this one goes.
-                if ((signal as? VegaValue.Obj)?.string("name") !in pushed) signal
-                else
-                  obj {
-                    (signal as VegaValue.Obj).fields.forEach { (key, value) -> put(key, value) }
-                    put("push", "outer")
-                  }
+        if (plot.facets.isNotEmpty()) emptyList()
+        else
+          localSizeSignals(plot) +
+            selections
+              // A selection declared **above** the concatenation belongs to every plot in it:
+              // `assembleUnitSelectionSignals` runs per unit model and a parameter written on the
+              // chart is inherited by each, so each writes its own machinery in its own group. Kept
+              // at the top instead, one set of signals watched marks in two plots at once — and the
+              // pointer over either of them wrote the same tuple.
+              .filter { it.owner == null || it.owner in plot.views }
+              .flatMap { selection ->
+                val pushed = boundOutward(selection, plot.views).map { it.second }.toSet()
+                machinery(selection, plot.views).map { signal ->
+                  // A signal the top level declares is *written* here and read there — `push:
+                  // "outer"`
+                  // is how Vega says which of the two directions this one goes.
+                  if ((signal as? VegaValue.Obj)?.string("name") !in pushed) signal
+                  else
+                    obj {
+                      (signal as VegaValue.Obj).fields.forEach { (key, value) -> put(key, value) }
+                      put("push", "outer")
+                    }
+                }
               }
-            }
       if (local.isNotEmpty()) put("signals", arr(local))
       // A **faceted** plot lays its own cells out inside its group: the grid is this plot's, not
       // the chart's, so its headers and its cell stand here and the axes are already inside them.
@@ -2140,7 +2693,9 @@ private class Compilation(
               HEADER_OFFSET,
               config,
               setOf("x", "y")
-                .filter { resolve.scaleIsIndependent(it, defaultIndependent = false) }
+                .filter {
+                  resolveFor(plot.views).scaleIsIndependent(it, defaultIndependent = false)
+                }
                 .toSet(),
               headings = if (plot.facets.size > 1) headingsPerLevel(plot.facets).first() else null,
               childHasSize = plot.facets.size == 1,
@@ -2194,6 +2749,14 @@ private class Compilation(
     namePrefix: String,
     /** The model each of the chart's own transforms belongs to, from the levels above. */
     above: List<String> = emptyList(),
+    /**
+     * Whether this specification itself reads a table of its own — see [UnitView.ownsSource].
+     *
+     * False for a plot, which is either the chart or a cell whose `data` the levels above it wrote:
+     * a **cell** that states its own table is the one shape this does not carry, its grid then
+     * partitioning a chain no view here represents.
+     */
+    ownsSource: Boolean = false,
   ): List<UnitView>? {
     val mineHere = owning(spec, above, namePrefix)
     fun named(suffix: String) =
@@ -2239,7 +2802,7 @@ private class Compilation(
       // Each declared layer may itself normalize into more than one — a line that draws its own
       // points is two marks — so the list is expanded first and only then numbered. The numbering
       // is what names `layer_0_marks`, so it has to count the views that actually exist.
-      val units = mutableListOf<Pair<Triple<String, VegaValue.Obj, String>, String>>()
+      val units = mutableListOf<Member>()
       /** The model each collected view's transforms was written on, in the same order. */
       val owners = mutableMapOf<VegaValue.Obj, List<String>>()
 
@@ -2259,6 +2822,8 @@ private class Compilation(
         path: String,
         /** The model each of the parent's own transforms belongs to. */
         above: List<String>,
+        /** Whether a level above these members already read a table of its own. */
+        ownsAbove: Boolean,
       ) {
         parent.array("layer").orEmpty().forEachIndexed { index, layer ->
           val child = layer as? VegaValue.Obj ?: return@forEachIndexed
@@ -2301,17 +2866,22 @@ private class Compilation(
           val mine =
             if (child.has("data")) List(child.array("transform").orEmpty().size) { here }
             else above + List(child.array("transform").orEmpty().size) { here }
+          // A member that states its own `data` reads a table of its own, and so does every member
+          // of a layer that states one: `parseRoot` starts a root for it rather than descending
+          // from the level above, and the whole chain below it hangs there. See
+          // [UnitView.ownsSource].
+          val ownsHere = ownsAbove || child.has("data")
           if (child.has("layer")) {
-            collect(merged, here, owner ?: here, here2, mine)
+            collect(merged, here, owner ?: here, here2, mine, ownsHere)
           } else {
             expand(merged, here, mine).forEach {
               owners[it.second] = it.third
-              units += Triple(it.first, it.second, owner ?: here) to here2
+              units += Member(it.first, it.second, owner ?: here, here2, ownsHere)
             }
           }
         }
       }
-      collect(spec, namePrefix, null, "$", mineHere)
+      collect(spec, namePrefix, null, "$", mineHere, ownsSource)
 
       // A member the parser could not read is **dropped**, and the rest of the layer is drawn.
       // Upstream throws on the same document, which takes the whole chart with it; keeping the
@@ -2319,20 +2889,20 @@ private class Compilation(
       // with the one that did not — `parser.unit` reports before it answers null. What was missing
       // is the fact that a layer came back smaller than it was written, which a reader counting
       // marks would otherwise have to work out.
-      return units.mapNotNull { (named, path) ->
-        val (name, unit, child) = named
-        val parsed = parser.unit(unit, path)
+      return units.mapNotNull { member ->
+        val parsed = parser.unit(member.unit, member.path)
         if (parsed == null) {
           diagnostics.error(
             VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
             "This layer member could not be read, so the layer is drawn without it. The " +
               "diagnostic above says what was wrong with it.",
-            jsonPath = path,
+            jsonPath = member.path,
           )
           return@mapNotNull null
         }
-        UnitView(parsed, config, name, child, parentIsLayer = true).also { view ->
-          view.transformOwners = owners[unit].orEmpty()
+        UnitView(parsed, config, member.name, member.child, parentIsLayer = true).also { view ->
+          view.transformOwners = owners[member.unit].orEmpty()
+          view.ownsSource = member.ownsSource
         }
       }
     }
@@ -2358,14 +2928,47 @@ private class Compilation(
         parser.unit(unit, "$")?.let {
           UnitView(it, config, name, name, parentIsLayer = true).also { view ->
             view.transformOwners = owned
+            view.ownsSource = ownsSource
           }
         }
       }
     }
 
     val unit = parser.unit(spec, "$") ?: return null
-    return listOf(UnitView(unit, config, namePrefix).also { it.transformOwners = mineHere })
+    return listOf(
+      UnitView(unit, config, namePrefix).also {
+        it.transformOwners = mineHere
+        it.ownsSource = ownsSource
+      }
+    )
   }
+
+  /** One member a `layer` collected, with everything the view built from it needs to know. */
+  private class Member(
+    val name: String,
+    val unit: VegaValue.Obj,
+    /** The outermost member it belongs to, which is what a top-level `resolve` speaks about. */
+    val child: String,
+    val path: String,
+    /** Whether it reads a table of its own — see [UnitView.ownsSource]. */
+    val ownsSource: Boolean,
+  )
+
+  /**
+   * `isFieldOrDatumDef`: whether a channel definition **names** something to measure.
+   *
+   * ```js
+   * export function isFieldDef(channelDef) {
+   *   return hasProperty(channelDef, 'field') || channelDef?.aggregate === 'count';
+   * }
+   * ```
+   *
+   * A count is the one aggregate that names no column of its own — it counts rows — so it is asked
+   * for by name here rather than through a `field`. A `datum` is a literal standing where a column
+   * would, and it is a definition of the same kind for this purpose.
+   */
+  private fun namesAColumn(def: VegaValue.Obj): Boolean =
+    def.has("field") || def.has("datum") || def.string("aggregate") == "count"
 
   /**
    * A layer's own definition over the chart's.
@@ -2397,10 +3000,12 @@ private class Compilation(
     put("transform", if (inheritedTransforms.isEmpty()) null else arr(inheritedTransforms))
     val shared = spec.obj("encoding")
     if (shared != null) {
-      // Channel by channel, and **property by property within a channel**: `mergeEncoding` spreads
-      // the parent's channel def under the child's, so a shared `x` stating the type and a layer's
-      // `x` naming only the field come out as one definition with both. Replacing the whole channel
-      // instead loses the type, and a quantitative measure is then spoken as a category.
+      // Channel by channel, and **property by property within a channel** — but only where the two
+      // are definitions of the same kind. `mergeEncoding` spreads the parent's channel def under
+      // the child's when the child's *names a column*, so a shared `x` stating the type and a
+      // layer's `x` naming only the field come out as one definition with both; replacing the whole
+      // channel there would lose the type, and a quantitative measure would be spoken as a
+      // category. Anything else replaces it outright.
       put(
         "encoding",
         obj {
@@ -2409,14 +3014,40 @@ private class Compilation(
           for (channel in channels) {
             val parent = shared.fields[channel] as? VegaValue.Obj
             val mine = own?.fields?.get(channel)
+            // `hasConditionalFieldOrDatumDef`: a single condition that names a column, which is the
+            // half of such a channel the parent's definition belongs under.
+            val condition = (mine as? VegaValue.Obj)?.obj("condition")
             put(
               channel,
-              if (parent != null && mine is VegaValue.Obj) {
-                obj {
-                  putAll(parent)
-                  putAll(mine)
-                }
-              } else mine ?: shared.fields[channel],
+              when {
+                parent == null || mine !is VegaValue.Obj -> mine ?: shared.fields[channel]
+                // "Field/Datum Def can inherit properties from its parent."
+                namesAColumn(mine) ->
+                  obj {
+                    putAll(parent)
+                    putAll(mine)
+                  }
+                condition != null && namesAColumn(condition) ->
+                  obj {
+                    putAll(mine)
+                    put(
+                      "condition",
+                      obj {
+                        putAll(parent)
+                        putAll(condition)
+                      },
+                    )
+                  }
+                // `} else if (channelDef || channelDef === null) { merged[channel] = channelDef; }`
+                // — a definition that names no column **replaces** the parent's rather than
+                // inheriting from it. A member drawing its label at the corner of the plot writes
+                // `{"value": "width"}` for its `x`, and spreading the chart's own `x` under it left
+                // that member still measuring a column: placed against a scale it had said it did
+                // not want, filtered for rows that column had no value in, described by a field it
+                // does not show, and contributing to a colour domain it takes no part in. An empty
+                // `{}` is such a definition too, and is how a member says it has no `x` at all.
+                else -> mine
+              },
             )
           }
         },
@@ -2430,7 +3061,19 @@ private class Compilation(
    * Their marks are then named `child_marks` and their sizes `child_width`/`child_height`, which is
    * upstream's naming and is load-bearing: `width` still exists and means the whole grid.
    */
-  private fun liftFacet(views: List<UnitView>, owner: String): Pair<List<UnitView>, FacetLayout?> {
+  private fun liftFacet(
+    views: List<UnitView>,
+    owner: String,
+    /**
+     * The specification the grid was written on — the chart's, or a plot's where the plot grids.
+     *
+     * `columns` is written beside the facet, so it belongs to whichever level wrote the facet:
+     * `getFacetMappingAndLayout` lifts it from there onto the layout. Read off the chart's
+     * specification alone, a wrapped grid written on a *plot* of a concatenation found no number to
+     * wrap at and laid its cells out in one long row.
+     */
+    owning: VegaValue.Obj = spec,
+  ): Pair<List<UnitView>, FacetLayout?> {
     // The model the grid belongs to: the chart itself, or — inside a concatenation — the plot that
     // holds it. Everything the grid names runs through it, so a faceted plot beside a plain one
     // reads `concat_0_cell` rather than `cell`.
@@ -2455,15 +3098,21 @@ private class Compilation(
       if (wrapped != null)
         FacetWrap(
           wrapped,
-          (spec.number("columns") ?: wrapped.raw.number("columns"))?.toInt(),
+          (owning.number("columns") ?: wrapped.raw.number("columns"))?.toInt(),
           named,
           config,
-          wrappedFacetLayout(spec, wrapped),
+          wrappedFacetLayout(owning, wrapped),
         )
       else FacetGrid(row, column, named, crossedFacetLayout(spec, row?.def, column?.def))
 
     return views.map { view ->
       val withoutFacet = view.spec.encoding.filterKeys { it !in Channels.FACET_CHANNELS }
+      val cellName =
+        Fields.varName(
+          listOf(named, "child", view.name.removePrefix(named).trimStart('_'))
+            .filter { it.isNotEmpty() }
+            .joinToString("_")
+        )
       UnitView(
           UnitSpec(
             markDef = view.spec.markDef,
@@ -2472,6 +3121,16 @@ private class Compilation(
             transforms = view.spec.transforms,
             width = view.spec.width,
             height = view.spec.height,
+            // Lifting a facet takes the facet **channels** out of the encoding and nothing else:
+            // `mapFacetedUnit` moves the mark and the encoding down into the cell as they stand,
+            // and the cell is the same unit it always was. Rebuilding the specification without
+            // what the view declared left the cell a stranger to its own parameters — a selection
+            // declared inside a grid belonged to no view, so every mark in the cell was reachable
+            // by the pointer whether or not it was the one that declared it — and to its own
+            // projection, so a map drawn in a cell was put on the page by whatever the chart above
+            // it said instead.
+            params = view.spec.params,
+            projection = view.spec.projection,
             // A cell has a plotting area of its own, so what the view block says about styling it
             // is the cell's — `assembleGroupStyle` is asked of the child model, which is this one.
             viewBackground = view.spec.viewBackground,
@@ -2480,29 +3139,51 @@ private class Compilation(
           // `child` under the chart's own name and above the layer's: a named trellis of layers
           // reads `trellis_child_layer_0`, because the name belongs to the model the cell hangs
           // from and the layer's index to the view inside it.
-          Fields.varName(
-            listOf(named, "child", view.name.removePrefix(named).trimStart('_'))
-              .filter { it.isNotEmpty() }
-              .joinToString("_")
-          ),
+          cellName,
           parentIsLayer = view.parentIsLayer,
         )
         .also {
           // A transform still belongs to the model it was written on. The facet's own are the
           // *facet model's*, whatever the cell is called, and that is what says they stand above
           // the partition rather than being rebuilt inside every cell.
-          it.transformOwners = view.transformOwners
+          //
+          // A model that is **renamed** still owns what it owned, though. The view becomes
+          // `child_layer_1` here, and a transform its own expansion wrote — a composite mark's
+          // bounds, written once above the parts it expands into — was still credited to
+          // `layer_1`, so the renamed view no longer recognised it as its own and left it to an
+          // ancestor that had never heard of it. It was then written nowhere at all: an error bar
+          // inside a grid filtered on columns no step computes, which is every row, so the
+          // intervals were not drawn.
+          //
+          // Only where the view **has** a name of its own. A chart written with the `column`
+          // shorthand is one view and the chart at once, and its transforms are the chart's:
+          // `owning` credits them to the empty name, which is the name the cell was renamed from,
+          // and renaming those would make the grid's own steps the cell's.
+          it.transformOwners =
+            view.transformOwners.map { owner ->
+              if (view.name.isNotEmpty() && owner == view.name) cellName else owner
+            }
           it.widthSignal = through("child_width")
           it.heightSignal = through("child_height")
-          it.facetFields = found.fields
-          it.facetDefs = found.defs
-          it.facetDeclared =
-            view.spec.encoding.entries
-              .filter { entry -> entry.key in Channels.FACET_CHANNELS }
-              .map { entry -> entry.value }
-          // The cell's marks read the partition Vega facets out for them, named `facet`; the
-          // scales still read the whole table, so every cell is scaled alike.
-          it.markData = found.named("facet")
+          it.ownsSource = view.ownsSource
+          // A view that reads a table of its own is **not** below the partition: its chain hangs
+          // beside the grid, off its own root, so the facet's fields group nothing of its and the
+          // facet's own columns are none of its business. Its marks read that chain's output and
+          // draw the same rows in every cell, which is what such a layer is written for — a grid
+          // of outlines over a map, say, drawn the same over each. See [UnitView.ownsSource].
+          it.cellOwner = owner
+          if (!view.ownsSource) {
+            it.facetFields = found.fields
+            it.gridTransforms = gridTransforms
+            it.facetDefs = found.defs
+            it.facetDeclared =
+              view.spec.encoding.entries
+                .filter { entry -> entry.key in Channels.FACET_CHANNELS }
+                .map { entry -> entry.value }
+            // The cell's marks read the partition Vega facets out for them, named `facet`; the
+            // scales still read the whole table, so every cell is scaled alike.
+            it.markData = found.named("facet")
+          }
         }
     } to found
   }
@@ -2519,8 +3200,134 @@ private class Compilation(
    */
   private var cellScales: List<VegaValue> = emptyList()
 
+  /** The keys a facet's cells own, which stand inside the cell as their scales do. */
+  private var cellLegends: List<VegaValue> = emptyList()
+
+  /**
+   * Whether the key explaining [scale] belongs **in the cell** rather than beside the grid.
+   *
+   * ```js
+   * resolve.legend[channel] = parseGuideResolve(model.component.resolve, channel);
+   *
+   * if (resolve.legend[channel] === 'shared') {
+   *   legends[channel] = mergeLegendComponent(legends[channel], child.component.legends[channel]);
+   * ```
+   *
+   * `parseNonUnitLegend` merges a child's key up into the composition only where the resolve says
+   * **shared**, and `parseGuideResolve` answers `independent` for any channel whose *scale* is
+   * independent. A key is a reading of one scale — its swatches are that scale's colours — so a
+   * trellis whose cells colour themselves has a key per cell, and it stands in the cell group where
+   * the scale it reads does.
+   *
+   * Asked of the **channel**, not of the scale: `{"legend": {"color": "independent"}}` is a key per
+   * cell for a scale every cell shares, which is a reader's answer to a grid too crowded to carry
+   * one key beside it. Reading the scale's own name instead would have missed exactly that.
+   *
+   * This engine placed a key by the composition alone — inside a plot of a concatenation, and
+   * otherwise beside the chart — so a trellis's own key was written beside the grid, one key for a
+   * scale there is one of per cell, drawn from a scale that does not exist at the level it was
+   * written on.
+   */
+  private fun cellOwnsLegend(channel: String?): Boolean =
+    facet != null &&
+      concat == null &&
+      channel != null &&
+      resolve.guideIsIndependent(
+        channel,
+        resolve.scaleIsIndependent(channel, defaultIndependent = false),
+      )
+
   /** The sizes a cell's own axes fall back to by name, aliased to the cell's own. */
   private var cellSignals: List<VegaValue> = emptyList()
+
+  /**
+   * The signals a grid's **cell** carries: what a selection inside it needs, and the sizes its own
+   * axes fall back to.
+   *
+   * ```js
+   * export function assembleFacetSignals(model: FacetModel, signals: Signal[]) {
+   *   if (model.component.selection && keys(model.component.selection).length > 0) {
+   *     const name = stringValue(model.getName('cell'));
+   *     signals.unshift({
+   *       name: 'facet',
+   *       value: {},
+   *       on: [{events: [{source: 'scope', type: 'pointermove'}],
+   *             update: `isTuple(facet) ? facet : group(${name}).datum`}],
+   *     });
+   *   }
+   *   return assembleTopLevelSignals(model, signals);
+   * }
+   * ```
+   *
+   * `assembleUnitSelectionSignals` runs on the **unit** model, and inside a grid the unit is the
+   * cell: the marks a selection watches are drawn there, the scales it reads are the cell's, and
+   * the `facet` signal beside it says which cell the pointer is in so that a pick made anywhere in
+   * the grid is attributed to the right one. A grid nothing is selected in needs no such signal.
+   *
+   * Written on the **plot's** group instead — which is where this compiler wrote a gridded plot's —
+   * one set of signals watched every cell at once, the pointer over any of them wrote the same
+   * tuple, and nothing said which cell it came from.
+   */
+  private fun cellSignalsFor(
+    grid: FacetLayout,
+    plot: Plot,
+    views: List<UnitView>,
+  ): List<VegaValue> {
+    val own =
+      selections.filter { it.owner == null || it.owner in plot.views }.distinctBy { it.name }
+    return (if (own.isEmpty()) emptyList()
+    else
+      listOf(
+        obj {
+          put("name", "facet")
+          put("value", VegaValue.EmptyObject)
+          put(
+            "on",
+            arr(
+              listOf(
+                obj {
+                  put(
+                    "events",
+                    arr(
+                      listOf(
+                        obj {
+                          put("source", "scope")
+                          put("type", "pointermove")
+                        }
+                      )
+                    ),
+                  )
+                  put(
+                    "update",
+                    "isTuple(facet) ? facet : group(${quoted(grid.named("cell"))}).datum",
+                  )
+                }
+              )
+            ),
+          )
+        }
+      )) +
+      localSizeSignals(plot) +
+      own.flatMap { selection ->
+        // A signal the top level declares is *written* here and read there — `push: "outer"` is
+        // how Vega says which of the two directions this one goes — and one a **control** writes
+        // is not written here at all: it belongs beside the widget, outside the grid.
+        val pushed = boundOutward(selection, views).map { it.second }.toSet()
+        val outside = boundInward(selection, views).toSet()
+        machinery(selection, views, grid).mapNotNull { signal ->
+          val named = (signal as? VegaValue.Obj)?.string("name")
+          when {
+            named in outside -> null
+            named !in pushed -> signal
+            else ->
+              obj {
+                (signal as VegaValue.Obj).fields.forEach { (key, value) -> put(key, value) }
+                put("push", "outer")
+              }
+          }
+        }
+      }
+  }
 
   /** Where the flow splits at the facet: each outer dataset's counterpart inside the cell. */
   private val cellDataFor = mutableMapOf<String, String>()
@@ -2532,10 +3339,70 @@ private class Compilation(
    * facet handed *that* cell, and inside the group those rows are the partition Vega named `facet`.
    * Left pointing at the shared dataset the scale would be built per cell and identical in each.
    */
-  private fun withinCell(scale: VegaValue): VegaValue {
+  /**
+   * Whether a scale belongs **inside** the cells of this plot's own grid.
+   *
+   * A plot of a concatenation that grids its cell resolves channels between those cells, and such a
+   * scale is measured over the rows one cell was handed: it is built there and named for the cell,
+   * so no level above can read it.
+   */
+  /**
+   * `findSource`: whether a table already standing is the one this mention asks for.
+   *
+   * ```js
+   * if (data.name && other.hasName() && data.name !== other.dataName) continue;
+   * ...
+   * if (isInlineData(data) && isInlineData(otherData)) { if (deepEqual(...)) return other; }
+   * else if (isUrlData(data) && isUrlData(otherData)) { if (data.url === otherData.url) return other; }
+   * else if (isNamedData(data)) { if (data.name === other.dataName) return other; }
+   * ```
+   *
+   * Two **named** tables of different names are never the same whatever else they say. Beyond that
+   * a table is its rows or its address — the same values, or the same URL — and a mention that is
+   * **only** a name is the table of that name, however it was declared. The `feature` and `mesh` a
+   * format picks out are part of the address: two views reading different layers of one topology
+   * read different tables.
+   */
+  private fun sameSource(standing: VegaValue, asked: VegaValue): Boolean {
+    val other = standing as? VegaValue.Obj ?: return false
+    val data = asked as? VegaValue.Obj ?: return false
+    val name = data.string("name")
+    val otherName = other.string("name")
+    if (name != null && otherName != null && name != otherName) return false
+    val mesh = data.obj("format")?.string("mesh")
+    val otherFeature = other.obj("format")?.string("feature")
+    // A feature and a mesh are two readings of one topology and never the same table.
+    if (mesh != null && otherFeature != null) return false
+    val feature = data.obj("format")?.string("feature")
+    if ((feature != null || otherFeature != null) && feature != otherFeature) return false
+    val otherMesh = other.obj("format")?.string("mesh")
+    if ((mesh != null || otherMesh != null) && mesh != otherMesh) return false
+    val values = data.fields["values"]
+    val url = data.string("url")
+    val generated =
+      data.fields["sequence"] != null ||
+        data.fields["sphere"] != null ||
+        data.fields["graticule"] != null
+    return when {
+      values != null -> other.fields["values"] == values
+      url != null -> other.string("url") == url
+      // `isNamedData`: a name, and nothing that says where the rows come from.
+      !generated && name != null -> name == otherName
+      else -> false
+    }
+  }
+
+  private fun cellOwnsScale(plot: Plot, name: String): Boolean =
+    concat != null && plot.facets.isNotEmpty() && name.startsWith("${plot.name}_child_")
+
+  private fun withinCell(scale: VegaValue, partition: String = "facet"): VegaValue {
     val block = scale as? VegaValue.Obj ?: return scale
     val domain = block.obj("domain") ?: return scale
-    fun inside(name: VegaValue) = cellDataFor[(name as? VegaValue.Str)?.value] ?: "facet"
+    // The **partition** is what a cell sees where no chain of its own was computed, and it is named
+    // for the grid that cut it: the chart's own is `facet`, and a plot of a concatenation cuts its
+    // own `concat_0_facet`. Falling back to the bare name left a plot's cell scale measuring a
+    // dataset that does not exist at that level.
+    fun inside(name: VegaValue) = cellDataFor[(name as? VegaValue.Str)?.value] ?: partition
     // A domain measured over **several** datasets — two layers of one cell — names each of them,
     // and where the flow splits at the facet each already has a counterpart computed inside the
     // cell. Those are the tables to measure; the partition itself is what a chain that could not
@@ -2663,9 +3530,13 @@ private class Compilation(
     // several different extents. `parseGuideResolve` says the same thing about the guide.
     val independent =
       setOf("x", "y").filter { channel ->
-        resolve.scaleIsIndependent(channel, defaultIndependent = false)
+        resolveFor(views).scaleIsIndependent(channel, defaultIndependent = false)
       }
-    fun cellsOwn(axis: VegaValue): Boolean = cellOwnsAxis(axis, ofFacet = true)
+    // Asked of the **grid's own** `resolve`, which for a plot of a concatenation is that plot's:
+    // the chart's speaks about the plots beside each other, and this question is about the cells
+    // inside one of them.
+    val here = resolveFor(views)
+    fun cellsOwn(axis: VegaValue): Boolean = cellOwnsAxis(axis, here)
     val gridAxes = axes.filter { (it["grid"] as? VegaValue.Bool)?.value == true || cellsOwn(it) }
     val mainAxes = axes.filter { (it["grid"] as? VegaValue.Bool)?.value != true && !cellsOwn(it) }
     val horizontal = mainAxes.filter {
@@ -2700,14 +3571,30 @@ private class Compilation(
           // Cartesian position to border, `view` where it has none. A trellis of pies has no
           // plotting area in any of its cells.
           style(views) ?: VegaValue.Str("cell"),
-          cellCardinality,
-          cellScales,
+          // The columns this plot's own cells count for themselves, where the plot is one of a
+          // concatenation: `getCardinalityAggregateForChild` is asked of the grid, and a plot's
+          // grid is one — see [cardinalityOf].
+          if (owner != null && concat != null && owner.facets.isNotEmpty()) cardinalityOf(owner)
+          else cellCardinality,
+          // The scales this plot's own cells own, where the plot is one of a concatenation: the
+          // chart's own grid hands them down in [cellScales], and a plot's grid keeps its in the
+          // plot.
+          owner
+            ?.scales
+            ?.values
+            ?.filter { cellOwnsScale(owner, it.name()) }
+            ?.map { withinCell(assembleScale(it), current.named("facet")) }
+            ?.takeIf { it.isNotEmpty() } ?: cellScales,
           viewEncode(),
           groupData,
           // `assembleAxisSignals` on the **cell**: an axis inside it that draws its grid across no
           // other scale falls back to `width` or `height` by name, and inside the cell those names
-          // mean the whole chart until the cell aliases them to its own.
-          cellSignals,
+          // mean the whole chart until the cell aliases them to its own. A plot of a concatenation
+          // that grids its cell carries its own there — see [cellSignalsFor].
+          if (owner != null && concat != null && owner.facets.isNotEmpty())
+            cellSignalsFor(current, owner, views)
+          else cellSignals,
+          cellLegends,
         )
     if (above.isEmpty()) return inner
 
@@ -3197,7 +4084,36 @@ private class Compilation(
     // creates one of its own: a chart whose first layer brings its own rows still numbers the
     // chart's table `source_0`. It is left out where nothing hangs off it, as an unused subtree is.
     spec.fields["data"]?.let { own -> if (views.any { it.spec.data == own }) order += own }
+    // And the tables the chart's **own** joins read come next, before any child's. `parseData`
+    // parses a model's transforms where it stands — `parseTransformArray` runs on the model's own
+    // list and `LookupNode.make` gives the joined table a root there — and only then descends. A
+    // join written on the chart therefore names its table before a layer that brought rows of its
+    // own names that; registered as the transform was *translated* instead, the table was numbered
+    // behind whatever the first view had already claimed, and every reader of it — the mark, the
+    // projection it is fitted to — named a different table than upstream's.
+    //
+    // Only where some view runs them: a layer that reads a table of its own skips its ancestors'
+    // transforms altogether, so a chart all of whose layers do that has no join to name.
+    if (views.any { !it.ownsSource }) {
+      for (transform in spec.array("transform").orEmpty()) {
+        // `from.data` is a **join's** and nothing else's — no other transform reads a second table
+        // — and a join against a *parameter* has none, reading the rows a selection has picked.
+        val table = transform.obj("from")?.get("data") ?: continue
+        if (table !in order) order += table
+      }
+    }
     val roots = LinkedHashMap<VegaValue, SourceNode>()
+    // `findSource`: a table already standing is **found** rather than made, and what makes two
+    // mentions the same table is not that they were written the same way. A dataset given a `name`
+    // is that name's, so a view that says `{"name": "locations"}` and nothing else reads the table
+    // another view declared under that name — which is how one specification names a table once and
+    // draws from it three times. Keyed by the value as written, each mention stood up a root of its
+    // own: the table was fetched again per mention, the derived tables were numbered around them,
+    // and a projection fitted to one of them named a table the marks did not read.
+    fun canonical(data: VegaValue): VegaValue =
+      order.firstOrNull { sameSource(it, data) }
+        ?: roots.keys.firstOrNull { sameSource(it, data) }
+        ?: data
     // How many **models** name each table, which is how many times `parseRoot` runs on it and
     // therefore how many times it can be *found* already standing. See [SourceNode.shared].
     val statedBy = LinkedHashMap<VegaValue, Int>()
@@ -3225,18 +4141,26 @@ private class Compilation(
     // itself whether its cells compute their own rows.
     for (plot in allPlots) {
       val grid = plot.facet ?: continue
+      // The views that hang **below** the partition, which are the ones the walk counts: a layer
+      // that reads a table of its own is a root of its own, so it is no child of the facet at all
+      // and cannot be the fork that stops the walk. A cell of three layers, two of them with their
+      // own tables, is therefore one child and hoists its chain like a single mark would.
+      val below = viewsBelow(plot)
       plot.split =
         grid
           .takeIf {
-            plot.views.size > 1 ||
+            below.size > 1 ||
               plot.facets.size > 1 ||
-              plot.views.any { view -> DataPipeline.needsRawTable(view) }
+              below.any { view -> DataPipeline.needsRawTable(view) }
           }
           ?.let { FacetNode(it.named("facet")) }
       // The levels above the split, whose partitions the chain passes through on the way down.
       plot.splitAbove =
         if (plot.split == null) emptyList()
         else plot.facets.dropLast(1).map { FacetNode(it.named("facet")) }
+      // One node for the grid either way, kept rather than made where it is used: the assembler
+      // fills in what it read and where it stood, and the grid's value lists are written there.
+      plot.tail = if (plot.split != null) null else FacetNode(grid.named("facet"))
     }
     val split = if (concat == null) allPlots.singleOrNull()?.split else null
     // One partition for the whole cell, however many plots stand in it: they share the cell, so
@@ -3259,7 +4183,8 @@ private class Compilation(
     // copies of one join apart from two joins. Named for the table it reads instead, three copies
     // of one plot folded into a single node above the fork where upstream keeps one per copy, and
     // the whole chart came out a dataset short.
-    val register: (VegaValue, String) -> String = { table, key ->
+    val register: (VegaValue, String) -> String = { raw, key ->
+      val table = canonical(raw)
       if (table !in order) order += table
       lookupOutputs.getOrPut(key) {
         OutputNode(key).also { roots.getOrPut(table) { SourceNode(table) }.then(it) }
@@ -3267,8 +4192,9 @@ private class Compilation(
       key
     }
     val outputs = views.map { view ->
-      val data = view.spec.data!!
+      val data = canonical(view.spec.data!!)
       if (data !in order) order += data
+      val partitioned = plotOfView(view)?.let { view in viewsBelow(it) } ?: !view.ownsSource
       // `requiresSelectionId(model)` asks the **unit**, not the chart: the identity column is
       // written where a selection that remembers rows by identity was declared, and nowhere else. A
       // layer of two bars, one of them hovered over, is the case — the hovered one needs a
@@ -3279,24 +4205,49 @@ private class Compilation(
           diagnostics,
           register,
           Selection.needsIdentity(selections),
-          Selection.needsIdentity(selections.filter { it.owner === view }),
+          // `requiresSelectionId(model)` asks the **unit model**, and a parameter declared above a
+          // composition is part of every unit model below it — inherited, not the chart's alone. So
+          // a view under a chart-level selection needs the identifier after its aggregate as much
+          // as one that declared its own: the rows an aggregate makes are not the rows that went
+          // in, and a selection that remembers by identity has nothing to remember them by.
+          Selection.needsIdentity(selections.filter { it.owner === view || it.owner == null }),
+          // A transform written on a **layer** is that layer's, and the identifier below its
+          // aggregate is the layer's too: the question is whether anything at or below that model
+          // remembers its rows by identity, which is what `forEachSelection` walks.
+          identityUnder = { owner ->
+            Selection.needsIdentity(
+              selections.filter {
+                val declared = it.owner?.name
+                it.owner == null ||
+                  declared == owner ||
+                  owner.isEmpty() ||
+                  declared?.startsWith("${owner}_") == true
+              }
+            )
+          },
           // `moveFacetDown` hoists a cell's chain above the facet until it meets a named point the
           // scales read. The pre-aggregation table a sorted domain asks for is such a point, and
           // where there is one the chain stays below the facet and a copy of it — with the facet's
           // own fields added to every grouping — is hung beside it for the scales to measure.
-          facetSplit = plotOfView(view)?.split ?: cellSplit,
+          // Only for a view that hangs below the grid: one reading a table of its own has a chain
+          // beside the grid rather than under it, so no partition stands anywhere in it. See
+          // [viewsBelow].
+          facetSplit = if (!partitioned) null else plotOfView(view)?.split ?: cellSplit,
           facetAbove =
-            plotOfView(view)
-              ?.split
-              ?.let { plotOfView(view)?.splitAbove }
-              .orEmpty()
-              .ifEmpty {
-                if (plotOfView(view)?.split == null) cellSplitAbove else emptyList()
-              },
+            if (!partitioned) emptyList()
+            else
+              plotOfView(view)
+                ?.split
+                ?.let { plotOfView(view)?.splitAbove }
+                .orEmpty()
+                .ifEmpty {
+                  if (plotOfView(view)?.split == null) cellSplitAbove else emptyList()
+                },
           // Where the flow does not split, the grid is still a node in it, and a node takes a name.
-          facetTail =
-            if (plotOfView(view)?.split != null) null
-            else plotOfView(view)?.facet?.let { FacetNode(it.named("facet")) },
+          facetTail = if (!partitioned) null else plotOfView(view)?.tail,
+          // Whether the partition is a fork, which is what stops the hoisting — see
+          // [DataPipeline.facetForked].
+          facetForked = plotOfView(view)?.let { viewsBelow(it).size > 1 } ?: false,
           materialized = materialized,
           lookupOutputs = lookupOutputs,
         )
@@ -3361,6 +4312,15 @@ private class Compilation(
       val read = plot.splitAbove.firstOrNull() ?: own
       plot.reads = read.data
       plot.domainsAt = read.at
+    }
+    // Where nothing splits, the grid's value lists still stand at the point the partition does —
+    // `data.push(...node.assemble())` the moment the walk reaches it, and then the walk turns back.
+    // Written at the end instead they came after a table a *later* root derived, which is the shape
+    // a layer reading a table of its own makes: its chain is walked after the grid's.
+    for (plot in allPlots) {
+      val tail = plot.tail?.takeIf { it.at >= 0 } ?: continue
+      plot.reads = tail.data
+      plot.domainsAt = tail.at
     }
     // "now fix the from references in lookup transforms": a join names the *output node* while the
     // flow is being built, because the dataset that node ends up being is not known until the tree
@@ -3489,6 +4449,10 @@ private class Compilation(
             def,
             view.spec.mark,
             hasOffset = offsetChannelFor(channel)?.let { view.spec.encoding[it] != null } == true,
+            // Reported **here** and not from `findIncompatibleScales`, which asks the same question
+            // earlier to see whether two views can share a scale: a refused type is one fact about
+            // the specification, and saying it twice would be a report of two.
+            diagnostics = diagnostics,
           )
         val key = name(view, channel)
         val existing = scales[key]
@@ -3771,10 +4735,27 @@ private class Compilation(
     // `assembleAxisSignals` asks each component without a `gridScale`, and a plot inside a
     // composition then aliases that name to its own size.
     plot.gridlessAxes = components.values.map { it.first }
-    val ordered = components.values.map { it.second }
-    // Gridlines first, so they are painted behind every mark, then the axes themselves.
-    return ordered.mapNotNull { Guides.assembleAxis(it, "grid") } +
-      ordered.mapNotNull { Guides.assembleAxis(it, "main") }
+    // ```js
+    // const {x = [], y = []} = axisComponents;
+    // return [
+    //   ...x.map((a) => assembleAxis(a, 'grid', config)),
+    //   ...y.map((a) => assembleAxis(a, 'grid', config)),
+    //   ...x.map((a) => assembleAxis(a, 'main', config)),
+    //   ...y.map((a) => assembleAxis(a, 'main', config)),
+    // ].filter((a) => a);
+    // ```
+    //
+    // Gridlines first, so they are painted behind every mark, then the axes themselves — and within
+    // each pass the **horizontals before the verticals**, because `axisComponents` is a map keyed
+    // by channel and upstream reads the two keys in turn. Written in the order the components were
+    // discovered, a chart whose first layer draws only a baseline listed that layer's `y` before
+    // the `x` the layer above it brought, and the two came out the other way round.
+    fun each(channel: String) = components.values.filter { it.first == channel }.map { it.second }
+    val (xs, ys) = each("x") to each("y")
+    return xs.mapNotNull { Guides.assembleAxis(it, "grid") } +
+      ys.mapNotNull { Guides.assembleAxis(it, "grid") } +
+      xs.mapNotNull { Guides.assembleAxis(it, "main") } +
+      ys.mapNotNull { Guides.assembleAxis(it, "main") }
   }
 
   /**
@@ -3787,6 +4768,25 @@ private class Compilation(
   private fun cellOwnsAxis(axis: VegaValue, ofFacet: Boolean = concat == null): Boolean =
     setOf("x", "y").any { channel ->
       guideIsIndependent(channel, ofFacet) && axis.string("scale")?.endsWith(channel) == true
+    }
+
+  /**
+   * The same question asked of a **plot's own** `resolve` — the grid inside one plot of a chart.
+   *
+   * `parseGuideResolve` is asked of the model the grid belongs to, and for a faceted plot of a
+   * concatenation that is the facet: its cells share their positions, whatever the plots beside it
+   * do about theirs. Asked of the chart's resolve instead, every position axis of such a plot
+   * looked like a cell's own — the concatenation's default for `x` and `y` being independent — so
+   * the grid was credited with no shared band at all and counted **no cells**. The bands were still
+   * drawn, from `assembleFacetMarks`, which asks the plot's own resolve: they read a sequence
+   * dataset nothing had written, and Vega refuses a chart that names a dataset it was never given.
+   */
+  private fun cellOwnsAxis(axis: VegaValue, within: Resolve): Boolean =
+    setOf("x", "y").any { channel ->
+      within.guideIsIndependent(
+        channel,
+        within.scaleIsIndependent(channel, defaultIndependent = channel == "theta"),
+      ) && axis.string("scale")?.endsWith(channel) == true
     }
 
   private fun guideIsIndependent(channel: String, ofFacet: Boolean = concat == null): Boolean =
@@ -3856,6 +4856,8 @@ private class Compilation(
     scaleOf: MutableMap<String, String> = mutableMapOf(),
     /** Which plot a legend belongs to, where the composition resolves that legend per plot. */
     plotOf: MutableMap<String, String> = mutableMapOf(),
+    /** Which channel each legend explains, which is what a guide's resolution is asked about. */
+    channelOf: MutableMap<String, String> = mutableMapOf(),
     /** The `resolve` of the composition each view sits in, which may not be the chart's own. */
     resolveOf: Map<UnitView, Resolve> = emptyMap(),
   ): LinkedHashMap<String, VegaValue> {
@@ -3933,6 +4935,7 @@ private class Compilation(
           val entry = legends.getOrPut(key) { LinkedHashMap() }
           if (key !in scaleOf) {
             scaleOf[key] = component.name()
+            channelOf[key] = channel
             ownPlot?.let { plotOf[key] = it }
           }
           // `putIfAbsent` is a JVM extension, and this file is compiled for five targets.
@@ -3950,6 +4953,7 @@ private class Compilation(
         if (existing == null) {
           legends[key] = LinkedHashMap(built.fields)
           scaleOf[key] = component.name()
+          channelOf[key] = channel
           ownPlot?.let { plotOf[key] = it }
           if (titled) explicitlyTitled += key
         } else {
@@ -4085,6 +5089,28 @@ private class Compilation(
     }
 
   private companion object {
+    /** The properties `mergeIfNoConflict` compares — see [sharesProjectionProperties]. */
+    val PROJECTION_PROPERTIES =
+      listOf(
+        "type",
+        "clipAngle",
+        "clipExtent",
+        "center",
+        "rotate",
+        "precision",
+        "reflectX",
+        "reflectY",
+        "coefficient",
+        "distance",
+        "fraction",
+        "lobes",
+        "parallel",
+        "radius",
+        "ratio",
+        "spacing",
+        "tilt",
+      )
+
     /**
      * Vega-Lite 6's top-level properties, and the one metadata key that is not one.
      *

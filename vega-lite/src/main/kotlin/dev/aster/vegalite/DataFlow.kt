@@ -104,11 +104,23 @@ internal sealed class DataNode {
     when (this) {
       is ParseNode -> "parse:$parse"
       is FilterInvalidNode -> "filter-invalid:$definitions"
-      // A time-unit step is merged by `mergeTimeUnits` instead, which keeps a different one.
-      is PassThroughNode -> if (timeUnit) null else "transforms:${transforms.map { it.toString() }}"
+      is PassThroughNode -> "transforms:${transforms.map { it.toString() }}"
       is BinNode -> "bin:${transforms()}"
       is ImputeNode -> "impute:${transforms()}"
       is StackNode -> "stack:${transforms()}|$component"
+      // An **aggregate** too, and it is the one kind two optimizers can fold: `MergeAggregates`
+      // runs first in each round and keeps the *last* of the aggregates that are already siblings
+      // when it runs, and this keeps the *first* of whatever is identical once the folds above have
+      // brought them together. `MergeIdenticalNodes` works top-down and descends straight into a
+      // node it has just merged, so a pair of aggregates that only becomes siblings because their
+      // own steps folded is folded here, in the same pass, before `MergeAggregates` sees them at
+      // all. Left with no identity, every such pair waited a round and folded the other way about:
+      // the branches came out reversed and each mark read its neighbour's dataset.
+      is AggregateNode -> "aggregate:$dimensions|$ops|$fields|$outputs"
+      // And a **time unit**, for the same reason and with the same pair of optimizers: upstream
+      // hashes it as `TimeUnit ${hash(this.timeUnits)}`, and `MergeTimeUnits` — which keeps the
+      // *last* — only ever sees the pairs that were already siblings when it ran.
+      is TimeUnitNode -> "timeunit:$units"
       else -> null
     }
 
@@ -136,41 +148,109 @@ internal sealed class DataNode {
    * the grandparent, which is where the pointers are.
    */
   fun moveParseUp() {
-    children.forEach { it.moveParseUp() }
-    var moved = true
-    while (moved) {
-      moved = false
-      for ((index, below) in children.withIndex()) {
-        val parse = below.children.singleOrNull() as? ParseNode ?: continue
+    // `BottomUpOptimizer.optimize`: every node in the tree, **deepest first**, in one pass.
+    //
+    // ```js
+    // public optimize(node: DataFlowNode): boolean {
+    //   const depths = this.getNodeDepths(node, 0, new Map());
+    //   const topologicalSort = [...depths.entries()].sort((a, b) => b[1] - a[1]);
+    //   for (const tuple of topologicalSort) {
+    //     this.run(tuple[0]);
+    //   }
+    // ```
+    //
+    // The depths are measured **once**, before anything moves, and a node is then visited at the
+    // depth it had then — so a parse that has already climbed is visited again from wherever it now
+    // is, and one whose parent has moved out from under it climbs from its new place. That is not a
+    // detail: it decides the order the branches below a fork end up in, and the dataset numbering
+    // follows the order. Written as a recursion that settles each level before the one above it,
+    // this compiler let a parse climb in a different sequence and numbered a chart's tables in an
+    // order no mark expected.
+    val parents = LinkedHashMap<DataNode, DataNode>()
+    val order = mutableListOf<Pair<DataNode, Int>>()
+    fun measure(node: DataNode, depth: Int) {
+      order += node to depth
+      for (child in node.children) {
+        parents[child] = node
+        measure(child, depth + 1)
+      }
+    }
+    measure(this, 0)
+    for ((node, _) in order.sortedByDescending { it.second }) {
+      // A root is nobody's child, and a fork is where a parse belongs rather than above.
+      if (node is SourceNode || node.children.size > 1) continue
+      // ```js
+      // for (const child of node.children) {
+      //   if (child instanceof ParseNode) {
+      //     …
+      //     child.swapWithParent();
+      // ```
+      //
+      // Walked **as it stands**, not over a copy. A swap empties the list and fills it with the
+      // parse's own children, and JavaScript's iterator then carries on at the next index — into
+      // the children the swap just put there. So a parse among them is swapped in the same pass,
+      // and the branch below *it* is appended after everything else. It reads like an accident and
+      // it is one, but it is what decides the order the branches below a fork are numbered in.
+      var index = 0
+      while (index < node.children.size) {
+        val child = node.children[index]
+        index++
+        if (child !is ParseNode) continue
         // A parse below a parse is one parse: `node.merge(child)` rather than a swap. The two are
         // only ever chained because this compiler brought them together — one lifted out of a
         // branch to meet the one already there — and leaving them chained wrote the second as a
         // formula over a column the first had already read.
-        if (below is ParseNode) {
-          below.parse.putAll(parse.parse)
-          below.children.clear()
-          below.children += parse.children
-          parse.children.clear()
-          moved = true
+        if (node is ParseNode) {
+          node.parse.putAll(child.parse)
+          val at = node.children.indexOf(child)
+          node.children.removeAt(at)
+          node.children.addAll(at, child.children)
+          child.children.forEach { parents[it] = node }
+          child.children.clear()
           continue
         }
         // A parse cannot climb past a step that produces what it reads — and a *nested* parse
         // reads the whole path, so a step producing `argmax_US_Gross` blocks a parse of
         // `argmax_US_Gross['Production Budget']` even though the two names differ.
-        val roots = parse.parse.keys.map { Fields.splitAccessPath(it).first() }.toSet()
-        if (below.producedFields().any { it in parse.parse.keys || it in roots }) continue
+        val roots = child.parse.keys.map { Fields.splitAccessPath(it).first() }.toSet()
+        if (node.producedFields().any { it in child.parse.keys || it in roots }) continue
         // A step whose outputs are **unknown** blocks every parse: a `pivot` turns a column of
         // categories into a column each, so nothing above it can say what the table will hold.
         // `PivotTransformNode.producedFields` answers `undefined` for exactly this reason, and the
         // parse then stays below it and is written as formulas rather than as `format.parse`.
-        if (below.producesUnknownFields()) continue
-        val above = parse.children.toList()
-        parse.children.clear()
-        below.children.clear()
-        below.children += above
-        parse.children += below
-        children[index] = parse
-        moved = true
+        if (node.producesUnknownFields()) continue
+        val above = parents[node] ?: continue
+        // ```js
+        // public swapWithParent() {
+        //   const parent = this._parent;
+        //   const newParent = parent.parent;
+        //   for (const child of this._children) {
+        //     child.parent = parent;
+        //   }
+        //   this._children = [];
+        //   parent.removeChild(this);
+        //   const loc = parent.parent.removeChild(parent);
+        //   this._parent = newParent;
+        //   newParent.addChild(this, loc);
+        //   parent.parent = this;
+        // }
+        // ```
+        //
+        // The parse's own children are **appended** to the step it climbed past, after whatever
+        // that step already held; the parse then takes that step's place among its siblings and the
+        // step hangs below it.
+        for (grandchild in child.children) {
+          node.children += grandchild
+          parents[grandchild] = node
+        }
+        child.children.clear()
+        node.children.remove(child)
+        val at = above.children.indexOf(node)
+        above.children.removeAt(at)
+        above.children.add(at, child)
+        parents[child] = above
+        child.children += node
+        parents[node] = child
       }
     }
   }
@@ -178,6 +258,35 @@ internal sealed class DataNode {
   /** Whether a step's outputs cannot be named — a `pivot`, whose columns are its rows' values. */
   private fun producesUnknownFields(): Boolean =
     this is PassThroughNode && transforms.any { (it as? VegaValue.Obj)?.string("type") == "pivot" }
+
+  /**
+   * The columns one **Vega** transform writes — the answer upstream keeps per node class.
+   *
+   * A transform that was not told what to call its outputs names them by convention, and those
+   * columns are as real as any `as`: a `lookup` brings the secondary table's own columns in under
+   * their own names, a `fold` writes a `key` and a `value`. Reading only the `as` left such a step
+   * looking like one that writes nothing, so a parse of a column it brings in climbed above the
+   * step that brings it — and was asked of a table that has no such column.
+   */
+  private fun producedBy(transform: VegaValue): List<String> {
+    val vega = transform as? VegaValue.Obj ?: return emptyList()
+    val stated =
+      when (val named = vega.fields["as"]) {
+        is VegaValue.Str -> listOf(named.value)
+        is VegaValue.Arr -> named.values.mapNotNull { (it as? VegaValue.Str)?.value }
+        else -> emptyList()
+      }
+    if (stated.isNotEmpty()) return stated
+    return when (vega.string("type")) {
+      "lookup" -> vega.array("values").orEmpty().mapNotNull { (it as? VegaValue.Str)?.value }
+      "fold" -> listOf("key", "value")
+      "density" -> listOf("value", "density")
+      "quantile" -> listOf("prob", "value")
+      "regression",
+      "loess" -> listOfNotNull(vega.string("x"), vega.string("y"))
+      else -> emptyList()
+    }
+  }
 
   /** The columns a step writes, which is what a parse cannot climb past. */
   private fun producedFields(): Set<String> =
@@ -188,11 +297,7 @@ internal sealed class DataNode {
       is AggregateNode -> outputs.toSet()
       is StackNode -> output.toSet()
       is ImputeNode -> setOf(field)
-      is PassThroughNode ->
-        transforms.mapNotNull { (it as? VegaValue.Obj)?.string("as") }.toSet() +
-          transforms
-            .flatMap { (it as? VegaValue.Obj)?.array("as").orEmpty() }
-            .mapNotNull { (it as? VegaValue.Str)?.value }
+      is PassThroughNode -> transforms.flatMap { producedBy(it) }.toSet()
       else -> emptySet()
     }
 
@@ -494,13 +599,15 @@ internal sealed class DataNode {
     }
     for (group in grouped.values) {
       if (group.size < 2) continue
-      // Exact duplicates fold into the **first**, and the rest into the *last*. The two rules are
-      // one rule upstream: a composite mark states its aggregate once, on the layer above the
-      // views it expands into, so upstream never has two identical sibling aggregates to merge and
-      // the branches below the single node stay in the order the views were written. This compiler
-      // gives each expanded view its own copy, and folding them into the first restores that tree.
-      // Genuinely different aggregates are `MergeAggregates` proper — `mergeableAggs.pop()` keeps
-      // the last, which is why an error bar's own aggregate ends up *under* the mean drawn over it.
+      // The copies of an aggregate an ancestor wrote fold into the **first**, and everything else
+      // into the *last*. A composite mark states its aggregate once, on the layer above the views
+      // it expands into; this compiler gives each expanded view its own copy, and folding them into
+      // the first restores the tree upstream has. Everything else is `MergeAggregates` proper —
+      // `mergeableAggs.pop()` keeps the last, which is why an error bar's own aggregate ends up
+      // *under* the mean drawn over it.
+      //
+      // Two aggregates that are **identical** and not copies are folded by whichever optimizer
+      // reaches them first, and the two keep opposite ends — see [identity].
       val distinct = foldCopies(group) { a, b -> a.sameAs(b) }
       if (distinct.size < 2) continue
       val kept = distinct.last()
@@ -774,7 +881,10 @@ internal class TimeUnitNode(units: List<TimeUnitComponent>) : DataNode() {
     listOf(
       obj {
         put("type", "timeunit")
-        put("field", it.field)
+        // `field: replacePathInField(field)` — a column called `t.s` is a name with a dot in it,
+        // not a path into `t`, and an unescaped one tells Vega to look a level in and find
+        // nothing. The bucket would then be cut from undefined on every row.
+        put("field", Fields.replacePathInField(it.field))
         put("units", strings(it.units))
         it.step?.let { step -> put("step", step) }
         // Which calendar the bucket is cut against. A `utcmonth` says so and a `month` says
@@ -1083,6 +1193,11 @@ internal class FacetNode(
     data = name
     at = position
   }
+
+  /** Moved along by the tables the assembler's hoist carried past this partition. */
+  fun shiftedBy(places: Int) {
+    at += places
+  }
 }
 
 /** A named point in the flow that something else reads: a mark's source, a scale's domain. */
@@ -1108,6 +1223,9 @@ internal class DataAssembler {
 
   /** Whether the fork this walk passed had to name the table it forked at. See [walk]. */
   private var forkNamedTheTable = false
+
+  /** Every partition this walk passed, each of which recorded where it stood. */
+  private val partitions = mutableListOf<FacetNode>()
 
   private class MutableDataset(
     var name: String?,
@@ -1166,6 +1284,19 @@ internal class DataAssembler {
     // derives from nothing and does nothing is a table the chart was handed, and Vega has to have
     // it before whatever joins against it. Stable, so the numbering still reads in order.
     val (plain, derived) = datasets.partition { it.source == null && it.transform.isEmpty() }
+    // A partition's own value lists are written the moment the walk reaches it — `data.push(…node
+    // .assemble())` — and this hoist runs afterwards, over a list those lists are already in. A
+    // place counted during the walk is therefore short by however many tables the hoist carried
+    // from behind the partition to in front of it, which is what a chart whose layers read tables
+    // of their own has: the grid's chain is walked first and theirs afterwards.
+    for (node in partitions) {
+      if (node.at < 0) continue
+      node.shiftedBy(
+        datasets.withIndex().count { (index, dataset) ->
+          index >= node.at && dataset.source == null && dataset.transform.isEmpty()
+        }
+      )
+    }
     return (plain + derived).map { it.build() }
   }
 
@@ -1300,6 +1431,7 @@ internal class DataAssembler {
         } else {
           node.readsFrom(dataset.source!!, datasets.size)
         }
+        partitions += node
         // A partition **inside** this one still takes a name from the chart's own numbering, even
         // though what hangs below it is assembled into a cell group with a numbering of its own. A
         // grid whose cells are grids is where it tells: leaving the inner partition unnamed here

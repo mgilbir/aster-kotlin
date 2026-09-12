@@ -182,11 +182,19 @@ internal class Transforms(
       return emptyList()
     }
     val stated = transform["bin"]
+    // `normalizeBin(bin, undefined)`, which is the same reading a bucketing in an encoding gets —
+    // with no channel to ask, so the count is always ten. A **stated** bucketing that says neither
+    // how many buckets it wants nor how wide they are gets the default count too, whatever else it
+    // says, and the count is spelled into the signals the transform publishes.
     val params =
       when {
-        stated == VegaValue.Bool(true) -> obj { put("maxbins", 10) }
-        stated is VegaValue.Obj && stated.fields.isEmpty() -> obj { put("maxbins", 10) }
-        stated is VegaValue.Obj -> stated
+        stated is VegaValue.Obj &&
+          (stated.fields["maxbins"].isTruthy() || stated.fields["step"].isTruthy()) -> stated
+        stated is VegaValue.Obj ->
+          obj {
+            stated.fields.forEach { (key, own) -> put(key, own) }
+            put("maxbins", 10)
+          }
         else -> obj { put("maxbins", 10) }
       }
     val names =
@@ -289,6 +297,40 @@ internal class Transforms(
             // silence are two different statements, and it is the statement that is carried
             // across. A boxplot over an ungrouped column states an empty one.
             if (transform.has("groupby")) put("groupby", strings(fieldList(transform["groupby"])))
+          }
+        )
+
+      // ```js
+      // if (frame && frame[0] === null && frame[1] === null && ops.every((o) => isAggregateOp(o)))
+      // {
+      //   // when the window does not rely on any particular window ops or frame, switch to a
+      //   // simpler and more efficient joinaggregate
+      //   return {type: 'joinaggregate', as, ops, fields, ...(groupby !== undefined ? {groupby} :
+      // {})};
+      // }
+      // ```
+      //
+      // A window over the **whole** partition, computing nothing a window alone can compute, is a
+      // join-aggregate: every row of the partition gets the same answer, and Vega has a transform
+      // that says exactly that. `[null, null]` is how a specification asks for the whole partition
+      // — the commonest window there is, *this row against the median of all of them* — and the
+      // window transform this compiler wrote instead carried a `sort`, a `frame` and a list of
+      // nulls for parameters no operation here takes. Three specifications in the wild corpus ask
+      // for it.
+      transform.has("window") && unframedAggregates(transform) ->
+        listOf(
+          obj {
+            val entries = transform.array("window").orEmpty()
+            put("type", "joinaggregate")
+            put("as", strings(entries.map { it.string("as") ?: "" }))
+            put("ops", strings(entries.map { it.string("op") ?: "" }))
+            put(
+              "fields",
+              arr(entries.map { entry -> entry.string("field")?.let(::str) ?: VegaValue.Null }),
+            )
+            if (transform.has("groupby")) {
+              put("groupby", strings(fieldList(transform["groupby"])))
+            }
           }
         )
 
@@ -678,6 +720,49 @@ internal class Transforms(
    * `density` computed is already a number, and asking the loader to parse it would name a column
    * the source table never had.
    */
+  /**
+   * What each transform **says** the columns it writes hold — `derivedType` in
+   * `parseTransformArray`.
+   *
+   * ```js
+   * } else if (isAggregate(t)) {
+   *   transformNode = head = AggregateNode.makeFromTransform(head, t);
+   *   derivedType = 'number';
+   * …
+   * if (transformNode && derivedType !== undefined) {
+   *   for (const field of transformNode.producedFields() ?? []) {
+   *     ancestorParse.set(field, derivedType, false);
+   *   }
+   * }
+   * ```
+   *
+   * It is not simply "derived": a `bin`, an `aggregate`, a `window` and a `joinaggregate` all write
+   * **numbers**, and a time unit writes a **date**. That matters where an encoding asks for
+   * something else — a box plot of an instant reads its own `lower_box_t` back as a date, and
+   * `makeWithAncestors` keeps that parse because what the aggregate derived was a number.
+   */
+  fun derivedTypes(transforms: List<VegaValue>, source: VegaValue? = null): Map<String, String> {
+    val derived = LinkedHashMap<String, String>()
+    source?.obj("sequence")?.let { derived[it.string("as") ?: "data"] = "derived" }
+    for (transform in transforms) {
+      // A `filter` and a `sample` write nothing and derive nothing; every other kind names the
+      // type it produces, and the ones not listed here are `'derived'` — an opaque value the
+      // encoding is trusted about.
+      val kind =
+        when {
+          transform.has("filter") || transform.has("sample") -> continue
+          transform.has("bin") ||
+            transform.has("aggregate") ||
+            transform.has("window") ||
+            transform.has("joinaggregate") -> "number"
+          transform.has("timeUnit") -> "date"
+          else -> "derived"
+        }
+      producedFields(listOf(transform)).forEach { derived[it] = kind }
+    }
+    return derived
+  }
+
   fun producedFields(transforms: List<VegaValue>, source: VegaValue? = null): Set<String> {
     val produced = LinkedHashSet<String>()
     // A generated column is derived too: nothing loaded it, so nothing has to parse it.
@@ -748,6 +833,36 @@ internal class Transforms(
       }
       else -> stated
     }
+
+  /**
+   * `isAggregateOp`, read from the other side: the operations only a **window** can compute.
+   *
+   * Every other operation answers for a set of rows rather than for a row's place among them, and a
+   * window over the whole partition asking for one of those is a join-aggregate.
+   */
+  private val WINDOW_ONLY_OPS =
+    setOf(
+      "row_number",
+      "rank",
+      "dense_rank",
+      "percent_rank",
+      "cume_dist",
+      "ntile",
+      "lag",
+      "lead",
+      "first_value",
+      "last_value",
+      "nth_value",
+    )
+
+  /** Whether a window states the whole partition as its frame and computes only aggregates. */
+  private fun unframedAggregates(transform: VegaValue): Boolean {
+    val frame = transform.array("frame") ?: return false
+    if (frame.size != 2 || frame.any { it != VegaValue.Null }) return false
+    return transform.array("window").orEmpty().all {
+      (it.string("op") ?: "") !in WINDOW_ONLY_OPS
+    }
+  }
 
   private fun collectParses(predicate: VegaValue?, into: MutableMap<String, String>) {
     when {

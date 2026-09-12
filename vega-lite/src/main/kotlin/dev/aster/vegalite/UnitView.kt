@@ -97,12 +97,50 @@ internal class UnitView(
   var scaleComponents: Map<String, ScaleComponent> = emptyMap()
 
   /**
+   * Whether this view reads a table of its **own** rather than the one above it derives.
+   *
+   * ```ts
+   * } else {
+   *   // If we don't have a source defined (overriding parent's data), use the parent's facet root or main.
+   *   return model.parent.component.data.facetRoot
+   *     ? model.parent.component.data.facetRoot
+   *     : model.parent.component.data.main;
+   * }
+   * ```
+   *
+   * `parseRoot` reads the parent's partition only for a view that states no `data`. One that states
+   * its own starts a root of its own instead, so its chain stands *beside* the grid rather than
+   * below it: the rows it draws are its whole table, the same in every cell, and nothing about the
+   * facet reaches them. What the marks read is then that chain's own output and not the partition.
+   */
+  var ownsSource: Boolean = false
+
+  /**
    * The fields this view is faceted by, which every grouping in its data flow has to carry.
    *
    * A stack accumulated without them would run across the cells rather than within each, which is
    * the difference between a trellis and one chart drawn several times over.
    */
   var facetFields: List<String> = emptyList()
+
+  /**
+   * The size the **level this view belongs to** settled on, per channel — its own or a sibling's.
+   *
+   * ```js
+   * function getDiscretePositionSize(channel, size, viewConfig) {
+   *   const sizeValue = size[channel === X ? 'width' : 'height'];
+   *   if (sizeValue !== undefined) { return sizeValue; }
+   *   return getViewConfigDiscreteSize(viewConfig, sizeChannel);
+   * }
+   * ```
+   *
+   * `model.size` is the size the model was **given**, and a layer hands its members its own. Read
+   * as this view's own instead, a member that states nothing was measured against the theme where
+   * its sibling had already said the level is one step per category — so a band chart whose second
+   * layer asks for a step of thirteen came out stretched across a themed width. See
+   * [LayoutSize.declaredSize], which settles it the same way for the layout itself.
+   */
+  var statedSize: Map<String, VegaValue?> = emptyMap()
 
   /**
    * The definitions the facet channels were lifted out of, for the steps that still need them.
@@ -112,6 +150,37 @@ internal class UnitView(
    * upstream does that on the facet's own model, above the cell's.
    */
   var facetDefs: List<ChannelDef> = emptyList()
+
+  /**
+   * Where this view's **own** transforms begin, the ones before it having been written by a grid.
+   *
+   * ```ts
+   * if (child instanceof AggregateNode || child instanceof StackNode ||
+   *     child instanceof WindowTransformNode || child instanceof JoinAggregateTransformNode) {
+   *   child.addDimensions(node.fields);
+   * }
+   * child.swapWithParent();
+   * ```
+   *
+   * `moveFacetDown` walks the partition down past the cell's chain one node at a time, and a node
+   * that **groups** picks up the facet's own fields on the way: a cell's count is a count within
+   * that cell, and the copy of the chain that stands beside the grid for the scales is grouped the
+   * same way — `cloneSubtree` adds them there too. A grid's *own* transforms are none of that: the
+   * partition is appended after them and never moves past them.
+   */
+  var gridTransforms: Int = Int.MAX_VALUE
+
+  /**
+   * The **cell model's** own name — the model the partition stops at, where this view is a cell of
+   * a grid and something forks below it.
+   *
+   * `moveFacetDown` walks the partition down until the node it is at has more than one child, so
+   * what climbs above the cut is what the cell model itself wrote and what the grids above it did.
+   * A layer *inside* the cell wrote its transforms below that fork, and they stay there — which is
+   * the whole difference between a cell that is a layer of two units and one whose second member is
+   * a layer of its own.
+   */
+  var cellOwner: String = ""
 
   /**
    * The same definitions in the order the specification **wrote** them.

@@ -45,7 +45,22 @@ internal object FacetOperator {
      * outermost level folded into its encoding, and [inner] holds the rest.
      */
     val cellIsComposition: Boolean = false,
+    /**
+     * How many of [spec]'s transforms were written by the **grids** rather than by the cell.
+     *
+     * The peel lays the levels' transforms end to end and the cell's after them, so this is where
+     * the cell's begin. It matters because the two sides of that line are hoisted differently: the
+     * partition is moved down past the cell's steps and adds its own fields to every grouping it
+     * passes, and is appended after the grids' own, which it never moves past.
+     */
+    val gridTransforms: Int = 0,
   )
+
+  /** The grids' transforms and then the cell's, in the order their models' passes run. */
+  private fun transforms(above: List<VegaValue>, leaf: VegaValue.Obj): VegaValue? {
+    val all = above + leaf.array("transform").orEmpty()
+    return if (all.isEmpty()) null else arr(all)
+  }
 
   /**
    * The equivalent view with the outermost facet's channels in its encoding, or null where it
@@ -60,9 +75,16 @@ internal object FacetOperator {
     // Every level down to the view that is actually drawn, and that view with what it inherited.
     val levels = mutableListOf<VegaValue.Obj>()
     var node = spec
-    // What the levels above contribute, innermost writer winning: a nested grid inherits its data,
-    // its size and its transforms from whichever level last stated them, exactly as one level does.
+    // What the levels above contribute, innermost writer winning: a nested grid inherits its data
+    // and its size from whichever level last stated them, exactly as one level does.
     val inherited = linkedMapOf<String, VegaValue>()
+    // A `transform` is the exception, and is **collected** rather than overwritten. Every model has
+    // a pass of its own and `parseTransformArray` runs in each of them, the grid's above the cell's
+    // and the cell's above what it draws: a chart that computes a column and grids a view that
+    // filters on it is two passes, not a choice between them. Taking the innermost writer left the
+    // grid's own transforms out of the flow altogether, so the cell filtered on a column nothing
+    // had written.
+    val above = mutableListOf<VegaValue>()
     while (true) {
       val facet = node.obj("facet") ?: break
       val template = node.obj("spec")
@@ -83,10 +105,13 @@ internal object FacetOperator {
         )
       }
       levels += facet
+      node.array("transform")?.let { above += it }
       node.fields.forEach { (key, value) ->
         // `columns` belongs to a *wrapped* facet, which is the only form that has anything to wrap,
         // and never travels down past the level that wrote it.
-        if (key != "facet" && key != "spec" && key != "columns") inherited[key] = value
+        if (key != "facet" && key != "spec" && key != "columns" && key != "transform") {
+          inherited[key] = value
+        }
       }
       node = template
     }
@@ -105,10 +130,12 @@ internal object FacetOperator {
         obj {
           inherited.forEach { (key, value) -> if (key != "encoding") put(key, value) }
           leaf.fields.forEach { (key, value) -> put(key, value) }
+          transforms(above, leaf)?.let { put("transform", it) }
         },
         emptyList(),
         levels,
         cellIsComposition = true,
+        gridTransforms = above.size,
       )
     }
     val outermost = levels.first()
@@ -125,8 +152,11 @@ internal object FacetOperator {
         // grid's own `facet` and `spec` are not among them: they are this chart's levels, taken out
         // above, and copying them down is what left a `facet` in the result to be refused by name.
         leaf.fields.forEach { (key, value) ->
-          if (key != "encoding" && key != "facet" && key != "spec") put(key, value)
+          if (key != "encoding" && key != "facet" && key != "spec" && key != "transform") {
+            put(key, value)
+          }
         }
+        transforms(above, leaf)?.let { put("transform", it) }
         put(
           "encoding",
           obj {
@@ -147,6 +177,7 @@ internal object FacetOperator {
       },
       levels.drop(1),
       levels,
+      gridTransforms = above.size,
     )
   }
 }

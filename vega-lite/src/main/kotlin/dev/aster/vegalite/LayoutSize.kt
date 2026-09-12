@@ -67,15 +67,17 @@ internal class LayoutSize(
 
     for (channel in listOf("x", "y")) {
       val sizeName = names.getValue(channel)
-      val declared =
-        spec.fields[if (channel == "x") "width" else "height"]
-          ?: views.firstOrNull()?.spec?.let { if (channel == "x") it.width else it.height }
+      val declared = declaredSize(views, spec, channel)
       val scale = scales[channel]
       // The step signal is named after the **scale**, which inside a facet that resolves the
       // channel independently is the cell's own — `child_x_step`, not `x_step`.
       val scaleName = scale?.name() ?: "$scalePrefix$channel"
       val discrete = scale != null && (scale.type == "band" || scale.type == "point")
       val step = (declared as? VegaValue.Obj)?.number("step")
+      // `getDiscretePositionSize` falls to the theme's size for **this dimension**, and the step it
+      // comes to is that dimension's own: `view.discreteWidth` answers for `x` and
+      // `view.discreteHeight` for `y`, `view.step` only where neither is set.
+      val themedStep = config.discreteStep(if (channel == "x") "width" else "height")
       // `{"step": 50, "for": "position"}` — the step belongs to the *outer* band, not to one mark
       // inside it. `getPositionStep` reads the `for` and hands the step straight to the position,
       // so the nested arithmetic below is skipped and the offset scale divides whatever band the
@@ -86,37 +88,19 @@ internal class LayoutSize(
       // follows it as the window changes, with the view's own default where there is nothing to
       // measure — a chart rendered outside a browser still has to have a width.
       if (declared == VegaValue.Str("container")) {
-        val measured = if (channel == "x") "containerSize()[0]" else "containerSize()[1]"
-        val fallback =
-          number(if (channel == "x") config.continuousWidth else config.continuousHeight)
-        val expression = "isFinite($measured) ? $measured : $fallback"
-        emitted += obj {
-          put("name", sizeName)
-          put("init", expression)
-          put(
-            "on",
-            arr(
-              listOf(
-                obj {
-                  put("events", "window:resize")
-                  put("update", expression)
-                }
-              )
-            ),
-          )
-        }
+        // Which dimension is measured follows the **signal's name** — see [containerSignal].
+        emitted += containerSignal(sizeName, channel, config)
         sizes[channel] = null
         continue
       }
 
-      // `getViewConfigDiscreteSize` answers a **number** where the theme states one and `{step: …}`
-      // only otherwise, so a themed discrete size replaces the step arithmetic entirely: every
-      // strip in the document is that deep, however many categories it holds.
-      val themedDiscrete = if (channel == "x") config.discreteWidth else config.discreteHeight
+      // [value] answers null for exactly the channels a **step** has to settle, and answering it
+      // here as well let the two drift: the size a plot is and the size a level above compares it
+      // by have to be the one answer.
+      val settled = value(views, scales, config, spec, channel)
       val value: VegaValue? =
         when {
-          !discrete || declared is VegaValue.Num -> value(views, scales, config, spec, channel)
-          declared == null && themedDiscrete != null -> num(themedDiscrete)
+          settled != null || !discrete -> settled
           else -> {
             val padding = (scale.properties["padding"] as? VegaValue.Num)?.value
             // Only a *band* scale has a real inner padding. A **point** scale counts as 1, because
@@ -144,7 +128,7 @@ internal class LayoutSize(
               if (offset == null || stepForPosition) {
                 obj {
                   put("name", "${scaleName}_step")
-                  put("value", step ?: config.step)
+                  put("value", step ?: themedStep)
                 }
               } else {
                 val nestedInner =
@@ -157,7 +141,7 @@ internal class LayoutSize(
                     "update",
                     // `bandspace` counts the *bands* a padded band scale needs; a **point** scale
                     // has no bands, only places, so the count is the domain's own length.
-                    "${number(step ?: config.step)} * " +
+                    "${number(step ?: themedStep)} * " +
                       (if (offset.type == "point") "domain('${offset.name()}').length"
                       else
                         "bandspace(domain('${offset.name()}').length, " +
@@ -206,6 +190,51 @@ internal class LayoutSize(
   }
 
   companion object {
+
+    /**
+     * The signal a **`"container"`** size is: the element measured at first render and again on
+     * every resize, with the view's own default where there is nothing to measure.
+     *
+     * A chart rendered outside a browser still has to have a width, which is what the fallback is
+     * for. Written here rather than only inside a plot's own sizing because a *concatenation* may
+     * merge its children onto it, and then the signal belongs to the level that settled it.
+     */
+    fun containerSignal(name: String, channel: String, config: Config): VegaValue {
+      // ```js
+      // const isWidth = name.endsWith('width');
+      // const expr = isWidth ? 'containerSize()[0]' : 'containerSize()[1]';
+      // const defaultValue = getViewConfigContinuousSize(model.config.view, isWidth ? 'width' :
+      // 'height');
+      // ```
+      //
+      // Which dimension is measured is asked of the **signal's name**, not of the channel — and the
+      // name a *cell* carries is `childWidth`, whose capital W the test does not match. So a cell
+      // told to fill its container measures the container's **height** for its width, and takes the
+      // themed height where there is nothing to measure. It is upstream's own slip and it is what
+      // upstream emits, so it is what this has to emit: a chart drawn against a different answer
+      // would lay out differently from the one the specification's author is looking at.
+      val isWidth = name.endsWith("width")
+      val measured = if (isWidth) "containerSize()[0]" else "containerSize()[1]"
+      val fallback =
+        Decimals.jsString(if (isWidth) config.continuousWidth else config.continuousHeight)
+      val expression = "isFinite($measured) ? $measured : $fallback"
+      return obj {
+        put("name", name)
+        put("init", expression)
+        put(
+          "on",
+          arr(
+            listOf(
+              obj {
+                put("events", "window:resize")
+                put("update", expression)
+              }
+            )
+          ),
+        )
+      }
+    }
+
     /**
      * The plain number a channel's size comes out as, or null where it is derived from a step.
      *
@@ -213,6 +242,46 @@ internal class LayoutSize(
      * depends on whether its plots agree; and the answer needs nothing but the declared size and
      * the kind of scale, both of which are settled long before a padding is.
      */
+    /**
+     * Whether this is a size the specification **stated**, rather than one to be worked out.
+     *
+     * A number or a string, `{"step": …}` aside: `isStep(specifiedSize) ? 'step' : specifiedSize`
+     * asks only that one question of it and takes anything else as written. `"container"` is a
+     * stated size too — the page settles what it comes to — and is answered before this is asked.
+     */
+    fun VegaValue?.isStatedSize(): Boolean = this is VegaValue.Num || this is VegaValue.Str
+
+    /**
+     * The size a level takes: its **first member's**, and the level's own where no member has one.
+     *
+     * ```js
+     * size: isFrameMixins(spec)
+     *   ? {...parentGivenSize, ...(spec.width !== undefined ? {width: spec.width} : {}), ...}
+     *   : parentGivenSize,
+     * ```
+     * ```js
+     * mergedSize = mergeValuesWithExplicit(mergedSize, childSize, sizeType, '', defaultTieBreaker);
+     * ```
+     *
+     * A member's own size overrides the one the level above handed it — that spread is the whole of
+     * it — and `parseNonUnitLayoutSizeForChannel` then merges the members', the first of them
+     * winning a disagreement with a warning. So a chart written `"width": "container"` whose layers
+     * are each 600 wide is 600 wide: the members were handed the container and then said otherwise,
+     * and there is nothing left for the page to settle. Read the other way round — the chart's own
+     * first — the layers' width was never consulted at all, and such a chart measured the element
+     * it was drawn in instead.
+     *
+     * A member that states nothing carries the level's own here, `inherited` having put it there,
+     * so the first member answers for both cases at once.
+     */
+    /** [declaredSize] for both channels, which is what a level hands the views inside it. */
+    fun statedSizes(views: List<UnitView>, spec: VegaValue.Obj): Map<String, VegaValue?> =
+      mapOf("x" to declaredSize(views, spec, "x"), "y" to declaredSize(views, spec, "y"))
+
+    private fun declaredSize(views: List<UnitView>, spec: VegaValue.Obj, channel: String) =
+      views.firstNotNullOfOrNull { if (channel == "x") it.spec.width else it.spec.height }
+        ?: spec.fields[if (channel == "x") "width" else "height"]
+
     fun value(
       views: List<UnitView>,
       scales: Map<String, ScaleComponent>,
@@ -220,12 +289,46 @@ internal class LayoutSize(
       spec: VegaValue.Obj,
       channel: String,
     ): VegaValue? {
-      val declared =
-        spec.fields[if (channel == "x") "width" else "height"]
-          ?: views.firstOrNull()?.spec?.let { if (channel == "x") it.width else it.height }
-      if (declared is VegaValue.Num) return declared
+      val declared = declaredSize(views, spec, channel)
+      // ```js
+      // component.layoutSize.set(sizeType, isStep(specifiedSize) ? 'step' : specifiedSize, true);
+      // ```
+      //
+      // **Whatever was stated** is the layout size, a step object aside: `parseUnitLayoutSize` puts
+      // the specified size into the component without asking what kind of value it is. A chart
+      // written `"width": "1024"` is 1024 wide, not 300 — the string is the size, and the only
+      // place it stops being one is the hoist to the top of the chart, which coerces it. Two
+      // specifications in the wild corpus state a size as a string.
+      if (declared.isStatedSize()) return declared
+      // `component.layoutSize.set(sizeType, isStep(specifiedSize) ? 'step' : specifiedSize, true)`:
+      // a **`"container"`** size is the layout size, as a number is. It is what a level above
+      // compares when it merges its children — two plots asking the page for their width agree,
+      // and what they agree on is to ask the page — and answering with the view's own default
+      // instead merged them on a number and wrote that number out. The chart then had a width of
+      // its own and never measured the element it was drawn in.
+      if (declared == VegaValue.Str("container")) return declared
       val scale = scales[channel]
-      if (scale != null && (scale.type == "band" || scale.type == "point")) return null
+      // ```js
+      // if (hasDiscreteDomain(scaleType)) {
+      //   const size = getViewConfigDiscreteSize(config.view, sizeType);
+      //   if (isVgRangeStep(range) || isStep(size)) {
+      //     return 'step';
+      //   } else {
+      //     return size;
+      //   }
+      // }
+      // ```
+      //
+      // A discrete position is sized by a **step** only where the theme leaves it to one.
+      // `getViewConfigDiscreteSize` reads `view.height` before `view.discreteHeight` and answers a
+      // `{step: …}` only where the answer is one, so a theme that states a plain depth settles
+      // every strip in the document at that depth however many categories it holds. A plot that
+      // states a size of its own has been answered above; `{"height": {"step": 30}}` is the one
+      // shape that is a step in spite of the theme, and `declared` still holds it here.
+      if (scale != null && (scale.type == "band" || scale.type == "point")) {
+        val themed = if (channel == "x") config.discreteWidth else config.discreteHeight
+        return if (declared == null) themed?.let { num(it) } else null
+      }
       // A channel with **no scale at all** is not a continuous one: `defaultUnitSize` falls to the
       // *discrete* size for it, which is a step. That is what makes a one-dimensional chart — a
       // strip of ticks, a bar chart of one measure — twenty units deep rather than three hundred,

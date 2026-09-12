@@ -192,6 +192,25 @@ internal class Composite(
       .filterNot { value -> (value as? VegaValue.Obj)?.has("aggregate") == true }
       .mapNotNull { value -> (value as? VegaValue.Obj)?.string("field") }
 
+  /**
+   * The specification without the parameters it declared — a composite mark takes none.
+   *
+   * ```js
+   * const {mark, encoding: _encoding, params, projection: _p, ...outerSpec} = spec;
+   * ...
+   * // TODO(https://github.com/vega/vega-lite/issues/3702): add selection support
+   * if (params) {
+   *   log.warn(log.message.selectionNotSupported('boxplot'));
+   * }
+   * ```
+   *
+   * `params` is taken off the specification and **nothing is done with it**: the summary is drawn
+   * and the parameter is not built at all. Reported where the selections are collected, which is
+   * before any of this runs — see `Selection.of`.
+   */
+  private fun withoutParameters(outer: VegaValue.Obj): VegaValue.Obj =
+    if (!outer.has("params")) outer else VegaValue.Obj(outer.fields.filterKeys { it != "params" })
+
   /** The marks this handles. Anything else is not a composite mark. */
   fun handles(type: String): Boolean =
     type == "errorbar" || type == "errorband" || type == "boxplot"
@@ -268,14 +287,39 @@ internal class Composite(
             it != "${continuous}2" &&
             it != "${continuous}Error" &&
             it != "${continuous}Error2" &&
-            it != "size"
+            it != "size" &&
+            // A **facet** channel is none of the mark's. Upstream normalises a grid into the
+            // operator form before it reaches a composite mark at all, so the cell it hands the
+            // mark has no `row` or `column` in its encoding and there is nothing there to carry:
+            // `errorBarParams` spreads what it is given. This compiler folds the operator form the
+            // other way, and the channel was then carried like any other — named in the tooltip,
+            // where upstream names only what the mark itself draws, and grouped by *first*, where
+            // the facet's own fields are appended to a grouping as the partition walks down past
+            // it.
+            it !in Channels.FACET_CHANNELS
         }
       )
     val shared = extracted.encoding
+    // ```ts
+    // if (child instanceof AggregateNode || ...) {
+    //   child.addDimensions(node.fields);
+    // }
+    // ```
+    //
+    // The grid's own columns are **not** grouped by here. `moveFacetDown` walks the partition down
+    // past the summary and the summary picks the facet's fields up on the way — so the copy that
+    // stands beside the grid groups by them and the copy inside each cell does not, each cell
+    // holding one value of them already. Written into the transform instead, both copies carried
+    // them: the cell's summary grouped by a column it cannot vary, and the two layers' summaries
+    // were no longer the same question, so the grouping was computed once per layer where upstream
+    // computes it once.
     // Rows that already carry their own interval are not summarised, so there is nothing to group.
     val groupby = if (ranged == null) extracted.groupby else emptyList()
 
-    val outer = VegaValue.Obj(unit.fields.filterKeys { it != "mark" && it != "encoding" })
+    val outer =
+      VegaValue.Obj(unit.fields.filterKeys { it != "mark" && it != "encoding" }).let {
+        withoutParameters(it)
+      }
     // `[...oldAggregate, ...errorBarSpecificAggregate]`: what the *encoding* asked the summary for
     // comes first, and the interval's own measures after it.
     val measures =
@@ -310,7 +354,7 @@ internal class Composite(
 
     // `getTitle`: the summarised column is named by its own **title** where it has one — a
     // tooltip that reads `Mean of Miles per Gallon` is the axis's title, not the column's name.
-    val tooltip = tooltip(summary, field, shared, def.string("title") ?: field)
+    val tooltip = tooltip(summary, field, shared, def.string("title") ?: field, def.string("type"))
     val parts =
       if (type == "errorbar") errorBarParts(markDef, orient) else errorBandParts(markDef, encoding)
 
@@ -448,18 +492,33 @@ internal class Composite(
         put("type", aggregatedTooltip.string("type") ?: "quantitative")
       }
     }
-    val outer = VegaValue.Obj(unit.fields.filterKeys { it != "mark" && it != "encoding" })
+    val outer =
+      VegaValue.Obj(unit.fields.filterKeys { it != "mark" && it != "encoding" }).let {
+        withoutParameters(it)
+      }
     val declared = unit.array("transform") ?: emptyList()
 
     /** `Max of v`, `Q3 of v`, … — what resting on a part of the box says. */
     val summarisedTitle = def.string("title") ?: field
+
+    // ```js
+    // return {
+    //   field: fieldPrefix + continuousAxisChannelDef.field,
+    //   type: continuousAxisChannelDef.type,
+    // ```
+    //
+    // A summary of the **continuous axis** is of that axis's kind: a box plot of an instant reads
+    // its quartiles back as dates. Written as quantities, the tooltip showed five epoch integers —
+    // and, worse, nothing asked for the column to be read as a date at all, so the summary was
+    // drawn and compared as numbers too.
+    val summarisedType = def.string("type") ?: "quantitative"
 
     fun summaryTooltip(entries: List<Pair<String, String>>): VegaValue =
       arr(
         entries.map { (prefix, title) ->
           obj {
             put("field", "$prefix$field")
-            put("type", "quantitative")
+            put("type", summarisedType)
             put("title", "$title of $summarisedTitle")
           }
         } +
@@ -1053,12 +1112,14 @@ internal class Composite(
     field: String,
     shared: Map<String, VegaValue>,
     title: String = field,
+    /** `continuousAxisChannelDef.type` — a summary of an instant is read back as one. */
+    summarisedType: String? = null,
   ): VegaValue {
     val entries = mutableListOf<VegaValue>()
     for ((prefix, prefixTitle) in summary.titles) {
       entries += obj {
         put("field", "$prefix$field")
-        put("type", "quantitative")
+        put("type", summarisedType ?: "quantitative")
         put("title", if (summary.titleNamesField) "$prefixTitle of $title" else prefixTitle)
       }
     }

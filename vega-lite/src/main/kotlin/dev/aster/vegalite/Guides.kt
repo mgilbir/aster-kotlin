@@ -2,6 +2,7 @@ package dev.aster.vegalite
 
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.canonicalNumberString
 
 /**
  * Axes and legends: the guides Vega-Lite writes for you.
@@ -69,17 +70,16 @@ internal object Guides {
       "labelPadding",
       "labels",
       "labelSeparation",
+      "maxExtent",
+      "minExtent",
       "orient",
+      "position",
       "tickCap",
       "tickColor",
       "tickDash",
       "tickDashOffset",
-      "tickExtra",
-      "tickOffset",
       "tickOpacity",
-      "tickRound",
       "tickSize",
-      "tickWidth",
       "ticks",
       "title",
       "titleAlign",
@@ -299,6 +299,20 @@ internal object Guides {
       val themed = configured(name)
       when {
         themed == null -> axis.set(name, value)
+        // ```js
+        // (propsToAlwaysIncludeConfig.has(property) && hasConfigValue) ||
+        // isConditionalAxisValue(configValue) ||
+        // isSignalRef(configValue)
+        // ```
+        //
+        // `propsToAlwaysIncludeConfig` is the list of properties whose themed value has to be
+        // written out **even from a block Vega knows**, because Vega does not apply them the way
+        // Vega-Lite means them: `grid` decides whether there is a second axis at all, `translate`
+        // has a default of its own in Vega, and the rest are Vega-Lite's own names. A themed value
+        // that is a *signal* or a conditional is written out for the same reason — Vega can read
+        // neither from its own configuration.
+        name in ALWAYS_FROM_CONFIG || conditionalOrSignal(themed) ->
+          axis.set(name, asSignal(themed))
         // `else if (!(configFrom === 'vgAxisConfig')) axisComponent.set(property, configValue,
         // false)`: a block only Vega-Lite knows has to be written **out**, there being nothing
         // downstream that would apply it.
@@ -344,12 +358,50 @@ internal object Guides {
     // and **null** is the useful value: it is how a chart whose columns explain themselves takes
     // every caption off at once, rather than writing `"title": null` on each of them.
     val themeTitle = if (guideTitle != null) null else configured("title")
+    // A themed caption follows the rule every themed property follows: written out where Vega
+    // could not apply it, and **left to Vega** where it could. `title` is not one of
+    // `propsToAlwaysIncludeConfig`, so a `config.axisX.title` reaches the chart through the Vega
+    // configuration this compiler emits beside it, and the axis itself says nothing about its
+    // caption — which is also what a themed `null` says. Writing it out named such an axis twice,
+    // and four specifications in the wild corpus theme their captions that way.
+    val writtenOut = themeTitle?.takeIf { !themedByVega("title") || conditionalOrSignal(it) }
+    // ```js
+    // case 'title':
+    //   if (value === getFieldDefTitle(model, channel)) {
+    //     return true; // name specified as fieldTitle in the field def is considered explicit
+    //   }
+    // ```
+    //
+    // A caption the **channel** states is explicit, exactly as one stated on the axis is, and an
+    // explicit value is taken before the theme is asked at all. Asking the theme first let a
+    // `config.axisY.title` — left to Vega, as it should be — take the place of the name the
+    // channel had written down, and the axis came out with no caption.
+    val fieldTitles = listOfNotNull(def.explicitTitle, secondary?.explicitTitle)
     val stated =
-      if (guideTitle != null) listOf(guideTitle)
-      else if (themeTitle != null) listOfNotNull(themeTitle.takeIf { it !is VegaValue.Null })
-      else listOfNotNull(def.explicitTitle, secondary?.explicitTitle)
-    if (guideTitle is VegaValue.Null) axis.nulledTitle = true
-    if (themeTitle is VegaValue.Null) {
+      when {
+        guideTitle != null -> listOf(guideTitle)
+        fieldTitles.any { it !is VegaValue.Null } -> fieldTitles
+        themeTitle != null -> listOfNotNull(writtenOut?.takeIf { it !is VegaValue.Null })
+        else -> fieldTitles
+      }
+    // ```js
+    // if (v1Val == null || v2Val === null) {
+    //   return {explicit: v1.explicit, value: null};
+    // }
+    // ```
+    //
+    // `mergeTitleComponent` answers `null` for **either** side being it, and a caption the
+    // *channel* nulls is as much the axis's `null` as one the axis block nulls: a layer that says
+    // its position needs no caption has said so for the axis the layers share. Read only off the
+    // axis block, a layer stating `"title": null` on its channel lost to whatever an earlier layer
+    // had named, and an axis the specification asked to leave unlabelled came out labelled.
+    if (
+      guideTitle is VegaValue.Null ||
+        (guideTitle == null && fieldTitles.any { it is VegaValue.Null })
+    ) {
+      axis.nulledTitle = true
+    }
+    if (themeTitle != null && stated.isEmpty() && fieldTitles.none { it !is VegaValue.Null }) {
       axis.explicitTitle = true
     } else if (stated.isNotEmpty()) {
       axis.explicitTitle = true
@@ -469,26 +521,23 @@ internal object Guides {
 
     // Labels for a bucketed instant, and a tick step no finer than the bucket.
     if (def.timeUnit != null) {
-      axis.set("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit, view.config.locale)))
-      Fields.timeUnitDuration(def.timeUnit)?.let { axis.set("tickMinStep", signalRef(it)) }
+      derived("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit, view.config.locale)))
+      Fields.timeUnitDuration(def.timeUnit)?.let { derived("tickMinStep", signalRef(it)) }
     }
     // `guideFormatType`: a specifier is a *time* specifier, and Vega has to be told so wherever the
     // scale itself does not already say it. A time or utc scale formats instants by nature; a band
     // scale of month names does not, and without this its labels come out as raw numbers.
-    formatType(def, type)?.let { axis.set("formatType", str(it)) }
+    formatType(def, type)?.let { derived("formatType", str(it)) }
 
     // A normalized stack is a proportion, so its axis is a percentage —
     // `config.normalizedNumberFormat`,
     // which defaults to `.0%`. Left off, the labels read 0, 0.2, 0.4 for what the chart draws as
     // fifths of a whole.
     if (view.stack?.offset == "normalize" && channel == view.stack.fieldChannel) {
-      axis.set(
-        "format",
-        str(view.config.normalizedNumberFormat),
-      )
+      derived("format", str(view.config.normalizedNumberFormat))
     }
 
-    tickCount(view, channel, def, type)?.let { axis.set("tickCount", it) }
+    tickCount(view, channel, def, type)?.let { derived("tickCount", it) }
 
     // A heatmap's axis is drawn *over* its cells: the rects fill their bands completely, so an axis
     // painted underneath would be hidden by them.
@@ -509,13 +558,32 @@ internal object Guides {
     // exclude is every word nobody has written yet.
     for (key in AXIS_PROPERTIES) {
       val value = user?.fields?.get(key) ?: continue
+      // ```js
+      // export function numberFormat({type, specifiedFormat, config, normalizeStack}) {
+      //   // Specified format in axis/legend has higher precedence than fieldDef.format
+      //   if (isString(specifiedFormat)) {
+      //     return specifiedFormat;
+      //   }
+      // ```
+      //
+      // A **number** format is taken only where it is a string: `numberFormat` asks `isString` and
+      // falls through to the configured one otherwise, so an axis written `{"format": {"condition":
+      // …}}` over a measure has no format at all — Vega has no conditional format, and there is
+      // nothing else for such an object to mean. A **time** format is taken on its truthiness
+      // instead — `if (specifiedFormat) return specifiedFormat` — so the same object written over
+      // an instant is passed through as it stands. One specification in the wild corpus writes one
+      // over a measure.
+      if (key == "format" && value !is VegaValue.Str && !timeFormatted(def)) continue
       // `normalizeAngle`: a turn is measured from zero, so a label the specification wrote at
       // minus forty-five degrees is a label at three hundred and fifteen.
       axis.properties[key] =
-        if (key == "labelAngle") {
-          (value as? VegaValue.Num)?.let { num(((it.value % 360) + 360) % 360) } ?: asSignal(value)
-        } else {
-          asSignal(value)
+        when {
+          key == "labelAngle" ->
+            (value as? VegaValue.Num)?.let { num(((it.value % 360) + 360) % 360) }
+              ?: asSignal(value)
+          // The ticks a guide was **told** to draw, each made into what Vega can read.
+          key == "values" && value is VegaValue.Arr -> valueArray(def, value)
+          else -> asSignal(value)
         }
     }
     // A property Vega has no name for cannot be left in the configuration for Vega to apply: it
@@ -531,23 +599,40 @@ internal object Guides {
         axis.properties[property] = asSignal(value)
       }
     }
-    // A property a **style block** settles has to be written out: this compiler resolves the block
-    // rather than forwarding its name, so nothing downstream would apply it. Upstream writes out
-    // every property whose `configFrom` is not `vgAxisConfig` — for a style block that is what
-    // keeps a `gridColor` kept in `config.style` on the axis that names it.
+    // ```js
+    // const {configValue = undefined, configFrom = undefined} =
+    //   isAxisProperty(property) && property !== 'values'
+    //     ? getAxisConfig(property, config.style, axis.style, axisConfigs)
+    //     : {};
+    // ...
+    // } else if (hasConfigValue && configFrom !== 'vgAxisConfig') {
+    //   // Add config value to axis component if there is no explicit value and the value is not
+    //   // from a Vega config
+    //   axisComponent.set(property, configValue, false);
+    // }
+    // ```
+    //
+    // A configuration Vega cannot apply has to be resolved **here**, onto this axis, or nothing
+    // acts on it at all — and that is every source but a Vega one: a style block this compiler has
+    // already resolved, and a family named after a *scale* (`config.axisQuantitative`,
+    // `config.axisTemporal`) which Vega has never heard of. This engine wrote out only the
+    // properties it had a rule for, so a theme colouring every measured axis orange or turning its
+    // labels to a stated font was read and dropped. Five specifications in the wild corpus theme
+    // their axes that way. A family Vega *does* know is still left to Vega: writing a derived value
+    // beside it would settle the property for this axis alone and beat the theme with a default.
     for (property in AXIS_PROPERTIES) {
       if (axis.properties.containsKey(property)) continue
-      // Only where a **style** is what settled it. A family's own property is left for Vega to
-      // apply where Vega knows the family — `configFrom === 'vgAxisConfig'` — and a family's style
-      // block is behind every family, so it is read only where none of them spoke.
-      val quiet =
-        vegaLiteOnlyConfigs.none { it.fields.containsKey(property) } &&
-          vegaConfigs.none { it.fields.containsKey(property) }
-      val value =
-        styleConfigs.firstNotNullOfOrNull { it.fields[property] }
-          ?: familyStyles.takeIf { quiet }?.firstNotNullOfOrNull { it.fields[property] }
-          ?: continue
-      axis.properties[property] = asSignal(value)
+      val themed = configured(property) ?: continue
+      // A themed **signal** or conditional is written out from any block: Vega can read neither
+      // from its own configuration, and a conditional is not a Vega property at all. So is one of
+      // `propsToAlwaysIncludeConfig` — `(propsToAlwaysIncludeConfig.has(property) &&
+      // hasConfigValue)` stands beside the block's own source in upstream's condition, and it
+      // stands here for the same reason: Vega either has no such property or means something else
+      // by it. A theme asking every date axis for five ticks was read and dropped, `tickCount`
+      // being one of the nine and `config.axisX` a block Vega knows.
+      if (themedByVega(property) && property !in ALWAYS_FROM_CONFIG && !conditionalOrSignal(themed))
+        continue
+      axis.properties[property] = asSignal(themed)
     }
     conditionalToEncode(axis, diagnostics)
 
@@ -885,8 +970,28 @@ internal object Guides {
     val moved = LinkedHashMap<String, LinkedHashMap<String, VegaValue>>()
     for ((property, mapping) in CONDITIONAL_AXIS_PARTS) {
       val value = axis.properties[property] as? VegaValue.Obj ?: continue
-      val condition = value["condition"] ?: continue
       val (part, vgProp) = mapping
+      // ```js
+      // } else if (isSignalRef(propValue)) {
+      //   const propIndex = CONDITIONAL_AXIS_PROP_INDEX[prop as ConditionalAxisProp];
+      //   if (propIndex) {
+      //     const {vgProp, part} = propIndex;
+      //     setAxisEncode(axis, part, vgProp, propValue as any);
+      //     delete axis[prop];
+      //   } // else do nothing since the property already supports signal
+      // ```
+      //
+      // A **signal** moves the same way a condition does, and for the same reason: these thirteen
+      // are the properties Vega paints per label or per tick rather than reading off the axis, so
+      // there is no axis property for a signal to be written into. Left on the axis, a document
+      // that colours its labels from a parameter had that colour read as nothing and every label
+      // drawn in the default.
+      if (value.fields.keys == setOf("signal")) {
+        moved.getOrPut(part) { LinkedHashMap() }[vgProp] = value
+        axis.properties.remove(property)
+        continue
+      }
+      val condition = value["condition"] ?: continue
       val otherwise = obj { value.fields.forEach { (k, v) -> if (k != "condition") put(k, v) } }
       val conditions =
         when (condition) {
@@ -965,6 +1070,122 @@ internal object Guides {
   }
 
   /** Splits one component into the gridline axis and the axis proper, in that order. */
+  /**
+   * `propsToAlwaysIncludeConfig`: the themed properties that are written onto the axis even where
+   * the block they came from is one Vega reads for itself.
+   *
+   * Upstream's own reasons: `grid` decides whether there is a second axis at all, so this compiler
+   * has to know its value rather than leave it to Vega; `translate` has a default of its own in
+   * Vega and a theme overriding it has to be seen; and the rest are Vega-Lite's names for things
+   * Vega either calls something else or does not have.
+   */
+  private val ALWAYS_FROM_CONFIG =
+    setOf(
+      "grid",
+      "translate",
+      "format",
+      "formatType",
+      "orient",
+      "labelExpr",
+      "tickCount",
+      "position",
+      "tickMinStep",
+    )
+
+  /**
+   * Whether this definition's guide is formatted as a **time**, which decides how its `format` is
+   * read.
+   *
+   * `isFieldOrDatumDefForTimeFormat`: a temporal field, or one whose time unit makes it an instant
+   * however its type was written — a month named on an ordinal scale is still a date to the
+   * formatter.
+   */
+  private fun timeFormatted(def: ChannelDef): Boolean =
+    def.type == MeasureType.TEMPORAL || def.timeUnit != null
+
+  /**
+   * `LOCAL_SINGLE_TIMEUNIT_INDEX`: the units that name **one** field of a date rather than several.
+   */
+  private val SINGLE_TIME_UNITS =
+    setOf(
+      "year",
+      "quarter",
+      "month",
+      "week",
+      "day",
+      "dayofyear",
+      "date",
+      "hours",
+      "minutes",
+      "seconds",
+      "milliseconds",
+    )
+
+  /**
+   * `valueArray`: the ticks a guide was **told** to draw, each one made into what Vega can read.
+   *
+   * ```js
+   * export function valueArray(fieldOrDatumDef, values) {
+   *   const {type} = fieldOrDatumDef;
+   *   return values.map((v) => {
+   *     const timeUnit = isFieldDef(fieldOrDatumDef) && !isBinnedTimeUnit(fieldOrDatumDef.timeUnit)
+   *       ? fieldOrDatumDef.timeUnit : undefined;
+   *     const expr = valueExpr(v, {timeUnit, type, undefinedIfExprNotRequired: true});
+   *     if (expr !== undefined) { return {signal: expr}; }
+   *     return v;
+   *   });
+   * }
+   * ```
+   *
+   * An **instant** is not a value Vega can be handed: `{"year": 2019, "month": "Jan"}` is a way of
+   * writing a date down and not a number, and a date written as text is text until something builds
+   * it. Every one of them becomes a signal that does — which is the same `datetime()` a domain over
+   * instants is built from. Written out as they stood, Vega read an object where it wanted a number
+   * and drew no ticks at all where the specification had listed them.
+   *
+   * A tick on a guide over a **single** unit is a reading of that unit rather than a date: `4` on
+   * an axis of hours is four o'clock, `"Jan"` on an axis of months is January.
+   * `isLocalSingleTimeUnit` is that rule, and upstream tells a reading from a date by asking
+   * whether the runtime can parse it. A number under ten thousand is a reading; so is a string with
+   * no digit in it, which is every name there is to write. (A string that holds digits and is still
+   * not a date — `"12:00"` — parts company there, and is a tick nothing could have drawn either
+   * way.)
+   */
+  private fun valueArray(def: ChannelDef, values: VegaValue.Arr): VegaValue {
+    // `isBinnedTimeUnit`: a bucketed column's values are the bucket's own edges and not a clock
+    // reading, so the unit is not one to build a date from.
+    val unit = def.timeUnit?.takeIf { !it.startsWith("binned") }
+    val instants = unit != null || def.type == MeasureType.TEMPORAL
+    // `normalizeTimeUnit` reads the `utc` out of the unit's *name* before asking whether it is a
+    // single one, so an axis of `utcmonth` is an axis of months: the reading is built into a local
+    // `datetime()` exactly as `month`'s is, the zone being the scale's business and not the tick's.
+    val single = unit?.removePrefix("utc")?.takeIf { it in SINGLE_TIME_UNITS }
+    fun expression(raw: VegaValue.Obj) =
+      signalRef(Transforms(DiagnosticCollector()).dateTimeExpression(raw))
+    return arr(
+      values.values.map { value ->
+        val reading =
+          when (value) {
+            is VegaValue.Num -> value.value < 10000
+            is VegaValue.Str -> value.value.none { it.isDigit() }
+            else -> false
+          }
+        when {
+          value is VegaValue.Obj && Scales.looksLikeADateTime(value) -> expression(value)
+          !instants -> value
+          single != null && reading -> expression(obj { put(single, value) })
+          value is VegaValue.Num -> signalRef("datetime(${canonicalNumberString(value.value)})")
+          value is VegaValue.Str -> signalRef("datetime(${quoted(value.value)})")
+          else -> value
+        }
+      }
+    )
+  }
+
+  /** A themed value Vega cannot read from its own configuration: a signal, or a conditional. */
+  private fun conditionalOrSignal(value: VegaValue): Boolean =
+    value is VegaValue.Obj && (value.has("signal") || value.has("expr") || value.has("condition"))
+
   /** `labelAlign`/`labelBaseline` of null are decisions the axis keeps and Vega is not shown. */
   private val NULLABLE_LABEL_PROPERTIES = setOf("labelAlign", "labelBaseline")
 
@@ -1334,7 +1555,9 @@ internal object Guides {
       // from. Applied below, after the encode parts are assembled, which is where upstream applies
       // it too.
       def.legend?.fields?.forEach { (key, value) ->
-        if (key in LEGEND_PROPERTIES) put(key, asSignal(value))
+        if (key !in LEGEND_PROPERTIES) return@forEach
+        if (key == "values" && value is VegaValue.Arr) put(key, valueArray(def, value))
+        else put(key, asSignal(value))
       }
       if (gradient) {
         // A ramp is painted at the mark's own opacity, so a legend beside a chart of translucent
@@ -1470,6 +1693,17 @@ internal object Guides {
     }
   }
 
+  /**
+   * `legendCmpt.get('symbolFillColor') ?? config.legend.symbolFillColor` — the colour a legend
+   * states for its own swatches.
+   *
+   * Stated on the legend or settled for every legend by the theme; either way the swatches are that
+   * colour and the mark's own paint has nothing left to say about them.
+   */
+  private fun symbolColour(view: UnitView, channel: String, property: String): VegaValue? =
+    view.spec.fieldDef(channel)?.legend?.fields?.get(property)
+      ?: view.config.raw.obj("legend")?.fields?.get(property)
+
   /** The glyph a legend entry draws: a line's legend shows a stroke, a bar's shows a square. */
   private fun defaultSymbolType(view: UnitView, channel: String): String {
     if (channel != "shape") {
@@ -1541,15 +1775,37 @@ internal object Guides {
       if (property == "stroke" && (channel == "stroke" || (!filled && channel == "color"))) continue
       markConfig.fields[property]?.let { fields[property] = obj { put("value", it) } }
     }
+    // ```js
+    // } else if (hasProperty(out.fill, 'field')) {
+    //   // For others, set fill to some opaque value (or nothing if a color is already set)
+    //   if (symbolFillColor) {
+    //     delete out.fill;
+    //   } else {
+    //     out.fill = signalOrValueRef(config.legend.symbolBaseFillColor ?? 'black');
+    //     out.fillOpacity = signalOrValueRef(opacity ?? 1);
+    //   }
+    // }
+    // ```
+    //
+    // A legend that states the colour its swatches are painted in has said what they look like, so
+    // the mark's own paint is taken off them — the base colour this compiler would otherwise write
+    // would be painted *over* by the legend's own and the opacity beside it would be applied twice.
+    // Three specifications in the wild corpus state one: a size legend beside a colour legend,
+    // whose swatches are all one colour because size is what they are showing.
+    val symbolFillColor = symbolColour(view, channel, "symbolFillColor")
+    val symbolStrokeColor = symbolColour(view, channel, "symbolStrokeColor")
     val fill = colors["fill"]
     if (fill != null && !(channel == "fill" || (filled && channel == "color"))) {
       when {
         // A swatch cannot resolve a *scaled* paint, so it is drawn in the legend's own base colour
-        // at the mark's opacity.
-        fill is VegaValue.Obj && fill.fields.containsKey("field") -> {
-          fields["fill"] = obj { put("value", "black") }
-          fields["fillOpacity"] = obj { put("value", symbolOpacity(view) ?: 1.0) }
-        }
+        // at the mark's opacity — unless the legend named a colour, and then it is drawn in that.
+        fill is VegaValue.Obj && fill.fields.containsKey("field") ->
+          if (symbolFillColor != null) {
+            fields.remove("fill")
+          } else {
+            fields["fill"] = obj { put("value", "black") }
+            fields["fillOpacity"] = obj { put("value", symbolOpacity(view) ?: 1.0) }
+          }
         // A **conditional** paint is a rule array, and the swatch takes the arm that is a plain
         // colour: a chart whose points are their category's colour only while picked is grey the
         // rest of the time, and grey is what the other legend's swatches are.
@@ -1561,7 +1817,10 @@ internal object Guides {
     val stroke = colors["stroke"]
     if (stroke != null && !(channel == "stroke" || (!filled && channel == "color"))) {
       when {
-        stroke is VegaValue.Obj && stroke.fields.containsKey("field") -> Unit
+        // `hasProperty(out.stroke, 'field') || symbolStrokeColor`: a scaled outline the swatch
+        // cannot resolve, or one the legend has named for itself. Either way the mark's is dropped.
+        stroke is VegaValue.Obj && stroke.fields.containsKey("field") -> fields.remove("stroke")
+        symbolStrokeColor != null -> fields.remove("stroke")
         stroke is VegaValue.Arr ->
           firstConditionValue(view, "stroke")?.let { fields["stroke"] = obj { put("value", it) } }
         else -> fields["stroke"] = stroke

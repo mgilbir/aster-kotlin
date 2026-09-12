@@ -8,6 +8,966 @@ section here does not get released.
 
 ### Fixed
 
+- **A parse climbs in the order `MoveParseUp` climbs it, and the branches are numbered in that
+  order.** Two things decide the shape it leaves behind. The node depths are measured *once*, before
+  anything moves, so a node is visited at the depth it had then — a parse that has already climbed
+  is visited again from wherever it now is. And the children are walked *as they stand*: a swap
+  empties that list and fills it with the parse's own children, and the iterator carries on at the
+  next index, into what the swap just put there — so a parse among them climbs in the same pass and
+  the branch below it is appended after every other branch. It reads like an accident and it is one,
+  but the dataset numbering follows the order the branches end up in. Written as a recursion that
+  settles each level before the one above it, this compiler numbered such a chart's tables in an
+  order no mark expected: the box plot read the density's table and the density the box plot's. One
+  specification in the wild corpus lays a box plot of instants beside one of numbers that way —
+  **the wild corpus now agrees with upstream on all 1981 of its specifications.**
+- **A summary of the continuous axis is of that axis's kind.** `getCompositeMarkTooltip` types every
+  entry of a composite mark's tooltip from the axis it summarises — `type:
+  continuousAxisChannelDef.type` — so a box plot of instants reads its quartiles back as dates and a
+  whisker of instants reads its ends as dates. Written as quantities, the tooltip showed five epoch
+  integers; and because what the encoding says a column is decides how it is parsed, nothing asked
+  for the summary to be read as a date at all, so the box was drawn and compared as numbers too. One
+  specification in the wild corpus box-plots an instant.
+- **A column a transform wrote is read back as what the encoding says, unless the transform already
+  said the same thing.** `parseTransformArray` records what each transform claims it wrote — a
+  *number* for a `bin`, an `aggregate`, a `window` and a `joinaggregate`, a *date* for a time unit,
+  and an opaque `derived` for the rest — and `makeWithAncestors` drops the implicit parse only where
+  the two agree, where nothing is claimed about the value, or where all that was wanted was to
+  flatten a path. This compiler dropped it whenever any transform wrote the column, so a box plot of
+  an instant lost the step that reads its own summary back as a date: the quartiles came out of the
+  aggregate as milliseconds and were drawn, labelled and compared as numbers, with a time axis
+  measuring a span of epoch integers. One specification in the wild corpus box-plots an instant.
+- **The identifier below an aggregate belongs to the model that wrote the aggregate.**
+  `parseTransformArray` runs once per model and asks `requiresSelectionId(model)` of that model —
+  for a layer, `forEachSelection` over its own components and its members'. A transform written on a
+  layer is that layer's however many members carry a copy of it, so the aggregate is one node and
+  the identifier below it is one node too. This compiler asked each member instead: in a layer that
+  aggregates once and whose first member declares a selection, the member that declared none got a
+  chain of its own — identical to its neighbour's but for the missing identifier, and so unable to
+  fold with it. The table was computed twice, and a domain sorted by an aggregate read the union of
+  both copies rather than the one table. The identifier after an aggregate an *encoding* asks for is
+  still the view's own, that aggregate being the unit's. One specification in the wild corpus
+  aggregates once per plot and picks in one member of each.
+- **Two identical sibling bucketings of an instant fold the way two aggregates do.** The same pair of
+  optimizers reaches them and they keep opposite ends: `MergeTimeUnits` runs first in each round and
+  keeps the *last* of what is already sibling when it runs — `timeUnitChildren.pop()` — where
+  `MergeIdenticalNodes`, which hashes the node as `TimeUnit ${hash(this.timeUnits)}`, keeps the
+  *first* and reaches a pair that only becomes sibling because the steps above them folded, in that
+  same pass. This compiler gave a time unit no identity and left every such fold a round later, so a
+  chart whose layers all bucket one column had its branches numbered backwards and every mark read
+  its neighbour's dataset. One specification in the wild corpus buckets an instant in sixteen layers.
+- **A transform climbs above a grid's partition only as far as the fork below it.** `moveFacetDown`
+  walks the partition down one node at a time and stops where the flow forks, so what climbs past it
+  is what the models *at or above the cell* wrote — one chain, no fork in it. A layer **inside** the
+  cell wrote its transforms below that fork, and they stay there, computed once per cell. This
+  compiler asked instead whether the transform belonged to the view carrying a copy of it; a
+  member's copy of its own layer's step is that layer's, so it counted as the grid's and was written
+  above the cut — where the chain is built from one view of the cell and knows nothing of it, so it
+  was written nowhere at all. A layer that filters itself down to one series had that filter dropped,
+  and every mark in the cell drew every row. One specification in the wild corpus layers a filtered
+  line inside a gridded cell.
+- **An expression in a theme is a signal, and a theme's parameters are the document's signals.**
+  `initConfig` rewrites `{"expr": …}` as `{"signal": …}` once, as the configuration is read, so
+  everything downstream sees a signal; `stripAndRedirectConfig` then moves `config.params` to
+  `config.signals`, Vega having no `config.params`. This compiler left both as written, and a
+  document that names a colour or a typeface once and reads it from the theme got three things
+  wrong: the expressions reached the renderer as *values* that happened to be objects, so a font was
+  named after an object and a colour was not a colour; the parameters reached it under a name Vega
+  has never heard of, so nothing those expressions named existed at all; and a label property
+  carrying a signal stayed on the axis, where Vega does not read it — the thirteen in
+  `CONDITIONAL_AXIS_PROP_INDEX` are painted per label, so a signal among them belongs in the axis's
+  own `encode` block. A signal is a **reference** wherever a value is read, too, and wrapped in one
+  it said nothing. One specification in the wild corpus themes itself that way.
+- **Two identical sibling aggregates fold into whichever end the optimizer that reaches them first
+  keeps.** `MergeAggregates` runs first in each round and keeps the *last* of the aggregates that
+  are already siblings when it runs — `mergeableAggs.pop()`. `MergeIdenticalNodes` runs later in the
+  same round, hashes every node by what it emits, aggregates included, and keeps the *first* —
+  `nodes.shift()`; it works top-down and descends straight into a node it has just merged, so a pair
+  of aggregates that only *becomes* siblings because the steps above them folded is folded by it, in
+  the same pass. This compiler gave an aggregate no identity at all and left every such fold to its
+  own `MergeAggregates` a round later, so the branches came out reversed and each mark read its
+  neighbour's dataset. Which of the two applies depends in turn on the identifier a selection needs:
+  `parseData` writes one in every model's pipeline, so the chart's sits above the fork from the
+  start and the views' copies are taken out again. Written once per view here, they were one node
+  only when the fold reached them, which is a round too late. Six specifications in the wild corpus
+  fold an aggregate that way.
+- **A bucketing that says neither how many buckets nor how wide gets the default count.**
+  `normalizeBin` has three arms and this compiler read two: `bin: true` and the empty object. A
+  stated bucketing that says something *else* — an `anchor`, a `base` — was left without a count, so
+  nothing cut the column into ten. The count is spelled into the name the bucketing writes, so the
+  column the mark read, `bin_anchor_0_5_v`, was not the one the data flow had written under
+  `bin_anchor_0_5_maxbins_10_v`: every mark, every axis and the scale's own `bins` named a column
+  that did not exist, and the chart drew nothing. `!bin.maxbins && !bin.step` is their truthiness, so
+  a bucketing asking for zero buckets is asking for the default; the default is the channel's — six
+  for a colour or a facet, ten elsewhere — and a bucketing written as a `transform` has no channel to
+  ask, so it is always ten. One specification in the wild corpus anchors its buckets that way.
+- **A grid that belongs to a plot is answered by that plot, not by the chart above it.** Two
+  questions were asked of the chart. *Which axes stand in a band beside the grid*:
+  `parseGuideResolve` is asked of the model the grid belongs to, and a facet's cells share their
+  positions whatever the plots beside it do about theirs. Asked of the chart — a concatenation
+  resolving `x` and `y` independently by default — every position axis of a faceted plot looked like
+  a cell's own, so the grid counted no cells and its `facet_domain_row` and `facet_domain_column`
+  sequences went unwritten; the bands were still drawn, from `assembleFacetMarks`, which does ask
+  the plot's own resolve, and they read a dataset nothing had written. Vega refuses a chart that
+  names a dataset it was never given, so it did not render at all. *Which grid a selection's view is
+  a cell of*: `unitName(model, {escape: false})` writes the cell's name and the values that cell
+  holds, and named with the bare cell name a faceted plot that opened with a brush had that brush
+  belong to no cell. One specification in the wild corpus grids a plot of a concatenation.
+- **A brush is drawn around the marks of the model that assembles it, once per unit that carries
+  the selection.** A unit inside a layer does not wrap its own marks: `assembleLayerSelectionMarks`
+  wraps for it, around everything that layer assembled, and only for the children that are *units* —
+  a layer inside a layer has wrapped its own already. So a brush declared in the inner layer of
+  `layer[layer[a, b], c]` is drawn around `a` and `b` and **under** `c`. This compiler wrapped the
+  whole plot whatever declared the brush, so a layer drawn over a brushed one came out beneath the
+  brush: a rule that should cross the highlighted region was covered by it. A selection declared
+  *above* the composition is owned by no view and pushed into every unit below it, so one such
+  declaration over a layer of two draws the brush twice, each wrap around its own unit's model and
+  each hidden unless the store's row came from that unit — upstream's own reading, and what upstream
+  emits. One specification in the wild corpus layers a rule over a brushed pair, in five plots.
+- **A binding declared above a composition drives every plot in it.** `scaleBindings.parse` runs
+  once per unit, and a parameter written at the top of a chart is pushed into every unit below it:
+  every plot's position scale carries the extent, reads it back as `domainRaw`, and is clipped by
+  `scaleClip`, so a pan moves the whole dashboard at once. The top-level signals are assembled the
+  same way, `topLevelSignals` appending per unit because "no single selCmpt has a global view". This
+  compiler answered for the first plot alone — one plot panned while the rest stood still, their
+  marks unclipped and spilling past their own edges, and a field only another plot is scaled by had
+  no signal at the top to be dragged by at all. One specification in the wild corpus binds a
+  nine-plot dashboard that way.
+- **A wrapped grid's heading is named where any grid's is.** `parseFacetHeaders` settles the heading
+  once for every facet channel: the `header` block's own `title`, then the definition's, then the
+  column's derived name — and only then if the theme has not emptied it, `includeDefault` being what
+  `config.header.title` decides and nothing more. `assembleHeaderMarks` then asks whether there *is*
+  a heading, and `""` is not one. The crossed form, `row` and `column`, read it that way; the wrapped
+  form read only the derived name, so a trellis took no heading from its own `header`, ignored a
+  document that said `{"header": {"title": null}}` to caption none of its grids, and drew a band of
+  blank space over a grid that wrote `"title": ""` to ask for no heading at all, with every cell
+  pushed down by it. One specification in the wild corpus asks for none that way.
+- **A view lifted into a cell keeps everything it said but the facet itself.** `mapFacetedUnit`
+  moves the unit down into the cell as the unit it was; only the facet channels are taken out of its
+  encoding. This compiler rebuilt the cell's specification property by property and left two of them
+  behind. Its **parameters**: a selection declared inside a grid then belonged to no view, and
+  `interactiveFlag` — which writes `interactive: false` on a mark whose view declared none, so a
+  click there falls through to the view that did — found every mark in the cell claiming it, so
+  whichever was drawn last swallowed the click. And its **projection**: a map drawn in a cell was
+  put on the page by whatever the chart above it said rather than by what the cell said itself, so
+  naming a projection inside a grid did nothing. One specification in the wild corpus declares a
+  selection in a layer inside a grid.
+- **Two members share a projection when they agree on what it is, not on where it was put.**
+  `mergeIfNoConflict` walks `PROJECTION_PROPERTIES` and no other, and that list is what a projection
+  *is* — its kind, its centre, its rotation — not `scale` and `translate`, which are where the map
+  was placed on the page. Two layers of one map that state the same kind and place it differently
+  are one projection, and the first of them settles the placing. Compared over the whole
+  specification instead, such layers were two projections: each was written out, each mark read its
+  own, and the outlines drawn over a map were placed by a projection the map underneath knew nothing
+  about — two readings of one country at two sizes, one on top of the other. Two specifications in
+  the wild corpus layer a map that way, and agreement with upstream goes from 1963 to 1965 of 1981.
+
+- **A table already standing is found rather than made, and a name is what finds it.**
+  `findSource` decides what makes two mentions the same table, and it is not that they were written
+  the same way: a dataset given a `name` is that name's, so a view that says `{"name": "places"}`
+  and nothing else reads the table another view declared under that name. Two names are two tables
+  whatever else they say, and the `feature` or `mesh` a format picks out is part of the address —
+  two views reading different layers of one topology read different tables. This compiler keyed a
+  table by the value as written, so each mention stood up a root of its own: the table was fetched
+  again per mention, and every table derived from it was numbered around the copies. Two
+  specifications in the wild corpus name a table once and draw from it three times; both need one
+  further fix to agree, so the count is unchanged.
+
+- **A binding to the scales binds only what can be panned.**
+  `scaleBindings.parse` keeps a projection only where its scale has a continuous domain — there is
+  no halfway between two categories to drag to — and only what it keeps publishes a signal at the
+  top of the chart or pushes one outward. This compiler bound every projected channel, so a chart of
+  several views that bound a categorical axis declared a signal at the top that nothing ever wrote
+  and pushed the view's own out to meet it: the view's own value was discarded on every pan and the
+  axis it belonged to never moved. Three specifications in the wild corpus bind a categorical axis
+  that way, and agreement with upstream goes from 1960 to 1963 of 1981.
+
+- **A plot's grid is a grid: its cell is the unit, and what a unit carries is carried there.**
+  `assembleUnitSelectionSignals` runs on the unit model, and inside a grid the unit is the cell: the
+  marks a selection watches are drawn there, the scales it reads are the cell's, and the `facet`
+  signal beside it says which cell the pointer is in. The cell's own name carries that too —
+  `unitName` of a cell is its name *and the value it holds* — so that a pick made in one cell is told
+  from the same pick made in another. This compiler wrote a gridded plot's machinery on the plot's
+  group: one set of signals watched every cell at once, the pointer over any of them wrote the same
+  tuple, and nothing said which cell it came from. Three more things were the chart's where they
+  should have been the plot's — the name of the partition a cell scale measures, the columns the
+  cells count for themselves, and the cell's own size signals. And what the cells count now comes
+  first in the partition's aggregate, `assembleFacet` starting from `getCardinalityAggregateForChild`
+  and pushing the sort's own onto it. Three specifications in the wild corpus grid a plot and select
+  inside it; each needs one further fix to agree, so the count is unchanged.
+
+- **`columns` belongs to the level that wrote the facet, which may be a plot rather than the chart.**
+  A wrapped grid has no direction of its own, so the number of cells to put in a row is written
+  beside the facet and `getFacetMappingAndLayout` lifts it from there onto the layout — along with
+  the `bounds` and `center` written beside it. A plot of a concatenation that grids its cell writes
+  all of them in the same place. This compiler read them off the chart's specification alone, so a
+  wrapped grid written on a plot found nothing to wrap at and laid its cells out in one long row, as
+  wide as the data happened to be and however narrow the plot beside it. `columns` is also written
+  last now, after the properties the specification stated, which is where upstream spreads it. Two
+  specifications in the wild corpus wrap a grid inside a plot; each needs further fixes to agree, so
+  the count is unchanged.
+
+- **A `resolve` on a plot that grids its cell speaks about the cells.**
+  Every model carries its own `resolve` and each speaks about its own children, and a plot of a
+  concatenation that lays out a grid has the *cell* between it and the layers. A channel it resolves
+  independently is therefore scaled per cell: the scale is named for the cell, built inside the cell
+  group where the rows it measures are, and its axis is drawn in the cell rather than in a band
+  beside the grid — a band of labels cannot stand for several different extents. The band then has
+  neither a caption nor an axis, and `assembleHeaderGroup` writes one only `if (title || hasAxes)`,
+  so it disappears with the axis that was its only content. This compiler asked the chart's
+  `resolve` for all of it, which speaks about the plots beside each other and not the cells within
+  one: such a plot came out with a single shared scale, one band of labels standing for extents that
+  differ cell by cell, and the scale itself written beside the grid where nothing measures a cell's
+  rows. Five specifications in the wild corpus grid a plot of a concatenation; each needs further
+  fixes to agree, so the count is unchanged.
+
+- **A channel whose children disagree is forced apart at the level that found the disagreement.**
+  `parseNonUnitScaleCore` runs per model, bottom-up: a model whose children disagree marks the
+  channel independent and offers nothing upward, so the level above has nothing to merge from it and
+  goes on merging the children that did agree. Two layers inside one plot of a concatenation are
+  where it tells — a colour ramp over counts beside a pair of named colours cannot be one scale, the
+  layer model says so, and each layer keeps `concat_0_layer_0_color`, while the other plot's colour
+  is still the chart's own. Asked of the whole chart at once and answered with the plot, such a chart
+  came out with one colour scale for the plot: two layers measuring different things drawn from a
+  scale that is neither, and a key beside them explaining a scale nothing is drawn with. A scale is
+  placed where it is named, so a level's own now stands before one named for something inside it —
+  `assembleScales` writes a model's own components and only then recurses. Five specifications in
+  the wild corpus layer scales that cannot merge, and agreement with upstream goes from 1955 to 1960
+  of 1981.
+
+- **A join names its table before a child of the chart names one.**
+  `parseData` parses a model's transforms where it stands — `parseTransformArray` runs on the
+  model's own list and `LookupNode.make` gives the joined table a root of its own there — and only
+  then descends into the children. So a join written on the chart names its table before a layer
+  that brought rows of its own names that. This compiler registered the table as the transform was
+  *translated*, which happens while a view's chain is being built, so the table was numbered behind
+  whatever the first view had already claimed, and every reader of it named a different table than
+  upstream's: the marks drawn from it and the projection fitted to it. Two specifications in the
+  wild corpus join a table and then layer a map that brings its own, and agreement with upstream
+  goes from 1953 to 1955 of 1981.
+
+- **A caption anchored to one end of its band is aligned to that end, angle or no angle.**
+  `defaultHeaderGuideAlign` asks the anchor first and asks it whether or not an angle was stated;
+  the angle settles only an unanchored caption, and the baseline is the angle's alone. This compiler
+  asked both inside a test for the angle, so a header that anchored its captions and left them flat
+  got no alignment and its names came out centred. And `assembleLabelTitle` is the same function
+  wherever the caption is drawn, so a *wrapped* grid's cell caption faces the way a band's does —
+  this compiler asked nothing at all there. One specification in the wild corpus is a wrapped trellis
+  that anchors its cell names to the start and hangs them below each cell, and agreement with
+  upstream goes from 1952 to 1953 of 1981.
+
+- **A model that is renamed still owns what it owned.**
+  A transform belongs to the model it was written on, and a grid's own stand above the partition
+  whatever the cell below is called — but a cell is *renamed* as it is built, `layer_1` becoming
+  `child_layer_1`, and a transform the view's own expansion wrote was still credited to the name it
+  had before. The renamed view then did not recognise its own step as its own and left it to an
+  ancestor that had never heard of it, so it was written nowhere at all. An error bar inside a grid
+  is where it tells: its bounds are two `calculate`s written once above the parts it expands into,
+  and without them the layer filtered on columns no step computes — which is every row, so no
+  interval was drawn. Only a view with a name of its own is renamed this way: a chart written with
+  the `column` shorthand is one view and the chart at once, and its transforms are the grid's. Four
+  specifications in the wild corpus draw their error bars inside a grid, and agreement with upstream
+  goes from 1948 to 1952 of 1981.
+
+- **A facet channel is none of the composite mark's own.**
+  Upstream normalises a grid into the operator form before a composite mark is reached at all, so
+  the cell it hands the mark has no `row` or `column` in its encoding and there is nothing there to
+  carry. This compiler folds the operator form the other way, and the channel was then carried like
+  any other: the grid's column was named in the tooltip, where upstream names only what the mark
+  itself draws — a reader hovering an interval was told which cell they were in — and it was grouped
+  by, where `moveFacetDown` adds the grid's own columns to a summary as the partition walks down
+  past it and so adds them to the copy beside the grid and not to the copy inside each cell. Written
+  into the transform, both copies carried them: the cell's summary grouped by a column it cannot
+  vary, and the two layers' summaries were no longer the same question, so the grouping was computed
+  once per layer where upstream computes it once. Four specifications in the wild corpus draw an
+  error bar inside a grid; each needs further fixes to agree, so the count is unchanged.
+
+- **A caption the channel nulls is as much the axis's `null` as one the axis block nulls.**
+  `mergeTitleComponent` answers `null` for either side of the merge being it, and a layer that says
+  its position needs no caption has said so for the axis the layers share. This compiler read the
+  `null` only off the `axis` block, so a layer writing `"title": null` on its channel lost to
+  whatever an earlier layer had named, and an axis the specification asked to leave unlabelled came
+  out labelled. The `axis` block is still asked first, so a caption written there outranks a channel
+  that nulls it. Two specifications in the wild corpus draw an error bar over a bar and null the
+  error bar's caption so the two do not both name the axis; each needs further fixes to agree, so
+  the count is unchanged.
+
+- **A scale stands at the level that owns it, and a level stands before its children.**
+  `assembleScales` walks the model tree and writes each model's own components before it recurses,
+  so the order of a chart's scales is the order of its levels. A nested concatenation is a level of
+  its own and may own a scale — one its plots share while the chart's other children do not — and
+  ordering by the *plots* alone put such a scale among the scales of the first plot under it, which
+  is after the level that owns it rather than before. Which level owns a scale is read off its name,
+  a scale a level owns being called after it; one named for something the composition cannot see — a
+  layer inside a plot — keeps its place after the levels. One specification in the wild corpus is a
+  column whose second entry is a row of plots sharing a colour scale, and agreement with upstream
+  goes from 1947 to 1948 of 1981.
+
+- **Independence is asked of every level, and a level below may still share what the chart split.**
+  `parseScaleCore` runs per model down the tree, so a concatenation of concatenations is two
+  questions. Colour defaults to shared everywhere: a chart that states
+  `"resolve": {"scale": {"color": "independent"}}` over a column whose second entry is a *row* of
+  plots gives that row one colour scale, named for the row, where positions default to independent
+  at every level and so do go all the way down. Named from the innermost plot regardless, such a
+  chart came out with a colour scale for every plot in the row where the specification asked for one
+  for the row — a legend each instead of one, and each drawn from a fraction of the rows. One
+  specification in the wild corpus resolves its colours that way; its key is still drawn on the
+  row's first plot rather than on the row, so the count is unchanged.
+
+- **A grid's own bucketing of an instant stands above its cells' transforms.**
+  `parseData` runs per model, top-down: a facet model writes its own steps and then its child writes
+  its, so the column a grid is cut by is computed before any step the cell asked for. A chart written
+  with the `column` shorthand has no cell of its own to ask, and its transforms are the grid's,
+  standing above the bucketing instead. This compiler wrote the two models' bucketings together at
+  the foot of the chain, so a trellis of years listed its `timeunit` after a `calculate` the cell
+  asked for. One specification in the wild corpus is such a trellis, its cells ordering a stack by a
+  stated colour domain, and agreement with upstream goes from 1946 to 1947 of 1981.
+
+- **A time unit written as an object is named in the order its parameters were written.**
+  `timeUnitToString` walks `keys` of the normalized object, whose own order `normalizeTimeUnit`
+  preserves — its one rewrite is `{...timeUnit, ...{unit}}`, and putting an existing key back leaves
+  it where it was. So `{"step": 5, "unit": "minutes"}` is called `_step_5minutes` and
+  `{"unit": "minutes", "step": 5}` is called `minutes_step_5`: the same bucketing, two names. The
+  name is what every column and every expression downstream is spelled with, so a specification that
+  wrote its step first named a column upstream never writes — the transform wrote one column, the
+  mark read another, and every row came out empty. `utc` is not a parameter but a prefix, being
+  destructured out before the walk, and this compiler merely skipped it: a UTC bucketing asked for
+  as an object was named as a local one. One specification in the wild corpus writes its step first,
+  and agreement with upstream goes from 1945 to 1946 of 1981.
+
+- **A channel the mark does not grow along reads its column as it stands, stack or no stack.**
+  `positionAndSize` hands `midPoint` the stack, but only so that an imputed bin can be read by its
+  middle: nowhere in that function does a stack put an `_end` on the column. The two ends of a stack
+  are written by `rangePosition`, which is where a channel a mark grows along is settled. Suffixed
+  in both places, a bar turned by a bucketed position — one that spans its two ends along the other
+  axis, and so is only a five-unit marker along this one — was placed at the top of a total it is no
+  part of; on a single row that is the same place, on several it is not. One specification in the
+  wild corpus draws its buckets that way, and agreement with upstream goes from 1944 to 1945 of
+  1981.
+
+- **A ranged position's two ends are unioned above the per-channel domain, not instead of it.**
+  `parseDomainForChannel` merges whatever the channel's own domain came out as with whatever its
+  second channel's did. This compiler read the union as one of the per-channel shapes, so it stood
+  behind the earlier ones: a bucketed position with a second column of its own contributed the bin's
+  extent alone and the scale stopped at the last bucket's start, and a position given as a `datum`
+  with a column beyond it contributed the constant alone. And once the union is read where upstream
+  reads it, the band it unions with has to be the one upstream computes — `getBandPosition` answers
+  nothing for a position given a second one of its own, there being no bucket to reach the end of
+  when the mark spans what the two of them name, while a `bandPosition` the specification states is
+  still a band. One specification in the wild corpus draws bars between a bucket's edges and a
+  column of its own; it needs one further fix to agree, so the count is unchanged.
+
+- **A bar is turned by a column that arrived bucketed, not by one it is about to bucket.**
+  `orient` asks `isBinned(x.bin)` — `"binned"` or `{binned: true}`, a pair of edges the data came
+  with, which the bar spans and which settles the orientation on its own. A bin the chart is
+  *computing* settles nothing yet, and the question falls through to the rules below; a plain
+  histogram gets the same answer from them anyway, its binned `x` being no measure and its `y` one.
+  This compiler read it as any bin at all, so a bar whose bucketed `x` was given a second position
+  of its own never reached the ranged rule: it was called vertical, and everything downstream
+  followed — `y` became the band the bar grows along, so the stack was drawn there, the `y` scale
+  took a `zero` it should not have had and lost its padding, and a marker five units tall came out a
+  full column. One specification in the wild corpus draws its buckets that way; it needs two further
+  fixes to agree, so the count is unchanged.
+
+- **A step is that dimension's own, and a theme may state one dimension and not the other.**
+  `getViewConfigDiscreteStep` reads `view.discreteWidth` for `x` and `view.discreteHeight` for `y`;
+  `view.step` is the answer only where neither is set, being what `getViewConfigDiscreteSize` falls
+  back to. This compiler read `view.step` and nothing else, so a document that spaces its bars
+  thirty units apart drew them twenty — and every reader of a step reads it: the position scale's
+  own, the arithmetic a grouped bar's band is widened by, the offset scale's range, the largest a
+  sized point may be, and the width a rect takes where nothing else settles one. Where the themed
+  size is a plain number the step is `DEFAULT_STEP` and not `view.step`, `isStep` being false once
+  the fallback has been passed; that is upstream's own reading, and it shows in the one reader that
+  asks for a step whether or not either dimension is sized by one. No specification in the wild
+  corpus themes a step: this was found by reading `getViewConfigDiscreteStep`'s callers beside this
+  compiler's.
+
+- **A discrete position is sized by a step only where the theme leaves it to one.**
+  `defaultUnitSize` takes the themed discrete size for a discrete domain and calls it a step only
+  where that size is itself a step; `getViewConfigDiscreteSize` reads `view.height` before
+  `view.discreteHeight` and answers a `{step: …}` only where the answer is one. So a theme that
+  states a plain depth settles every strip in the document at that depth, however many categories it
+  holds. This compiler wrote the depth out but went on calling it a step behind the theme's back,
+  and it is a concatenation that asks: `parseNonUnitLayoutSizeForChannel` abandons the merge where a
+  child's size is a step, so a column of themed strips came out with a size signal each instead of
+  the one they share, and every name derived from it moved with them — the group's own height, the
+  range of its scale, and every clamp an interval brush is bounded by. One specification in the wild
+  corpus is a themed column of strips a brush is dragged across, and agreement with upstream goes
+  from 1943 to 1944 of 1981.
+
+- **A selection declared above a concatenation belongs to every plot in it.**
+  `assembleUnitSelectionSignals` runs per unit model, and a parameter written on the chart is
+  inherited by each of them rather than being the chart's alone. Three things follow, and this
+  compiler had all three the other way. The machinery is written in each plot's own group, where the
+  marks it watches are — kept at the top instead, one set of signals watched the marks of two plots
+  at once and the pointer over either of them wrote the same tuple. The unit each tuple records is
+  that plot's name — recorded empty, every plot's tuples claimed to come from the same unit and a
+  selection resolved per plot could not tell them apart. And each view needs the identifier after
+  its aggregate, `requiresSelectionId(model)` asking the unit model: the rows an aggregate makes are
+  not the rows that went in, and a selection that remembers by identity has nothing to remember them
+  by. One specification in the wild corpus picks rows that way from a row of plots, and agreement
+  with upstream goes from 1942 to 1943 of 1981.
+
+- **`unit` is unshifted after one view's selections, so a later view's controls go in front of it.**
+  `assembleTopLevelSignals` runs once per view on one accumulating array: a view's controls are
+  unshifted onto the front as its selections are walked, and `unit` is unshifted after that loop —
+  but only where it is not there already. So `unit` lands in front of the first selection-bearing
+  view's controls and behind every later view's, which go on being unshifted past it. This compiler
+  wrote `unit` first always, so a concatenation whose *second* plot binds a legend listed the two
+  the other way about. One specification in the wild corpus binds a legend that way, and agreement
+  with upstream goes from 1941 to 1942 of 1981.
+
+- **Which dimension a `"container"` size measures is asked of the signal's name.**
+  `const isWidth = name.endsWith('width')` — and the name a **cell** carries is `childWidth`, whose
+  capital W the test does not match, so a cell told to fill its container measures the container's
+  *height* for its width and takes the themed height where there is nothing to measure. It is
+  upstream's own slip, and it is what upstream emits: a chart drawn against a different answer would
+  lay out differently from the one the specification's author is looking at. This compiler asked the
+  channel instead, so a responsive concatenation measured the wrong way about. One specification in
+  the wild corpus is a row of container-sized plots.
+
+- **The pre-aggregation table exists where a domain reads it, not merely where a sort could.**
+  Upstream builds a raw output node for every unit and its optimizer removes the ones nothing asked
+  for, so the count is of *requests*. A scale whose domain the specification **states** never reads
+  any table at all, whatever its sort says, and neither does one taken from a `datum`, a stack or a
+  bin's own extent. This compiler asked the sort alone, so such a chart kept a raw table nothing
+  read: it costs nothing to compute, the node having no transforms, but a named point in the flow
+  spends a dataset name — every table the chart derived afterwards came out one number high, and
+  every mark and domain that named one named the wrong table. A **bin** on a discrete scale is
+  ordered by its own start, and that order is written on the domain entry rather than answered by
+  `domainSort`: which table to read is that function's question, and a bin ordered by its own start
+  still reads the table being drawn. One specification in the wild corpus is fixed, and agreement
+  with upstream goes from 1940 to 1941 of 1981.
+
+- **A line given a second position is a `rule`.**
+  A line is drawn through its points and has one position per row; a second position asks for a
+  segment, and a segment is what a rule is. `RuleForRangedLineNormalizer` rewrites the mark and says
+  so. Left a line, such a view kept the mark and lost the second position with it: the far end of
+  every segment was dropped, and a map of great circles came out as a line from each origin to
+  nowhere. A column that arrived already binned is a span in itself, and its `x2` is the far edge of
+  that span rather than the far end of a segment — so such a line stays a line. One specification in
+  the wild corpus draws its routes that way, and agreement with upstream goes from 1939 to 1940 of
+  1981.
+
+- **A grid inside a concatenation reads its own plot's `resolve`, not the chart's.**
+  A concatenation's plot that grids its cell is a facet model, and everything a facet model decides
+  about its cells is decided from the `resolve` written on it. Two of those decisions were read off
+  the chart instead, where a concatenation's own `resolve` speaks about its plots and says nothing
+  about anybody's cells: the **count** a cell sizes itself by — a cell whose discrete position is
+  its own has no width for the grid to share, so it counts its own categories — and whether the
+  cells can be **aligned**, which cells of different sizes cannot be. Such a grid sized every cell
+  from a width that does not exist and lined them up against it. No wild corpus specification is
+  fixed outright by this — the three that write such a plot differ in other ways too — but each of
+  them loses two of its differences.
+
+- **A mark given a size of its own is placed by the edge its alignment names.**
+  `vgAlignedPositionChannel` reads the mark's `align` and `baseline` and answers with the Vega
+  channel that edge is: `x`, `xc` or `x2`, and `y`, `yc` or `y2`. This compiler asked only whether
+  the mark was centred in its band, so every such mark was written with an `xc` — a picture aligned
+  to the right and tucked into the corner of a plot was drawn half outside it, and one aligned to
+  the left half a width too far along. A word the map has no key for is answered by the bare
+  channel, which is what `BASELINED_Y_CHANNEL[…] ?? channel` comes to: a `"line-top"` baseline is a
+  top for this even though the map does not list it. One specification in the wild corpus puts a
+  picture in a corner that way, and agreement with upstream goes from 1938 to 1939 of 1981.
+
+- **A compound time unit is taken apart by filtering the parts, not by reading the name.**
+  Three names live inside another name: `milliseconds` holds `seconds`, and `dayofyear` holds both
+  `day` and `year`. `containsTimeUnit` writes those three out by hand, and `getTimeUnitParts`
+  filters the index rather than scanning, so the parts come back in the order the index lists them
+  however the unit was spelled. This compiler read the name left to right and took the first unit
+  that fitted, so `yeardayofyear` came out as a year and a **day**: the transform bucketed the day
+  of the week rather than the day of the year, and the caption said so. One specification in the
+  wild corpus buckets that way, and agreement with upstream goes from 1937 to 1938 of 1981.
+
+- **Axes come out gridlines first and horizontals before verticals, in both passes.**
+  `assembleAxes` reads a map keyed by channel and takes the two keys in turn, so the order an axis
+  was *discovered* in never reaches the output. This compiler wrote them in that discovery order,
+  so a chart whose first layer draws only a baseline listed that layer's `y` before the `x` the
+  layer above it brought, and the two came out the other way round. The order is what Vega paints
+  in: the gridlines of both channels stand behind every axis, and an axis behind the one after it.
+  Four specifications in the wild corpus are layered that way, and agreement with upstream goes
+  from 1933 to 1937 of 1981.
+
+- **A band's range is measured against the size the level settled on, not the view's own.**
+  `model.size` is the size a model was **given**, and a layer hands its members its own — which is
+  its first member's, by the rule that settles a layer's size. Read as this view's own instead, a
+  member that states nothing fell through to the theme where its sibling had already said the level
+  is one step per category: a band chart whose second layer asks for a step of thirteen came out
+  stretched across a themed width, with its bands as wide as the plot divided by their number. The
+  theme still answers where nothing states a size, which is what makes a document that sizes every
+  plot with `config.view.discreteWidth` size them. One specification in the wild corpus writes such
+  a layer, and agreement with upstream goes from 1932 to 1933 of 1981.
+
+- **A `resolve` written on a plot of a concatenation speaks about the layers inside that plot.**
+  Every model in upstream's hierarchy carries a `resolve` of its own and each speaks about its own
+  children: the chart's is about the concatenation's plots, and a plot's is about the layers within
+  it. The innermost level to ask for independence settles the name, because it divides what the
+  level above had already divided — `concat_0_layer_0_y` beside `concat_0_layer_1_y` rather than one
+  `concat_0_y`. This compiler read the chart's `resolve` alone, so a plot that measures its two
+  lines apart shared one scale between them: one axis where the specification had asked for two,
+  and both series drawn against an extent that is neither's. Two levels bound the rule — a plot that
+  **grids** its cell has the cell between it and its layers, and a `resolve` there speaks about the
+  cells; a plot that is a single view has no children to divide at all. One specification in the
+  wild corpus writes such a plot and another is brought most of the way, and agreement with upstream
+  goes from 1931 to 1932 of 1981.
+
+- **What a selection opens with is a row already in its store, written the way that store is.**
+  Two arms of `assembleInit` were missing here. A selection that remembers rows **by identity** and
+  was told which rows to start with says so the same way its store will — one row per identity,
+  with no projection to name — and left out, such a chart opened with nothing picked however the
+  specification had started it. And `assembleInit` maps a list element by element and hands
+  anything else back as it stands, so a channel a brush's extent says nothing about is `null`
+  rather than an empty extent: an empty one is a brush of no width, which filters every row out,
+  where a null is the absence Vega reads as "not brushed along this channel". No wild corpus
+  specification writes either, so the count stays at 1931 of 1981; both were found while reading
+  `assembleUnitSelectionData` beside this compiler's own store.
+
+- **A selection told what it starts with and nothing else is projected onto whatever that names.**
+  "If no explicit projection (either fields or encodings) is specified, set some defaults. If an
+  initial value is set, try to infer projections." A slider bound to `maxReported` remembers a
+  `maxReported`, and a click started at `{"x": 5}` remembers the column `x` is drawn from. With
+  neither read, such a selection fell back to remembering rows by identity: it had no field signal
+  for the control to write into, no `tuple_fields` to say what it stored, and a store that began
+  empty however the specification had started it — so a chart whose sliders were meant to filter it
+  from the first frame filtered nothing until the reader moved one. An interval is the same rule
+  seen from the other side: a brush started over a range of `y` is dragged along `y` alone, where
+  before it was projected onto both positions and opened as a rectangle. A scalar starting value is
+  not a projection, being the identity of a row. Three specifications in the wild corpus are
+  written that way, and agreement with upstream goes from 1928 to 1931 of 1981.
+
+- **The ticks a guide was told to draw are made into something Vega can read.**
+  An instant is not a value Vega can be handed: `{"year": 2019, "month": "Jan"}` is a way of writing
+  a date down and not a number, and a date written as text is text until something builds it.
+  `valueArray` turns every one of them into the signal that does — the same `datetime()` a domain
+  over instants is built from. This compiler copied a stated `values` list through as it stood, so
+  Vega was handed an object where it wanted a number and drew no ticks at all where the
+  specification had listed them. A tick on a guide over a **single** unit is a reading of that unit
+  rather than a date — `4` on an axis of hours is four o'clock, `"Jan"` on an axis of months is
+  January — and `utcmonth` is a month for this, the zone being the scale's business and not the
+  tick's. Axes and legends alike. Three specifications in the wild corpus list their ticks that way,
+  and agreement with upstream goes from 1925 to 1928 of 1981.
+
+- **A step the partition is walked past is grouped by the grid's own columns as well as its own.**
+  `moveFacetDown` walks the partition down past the cell's chain one node at a time, and each of the
+  four nodes that group — an aggregate, a stack, a window, a join-aggregate — picks up the facet's
+  fields on the way. A count a cell states is a count within that cell; hoisted above the grid
+  without the grid's own columns it counts the whole table instead, and every cell of the trellis
+  then draws the same number. This compiler did that for the aggregate an *encoding* asks for and
+  not for one a `transform` states, so a confusion matrix computed per revision came out computed
+  once over every revision at once. A grid's own transforms keep the grouping they were written
+  with, the partition being appended after them and never moving past them — and a facet written in
+  the *encoding* keeps them all, `mapFacetedUnit` moving the mark and the encoding down and leaving
+  everything else where it was. One specification in the wild corpus states such a transform, and
+  agreement with upstream goes from 1924 to 1925 of 1981.
+
+- **A grid's own transforms run as well as its cell's, and above them.**
+  `parseData` runs once per model, and a faceted chart has one model per level plus the cell's: the
+  grid's pass writes its transforms and then the partition, and the cell's writes its own below. A
+  chart that computes a column and grids a view that filters on it is two passes, not a choice
+  between them. This compiler folded a grid's properties into its cell and let the cell's own win
+  — right for a `data` or a `width`, wrong for a `transform` — so the grid's were dropped outright
+  wherever the cell wrote any of its own, and such a chart filtered on a column nothing had written
+  and came out empty. A grid whose cells are grids is the same rule at every level, outermost
+  first. No wild corpus specification writes both, so the count stays at 1924 of 1981.
+
+- **A layer is as wide as its first member, and as wide as itself where no member says.**
+  A member's own size overrides the one the level above handed it — `{...parentGivenSize,
+  ...(spec.width !== undefined ? {width: spec.width} : {})}` is the whole of that rule — and
+  `parseNonUnitLayoutSizeForChannel` then merges the members', the first of them winning a
+  disagreement. So a chart written `"width": "container"` whose layers are each 600 wide is 600
+  wide: the members were handed the container and then said otherwise, and there is nothing left
+  for the page to settle. This compiler read the chart's own size first, so the layers' width was
+  never consulted and such a chart measured the element it was drawn in instead — a responsive
+  width where the specification had asked for a fixed one. One specification in the wild corpus is
+  written that way, and agreement with upstream goes from 1923 to 1924 of 1981.
+
+- **A datum is placed the way a column is, half-band and all.**
+  `valueRefForFieldOrDatumDef` writes a `value` where the definition is a literal and a `field`
+  where it names a column, and everything after that is written the same way for both — including
+  the half-band that puts a mark in the middle of its band rather than on its edge. This compiler
+  answered a datum from a branch of its own and stopped there, so a rule drawn at a named category
+  stood on the boundary between two bands instead of through the middle of one. The bucketing
+  branches stay a column's: `isTypedFieldDef` gates them on the definition naming one, so a literal
+  written with a `timeUnit` or a `bin` is placed at the literal, which is what it says. No wild
+  corpus specification places a datum that way; the divergence was found while reading the two
+  branches side by side.
+
+- **A layer member's channel replaces the chart's unless it names something to measure.**
+  `mergeEncoding` spreads the chart's definition under the member's only where the member's is a
+  field or datum def — that is what lets a shared `x` state the type and a member's `x` name only
+  the column — and everything else takes the channel over outright. This compiler spread any two
+  objects together, so a member drawing its label at the corner of the plot, `{"value": "width"}`
+  for its `x`, came out still measuring a column: placed against a scale it had said it did not
+  want, filtered for the rows that column had no value in, described by a field it does not show,
+  and contributing to a colour domain it takes no part in. A `condition` that names a column
+  inherits into the condition rather than into the channel, and an empty `{}` is how a member says
+  it has no such channel at all. Four specifications in the wild corpus write a layer that way, and
+  agreement with upstream goes from 1919 to 1923 of 1981.
+
+- **The column a grid is split by is read before it is cut.**
+  `getImplicitFromEncoding` is asked of a facet model as much as of a unit, and its answer goes in
+  between that model's transforms and its bucketing — `parseData` runs the same sequence for every
+  model there is. A cell's encoding no longer mentions the column a grid is split by, a facet
+  saying nothing about what a cell looks like, so this compiler built the parse from the cell's
+  encoding alone and never asked for it. The column stayed as it arrived, and a `timeunit`
+  bucketing text found nothing to bucket: every cell of such a grid was cut from a date that was
+  never a date. The grid's own columns are read first, its model's pass running before its child's,
+  and where the flow forks below the partition the parse stands above it with the rest of that
+  pass. Two specifications in the wild corpus split a grid by a column stated as an instant, and
+  agreement with upstream goes from 1917 to 1919 of 1981.
+
+- **A trellis caption is written the way the header says to write it.**
+  `assembleHeaderTitle` reads `format` and `formatType` off the header and hands them to the same
+  `formatSignalRef` a mark's text goes through. This compiler read them too, but only after it had
+  already answered: a date was captioned by the clock and a bucket by its two edges before the
+  question was asked. A trellis of months written `{"format": "%b %y", "formatType": "time"}` was
+  therefore captioned `%b %d, %Y`, and one of buckets written `{"format": ".2f"}` with no specifier
+  at all. The order is now upstream's — a custom format type first, being the name of a function
+  the embedding page registered; then the theme's own writer, and only where the header asked for
+  neither of its own; then the clock, where a stated specifier beats the bucketing; then the
+  number, where the theme's format applies to a measured column alone. A bucket asks for the
+  theme's writer itself, since a grid wrapped on one is a `facet` channel and its default type is
+  `nominal` however the field is measured. One specification in the wild corpus captions a trellis
+  of months that way.
+
+- **A stated scale type is checked against its channel and its field before it is used.**
+  `scaleType` asks two questions of a `scale: {"type": …}` and drops it for the default on either
+  refusal: whether the **channel** can carry such a scale — there is no band of colour, and a shape
+  chooses between symbols so only a scale whose range is a list can drive one — and whether the
+  **field** can sit on it, a `threshold` over a list of country names having no extent to cut into
+  pieces. This compiler took whatever was written, so a chart asking for a threshold scale over its
+  nominal `shape` handed Vega a scale it could make nothing of, and drew a second legend besides. A
+  `datum` skips the second question, a literal carrying no measurement to disagree with. The
+  refusal is reported rather than silent. One specification in the wild corpus states such a scale,
+  and agreement with upstream goes from 1916 to 1917 of 1981.
+
+- **A position stated on the mark is a value ref like any other, expression and all.**
+  `{"mark": {"type": "bar", "x": {"expr": "childWidth + 5"}}}` places a bar relative to a size the
+  chart computes — five units past the plot it stands beside — and `signalOrValueRef` turns that
+  expression into a signal. Every other mark property already went through this compiler's own
+  `literalRef`; the two positions did not, so such a mark was handed an object where Vega wants a
+  number and drawn at nothing at all. A number is still a value and the words `width` and `height`
+  are still a reference to the enclosing group's own size. One specification in the wild corpus
+  places a bar that way, and agreement with upstream goes from 1915 to 1916 of 1981.
+
+- **A number format is taken only where it is a string; a time format on its truthiness.**
+  `numberFormat` asks `isString` of the stated format and falls through to the configured one
+  otherwise, so an axis written `{"format": {"condition": …}}` over a measure has no format at all —
+  Vega has no conditional format, and there is nothing else for such an object to mean. `timeFormat`
+  asks only `if (specifiedFormat)`, so the same object written over an instant is passed through as
+  it stands. This engine copied whatever was stated onto the axis, so the object reached Vega and
+  the theme's own number format never got its turn. One specification in the wild corpus writes one
+  over a measure, and agreement with upstream goes from 1914 to 1915 of 1981.
+
+- **A column whose name holds a dot is written with that dot escaped.** `replacePathInField` splits
+  the access path, escapes what is inside each step and joins them with an escaped dot, because
+  Vega reads an unescaped one as a step into a nested object. A column called `properties.NAME` is
+  a name with a dot in it — a GeoJSON feature's flattened property is the usual way to get one —
+  and written bare it tells Vega to look a level in and find nothing. Two places wrote it bare: the
+  field a **selection** remembers a value by, where the store then compares against a value no row
+  has and nothing ever matches; and the field a **`timeunit`** transform buckets, where the bucket
+  is cut from undefined on every row. `vgField` already escaped it everywhere else, which is why
+  the encoding read the column correctly in the same chart. One specification in the wild corpus
+  picks countries out of a map that way, and agreement with upstream goes from 1913 to 1914 of 1981.
+
+- **A themed value of one of the nine is written onto the axis whatever block it came from.**
+  `(propsToAlwaysIncludeConfig.has(property) && hasConfigValue)` stands beside the block's own
+  source in upstream's condition: `grid`, `translate`, `format`, `formatType`, `orient`,
+  `labelExpr`, `tickCount`, `position` and `tickMinStep` are written out even from a block Vega
+  knows, because Vega either has no such property or means something else by it. This engine
+  applied that rule only where the property also had a rule with something to say, so a theme
+  asking every date axis for five ticks was read and dropped — `tickCount` has no rule on a band
+  scale, there being no continuum to count along, and `config.axisX` is a block Vega knows. A
+  property that is not one of the nine is still left to Vega. One specification in the wild corpus
+  themes its tick count that way, and agreement with upstream goes from 1912 to 1913 of 1981.
+
+- **A mark that switches its tooltip off says so, and stops being reachable.** `tooltip` is one of
+  Vega's own mark properties, so `markDefProperties` writes whatever the mark definition states as
+  a value — `null` and `false` included — and the tooltip encoder that runs afterwards overwrites
+  it wherever it has something to say. This engine took the property off that pass entirely and let
+  the encoder answer alone, so a mark written `{"tooltip": null}` came out with no tooltip entry at
+  all. And `interactive` reads the **truthiness** of it: asking whether the property was stated
+  made such a mark the one in a layer that swallowed the click, where upstream leaves it
+  `interactive: false` so the click falls through to the layer whose selection it belongs to. One
+  specification in the wild corpus switches a tooltip off that way, and agreement with upstream goes
+  from 1911 to 1912 of 1981.
+
+- **A theme's background is taken only where it is truthy, as its padding is.** `initConfig` takes
+  `background`, `lineBreak` and `padding` off the configuration and puts back only the ones that
+  are truthy, so a theme saying `{"background": null}` — a document whose charts are drawn on
+  whatever is behind them — is a theme with no background at all. This engine wrote the null out as
+  the chart's own background, and an empty string likewise. A background the **chart** states is
+  still written as it stands, null included: that one is not the theme's to drop. One specification
+  in the wild corpus themes it away, and agreement with upstream goes from 1910 to 1911 of 1981.
+
+- **Whatever a specification states as a size is the size, a step object aside.**
+  `parseUnitLayoutSize` puts the specified size into the layout component without asking what kind
+  of value it is — `isStep(specifiedSize) ? 'step' : specifiedSize` — so a chart written
+  `{"width": "1024"}` is 1024 wide. This engine read a number and nothing else, so such a chart came
+  out at the view's own default of three hundred, and on a discrete scale the step arithmetic ran
+  where a stated size should have stopped it. The string stops being one at the **hoist**:
+  `topLevelProperties[signal.name] = +signal.value` coerces what moves to the top of the chart, so
+  the chart's own width is a number while the signal a plot of a concatenation keeps carries the
+  string as written. Two specifications in the wild corpus state a size as a string, one of each
+  kind, and agreement with upstream goes from 1908 to 1910 of 1981.
+
+- **A parameter belongs to the mark that was written, not to what it expands into.** A line that
+  draws its own points is two marks, and the parameters go on the **first** of them alone: they
+  were declared on the mark the specification wrote, and the overlay is something the normalizer
+  added. This engine handed them to every member, so one declaration was claimed twice — invisible
+  until a second plot declares the same name, because that plot then found its own declaration
+  already taken and reacted to nothing at all. A **composite** mark takes none at all: its
+  normalizer lifts the parameters off the specification and does nothing with them, so the summary
+  is drawn and nothing reacts. Upstream says so in a warning and has an issue open about it — what a
+  click on one of the five marks a box plot draws would pick is the question it has not answered —
+  and this engine built the whole selection, drawing a chart that reacts where upstream's does not.
+  It is reported rather than dropped in silence. Two specifications in the wild corpus are a
+  concatenation whose plots both declare one name, and agreement with upstream goes from 1906 to
+  1908 of 1981.
+
+- **A view that writes both spellings keeps only what its `selection` block converts to.** The
+  compatibility normalizer spreads the rest of the unit and then writes `params:` after it, so what
+  the unit already had is **overwritten** rather than added to: a chart that mixes a version 4
+  `selection` with a version 5 parameter is drawn with the converted selections and nothing else.
+  This engine appended, so such a chart came out with machinery upstream never builds — a store,
+  the tuple and modify signals that follow it, and the cell signals beside them. The chart's **own**
+  parameters are the exception, and only those that select nothing: `extractTopLevelProperties`
+  reads them off the specification as written, before any normalizer runs, so a slider declared
+  beside a `selection` at the top of a chart is still a slider and one that selects is not. Three
+  specifications in the wild corpus mix the two spellings on one view, and agreement with upstream
+  goes from 1903 to 1906 of 1981.
+
+- **A wrapped grid whose values are listed is ordered by the place each cell holds in that list.**
+  The list is a stated sequence and a cell's place in it cannot be read off the column being
+  faceted on, so the place is computed onto every row and the grid takes the greatest of each
+  cell's — every row of a cell carrying the same number. Both the grid's own value list and the
+  partition it cuts have to carry it up. This compiler wrote the column and then ordered the grid
+  by the faceted column anyway: the two places that carry it were written for an aggregate `sort`
+  and answered nothing for a list, so a wrapped trellis with a stated order came out with its cells
+  in whatever order their column happened to come in. The index is carried under the name it
+  already has, where an aggregate's is suffixed with the faceted column — it is computed once above
+  the grid rather than a second time per cell, so there is no second column for it to collide with.
+  Four specifications in the wild corpus are that trellis, and agreement with upstream goes from
+  1899 to 1903 of 1981.
+
+- **A caption turned to a stated angle is anchored through its band's own axis.**
+  `defaultHeaderGuideAlign` and `defaultHeaderGuideBaseline` both open with "if the angle is
+  stated" — a caption left at whatever angle the renderer chooses is left at whatever anchor it
+  chooses too — and which way a stated one turns is the **band's** question. A row's captions run
+  down the side of the grid and are anchored as a `y` axis's labels are; a column's run along the
+  top and are anchored as an `x` axis's. This compiler asked it of rows alone and answered the
+  baseline with a flat `middle`, so a column's caption never had a baseline at all — one at no angle
+  sits on `bottom` — and a row's turned a quarter of a turn was centred where upstream puts it on
+  `top`. A caption anchored to one end of its band is pushed to that end whatever angle it is at,
+  and the angle is read through the theme as every other header property is. The angle is read as
+  **written**, negatives and all: neither rule normalises a number — only the expression form of
+  one — so a caption turned to `-90` is anchored by the arm of the rule that reads `angle <= 45`,
+  and turning it into `270` first sends it down another. Four specifications in the wild corpus
+  state a column caption's angle, and agreement with upstream goes from 1895 to 1899 of 1981.
+
+- **The column a stated order writes is a node of its own, one per channel.** Each is its own
+  `CalculateNode` upstream, and a node is what the fold works on: two members of a cell that order
+  their marks by the same list write the same calculate, so those two fold into one and whatever
+  else either of them writes stays below the fold. This engine wrote a view's columns as a single
+  node carrying them all, which is equal to neither of the others — so nothing folded, and the
+  member that ordered only its bars was handed the column that ordered the other's colours as well.
+  Four specifications in the wild corpus are that trellis. They are one difference from agreement
+  after this, not none, so the corpus count is unchanged at 1895 of 1981. Nothing changes for a
+  chart whose columns have nothing between them: those are still written in one table, the split
+  being in the flow rather than in the writing.
+
+- **What a member of a trellis's cell writes for itself is written below the partition.**
+  `moveFacetDown` hoists a cell's chain above the partition one node at a time, and the walk runs
+  while the partition has a **single** child: a cell of one view is that, and its own steps climb
+  until they meet the named point the scales read; a cell of several is not, so the walk stops at
+  the fork and every member's own steps stay below, computed over the rows that cell was handed.
+  The fold that makes two members' identical steps one node runs after the walk — it is in the
+  second pass, with the facet moved between the two — so a step both members write is folded below
+  the partition rather than hoisted above it. This engine built the whole of the **first** member's
+  chain above the partition and every later member's below it, so one member's sort index, buckets
+  or instants stood above a cut the others' stayed below. The facet model's own pass is the only
+  one that ends above it, and its transforms, its buckets and the columns its cells are ordered by
+  still stand there. Agreement with upstream goes from 1894 to 1895 of 1981.
+
+- **A key a trellis resolves per cell stands in the cell, not beside the grid.** `parseNonUnitLegend`
+  merges a child's key up into the composition only where the resolve says shared, and
+  `parseGuideResolve` answers `independent` for any channel whose scale is independent. A key is a
+  reading of one scale — its swatches are that scale's colours — so a trellis whose cells colour
+  themselves has a key per cell, written in the cell group beside the scale it reads. It is the
+  **channel** that is asked and not the scale: `{"legend": {"color": "independent"}}` is a key per
+  cell for a scale every cell shares, which is a reader's answer to a grid too crowded to carry one
+  key beside it. This engine placed a key by the composition alone — inside a plot of a
+  concatenation, and otherwise beside the chart — so a trellis's own key was written beside the
+  grid, drawn from a scale that does not exist at the level it was written on. Two specifications in
+  the wild corpus are that chart, and agreement with upstream goes from 1892 to 1894 of 1981.
+
+- **A channel that names a column only under a test is a dimension of the stack all the same.**
+  `channelHasField` counts a conditional field def and `getFieldDef` then reaches into the condition
+  for it, so a colour that is a measure where a row was picked and grey otherwise orders the stack
+  exactly as an unconditional one would. This engine read the unconditional part alone, so such a
+  chart came out stacked in no order at all — `sort: {"field": [], "order": []}` where upstream
+  sorts by the column the condition names. Every entry of a channel written as a list now counts as
+  well, not the first alone; the guard reads those entries differently from a lone definition, and
+  faithfully so — `some(channelDef, fieldDef => !!fieldDef.field)` asks each entry for a field of
+  its own, so a list of conditions names no column where a single condition does. Two
+  specifications in the wild corpus stack by a condition, and agreement with upstream goes from
+  1890 to 1892 of 1981.
+
+- **A channel summarised by a word that is no operation is summarised by nothing.** `initFieldDef`
+  reads `AGGREGATE_OP_INDEX` for the word as written and **deletes** what it does not find, so
+  `"Mean"` is no more an operation than `"null"` is. The channel is then the plain column it names:
+  the field keeps its own name, the axis its own title, and a bar whose measure is no longer
+  summarised stacks — a stack being what an unsummarised measure over a category is. This engine
+  passed the word through, so `{"aggregate": "null"}` reached Vega as an `aggregate` transform
+  asking for an operation called `null`, and every column that summary would have produced was
+  named after it: `null_Salary` beneath an axis reading `Null of Salary`. The word is dropped before
+  the channel is asked whether it has anything left to draw and before its type is settled, both of
+  which upstream decides underneath the deletion. Two specifications in the wild corpus write one,
+  and agreement with upstream goes from 1888 to 1890 of 1981.
+
+- **A layer that reads a table of its own is no child of the grid it is drawn in.** `parseRoot`
+  hands a child the partition its parent cut only where the child states no `data`; one that states
+  its own starts a root of its own, so its chain stands *beside* the grid rather than below it. Two
+  things follow, and this engine had neither. Its marks read that chain — the same rows in every
+  cell, which is what such a layer is written for — where they were being drawn from the rows the
+  cell was handed. And `moveFacetDown` counts the partition's *children*, so a cell of three layers
+  two of which read their own tables is **one** child: the cell's own chain hoists above the grid
+  as a single mark's would, and the grid's own value lists stand where the walk reached it rather
+  than at the end of the list. Eight specifications in the wild corpus are that shape — a trellis
+  of maps, a choropleth in each cell and the same outlines over every one of them — and agreement
+  with upstream goes from 1880 to 1888 of 1981. A facet whose **cell** states its own table is the
+  one shape of this still outstanding: the grid then partitions a chain no view here stands for.
+
+- **A theme may take the heading off every grid in a document.** A header's `title` is read through
+  `getHeaderProperty` like every other header property — the header's own block, then the family for
+  its channel, then `config.header` — so `{"config": {"header": {"title": null}}}` says once what a
+  chart whose cells caption themselves would otherwise say on each of its grids. The heading goes,
+  and so does the room the layout was keeping for it. This engine read the definition's own block
+  alone, so such a chart came out with a heading over every grid and a `columnTitle` offset holding
+  space for it; six specifications in the wild corpus theme it that way, and each of them differs
+  from upstream in a second place this does not touch.
+
+- **A size a row of plots merges on may be `"container"`, and then it is a signal.** The hoist
+  upstream does at the end of assembly is for a signal *carrying a value*: a plain number named
+  `width` is the chart's width and is written as one, while a `"container"` size has no number to
+  hoist — the page has to be measured first — so it stays a signal, measured at first render and
+  again on every resize. `parseUnitLayoutSize` keeps the string as the layout size, which is what a
+  level above compares when it merges its children: two plots asking the page for their width agree,
+  and what they agree on is to ask the page. This engine answered with the view's own default
+  instead, merged them on that number and wrote it out as the chart's width — so such a chart had a
+  width of its own and never measured the element it was drawn in. Four specifications in the wild
+  corpus are a column of plots each asking the page for its width.
+
+- **A legend that states the colour of its swatches takes the mark's paint off them.** A swatch
+  cannot resolve a *scaled* paint — a size legend's swatches are all one colour, size being what
+  they show — so it is drawn in a base colour at the mark's opacity. Unless the legend named a
+  colour for them, and then `symbols` deletes the fill outright: the base colour this compiler wrote
+  would be painted over by the legend's own and the opacity beside it applied twice. Three
+  specifications in the wild corpus state one, each a size legend beside a colour legend. The same
+  is true of the outline, where a stated `symbolStrokeColor` takes the mark's off — as a scaled
+  outline does, the swatch having no way to resolve one.
+
+- **A window over the whole partition, computing nothing a window alone can compute, is a
+  join-aggregate.** Every row of the partition gets the same answer, and Vega has a transform that
+  says exactly that — upstream switches to it "when the window does not rely on any particular
+  window ops or frame". `[null, null]` is how a specification asks for the whole partition, the
+  commonest window there is (*this row against the median of all of them*), and this compiler wrote
+  a window transform instead: a `sort`, a `frame` and a list of nulls for parameters no operation
+  there takes. Three specifications in the wild corpus ask for it. A stated `sort` changes nothing,
+  there being nothing for an order to do over a whole partition; an operation only a window can
+  compute, a one-sided frame, or no frame at all leaves it a window.
+
+- **Two layers' projections merge when one of them said nothing.** `mergeIfNoConflict` treats a
+  member that stated nothing as agreeing with one that did, and takes the one that spoke. This
+  engine compared the two specifications for equality, so a map layered under another map where only
+  the upper one names its kind came out with a projection each — and two projections fitted to two
+  different sets of outlines draw the same country at two sizes. Six specifications in the wild
+  corpus layer their maps that way. The *order* of what a merged projection is fitted to follows from
+  how upstream builds it: the component starts as a copy of the fold's own data — whichever child the
+  fold ended on — and every fitted child is appended after it, so the child that spoke is fitted
+  first. Where the two disagree, or where one is placed by hand and the other fitted, each member
+  keeps its own.
+
+- **A themed axis property beats a derived one, and who applies it decides whether it is written
+  out.** Three rules in one place, all of them `parseAxis`'s. A value this compiler derived is used
+  only where the theme said nothing, so a themed `format` replaces the specifier a time unit would
+  have produced and a themed `tickCount` replaces `ceil(width/40)` — this engine settled `format`,
+  `formatType`, `tickCount` and `tickMinStep` without asking the theme at all. Where the theme did
+  speak and Vega can apply it itself, the axis says nothing: a `config.axisX.title` reaches the chart
+  through the Vega configuration written beside it, and writing it out named the axis twice. And a
+  property on `propsToAlwaysIncludeConfig` — `grid`, `translate`, `format`, `formatType`, `orient`,
+  `labelExpr`, `tickCount`, `position`, `tickMinStep` — or a themed value that is a **signal** or a
+  conditional is written out even from a block Vega knows, Vega being unable to apply those from its
+  own configuration. Four specifications in the wild corpus theme their axes that way. A caption the
+  *channel* states is explicit, as `isExplicit` says in as many words, so it is taken before the
+  theme is asked.
+
+- **A selection's value may be a scalar, and then it settles every projection.** A tuple names the
+  channel a projection is over or the column it reads; a scalar names neither — `{"value": "US"}`
+  beside `"fields": ["cont"]` — and upstream calls it smoothing the gradient from a variable
+  parameter to a point selection. This engine read every value as a tuple, so a scalar one found
+  nothing in it: the chart opened with nothing picked and, where a control was bound to the
+  selection, with the control empty. Five specifications in the wild corpus open that way, all of
+  them a picker over one column.
+
+- **A mark's fill and stroke are read under their own Vega names, not only under `color`.** `color`
+  answers for the one the colour *is* — the fill of a filled mark, the stroke of a hollow one — and
+  each of the two is looked up under its Vega name whatever the mark is filled with. So a theme that
+  strokes every point black, `config.point.stroke`, strokes a **filled** point too, and a
+  `config.mark.fill` fills a line that is not filled at all. This engine read `color` alone, so such
+  a theme was read and dropped; five specifications in the wild corpus theme their marks that way.
+  The style blocks are deliberately not in that chain: a style block is something *Vega* applies,
+  the mark carrying its names in `style`, so only a `color` written in one — a name Vega has never
+  heard of — is resolved here.
+
+- **A themed axis property Vega cannot apply is written onto the axis, on the parts it belongs to.**
+  A configuration family named after a *scale* — `config.axisQuantitative`, `config.axisTemporal` —
+  is Vega-Lite's own, and Vega has never heard of it, so a property found there has to be resolved
+  onto the axis or nothing acts on it: upstream writes out every property whose `configFrom` is not
+  `vgAxisConfig`. This engine wrote out only the handful it had a rule for, so a theme colouring
+  every measured axis or turning its labels to a stated font was read and dropped. Five
+  specifications in the wild corpus theme their axes that way. Which *part* each property lands on
+  is `AXIS_PROPERTY_TYPE`, and four of its `both` entries were being treated as the axis proper's
+  alone — `tickOffset` among them, which upstream's comment says is "needed to be applied to grid
+  axis too, so the grid will align with ticks".
+
+- **A row a selection opens with says which cell of the grid it was picked in.** Inside a facet the
+  `unit` a tuple records is not a name but the cell's name and the values that cell holds, since
+  every cell is the same model drawn once per value — `unitName` spells the grid's channels into it.
+  This engine wrote the declaring view's plain name into the store, so a trellis opening with one of
+  its cells brushed had that row belong to no cell at all, and every test of the selection compared
+  it against a unit that never matched. Four specifications in the wild corpus open that way. The
+  store's copy is the one place the name is *not* quoted: a row already in the store is data, where
+  every other use of the name is spelled into an expression a signal computes.
+
+- **A grid's sort index is written above its cells'.** `model.parse()` walks the tree top-down, so a
+  facet model parses its data before its child does and `parseAllForSortIndex` writes the grid's
+  index above the cell's chain; below it, the cell's own channels are indexed in the order the
+  encoding lists them. This engine lifted the facet channels out of the encoding and appended their
+  indices, so the formulas came out the other way about — four specifications in the wild corpus are
+  a trellis whose columns *and* whose marks are listed in stated orders, and every one of their
+  formulas was in the wrong place.
+
+- **The parse a specification stated is read before the one this compiler inferred.**
+  `ParseNode.makeExplicit` runs before the transforms and the implicit parse from the encoding after
+  them, so where the two meet the stated half is the one above — and the formulas a parse writes come
+  out in its insertion order. This engine added the stated half last, so a table stating how to read
+  one column and leaving another to be inferred read them in the opposite order to upstream. It shows
+  on a table written *out* in the specification, where Vega has already ingested the rows and a parse
+  is a formula rather than an instruction to the loader; one specification in the wild corpus carries
+  such a table. The two halves settle the same column as `Split(explicit, implicit)` does: the stated
+  one wins, and a stated `null` denies the inferred parse altogether.
+
+- **A transform that was not told what to call its outputs still writes columns.** A parse cannot
+  climb past a step that produces what it reads — and the intersection is taken over path
+  *prefixes*, so a step producing `properties` blocks a parse of `properties.name`. This engine
+  asked each step only for its `as`, so a `lookup` that brings the secondary table's columns in
+  under their own names looked like a step that writes nothing: the flatten formula climbed above
+  the lookup and read a column the source table has never had. **Seven** specifications in the wild
+  corpus join a table that way and then name a path inside what it brought in — a world map looking
+  up a country's shape and captioning it by `properties.name`. The names a transform gives itself
+  are upstream's, one per node class: a lookup's are the secondary table's `values`, a fold's are
+  `key` and `value`, a density's are `value` and `density`.
+
 - **A selection bound to a control opens at the value it was given.** The value is a *list* of tuples
   — `array(selDef.value)` in `parseSelectionProject` — of which a bound control shows the first, and
   a lone tuple is a list of one. That is how a Vega-Lite 4 selection arrives: its `init` is a single

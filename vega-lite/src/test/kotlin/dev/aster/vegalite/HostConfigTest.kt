@@ -124,7 +124,10 @@ class HostConfigTest {
       )
     val vega = compile(withPoint, """{"point": {"fill": "#7aa2f7"}, "mark": {"fill": "#7aa2f7"}}""")
 
-    // The overlay mark carries the specification's white, from its own mark definition.
+    // The overlay mark carries the specification's white, from its own mark definition. The line
+    // under it takes the host's fill, which is a configuration reaching a mark that stated nothing
+    // — `config.mark.fill` answers for every mark's fill whether or not the mark is filled, which
+    // is upstream's own answer for this chart.
     val marks = vega.fields["marks"] as VegaValue.Arr
     val fills =
       marks.values.mapNotNull { mark ->
@@ -134,10 +137,10 @@ class HostConfigTest {
           ?.asString()
       }
     assertEquals(
-      listOf("white"),
+      listOf("#7aa2f7", "white"),
       fills,
-      "if this ever reads #7aa2f7, a host configuration has started beating a mark's own property " +
-        "and the note in VegaLiteCompiler.hostConfig is wrong",
+      "if the second of these ever reads #7aa2f7, a host configuration has started beating a " +
+        "mark's own property and the note in VegaLiteCompiler.hostConfig is wrong",
     )
   }
 

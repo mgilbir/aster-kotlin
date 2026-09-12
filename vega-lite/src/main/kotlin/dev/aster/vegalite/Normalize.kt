@@ -46,7 +46,22 @@ internal class Normalize(
     val line = if (type == "area") lineOverlay(markDef, markConfig) else null
     if (point == null && line == null) return null
 
-    val outer = VegaValue.Obj(unit.fields.filterKeys { it != "mark" && it != "encoding" })
+    // ```js
+    // const {params, projection, mark, name, encoding: e, ...outerSpec} = spec;
+    // ...
+    // const layer: NormalizedUnitSpec[] = [
+    //   {
+    //     name,
+    //     ...(params ? {params} : {}),
+    // ```
+    //
+    // The parameters go on the **first** member alone: they were declared on the mark the
+    // specification wrote, and the overlay is something this normalizer added. Handed to every
+    // member, one declaration is claimed twice — which is only visible where a second plot declares
+    // the same name, since that plot then finds its own declaration already taken and reacts to
+    // nothing at all.
+    val outer =
+      VegaValue.Obj(unit.fields.filterKeys { it != "mark" && it != "encoding" && it != "params" })
     // The base layer, with `point` and `line` taken off it. An area that says nothing about its own
     // opacity is faded to 0.7 first, so the line or the points drawn over it stay legible — which
     // is why a plain area and an area with `line: true` are different colours.
@@ -65,6 +80,7 @@ internal class Normalize(
     val layers = mutableListOf<VegaValue.Obj>()
     layers += obj {
       putAll(outer)
+      unit.fields["params"]?.let { put("params", it) }
       // A mark definition with nothing left but its type collapses back to the name, which is what
       // upstream's `dropLineAndPoint` does and what keeps a plain line's output unchanged.
       put("mark", if (base.size > 1) VegaValue.Obj(base) else VegaValue.Str(type))

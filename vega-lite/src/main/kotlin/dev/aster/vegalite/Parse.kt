@@ -19,7 +19,70 @@ internal class Parse(
   private val selections: List<Selection> = emptyList(),
 ) {
 
-  fun unit(spec: VegaValue.Obj, path: String): UnitSpec? {
+  /**
+   * `RuleForRangedLineNormalizer`: a **line** given a second position is a `rule`.
+   *
+   * ```js
+   * if (mark === 'line' || (isMarkDef(mark) && mark.type === 'line')) {
+   *   for (const channel of SECONDARY_RANGE_CHANNEL) {
+   *     const mainChannel = getMainRangeChannel(channel);
+   *     const mainChannelDef = encoding[mainChannel];
+   *     if (encoding[channel]) {
+   *       if ((isFieldDef(mainChannelDef) && !isBinned(mainChannelDef.bin)) || isDatumDef(mainChannelDef)) {
+   *         return true;
+   *       }
+   *     }
+   *   }
+   * }
+   * ```
+   *
+   * A line is drawn *through* its points and has one position per row; a second position asks for a
+   * segment, and a segment is what a rule is. Upstream rewrites the mark and says so. Left a line,
+   * such a view kept the mark but lost the second position with it — the far end of every segment
+   * was dropped, and a map of great circles drawn as a line from each origin to nowhere.
+   */
+  private fun rangedLineIsARule(spec: VegaValue.Obj, path: String): VegaValue.Obj {
+    val mark = spec.fields["mark"]
+    val type =
+      when (mark) {
+        is VegaValue.Str -> mark.value
+        is VegaValue.Obj -> mark.string("type")
+        else -> null
+      }
+    if (type != "line") return spec
+    val encoding = spec.obj("encoding") ?: return spec
+    val ranged = SECONDARY_RANGE_CHANNELS.any { channel ->
+      if (encoding.fields[channel] == null) return@any false
+      // The **main** channel has to be something a segment can run from: a column or a literal.
+      // A column that arrived already binned is a span in itself, and its `x2` is the far edge of
+      // that span rather than the far end of a segment.
+      val main = encoding.obj(mainChannel(channel)) ?: return@any false
+      val binned = main.fields["bin"] == VegaValue.Str("binned")
+      (main.fields["field"] != null && !binned) || main.fields["datum"] != null
+    }
+    if (!ranged) return spec
+    diagnostics.warn(
+      VegaLiteDiagnostics.UNSUPPORTED_ENCODING_PROPERTY,
+      "A `line` is drawn through its points and has one position per row; this one states a " +
+        "second position, which asks for a segment. It is drawn as a `rule`.",
+      jsonPath = "$path.mark",
+    )
+    return VegaValue.Obj(
+      LinkedHashMap(spec.fields).also {
+        it["mark"] =
+          when (mark) {
+            is VegaValue.Obj ->
+              VegaValue.Obj(
+                LinkedHashMap(mark.fields).also { m -> m["type"] = VegaValue.Str("rule") }
+              )
+            else -> VegaValue.Str("rule")
+          }
+      }
+    )
+  }
+
+  fun unit(rawSpec: VegaValue.Obj, path: String): UnitSpec? {
+    val spec = rangedLineIsARule(rawSpec, path)
     val markValue = spec.fields["mark"]
     if (markValue == null) {
       diagnostics.error(
@@ -471,25 +534,39 @@ internal class Parse(
   /**
    * `timeUnitToString`: a time unit written as an **object** spelled back into a name.
    *
-   * `{"unit": "year", "step": 2}` buckets two years at a time, and the column it writes is called
-   * `year_step_2_date` — the unit, then every other parameter as `_<name>_<value>`. Keeping the
-   * name is what lets everything downstream go on treating a time unit as a word: the parts are
-   * still read off the front of it, and the step is read back out where the transform needs it.
+   * ```js
+   * const {utc, ...rest} = normalizeTimeUnit(tu);
+   * return (utc ? 'utc' : '') +
+   *   keys(rest).map((p) => varName(`${p === 'unit' ? '' : `_${p}_`}${rest[p]}`)).join('');
+   * ```
+   *
+   * The parameters are walked **in the order they were written** — `keys` of an object whose own
+   * order `normalizeTimeUnit` preserves, its one rewrite being `{...timeUnit, ...{unit}}`, which
+   * puts an existing key back where it already was. So `{"step": 2, "unit": "year"}` is called
+   * `_step_2year` and `{"unit": "year", "step": 2}` is called `year_step_2`: the same bucketing,
+   * two names, and the name is what every column and every expression downstream is spelled with.
+   * Written unit-first regardless, a specification that put the step first named a column upstream
+   * never writes, and every reader of it read a column that is not there.
+   *
+   * `utc` is not a parameter but a **prefix**, being destructured out before the walk.
+   *
+   * `binned` is left out because this compiler carries a time unit as a word and reads that word
+   * for its binned-ness — `binnedyearmonth`. Upstream would spell it `yearmonth_binned_true` here,
+   * but never asks: a binned unit is answered before `timeUnitToString` is reached. That the object
+   * form of a binned unit is not recognised as binned at all is a gap of its own, and not this
+   * rule's.
    */
   private fun timeUnitName(params: VegaValue.Obj?): String? {
-    val unit = params?.string("unit") ?: return null
+    if (params?.string("unit") == null) return null
     return buildString {
-      append(unit)
+      if (params.fields["utc"] == VegaValue.Bool(true)) append("utc")
       params.fields.forEach { (key, value) ->
-        if (key != "unit" && key != "utc" && key != "binned") {
-          append(
-            Fields.varName(
-              "_${key}_${(value as? VegaValue.Num)?.value?.let {
+        if (key == "utc" || key == "binned") return@forEach
+        val text =
+          (value as? VegaValue.Num)?.value?.let {
             if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString()
-          } ?: (value as? VegaValue.Str)?.value ?: value.toString()}"
-            )
-          )
-        }
+          } ?: (value as? VegaValue.Str)?.value ?: value.toString()
+        append(Fields.varName(if (key == "unit") text else "_${key}_$text"))
       }
     }
   }
@@ -570,6 +647,43 @@ internal class Parse(
       else -> null
     }
 
+  /**
+   * The operation a channel is summarised by, or null where it names one there is no such thing as.
+   *
+   * ```js
+   * // Drop invalid aggregate
+   * if (!compositeMark && aggregate && !isAggregateOp(aggregate) && !isArgmaxDef(aggregate) && !isArgminDef(aggregate)) {
+   *   log.warn(log.message.invalidAggregate(aggregate));
+   *   delete fieldDef.aggregate;
+   * }
+   * ```
+   *
+   * `initFieldDef` **deletes** it, so the channel is the plain column it names and everything
+   * downstream reads it as one: the field keeps its own name, the axis its own title, and a bar
+   * whose measure is no longer summarised stacks, a stack being what an unsummarised measure over a
+   * category is. Kept instead, `{"aggregate": "null"}` reached Vega as an `aggregate` transform
+   * asking for an operation called `null` — one chart in the wild corpus writes exactly that — and
+   * every column the summary would have produced was named after it: `null_Salary` under an axis
+   * reading `Null of Salary`.
+   *
+   * Before the type is inferred, because the type a channel is inferred to have depends on whether
+   * it counts rows: `initFieldDef` drops the operation and settles the type underneath it.
+   *
+   * A **composite** mark's own channels are not asked — `!compositeMark` — and they are not asked
+   * here either, a box plot's parts being normalised out of the specification before it is parsed.
+   */
+  private fun aggregate(stated: String?, path: String): String? {
+    if (stated == null || stated in AGGREGATE_OPS) return stated
+    diagnostics.error(
+      VegaLiteDiagnostics.INVALID_ENCODING,
+      "`$stated` is not an aggregation operator, so the channel is summarised by nothing and " +
+        "draws the column as it stands. Upstream drops it with the same warning. The operators " +
+        "are ${AGGREGATE_OPS.sorted().joinToString(", ")}.",
+      jsonPath = "$path.aggregate",
+    )
+    return null
+  }
+
   private fun channelDef(channel: String, value: VegaValue, path: String): ChannelDef? {
     if (value !is VegaValue.Obj) {
       diagnostics.error(
@@ -586,8 +700,11 @@ internal class Parse(
     // separate things and everything downstream needs both.
     val aggregateObject = value.obj("aggregate")
     val aggregate =
-      value.string("aggregate")
-        ?: aggregateObject?.fields?.keys?.firstOrNull { it == "argmin" || it == "argmax" }
+      aggregate(
+        value.string("aggregate")
+          ?: aggregateObject?.fields?.keys?.firstOrNull { it == "argmin" || it == "argmax" },
+        path,
+      )
     val argumentField = aggregate?.let { aggregateObject?.string(it) }
     val timeUnit = value.string("timeUnit") ?: timeUnitName(value.obj("timeUnit"))
     val bin = binning(value.fields["bin"], path, channel)
@@ -696,6 +813,26 @@ internal class Parse(
    * `bin: true` normalizes to `{maxbins: 10}` — and the normalized parameters are what the field
    * name is built from, so `bin_maxbins_10_v` appears even where the specification said only
    * `true`.
+   *
+   * ```js
+   * export function normalizeBin(bin: BinParams | boolean | 'binned', channel?: ExtendedChannel) {
+   *   if (isBoolean(bin)) {
+   *     return {maxbins: autoMaxBins(channel)};
+   *   } else if (bin === 'binned') {
+   *     return {binned: true};
+   *   } else if (!bin.maxbins && !bin.step) {
+   *     return {...bin, maxbins: autoMaxBins(channel)};
+   *   } else {
+   *     return bin;
+   *   }
+   * }
+   * ```
+   *
+   * The third arm is the one this missed: a **stated** bucketing that says neither how many buckets
+   * it wants nor how wide they are gets the default count too, whatever else it says. Reading only
+   * the empty object as unstated, a `{"anchor": 0.5}` was left without one, so nothing bucketed the
+   * column into ten — and the count is spelled into the name, so the column the mark read,
+   * `bin_anchor_0_5_v`, was not the one `bin_anchor_0_5_maxbins_10_v` had written.
    */
   private fun binning(value: VegaValue?, path: String, channel: String): Binning? =
     when {
@@ -708,8 +845,16 @@ internal class Parse(
       // and its extent signal into the data flow and shifted everything after it.
       (value as? VegaValue.Obj)?.fields?.get("binned") == VegaValue.Bool(true) -> Binning.PreBinned
       value is VegaValue.Obj ->
-        if (value.fields.isEmpty()) {
-          Binning.Bin(obj { put("maxbins", autoMaxBins(channel)) })
+        // `!bin.maxbins && !bin.step`, which is their **truthiness**: a bucketing asking for none
+        // at all is asking for the default, and so is one that asks for zero of them. Written
+        // after what the specification said, as the spread is, so the name reads `anchor` first.
+        if (!value.fields["maxbins"].isTruthy() && !value.fields["step"].isTruthy()) {
+          Binning.Bin(
+            obj {
+              value.fields.forEach { (key, own) -> put(key, own) }
+              put("maxbins", autoMaxBins(channel))
+            }
+          )
         } else {
           Binning.Bin(value)
         }
@@ -813,8 +958,23 @@ internal class Parse(
     val y = encoding["y"]
 
     if (mark == "bar") {
-      if (x?.bin != null) return "vertical"
-      if (y?.bin != null) return "horizontal"
+      // ```js
+      // if (isFieldDef(x) && (isBinned(x.bin) || (isFieldDef(y) && y.aggregate && !x.aggregate))) {
+      //   return 'vertical';
+      // }
+      // ```
+      //
+      // `isBinned`, and not any bin at all: a column that **arrived** bucketed is a pair of edges
+      // and the bar spans them, which settles the orientation on its own. A bin this chart is
+      // computing settles nothing yet, and the question falls through to the rules below — which
+      // give a plain histogram the same answer anyway, its binned x being no measure and its y one.
+      //
+      // Read as any bin, a bar whose bucketed x was given a second position of its own never
+      // reached the ranged rule: it was called vertical, so the *stack* became its y, its y scale
+      // took a zero it should not have had, and the bar was drawn as a column rather than as the
+      // five-unit marker upstream draws across each bucket.
+      if (x?.isFieldDef == true && x.bin == Binning.PreBinned) return "vertical"
+      if (y?.isFieldDef == true && y.bin == Binning.PreBinned) return "horizontal"
       if (x?.isFieldDef == true && y?.aggregate != null && x.aggregate == null) return "vertical"
       if (y?.isFieldDef == true && x?.aggregate != null && y.aggregate == null) return "horizontal"
     }
@@ -889,6 +1049,44 @@ internal class Parse(
      */
     /** The two aggregates that answer with a whole row rather than a number. */
     private val ARGMINMAX = setOf("argmin", "argmax")
+
+    /**
+     * `AGGREGATE_OP_INDEX` — every operation a channel may be summarised by, and no other.
+     *
+     * An **allowlist**, and read exactly: `hasOwnProperty(AGGREGATE_OP_INDEX, a)` asks the index
+     * for the word as written, so `"Mean"` is no more an operation than `"null"` is. What a
+     * specification writes here reaches Vega as an `aggregate` transform, and a word Vega does not
+     * know is not a summary but an error in the middle of a chart — which is why the one thing that
+     * must not happen is passing it through. See [aggregate].
+     */
+    private val AGGREGATE_OPS =
+      setOf(
+        "argmax",
+        "argmin",
+        "average",
+        "count",
+        "distinct",
+        "exponential",
+        "exponentialb",
+        "product",
+        "max",
+        "mean",
+        "median",
+        "min",
+        "missing",
+        "q1",
+        "q3",
+        "ci0",
+        "ci1",
+        "stderr",
+        "stdev",
+        "stdevp",
+        "sum",
+        "valid",
+        "values",
+        "variance",
+        "variancep",
+      )
 
     /**
      * `autoMaxBins`: how many buckets a `bin: true` asks for, which depends on the channel.

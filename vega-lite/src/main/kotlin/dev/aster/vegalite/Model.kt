@@ -328,6 +328,15 @@ internal object Channels {
       "description",
     )
 
+  /**
+   * `SINGLE_DEF_UNIT_CHANNELS`: the channels that cannot hold a **list** of definitions.
+   *
+   * "The only two channels that can have an array of channelDefs are `detail` and `order`" —
+   * `tooltip` is the third the index leaves out, and a selection cannot be projected onto any of
+   * them because there is no one definition to project.
+   */
+  val SINGLE_DEF_UNIT_CHANNELS = UNIT_CHANNELS.toSet() - setOf("order", "detail", "tooltip")
+
   /** The channels that name a place on the globe rather than a position on the page. */
   val GEO_POSITION_CHANNELS = setOf("longitude", "latitude", "longitude2", "latitude2")
 
@@ -625,6 +634,14 @@ internal val RECT_BASED_MARKS = setOf("rect", "bar", "image", "arc", "tick")
 internal val MIN_MAX_OPS = setOf("min", "max")
 
 /**
+ * The Vega transforms that **group**, and so take the facet's fields when a partition moves past.
+ *
+ * `AggregateNode`, `StackNode`, `WindowTransformNode` and `JoinAggregateTransformNode` upstream —
+ * the four `moveFacetDown` and `cloneSubtree` call `addDimensions` on.
+ */
+internal val GROUPING_TRANSFORMS = setOf("aggregate", "stack", "window", "joinaggregate")
+
+/**
  * The aggregates that count rather than measure, and so cannot produce an invalid value.
  *
  * `COUNTING_OPS` in `aggregate.ts`. Each answers with how many rows met a condition, which is a
@@ -661,5 +678,11 @@ internal fun mainChannel(channel: String): String =
     "y2" -> "y"
     "theta2" -> "theta"
     "radius2" -> "radius"
+    "latitude2" -> "latitude"
+    "longitude2" -> "longitude"
     else -> channel
   }
+
+/** `SECONDARY_RANGE_CHANNEL`: the channels that name the **far end** of a position. */
+internal val SECONDARY_RANGE_CHANNELS =
+  listOf("x2", "y2", "latitude2", "longitude2", "theta2", "radius2")

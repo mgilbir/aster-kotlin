@@ -409,7 +409,11 @@ internal object Marks {
             // a click on a country whether or not that layer declared the selection.
             view.spec.mark == "geoshape" ||
             view.spec.encoding.containsKey("tooltip") ||
-            view.markDef.raw.fields.containsKey("tooltip")
+            // `!!model.markDef.tooltip` — the **truthiness** of it, so a mark that says
+            // `{"tooltip": null}` is one the pointer has no business reaching. Asking whether the
+            // property was stated instead made a mark that switched its tooltip off the one mark
+            // in the layer that swallowed the click.
+            view.markDef.raw.fields["tooltip"].isTruthy()
         put("interactive", VegaValue.Bool(own))
       }
       if (view.markDef.raw.fields["aria"] == VegaValue.Bool(false)) {
@@ -780,12 +784,7 @@ internal object Marks {
       // no mark at all, so [VG_MARK_PROPERTIES] never lets them through. `radius` is a Vega
       // property on every mark and goes out under its own name.
       if (key in TEXT_ONLY_MARK_PROPERTIES && view.spec.mark != "text") continue
-      // `{"expr": …}` is Vega-Lite's way of writing a signal, and Vega's is `{"signal": …}` — and
-      // a signal is a *reference*, not a value, so it replaces the whole entry rather than sitting
-      // inside one.
-      val expression = (value as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }
-      if (expression != null) put(key, signalRef(expression.string("expr").orEmpty()))
-      else put(key, obj { put("value", value) })
+      put(key, markProperty(value))
     }
   }
 
@@ -798,11 +797,68 @@ internal object Marks {
       "radius2" to "innerRadius",
     )
 
-  /** A mark-definition value as an encode entry: a signal where it is an `expr`, a value else. */
+  /**
+   * A mark-definition value as an encode entry: a **reference** where it is one, a value else.
+   *
+   * ```js
+   * export function signalOrValueRef<T>(value: T | SignalRef): {value: T} | SignalRef {
+   *   if (isSignalRef(value)) return value;
+   *   return value !== undefined ? {value} : undefined;
+   * }
+   * ```
+   *
+   * `{"expr": …}` is Vega-Lite's way of writing a signal and Vega's is `{"signal": …}`; either way
+   * it is a reference, not a value, and replaces the whole entry rather than sitting inside one. A
+   * theme's own expressions are already signals by the time they are read — `initConfig` makes them
+   * so — and wrapped in a value they reached the renderer as an object where a colour was wanted.
+   */
   private fun markProperty(value: VegaValue): VegaValue {
-    val expression = (value as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }
+    val stated = value as? VegaValue.Obj
+    if (stated?.fields?.keys == setOf("signal")) return stated
+    val expression = stated?.takeIf { it.fields.keys == setOf("expr") }
     return if (expression != null) signalRef(expression.string("expr").orEmpty())
     else obj { put("value", value) }
+  }
+
+  /**
+   * `vgAlignedPositionChannel`: which edge of the mark the position it is given names.
+   *
+   * ```js
+   * const ALIGNED_X_CHANNEL = {left: 'x', center: 'xc', right: 'x2'};
+   * const BASELINED_Y_CHANNEL = {top: 'y', middle: 'yc', bottom: 'y2'};
+   * ...
+   * if (channel === 'x') {
+   *   return ALIGNED_X_CHANNEL[alignExcludingSignal || (defaultAlign === 'top' ? 'left' : 'center')];
+   * } else {
+   *   return BASELINED_Y_CHANNEL[alignExcludingSignal || defaultAlign];
+   * }
+   * ```
+   *
+   * A picture aligned to the **right** is placed by its right edge, so the position it is handed is
+   * an `x2` and the width runs back from it. Written as an `xc` instead — this compiler asked only
+   * whether the mark was centred in its band — an image tucked into the corner of a plot was drawn
+   * half outside it, and one aligned to the left was drawn half a width too far along.
+   *
+   * A word the map has no key for is answered by the **bare** channel, which is what
+   * `BASELINED_Y_CHANNEL[…] ?? channel` comes to: a `"line-top"` baseline is a top for this even
+   * though the map does not list it. So is an `{"expr": …}`, which upstream refuses by name — an
+   * alignment settled at render time cannot decide which channel to write at compile time.
+   */
+  private fun alignedPositionChannel(view: UnitView, channel: String, centred: Boolean): String {
+    val stated =
+      (styled(view, if (channel == "x") "align" else "baseline") as? VegaValue.Str)?.value
+    val fallback =
+      if (channel == "x") (if (centred) "center" else "left")
+      else (if (centred) "middle" else "top")
+    return when (stated ?: fallback) {
+      "left" -> "x"
+      "center" -> "xc"
+      "right" -> "x2"
+      "top" -> "y"
+      "middle" -> "yc"
+      "bottom" -> "y2"
+      else -> channel
+    }
   }
 
   /** `isRectBasedMark`: the marks whose size along a channel is a *band* rather than a symbol. */
@@ -910,7 +966,6 @@ internal object Marks {
       "timeUnitBandSize",
       "timeUnitBandPosition",
       "invalid",
-      "tooltip",
       // Resolved into two of Vega's four corner properties, which end depending on the
       // orientation; and into an `offset` on the position, Vega having no `xOffset` on a mark.
       "cornerRadiusEnd",
@@ -948,10 +1003,6 @@ internal object Marks {
   fun colorEncode(view: UnitView, filledOverride: Boolean? = null): VegaValue.Obj {
     val filled = filledOverride ?: view.markDef.filled
     val markConfig = view.config.markConfig(view.spec.mark)
-    val declaredColor =
-      view.markDef.raw.fields["color"] ?: view.markDef.raw.fields[if (filled) "fill" else "stroke"]
-    val defaultColor = declaredColor ?: markConfig.fields["color"]
-
     val transparentIfNeeded =
       // A **geoshape** is on the list too: an outline drawn but not filled still wants a hit area,
       // and a transparent fill is what gives one — the same reason a hollow point has one.
@@ -959,12 +1010,42 @@ internal object Marks {
         VegaValue.Str("transparent")
       else null
 
-    val defaultFill = if (filled) defaultColor else transparentIfNeeded
-    val defaultStroke = if (!filled) defaultColor else null
+    // ```js
+    // const defaultFill =
+    //   getMarkPropOrConfig(filled === true ? 'color' : undefined, markDef, config, {vgChannel:
+    // 'fill'}) ??
+    //   markDef.fill ?? config.mark.fill ?? transparentIfNeeded;
+    // const defaultStroke =
+    //   getMarkPropOrConfig(filled === false ? 'color' : undefined, markDef, config, {vgChannel:
+    // 'stroke'}) ??
+    //   markDef.stroke ?? config.mark.stroke;
+    // ```
+    //
+    // Each of the two is looked up under its **own Vega name** whatever the mark is filled with,
+    // and under `color` only for the one the colour *is*. So a theme that strokes every point black
+    // — `config.point.stroke` — strokes a filled point too, and this compiler read `color` alone:
+    // such a theme was read and dropped. Five specifications in the wild corpus theme their marks
+    // that way.
+    //
+    // The **style blocks** are not part of this chain. `getMarkConfig` consults them for `color`
+    // and not for `fill` or `stroke`, which is exactly right: a style block is something *Vega*
+    // applies, the mark carrying its names in `style`, so a `stroke` kept in one needs no help.
+    // A colour written there does, `color` being a name Vega has never heard of.
+    val byColorName =
+      view.markDef.raw.fields["color"] ?: styled(view, "color") ?: markConfig.fields["color"]
+    val defaultFill =
+      view.markDef.raw.fields["fill"]
+        ?: (if (filled) byColorName else null)
+        ?: markConfig.fields["fill"]
+        ?: transparentIfNeeded
+    val defaultStroke =
+      view.markDef.raw.fields["stroke"]
+        ?: (if (!filled) byColorName else null)
+        ?: markConfig.fields["stroke"]
 
     return obj {
-      if (defaultFill != null) put("fill", obj { put("value", defaultFill) })
-      if (defaultStroke != null) put("stroke", obj { put("value", defaultStroke) })
+      if (defaultFill != null) put("fill", markProperty(defaultFill))
+      if (defaultStroke != null) put("stroke", markProperty(defaultStroke))
       val colorChannel = if (filled) "fill" else "stroke"
       // The mark's own colour is what a *conditional* colour falls through to — upstream passes it
       // as `defaultValue` into `nonPosition`, so the production rule ends in it. Setting it above
@@ -1129,7 +1210,17 @@ internal object Marks {
 
   private fun literalRef(value: VegaValue?): Pair<String, VegaValue>? {
     if (value == null) return null
-    val expr = (value as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }?.get("expr")
+    val stated = value as? VegaValue.Obj
+    // A theme's expressions are already signals by the time they are read — `initConfig` makes them
+    // so — and a signal is a reference, not a value. Wrapped in one it reached the renderer as an
+    // object where a number or a colour was wanted.
+    stated
+      ?.takeIf { it.fields.keys == setOf("signal") }
+      ?.get("signal")
+      ?.let {
+        return "signal" to it
+      }
+    val expr = stated?.takeIf { it.fields.keys == setOf("expr") }?.get("expr")
     return if (expr != null) "signal" to expr else "value" to value
   }
 
@@ -1879,23 +1970,6 @@ internal object Marks {
       }
       return obj { literalRef(value)?.let { (key, it) -> put(key, it) } }
     }
-    if (def.datum != null) {
-      return obj {
-        put("scale", scaleName(view, mainChannel(channel)))
-        // A datum written as a **date** is the expression that builds the instant, not an object:
-        // Vega has no `{year: 2006}`, and passing one through scaled a mark by an object.
-        val datum = def.datum
-        if (
-          def.type == MeasureType.TEMPORAL &&
-            datum is VegaValue.Obj &&
-            Scales.looksLikeADateTime(datum)
-        ) {
-          put("signal", Transforms(DiagnosticCollector()).dateTimeExpression(datum))
-        } else {
-          literalRef(datum)?.let { (key, it) -> put(key, it) }
-        }
-      }
-    }
     // A **bucket** is placed by a point inside it rather than at its near edge, and a bucketed
     // *instant* is a bucket too — `isBinning(bin) || (bandPosition && timeUnit && type ===
     // TEMPORAL)`. A label over a month asked for the middle of the month sits in the middle of it,
@@ -1904,8 +1978,11 @@ internal object Marks {
     // end of somebody else's — upstream reaches it as a `SecondaryFieldDef`, which carries no type
     // and so never takes the bucketed branch — and reading it as a bucket of its own put a rect's
     // far edge halfway into a bucket that does not exist.
+    // A **datum** is a literal standing where a column would: there is nothing of it to bucket, so
+    // only the last arm — the one `valueRefForFieldOrDatumDef` shares between the two — answers it.
     val bucketed =
-      channel == mainChannel(channel) &&
+      def.datum == null &&
+        channel == mainChannel(channel) &&
         (def.bin is Binning.Bin ||
           (def.timeUnit != null &&
             def.type == MeasureType.TEMPORAL &&
@@ -1937,12 +2014,27 @@ internal object Marks {
     }
     return obj {
       put("scale", scaleName(view, mainChannel(channel)))
-      // A binned field on a discrete scale is placed by its **label**: that is what the domain
-      // lists, so the bin's start would name a category the scale has never heard of.
-      val binnedLabels =
-        def.bin is Binning.Bin &&
-          (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL)
-      put("field", Fields.vgField(def, suffix = if (binnedLabels) "range" else null))
+      val datum = def.datum
+      if (datum != null) {
+        // A datum written as a **date** is the expression that builds the instant, not an object:
+        // Vega has no `{year: 2006}`, and passing one through scaled a mark by an object.
+        if (
+          def.type == MeasureType.TEMPORAL &&
+            datum is VegaValue.Obj &&
+            Scales.looksLikeADateTime(datum)
+        ) {
+          put("signal", Transforms(DiagnosticCollector()).dateTimeExpression(datum))
+        } else {
+          literalRef(datum)?.let { (key, it) -> put(key, it) }
+        }
+      } else {
+        // A binned field on a discrete scale is placed by its **label**: that is what the domain
+        // lists, so the bin's start would name a category the scale has never heard of.
+        val binnedLabels =
+          def.bin is Binning.Bin &&
+            (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL)
+        put("field", Fields.vgField(def, suffix = if (binnedLabels) "range" else null))
+      }
       // `positionOffset` runs for every position, not only a rect's: a label over a grouped bar
       // has to move into the same lane the bar did, or it sits over the middle of the group.
       val offset = offsetRef(view, mainChannel(channel), centred = true)
@@ -1968,7 +2060,12 @@ internal object Marks {
     view.markDef.raw.fields[channel]?.let {
       if (it == VegaValue.Str("width")) return obj { put("field", obj { put("group", "width") }) }
       if (it == VegaValue.Str("height")) return obj { put("field", obj { put("group", "height") }) }
-      return obj { put("value", it) }
+      // `signalOrValueRef`, as every other mark property is built: a position written `{"expr": …}`
+      // is a **signal**, which is how a mark is placed relative to a size the chart computes —
+      // `{"x": {"expr": "childWidth + 5"}}` puts a bar five units past the plot it stands beside.
+      // Written out as a value, Vega is handed an object where a number belongs and the mark is
+      // placed at nothing.
+      return obj { literalRef(it)?.let { (key, resolved) -> put(key, resolved) } }
     }
     return when (defaultPos) {
       "zeroOrMin",
@@ -2044,7 +2141,10 @@ internal object Marks {
     val sizeChannel = if (channel == "x") "width" else if (channel == "y") "height" else null
     val stated = sizeChannel?.let { view.markDef.raw.fields[it] }
     if (view.spec.encoding[channel2] == null && stated != null) {
-      val centred = if (channel == "x") "xc" else "yc"
+      // Which **edge** that size runs from is the mark's own alignment — see
+      // [alignedPositionChannel]. A picture aligned to the right is placed by its right edge, and
+      // the width runs back from it; centred was only the default.
+      val centred = alignedPositionChannel(view, channel, centred = true)
       return obj {
         putAll(pointPosition(view, channel, defaultPos, centred))
         put(sizeChannel, markProperty(stated))
@@ -2281,7 +2381,9 @@ internal object Marks {
               signalRef("${canonicalNumberString(1 - padding)} * $sizeChannel")
             }
             discreteBandSize != null -> obj { put("value", discreteBandSize) }
-            else -> obj { put("value", view.config.step - 2) }
+            // `const defaultStep = getViewConfigDiscreteStep(config.view, sizeChannel)` — the step
+            // of the dimension this mark is being sized along, not whichever `view.step` is.
+            else -> obj { put("value", view.config.discreteStep(sizeChannel!!) - 2) }
           }
         }
       }
@@ -2303,7 +2405,7 @@ internal object Marks {
     // nominal scale with `"width": 20`, where a mark left to fill the band gets `x` and a
     // bandwidth.
     val centred = bandingType != "band" || sizeWasHonoured || markSizeChannel != null
-    val vgChannel = if (centred) if (channel == "x") "xc" else "yc" else channel
+    val vgChannel = alignedPositionChannel(view, channel, centred)
 
     val posRef =
       if (def != null) {
@@ -2353,12 +2455,15 @@ internal object Marks {
     scaleType: String?,
     centred: Boolean,
   ): VegaValue {
-    if (view.stack != null && channel == view.stack.fieldChannel) {
-      return obj {
-        put("scale", scaleName(view, channel))
-        put("field", Fields.vgField(def, suffix = "end"))
-      }
-    }
+    // `positionAndSize` places the mark with `midPointRefWithPositionInvalidTest`, and `midPoint`
+    // is handed the stack only so that an **imputed** bin can be read by its middle: nowhere in it
+    // does a stack put an `_end` on the column. The two ends of a stack are written by
+    // `rangePosition`, which is where a channel a mark *grows* along is settled.
+    //
+    // So a channel the mark does not grow along reads the column as it stands, stack or no stack.
+    // Suffixed here as well, a bar turned by a bucketed position — one that spans its two ends
+    // along the other axis and so is only a marker along this one — was placed at the top of a
+    // total it is no part of, which on a single row is the same place and on several is not.
     if (!def.isFieldDef && def.datum == null) return midPoint(view, channel, def, scaleType)
     return obj {
       put("scale", scaleName(view, channel))

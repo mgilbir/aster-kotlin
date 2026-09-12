@@ -1,5 +1,6 @@
 package dev.aster.vegalite
 
+import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.locale.VegaLocale
 
@@ -14,7 +15,7 @@ import dev.aster.vega.model.locale.VegaLocale
  * does: `{"bar": {"fill": "red"}}` replaces the bar's fill and keeps its `binSpacing`.
  */
 internal class Config(
-  private val user: VegaValue.Obj = VegaValue.EmptyObject,
+  stated: VegaValue.Obj = VegaValue.EmptyObject,
   /**
    * The host's language, carried here because it decides one thing this compiler **emits**.
    *
@@ -29,6 +30,29 @@ internal class Config(
    */
   val locale: VegaLocale = VegaLocale.EnglishUS,
 ) {
+
+  /**
+   * What the specification wrote, with every **expression** in it made a signal.
+   *
+   * ```js
+   * export function replaceExprRef<T extends Dict<any>>(index: T, {level}: {level: number} = {level: 0}) {
+   *   const props = keys(index || {});
+   *   const newIndex: Dict<any> = {};
+   *   for (const prop of props) {
+   *     newIndex[prop] = level === 0 ? signalRefOrValue(index[prop]) : replaceExprRef(index[prop], {level: level - 1});
+   *   }
+   *   return newIndex as MappedExclude<T, ExprRef>;
+   * }
+   * ```
+   *
+   * `initConfig` does this **once**, as the configuration is read, and everything downstream sees
+   * signals: `config.mark.font` reaches a mark's encoding as `{"signal": …}` and `config.axis
+   * .labelColor` reaches an axis the same way. Left as `{"expr": …}`, each of them was written into
+   * the chart as a *value* that happened to be an object — a font whose name was `[object Object]`
+   * — so a document that names its typeface once, in a parameter, and reads it from the theme drew
+   * every word of every chart in the fallback face.
+   */
+  private val user: VegaValue.Obj = withSignals(stated)
 
   val raw: VegaValue.Obj
     get() = user
@@ -110,7 +134,7 @@ internal class Config(
   val continuousHeight: Double = view.number("height") ?: view.number("continuousHeight") ?: 300.0
 
   /** One discrete step, from which a band-scaled plot's whole width is computed. */
-  val step: Double = view.number("step") ?: 20.0
+  val step: Double = view.number("step") ?: DEFAULT_STEP
 
   /**
    * `view.discreteWidth`/`discreteHeight`: how deep a plot is along a channel with **no scale**.
@@ -122,6 +146,35 @@ internal class Config(
   val discreteWidth: Double? = view.number("width") ?: view.number("discreteWidth")
 
   val discreteHeight: Double? = view.number("height") ?: view.number("discreteHeight")
+
+  /**
+   * `getViewConfigDiscreteStep`: the step **that channel's** own themed size comes to.
+   *
+   * ```js
+   * export function getViewConfigDiscreteStep(viewConfig, channel) {
+   *   const size = getViewConfigDiscreteSize(viewConfig, channel);
+   *   return isStep(size) ? size.step : DEFAULT_STEP;
+   * }
+   * ```
+   *
+   * A theme may state a step for one dimension and leave the other alone, and every reader asks the
+   * dimension it is sizing: `view.discreteWidth` answers for `x` and `view.discreteHeight` for `y`.
+   * `view.step` is the answer only where neither is set — it is what `getViewConfigDiscreteSize`
+   * falls back to — so a theme that states one was being ignored, and a document whose bars are
+   * thirty units apart drew them twenty.
+   *
+   * Where the themed size is a plain **number** the answer is `DEFAULT_STEP` and not `view.step`:
+   * `isStep` is false and the fallback has already been passed. It is upstream's own reading and it
+   * is what upstream emits. Most readers never see it — a themed depth is not a step at all, so
+   * they are not asking — but the `size` scale's largest point is bounded by the *smaller* of the
+   * two steps whether or not either sizes a scale, and there it shows.
+   */
+  fun discreteStep(size: String): Double {
+    val themed =
+      view.fields[size] ?: view.fields[if (size == "width") "discreteWidth" else "discreteHeight"]
+    if (themed == null) return step
+    return (themed as? VegaValue.Obj)?.number("step") ?: DEFAULT_STEP
+  }
 
   private val view: VegaValue.Obj
     get() = user.obj("view") ?: VegaValue.EmptyObject
@@ -215,7 +268,7 @@ internal class Config(
    * configuration this compiler never reads, and a theme that sets it should still reach the
    * renderer.
    */
-  fun forVega(): VegaValue.Obj? {
+  fun forVega(diagnostics: DiagnosticCollector): VegaValue.Obj? {
     val out = LinkedHashMap<String, VegaValue>()
     val styles = LinkedHashMap<String, VegaValue>()
 
@@ -299,6 +352,22 @@ internal class Config(
     }
 
     if (styles.isNotEmpty()) out["style"] = VegaValue.Obj(styles)
+    // ```js
+    // if (config.params) {
+    //   config.signals = (config.signals || []).concat(assembleParameterSignals(config.params));
+    //   delete config.params;
+    // }
+    // ```
+    //
+    // A theme's **parameters** are signals of the document rather than of a chart: a colour named
+    // once and read by every guide in it. Vega has no `config.params`, so left under that name they
+    // reached the renderer as nothing at all and every expression that read one was undefined.
+    Params.signals(user, diagnostics)
+      .takeIf { it.isNotEmpty() }
+      ?.let { declared ->
+        out.remove("params")
+        out["signals"] = arr((out["signals"] as? VegaValue.Arr)?.values.orEmpty() + declared)
+      }
     return if (out.isEmpty()) null else VegaValue.Obj(out)
   }
 
@@ -399,6 +468,101 @@ internal class Config(
   }
 
   private companion object {
+    /** `DEFAULT_STEP`: one discrete step where nothing at all says otherwise. */
+    const val DEFAULT_STEP = 20.0
+
+    /**
+     * `signalRefOrValue`: `{"expr": …}` is Vega-Lite's way of writing a signal, Vega's is
+     * `{"signal": …}`, and whatever else was written beside it stays.
+     */
+    private fun asSignal(value: VegaValue): VegaValue {
+      val stated = (value as? VegaValue.Obj)?.takeIf { it.has("expr") } ?: return value
+      val expression = stated.string("expr") ?: return value
+      return obj {
+        put("signal", expression)
+        stated.fields.forEach { (key, own) -> if (key != "expr") put(key, own) }
+      }
+    }
+
+    /** One block's properties, each made a signal where it is an expression. */
+    private fun signalled(block: VegaValue): VegaValue {
+      val fields = (block as? VegaValue.Obj)?.fields ?: return block
+      return obj { fields.forEach { (key, value) -> put(key, asSignal(value)) } }
+    }
+
+    /**
+     * `configPropsWithExpr`: the blocks `initConfig` reads for expressions, and nothing else.
+     *
+     * A key not in this list passes through as written — `config.params` above all, which is the
+     * one place an expression is a *parameter's* and not a property's.
+     */
+    private val EXPR_BLOCKS: Set<String> by lazy {
+      MARK_TYPES +
+        setOf("mark") +
+        setOf(
+          "axis",
+          "axisBand",
+          "axisBottom",
+          "axisDiscrete",
+          "axisLeft",
+          "axisPoint",
+          "axisQuantitative",
+          "axisRight",
+          "axisTemporal",
+          "axisTop",
+          "axisX",
+          "axisXBand",
+          "axisXDiscrete",
+          "axisXPoint",
+          "axisXQuantitative",
+          "axisXTemporal",
+          "axisY",
+          "axisYBand",
+          "axisYDiscrete",
+          "axisYPoint",
+          "axisYQuantitative",
+          "axisYTemporal",
+        ) +
+        setOf("header", "headerRow", "headerColumn", "headerFacet") +
+        setOf("legend", "scale", "title", "view")
+    }
+
+    /** The three read as a property rather than as a block of them. */
+    private val EXPR_VALUES = setOf("background", "lineBreak", "padding")
+
+    private fun withSignals(stated: VegaValue.Obj): VegaValue.Obj = obj {
+      stated.fields.forEach { (key, value) ->
+        when {
+          key in EXPR_VALUES -> put(key, asSignal(value))
+          // `config.style` is a block **of** blocks — one per named style — so the properties are
+          // one level further down than everywhere else.
+          key == "style" ->
+            put(
+              key,
+              obj {
+                (value as? VegaValue.Obj)?.fields.orEmpty().forEach { (name, own) ->
+                  put(name, signalled(own))
+                }
+              },
+            )
+          // `replaceExprRef(invalid, {level: 1})`: what a scale does about an unplaceable value is
+          // stated per channel, so its properties are a level down too. The rest of the scale
+          // block is read as any other.
+          key == "scale" ->
+            put(
+              key,
+              obj {
+                (value as? VegaValue.Obj)?.fields.orEmpty().forEach { (name, own) ->
+                  put(name, if (name == "invalid") signalled(own) else asSignal(own))
+                }
+              },
+            )
+          key in EXPR_BLOCKS -> put(key, signalled(value))
+          else -> put(key, value)
+        }
+      }
+    }
+
     /** Keys Vega has no use for: this compiler has already applied them, or they mean nothing. */
     /**
      * `VL_ONLY_MARK_SPECIFIC_CONFIG_PROPERTY_INDEX`: what each *kind* of mark loses on top.

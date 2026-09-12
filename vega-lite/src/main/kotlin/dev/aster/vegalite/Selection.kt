@@ -114,14 +114,58 @@ internal class Selection(
    * Inside a facet that is not a *name* but an expression: every cell of the grid is the same model
    * drawn once per value, so the unit is the cell's name and the values it holds. `unitName`.
    */
-  fun unitName(cell: UnitView? = null, grid: FacetLayout? = null): String {
-    val base = quoted(cell?.name ?: owner?.name ?: "")
+  fun unitName(
+    cell: UnitView? = null,
+    grid: FacetLayout? = null,
+    /**
+     * Whether the name is quoted, which says whether it is being written into an **expression**.
+     *
+     * `unitName(model, {escape: false})` for the store's own rows: a tuple already in the store is
+     * data, and its `unit` is the name itself. Everywhere else the name is spelled into an
+     * expression a signal computes, where it has to be a string literal.
+     */
+    escape: Boolean = true,
+    /**
+     * The view whose group this is being written into, where the selection owns none of its own.
+     *
+     * `unitName(model)` is `model.getName('')` — the name of the model the signal is being written
+     * for. A parameter declared **above** a concatenation owns no view, and its machinery is
+     * written once in each plot: the name each copy records is that plot's, not the empty string
+     * the chart itself carries. Recorded empty, every plot's tuples claimed to come from the same
+     * unit, and a selection resolved per plot could not tell them apart.
+     */
+    fallback: UnitView? = null,
+  ): String {
+    val name = cell?.name ?: owner?.name ?: fallback?.name ?: ""
+    val base = if (escape) quoted(name) else name
     if (grid == null) return base
     return base +
       grid.byChannel.joinToString("") { (channel, field) ->
         " + '__facet_${channel}_' + (facet[${quoted(field)}])"
       }
   }
+
+  /**
+   * One projection's share of a value tuple — `parseSelectionProject`'s own reading.
+   *
+   * ```js
+   * return proj.items.map((p) =>
+   *   isObject(v) ? (v[p.geoChannel || p.channel] !== undefined ? v[p.geoChannel || p.channel] : v[p.field]) : v,
+   * );
+   * ```
+   *
+   * A tuple names the channel a projection is over or the column it reads; a **scalar** names
+   * neither and settles every projection at once, which upstream calls smoothing the gradient from
+   * a variable parameter to a point selection — `{"value": "US"}` is what a chart bound to a picker
+   * writes, and there is only one thing it could mean. Reading a scalar as a tuple found nothing in
+   * it, so such a chart opened picking nothing.
+   */
+  private fun projectedValue(tuple: VegaValue?, channel: String?, field: String): VegaValue? =
+    when (tuple) {
+      null -> null
+      is VegaValue.Obj -> channel?.let { tuple.fields[it] } ?: tuple.fields[field]
+      else -> tuple
+    }
 
   /** Whether the pointer becomes a hand over a mark: a *hover* selection is not clicked. */
   val showsPointer: Boolean
@@ -212,7 +256,13 @@ internal class Selection(
      * than the chart: the whole tree is walked so that a condition anywhere can be resolved against
      * a selection defined anywhere, and the views then claim the ones they declared.
      */
-    fun of(spec: VegaValue.Obj): List<Selection> {
+    /** The marks that stand for a layer of others, which take no parameters of their own. */
+    private val COMPOSITE_MARKS = setOf("errorbar", "errorband", "boxplot")
+
+    fun of(
+      spec: VegaValue.Obj,
+      diagnostics: DiagnosticCollector? = null,
+    ): List<Selection> {
       val found = mutableListOf<Selection>()
       // `UnitModel.hasProjection`, asked of the unit each selection is **declared on** and asked
       // here rather than of the view later: a condition testing the selection is compiled while the
@@ -224,7 +274,36 @@ internal class Selection(
         val geography =
           node["mark"].let { it == VegaValue.Str("geoshape") || it.string("type") == "geoshape" } ||
             channels.any { it in Channels.GEO_POSITION_CHANNELS }
-        found += from(node.array("params").orEmpty()).onEach { it.onGeography = geography }
+        // ```js
+        // const {mark, encoding: _encoding, params, projection: _p, ...outerSpec} = spec;
+        // ...
+        // // TODO(https://github.com/vega/vega-lite/issues/3702): add selection support
+        // if (params) {
+        //   log.warn(log.message.selectionNotSupported('boxplot'));
+        // }
+        // ```
+        //
+        // A **composite mark** takes none: its normalizer lifts the parameters off the
+        // specification and does nothing with them, so the summary is drawn and nothing reacts.
+        // Upstream says so in a warning and has an issue open about it — what a click on one of
+        // the five marks a box plot draws would pick is the question it has not answered — and a
+        // compiler that built the parameter anyway draws a chart that reacts where upstream's does
+        // not.
+        val composite =
+          node["mark"].let { it.string("type") ?: (it as? VegaValue.Str)?.value } in COMPOSITE_MARKS
+        val declared = node.array("params").orEmpty()
+        if (composite && declared.isNotEmpty()) {
+          diagnostics?.error(
+            VegaLiteDiagnostics.UNSUPPORTED_PARAMETER,
+            "A composite mark takes no parameters, so " +
+              declared.mapNotNull { it.string("name") }.joinToString(", ") { "`$it`" } +
+              " is not built and the chart does not react. Upstream drops it with the same " +
+              "warning. A parameter on a layer *around* the composite mark is built as any " +
+              "other is.",
+            jsonPath = "$.params",
+          )
+        }
+        if (!composite) found += from(declared).onEach { it.onGeography = geography }
         for (composition in listOf("layer", "hconcat", "vconcat", "concat")) {
           node.array(composition).orEmpty().forEach {
             (it as? VegaValue.Obj)?.let { child -> walk(child, channels) }
@@ -250,9 +329,52 @@ internal class Selection(
             is VegaValue.Obj -> (select.string("type") ?: return@mapNotNull null) to select
             else -> return@mapNotNull null
           }
-        val encodings =
+        val statedChannels =
           options.array("encodings").orEmpty().mapNotNull { (it as? VegaValue.Str)?.value }
-        val fields = options.array("fields").orEmpty().mapNotNull { (it as? VegaValue.Str)?.value }
+        val statedFields =
+          options.array("fields").orEmpty().mapNotNull { (it as? VegaValue.Str)?.value }
+        // ```js
+        // // If no explicit projection (either fields or encodings) is specified, set some
+        // defaults.
+        // // If an initial value is set, try to infer projections.
+        // if (!fields && !encodings && init) {
+        //   for (const initVal of init) {
+        //     if (!isObject(initVal)) { continue; }
+        //     for (const key of keys(initVal)) {
+        //       if (isSingleDefUnitChannel(key)) { (encodings ||= []).push(key); }
+        //       else { (fields ??= []).push(key); }
+        //     }
+        //   }
+        // }
+        // ```
+        //
+        // A selection given a **starting value** and told nothing else about what it projects onto
+        // is projected onto whatever that value names: a slider bound to `maxReported` remembers a
+        // `maxReported`, and a click started at `{"x": 5}` remembers the column `x` is drawn from.
+        // With neither read, such a selection fell back to remembering rows by *identity* — so it
+        // had no field signal for the control to write into, no `tuple_fields` to say what it
+        // stored, and a store that began empty however the specification had started it.
+        //
+        // A **scalar** value is not a projection: it is the identity of a row, and `isObject`
+        // passes over it.
+        //
+        // An **interval** is the same rule seen from the other side: a brush started over a range
+        // of `y` is dragged along `y` alone, where without this it was projected onto both
+        // positions and opened as a rectangle. A key that names no channel contributes no channel,
+        // and [channelProjections] then falls back to the two positions — which is what upstream's
+        // own interval arm does after warning about the key.
+        val inferred =
+          if (statedChannels.isNotEmpty() || statedFields.isNotEmpty()) emptyList()
+          else
+            when (val initial = param.fields["value"]) {
+                is VegaValue.Arr -> initial.values
+                null -> emptyList()
+                else -> listOf(initial)
+              }
+              .filterIsInstance<VegaValue.Obj>()
+              .flatMap { it.fields.keys }
+        val encodings = statedChannels + inferred.filter { it in Channels.SINGLE_DEF_UNIT_CHANNELS }
+        val fields = statedFields + inferred.filterNot { it in Channels.SINGLE_DEF_UNIT_CHANNELS }
         val bind = param.fields["bind"]
         Selection(
           name = name,
@@ -393,8 +515,19 @@ internal class Selection(
    *   store carries a millisecond rather than an expression, so this is the one place in a
    *   selection where the zone has to be settled at compile time.
    */
-  fun storeData(view: UnitView?, initial: VegaValue?, timeZone: TimeZone? = null): VegaValue = obj {
+  fun storeData(
+    view: UnitView?,
+    initial: VegaValue?,
+    timeZone: TimeZone? = null,
+    /** The grid the declaring view is a cell of, whose values name the cell a row was picked in. */
+    grid: FacetLayout? = null,
+  ): VegaValue = obj {
     put("name", store)
+    // `unitName(model, {escape: false})`: inside a grid the unit is not a name but the cell's name
+    // and the values that cell holds, since every cell is the same model drawn once per value. A
+    // row the chart **opens** with has to say which cell it was picked in, or it is a pick in no
+    // cell at all: a trellis opening with one of its cells brushed had the brush belong to nothing.
+    val unit = unitName(view.takeIf { grid != null }, grid, escape = false)
     // A stated starting extent is a row **already** in the store: the chart opens with the brush
     // drawn and everything reading it already filtered, rather than opening empty and waiting for a
     // drag that has in effect already happened.
@@ -412,13 +545,14 @@ internal class Selection(
         arr(
           picked.map { row ->
             obj {
-              put("unit", owner?.name ?: "")
+              put("unit", unit)
               put(
                 "fields",
                 arr(
                   pointProjection.map { (channel, field) ->
                     obj {
-                      put("field", field)
+                      // The path is escaped — see the tuple-fields signal below.
+                      put("field", Fields.replacePathInField(field))
                       channel?.let { put("channel", it) }
                       put("type", if (view != null) projectionType(view, channel) else "E")
                     }
@@ -433,10 +567,7 @@ internal class Selection(
                 "values",
                 arr(
                   pointProjection.map { (channel, field) ->
-                    val stated =
-                      (row as? VegaValue.Obj)?.let { own ->
-                        channel?.let { own.fields[it] } ?: own.fields[field]
-                      } ?: (row as? VegaValue.Obj)?.fields?.get(field)
+                    val stated = projectedValue(row, channel, field)
                     if (stated == null) VegaValue.Null else asStoredValue(stated, timeZone)
                   }
                 ),
@@ -457,7 +588,7 @@ internal class Selection(
         arr(
           listOf(
             obj {
-              put("unit", owner?.name ?: "")
+              put("unit", unit)
               put(SELECTION_ID, arr(initial.array(first.written).orEmpty()))
             }
           )
@@ -469,13 +600,13 @@ internal class Selection(
         arr(
           listOf(
             obj {
-              put("unit", owner?.name ?: "")
+              put("unit", unit)
               put(
                 "fields",
                 arr(
                   projected.map { (channel, field) ->
                     obj {
-                      put("field", field)
+                      put("field", Fields.replacePathInField(field))
                       put("channel", channel)
                       put("type", projectionType(view, channel))
                     }
@@ -488,16 +619,48 @@ internal class Selection(
               // Emitting the `{"year": …, "month": …}` object raw left the initial filtering
               // comparing a column of milliseconds against an object — false for every row — until
               // the reader's first drag replaced the store with real numbers.
+              // `assembleInit` maps a **list** element by element and hands anything else back as
+              // it stands, so a channel the extent says nothing about is `null` rather than an
+              // empty extent: an empty one is a brush of no width, which filters everything out,
+              // where a null is the absence Vega reads as "not brushed along this channel".
               put(
                 "values",
                 arr(
                   projected.map { (channel, _) ->
-                    arr(initial.array(channel).orEmpty().map { asStoredValue(it, timeZone) })
+                    when (val stated = (initial as? VegaValue.Obj)?.fields?.get(channel)) {
+                      null -> VegaValue.Null
+                      is VegaValue.Arr -> arr(stated.values.map { asStoredValue(it, timeZone) })
+                      else -> asStoredValue(stated, timeZone)
+                    }
                   }
                 ),
               )
             }
           )
+        ),
+      )
+    }
+    // ```js
+    // init.values = selCmpt.project.hasSelectionId
+    //   ? selCmpt.init.map((v) => ({unit: unitName(...), [SELECTION_ID]: assembleInit(v,
+    // false)[0]}))
+    //   : selCmpt.init.map((v) => ({unit: ..., fields, values: assembleInit(v, false)}));
+    // ```
+    //
+    // A selection that remembers rows **by identity** and was told which rows to start with says so
+    // the same way its store will: one row per identity, with no projection to name. Left out, such
+    // a chart opened with nothing picked however the specification had started it.
+    if (type != "interval" && initial != null && pointProjection.isEmpty() && byIdentity) {
+      val picked = (initial as? VegaValue.Arr)?.values ?: listOf(initial)
+      put(
+        "values",
+        arr(
+          picked.map { row ->
+            obj {
+              put("unit", unit)
+              put(SELECTION_ID, asStoredValue(row, timeZone))
+            }
+          }
         ),
       )
     }
@@ -616,7 +779,7 @@ internal class Selection(
           arr(
             projected.map { (channel, field) ->
               obj {
-                put("field", field)
+                put("field", Fields.replacePathInField(field))
                 put("channel", channel)
                 put("type", projectionType(view, channel))
               }
@@ -944,15 +1107,14 @@ internal class Selection(
     // compatibility pass hands it over as the parameter's `value` unchanged. Reading only the list
     // form left such a control starting at nothing, which is a chart that opens showing every row
     // where the specification asked for one.
-    val started = ((initial as? VegaValue.Arr)?.values?.firstOrNull() ?: initial) as? VegaValue.Obj
+    val started = (initial as? VegaValue.Arr)?.values?.firstOrNull() ?: initial
     return projected
       .map { (channel, field) ->
         obj {
           put("name", Fields.varName("${name}_$field"))
-          // `v[p.geoChannel || p.channel] !== undefined ? v[…] : v[p.field]`: a tuple may name
-          // the channel it starts on rather than the column, which is how a selection over a
-          // renamed or bucketed field says where it opens.
-          val start = channel?.let { started?.fields?.get(it) } ?: started?.fields?.get(field)
+          // A tuple may name the channel it starts on rather than the column, and a scalar names
+          // neither — see [projectedValue].
+          val start = projectedValue(started, channel, field)
           if (start != null) put("init", literal(start)) else put("value", VegaValue.Null)
           // The control is written **into** by the chart as well as by the reader: a pick still
           // moves the widget. `disableDirectManipulation` takes the pointer streams off unless the
@@ -1292,7 +1454,20 @@ internal class Selection(
           arr(
             projected.map { (channel, field) ->
               obj {
-                put("field", field)
+                // ```js
+                // export function assembleProjection(proj: SelectionProjection) {
+                //   const {signals, hasLegend, index, ...rest} = proj;
+                //   rest.field = replacePathInField(rest.field);
+                //   return rest;
+                // }
+                // ```
+                //
+                // The name a selection remembers a value **by**, with its path escaped: a column
+                // called `properties.NAME` is a name with a dot in it, not a path into
+                // `properties`, and the store compares what it was given against what the row
+                // holds under that name. Written unescaped, Vega looks a level in, finds nothing,
+                // and nothing ever matches.
+                put("field", Fields.replacePathInField(field))
                 // A projection made through a **channel** records which channel, because a test
                 // has to know what the value was compared against; one made on a bare field does
                 // not, there being no channel it came from.
@@ -1785,7 +1960,19 @@ internal class Selection(
       val sign = if (channel == "x") "-" else ""
       out += obj {
         put("name", data)
-        if (pushesOutward) put("push", "outer")
+        // ```js
+        // for (const proj of selCmpt.scales) {
+        //   const signal = signals.find((s) => s.name === proj.signals.data);
+        //   signal.push = 'outer';
+        // }
+        // ```
+        //
+        // Only what is **bound** pushes outward, and `scaleBindings.parse` binds only a scale with
+        // a continuous domain: there is no halfway between two categories to drag to. A channel it
+        // left out still writes its signal here — the selection remembers what was picked along it
+        // — but it is this view's own and there is nothing above for it to push into. Pushed
+        // regardless, such a signal was written into a top-level one that was never declared.
+        if (pushesOutward && isContinuous(type)) put("push", "outer")
         put(
           "on",
           arr(

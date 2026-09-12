@@ -56,6 +56,23 @@ internal object Scales {
 
   private val COLOR_CHANNELS = setOf("color", "fill", "stroke")
   private val DISCRETE_RANGE_CHANNELS = setOf("shape", "strokeDash")
+  private val OFFSET_CHANNELS = setOf("xOffset", "yOffset")
+
+  /** The channels whose range is a **magnitude**: a size, a width, a transparency, an angle. */
+  private val MAGNITUDE_CHANNELS =
+    setOf("size", "strokeWidth", "opacity", "fillOpacity", "strokeOpacity", "angle")
+
+  /**
+   * `CONTINUOUS_TO_CONTINUOUS_SCALES`: a number in, a number out, everything between interpolated.
+   */
+  private val CONTINUOUS_TO_CONTINUOUS =
+    setOf("linear", "log", "pow", "sqrt", "symlog", "time", "utc")
+
+  /** `CONTINUOUS_TO_DISCRETE_SCALES`: an extent cut into pieces, one listed value out of each. */
+  private val CONTINUOUS_TO_DISCRETE = setOf("quantile", "quantize", "threshold")
+
+  /** `QUANTITATIVE_SCALES`: the continuous ones that measure a number rather than an instant. */
+  private val QUANTITATIVE_SCALES = setOf("linear", "log", "pow", "sqrt", "symlog")
 
   /**
    * Scale types with a discrete domain, where a band or a point is looked up rather than mapped.
@@ -141,6 +158,50 @@ internal object Scales {
         "threshold",
       )
 
+  /**
+   * `channelSupportScaleType`: whether a channel can carry a scale of this type at all.
+   *
+   * A position is a span or a place along an axis, so it takes anything continuous, a band or a
+   * point — but not a scale that answers one of a handful of values, there being nowhere for the
+   * points between the pieces to go. Colour takes everything except a band, a band of colour not
+   * being a thing. A shape or a dash chooses between a fixed set of symbols, so only the scales
+   * whose *range* is a list can drive one.
+   */
+  fun channelSupports(channel: String, type: String): Boolean =
+    when {
+      channelIsPosition(channel) || channelIsPolar(channel) || channel in OFFSET_CHANNELS ->
+        // Upstream asks this **without** the nested-offset flag, even though it has one to hand:
+        // the question is what the channel can carry, not what this particular chart would have
+        // defaulted to, so a stated `point` on a position with an offset nested in it is kept.
+        type in CONTINUOUS_TO_CONTINUOUS || type == "band" || type == "point"
+      channel == "time" -> type == "linear" || type == "band"
+      channel in MAGNITUDE_CHANNELS ->
+        type in CONTINUOUS_TO_CONTINUOUS ||
+          type in CONTINUOUS_TO_DISCRETE ||
+          type == "band" ||
+          type == "point" ||
+          type == "ordinal"
+      channel in COLOR_CHANNELS -> type != "band"
+      channel in DISCRETE_RANGE_CHANNELS -> type == "ordinal" || type in CONTINUOUS_TO_DISCRETE
+      // `isScaleChannel`: a channel with no scale of its own supports no scale type either.
+      else -> false
+    }
+
+  /**
+   * `scaleTypeSupportDataType`: whether the *field's* own measurement can sit on this scale.
+   *
+   * A category has no order to interpolate along, so only a discrete domain can hold one; an
+   * instant is a clock; and a number is either measured continuously or cut into pieces.
+   */
+  fun typeSupports(type: String, measure: MeasureType?): Boolean =
+    when (measure) {
+      MeasureType.NOMINAL,
+      MeasureType.ORDINAL -> hasDiscreteDomain(type)
+      MeasureType.TEMPORAL -> type == "time" || type == "utc"
+      MeasureType.QUANTITATIVE -> type in QUANTITATIVE_SCALES || type in CONTINUOUS_TO_DISCRETE
+      else -> true
+    }
+
   /** `scaleType()` in `compile/scale/type.ts`, for the channels this compiler scales. */
   fun scaleType(
     channel: String,
@@ -148,10 +209,41 @@ internal object Scales {
     mark: String,
     /** Whether an offset scale is nested inside this position, which makes it a band. */
     hasOffset: Boolean = false,
+    diagnostics: DiagnosticCollector? = null,
   ): String {
-    def.scale?.string("type")?.let {
-      return it
+    val default = defaultScaleType(channel, def, mark, hasOffset)
+    val stated = def.scale?.string("type") ?: return default
+    // A stated type is **checked**, not obeyed. Upstream refuses one the channel cannot carry and
+    // one the field's own measurement cannot sit on, warns, and falls back to the default it would
+    // have picked anyway — a `threshold` over a list of country names has no extent to threshold,
+    // so the scale it asks Vega for would have no domain to speak of.
+    if (!channelSupports(channel, stated)) {
+      diagnostics?.warn(
+        VegaLiteDiagnostics.INVALID_ENCODING,
+        "Channel \"$channel\" does not work with a \"$stated\" scale. Using \"$default\" instead.",
+      )
+      return default
     }
+    // A **datum** is not a field: a literal carries no measurement to disagree with, and upstream
+    // asks `isFieldDef` before this second question for exactly that reason.
+    if (def.isFieldDef && !typeSupports(stated, def.type)) {
+      diagnostics?.warn(
+        VegaLiteDiagnostics.INVALID_ENCODING,
+        "A \"${def.type?.jsonName}\" field does not work with a \"$stated\" scale. " +
+          "Using \"$default\" instead.",
+      )
+      return default
+    }
+    return stated
+  }
+
+  /** `defaultType()`: the scale a channel takes where the specification states none. */
+  private fun defaultScaleType(
+    channel: String,
+    def: ChannelDef,
+    mark: String,
+    hasOffset: Boolean,
+  ): String {
     return when (def.type) {
       // An outline is not measured against anything: the projection draws it, and there is no
       // scale between the column and the page.
@@ -241,6 +333,8 @@ internal object Scales {
     def: ChannelDef,
     type: String,
     dataName: String,
+    /** The **pre-aggregation** table's name, for the one domain shape that reads it. */
+    rawName: String = view.rawData,
   ): List<VegaValue> {
     // `{"domain": {"unionWith": [...]}}` widens the domain the data would have given rather than
     // replacing it: the stated values come first and the derived domain follows them, both in the
@@ -278,6 +372,58 @@ internal object Scales {
       return values.map { signalRef("{data: ${instantExpression(it)}}") }
     }
 
+    // ```js
+    // if (channel === 'x' && getFieldOrDatumDef(encoding.x2)) {
+    //   if (getFieldOrDatumDef(encoding.x)) {
+    //     return mergeValuesWithExplicit(
+    //       parseSingleChannelDomain(scaleType, domain, model, 'x'),
+    //       parseSingleChannelDomain(scaleType, domain, model, 'x2'), ...);
+    //   }
+    // ```
+    //
+    // A ranged position contributes **both** of its ends, and the union happens a level above the
+    // per-channel answer: whatever the channel's own domain came out as, the second channel's is
+    // merged with it. Read as one of the per-channel shapes instead, it stood behind the earlier
+    // ones — so a **bucketed** position with a second column of its own contributed the bin's
+    // extent alone and the scale stopped at the last bucket's start, and a position given as a
+    // `datum` with a column beyond it contributed the constant alone.
+    //
+    // The far end asks for no **sort** of its own: a second position is a column and nothing else,
+    // with no type and no order written on it, so `parseSingleChannelDomain` reaches its tail with
+    // nothing to sort by. The near end's sort then stands for the union — `mergeDomains` lifts a
+    // sort no part contradicts — which is the answer a lane drawn between two categorical bounds
+    // needs: sorting each end separately and concatenating them is a different answer.
+    val secondaryChannel = secondaryChannel(channel)
+    val secondary = secondaryChannel?.let { view.spec.encoding[it] }
+    if (secondary != null && (secondary.isFieldDef || secondary.datum != null)) {
+      val far =
+        // A ranged position whose far end is a **datum** contributes that constant, not a column:
+        // an area drawn down to zero has to cover zero whether or not any row holds it.
+        if (secondary.isFieldDef)
+          obj {
+            put("data", dataName)
+            put("field", Fields.vgField(secondary))
+          }
+        else arr(listOf(secondary.datum!!))
+      return singleChannelDomain(view, channel, def, type, dataName, rawName) + far
+    }
+    return singleChannelDomain(view, channel, def, type, dataName, rawName)
+  }
+
+  /**
+   * `parseSingleChannelDomain`: the domain **one** channel contributes, before any union.
+   *
+   * What the second position of a ranged mark adds is settled by [domain], the level above this,
+   * exactly as upstream settles it in `parseDomainForChannel`.
+   */
+  private fun singleChannelDomain(
+    view: UnitView,
+    channel: String,
+    def: ChannelDef,
+    type: String,
+    dataName: String,
+    rawName: String,
+  ): List<VegaValue> {
     val stack = view.stack
     if (stack != null && channel == stack.fieldChannel) {
       if (stack.offset == "normalize") return listOf(arr(num(0), num(1)))
@@ -315,48 +461,12 @@ internal object Scales {
       }
     }
 
-    // A ranged position contributes *both* of its fields: the scale has to cover the whole span,
-    // not the ends the first channel happens to name.
-    val secondaryChannel = secondaryChannel(channel)
-    val secondary = secondaryChannel?.let { view.spec.fieldDef(it) }
-    if (secondary != null) {
-      // Each end carries the channel's own sort, which on a **discrete** scale is a plain `true`.
-      // The two then agree and the union takes it — a lane drawn between two categorical bounds is
-      // sorted as a whole, where sorting each end separately and concatenating them is a different
-      // answer. `mergeDomains` lifts a sort every part agrees on for exactly that reason.
-      val ranged = domainSort(view, channel, def, type)
-      return listOf(
-        obj {
-          put("data", dataName)
-          put("field", Fields.vgField(def))
-          put("sort", ranged)
-        },
-        obj {
-          put("data", dataName)
-          put("field", Fields.vgField(secondary))
-          put("sort", ranged)
-        },
-      )
-    }
-    // A ranged position whose far end is a **datum** contributes that constant, not a column: an
-    // area drawn down to zero has to cover zero whether or not any row holds it.
-    val secondaryDatum = secondaryChannel?.let { view.spec.encoding[it] }?.datum
-    if (secondaryDatum != null) {
-      return listOf(
-        obj {
-          put("data", dataName)
-          put("field", Fields.vgField(def))
-        },
-        arr(listOf(secondaryDatum)),
-      )
-    }
-
     // A `timeUnit` buckets an instant into a span, and the scale covers the span: the bucket's
     // start and the end the transform computed beside it — but only for a mark that *occupies* the
     // span. Upstream decides that by whether the mark has a `timeUnitBandPosition`, which only the
     // rect-shaped configurations define, so a bar over months reaches the end of December and a
     // point over the same months sits on the first of it.
-    if (def.timeUnit != null && (type == "time" || type == "utc") && bandEnd(view, def)) {
+    if (def.timeUnit != null && (type == "time" || type == "utc") && bandEnd(view, channel, def)) {
       // A rect shifted off the middle of its bucket covers the *interpolated* edges instead, so
       // those are the columns the scale has to reach.
       val shifted = view.offsettedRectPosition(def, channel) != null
@@ -379,7 +489,7 @@ internal object Scales {
     val sort = domainSort(view, channel, def, type)
     // Sorting by an aggregate of some *other* field has to be computed independently of the
     // aggregation being drawn, so upstream reads the pre-aggregation table for it.
-    val source = if (sortsFromRawTable(sort)) view.rawData else dataName
+    val source = if (sortsFromRawTable(sort)) rawName else dataName
     // A binned field forced onto a discrete scale is a domain of *labels*, not of bin starts: the
     // `_range` column the bin wrote is what the axis reads, and it is what has to be listed.
     val binnedLabels =
@@ -388,7 +498,27 @@ internal object Scales {
       obj {
         put("data", source)
         put("field", Fields.vgField(def, suffix = if (binnedLabels) "range" else null))
-        put("sort", sort)
+        // ```js
+        // // we have to use a sort object if sort = true to make the sort correct by bin start
+        // sort: sort === true || !isObject(sort) ? {field: model.vgField(channel, {}), op: 'min'} :
+        // sort,
+        // ```
+        //
+        // A domain of **labels** does not sort itself into numeric order — `"1.0 – 2.0"` sorts
+        // before `"9.0 – 10.0"` alphabetically — so the bin's own start orders them. It is written
+        // *here*, on the entry, and not answered by `domainSort`: which table the domain reads is
+        // that function's answer, and a bin ordered by its own start still reads the table being
+        // drawn. Answered there instead, such a scale asked for a pre-aggregation table nothing
+        // else wanted, and every dataset the chart derived afterwards came out one number high.
+        put(
+          "sort",
+          if (binnedLabels && sort !is VegaValue.Obj)
+            obj {
+              put("field", Fields.vgField(def))
+              put("op", "min")
+            }
+          else sort,
+        )
       }
     )
   }
@@ -409,6 +539,40 @@ internal object Scales {
    * the rows themselves. Testing the written form instead misses the string spelling, which is the
    * one a population pyramid uses to run its ages downwards.
    */
+  /**
+   * Whether this channel's domain is read off the **pre-aggregation** table.
+   *
+   * ```js
+   * public isRequired(): boolean {
+   *   return !!this.refCounts[this._name];
+   * }
+   * ```
+   *
+   * Upstream builds a raw output node for every unit and its optimizer then removes the ones
+   * nothing asked for — the count is of *requests*, so the question is not "could this sort read
+   * the raw table" but "does the domain this channel ends up with read it". A scale whose domain
+   * the specification **states** never reads any table at all, whatever its sort says, and neither
+   * does one taken from a `datum`, a stack, a bin's own extent or a bucket's two edges: each is a
+   * different arm of [domain], and every one of them returns before the sort is consulted.
+   *
+   * Asking the sort alone left a raw table standing in the flow with nothing reading it. It cost
+   * nothing to compute — the node has no transforms — but a named point in the flow **spends a
+   * dataset name**, so every table the chart derived afterwards came out one number high.
+   */
+  fun readsRawTable(view: UnitView, channel: String, def: ChannelDef, type: String): Boolean {
+    val raw = "\u0000raw"
+    fun mentions(value: VegaValue): Boolean =
+      when (value) {
+        is VegaValue.Str -> value.value == raw
+        is VegaValue.Obj -> value.fields.values.any { mentions(it) }
+        is VegaValue.Arr -> value.values.any { mentions(it) }
+        else -> false
+      }
+    return domain(view, channel, def, type, dataName = "\u0000main", rawName = raw).any {
+      mentions(it)
+    }
+  }
+
   fun sortsFromRawTable(sort: VegaValue?): Boolean =
     sort != null && sort != VegaValue.Null && sort !is VegaValue.Bool
 
@@ -424,20 +588,7 @@ internal object Scales {
     override: VegaValue? = null,
   ): VegaValue? {
     if (!hasDiscreteDomain(type)) return null
-    // A binned field on a discrete scale is a domain of *labels*, and labels do not sort
-    // themselves into numeric order — `"1.0 – 2.0"` sorts before `"9.0 – 10.0"` alphabetically.
-    // The bin's own start is what orders them.
-    if (
-      override == null &&
-        def.sort == null &&
-        def.bin is Binning.Bin &&
-        (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL)
-    ) {
-      return obj {
-        put("field", Fields.vgField(def))
-        put("op", "min")
-      }
-    }
+
     return when (val sort = override ?: def.sort) {
       null -> bool(true)
       is VegaValue.Str ->
@@ -638,19 +789,25 @@ internal object Scales {
             )
           )
         }
+        val size = if (position == "x") "width" else "height"
         val declared = if (position == "x") view.spec.width else view.spec.height
-        // `getDiscretePositionSize`: an undeclared size is *already* a step — the configured one —
-        // so the ordinary grouped bar takes that branch, and only a size stated as a **number**
-        // leaves the offset nothing to grow by.
+        // `getDiscretePositionSize`: an undeclared size is the **theme's** size for this dimension,
+        // which is a step unless the theme states a depth — so the ordinary grouped bar takes that
+        // branch, and only a size that is a number leaves the offset nothing to grow by. The theme
+        // may state one dimension as a depth and leave the other a step, and this reads the one it
+        // is sizing: a themed depth was taken for the configured step, and the offset then asked
+        // for a band inside a plot that had no bands.
         val stated = declared as? VegaValue.Obj
-        val step =
-          stated?.number("step") ?: (declared as? VegaValue.Num)?.let { null } ?: view.config.step
+        val themedDepth =
+          if (position == "x") view.config.discreteWidth else view.config.discreteHeight
+        val step = stated?.number("step") ?: view.config.discreteStep(size)
         // `getStepFor`: a stated step is the **offset's** only where the offset scale is discrete.
         // A continuous one — a jitter over `random()` — has no bands to be one step each, so the
         // step sizes the outer band and the offset fills whatever that came out as.
         val offsetIsDiscrete = hasDiscreteDomain(type)
         val stepFor = if (offsetIsDiscrete) stated?.string("for") ?: "offset" else "position"
-        if (declared is VegaValue.Num || stepFor != "offset") {
+        val isDepth = declared is VegaValue.Num || (declared == null && themedDepth != null)
+        if (isDepth || stepFor != "offset") {
           arr(listOf(num(0.0), signalRef("bandwidth('${view.scale(position)}')")))
         } else {
           obj { put("step", num(step)) }
@@ -659,7 +816,11 @@ internal object Scales {
       "x",
       "y" -> {
         if (type == "point" || type == "band") {
-          val declared = if (channel == "x") view.spec.width else view.spec.height
+          // `model.size`, which is the size the model was **given**: a layer hands its members its
+          // own, and a member that states nothing is measured against that rather than against the
+          // theme. See [UnitView.statedSize].
+          val declared =
+            view.statedSize[channel] ?: if (channel == "x") view.spec.width else view.spec.height
           val step = (declared as? VegaValue.Obj)?.number("step")
           // `getDiscretePositionSize`: the specification's own size where it states one, and the
           // **theme's** discrete size otherwise — which is a step only where the theme states no
@@ -826,8 +987,16 @@ internal object Scales {
   private const val MAX_SIZE_RANGE_STEP_RATIO = 0.95
 
   private fun stepFor(view: UnitView, size: String): Double {
+    // ```js
+    // const widthStep = isStep(size.width) ? size.width.step :
+    // getViewConfigDiscreteStep(viewConfig, 'width');
+    // ```
+    //
+    // `minXYStep` asks each dimension for **its own** step, and the theme may have stated one and
+    // not the other. This read `view.step` for both, so a document that spaces its bars along one
+    // axis and not the other sized its points by the wrong one.
     val declared = if (size == "width") view.spec.width else view.spec.height
-    return (declared as? VegaValue.Obj)?.number("step") ?: view.config.step
+    return (declared as? VegaValue.Obj)?.number("step") ?: view.config.discreteStep(size)
   }
 
   /**
@@ -1173,7 +1342,19 @@ internal object Scales {
    * define (`defaultRectConfig`), so the question answers itself by mark type without a list of
    * mark types anywhere.
    */
-  private fun bandEnd(view: UnitView, def: ChannelDef): Boolean =
-    def.raw.number("bandPosition") != null ||
-      view.config.markConfig(view.spec.mark).fields["timeUnitBandPosition"] != null
+  private fun bandEnd(view: UnitView, channel: String, def: ChannelDef): Boolean {
+    if (def.raw.number("bandPosition") != null) return true
+    // ```js
+    // if (timeUnit && !fieldDef2) {
+    //   return getMarkConfig('timeUnitBandPosition', mark, config);
+    // }
+    // ```
+    //
+    // A position given a **second** one of its own spans what the two of them name, not the bucket
+    // the first sits in: `getBandPosition` answers nothing for it, so there is no band to reach the
+    // end of. The bucket's own end is what a rect over one column covers, and a rect drawn between
+    // two columns covers the second.
+    if (secondaryChannel(channel)?.let { view.spec.encoding[it] } != null) return false
+    return view.config.markConfig(view.spec.mark).fields["timeUnitBandPosition"] != null
+  }
 }
