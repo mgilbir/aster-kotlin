@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A bar is turned by a column that arrived bucketed, not by one it is about to bucket.**
+  `orient` asks `isBinned(x.bin)` — `"binned"` or `{binned: true}`, a pair of edges the data came
+  with, which the bar spans and which settles the orientation on its own. A bin the chart is
+  *computing* settles nothing yet, and the question falls through to the rules below; a plain
+  histogram gets the same answer from them anyway, its binned `x` being no measure and its `y` one.
+  This compiler read it as any bin at all, so a bar whose bucketed `x` was given a second position
+  of its own never reached the ranged rule: it was called vertical, and everything downstream
+  followed — `y` became the band the bar grows along, so the stack was drawn there, the `y` scale
+  took a `zero` it should not have had and lost its padding, and a marker five units tall came out a
+  full column. One specification in the wild corpus draws its buckets that way; it needs two further
+  fixes to agree, so the count is unchanged.
+
 - **A step is that dimension's own, and a theme may state one dimension and not the other.**
   `getViewConfigDiscreteStep` reads `view.discreteWidth` for `x` and `view.discreteHeight` for `y`;
   `view.step` is the answer only where neither is set, being what `getViewConfigDiscreteSize` falls

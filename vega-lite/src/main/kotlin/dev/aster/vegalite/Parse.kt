@@ -916,8 +916,23 @@ internal class Parse(
     val y = encoding["y"]
 
     if (mark == "bar") {
-      if (x?.bin != null) return "vertical"
-      if (y?.bin != null) return "horizontal"
+      // ```js
+      // if (isFieldDef(x) && (isBinned(x.bin) || (isFieldDef(y) && y.aggregate && !x.aggregate))) {
+      //   return 'vertical';
+      // }
+      // ```
+      //
+      // `isBinned`, and not any bin at all: a column that **arrived** bucketed is a pair of edges
+      // and the bar spans them, which settles the orientation on its own. A bin this chart is
+      // computing settles nothing yet, and the question falls through to the rules below — which
+      // give a plain histogram the same answer anyway, its binned x being no measure and its y one.
+      //
+      // Read as any bin, a bar whose bucketed x was given a second position of its own never
+      // reached the ranged rule: it was called vertical, so the *stack* became its y, its y scale
+      // took a zero it should not have had, and the bar was drawn as a column rather than as the
+      // five-unit marker upstream draws across each bucket.
+      if (x?.isFieldDef == true && x.bin == Binning.PreBinned) return "vertical"
+      if (y?.isFieldDef == true && y.bin == Binning.PreBinned) return "horizontal"
       if (x?.isFieldDef == true && y?.aggregate != null && x.aggregate == null) return "vertical"
       if (y?.isFieldDef == true && x?.aggregate != null && y.aggregate == null) return "horizontal"
     }
