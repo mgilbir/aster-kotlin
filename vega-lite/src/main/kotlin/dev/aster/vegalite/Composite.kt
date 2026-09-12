@@ -287,10 +287,32 @@ internal class Composite(
             it != "${continuous}2" &&
             it != "${continuous}Error" &&
             it != "${continuous}Error2" &&
-            it != "size"
+            it != "size" &&
+            // A **facet** channel is none of the mark's. Upstream normalises a grid into the
+            // operator form before it reaches a composite mark at all, so the cell it hands the
+            // mark has no `row` or `column` in its encoding and there is nothing there to carry:
+            // `errorBarParams` spreads what it is given. This compiler folds the operator form the
+            // other way, and the channel was then carried like any other — named in the tooltip,
+            // where upstream names only what the mark itself draws, and grouped by *first*, where
+            // the facet's own fields are appended to a grouping as the partition walks down past
+            // it.
+            it !in Channels.FACET_CHANNELS
         }
       )
     val shared = extracted.encoding
+    // ```ts
+    // if (child instanceof AggregateNode || ...) {
+    //   child.addDimensions(node.fields);
+    // }
+    // ```
+    //
+    // The grid's own columns are **not** grouped by here. `moveFacetDown` walks the partition down
+    // past the summary and the summary picks the facet's fields up on the way — so the copy that
+    // stands beside the grid groups by them and the copy inside each cell does not, each cell
+    // holding one value of them already. Written into the transform instead, both copies carried
+    // them: the cell's summary grouped by a column it cannot vary, and the two layers' summaries
+    // were no longer the same question, so the grouping was computed once per layer where upstream
+    // computes it once.
     // Rows that already carry their own interval are not summarised, so there is nothing to group.
     val groupby = if (ranged == null) extracted.groupby else emptyList()
 

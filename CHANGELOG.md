@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **A facet channel is none of the composite mark's own.**
+  Upstream normalises a grid into the operator form before a composite mark is reached at all, so
+  the cell it hands the mark has no `row` or `column` in its encoding and there is nothing there to
+  carry. This compiler folds the operator form the other way, and the channel was then carried like
+  any other: the grid's column was named in the tooltip, where upstream names only what the mark
+  itself draws — a reader hovering an interval was told which cell they were in — and it was grouped
+  by, where `moveFacetDown` adds the grid's own columns to a summary as the partition walks down
+  past it and so adds them to the copy beside the grid and not to the copy inside each cell. Written
+  into the transform, both copies carried them: the cell's summary grouped by a column it cannot
+  vary, and the two layers' summaries were no longer the same question, so the grouping was computed
+  once per layer where upstream computes it once. Four specifications in the wild corpus draw an
+  error bar inside a grid; each needs further fixes to agree, so the count is unchanged.
+
 - **A caption the channel nulls is as much the axis's `null` as one the axis block nulls.**
   `mergeTitleComponent` answers `null` for either side of the merge being it, and a layer that says
   its position needs no caption has said so for the axis the layers share. This compiler read the
