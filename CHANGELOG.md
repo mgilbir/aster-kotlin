@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A parse climbs in the order `MoveParseUp` climbs it, and the branches are numbered in that
+  order.** Two things decide the shape it leaves behind. The node depths are measured *once*, before
+  anything moves, so a node is visited at the depth it had then — a parse that has already climbed
+  is visited again from wherever it now is. And the children are walked *as they stand*: a swap
+  empties that list and fills it with the parse's own children, and the iterator carries on at the
+  next index, into what the swap just put there — so a parse among them climbs in the same pass and
+  the branch below it is appended after every other branch. It reads like an accident and it is one,
+  but the dataset numbering follows the order the branches end up in. Written as a recursion that
+  settles each level before the one above it, this compiler numbered such a chart's tables in an
+  order no mark expected: the box plot read the density's table and the density the box plot's. One
+  specification in the wild corpus lays a box plot of instants beside one of numbers that way —
+  **the wild corpus now agrees with upstream on all 1981 of its specifications.**
 - **A summary of the continuous axis is of that axis's kind.** `getCompositeMarkTooltip` types every
   entry of a composite mark's tooltip from the axis it summarises — `type:
   continuousAxisChannelDef.type` — so a box plot of instants reads its quartiles back as dates and a

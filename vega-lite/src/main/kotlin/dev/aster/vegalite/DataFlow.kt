@@ -148,41 +148,109 @@ internal sealed class DataNode {
    * the grandparent, which is where the pointers are.
    */
   fun moveParseUp() {
-    children.forEach { it.moveParseUp() }
-    var moved = true
-    while (moved) {
-      moved = false
-      for ((index, below) in children.withIndex()) {
-        val parse = below.children.singleOrNull() as? ParseNode ?: continue
+    // `BottomUpOptimizer.optimize`: every node in the tree, **deepest first**, in one pass.
+    //
+    // ```js
+    // public optimize(node: DataFlowNode): boolean {
+    //   const depths = this.getNodeDepths(node, 0, new Map());
+    //   const topologicalSort = [...depths.entries()].sort((a, b) => b[1] - a[1]);
+    //   for (const tuple of topologicalSort) {
+    //     this.run(tuple[0]);
+    //   }
+    // ```
+    //
+    // The depths are measured **once**, before anything moves, and a node is then visited at the
+    // depth it had then — so a parse that has already climbed is visited again from wherever it now
+    // is, and one whose parent has moved out from under it climbs from its new place. That is not a
+    // detail: it decides the order the branches below a fork end up in, and the dataset numbering
+    // follows the order. Written as a recursion that settles each level before the one above it,
+    // this compiler let a parse climb in a different sequence and numbered a chart's tables in an
+    // order no mark expected.
+    val parents = LinkedHashMap<DataNode, DataNode>()
+    val order = mutableListOf<Pair<DataNode, Int>>()
+    fun measure(node: DataNode, depth: Int) {
+      order += node to depth
+      for (child in node.children) {
+        parents[child] = node
+        measure(child, depth + 1)
+      }
+    }
+    measure(this, 0)
+    for ((node, _) in order.sortedByDescending { it.second }) {
+      // A root is nobody's child, and a fork is where a parse belongs rather than above.
+      if (node is SourceNode || node.children.size > 1) continue
+      // ```js
+      // for (const child of node.children) {
+      //   if (child instanceof ParseNode) {
+      //     …
+      //     child.swapWithParent();
+      // ```
+      //
+      // Walked **as it stands**, not over a copy. A swap empties the list and fills it with the
+      // parse's own children, and JavaScript's iterator then carries on at the next index — into
+      // the children the swap just put there. So a parse among them is swapped in the same pass,
+      // and the branch below *it* is appended after everything else. It reads like an accident and
+      // it is one, but it is what decides the order the branches below a fork are numbered in.
+      var index = 0
+      while (index < node.children.size) {
+        val child = node.children[index]
+        index++
+        if (child !is ParseNode) continue
         // A parse below a parse is one parse: `node.merge(child)` rather than a swap. The two are
         // only ever chained because this compiler brought them together — one lifted out of a
         // branch to meet the one already there — and leaving them chained wrote the second as a
         // formula over a column the first had already read.
-        if (below is ParseNode) {
-          below.parse.putAll(parse.parse)
-          below.children.clear()
-          below.children += parse.children
-          parse.children.clear()
-          moved = true
+        if (node is ParseNode) {
+          node.parse.putAll(child.parse)
+          val at = node.children.indexOf(child)
+          node.children.removeAt(at)
+          node.children.addAll(at, child.children)
+          child.children.forEach { parents[it] = node }
+          child.children.clear()
           continue
         }
         // A parse cannot climb past a step that produces what it reads — and a *nested* parse
         // reads the whole path, so a step producing `argmax_US_Gross` blocks a parse of
         // `argmax_US_Gross['Production Budget']` even though the two names differ.
-        val roots = parse.parse.keys.map { Fields.splitAccessPath(it).first() }.toSet()
-        if (below.producedFields().any { it in parse.parse.keys || it in roots }) continue
+        val roots = child.parse.keys.map { Fields.splitAccessPath(it).first() }.toSet()
+        if (node.producedFields().any { it in child.parse.keys || it in roots }) continue
         // A step whose outputs are **unknown** blocks every parse: a `pivot` turns a column of
         // categories into a column each, so nothing above it can say what the table will hold.
         // `PivotTransformNode.producedFields` answers `undefined` for exactly this reason, and the
         // parse then stays below it and is written as formulas rather than as `format.parse`.
-        if (below.producesUnknownFields()) continue
-        val above = parse.children.toList()
-        parse.children.clear()
-        below.children.clear()
-        below.children += above
-        parse.children += below
-        children[index] = parse
-        moved = true
+        if (node.producesUnknownFields()) continue
+        val above = parents[node] ?: continue
+        // ```js
+        // public swapWithParent() {
+        //   const parent = this._parent;
+        //   const newParent = parent.parent;
+        //   for (const child of this._children) {
+        //     child.parent = parent;
+        //   }
+        //   this._children = [];
+        //   parent.removeChild(this);
+        //   const loc = parent.parent.removeChild(parent);
+        //   this._parent = newParent;
+        //   newParent.addChild(this, loc);
+        //   parent.parent = this;
+        // }
+        // ```
+        //
+        // The parse's own children are **appended** to the step it climbed past, after whatever
+        // that step already held; the parse then takes that step's place among its siblings and the
+        // step hangs below it.
+        for (grandchild in child.children) {
+          node.children += grandchild
+          parents[grandchild] = node
+        }
+        child.children.clear()
+        node.children.remove(child)
+        val at = above.children.indexOf(node)
+        above.children.removeAt(at)
+        above.children.add(at, child)
+        parents[child] = above
+        child.children += node
+        parents[node] = child
       }
     }
   }
