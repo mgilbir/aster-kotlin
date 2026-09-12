@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **Two members share a projection when they agree on what it is, not on where it was put.**
+  `mergeIfNoConflict` walks `PROJECTION_PROPERTIES` and no other, and that list is what a projection
+  *is* — its kind, its centre, its rotation — not `scale` and `translate`, which are where the map
+  was placed on the page. Two layers of one map that state the same kind and place it differently
+  are one projection, and the first of them settles the placing. Compared over the whole
+  specification instead, such layers were two projections: each was written out, each mark read its
+  own, and the outlines drawn over a map were placed by a projection the map underneath knew nothing
+  about — two readings of one country at two sizes, one on top of the other. Two specifications in
+  the wild corpus layer a map that way, and agreement with upstream goes from 1963 to 1965 of 1981.
+
 - **A table already standing is found rather than made, and a name is what finds it.**
   `findSource` decides what makes two mentions the same table, and it is not that they were written
   the same way: a dataset given a `name` is that name's, so a view that says `{"name": "places"}`

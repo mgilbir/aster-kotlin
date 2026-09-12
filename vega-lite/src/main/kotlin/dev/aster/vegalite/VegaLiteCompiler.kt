@@ -1732,6 +1732,31 @@ private class Compilation(
    * The sizes have to agree too, which here is whether each is **fitted**: a projection that states
    * its own `scale` or `translate` has been placed by hand and has no size to compare.
    */
+  /**
+   * `PROJECTION_PROPERTIES`: what a projection **is**, as against where it was put.
+   *
+   * ```js
+   * export const PROJECTION_PROPERTIES = [
+   *   'type', 'clipAngle', 'clipExtent', 'center', 'rotate', 'precision', 'reflectX', 'reflectY',
+   *   'coefficient', 'distance', 'fraction', 'lobes', 'parallel', 'radius', 'ratio', 'spacing',
+   *   'tilt',
+   * ];
+   * ```
+   *
+   * `mergeIfNoConflict` walks that list and no other, so `scale` and `translate` — where the map
+   * was placed on the page — say nothing about whether two members are drawing the same projection.
+   * Two layers of one map that state the same kind and place it differently are one projection, and
+   * the first of them settles the placing.
+   *
+   * Compared over the whole specification instead, such layers were two projections: each was
+   * written out, each mark read its own, and the outlines drawn over a map were placed by a
+   * projection the map underneath knew nothing about.
+   */
+  private fun sharesProjectionProperties(first: VegaValue.Obj, second: VegaValue.Obj): Boolean =
+    PROJECTION_PROPERTIES.all { property ->
+      first.fields[property] == second.fields[property]
+    }
+
   private fun agreedProjection(views: List<UnitView>): Pair<UnitView, VegaValue.Obj>? {
     fun fitted(spec: VegaValue.Obj) =
       spec.fields["scale"] == null && spec.fields["translate"] == null
@@ -1741,7 +1766,7 @@ private class Compilation(
       val own = view.projection ?: return null
       if (fitted(merged) != fitted(own)) return null
       when {
-        merged.fields == own.fields -> Unit
+        sharesProjectionProperties(merged, own) -> Unit
         merged.fields.isEmpty() -> {
           winner = view
           merged = own
@@ -4932,6 +4957,28 @@ private class Compilation(
     }
 
   private companion object {
+    /** The properties `mergeIfNoConflict` compares — see [sharesProjectionProperties]. */
+    val PROJECTION_PROPERTIES =
+      listOf(
+        "type",
+        "clipAngle",
+        "clipExtent",
+        "center",
+        "rotate",
+        "precision",
+        "reflectX",
+        "reflectY",
+        "coefficient",
+        "distance",
+        "fraction",
+        "lobes",
+        "parallel",
+        "radius",
+        "ratio",
+        "spacing",
+        "tilt",
+      )
+
     /**
      * Vega-Lite 6's top-level properties, and the one metadata key that is not one.
      *
