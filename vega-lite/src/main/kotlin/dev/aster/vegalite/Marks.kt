@@ -2434,12 +2434,15 @@ internal object Marks {
     scaleType: String?,
     centred: Boolean,
   ): VegaValue {
-    if (view.stack != null && channel == view.stack.fieldChannel) {
-      return obj {
-        put("scale", scaleName(view, channel))
-        put("field", Fields.vgField(def, suffix = "end"))
-      }
-    }
+    // `positionAndSize` places the mark with `midPointRefWithPositionInvalidTest`, and `midPoint`
+    // is handed the stack only so that an **imputed** bin can be read by its middle: nowhere in it
+    // does a stack put an `_end` on the column. The two ends of a stack are written by
+    // `rangePosition`, which is where a channel a mark *grows* along is settled.
+    //
+    // So a channel the mark does not grow along reads the column as it stands, stack or no stack.
+    // Suffixed here as well, a bar turned by a bucketed position — one that spans its two ends
+    // along the other axis and so is only a marker along this one — was placed at the top of a
+    // total it is no part of, which on a single row is the same place and on several is not.
     if (!def.isFieldDef && def.datum == null) return midPoint(view, channel, def, scaleType)
     return obj {
       put("scale", scaleName(view, channel))

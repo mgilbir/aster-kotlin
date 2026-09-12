@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A channel the mark does not grow along reads its column as it stands, stack or no stack.**
+  `positionAndSize` hands `midPoint` the stack, but only so that an imputed bin can be read by its
+  middle: nowhere in that function does a stack put an `_end` on the column. The two ends of a stack
+  are written by `rangePosition`, which is where a channel a mark grows along is settled. Suffixed
+  in both places, a bar turned by a bucketed position — one that spans its two ends along the other
+  axis, and so is only a five-unit marker along this one — was placed at the top of a total it is no
+  part of; on a single row that is the same place, on several it is not. One specification in the
+  wild corpus draws its buckets that way, and agreement with upstream goes from 1944 to 1945 of
+  1981.
+
 - **A ranged position's two ends are unioned above the per-channel domain, not instead of it.**
   `parseDomainForChannel` merges whatever the channel's own domain came out as with whatever its
   second channel's did. This compiler read the union as one of the per-channel shapes, so it stood
