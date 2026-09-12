@@ -3027,6 +3027,16 @@ private class Compilation(
             transforms = view.spec.transforms,
             width = view.spec.width,
             height = view.spec.height,
+            // Lifting a facet takes the facet **channels** out of the encoding and nothing else:
+            // `mapFacetedUnit` moves the mark and the encoding down into the cell as they stand,
+            // and the cell is the same unit it always was. Rebuilding the specification without
+            // what the view declared left the cell a stranger to its own parameters — a selection
+            // declared inside a grid belonged to no view, so every mark in the cell was reachable
+            // by the pointer whether or not it was the one that declared it — and to its own
+            // projection, so a map drawn in a cell was put on the page by whatever the chart above
+            // it said instead.
+            params = view.spec.params,
+            projection = view.spec.projection,
             // A cell has a plotting area of its own, so what the view block says about styling it
             // is the cell's — `assembleGroupStyle` is asked of the child model, which is this one.
             viewBackground = view.spec.viewBackground,

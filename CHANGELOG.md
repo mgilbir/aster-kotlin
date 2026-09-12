@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A view lifted into a cell keeps everything it said but the facet itself.** `mapFacetedUnit`
+  moves the unit down into the cell as the unit it was; only the facet channels are taken out of its
+  encoding. This compiler rebuilt the cell's specification property by property and left two of them
+  behind. Its **parameters**: a selection declared inside a grid then belonged to no view, and
+  `interactiveFlag` — which writes `interactive: false` on a mark whose view declared none, so a
+  click there falls through to the view that did — found every mark in the cell claiming it, so
+  whichever was drawn last swallowed the click. And its **projection**: a map drawn in a cell was
+  put on the page by whatever the chart above it said rather than by what the cell said itself, so
+  naming a projection inside a grid did nothing. One specification in the wild corpus declares a
+  selection in a layer inside a grid.
 - **Two members share a projection when they agree on what it is, not on where it was put.**
   `mergeIfNoConflict` walks `PROJECTION_PROPERTIES` and no other, and that list is what a projection
   *is* — its kind, its centre, its rotation — not `scale` and `translate`, which are where the map
