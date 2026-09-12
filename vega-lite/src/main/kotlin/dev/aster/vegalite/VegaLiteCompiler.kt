@@ -1038,8 +1038,14 @@ private class Compilation(
       // The **outermost** level's values stand beside the plot's table; a level inside one breaks
       // that level's partition down further, so its values are computed inside that level's cell.
       val current = plot.facets.first()
+      // Asked of the **plot's own** resolve, which is the same reading `assembleFacetMarks` uses to
+      // decide which bands to draw. The two have to agree: a band reads the counting sequence these
+      // datasets carry, and one drawn without them names a dataset the chart never wrote.
+      val here = resolveFor(plot.views)
       val bands =
-        plot.axes.filter { (it["grid"] as? VegaValue.Bool)?.value != true && !cellOwnsAxis(it) }
+        plot.axes.filter {
+          (it["grid"] as? VegaValue.Bool)?.value != true && !cellOwnsAxis(it, here)
+        }
       val across = bands.filter { it.string("orient") == "bottom" || it.string("orient") == "top" }
       val reads = plot.reads ?: plot.views.first().mainData
       val domains =
@@ -1158,7 +1164,13 @@ private class Compilation(
             .distinctBy { it.name }
             .sortedByDescending { views.indexOf(it.owner) }
             .map {
-              it.storeData(it.owner ?: views.firstOrNull(), it.initial, timeZone, facet)
+              val where = it.owner ?: views.firstOrNull()
+              // The grid the declaring view is a **cell of**, which for a plot of a concatenation
+              // is that plot's rather than the chart's — the chart has none. A row the store opens
+              // with names the cell it was picked in, and named with the cell's bare name it was a
+              // pick in no cell at all: the brush a faceted plot opened with belonged to nothing.
+              val grid = facet ?: where?.let { view -> plotOfView(view)?.facet }
+              it.storeData(where, it.initial, timeZone, grid)
             } + data
         ),
       )
@@ -3523,13 +3535,7 @@ private class Compilation(
     // the chart's speaks about the plots beside each other, and this question is about the cells
     // inside one of them.
     val here = resolveFor(views)
-    fun cellsOwn(axis: VegaValue): Boolean =
-      setOf("x", "y").any { channel ->
-        here.guideIsIndependent(
-          channel,
-          here.scaleIsIndependent(channel, defaultIndependent = channel == "theta"),
-        ) && axis.string("scale")?.endsWith(channel) == true
-      }
+    fun cellsOwn(axis: VegaValue): Boolean = cellOwnsAxis(axis, here)
     val gridAxes = axes.filter { (it["grid"] as? VegaValue.Bool)?.value == true || cellsOwn(it) }
     val mainAxes = axes.filter { (it["grid"] as? VegaValue.Bool)?.value != true && !cellsOwn(it) }
     val horizontal = mainAxes.filter {
@@ -4747,6 +4753,25 @@ private class Compilation(
   private fun cellOwnsAxis(axis: VegaValue, ofFacet: Boolean = concat == null): Boolean =
     setOf("x", "y").any { channel ->
       guideIsIndependent(channel, ofFacet) && axis.string("scale")?.endsWith(channel) == true
+    }
+
+  /**
+   * The same question asked of a **plot's own** `resolve` — the grid inside one plot of a chart.
+   *
+   * `parseGuideResolve` is asked of the model the grid belongs to, and for a faceted plot of a
+   * concatenation that is the facet: its cells share their positions, whatever the plots beside it
+   * do about theirs. Asked of the chart's resolve instead, every position axis of such a plot
+   * looked like a cell's own — the concatenation's default for `x` and `y` being independent — so
+   * the grid was credited with no shared band at all and counted **no cells**. The bands were still
+   * drawn, from `assembleFacetMarks`, which asks the plot's own resolve: they read a sequence
+   * dataset nothing had written, and Vega refuses a chart that names a dataset it was never given.
+   */
+  private fun cellOwnsAxis(axis: VegaValue, within: Resolve): Boolean =
+    setOf("x", "y").any { channel ->
+      within.guideIsIndependent(
+        channel,
+        within.scaleIsIndependent(channel, defaultIndependent = channel == "theta"),
+      ) && axis.string("scale")?.endsWith(channel) == true
     }
 
   private fun guideIsIndependent(channel: String, ofFacet: Boolean = concat == null): Boolean =

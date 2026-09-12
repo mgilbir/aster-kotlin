@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A grid that belongs to a plot is answered by that plot, not by the chart above it.** Two
+  questions were asked of the chart. *Which axes stand in a band beside the grid*:
+  `parseGuideResolve` is asked of the model the grid belongs to, and a facet's cells share their
+  positions whatever the plots beside it do about theirs. Asked of the chart — a concatenation
+  resolving `x` and `y` independently by default — every position axis of a faceted plot looked like
+  a cell's own, so the grid counted no cells and its `facet_domain_row` and `facet_domain_column`
+  sequences went unwritten; the bands were still drawn, from `assembleFacetMarks`, which does ask
+  the plot's own resolve, and they read a dataset nothing had written. Vega refuses a chart that
+  names a dataset it was never given, so it did not render at all. *Which grid a selection's view is
+  a cell of*: `unitName(model, {escape: false})` writes the cell's name and the values that cell
+  holds, and named with the bare cell name a faceted plot that opened with a brush had that brush
+  belong to no cell. One specification in the wild corpus grids a plot of a concatenation.
 - **A brush is drawn around the marks of the model that assembles it, once per unit that carries
   the selection.** A unit inside a layer does not wrap its own marks: `assembleLayerSelectionMarks`
   wraps for it, around everything that layer assembled, and only for the children that are *units* —
