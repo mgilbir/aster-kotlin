@@ -2360,7 +2360,9 @@ internal object Marks {
               signalRef("${canonicalNumberString(1 - padding)} * $sizeChannel")
             }
             discreteBandSize != null -> obj { put("value", discreteBandSize) }
-            else -> obj { put("value", view.config.step - 2) }
+            // `const defaultStep = getViewConfigDiscreteStep(config.view, sizeChannel)` — the step
+            // of the dimension this mark is being sized along, not whichever `view.step` is.
+            else -> obj { put("value", view.config.discreteStep(sizeChannel!!) - 2) }
           }
         }
       }

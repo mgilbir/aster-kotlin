@@ -773,19 +773,25 @@ internal object Scales {
             )
           )
         }
+        val size = if (position == "x") "width" else "height"
         val declared = if (position == "x") view.spec.width else view.spec.height
-        // `getDiscretePositionSize`: an undeclared size is *already* a step — the configured one —
-        // so the ordinary grouped bar takes that branch, and only a size stated as a **number**
-        // leaves the offset nothing to grow by.
+        // `getDiscretePositionSize`: an undeclared size is the **theme's** size for this dimension,
+        // which is a step unless the theme states a depth — so the ordinary grouped bar takes that
+        // branch, and only a size that is a number leaves the offset nothing to grow by. The theme
+        // may state one dimension as a depth and leave the other a step, and this reads the one it
+        // is sizing: a themed depth was taken for the configured step, and the offset then asked
+        // for a band inside a plot that had no bands.
         val stated = declared as? VegaValue.Obj
-        val step =
-          stated?.number("step") ?: (declared as? VegaValue.Num)?.let { null } ?: view.config.step
+        val themedDepth =
+          if (position == "x") view.config.discreteWidth else view.config.discreteHeight
+        val step = stated?.number("step") ?: view.config.discreteStep(size)
         // `getStepFor`: a stated step is the **offset's** only where the offset scale is discrete.
         // A continuous one — a jitter over `random()` — has no bands to be one step each, so the
         // step sizes the outer band and the offset fills whatever that came out as.
         val offsetIsDiscrete = hasDiscreteDomain(type)
         val stepFor = if (offsetIsDiscrete) stated?.string("for") ?: "offset" else "position"
-        if (declared is VegaValue.Num || stepFor != "offset") {
+        val isDepth = declared is VegaValue.Num || (declared == null && themedDepth != null)
+        if (isDepth || stepFor != "offset") {
           arr(listOf(num(0.0), signalRef("bandwidth('${view.scale(position)}')")))
         } else {
           obj { put("step", num(step)) }
@@ -965,8 +971,16 @@ internal object Scales {
   private const val MAX_SIZE_RANGE_STEP_RATIO = 0.95
 
   private fun stepFor(view: UnitView, size: String): Double {
+    // ```js
+    // const widthStep = isStep(size.width) ? size.width.step :
+    // getViewConfigDiscreteStep(viewConfig, 'width');
+    // ```
+    //
+    // `minXYStep` asks each dimension for **its own** step, and the theme may have stated one and
+    // not the other. This read `view.step` for both, so a document that spaces its bars along one
+    // axis and not the other sized its points by the wrong one.
     val declared = if (size == "width") view.spec.width else view.spec.height
-    return (declared as? VegaValue.Obj)?.number("step") ?: view.config.step
+    return (declared as? VegaValue.Obj)?.number("step") ?: view.config.discreteStep(size)
   }
 
   /**

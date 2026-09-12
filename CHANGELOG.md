@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **A step is that dimension's own, and a theme may state one dimension and not the other.**
+  `getViewConfigDiscreteStep` reads `view.discreteWidth` for `x` and `view.discreteHeight` for `y`;
+  `view.step` is the answer only where neither is set, being what `getViewConfigDiscreteSize` falls
+  back to. This compiler read `view.step` and nothing else, so a document that spaces its bars
+  thirty units apart drew them twenty — and every reader of a step reads it: the position scale's
+  own, the arithmetic a grouped bar's band is widened by, the offset scale's range, the largest a
+  sized point may be, and the width a rect takes where nothing else settles one. Where the themed
+  size is a plain number the step is `DEFAULT_STEP` and not `view.step`, `isStep` being false once
+  the fallback has been passed; that is upstream's own reading, and it shows in the one reader that
+  asks for a step whether or not either dimension is sized by one. No specification in the wild
+  corpus themes a step: this was found by reading `getViewConfigDiscreteStep`'s callers beside this
+  compiler's.
+
 - **A discrete position is sized by a step only where the theme leaves it to one.**
   `defaultUnitSize` takes the themed discrete size for a discrete domain and calls it a step only
   where that size is itself a step; `getViewConfigDiscreteSize` reads `view.height` before

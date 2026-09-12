@@ -110,7 +110,7 @@ internal class Config(
   val continuousHeight: Double = view.number("height") ?: view.number("continuousHeight") ?: 300.0
 
   /** One discrete step, from which a band-scaled plot's whole width is computed. */
-  val step: Double = view.number("step") ?: 20.0
+  val step: Double = view.number("step") ?: DEFAULT_STEP
 
   /**
    * `view.discreteWidth`/`discreteHeight`: how deep a plot is along a channel with **no scale**.
@@ -122,6 +122,35 @@ internal class Config(
   val discreteWidth: Double? = view.number("width") ?: view.number("discreteWidth")
 
   val discreteHeight: Double? = view.number("height") ?: view.number("discreteHeight")
+
+  /**
+   * `getViewConfigDiscreteStep`: the step **that channel's** own themed size comes to.
+   *
+   * ```js
+   * export function getViewConfigDiscreteStep(viewConfig, channel) {
+   *   const size = getViewConfigDiscreteSize(viewConfig, channel);
+   *   return isStep(size) ? size.step : DEFAULT_STEP;
+   * }
+   * ```
+   *
+   * A theme may state a step for one dimension and leave the other alone, and every reader asks the
+   * dimension it is sizing: `view.discreteWidth` answers for `x` and `view.discreteHeight` for `y`.
+   * `view.step` is the answer only where neither is set — it is what `getViewConfigDiscreteSize`
+   * falls back to — so a theme that states one was being ignored, and a document whose bars are
+   * thirty units apart drew them twenty.
+   *
+   * Where the themed size is a plain **number** the answer is `DEFAULT_STEP` and not `view.step`:
+   * `isStep` is false and the fallback has already been passed. It is upstream's own reading and it
+   * is what upstream emits. Most readers never see it — a themed depth is not a step at all, so
+   * they are not asking — but the `size` scale's largest point is bounded by the *smaller* of the
+   * two steps whether or not either sizes a scale, and there it shows.
+   */
+  fun discreteStep(size: String): Double {
+    val themed =
+      view.fields[size] ?: view.fields[if (size == "width") "discreteWidth" else "discreteHeight"]
+    if (themed == null) return step
+    return (themed as? VegaValue.Obj)?.number("step") ?: DEFAULT_STEP
+  }
 
   private val view: VegaValue.Obj
     get() = user.obj("view") ?: VegaValue.EmptyObject
@@ -399,6 +428,9 @@ internal class Config(
   }
 
   private companion object {
+    /** `DEFAULT_STEP`: one discrete step where nothing at all says otherwise. */
+    const val DEFAULT_STEP = 20.0
+
     /** Keys Vega has no use for: this compiler has already applied them, or they mean nothing. */
     /**
      * `VL_ONLY_MARK_SPECIFIC_CONFIG_PROPERTY_INDEX`: what each *kind* of mark loses on top.

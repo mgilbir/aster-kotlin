@@ -74,6 +74,10 @@ internal class LayoutSize(
       val scaleName = scale?.name() ?: "$scalePrefix$channel"
       val discrete = scale != null && (scale.type == "band" || scale.type == "point")
       val step = (declared as? VegaValue.Obj)?.number("step")
+      // `getDiscretePositionSize` falls to the theme's size for **this dimension**, and the step it
+      // comes to is that dimension's own: `view.discreteWidth` answers for `x` and
+      // `view.discreteHeight` for `y`, `view.step` only where neither is set.
+      val themedStep = config.discreteStep(if (channel == "x") "width" else "height")
       // `{"step": 50, "for": "position"}` — the step belongs to the *outer* band, not to one mark
       // inside it. `getPositionStep` reads the `for` and hands the step straight to the position,
       // so the nested arithmetic below is skipped and the offset scale divides whatever band the
@@ -124,7 +128,7 @@ internal class LayoutSize(
               if (offset == null || stepForPosition) {
                 obj {
                   put("name", "${scaleName}_step")
-                  put("value", step ?: config.step)
+                  put("value", step ?: themedStep)
                 }
               } else {
                 val nestedInner =
@@ -137,7 +141,7 @@ internal class LayoutSize(
                     "update",
                     // `bandspace` counts the *bands* a padded band scale needs; a **point** scale
                     // has no bands, only places, so the count is the domain's own length.
-                    "${number(step ?: config.step)} * " +
+                    "${number(step ?: themedStep)} * " +
                       (if (offset.type == "point") "domain('${offset.name()}').length"
                       else
                         "bandspace(domain('${offset.name()}').length, " +
