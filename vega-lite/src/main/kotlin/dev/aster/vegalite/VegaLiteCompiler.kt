@@ -1193,7 +1193,12 @@ private class Compilation(
       // the level that owns it rather than before.
       val scales =
         allScales.values
-          .sortedBy { levelOfScale(it.name(), it.channel) }
+          // A level's **own** scale stands before one named for something inside it: upstream
+          // assembles a model's own components and only then recurses, so a plot that resolves its
+          // `y` writes that before the layers below it write the `x` they could not share.
+          .sortedWith(
+            compareBy({ levelOfScale(it.name(), it.channel) }, { depthOfScale(it.name()) })
+          )
           // A facet's independently resolved scales are built inside its cells, where the rows
           // they measure are, so they are not written beside the grid as well.
           .filterNot { facet != null && concat == null && it.name() != prefixed(it.channel) }
@@ -1259,9 +1264,8 @@ private class Compilation(
     // across the grid.
     // A channel whose children disagree about the *kind* of scale it is resolves independently
     // whatever the resolve says, because there is no one scale for them to share.
-    if (channel in incompatibleChannels) {
-      val owner = independenceOwner(view)
-      return if (owner.isEmpty()) channel else "${owner}_$channel"
+    forcedScaleOwners[view to channel]?.let { owner ->
+      return if (owner.isEmpty()) channel else Fields.varName("${owner}_$channel")
     }
     val independent =
       resolve.scaleIsIndependent(
@@ -1375,6 +1379,9 @@ private class Compilation(
    * `concat_1_concat_0_x` belongs to the plot and `concat_1_color` to the row above it, and a scale
    * still called by its plain channel belongs to the chart.
    */
+  /** How far below its level a scale's name reaches, which orders two scales of one level. */
+  private fun depthOfScale(name: String): Int = name.count { it == '_' }
+
   private fun levelOfScale(name: String, channel: String): Int {
     // The chart's own, which stands before every level of it.
     if (name == prefixed(channel)) return -1
@@ -1445,18 +1452,41 @@ private class Compilation(
       .toMap()
   }
 
-  /** Channels whose views disagree about the scale type, and so cannot share one. */
-  private val incompatibleChannels = mutableSetOf<String>()
+  /**
+   * What a channel a disagreement forced apart is called, per view — see [findIncompatibleScales].
+   */
+  private val forcedScaleOwners = mutableMapOf<Pair<UnitView, String>, String>()
 
   /**
-   * `parseNonUnitScaleCore`: a shared channel is forced independent when the types cannot merge.
+   * `parseNonUnitScaleCore`: a shared channel is forced independent **at the level whose children
+   * disagree**, and nowhere else.
    *
-   * The check is per **name**, not per channel outright: a concatenation that already resolves `x`
-   * per plot has nothing to disagree about, and two layers that would share a colour scale — one a
-   * ramp over counts, one a pair of named colours — have everything.
+   * ```js
+   * if (scaleCompatible(explicitScaleType.value, childScaleType.value)) {
+   *   scaleTypeWithExplicitIndex[channel] = mergeValuesWithExplicit(...);
+   * } else {
+   *   resolve.scale[channel] = 'independent';
+   *   delete scaleTypeWithExplicitIndex[channel];
+   * }
+   * ```
+   *
+   * The check runs per model, bottom-up. A model whose children disagree marks the channel
+   * independent and offers nothing upward, so the level *above* has nothing to merge and leaves the
+   * names its children settled on. Two layers inside one plot of a concatenation are where it
+   * tells: a colour ramp over counts beside a pair of named colours cannot be one scale, the layer
+   * model says so, and each layer keeps `concat_0_layer_0_color` — while the concatenation above,
+   * whose other plot agrees with itself, is none the wiser.
+   *
+   * Asked of the whole chart at once and answered with the *plot* that holds the disagreement, such
+   * a chart came out with one colour scale for the plot rather than one per layer: two layers
+   * measuring different things were drawn from one scale that is neither, and the key beside them
+   * explained a scale nothing is drawn with.
+   *
+   * The check is per **name** to begin with, not per channel outright: a concatenation that already
+   * resolves `x` per plot has nothing to disagree about.
    */
   private fun findIncompatibleScales(views: List<UnitView>) {
-    val byName = mutableMapOf<String, MutableList<Pair<String, String>>>()
+    val byName = LinkedHashMap<String, MutableList<Triple<UnitView, String, String>>>()
     for (view in views) {
       for ((channel, def) in view.scaledChannels()) {
         val type =
@@ -1466,15 +1496,62 @@ private class Compilation(
             view.spec.mark,
             hasOffset = offsetChannelFor(channel)?.let { view.spec.encoding[it] != null } == true,
           )
-        byName.getOrPut(scaleName(view, channel)) { mutableListOf() } += channel to type
+        byName.getOrPut(scaleName(view, channel)) { mutableListOf() } += Triple(view, channel, type)
       }
     }
-    for ((_, entries) in byName) {
-      val types = entries.map { it.second }
-      if (types.any { one -> types.any { !Scales.compatible(one, it) } }) {
-        incompatibleChannels += entries.first().first
-      }
+    for ((_, entries) in byName) forceApart(entries, prefix = "")
+  }
+
+  /**
+   * The type one level offers the level above, or null where its children could not agree.
+   *
+   * Walked a name at a time, because the names are the tree: `concat_1_layer_0_layer_2` is a layer
+   * of a layer of a plot, and each step of the name is a model upstream asked the question of. The
+   * walk is **bottom-up**, as `parseNonUnitScaleCore` is: a level whose children disagree names
+   * each of them after itself and offers nothing upward, so the level above has nothing to merge
+   * from it and goes on merging the children that did agree. A plot whose two layers cannot share a
+   * colour therefore takes no colour scale of its own, and the plot beside it keeps the chart's.
+   */
+  private fun forceApart(entries: List<Triple<UnitView, String, String>>, prefix: String): String? {
+    if (entries.size == 1) return entries.single().third
+    val groups = LinkedHashMap<String, MutableList<Triple<UnitView, String, String>>>()
+    for (entry in entries) {
+      // Nowhere further to go: what disagrees is one model, which upstream cannot split either.
+      val step = nextLevel(entry.first.name, prefix) ?: return entries.first().third
+      groups.getOrPut(step) { mutableListOf() } += entry
     }
+    val offered = groups.map { (step, members) ->
+      val owner = if (prefix.isEmpty()) step else "${prefix}_$step"
+      Triple(owner, members, forceApart(members, owner))
+    }
+    val types = offered.mapNotNull { it.third }
+    // Everything still on offer agrees, so this level merges it and nothing is forced apart here.
+    if (types.all { one -> types.all { Scales.compatible(one, it) } }) return types.firstOrNull()
+    for ((owner, members, type) in offered) if (type != null) assign(members, owner)
+    return null
+  }
+
+  private fun assign(entries: List<Triple<UnitView, String, String>>, owner: String) {
+    for ((view, channel, _) in entries) forcedScaleOwners[view to channel] = owner
+  }
+
+  /**
+   * The next step of a view's name below [prefix], or null where the name ends there.
+   *
+   * A step is a word and, where one follows it, the number that numbers it: `concat_0`, `layer_1`,
+   * `child`. A name a specification gave itself is one word, which is one step.
+   */
+  private fun nextLevel(name: String, prefix: String): String? {
+    val rest =
+      when {
+        prefix.isEmpty() -> name
+        name == prefix -> return null
+        else -> name.removePrefix("${prefix}_").takeIf { it != name } ?: return null
+      }
+    if (rest.isEmpty()) return null
+    val tokens = rest.split("_")
+    val numbered = tokens.size > 1 && tokens[1].isNotEmpty() && tokens[1].all { it.isDigit() }
+    return tokens.take(if (numbered) 2 else 1).joinToString("_")
   }
 
   /**

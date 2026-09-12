@@ -8,6 +8,20 @@ section here does not get released.
 
 ### Fixed
 
+- **A channel whose children disagree is forced apart at the level that found the disagreement.**
+  `parseNonUnitScaleCore` runs per model, bottom-up: a model whose children disagree marks the
+  channel independent and offers nothing upward, so the level above has nothing to merge from it and
+  goes on merging the children that did agree. Two layers inside one plot of a concatenation are
+  where it tells — a colour ramp over counts beside a pair of named colours cannot be one scale, the
+  layer model says so, and each layer keeps `concat_0_layer_0_color`, while the other plot's colour
+  is still the chart's own. Asked of the whole chart at once and answered with the plot, such a chart
+  came out with one colour scale for the plot: two layers measuring different things drawn from a
+  scale that is neither, and a key beside them explaining a scale nothing is drawn with. A scale is
+  placed where it is named, so a level's own now stands before one named for something inside it —
+  `assembleScales` writes a model's own components and only then recurses. Five specifications in
+  the wild corpus layer scales that cannot merge, and agreement with upstream goes from 1955 to 1960
+  of 1981.
+
 - **A join names its table before a child of the chart names one.**
   `parseData` parses a model's transforms where it stands — `parseTransformArray` runs on the
   model's own list and `LookupNode.make` gives the joined table a root of its own there — and only
