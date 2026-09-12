@@ -2903,6 +2903,12 @@ private class Compilation(
 
     return views.map { view ->
       val withoutFacet = view.spec.encoding.filterKeys { it !in Channels.FACET_CHANNELS }
+      val cellName =
+        Fields.varName(
+          listOf(named, "child", view.name.removePrefix(named).trimStart('_'))
+            .filter { it.isNotEmpty() }
+            .joinToString("_")
+        )
       UnitView(
           UnitSpec(
             markDef = view.spec.markDef,
@@ -2919,18 +2925,30 @@ private class Compilation(
           // `child` under the chart's own name and above the layer's: a named trellis of layers
           // reads `trellis_child_layer_0`, because the name belongs to the model the cell hangs
           // from and the layer's index to the view inside it.
-          Fields.varName(
-            listOf(named, "child", view.name.removePrefix(named).trimStart('_'))
-              .filter { it.isNotEmpty() }
-              .joinToString("_")
-          ),
+          cellName,
           parentIsLayer = view.parentIsLayer,
         )
         .also {
           // A transform still belongs to the model it was written on. The facet's own are the
           // *facet model's*, whatever the cell is called, and that is what says they stand above
           // the partition rather than being rebuilt inside every cell.
-          it.transformOwners = view.transformOwners
+          //
+          // A model that is **renamed** still owns what it owned, though. The view becomes
+          // `child_layer_1` here, and a transform its own expansion wrote — a composite mark's
+          // bounds, written once above the parts it expands into — was still credited to
+          // `layer_1`, so the renamed view no longer recognised it as its own and left it to an
+          // ancestor that had never heard of it. It was then written nowhere at all: an error bar
+          // inside a grid filtered on columns no step computes, which is every row, so the
+          // intervals were not drawn.
+          //
+          // Only where the view **has** a name of its own. A chart written with the `column`
+          // shorthand is one view and the chart at once, and its transforms are the chart's:
+          // `owning` credits them to the empty name, which is the name the cell was renamed from,
+          // and renaming those would make the grid's own steps the cell's.
+          it.transformOwners =
+            view.transformOwners.map { owner ->
+              if (view.name.isNotEmpty() && owner == view.name) cellName else owner
+            }
           it.widthSignal = through("child_width")
           it.heightSignal = through("child_height")
           it.ownsSource = view.ownsSource

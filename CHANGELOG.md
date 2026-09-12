@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **A model that is renamed still owns what it owned.**
+  A transform belongs to the model it was written on, and a grid's own stand above the partition
+  whatever the cell below is called — but a cell is *renamed* as it is built, `layer_1` becoming
+  `child_layer_1`, and a transform the view's own expansion wrote was still credited to the name it
+  had before. The renamed view then did not recognise its own step as its own and left it to an
+  ancestor that had never heard of it, so it was written nowhere at all. An error bar inside a grid
+  is where it tells: its bounds are two `calculate`s written once above the parts it expands into,
+  and without them the layer filtered on columns no step computes — which is every row, so no
+  interval was drawn. Only a view with a name of its own is renamed this way: a chart written with
+  the `column` shorthand is one view and the chart at once, and its transforms are the grid's. Four
+  specifications in the wild corpus draw their error bars inside a grid, and agreement with upstream
+  goes from 1948 to 1952 of 1981.
+
 - **A facet channel is none of the composite mark's own.**
   Upstream normalises a grid into the operator form before a composite mark is reached at all, so
   the cell it hands the mark has no `row` or `column` in its encoding and there is nothing there to
