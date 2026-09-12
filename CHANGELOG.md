@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **A discrete position is sized by a step only where the theme leaves it to one.**
+  `defaultUnitSize` takes the themed discrete size for a discrete domain and calls it a step only
+  where that size is itself a step; `getViewConfigDiscreteSize` reads `view.height` before
+  `view.discreteHeight` and answers a `{step: …}` only where the answer is one. So a theme that
+  states a plain depth settles every strip in the document at that depth, however many categories it
+  holds. This compiler wrote the depth out but went on calling it a step behind the theme's back,
+  and it is a concatenation that asks: `parseNonUnitLayoutSizeForChannel` abandons the merge where a
+  child's size is a step, so a column of themed strips came out with a size signal each instead of
+  the one they share, and every name derived from it moved with them — the group's own height, the
+  range of its scale, and every clamp an interval brush is bounded by. One specification in the wild
+  corpus is a themed column of strips a brush is dragged across, and agreement with upstream goes
+  from 1943 to 1944 of 1981.
+
 - **A selection declared above a concatenation belongs to every plot in it.**
   `assembleUnitSelectionSignals` runs per unit model, and a parameter written on the chart is
   inherited by each of them rather than being the chart's alone. Three things follow, and this

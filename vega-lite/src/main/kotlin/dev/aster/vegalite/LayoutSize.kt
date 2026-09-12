@@ -90,14 +90,13 @@ internal class LayoutSize(
         continue
       }
 
-      // `getViewConfigDiscreteSize` answers a **number** where the theme states one and `{step: …}`
-      // only otherwise, so a themed discrete size replaces the step arithmetic entirely: every
-      // strip in the document is that deep, however many categories it holds.
-      val themedDiscrete = if (channel == "x") config.discreteWidth else config.discreteHeight
+      // [value] answers null for exactly the channels a **step** has to settle, and answering it
+      // here as well let the two drift: the size a plot is and the size a level above compares it
+      // by have to be the one answer.
+      val settled = value(views, scales, config, spec, channel)
       val value: VegaValue? =
         when {
-          !discrete || declared.isStatedSize() -> value(views, scales, config, spec, channel)
-          declared == null && themedDiscrete != null -> num(themedDiscrete)
+          settled != null || !discrete -> settled
           else -> {
             val padding = (scale.properties["padding"] as? VegaValue.Num)?.value
             // Only a *band* scale has a real inner padding. A **point** scale counts as 1, because
@@ -305,7 +304,27 @@ internal class LayoutSize(
       // its own and never measured the element it was drawn in.
       if (declared == VegaValue.Str("container")) return declared
       val scale = scales[channel]
-      if (scale != null && (scale.type == "band" || scale.type == "point")) return null
+      // ```js
+      // if (hasDiscreteDomain(scaleType)) {
+      //   const size = getViewConfigDiscreteSize(config.view, sizeType);
+      //   if (isVgRangeStep(range) || isStep(size)) {
+      //     return 'step';
+      //   } else {
+      //     return size;
+      //   }
+      // }
+      // ```
+      //
+      // A discrete position is sized by a **step** only where the theme leaves it to one.
+      // `getViewConfigDiscreteSize` reads `view.height` before `view.discreteHeight` and answers a
+      // `{step: …}` only where the answer is one, so a theme that states a plain depth settles
+      // every strip in the document at that depth however many categories it holds. A plot that
+      // states a size of its own has been answered above; `{"height": {"step": 30}}` is the one
+      // shape that is a step in spite of the theme, and `declared` still holds it here.
+      if (scale != null && (scale.type == "band" || scale.type == "point")) {
+        val themed = if (channel == "x") config.discreteWidth else config.discreteHeight
+        return if (declared == null) themed?.let { num(it) } else null
+      }
       // A channel with **no scale at all** is not a continuous one: `defaultUnitSize` falls to the
       // *discrete* size for it, which is a step. That is what makes a one-dimensional chart — a
       // strip of ticks, a bar chart of one measure — twenty units deep rather than three hundred,
