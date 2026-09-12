@@ -688,12 +688,25 @@ private class Compilation(
     // domain a pan or a zoom has arrived at, and Vega prefers it over the computed one whenever the
     // signal is not null — which is what makes the plot itself the thing being dragged.
     for (selection in selections.filter { it.bindsScales }) {
-      val view = selection.owner ?: views.firstOrNull() ?: continue
-      for ((channel, field) in selection.intervalChannels(view)) {
-        val scale = allScales.values.firstOrNull { it.name() == view.scale(channel) } ?: continue
-        // Only a continuous scale can be panned: there is no halfway between two categories.
-        if (!Selection.isContinuous(scale.type)) continue
-        scale.properties["domainRaw"] = signalRef("${selection.name}[${quoted(field)}]")
+      // ```js
+      // const scale = model.getScaleComponent(channel);
+      // …
+      // scale.set('selectionExtent', {param: selCmpt.name, field: proj.field}, true);
+      // ```
+      //
+      // `scaleBindings.parse` runs **per unit**, and a parameter declared above a composition is
+      // pushed into every unit below it — so every plot's scale carries the extent, and every plot
+      // is dragged by the one binding. Answering for the first plot alone left the rest of a
+      // dashboard reading their computed domains: one plot panned and the others stood still,
+      // which is the opposite of what a binding declared over all of them is written for.
+      val bound = selection.owner?.let { listOf(it) } ?: views
+      for (view in bound) {
+        for ((channel, field) in selection.intervalChannels(view)) {
+          val scale = allScales.values.firstOrNull { it.name() == view.scale(channel) } ?: continue
+          // Only a continuous scale can be panned: there is no halfway between two categories.
+          if (!Selection.isContinuous(scale.type)) continue
+          scale.properties["domainRaw"] = signalRef("${selection.name}[${quoted(field)}]")
+        }
       }
     }
     // A scale domain may also name a selection outright — `{"domain": {"param": "brush"}}` — which
@@ -1576,7 +1589,12 @@ private class Compilation(
     val declaring = views.filter { view ->
       Selection.from(view.spec.params).any { it.name == selection.name }
     }
-    val over = (listOfNotNull(selection.owner) + declaring).distinct().ifEmpty { views.take(1) }
+    // A parameter declared **above** the composition is declared by no view and owned by none, and
+    // is pushed into every unit below it: the state at the top is assembled from all of them, which
+    // is what `topLevelSignals` appending per unit amounts to. Reading the first plot's projections
+    // alone left a dashboard bound over all its plots publishing only the fields the first one
+    // happens to scale by.
+    val over = (listOfNotNull(selection.owner) + declaring).distinct().ifEmpty { views }
     // `if (!model.parent || isTopLevelLayer(model) || bound.length === 0) return signals` — a chart
     // whose views push nothing outward has nothing to push *into*, and the state is read from the
     // one view's own signals.

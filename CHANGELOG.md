@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A binding declared above a composition drives every plot in it.** `scaleBindings.parse` runs
+  once per unit, and a parameter written at the top of a chart is pushed into every unit below it:
+  every plot's position scale carries the extent, reads it back as `domainRaw`, and is clipped by
+  `scaleClip`, so a pan moves the whole dashboard at once. The top-level signals are assembled the
+  same way, `topLevelSignals` appending per unit because "no single selCmpt has a global view". This
+  compiler answered for the first plot alone — one plot panned while the rest stood still, their
+  marks unclipped and spilling past their own edges, and a field only another plot is scaled by had
+  no signal at the top to be dragged by at all. One specification in the wild corpus binds a
+  nine-plot dashboard that way.
 - **A wrapped grid's heading is named where any grid's is.** `parseFacetHeaders` settles the heading
   once for every facet channel: the `header` block's own `title`, then the definition's, then the
   column's derived name — and only then if the theme has not emptied it, `includeDefault` being what
