@@ -3216,6 +3216,52 @@ private class Compilation(
    * scale is measured over the rows one cell was handed: it is built there and named for the cell,
    * so no level above can read it.
    */
+  /**
+   * `findSource`: whether a table already standing is the one this mention asks for.
+   *
+   * ```js
+   * if (data.name && other.hasName() && data.name !== other.dataName) continue;
+   * ...
+   * if (isInlineData(data) && isInlineData(otherData)) { if (deepEqual(...)) return other; }
+   * else if (isUrlData(data) && isUrlData(otherData)) { if (data.url === otherData.url) return other; }
+   * else if (isNamedData(data)) { if (data.name === other.dataName) return other; }
+   * ```
+   *
+   * Two **named** tables of different names are never the same whatever else they say. Beyond that
+   * a table is its rows or its address — the same values, or the same URL — and a mention that is
+   * **only** a name is the table of that name, however it was declared. The `feature` and `mesh` a
+   * format picks out are part of the address: two views reading different layers of one topology
+   * read different tables.
+   */
+  private fun sameSource(standing: VegaValue, asked: VegaValue): Boolean {
+    val other = standing as? VegaValue.Obj ?: return false
+    val data = asked as? VegaValue.Obj ?: return false
+    val name = data.string("name")
+    val otherName = other.string("name")
+    if (name != null && otherName != null && name != otherName) return false
+    val mesh = data.obj("format")?.string("mesh")
+    val otherFeature = other.obj("format")?.string("feature")
+    // A feature and a mesh are two readings of one topology and never the same table.
+    if (mesh != null && otherFeature != null) return false
+    val feature = data.obj("format")?.string("feature")
+    if ((feature != null || otherFeature != null) && feature != otherFeature) return false
+    val otherMesh = other.obj("format")?.string("mesh")
+    if ((mesh != null || otherMesh != null) && mesh != otherMesh) return false
+    val values = data.fields["values"]
+    val url = data.string("url")
+    val generated =
+      data.fields["sequence"] != null ||
+        data.fields["sphere"] != null ||
+        data.fields["graticule"] != null
+    return when {
+      values != null -> other.fields["values"] == values
+      url != null -> other.string("url") == url
+      // `isNamedData`: a name, and nothing that says where the rows come from.
+      !generated && name != null -> name == otherName
+      else -> false
+    }
+  }
+
   private fun cellOwnsScale(plot: Plot, name: String): Boolean =
     concat != null && plot.facets.isNotEmpty() && name.startsWith("${plot.name}_child_")
 
@@ -3933,6 +3979,17 @@ private class Compilation(
       }
     }
     val roots = LinkedHashMap<VegaValue, SourceNode>()
+    // `findSource`: a table already standing is **found** rather than made, and what makes two
+    // mentions the same table is not that they were written the same way. A dataset given a `name`
+    // is that name's, so a view that says `{"name": "locations"}` and nothing else reads the table
+    // another view declared under that name — which is how one specification names a table once and
+    // draws from it three times. Keyed by the value as written, each mention stood up a root of its
+    // own: the table was fetched again per mention, the derived tables were numbered around them,
+    // and a projection fitted to one of them named a table the marks did not read.
+    fun canonical(data: VegaValue): VegaValue =
+      order.firstOrNull { sameSource(it, data) }
+        ?: roots.keys.firstOrNull { sameSource(it, data) }
+        ?: data
     // How many **models** name each table, which is how many times `parseRoot` runs on it and
     // therefore how many times it can be *found* already standing. See [SourceNode.shared].
     val statedBy = LinkedHashMap<VegaValue, Int>()
@@ -4002,7 +4059,8 @@ private class Compilation(
     // copies of one join apart from two joins. Named for the table it reads instead, three copies
     // of one plot folded into a single node above the fork where upstream keeps one per copy, and
     // the whole chart came out a dataset short.
-    val register: (VegaValue, String) -> String = { table, key ->
+    val register: (VegaValue, String) -> String = { raw, key ->
+      val table = canonical(raw)
       if (table !in order) order += table
       lookupOutputs.getOrPut(key) {
         OutputNode(key).also { roots.getOrPut(table) { SourceNode(table) }.then(it) }
@@ -4010,7 +4068,7 @@ private class Compilation(
       key
     }
     val outputs = views.map { view ->
-      val data = view.spec.data!!
+      val data = canonical(view.spec.data!!)
       if (data !in order) order += data
       val partitioned = plotOfView(view)?.let { view in viewsBelow(it) } ?: !view.ownsSource
       // `requiresSelectionId(model)` asks the **unit**, not the chart: the identity column is

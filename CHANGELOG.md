@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A table already standing is found rather than made, and a name is what finds it.**
+  `findSource` decides what makes two mentions the same table, and it is not that they were written
+  the same way: a dataset given a `name` is that name's, so a view that says `{"name": "places"}`
+  and nothing else reads the table another view declared under that name. Two names are two tables
+  whatever else they say, and the `feature` or `mesh` a format picks out is part of the address —
+  two views reading different layers of one topology read different tables. This compiler keyed a
+  table by the value as written, so each mention stood up a root of its own: the table was fetched
+  again per mention, and every table derived from it was numbered around the copies. Two
+  specifications in the wild corpus name a table once and draw from it three times; both need one
+  further fix to agree, so the count is unchanged.
+
 - **A binding to the scales binds only what can be panned.**
   `scaleBindings.parse` keeps a projection only where its scale has a continuous domain — there is
   no halfway between two categories to drag to — and only what it keeps publishes a signal at the
