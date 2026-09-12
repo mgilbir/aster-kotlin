@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A bucketing that says neither how many buckets nor how wide gets the default count.**
+  `normalizeBin` has three arms and this compiler read two: `bin: true` and the empty object. A
+  stated bucketing that says something *else* — an `anchor`, a `base` — was left without a count, so
+  nothing cut the column into ten. The count is spelled into the name the bucketing writes, so the
+  column the mark read, `bin_anchor_0_5_v`, was not the one the data flow had written under
+  `bin_anchor_0_5_maxbins_10_v`: every mark, every axis and the scale's own `bins` named a column
+  that did not exist, and the chart drew nothing. `!bin.maxbins && !bin.step` is their truthiness, so
+  a bucketing asking for zero buckets is asking for the default; the default is the channel's — six
+  for a colour or a facet, ten elsewhere — and a bucketing written as a `transform` has no channel to
+  ask, so it is always ten. One specification in the wild corpus anchors its buckets that way.
 - **A grid that belongs to a plot is answered by that plot, not by the chart above it.** Two
   questions were asked of the chart. *Which axes stand in a band beside the grid*:
   `parseGuideResolve` is asked of the model the grid belongs to, and a facet's cells share their

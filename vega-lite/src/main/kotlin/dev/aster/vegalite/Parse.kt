@@ -813,6 +813,26 @@ internal class Parse(
    * `bin: true` normalizes to `{maxbins: 10}` — and the normalized parameters are what the field
    * name is built from, so `bin_maxbins_10_v` appears even where the specification said only
    * `true`.
+   *
+   * ```js
+   * export function normalizeBin(bin: BinParams | boolean | 'binned', channel?: ExtendedChannel) {
+   *   if (isBoolean(bin)) {
+   *     return {maxbins: autoMaxBins(channel)};
+   *   } else if (bin === 'binned') {
+   *     return {binned: true};
+   *   } else if (!bin.maxbins && !bin.step) {
+   *     return {...bin, maxbins: autoMaxBins(channel)};
+   *   } else {
+   *     return bin;
+   *   }
+   * }
+   * ```
+   *
+   * The third arm is the one this missed: a **stated** bucketing that says neither how many buckets
+   * it wants nor how wide they are gets the default count too, whatever else it says. Reading only
+   * the empty object as unstated, a `{"anchor": 0.5}` was left without one, so nothing bucketed the
+   * column into ten — and the count is spelled into the name, so the column the mark read,
+   * `bin_anchor_0_5_v`, was not the one `bin_anchor_0_5_maxbins_10_v` had written.
    */
   private fun binning(value: VegaValue?, path: String, channel: String): Binning? =
     when {
@@ -825,8 +845,16 @@ internal class Parse(
       // and its extent signal into the data flow and shifted everything after it.
       (value as? VegaValue.Obj)?.fields?.get("binned") == VegaValue.Bool(true) -> Binning.PreBinned
       value is VegaValue.Obj ->
-        if (value.fields.isEmpty()) {
-          Binning.Bin(obj { put("maxbins", autoMaxBins(channel)) })
+        // `!bin.maxbins && !bin.step`, which is their **truthiness**: a bucketing asking for none
+        // at all is asking for the default, and so is one that asks for zero of them. Written
+        // after what the specification said, as the spread is, so the name reads `anchor` first.
+        if (!value.fields["maxbins"].isTruthy() && !value.fields["step"].isTruthy()) {
+          Binning.Bin(
+            obj {
+              value.fields.forEach { (key, own) -> put(key, own) }
+              put("maxbins", autoMaxBins(channel))
+            }
+          )
         } else {
           Binning.Bin(value)
         }

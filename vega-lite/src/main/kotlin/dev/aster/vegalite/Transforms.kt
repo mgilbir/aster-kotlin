@@ -182,11 +182,19 @@ internal class Transforms(
       return emptyList()
     }
     val stated = transform["bin"]
+    // `normalizeBin(bin, undefined)`, which is the same reading a bucketing in an encoding gets —
+    // with no channel to ask, so the count is always ten. A **stated** bucketing that says neither
+    // how many buckets it wants nor how wide they are gets the default count too, whatever else it
+    // says, and the count is spelled into the signals the transform publishes.
     val params =
       when {
-        stated == VegaValue.Bool(true) -> obj { put("maxbins", 10) }
-        stated is VegaValue.Obj && stated.fields.isEmpty() -> obj { put("maxbins", 10) }
-        stated is VegaValue.Obj -> stated
+        stated is VegaValue.Obj &&
+          (stated.fields["maxbins"].isTruthy() || stated.fields["step"].isTruthy()) -> stated
+        stated is VegaValue.Obj ->
+          obj {
+            stated.fields.forEach { (key, own) -> put(key, own) }
+            put("maxbins", 10)
+          }
         else -> obj { put("maxbins", 10) }
       }
     val names =
