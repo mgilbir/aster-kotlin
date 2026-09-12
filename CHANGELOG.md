@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A join names its table before a child of the chart names one.**
+  `parseData` parses a model's transforms where it stands — `parseTransformArray` runs on the
+  model's own list and `LookupNode.make` gives the joined table a root of its own there — and only
+  then descends into the children. So a join written on the chart names its table before a layer
+  that brought rows of its own names that. This compiler registered the table as the transform was
+  *translated*, which happens while a view's chain is being built, so the table was numbered behind
+  whatever the first view had already claimed, and every reader of it named a different table than
+  upstream's: the marks drawn from it and the projection fitted to it. Two specifications in the
+  wild corpus join a table and then layer a map that brings its own, and agreement with upstream
+  goes from 1953 to 1955 of 1981.
+
 - **A caption anchored to one end of its band is aligned to that end, angle or no angle.**
   `defaultHeaderGuideAlign` asks the anchor first and asks it whether or not an angle was stated;
   the angle settles only an unanchored caption, and the baseline is the angle's alone. This compiler

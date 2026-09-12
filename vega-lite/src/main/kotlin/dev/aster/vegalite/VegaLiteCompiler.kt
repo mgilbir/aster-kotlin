@@ -3701,6 +3701,24 @@ private class Compilation(
     // creates one of its own: a chart whose first layer brings its own rows still numbers the
     // chart's table `source_0`. It is left out where nothing hangs off it, as an unused subtree is.
     spec.fields["data"]?.let { own -> if (views.any { it.spec.data == own }) order += own }
+    // And the tables the chart's **own** joins read come next, before any child's. `parseData`
+    // parses a model's transforms where it stands — `parseTransformArray` runs on the model's own
+    // list and `LookupNode.make` gives the joined table a root there — and only then descends. A
+    // join written on the chart therefore names its table before a layer that brought rows of its
+    // own names that; registered as the transform was *translated* instead, the table was numbered
+    // behind whatever the first view had already claimed, and every reader of it — the mark, the
+    // projection it is fitted to — named a different table than upstream's.
+    //
+    // Only where some view runs them: a layer that reads a table of its own skips its ancestors'
+    // transforms altogether, so a chart all of whose layers do that has no join to name.
+    if (views.any { !it.ownsSource }) {
+      for (transform in spec.array("transform").orEmpty()) {
+        // `from.data` is a **join's** and nothing else's — no other transform reads a second table
+        // — and a join against a *parameter* has none, reading the rows a selection has picked.
+        val table = transform.obj("from")?.get("data") ?: continue
+        if (table !in order) order += table
+      }
+    }
     val roots = LinkedHashMap<VegaValue, SourceNode>()
     // How many **models** name each table, which is how many times `parseRoot` runs on it and
     // therefore how many times it can be *found* already standing. See [SourceNode.shared].
