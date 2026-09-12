@@ -309,58 +309,16 @@ internal class Facet(
     put("text", signalRef(headerLabel(def, field, config)))
     if (!isColumn) put("orient", "left")
     put("style", "guide-label")
-    put("frame", "group")
-    put("offset", num(offset))
     // A caption in the trailing band hangs off the other side of its cell.
     headerOrient("label").takeIf { it != "top" }?.let { put("orient", it) }
-    // ```js
-    // export function defaultHeaderGuideBaseline(angle: number, channel: FacetChannel) {
-    //   const baseline = defaultLabelBaseline(angle, channel === 'row' ? 'left' : 'top',
-    //                                         channel === 'row' ? 'y' : 'x', true);
-    //   return baseline ? {baseline} : {};
-    // }
-    // ```
-    //
-    // `defaultHeaderGuideAlign`/`defaultHeaderGuideBaseline` both open with "if the angle is
-    // stated" — a caption left at whatever angle the renderer chooses is left at whatever anchor it
-    // chooses too. State one and the caption has to be turned to face its cell.
-    //
-    // Both are asked through the **band's** own axis, not the caption's own side: a row's captions
-    // run down the side of the grid and are read as a `y` axis's labels are, a column's along the
-    // top and read as an `x` axis's. A column's caption at no angle at all therefore sits on its
-    // baseline — `bottom` — which this compiler wrote for no column at all, having asked the
-    // question only of rows and answered the baseline with a flat `middle`.
-    val angle =
-      (headerProperty(def.raw.obj("header"), config, channel, "labelAngle") as? VegaValue.Num)
-        ?.value
-    if (angle != null) {
-      val band = headerChannel("label")
-      val axis = if (band == "row") "y" else "x"
-      val side = if (band == "row") "left" else "top"
-      // The angle **as written**, negatives and all: neither rule normalises a number — only the
-      // expression form of one, through `normalizeAngleExpr` — so a caption turned to `-90` is
-      // anchored by the arm of the rule that reads `angle <= 45`, and turning it into `270` first
-      // sends it down a different one. A caption turned a *quarter* turn is **centred** rather than
-      // pushed to one side, its own length now running across the band rather than along it, so
-      // there is no side left to push it to: `alwaysIncludeMiddle`, which a header asks for and an
-      // axis does not.
-      Guides.labelBaseline(angle, axis, side, alwaysIncludeMiddle = true)?.let {
-        put("baseline", it)
-      }
-      // `defaultHeaderGuideAlign` opens on the **anchor**: a caption anchored to one end of its
-      // band is pushed to that end whatever angle it is at, and only an unanchored one is aligned
-      // by the turn.
-      when (
-        (headerProperty(def.raw.obj("header"), config, channel, "labelAnchor") as? VegaValue.Str)
-          ?.value
-      ) {
-        "start" -> put("align", "left")
-        "end" -> put("align", "right")
-        else -> Guides.labelAlign(angle, axis, side)?.let { put("align", it) }
-      }
-      put("angle", num(angle))
-    }
-    headerProperties("label").forEach { (key, value) -> put(key, value) }
+    put("frame", "group")
+    captionFacing(def.raw.obj("header"), config, channel, headerChannel("label"))
+    val properties = headerProperties("label")
+    properties.forEach { (key, value) -> put(key, value) }
+    // `config.header.labelPadding: 10`, which this compiler carries as a fallback rather than in a
+    // default configuration object — so a stated `labelPadding` is not overwritten by it, and, put
+    // *after* the header's own properties, the gap is written where upstream writes it.
+    if (!properties.containsKey("offset")) put("offset", num(offset))
   }
 
   /** Whether this channel's captions belong to the trailing band rather than the leading one. */
@@ -788,6 +746,58 @@ internal interface FacetLayout {
      */
     legends: List<VegaValue> = emptyList(),
   ): VegaValue
+}
+
+/**
+ * `defaultHeaderGuideBaseline` and `defaultHeaderGuideAlign`: which way a caption faces.
+ *
+ * ```js
+ * export function defaultHeaderGuideAlign(headerChannel, angle, anchor = 'middle') {
+ *   switch (anchor) {
+ *     case 'start': return {align: 'left'};
+ *     case 'end': return {align: 'right'};
+ *   }
+ *   const align = defaultLabelAlign(angle, headerChannel === 'row' ? 'left' : 'top', ...);
+ *   return align ? {align} : {};
+ * }
+ * ```
+ *
+ * The **anchor** is asked first, and is asked whether or not an angle was stated: a caption
+ * anchored to one end of its band is pushed to that end, and the angle settles only an unanchored
+ * one. Asked inside a test for the angle, a header that anchored its captions and left them flat
+ * got no alignment at all and its names came out centred.
+ *
+ * The baseline is the angle's alone — `defaultLabelBaseline` answers nothing without one — and the
+ * angle **as written**, negatives and all: neither rule normalises a number, only the expression
+ * form of one through `normalizeAngleExpr`, so a caption turned to `-90` is anchored by the arm
+ * that reads `angle <= 45` and turning it into `270` first sends it down a different one. A caption
+ * turned a *quarter* turn is centred rather than pushed to one side, its own length now running
+ * across the band rather than along it: `alwaysIncludeMiddle`, which a header asks for and an axis
+ * does not.
+ *
+ * Both are asked through the **band's** own axis, not the caption's own side: a row's captions run
+ * down the side of the grid and are read as a `y` axis's labels are, a column's along the top and
+ * read as an `x` axis's.
+ */
+private fun ObjectBuilder.captionFacing(
+  header: VegaValue.Obj?,
+  config: Config?,
+  channel: String,
+  band: String,
+) {
+  val angle = (headerProperty(header, config, channel, "labelAngle") as? VegaValue.Num)?.value
+  val axis = if (band == "row") "y" else "x"
+  val side = if (band == "row") "left" else "top"
+  if (angle != null) {
+    Guides.labelBaseline(angle, axis, side, alwaysIncludeMiddle = true)?.let { put("baseline", it) }
+  }
+  when ((headerProperty(header, config, channel, "labelAnchor") as? VegaValue.Str)?.value) {
+    "start" -> put("align", "left")
+    "end" -> put("align", "right")
+    else -> if (angle != null) Guides.labelAlign(angle, axis, side)?.let { put("align", it) }
+  }
+  // The **angle** itself is not written here: `assembleHeaderProperties` carries `labelAngle` over
+  // as `angle`, so writing it twice only moves it ahead of the anchor it is written after.
 }
 
 internal class FacetGrid(
@@ -1286,6 +1296,19 @@ internal class FacetWrap(
    */
   private fun titleBand(): String = headerChannel("facet", statedTitleOrient())
 
+  /**
+   * Which band a **caption** is read as belonging to — `getHeaderChannel('facet', labelOrient)`.
+   *
+   * A wrapped facet captions its cells above them, so a caption is read as a column heading is
+   * unless the header moves it to a side.
+   */
+  private fun labelBand(): String =
+    headerChannel(
+      "facet",
+      (headerProperty(def.raw.obj("header"), config, "facet", "labelOrient") as? VegaValue.Str)
+        ?.value,
+    )
+
   /** The side the header states for its heading, before a wrapped facet's own default. */
   private fun statedTitleOrient(): String? =
     (headerProperty(def.raw.obj("header"), config, "facet", "titleOrient") as? VegaValue.Str)?.value
@@ -1599,6 +1622,11 @@ internal class FacetWrap(
         )
         put("style", "guide-label")
         put("frame", "group")
+        // `assembleLabelTitle` is the **same** function wherever the caption is drawn, so a wrapped
+        // grid's cell caption faces the way a band's does: see [captionFacing]. Left out here, a
+        // wrapped trellis that anchored its names to one end of each cell drew them centred, and
+        // one that turned them read them off their own baseline.
+        captionFacing(def.raw.obj("header"), config, "facet", labelBand())
         // A wrapped facet captions its **cells**, so the header's *label* properties belong on the
         // cell's own title — a grid captions its bands with them instead.
         val properties = labelProperties()

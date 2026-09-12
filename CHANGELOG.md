@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A caption anchored to one end of its band is aligned to that end, angle or no angle.**
+  `defaultHeaderGuideAlign` asks the anchor first and asks it whether or not an angle was stated;
+  the angle settles only an unanchored caption, and the baseline is the angle's alone. This compiler
+  asked both inside a test for the angle, so a header that anchored its captions and left them flat
+  got no alignment and its names came out centred. And `assembleLabelTitle` is the same function
+  wherever the caption is drawn, so a *wrapped* grid's cell caption faces the way a band's does —
+  this compiler asked nothing at all there. One specification in the wild corpus is a wrapped trellis
+  that anchors its cell names to the start and hangs them below each cell, and agreement with
+  upstream goes from 1952 to 1953 of 1981.
+
 - **A model that is renamed still owns what it owned.**
   A transform belongs to the model it was written on, and a grid's own stand above the partition
   whatever the cell below is called — but a cell is *renamed* as it is built, `layer_1` becoming
