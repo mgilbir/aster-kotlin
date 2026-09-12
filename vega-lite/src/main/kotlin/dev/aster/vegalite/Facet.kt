@@ -165,6 +165,44 @@ internal fun headerProperty(
 }
 
 /**
+ * The heading a grid carries over its cells, or `null` where it carries none.
+ *
+ * ```js
+ * const titleConfig = getHeaderProperty('title', null, config, channel);
+ * let title = fieldDefTitle(fieldDef, config, {
+ *   allowDisabling: true,
+ *   includeDefault: titleConfig === undefined || !!titleConfig,
+ * });
+ * …
+ * title: fieldDef.header !== null ? title : null,
+ * ```
+ *
+ * Three readings in one, and they are not interchangeable:
+ * - The **header's** own `title` is the heading, and the definition's own `title` is it where the
+ *   header states none. Either stated as `null` leaves the grid with no heading at all, since
+ *   `getFirstDefined` stops at the first value that was *written* rather than the first truthy one.
+ * - The **theme's** `title` is not a heading. It only decides whether the derived name of the
+ *   column is used at all: a document that says `{"header": {"title": null}}` takes the heading off
+ *   every grid in it, which is how a chart whose cells caption themselves says so once — but a
+ *   theme that names a title does not put that name over a grid.
+ * - `"header": null` takes the whole header off, which is not the same as a header with nothing in
+ *   it: the band of captions stays either way, the captions being what name the cells.
+ */
+internal fun heading(def: ChannelDef, config: Config, channel: String): String? {
+  if (def.raw.fields["header"] == VegaValue.Null) return null
+  val fromTheme = headerProperty(null, config, channel, "title")
+  val stated = def.raw.obj("header")?.fields?.get("title") ?: def.explicitTitle
+  val text =
+    stated
+      ?: if (fromTheme == null || fromTheme.isTruthy())
+        Fields.defaultTitle(def, config)?.let { VegaValue.Str(it) }
+      else null
+  // `if (layoutHeaders[channel].title)` in `assembleHeaderMarks`: an empty heading is no heading,
+  // and the room the layout was keeping for one goes with it.
+  return (text as? VegaValue.Str)?.value?.takeIf { it.isNotEmpty() }
+}
+
+/**
  * `HEADER_TITLE_PROPERTIES_MAP` and its label twin: a header names its properties `titleFontSize`
  * and a Vega title names them `fontSize`, so what reaches the caption is a **rename per part**.
  *
@@ -1003,26 +1041,8 @@ internal class FacetGrid(
    */
   override fun headings(config: Config): Map<String, String> =
     listOfNotNull(row, column)
-      // `"header": null` takes the whole header off — its caption, its labels and the room the
-      // layout was keeping for them. It is not the same as a header with nothing in it.
-      .filter { it.def.raw.fields["header"] != VegaValue.Null }
       .mapNotNull { facet ->
-        // The **header's** own title where it states one, and the column's derived name where it
-        // does not. A heading the specification emptied is no heading at all — `assembleTitleGroup`
-        // writes nothing for a falsy title — and the room the layout was keeping for it goes with
-        // it. That is not the same as leaving the heading out: the band of captions stays either
-        // way, since the captions are what name the cells.
-        // Asked of the header, of the family for this channel and of `config.header` in turn —
-        // `getHeaderProperty`, the same chain every other header property is read through. A theme
-        // that says `{"header": {"title": null}}` takes the heading off **every** grid in a
-        // document, which is how a chart whose cells caption themselves says so once; reading only
-        // the definition's own block left such a chart with a heading over each grid and the room
-        // the layout keeps for one. Six specifications in the wild corpus theme it that way.
-        val stated = headerProperty(facet.def.raw.obj("header"), config, facet.channel, "title")
-        val text =
-          if (stated != null) (stated as? VegaValue.Str)?.value
-          else (Fields.title(facet.def, config) as? VegaValue.Str)?.value
-        text?.takeIf { it.isNotEmpty() }?.let { facet.channel to it }
+        heading(facet.def, config, facet.channel)?.let { facet.channel to it }
       }
       .toMap()
 
@@ -1447,37 +1467,36 @@ internal class FacetWrap(
     fun leading(axes: List<VegaValue>) = axes.filter {
       it.string("orient") == "left" || it.string("orient") == "top"
     }
-    // A header that states `"title": null` has no heading over the grid at all: the cells name
-    // themselves, and a caption above them naming the column would say it twice.
-    val titled = def.raw.obj("header")?.fields?.get("title") != VegaValue.Null
+    // The same reading the crossed form uses: a wrapped grid's heading is named where any grid's
+    // is. Read here as `Fields.title` alone, a trellis took no heading from its `header` block and
+    // no instruction from a theme that emptied one, and drew a band of blank space where the
+    // specification said it wanted nothing at all.
     val heading =
-      (Fields.title(def, config) as? VegaValue.Str)
-        ?.takeIf { titled }
-        ?.let { title ->
-          obj {
-            put("name", "facet-title")
-            put("type", "group")
-            put("role", "${titleBand()}-title")
-            put(
-              "title",
-              obj {
-                put("text", title.value)
-                put("style", "guide-title")
-                // `assembleHeaderProperties(config, facetFieldDef, channel,
-                // HEADER_TITLE_PROPERTIES,
-                // …)`: the heading is styled by the header's `title…` properties exactly as each
-                // cell's caption is by its `label…` ones. This wrote none of them, so a trellis
-                // sizing or colouring its heading — or `config.header.titleFontSize`, which sizes
-                // every heading in a document at once — was drawn with the default.
-                val properties = titleProperties()
-                properties.forEach { (key, value) -> put(key, value) }
-                // `config.header.titlePadding: 10`, carried here as a fallback rather than in a
-                // default configuration object, so a stated `titlePadding` stands instead of it.
-                if (!properties.containsKey("offset")) put("offset", num(titleOffset))
-              },
-            )
-          }
+      heading(def, config, "facet")?.let { title ->
+        obj {
+          put("name", "facet-title")
+          put("type", "group")
+          put("role", "${titleBand()}-title")
+          put(
+            "title",
+            obj {
+              put("text", title)
+              put("style", "guide-title")
+              // `assembleHeaderProperties(config, facetFieldDef, channel,
+              // HEADER_TITLE_PROPERTIES,
+              // …)`: the heading is styled by the header's `title…` properties exactly as each
+              // cell's caption is by its `label…` ones. This wrote none of them, so a trellis
+              // sizing or colouring its heading — or `config.header.titleFontSize`, which sizes
+              // every heading in a document at once — was drawn with the default.
+              val properties = titleProperties()
+              properties.forEach { (key, value) -> put(key, value) }
+              // `config.header.titlePadding: 10`, carried here as a fallback rather than in a
+              // default configuration object, so a stated `titlePadding` stands instead of it.
+              if (!properties.containsKey("offset")) put("offset", num(titleOffset))
+            },
+          )
         }
+      }
     return listOfNotNull(
       heading,
       band("row", "header", leading(vertical), columnSize, rowSize),

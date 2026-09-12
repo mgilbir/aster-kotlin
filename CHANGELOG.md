@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A wrapped grid's heading is named where any grid's is.** `parseFacetHeaders` settles the heading
+  once for every facet channel: the `header` block's own `title`, then the definition's, then the
+  column's derived name — and only then if the theme has not emptied it, `includeDefault` being what
+  `config.header.title` decides and nothing more. `assembleHeaderMarks` then asks whether there *is*
+  a heading, and `""` is not one. The crossed form, `row` and `column`, read it that way; the wrapped
+  form read only the derived name, so a trellis took no heading from its own `header`, ignored a
+  document that said `{"header": {"title": null}}` to caption none of its grids, and drew a band of
+  blank space over a grid that wrote `"title": ""` to ask for no heading at all, with every cell
+  pushed down by it. One specification in the wild corpus asks for none that way.
 - **A view lifted into a cell keeps everything it said but the facet itself.** `mapFacetedUnit`
   moves the unit down into the cell as the unit it was; only the facet channels are taken out of its
   encoding. This compiler rebuilt the cell's specification property by property and left two of them
