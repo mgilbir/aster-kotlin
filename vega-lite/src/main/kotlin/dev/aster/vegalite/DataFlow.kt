@@ -104,8 +104,7 @@ internal sealed class DataNode {
     when (this) {
       is ParseNode -> "parse:$parse"
       is FilterInvalidNode -> "filter-invalid:$definitions"
-      // A time-unit step is merged by `mergeTimeUnits` instead, which keeps a different one.
-      is PassThroughNode -> if (timeUnit) null else "transforms:${transforms.map { it.toString() }}"
+      is PassThroughNode -> "transforms:${transforms.map { it.toString() }}"
       is BinNode -> "bin:${transforms()}"
       is ImputeNode -> "impute:${transforms()}"
       is StackNode -> "stack:${transforms()}|$component"
@@ -118,6 +117,10 @@ internal sealed class DataNode {
       // all. Left with no identity, every such pair waited a round and folded the other way about:
       // the branches came out reversed and each mark read its neighbour's dataset.
       is AggregateNode -> "aggregate:$dimensions|$ops|$fields|$outputs"
+      // And a **time unit**, for the same reason and with the same pair of optimizers: upstream
+      // hashes it as `TimeUnit ${hash(this.timeUnits)}`, and `MergeTimeUnits` — which keeps the
+      // *last* — only ever sees the pairs that were already siblings when it ran.
+      is TimeUnitNode -> "timeunit:$units"
       else -> null
     }
 

@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **Two identical sibling bucketings of an instant fold the way two aggregates do.** The same pair of
+  optimizers reaches them and they keep opposite ends: `MergeTimeUnits` runs first in each round and
+  keeps the *last* of what is already sibling when it runs — `timeUnitChildren.pop()` — where
+  `MergeIdenticalNodes`, which hashes the node as `TimeUnit ${hash(this.timeUnits)}`, keeps the
+  *first* and reaches a pair that only becomes sibling because the steps above them folded, in that
+  same pass. This compiler gave a time unit no identity and left every such fold a round later, so a
+  chart whose layers all bucket one column had its branches numbered backwards and every mark read
+  its neighbour's dataset. One specification in the wild corpus buckets an instant in sixteen layers.
 - **A transform climbs above a grid's partition only as far as the fork below it.** `moveFacetDown`
   walks the partition down one node at a time and stops where the flow forks, so what climbs past it
   is what the models *at or above the cell* wrote — one chain, no fork in it. A layer **inside** the
