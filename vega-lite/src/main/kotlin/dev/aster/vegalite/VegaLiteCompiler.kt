@@ -1200,8 +1200,11 @@ private class Compilation(
             compareBy({ levelOfScale(it.name(), it.channel) }, { depthOfScale(it.name()) })
           )
           // A facet's independently resolved scales are built inside its cells, where the rows
-          // they measure are, so they are not written beside the grid as well.
+          // they measure are, so they are not written beside the grid as well. A **plot** that
+          // grids its cell does the same within its own group, and a scale named for that cell is
+          // the one to move: nothing else in the chart can read it.
           .filterNot { facet != null && concat == null && it.name() != prefixed(it.channel) }
+          .filterNot { scale -> allPlots.any { cellOwnsScale(it, scale.name()) } }
       // A cell holding **plots** keeps those plots' own scales: each is measured over the rows the
       // partition handed one cell, so it is built there and not once beside the grid. What a
       // composition *shares* — a colour key covering every plot — is still the chart's. Settled
@@ -1293,6 +1296,22 @@ private class Compilation(
     ) {
       return Fields.varName("${view.childName}_$channel")
     }
+    // A `resolve` on a plot that **grids** its cell speaks about the cells, not about the layers
+    // inside one: the layers are a single model to the grid. A channel it resolves independently is
+    // therefore the cell's own scale, named for the cell the plot hangs its grid from.
+    plotOfView(view)
+      ?.takeIf { concat != null }
+      ?.let { plot ->
+        if (
+          plot.facets.isNotEmpty() &&
+            plotResolves[view]?.scaleIsIndependent(
+              channel,
+              defaultIndependent = channel == "theta",
+            ) == true
+        ) {
+          return Fields.varName("${plot.name}_child_$channel")
+        }
+      }
     if (!independent) return prefixed(channel)
     val owner = declaredIndependenceOwner(view, channel)
     return if (owner.isEmpty()) channel else "${owner}_$channel"
@@ -3112,6 +3131,16 @@ private class Compilation(
    * facet handed *that* cell, and inside the group those rows are the partition Vega named `facet`.
    * Left pointing at the shared dataset the scale would be built per cell and identical in each.
    */
+  /**
+   * Whether a scale belongs **inside** the cells of this plot's own grid.
+   *
+   * A plot of a concatenation that grids its cell resolves channels between those cells, and such a
+   * scale is measured over the rows one cell was handed: it is built there and named for the cell,
+   * so no level above can read it.
+   */
+  private fun cellOwnsScale(plot: Plot, name: String): Boolean =
+    concat != null && plot.facets.isNotEmpty() && name.startsWith("${plot.name}_child_")
+
   private fun withinCell(scale: VegaValue): VegaValue {
     val block = scale as? VegaValue.Obj ?: return scale
     val domain = block.obj("domain") ?: return scale
@@ -3245,7 +3274,17 @@ private class Compilation(
       setOf("x", "y").filter { channel ->
         resolveFor(views).scaleIsIndependent(channel, defaultIndependent = false)
       }
-    fun cellsOwn(axis: VegaValue): Boolean = cellOwnsAxis(axis, ofFacet = true)
+    // Asked of the **grid's own** `resolve`, which for a plot of a concatenation is that plot's:
+    // the chart's speaks about the plots beside each other, and this question is about the cells
+    // inside one of them.
+    val here = resolveFor(views)
+    fun cellsOwn(axis: VegaValue): Boolean =
+      setOf("x", "y").any { channel ->
+        here.guideIsIndependent(
+          channel,
+          here.scaleIsIndependent(channel, defaultIndependent = channel == "theta"),
+        ) && axis.string("scale")?.endsWith(channel) == true
+      }
     val gridAxes = axes.filter { (it["grid"] as? VegaValue.Bool)?.value == true || cellsOwn(it) }
     val mainAxes = axes.filter { (it["grid"] as? VegaValue.Bool)?.value != true && !cellsOwn(it) }
     val horizontal = mainAxes.filter {
@@ -3281,7 +3320,15 @@ private class Compilation(
           // plotting area in any of its cells.
           style(views) ?: VegaValue.Str("cell"),
           cellCardinality,
-          cellScales,
+          // The scales this plot's own cells own, where the plot is one of a concatenation: the
+          // chart's own grid hands them down in [cellScales], and a plot's grid keeps its in the
+          // plot.
+          owner
+            ?.scales
+            ?.values
+            ?.filter { cellOwnsScale(owner, it.name()) }
+            ?.map { withinCell(assembleScale(it)) }
+            ?.takeIf { it.isNotEmpty() } ?: cellScales,
           viewEncode(),
           groupData,
           // `assembleAxisSignals` on the **cell**: an axis inside it that draws its grid across no

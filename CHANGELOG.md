@@ -8,6 +8,20 @@ section here does not get released.
 
 ### Fixed
 
+- **A `resolve` on a plot that grids its cell speaks about the cells.**
+  Every model carries its own `resolve` and each speaks about its own children, and a plot of a
+  concatenation that lays out a grid has the *cell* between it and the layers. A channel it resolves
+  independently is therefore scaled per cell: the scale is named for the cell, built inside the cell
+  group where the rows it measures are, and its axis is drawn in the cell rather than in a band
+  beside the grid — a band of labels cannot stand for several different extents. The band then has
+  neither a caption nor an axis, and `assembleHeaderGroup` writes one only `if (title || hasAxes)`,
+  so it disappears with the axis that was its only content. This compiler asked the chart's
+  `resolve` for all of it, which speaks about the plots beside each other and not the cells within
+  one: such a plot came out with a single shared scale, one band of labels standing for extents that
+  differ cell by cell, and the scale itself written beside the grid where nothing measures a cell's
+  rows. Five specifications in the wild corpus grid a plot of a concatenation; each needs further
+  fixes to agree, so the count is unchanged.
+
 - **A channel whose children disagree is forced apart at the level that found the disagreement.**
   `parseNonUnitScaleCore` runs per model, bottom-up: a model whose children disagree marks the
   channel independent and offers nothing upward, so the level above has nothing to merge from it and
