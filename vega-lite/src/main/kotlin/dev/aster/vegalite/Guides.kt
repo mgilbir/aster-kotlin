@@ -970,8 +970,28 @@ internal object Guides {
     val moved = LinkedHashMap<String, LinkedHashMap<String, VegaValue>>()
     for ((property, mapping) in CONDITIONAL_AXIS_PARTS) {
       val value = axis.properties[property] as? VegaValue.Obj ?: continue
-      val condition = value["condition"] ?: continue
       val (part, vgProp) = mapping
+      // ```js
+      // } else if (isSignalRef(propValue)) {
+      //   const propIndex = CONDITIONAL_AXIS_PROP_INDEX[prop as ConditionalAxisProp];
+      //   if (propIndex) {
+      //     const {vgProp, part} = propIndex;
+      //     setAxisEncode(axis, part, vgProp, propValue as any);
+      //     delete axis[prop];
+      //   } // else do nothing since the property already supports signal
+      // ```
+      //
+      // A **signal** moves the same way a condition does, and for the same reason: these thirteen
+      // are the properties Vega paints per label or per tick rather than reading off the axis, so
+      // there is no axis property for a signal to be written into. Left on the axis, a document
+      // that colours its labels from a parameter had that colour read as nothing and every label
+      // drawn in the default.
+      if (value.fields.keys == setOf("signal")) {
+        moved.getOrPut(part) { LinkedHashMap() }[vgProp] = value
+        axis.properties.remove(property)
+        continue
+      }
+      val condition = value["condition"] ?: continue
       val otherwise = obj { value.fields.forEach { (k, v) -> if (k != "condition") put(k, v) } }
       val conditions =
         when (condition) {

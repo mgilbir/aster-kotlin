@@ -1285,7 +1285,7 @@ private class Compilation(
       if (legends.isNotEmpty()) put("legends", arr(legends))
       // The theme, as Vega takes it. Without this a chart's guides are drawn in the engine's own
       // colours however carefully the specification restyled them.
-      config.forVega()?.let { put("config", it) }
+      config.forVega(diagnostics)?.let { put("config", it) }
       // `usermeta` is carried through to the Vega specification, last, which is where upstream's
       // `assemble` puts it — verified against the pinned compiler rather than read off its
       // documentation. It is the one top-level property whose whole purpose is to survive

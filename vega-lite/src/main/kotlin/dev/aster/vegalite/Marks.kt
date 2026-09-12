@@ -784,12 +784,7 @@ internal object Marks {
       // no mark at all, so [VG_MARK_PROPERTIES] never lets them through. `radius` is a Vega
       // property on every mark and goes out under its own name.
       if (key in TEXT_ONLY_MARK_PROPERTIES && view.spec.mark != "text") continue
-      // `{"expr": …}` is Vega-Lite's way of writing a signal, and Vega's is `{"signal": …}` — and
-      // a signal is a *reference*, not a value, so it replaces the whole entry rather than sitting
-      // inside one.
-      val expression = (value as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }
-      if (expression != null) put(key, signalRef(expression.string("expr").orEmpty()))
-      else put(key, obj { put("value", value) })
+      put(key, markProperty(value))
     }
   }
 
@@ -802,9 +797,25 @@ internal object Marks {
       "radius2" to "innerRadius",
     )
 
-  /** A mark-definition value as an encode entry: a signal where it is an `expr`, a value else. */
+  /**
+   * A mark-definition value as an encode entry: a **reference** where it is one, a value else.
+   *
+   * ```js
+   * export function signalOrValueRef<T>(value: T | SignalRef): {value: T} | SignalRef {
+   *   if (isSignalRef(value)) return value;
+   *   return value !== undefined ? {value} : undefined;
+   * }
+   * ```
+   *
+   * `{"expr": …}` is Vega-Lite's way of writing a signal and Vega's is `{"signal": …}`; either way
+   * it is a reference, not a value, and replaces the whole entry rather than sitting inside one. A
+   * theme's own expressions are already signals by the time they are read — `initConfig` makes them
+   * so — and wrapped in a value they reached the renderer as an object where a colour was wanted.
+   */
   private fun markProperty(value: VegaValue): VegaValue {
-    val expression = (value as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }
+    val stated = value as? VegaValue.Obj
+    if (stated?.fields?.keys == setOf("signal")) return stated
+    val expression = stated?.takeIf { it.fields.keys == setOf("expr") }
     return if (expression != null) signalRef(expression.string("expr").orEmpty())
     else obj { put("value", value) }
   }
@@ -1033,8 +1044,8 @@ internal object Marks {
         ?: markConfig.fields["stroke"]
 
     return obj {
-      if (defaultFill != null) put("fill", obj { put("value", defaultFill) })
-      if (defaultStroke != null) put("stroke", obj { put("value", defaultStroke) })
+      if (defaultFill != null) put("fill", markProperty(defaultFill))
+      if (defaultStroke != null) put("stroke", markProperty(defaultStroke))
       val colorChannel = if (filled) "fill" else "stroke"
       // The mark's own colour is what a *conditional* colour falls through to — upstream passes it
       // as `defaultValue` into `nonPosition`, so the production rule ends in it. Setting it above
@@ -1199,7 +1210,17 @@ internal object Marks {
 
   private fun literalRef(value: VegaValue?): Pair<String, VegaValue>? {
     if (value == null) return null
-    val expr = (value as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }?.get("expr")
+    val stated = value as? VegaValue.Obj
+    // A theme's expressions are already signals by the time they are read — `initConfig` makes them
+    // so — and a signal is a reference, not a value. Wrapped in one it reached the renderer as an
+    // object where a number or a colour was wanted.
+    stated
+      ?.takeIf { it.fields.keys == setOf("signal") }
+      ?.get("signal")
+      ?.let {
+        return "signal" to it
+      }
+    val expr = stated?.takeIf { it.fields.keys == setOf("expr") }?.get("expr")
     return if (expr != null) "signal" to expr else "value" to value
   }
 

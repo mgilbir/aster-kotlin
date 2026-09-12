@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **An expression in a theme is a signal, and a theme's parameters are the document's signals.**
+  `initConfig` rewrites `{"expr": …}` as `{"signal": …}` once, as the configuration is read, so
+  everything downstream sees a signal; `stripAndRedirectConfig` then moves `config.params` to
+  `config.signals`, Vega having no `config.params`. This compiler left both as written, and a
+  document that names a colour or a typeface once and reads it from the theme got three things
+  wrong: the expressions reached the renderer as *values* that happened to be objects, so a font was
+  named after an object and a colour was not a colour; the parameters reached it under a name Vega
+  has never heard of, so nothing those expressions named existed at all; and a label property
+  carrying a signal stayed on the axis, where Vega does not read it — the thirteen in
+  `CONDITIONAL_AXIS_PROP_INDEX` are painted per label, so a signal among them belongs in the axis's
+  own `encode` block. A signal is a **reference** wherever a value is read, too, and wrapped in one
+  it said nothing. One specification in the wild corpus themes itself that way.
 - **Two identical sibling aggregates fold into whichever end the optimizer that reaches them first
   keeps.** `MergeAggregates` runs first in each round and keeps the *last* of the aggregates that
   are already siblings when it runs — `mergeableAggs.pop()`. `MergeIdenticalNodes` runs later in the
