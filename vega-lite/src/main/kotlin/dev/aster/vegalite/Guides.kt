@@ -384,7 +384,23 @@ internal object Guides {
         themeTitle != null -> listOfNotNull(writtenOut?.takeIf { it !is VegaValue.Null })
         else -> fieldTitles
       }
-    if (guideTitle is VegaValue.Null) axis.nulledTitle = true
+    // ```js
+    // if (v1Val == null || v2Val === null) {
+    //   return {explicit: v1.explicit, value: null};
+    // }
+    // ```
+    //
+    // `mergeTitleComponent` answers `null` for **either** side being it, and a caption the
+    // *channel* nulls is as much the axis's `null` as one the axis block nulls: a layer that says
+    // its position needs no caption has said so for the axis the layers share. Read only off the
+    // axis block, a layer stating `"title": null` on its channel lost to whatever an earlier layer
+    // had named, and an axis the specification asked to leave unlabelled came out labelled.
+    if (
+      guideTitle is VegaValue.Null ||
+        (guideTitle == null && fieldTitles.any { it is VegaValue.Null })
+    ) {
+      axis.nulledTitle = true
+    }
     if (themeTitle != null && stated.isEmpty() && fieldTitles.none { it !is VegaValue.Null }) {
       axis.explicitTitle = true
     } else if (stated.isNotEmpty()) {

@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A caption the channel nulls is as much the axis's `null` as one the axis block nulls.**
+  `mergeTitleComponent` answers `null` for either side of the merge being it, and a layer that says
+  its position needs no caption has said so for the axis the layers share. This compiler read the
+  `null` only off the `axis` block, so a layer writing `"title": null` on its channel lost to
+  whatever an earlier layer had named, and an axis the specification asked to leave unlabelled came
+  out labelled. The `axis` block is still asked first, so a caption written there outranks a channel
+  that nulls it. Two specifications in the wild corpus draw an error bar over a bar and null the
+  error bar's caption so the two do not both name the axis; each needs further fixes to agree, so
+  the count is unchanged.
+
 - **A scale stands at the level that owns it, and a level stands before its children.**
   `assembleScales` walks the model tree and writes each model's own components before it recurses,
   so the order of a chart's scales is the order of its levels. A nested concatenation is a level of
