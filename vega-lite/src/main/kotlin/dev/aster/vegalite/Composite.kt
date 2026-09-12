@@ -354,7 +354,7 @@ internal class Composite(
 
     // `getTitle`: the summarised column is named by its own **title** where it has one — a
     // tooltip that reads `Mean of Miles per Gallon` is the axis's title, not the column's name.
-    val tooltip = tooltip(summary, field, shared, def.string("title") ?: field)
+    val tooltip = tooltip(summary, field, shared, def.string("title") ?: field, def.string("type"))
     val parts =
       if (type == "errorbar") errorBarParts(markDef, orient) else errorBandParts(markDef, encoding)
 
@@ -501,12 +501,24 @@ internal class Composite(
     /** `Max of v`, `Q3 of v`, … — what resting on a part of the box says. */
     val summarisedTitle = def.string("title") ?: field
 
+    // ```js
+    // return {
+    //   field: fieldPrefix + continuousAxisChannelDef.field,
+    //   type: continuousAxisChannelDef.type,
+    // ```
+    //
+    // A summary of the **continuous axis** is of that axis's kind: a box plot of an instant reads
+    // its quartiles back as dates. Written as quantities, the tooltip showed five epoch integers —
+    // and, worse, nothing asked for the column to be read as a date at all, so the summary was
+    // drawn and compared as numbers too.
+    val summarisedType = def.string("type") ?: "quantitative"
+
     fun summaryTooltip(entries: List<Pair<String, String>>): VegaValue =
       arr(
         entries.map { (prefix, title) ->
           obj {
             put("field", "$prefix$field")
-            put("type", "quantitative")
+            put("type", summarisedType)
             put("title", "$title of $summarisedTitle")
           }
         } +
@@ -1100,12 +1112,14 @@ internal class Composite(
     field: String,
     shared: Map<String, VegaValue>,
     title: String = field,
+    /** `continuousAxisChannelDef.type` — a summary of an instant is read back as one. */
+    summarisedType: String? = null,
   ): VegaValue {
     val entries = mutableListOf<VegaValue>()
     for ((prefix, prefixTitle) in summary.titles) {
       entries += obj {
         put("field", "$prefix$field")
-        put("type", "quantitative")
+        put("type", summarisedType ?: "quantitative")
         put("title", if (summary.titleNamesField) "$prefixTitle of $title" else prefixTitle)
       }
     }

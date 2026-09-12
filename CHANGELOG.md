@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **A summary of the continuous axis is of that axis's kind.** `getCompositeMarkTooltip` types every
+  entry of a composite mark's tooltip from the axis it summarises — `type:
+  continuousAxisChannelDef.type` — so a box plot of instants reads its quartiles back as dates and a
+  whisker of instants reads its ends as dates. Written as quantities, the tooltip showed five epoch
+  integers; and because what the encoding says a column is decides how it is parsed, nothing asked
+  for the summary to be read as a date at all, so the box was drawn and compared as numbers too. One
+  specification in the wild corpus box-plots an instant.
 - **A column a transform wrote is read back as what the encoding says, unless the transform already
   said the same thing.** `parseTransformArray` records what each transform claims it wrote — a
   *number* for a `bin`, an `aggregate`, a `window` and a `joinaggregate`, a *date* for a time unit,
