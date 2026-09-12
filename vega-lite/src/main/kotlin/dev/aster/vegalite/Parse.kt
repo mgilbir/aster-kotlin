@@ -2,6 +2,7 @@ package dev.aster.vegalite
 
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.canonicalNumberString
 
 /**
  * Reads a Vega-Lite specification into [UnitSpec], filling in what the grammar leaves implicit.
@@ -29,14 +30,53 @@ internal class Parse(
       return null
     }
 
-    val encoding = encoding(spec.obj("encoding") ?: VegaValue.EmptyObject, "$path.encoding")
-    val markDef =
-      markDef(markValue, encoding, path, spec.obj("data")?.fields?.containsKey("graticule") == true)
-        ?: return null
+    // The mark **type** is read before the encoding is, because which channels mean anything is the
+    // mark's answer: `const mark = markDef.type` above `initEncoding(spec.encoding, mark, …)`. The
+    // rest of the mark's definition still comes after, that part depending on the encoding.
+    val markType =
+      when (markValue) {
+        is VegaValue.Str -> markValue.value
+        is VegaValue.Obj -> markValue.string("type")
+        else -> null
+      }
+    val graticule = spec.obj("data")?.fields?.containsKey("graticule") == true
+    val encoding =
+      encoding(
+        spec.obj("encoding") ?: VegaValue.EmptyObject,
+        "$path.encoding",
+        markType,
+        markType?.let {
+          filled(markValue as? VegaValue.Obj ?: VegaValue.EmptyObject, it, graticule)
+        } ?: false,
+      )
+    val markDef = markDef(markValue, encoding, path, graticule) ?: return null
 
     // `alignStackOrderWithColorDomain`: a chart whose colours are listed in a stated order is drawn
     // in that order too, and the rule reaches into the encoding to say so.
-    val aligned = alignStackOrderWithColorDomain(encoding, markDef)
+    //
+    // **Asked of the stack, not guessed from the encoding.** Upstream computes `this.stack` and
+    // then
+    // aligns — `stack(markDef, encoding)` on line 118 of `unit.ts`, the alignment on line 128 — so
+    // the question is answered by the same code that decides whether anything stacks at all. This
+    // used to approximate it as "a quantitative position that aggregates", which misses a chart
+    // that stacks because it *said* `stack: true` and nothing else: 62 charts in the wild corpus
+    // differed by exactly the one formula this produces.
+    //
+    // The provisional spec is the pre-alignment one, which is also upstream's: the alignment adds
+    // an
+    // `order` channel afterwards and the stack is never recomputed against it.
+    val provisional =
+      UnitSpec(
+        markDef = markDef,
+        encoding = encoding,
+        data = spec.fields["data"],
+        transforms = spec.array("transform") ?: emptyList(),
+        width = spec.fields["width"],
+        height = spec.fields["height"],
+        params = spec.array("params").orEmpty(),
+        projection = spec.obj("projection"),
+      )
+    val aligned = alignStackOrderWithColorDomain(encoding, markDef, Stack.of(provisional) != null)
 
     return UnitSpec(
       markDef = markDef,
@@ -49,6 +89,7 @@ internal class Parse(
       // A **projection** belongs to the unit that draws through it. A layer may state one of its
       // own, and a chart's own is handed down to the members that did not.
       projection = spec.obj("projection"),
+      viewBackground = spec.obj("view"),
     )
   }
 
@@ -77,6 +118,10 @@ internal class Parse(
   private fun alignStackOrderWithColorDomain(
     encoding: Map<String, ChannelDef>,
     markDef: MarkDef,
+    /**
+     * Whether this view stacks, which is `this.stack` in `unit.ts` and decides the second branch.
+     */
+    stacked: Boolean,
   ): Aligned {
     if (encoding.containsKey("order")) return Aligned(encoding)
     val colour = encoding["fill"] ?: encoding["color"] ?: return Aligned(encoding)
@@ -86,9 +131,16 @@ internal class Parse(
 
     val offsetChannel =
       listOf("xOffset", "yOffset").firstOrNull { encoding[it]?.isFieldDef == true }
-    if (offsetChannel != null) {
+    // Upstream: `if (offsetEncoding && !offsetEncoding.sort) … else { … the stack branch … }`. An
+    // offset that already states a `sort` therefore **falls through** to the stack branch rather
+    // than ending the rule, which is what this used to do.
+    //
+    // No observable difference has been found for it: a chart dodged by an offset channel does not
+    // stack, so the branch returns on `!stacked` either way. Aligned regardless, because a rule
+    // that
+    // agrees by accident stops agreeing as soon as anything around it moves.
+    if (offsetChannel != null && encoding.getValue(offsetChannel).sort == null) {
       val offset = encoding.getValue(offsetChannel)
-      if (offset.sort != null) return Aligned(encoding)
       val listed = arr(domain)
       return Aligned(
         encoding +
@@ -100,16 +152,8 @@ internal class Parse(
       )
     }
     // A stack, and only a stack: with neither an offset channel nor an accumulation there is
-    // nothing whose order this could be. An accumulation is an aggregated measure against a
-    // discrete other position, which is what `Stack.of` decides from the whole view — but the mark
-    // is not built yet here, so the question is asked of the encoding: a quantitative position
-    // that aggregates.
-    val accumulating =
-      listOf("x", "y").firstOrNull { channel ->
-        val def = encoding[channel] ?: return@firstOrNull false
-        def.aggregate != null && def.type == MeasureType.QUANTITATIVE
-      }
-    if (accumulating == null) return Aligned(encoding)
+    // nothing whose order this could be. Upstream's test is `if (!this.stack) return`.
+    if (!stacked) return Aligned(encoding)
     val order = "_${field}_sort_index"
     // Written as Vega writes it, since it is the *text* of the list that reaches the expression:
     // `indexof(["sun","fog"], datum['weather'])`.
@@ -126,18 +170,26 @@ internal class Parse(
     }
     // A stack is accumulated from the origin outwards, so the *first* listed colour is the one
     // nearest it: at the bottom of a vertical stack, which counts down, and at the left of a
-    // horizontal one, which counts up. The orientation is the mark's where it states one and the
-    // accumulating channel's otherwise — a bar measured along x is a horizontal bar.
-    val horizontal =
-      markDef.raw.string("orient")?.let { it == "horizontal" } ?: (accumulating == "x")
-    val direction = if (horizontal) "ascending" else "descending"
+    // horizontal one, which counts up.
+    //
+    // **The mark's *resolved* orientation.** Upstream reads
+    // `this.markDef?.orient === 'horizontal' ? 'ascending' : 'descending'`, and `this.markDef` is
+    // the initialised definition: `initMarkDef` has already run
+    // `markDef.orient = orient(type, encoding, specifiedOrient)`, so a chart that states no
+    // `orient`
+    // still has the one inferred from its encoding. Reading the *stated* value instead ordered
+    // `stacked_bar_h_custom_color_domain` the wrong way about, which the gallery gate caught on the
+    // first run — the reason this rule is checked against those 627 before the wild corpus.
+    val direction = if (markDef.orient == "horizontal") "ascending" else "descending"
     val orderDef = obj {
       put("field", order)
       put("type", "quantitative")
       put("sort", direction)
     }
     return Aligned(
-      encoding + ("order" to channelDef("order", orderDef, "$.encoding.order")!!),
+      encoding +
+        ("order" to
+          channelDef("order", orderDef, "$.encoding.order")!!.copy(addedAfterStack = true)),
       listOf(calculate),
     )
   }
@@ -183,15 +235,7 @@ internal class Parse(
     }
 
     val markConfig = config.markConfig(type)
-    // `filled` before anything else: the encoding's colour channel resolves to `fill` or `stroke`
-    // depending on it, and the mark's own properties then depend on the encoding.
-    val filled =
-      raw.boolean("filled")
-        ?: markConfig.boolean("filled")
-        // `defaultFilled`: a **graticule** is not filled. It is the globe's grid of meridians and
-        // parallels — lines, whatever mark draws them — and filling each cell of it would paint
-        // over the map underneath.
-        ?: if (graticule) false else (type != "point" && type != "line" && type != "rule")
+    val filled = filled(raw, type, graticule)
 
     return MarkDef(
       type = type,
@@ -229,19 +273,93 @@ internal class Parse(
    * axes and the fields in the spoken description, so a specification that happens to list `y`
    * before `x` still produces the same chart as one that does not.
    */
-  fun encoding(block: VegaValue.Obj, path: String): Map<String, ChannelDef> {
+  fun encoding(
+    block: VegaValue.Obj,
+    path: String,
+    mark: String? = null,
+    filled: Boolean = false,
+  ): Map<String, ChannelDef> {
     val result = LinkedHashMap<String, ChannelDef>()
     val ordered =
       Channels.UNIT_CHANNELS.filter { block.fields.containsKey(it) } +
         block.fields.keys.filter { it !in Channels.UNIT_CHANNELS }
-    for (channel in ordered) {
-      val value = block.fields.getValue(channel)
+    val known = mark != null && mark in Channels.MARKS
+    for (written in ordered) {
+      val value = block.fields.getValue(written)
+      // An **offset nested inside a continuous position** is dropped: offsetting a band is moving
+      // the mark within its own slot, and a continuous position has no slot to move within.
+      // Upstream's own note says the right behaviour would be to offset in *data* space, and until
+      // it does, the encoding goes. A position bucketed by a time unit is exempt — that one has
+      // bands after all — and so is an offset given as a plain value.
+      if (known && (written == "xOffset" || written == "yOffset")) {
+        // `normalizedEncoding[mainChannel]`: the position **as parsed**, so a column that names no
+        // type but aggregates counts as the continuous position it will be drawn as.
+        val position = result[if (written == "xOffset") "x" else "y"]
+        val continuous =
+          position?.field != null &&
+            (position.type == MeasureType.QUANTITATIVE || position.type == MeasureType.TEMPORAL) &&
+            position.timeUnit == null
+        if (continuous && namesColumn(value as? VegaValue.Obj)) {
+          diagnostics.warn(
+            VegaLiteDiagnostics.UNSUPPORTED_CHANNEL,
+            "`$written` offsets a mark within its band, and a continuous " +
+              "`${if (written == "xOffset") "x" else "y"}` has no band to offset within, so the " +
+              "encoding is dropped — upstream does the same.",
+            jsonPath = "$path.$written",
+          )
+          continue
+        }
+      }
+      // An `angle` on a pie is the **slice**, not the rotation of a glyph that has none — upstream
+      // reads it as `theta` and says so, and it has to happen before the channel is asked whether
+      // an `arc` supports it, which an `angle` is not.
+      val channel =
+        if (written == "angle" && mark == "arc" && block.fields["theta"] == null) "theta"
+        else written
+      // `markChannelCompatible`: a channel the mark has no use for is dropped, and dropping it is
+      // not cosmetic. It would otherwise group an aggregate, name a scale of its own and be spoken
+      // in the chart's description — a line whose layer states the `text` its sibling label draws
+      // described every point by a column the line does not show.
+      if (mark != null && known && !compatible(channel, mark, block)) {
+        diagnostics.warn(
+          VegaLiteDiagnostics.UNSUPPORTED_CHANNEL,
+          "A `$mark` has nothing to set from `$channel`, so its encoding is dropped — upstream " +
+            "does the same, and reports `$channel dropped as it is incompatible with \"$mark\"`.",
+          jsonPath = "$path.$written",
+        )
+        continue
+      }
+      // A **line of varying thickness** is not a line Vega can draw: one `line` mark is one path,
+      // and a path has one `strokeWidth`. A size that varies per row is therefore dropped where it
+      // would vary — an aggregate is one value per group, and a group is what a line joins.
+      if (known && channel == "size" && mark == "line" && aggregates(value)) {
+        diagnostics.warn(
+          VegaLiteDiagnostics.UNSUPPORTED_CHANNEL,
+          "A `line` is one path of one thickness, so a `size` that aggregates is dropped — " +
+            "upstream does the same. Draw the varying thickness with a `trail`.",
+          jsonPath = "$path.$written",
+        )
+        continue
+      }
+      // `color` is the channel that means *whichever of fill and stroke this mark paints with*, so
+      // stating that one **as well** leaves nothing for the colour to set. Which one it collides
+      // with is the mark's own answer: a filled mark is painted by its fill, and an outline by its
+      // stroke.
+      if (known && channel == "color" && block.fields[if (filled) "fill" else "stroke"] != null) {
+        diagnostics.warn(
+          VegaLiteDiagnostics.UNSUPPORTED_CHANNEL,
+          "A `${if (filled) "fill" else "stroke"}` is what a `$mark` would have taken its " +
+            "`color` from, so the `color` encoding is dropped — upstream does the same.",
+          jsonPath = "$path.$written",
+        )
+        continue
+      }
       if (channel in UNSUPPORTED_CHANNELS) {
         diagnostics.error(
           VegaLiteDiagnostics.UNSUPPORTED_CHANNEL,
           "The `$channel` channel is not implemented; its encoding is ignored. Express the view " +
             "with the position, colour, size, shape, text and detail channels instead.",
-          jsonPath = "$path.$channel",
+          jsonPath = "$path.$written",
         )
         continue
       }
@@ -255,7 +373,7 @@ internal class Parse(
           VegaLiteDiagnostics.UNSUPPORTED_CHANNEL,
           "`$channel` is not an encoding channel, so its encoding is dropped — upstream does the " +
             "same. A near miss for one that is, such as `colour` for `color`, is worth checking.",
-          jsonPath = "$path.$channel",
+          jsonPath = "$path.$written",
         )
         continue
       }
@@ -264,7 +382,7 @@ internal class Parse(
       // losing them loses every field but the first from a tooltip.
       val entries = (value as? VegaValue.Arr)?.values ?: listOf(value)
       val parsed = entries.mapIndexedNotNull { index, entry ->
-        val at = if (value is VegaValue.Arr) "$path.$channel[$index]" else "$path.$channel"
+        val at = if (value is VegaValue.Arr) "$path.$written[$index]" else "$path.$written"
         channelDef(channel, entry, at)
       }
       val def = parsed.firstOrNull() ?: continue
@@ -285,6 +403,69 @@ internal class Parse(
       result[channel] = def.copy(type = result[main]?.type)
     }
     return result
+  }
+
+  /**
+   * `defaultFilled`, asked **before** anything else about the mark.
+   *
+   * ```js
+   * // Need to init filled before other mark properties because encoding depends on filled but
+   * // other mark properties depend on types inside encoding
+   * ```
+   *
+   * The encoding's colour channel resolves to a `fill` or a `stroke` depending on it — and so does
+   * whether a `color` beside one of them is dropped — while the mark's own properties depend on the
+   * encoding, so the order of those three questions is fixed.
+   *
+   * A **graticule** is not filled. It is the globe's grid of meridians and parallels — lines,
+   * whatever mark draws them — and filling each cell of it would paint over the map underneath.
+   */
+  private fun filled(raw: VegaValue.Obj, type: String, graticule: Boolean): Boolean =
+    raw.boolean("filled")
+      ?: config.markConfig(type).boolean("filled")
+      ?: if (graticule) false else (type != "point" && type != "line" && type != "rule")
+
+  /**
+   * `markChannelCompatible`: whether this mark has anything to set from this channel.
+   *
+   * ```js
+   * const markSupported = supportMark(channel, mark);
+   * if (!markSupported) return false;
+   * else if (markSupported === 'binned') {
+   *   const primaryFieldDef = encoding[channel === X2 ? X : Y];
+   *   if (isFieldDef(primaryFieldDef) && isFieldDef(encoding[channel]) && isBinned(primaryFieldDef.bin))
+   *     return true;
+   *   return false;
+   * }
+   * ```
+   *
+   * The second edge of an interval is the only conditional case: a mark that draws a **point**
+   * takes an `x2` to say where the bin the point sits in ends, so the primary channel has to be one
+   * whose data arrived already binned. The primary channel it looks at is `x` for an `x2` and `y`
+   * for everything else, latitudes included — upstream's own reading, and not a simplification of
+   * it.
+   */
+  private fun compatible(channel: String, mark: String, encoding: VegaValue.Obj): Boolean {
+    val supported = Channels.supportsMark(channel, mark) ?: return false
+    if (supported != "binned") return true
+    val primary = encoding.obj(if (channel == "x2") "x" else "y") ?: return false
+    if (!namesColumn(primary) || !namesColumn(encoding.obj(channel))) return false
+    // `isBinned`: the string, and an object saying so — the two ways a specification says its data
+    // was binned before it arrived.
+    val bin = primary.fields["bin"]
+    return bin == VegaValue.Str("binned") ||
+      (bin as? VegaValue.Obj)?.fields?.get("binned") == VegaValue.Bool(true)
+  }
+
+  /** `isFieldDef`: a definition naming a column, or counting the rows. */
+  private fun namesColumn(def: VegaValue.Obj?): Boolean =
+    def != null &&
+      (def.fields["field"] != null || def.fields["aggregate"] == VegaValue.Str("count"))
+
+  /** `getFieldDef(…)?.aggregate` — which reaches into a `condition` for its definition. */
+  private fun aggregates(value: VegaValue?): Boolean {
+    val def = value as? VegaValue.Obj ?: return false
+    return def.fields["aggregate"] != null || def.obj("condition")?.fields?.get("aggregate") != null
   }
 
   /**
@@ -335,6 +516,60 @@ internal class Parse(
     return out
   }
 
+  /**
+   * The column a definition names, read as **JavaScript** reads it.
+   *
+   * `field` is a string in the grammar and nothing upstream checks that: it is spelled into a
+   * template — `` `${expr}["${channelDef.field}"]` `` — and into `vgField`'s regular expressions,
+   * both of which coerce whatever they are given. So `"field": ["2021"]` names the column `2021`, a
+   * one-element array stringifying to its element, and `"field": 2021` names it too.
+   *
+   * This read the property as a string and answered nothing for anything else, which makes the
+   * definition not a field definition at all: the channel then had no scale, and a map coloured by
+   * a column written that way was drawn in one flat colour. Two specifications in the wild corpus
+   * write the array form.
+   *
+   * An object or a `null` is refused rather than coerced — `[object Object]` and `null` are columns
+   * no table has, and a chart naming one is a chart with a mistake in it worth reporting.
+   */
+  private fun fieldName(value: VegaValue.Obj, path: String): String? {
+    val stated = value.fields["field"] ?: return null
+    val coerced = jsString(stated)
+    if (coerced == null) {
+      diagnostics.warn(
+        VegaLiteDiagnostics.INVALID_ENCODING,
+        "A `field` names a column, so it has to be text; this one is neither text nor a number, " +
+          "and the channel is read as naming no column at all.",
+        jsonPath = "$path.field",
+      )
+      return null
+    }
+    if (stated !is VegaValue.Str) {
+      diagnostics.warn(
+        VegaLiteDiagnostics.INVALID_ENCODING,
+        "A `field` names a column, so it should be written as text. Upstream reads this one as " +
+          "`$coerced` — JavaScript's own string coercion — and so does this compiler.",
+        jsonPath = "$path.field",
+      )
+    }
+    return coerced
+  }
+
+  /** `String(value)` for the values a `field` may have been written as, and null for the rest. */
+  private fun jsString(value: VegaValue): String? =
+    when (value) {
+      is VegaValue.Str -> value.value
+      is VegaValue.Num -> canonicalNumberString(value.value)
+      is VegaValue.Bool -> value.value.toString()
+      // `Array.prototype.toString`: the elements coerced in turn and joined with a comma, which is
+      // why a **one-element** array is indistinguishable from its element.
+      is VegaValue.Arr -> {
+        val parts = value.values.map { jsString(it) ?: return null }
+        parts.joinToString(",")
+      }
+      else -> null
+    }
+
   private fun channelDef(channel: String, value: VegaValue, path: String): ChannelDef? {
     if (value !is VegaValue.Obj) {
       diagnostics.error(
@@ -345,7 +580,7 @@ internal class Parse(
       return null
     }
 
-    val field = value.string("field")
+    val field = fieldName(value, path)
     // `{"aggregate": {"argmax": "US Gross"}}` — an aggregate that answers with a whole *row*
     // rather than a number, named by the column it maximises. The op and that column are two
     // separate things and everything downstream needs both.
@@ -364,7 +599,7 @@ internal class Parse(
 
     return ChannelDef(
       channel = channel,
-      raw = value,
+      raw = withHeaderOrients(value),
       field = field,
       datum = value.fields["datum"],
       value = value.fields["value"],
@@ -378,6 +613,38 @@ internal class Parse(
       explicitTitle = value.fields["title"],
       conditions = conditions,
     )
+  }
+
+  /**
+   * `normalizeFieldDef`: a header's `orient` is a **shortcut** for both of its orients.
+   *
+   * ```js
+   * const {orient, ...rest} = header;
+   * if (orient) {
+   *   return {...fieldDef, header: {...rest, labelOrient: header.labelOrient || orient,
+   *                                          titleOrient: header.titleOrient || orient}};
+   * }
+   * ```
+   *
+   * Expanding it once, here, is what lets everything downstream ask for the part it is drawing —
+   * the caption's side or the heading's — rather than each reader remembering the shortcut. And the
+   * expansion is what a *reader* of the header sees: the `orient` itself is dropped, so the
+   * property rename that carries a header's styling onto the caption carries the side with it.
+   */
+  private fun withHeaderOrients(value: VegaValue.Obj): VegaValue.Obj {
+    val header = value.obj("header") ?: return value
+    val orient = header.fields["orient"] ?: return value
+    return obj {
+      putAll(value)
+      put(
+        "header",
+        obj {
+          header.fields.forEach { (key, entry) -> if (key != "orient") put(key, entry) }
+          put("labelOrient", header.fields["labelOrient"] ?: orient)
+          put("titleOrient", header.fields["titleOrient"] ?: orient)
+        },
+      )
+    }
   }
 
   /**

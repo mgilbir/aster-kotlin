@@ -22,61 +22,152 @@ internal class Composite(
   private val diagnostics: DiagnosticCollector,
 ) {
 
+  /** What an encoding *implies*, once [extractTransforms] has taken it out. */
+  private class Extracted(
+    /** The `timeUnit` transforms, which run before the summary. */
+    val transforms: List<VegaValue>,
+    /** `{"op": …, "field": …, "as": …}` — the measures the encoding asked the summary for. */
+    val aggregates: List<VegaValue>,
+    /** The columns the summary is broken down by, in the order the walk found them. */
+    val groupby: List<String>,
+    /** The encoding as the parts of the composite mark then carry it. */
+    val encoding: Map<String, VegaValue>,
+  )
+
   /**
-   * `extractTransformsFromEncoding`, for the buckets: a **time unit** on a channel of a composite
-   * mark becomes a transform of its own, and the channel is rewritten to read what it wrote.
+   * `extractTransformsFromEncoding`: the transforms an encoding *implies*, taken out of it.
    *
-   * The summary happens *after* the bucketing — one interval per bucket, not one per instant — so
-   * the unit cannot stay on the channel, where it would be applied to a column the aggregate has
+   * A channel of a composite mark asking for a mean, or for a column bucketed by year, is not
+   * something the parts can carry: they are drawn from the summary, and the summary is already one
+   * row per group. So each request becomes a transform of its own — a `timeUnit` above the
+   * aggregate, an `aggregate` measure inside it — and the channel is rewritten to read the column
+   * that transform writes. What is left names a column plainly, and *that* is what the summary is
+   * grouped by.
+   *
+   * Two details of the upstream walk decide the answer and are easy to miss.
+   *
+   * `forEach` spreads a **list** channel — a `tooltip` naming four columns is four definitions,
+   * each contributing a grouping or a measure — but the rewrite writes the *channel*:
+   * ```js
+   * (encoding as any)[channel as any] = newFieldDef;
+   * ```
+   *
+   * so only the **last** entry is left standing, and a four-column tooltip over an error bar reads
+   * one line. Where that last entry asks for nothing derived, the other branch writes
+   * `oldEncoding[channel]` instead — the list, whole and untouched, aggregating entries and all,
+   * which is why such a tooltip makes the part view summarise a second time.
+   *
+   * The summary happens *after* the bucketing — one interval per bucket, not one per instant — so a
+   * unit cannot stay on the channel, where it would be applied to a column the aggregate has
    * already collapsed. A channel that is not itself temporal is told to read the column it now
    * holds as a *time*, since nothing about an ordinal band would otherwise say so.
+   *
+   * The `bin` arm is not ported: a bucketed channel is carried through as it was written, and
+   * groups the summary by the raw column.
    */
-  private fun extractTimeUnits(
-    shared: Map<String, VegaValue>
-  ): Pair<List<VegaValue>, Map<String, VegaValue>> {
+  private fun extractTransforms(shared: Map<String, VegaValue>): Extracted {
     val transforms = mutableListOf<VegaValue>()
+    val aggregates = mutableListOf<VegaValue>()
+    val groupby = mutableListOf<String>()
     val rewritten = LinkedHashMap<String, VegaValue>()
     for ((channel, value) in shared) {
-      val entry = value as? VegaValue.Obj
-      val unit = entry?.string("timeUnit")
-      val field = entry?.string("field")
-      if (entry == null || unit == null || field == null || Fields.isBinnedTimeUnit(unit)) {
-        rewritten[channel] = value
-        continue
-      }
-      val name = Fields.varName("${unit}_$field")
-      transforms += obj {
-        put("timeUnit", unit)
-        put("field", field)
-        put("as", name)
-      }
-      // A column with a time unit and no stated type is an instant — that is the type Vega-Lite
-      // infers for one, and the rewritten channel has to say so, the unit no longer being there to
-      // imply it.
-      val temporal = entry.string("type") == null || entry.string("type") == "temporal"
-      rewritten[channel] = obj {
-        if (entry.fields["title"] == null) {
-          put("title", "$field (${Fields.timeUnitParts(unit).joinToString("-")})")
+      for (element in (value as? VegaValue.Arr)?.values ?: listOf(value)) {
+        val entry = element as? VegaValue.Obj
+        val field = entry?.string("field")
+        // An `argmin`/`argmax` is written as an object naming the column to take the extreme of,
+        // and produces the whole extreme *row* — the field then says which of its columns to read.
+        val extreme = entry?.obj("aggregate")
+        val argument =
+          extreme?.string("argmax")?.let { "argmax" to it }
+            ?: extreme?.string("argmin")?.let { "argmin" to it }
+        val op = entry?.string("aggregate") ?: argument?.first
+        val stated = entry?.string("timeUnit")
+        // A column that arrived already bucketed keeps its own name and needs no transform, there
+        // being nothing left to bucket — but it is still a `timeUnit`, so the unit comes **off**
+        // the
+        // channel all the same and the summary groups by the column as it stands.
+        val unit = stated?.takeIf { !Fields.isBinnedTimeUnit(it) }
+        // `isFieldDef`: a definition names a column, or counts the rows — a `count` is the one
+        // aggregate with nothing to be an aggregate *of*.
+        val named = field != null || op == "count"
+        if (entry == null || !named || (op == null && stated == null)) {
+          // `groupby.push(field)`, and a plain copy of the channel's whole value — which for a list
+          // is the list.
+          if (named && op == null && field != null) groupby += field
+          rewritten[channel] = value
+          continue
         }
-        entry.fields.forEach { (key, own) ->
-          if (key != "timeUnit" && key != "field") put(key, own)
+        // `vgField(channelDef, {forAs: true})`: the column the transform writes. A dot in the name
+        // stays a dot here, a transform's output being a name rather than a path.
+        val name =
+          when {
+            op == "count" -> "__count"
+            argument != null -> Fields.flatFieldName("${argument.first}_${argument.second}")
+            op != null -> Fields.flatFieldName("${op}_$field")
+            unit != null -> Fields.flatFieldName("${unit}_$field")
+            else -> Fields.flatFieldName(field!!)
+          }
+        if (op != null) {
+          aggregates += obj {
+            put("op", op)
+            if (field != null) put("field", field)
+            put("as", name)
+          }
+        } else {
+          groupby += name
+          if (unit != null) {
+            transforms += obj {
+              put("timeUnit", unit)
+              put("field", field)
+              put("as", name)
+            }
+          }
         }
-        if (entry.string("type") == null) put("type", "temporal")
-        put("field", name)
-        if (!temporal) {
-          val guide = if (channel == "x" || channel == "y") "axis" else "legend"
-          put(
-            guide,
-            obj {
-              put("formatType", "time")
-              entry.obj(guide)?.fields?.forEach { (key, own) -> put(key, own) }
-            },
-          )
+        // The title is written out because the rewritten definition no longer says what it was: a
+        // tooltip asking for a mean still reads `Mean of Body Mass (g)` and not `mean_Body Mass`.
+        val titled = entry.fields["title"] ?: guideTitle(entry)
+        val derived =
+          when {
+            op == "count" -> config.countTitle
+            argument != null ->
+              "$field for ${if (argument.first == "argmax") "max" else "min"} ${argument.second}"
+            op != null -> "${titleCase(op)} of $field"
+            unit != null -> "$field (${Fields.timeUnitParts(unit).joinToString("-")})"
+            else -> field!!
+          }
+        // A column with a time unit and no stated type is an instant — that is the type Vega-Lite
+        // infers for one, and the rewritten channel has to say so, the unit no longer being there
+        // to imply it.
+        val temporal = entry.string("type") == null || entry.string("type") == "temporal"
+        rewritten[channel] = obj {
+          if (titled == null) put("title", derived)
+          entry.fields.forEach { (key, own) ->
+            if (key != "timeUnit" && key != "field" && key != "aggregate") put(key, own)
+          }
+          if (stated != null && entry.string("type") == null) put("type", "temporal")
+          // The extreme row is read one step further in, and that step is a real path.
+          put("field", if (argument != null) "$name.$field" else name)
+          if (unit != null && !temporal) {
+            val guide = if (channel == "x" || channel == "y") "axis" else "legend"
+            put(
+              guide,
+              obj {
+                put("formatType", "time")
+                entry.obj(guide)?.fields?.forEach { (key, own) -> put(key, own) }
+              },
+            )
+          }
         }
       }
     }
-    return transforms to rewritten
+    return Extracted(transforms, aggregates, groupby, rewritten)
   }
+
+  /** `getGuide(channelDef)?.title` — a title said through the guide is said. */
+  private fun guideTitle(entry: VegaValue.Obj): VegaValue? =
+    entry.obj("axis")?.fields?.get("title")
+      ?: entry.obj("legend")?.fields?.get("title")
+      ?: entry.obj("header")?.fields?.get("title")
 
   /**
    * What a composite mark's summary is grouped by — `extractTransformsFromEncoding`.
@@ -88,12 +179,18 @@ internal class Composite(
    * column is not a request to break the summary down by that column.
    */
   private fun groupbyOf(shared: Map<String, VegaValue>): List<String> =
-    shared.entries
+    shared.values
+      // A **list** channel is a list of definitions, and each is a grouping of its own. `forEach`
+      // in `encoding.ts` — which is what `extractTransformsFromEncoding` walks the encoding with —
+      // spreads an array before it calls: `if (isArray(el)) for (const channelDef of el) f(…)`.
+      // A `tooltip` naming four columns breaks the summary down by all four, and reading only the
+      // channel's own definition summarised across every one of them.
+      .flatMap { value -> (value as? VegaValue.Arr)?.values ?: listOf(value) }
       // A channel that **aggregates** is a measure, not a grouping: `extractTransformsFromEncoding`
       // pushes it onto the aggregate list instead, so a tooltip asking for a mean of the column
       // being summarised does not also break the summary down by that column.
-      .filterNot { (_, value) -> (value as? VegaValue.Obj)?.has("aggregate") == true }
-      .mapNotNull { (_, value) -> (value as? VegaValue.Obj)?.string("field") }
+      .filterNot { value -> (value as? VegaValue.Obj)?.has("aggregate") == true }
+      .mapNotNull { value -> (value as? VegaValue.Obj)?.string("field") }
 
   /** The marks this handles. Anything else is not a composite mark. */
   fun handles(type: String): Boolean =
@@ -164,8 +261,8 @@ internal class Composite(
 
     // Everything but the continuous axis is carried by every part, and it is also what the summary
     // is grouped by: one interval per category, per colour, per detail.
-    val (units, shared) =
-      extractTimeUnits(
+    val extracted =
+      extractTransforms(
         encoding.fields.filterKeys {
           it != continuous &&
             it != "${continuous}2" &&
@@ -174,32 +271,33 @@ internal class Composite(
             it != "size"
         }
       )
+    val shared = extracted.encoding
     // Rows that already carry their own interval are not summarised, so there is nothing to group.
-    val groupby = if (ranged == null) groupbyOf(shared) else emptyList()
+    val groupby = if (ranged == null) extracted.groupby else emptyList()
 
     val outer = VegaValue.Obj(unit.fields.filterKeys { it != "mark" && it != "encoding" })
+    // `[...oldAggregate, ...errorBarSpecificAggregate]`: what the *encoding* asked the summary for
+    // comes first, and the interval's own measures after it.
+    val measures =
+      extracted.aggregates +
+        summary.aggregates.map { (op, name) ->
+          obj {
+            put("op", op)
+            put("field", field)
+            put("as", name)
+          }
+        }
     val transform =
       (unit.array("transform") ?: emptyList()) +
-        units +
+        extracted.transforms +
         // `aggregate.length === 0 ? [] : [{aggregate, groupby}]` — an interval the rows already
         // carry has nothing to aggregate, and an empty aggregate would collapse the whole table
         // into one row rather than leaving it alone.
-        (if (summary.aggregates.isEmpty()) emptyList()
+        (if (measures.isEmpty()) emptyList()
         else
           listOf(
             obj {
-              put(
-                "aggregate",
-                arr(
-                  summary.aggregates.map { (op, name) ->
-                    obj {
-                      put("op", op)
-                      put("field", field)
-                      put("as", name)
-                    }
-                  }
-                ),
-              )
+              put("aggregate", arr(measures))
               put("groupby", strings(groupby))
             }
           )) +
@@ -659,64 +757,69 @@ internal class Composite(
         )
     // With no outlier layer the whiskers *are* the first layer, so every name below loses a level.
     val whiskerPrefix = if (wantsOutliers) "layer_0_layer_1" else "layer_0"
+    // Each group is numbered by **position among the parts actually drawn**: upstream builds the
+    // layer array from the enabled parts and the names follow the array, so a box plot with its box
+    // switched off has its median at `layer_1_layer_0` rather than keeping the box's old slot.
     val whiskers =
       listOfNotNull(
-        part(
-          "rule",
-          "${whiskerPrefix}_layer_0",
-          listOf(quartiles, inside, whiskerSummary),
-          rule(),
-          "lower_whisker",
-          "lower_box",
-          tooltip = whiskerTooltip,
-        ),
-        part(
-          "rule",
-          "${whiskerPrefix}_layer_1",
-          listOf(quartiles, inside, whiskerSummary),
-          rule(),
-          "upper_box",
-          "upper_whisker",
-          tooltip = whiskerTooltip,
-        ),
-        part(
-          "ticks",
-          "${whiskerPrefix}_layer_2",
-          listOf(quartiles, inside, whiskerSummary),
-          tick("black"),
-          "lower_whisker",
-          tooltip = whiskerTooltip,
-        ),
-        part(
-          "ticks",
-          "${whiskerPrefix}_layer_3",
-          listOf(quartiles, inside, whiskerSummary),
-          tick("black"),
-          "upper_whisker",
-          tooltip = whiskerTooltip,
-        ),
-      )
+          part(
+            "rule",
+            "",
+            listOf(quartiles, inside, whiskerSummary),
+            rule(),
+            "lower_whisker",
+            "lower_box",
+            tooltip = whiskerTooltip,
+          ),
+          part(
+            "rule",
+            "",
+            listOf(quartiles, inside, whiskerSummary),
+            rule(),
+            "upper_box",
+            "upper_whisker",
+            tooltip = whiskerTooltip,
+          ),
+          part(
+            "ticks",
+            "",
+            listOf(quartiles, inside, whiskerSummary),
+            tick("black"),
+            "lower_whisker",
+            tooltip = whiskerTooltip,
+          ),
+          part(
+            "ticks",
+            "",
+            listOf(quartiles, inside, whiskerSummary),
+            tick("black"),
+            "upper_whisker",
+            tooltip = whiskerTooltip,
+          ),
+        )
+        .mapIndexed { index, (_, spec) -> "${whiskerPrefix}_layer_$index" to spec }
     val boxes =
       listOfNotNull(
-        part(
-          "box",
-          "layer_1_layer_0",
-          listOf(boxSummary),
-          box,
-          "lower_box",
-          "upper_box",
-          tooltip = fiveNumber,
-        ),
-        part(
-          "median",
-          "layer_1_layer_1",
-          listOf(boxSummary),
-          median,
-          "mid_box",
-          tooltip = fiveNumber,
-          colour = medianColour,
-        ),
-      )
+          part(
+            "box",
+            "",
+            listOf(boxSummary),
+            box,
+            "lower_box",
+            "upper_box",
+            tooltip = fiveNumber,
+          ),
+          part(
+            "median",
+            "",
+            listOf(boxSummary),
+            median,
+            "mid_box",
+            tooltip = fiveNumber,
+            colour = medianColour,
+          ),
+        )
+        .mapIndexed { index, (_, spec) -> "layer_1_layer_$index" to spec }
     return listOfNotNull(outliers) + whiskers + boxes
   }
 

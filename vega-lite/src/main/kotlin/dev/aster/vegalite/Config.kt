@@ -37,6 +37,16 @@ internal class Config(
 
   val padding: VegaValue = user.fields["padding"] ?: VegaValue.Num(5.0)
 
+  /**
+   * How a themed chart is sized, which `normalizeAutoSize` reads between the two it settles.
+   *
+   * A theme states the sizing behaviour a document's charts share — `{"autosize": "fit-x"}` for a
+   * column of charts that fill the page — and a chart of its own overrides it, property by property
+   * rather than whole: a theme's `contains: "padding"` survives a chart asking to be padded instead
+   * of fitted.
+   */
+  val autosize: VegaValue? = user.fields["autosize"]
+
   val timeFormat: String = user.string("timeFormat") ?: "%b %d, %Y"
 
   val countTitle: String = user.string("countTitle") ?: "Count of Records"
@@ -87,10 +97,17 @@ internal class Config(
   fun scaleInvalid(channel: String): VegaValue? =
     user.obj("scale")?.obj("invalid")?.fields?.get(channel)
 
-  /** `view.continuousWidth`/`continuousHeight`: the size of a plot with a continuous position. */
-  val continuousWidth: Double = view.number("continuousWidth") ?: 300.0
+  /**
+   * `view.continuousWidth`/`continuousHeight`: the size of a plot with a continuous position.
+   *
+   * `view.width` and `view.height` are the same properties under the names they had before the
+   * continuous and discrete sizes were told apart, and upstream still reads them **first** — "get
+   * width/height for backwards compatibility". A theme written against an older Vega-Lite sizes its
+   * plots that way, and this read only the newer names, so such a chart was drawn at the default.
+   */
+  val continuousWidth: Double = view.number("width") ?: view.number("continuousWidth") ?: 300.0
 
-  val continuousHeight: Double = view.number("continuousHeight") ?: 300.0
+  val continuousHeight: Double = view.number("height") ?: view.number("continuousHeight") ?: 300.0
 
   /** One discrete step, from which a band-scaled plot's whole width is computed. */
   val step: Double = view.number("step") ?: 20.0
@@ -138,6 +155,32 @@ internal class Config(
    * the rest, since Vega has never heard of them and would apply nothing.
    */
   fun axisConfigChain(channel: String, scaleType: String, orient: String): List<VegaValue.Obj> {
+    val (vegaLiteOnly, vega) = axisConfigFamilies(channel, scaleType, orient)
+    return vegaLiteOnly + vega
+  }
+
+  /**
+   * [axisConfigChain], split into the two families `getAxisConfigs` keeps apart.
+   *
+   * ```js
+   * const vlOnlyConfigTypes = [...typeBasedConfigTypes, ...typeBasedConfigTypes.map((c) => axisChannel + c.substr(4))];
+   * const vgConfigTypes = ['axis', axisOrient, axisChannel];
+   * ```
+   *
+   * The distinction decides what reaches the axis. A property stated in a block **Vega** knows —
+   * `config.axis`, `config.axisX`, `config.axisBottom` — is left off the axis so that Vega applies
+   * it from its own config block, which is the only way it can settle every axis at once. One
+   * stated in a block only *Vega-Lite* knows — `config.axisQuantitative` and its per-direction
+   * twins, named after a kind of scale rather than a place — has to be written onto the axis, since
+   * nothing downstream would apply it.
+   *
+   * @return the Vega-Lite-only blocks first, then Vega's own; each most specific first.
+   */
+  fun axisConfigFamilies(
+    channel: String,
+    scaleType: String,
+    orient: String,
+  ): Pair<List<VegaValue.Obj>, List<VegaValue.Obj>> {
     val typeBased =
       when {
         scaleType == "band" -> listOf("Band", "Discrete")
@@ -147,11 +190,9 @@ internal class Config(
         else -> emptyList()
       }
     val axisChannel = if (channel == "x") "axisX" else "axisY"
-    val names =
-      typeBased.map { axisChannel + it } +
-        typeBased.map { "axis$it" } +
-        listOf(axisChannel, "axis${orient.replaceFirstChar { it.uppercase() }}", "axis")
-    return names.mapNotNull { user.obj(it) }
+    val vegaLiteOnly = typeBased.map { axisChannel + it } + typeBased.map { "axis$it" }
+    val vega = listOf(axisChannel, "axis${orient.replaceFirstChar { it.uppercase() }}", "axis")
+    return vegaLiteOnly.mapNotNull { user.obj(it) } to vega.mapNotNull { user.obj(it) }
   }
 
   /** `config.style.<name>`, which a mark's `style` list pulls in as well as its own block. */
@@ -178,6 +219,29 @@ internal class Config(
     val out = LinkedHashMap<String, VegaValue>()
     val styles = LinkedHashMap<String, VegaValue>()
 
+    // `initConfig` lifts `font` out of the configuration and merges a derived block in its place,
+    // **under** everything the specification wrote:
+    //
+    //     const {color, font, fontSize, selection, ...restConfig} = specifiedConfig;
+    //     const mergedConfig = mergeConfig({}, duplicate(defaultConfig),
+    //       font ? fontConfig(font) : {}, …, restConfig || {});
+    //
+    //     export function fontConfig(font: string): Config {
+    //       return {text: {font}, style: {'guide-label': {font}, 'guide-title': {font},
+    //                                     'group-title': {font}, 'group-subtitle': {font}}};
+    //     }
+    //
+    // Vega has no top-level `config.font`, so a theme that names one and nothing else reached the
+    // renderer with the font in a place nothing reads: the whole chart was drawn in the default
+    // face. Seeded here rather than written at the end, because the specification's own style
+    // blocks merge *over* it — a `guide-label` that names a colour keeps this font beside it.
+    (user.fields["font"] as? VegaValue.Str)?.let { font ->
+      val block = obj { put("font", font) }
+      for (name in listOf("text", "guide-label", "guide-title", "group-title", "group-subtitle")) {
+        styles[name] = block
+      }
+    }
+
     for ((key, value) in user.fields) {
       when {
         key in VEGA_LITE_ONLY -> Unit
@@ -190,7 +254,10 @@ internal class Config(
               (v as? VegaValue.Obj)?.let { block ->
                 VegaValue.Obj(block.fields.filterKeys { it !in VEGA_LITE_ONLY_MARK })
               } ?: v
-            if (kept !is VegaValue.Obj || kept.fields.isNotEmpty()) styles[k] = kept
+            // `mergeConfig` is a deep merge over the derived blocks above, so a style that names
+            // one property keeps the seeded font beside it rather than replacing the block.
+            if (kept !is VegaValue.Obj || kept.fields.isNotEmpty())
+              styles[k] = merged(styles[k], kept)
           }
         // `config.mark` survives, minus the properties only Vega-Lite understands — `color` and
         // `filled` are resolved into a mark's own fill and stroke long before Vega sees anything.
@@ -208,18 +275,92 @@ internal class Config(
               VegaValue.Obj(block.fields.filterKeys { it !in drop })
             }
             ?.takeIf { it.fields.isNotEmpty() }
-            ?.let { styles[key] = it }
-        key == "title" -> titleStyle(value)?.let { styles["group-title"] = it }
+            ?.let { styles[key] = merged(styles[key], it) }
+        key == "title" -> {
+          titleStyle(value)?.let { styles["group-title"] = merged(styles["group-title"], it) }
+          subtitleStyle(value)?.let {
+            styles["group-subtitle"] = merged(styles["group-subtitle"], it)
+          }
+          // "subtitle part can stay in config.title since header titles do not use subtitle":
+          //
+          //     if (!isEmpty(subtitle)) { config.title = subtitle; } else { delete config.title; }
+          //
+          // So `config.title` **survives**, holding those seven properties and nothing else. This
+          // consumed the whole block, and a theme that set `subtitleFont` had nowhere to say it —
+          // the subtitle was drawn in the title's face.
+          subtitleProperties(value)?.let { out["title"] = it }
+        }
         // `config.view` becomes the **`cell`** style, not a `view` one: "View's default style is
         // `cell`" — `stripAndRedirectConfig` renames it on the way through, and a chart that told
         // its plotting area not to draw a border was otherwise still drawing one.
-        key == "view" -> viewStyle(value)?.let { styles["cell"] = it }
+        key == "view" -> viewStyle(value)?.let { styles["cell"] = merged(styles["cell"], it) }
         else -> out[key] = value
       }
     }
 
     if (styles.isNotEmpty()) out["style"] = VegaValue.Obj(styles)
     return if (out.isEmpty()) null else VegaValue.Obj(out)
+  }
+
+  /**
+   * The `subtitle` half of `extractTitleConfig`: the seven properties that stay in `config.title`.
+   *
+   * A **header** title has no subtitle, which is why these are the part that does not become a
+   * style — Vega's title directive reads them from the configuration itself. Each is kept only
+   * where it is truthy, `...(subtitleColor ? {subtitleColor} : {})`.
+   */
+  private fun subtitleProperties(value: VegaValue): VegaValue.Obj? {
+    val block = value as? VegaValue.Obj ?: return null
+    val fields = LinkedHashMap<String, VegaValue>()
+    for (key in
+      listOf(
+        "subtitleColor",
+        "subtitleFont",
+        "subtitleFontSize",
+        "subtitleFontStyle",
+        "subtitleFontWeight",
+        "subtitleLineHeight",
+        "subtitlePadding",
+      )) {
+      block.fields[key]?.takeIf { it.isTruthy() }?.let { fields[key] = it }
+    }
+    return if (fields.isEmpty()) null else VegaValue.Obj(fields)
+  }
+
+  /** `mergeConfig`, for one style block: what the specification wrote wins, key by key. */
+  private fun merged(seeded: VegaValue?, stated: VegaValue): VegaValue {
+    val under = (seeded as? VegaValue.Obj)?.fields ?: return stated
+    val over = (stated as? VegaValue.Obj)?.fields ?: return stated
+    val fields = LinkedHashMap(under)
+    fields.putAll(over)
+    return VegaValue.Obj(fields)
+  }
+
+  /**
+   * `subtitleMarkConfig`: the five properties a chart's **subtitle** inherits from its title.
+   *
+   * ```js
+   * const subtitleMarkConfig = pick(titleConfig, ['align', 'baseline', 'dx', 'dy', 'limit']);
+   * …
+   * if (!isEmpty(subtitleMarkConfig)) {
+   *   config.style['group-subtitle'] = {...config.style['group-subtitle'], ...subtitleMarkConfig};
+   * }
+   * ```
+   *
+   * A subtitle sits under the title and is nudged with it, so the placement carries over while the
+   * type does not — `fontSize` and `fontWeight` stay the title's alone, and the subtitle's own
+   * `subtitleFontSize` and its kin are left in `config.title` for the title directive to read.
+   *
+   * Writing only the `group-title` style left a chart that had moved its title fifty units across
+   * with a subtitle still at the origin, under nothing.
+   */
+  private fun subtitleStyle(value: VegaValue): VegaValue.Obj? {
+    val block = value as? VegaValue.Obj ?: return null
+    val fields = LinkedHashMap<String, VegaValue>()
+    for (key in listOf("align", "baseline", "dx", "dy", "limit")) {
+      block.fields[key]?.let { fields[key] = it }
+    }
+    return if (fields.isEmpty()) null else VegaValue.Obj(fields)
   }
 
   /** `config.title` names its colour `color`; a style block names it `fill`. */
@@ -242,7 +383,13 @@ internal class Config(
     for ((key, property) in block.fields) {
       if (
         key in
-          setOf("continuousWidth", "continuousHeight", "discreteWidth", "discreteHeight", "step")
+          setOf(
+            "continuousWidth",
+            "continuousHeight",
+            "discreteWidth",
+            "discreteHeight",
+            "step",
+          )
       ) {
         continue
       }
@@ -289,6 +436,7 @@ internal class Config(
       setOf(
         "scale",
         "color",
+        "font",
         "fontSize",
         "background",
         "padding",

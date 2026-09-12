@@ -650,16 +650,24 @@ internal class Transforms(
   fun implicitParses(transforms: List<VegaValue>): Map<String, String> {
     val parses = LinkedHashMap<String, String>()
     for (transform in transforms) {
-      // A `timeUnit` transform reads an *instant*, so the column it names is a date whatever the
-      // loader would otherwise have made of it — the same rule a temporal encoding follows.
-      if (transform.has("timeUnit")) {
-        transform.string("field")?.let { parses[it] = "date" }
-        continue
-      }
+      // A `timeUnit` transform's own input is parsed **above the transform** rather than here —
+      // see `parsedBeforeProducing` and the node the pipeline inserts from it.
+      if (transform.has("timeUnit")) continue
       if (!transform.has("filter")) continue
       collectParses(transform["filter"], parses)
     }
     return parses
+  }
+
+  /**
+   * The column a `timeUnit` transform reads, where nothing above it has settled that column's type.
+   *
+   * `ancestorParse.getWithExplicit(t.field)` is the guard: a column an earlier transform produced
+   * has the type that transform gave it and is not read again as text.
+   */
+  fun timeUnitInput(transform: VegaValue, alreadyProduced: Set<String>): String? {
+    if (!transform.has("timeUnit")) return null
+    return transform.string("field")?.takeIf { it !in alreadyProduced }
   }
 
   /**
@@ -697,8 +705,23 @@ internal class Transforms(
           (entry as? VegaValue.Obj)?.string("as")?.let { produced += it }
         }
       }
-      transform.obj("lookup")?.let {
-        produced += it.array("fields").orEmpty().mapNotNull { f -> (f as? VegaValue.Str)?.value }
+      // ```js
+      // public producedFields() {
+      //   return new Set(this.transform.as ? array(this.transform.as) :
+      // this.transform.from.fields);
+      // }
+      // ```
+      //
+      // A lookup's `lookup` names the column of *this* table it matches on; the columns it brings
+      // in are named by the **secondary** table — `from.fields` — or by the `as` that renames them.
+      // Reading them off the `lookup` property found nothing, since that property is a string, so a
+      // column brought in by a lookup was read as one the source table had: a date column arriving
+      // that way had the loader asked to parse it, in a table it is not in.
+      if (transform.has("lookup") && stated == null) {
+        produced +=
+          transform.obj("from")?.array("fields").orEmpty().mapNotNull { f ->
+            (f as? VegaValue.Str)?.value
+          }
       }
       transform.string("extent")?.let { produced += transform.string("param") ?: it }
     }
@@ -738,8 +761,23 @@ internal class Transforms(
           listOf("equal", "lte", "lt", "gt", "gte").firstNotNullOfOrNull { predicate.fields[it] }
             ?: (predicate.fields["range"] as? VegaValue.Arr)?.values?.firstOrNull()
             ?: (predicate.fields["oneOf"] as? VegaValue.Arr)?.values?.firstOrNull()
+        // ```js
+        // if (val) {
+        //   if (isDateTime(val)) implicit[filter.field] = 'date';
+        //   else if (isNumber(val)) implicit[filter.field] = 'number';
+        //   else if (isString(val)) implicit[filter.field] = 'string';
+        // }
+        // if (filter.timeUnit) implicit[filter.field] = 'date';
+        // ```
+        //
+        // `if (val)` is **truthiness**, so a comparison against zero or against the empty string
+        // says nothing about the column's type: `{"gt": 0}` is the commonest filter there is — keep
+        // the rows that have a value — and it left this compiler asking the loader to read a column
+        // upstream leaves as it found it. The `timeUnit` is asked outside that gate and so is asked
+        // here whatever the comparison was.
         when {
           predicate.string("timeUnit") != null -> into[field] = "date"
+          !value.isTruthy() -> Unit
           value is VegaValue.Obj -> into[field] = "date"
           value is VegaValue.Num -> into[field] = "number"
           value is VegaValue.Str -> into[field] = "string"
@@ -949,8 +987,10 @@ internal class Transforms(
       value is VegaValue.Num -> canonicalNumberString(value.value)
       value is VegaValue.Bool -> value.value.toString()
       // A date-time literal is compared as a number too, so it takes the same `time()` wrapper the
-      // field does — `predicateValueExpr` passes `wrapTime`.
-      value is VegaValue.Obj -> "time(datetime(${dateTimeArguments(value)}))"
+      // field does — `predicateValueExpr` passes `wrapTime`. Through `dateTimeToExpr` and not the
+      // arguments alone: that is what drops a `day` written beside a year, and what writes an
+      // instant the specification marked `utc` as `utc(…)` rather than as local time.
+      value is VegaValue.Obj -> "time(${dateTimeExpression(value)})"
       else -> "null"
     }
 
@@ -961,10 +1001,37 @@ internal class Transforms(
    * month to zero *or* to a quarter times three, and a date to one *or* to a day plus one, which is
    * the arithmetic that makes a bare `{"day": "mon"}` land on a Monday.
    */
+  /**
+   * `dateTimeParts(d, normalize = true)`'s first step: a **day** beside anything else is dropped.
+   *
+   * ```js
+   * if (normalize && d.day !== undefined) {
+   *   if (keys(d).length > 1) {
+   *     log.warn(log.message.droppedDay(d));
+   *     d = duplicate(d);
+   *     delete d.day;
+   *   }
+   * }
+   * ```
+   *
+   * Upstream's own comment further down says why: "HACK: Day only works as a standalone unit. This
+   * is only correct because we always set year to 2006 for day." A weekday is a position in a week
+   * and not a position in a month, and the `day + 1` that places it is arithmetic that only makes
+   * sense when nothing else is pinned. Written beside a year and a month it is nonsense, and
+   * carrying it there moved the date a day: `{"year": 1900, "month": 1, "day": 1}` came out as the
+   * second of January rather than the first.
+   */
+  private fun standaloneDay(value: VegaValue.Obj): VegaValue.Obj =
+    if (value.fields.containsKey("day") && value.fields.size > 1)
+      VegaValue.Obj(LinkedHashMap(value.fields).apply { remove("day") })
+    else value
+
   /** `dateTimeToExpr`: the instant a `DateTime` object names, as an expression. */
-  fun dateTimeExpression(value: VegaValue.Obj): String =
-    if (value.fields["utc"] == VegaValue.Bool(true)) "utc(${dateTimeArguments(value)})"
+  fun dateTimeExpression(raw: VegaValue.Obj): String {
+    val value = standaloneDay(raw)
+    return if (value.fields["utc"] == VegaValue.Bool(true)) "utc(${dateTimeArguments(value)})"
     else "datetime(${dateTimeArguments(value)})"
+  }
 
   private fun dateTimeArguments(value: VegaValue.Obj): String {
     fun number(key: String): String? =
@@ -1022,7 +1089,9 @@ internal class Transforms(
    * Date(year, month, …)` reads it — the two sides of the comparison agree because both ask the
    * same machine what its zone is.
    */
-  fun dateTimeTimestamp(value: VegaValue.Obj): Double {
+  fun dateTimeTimestamp(raw: VegaValue.Obj): Double {
+    // `dateTimeToTimestamp` reads the same normalised parts the expression does.
+    val value = standaloneDay(raw)
     fun part(key: String): Double? =
       when (val own = value.fields[key]) {
         is VegaValue.Num -> own.value

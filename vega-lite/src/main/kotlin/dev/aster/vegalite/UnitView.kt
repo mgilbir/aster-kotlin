@@ -256,6 +256,7 @@ internal class UnitView(
           height = spec.height,
           params = spec.params,
           projection = spec.projection,
+          viewBackground = spec.viewBackground,
         ),
         config,
         name,
@@ -312,11 +313,18 @@ internal class UnitView(
     return !def.scaleDisabled
   }
 
-  /** The channels that own a scale in this view, in specification order. */
+  /**
+   * The channels that own a scale in this view, in the order `parseUnitScaleCore` walks them.
+   *
+   * `for (const channel of SCALE_CHANNELS)`, and not the order the encoding was written in: the
+   * scale components go into a dictionary keyed by channel, and `assembleScales` reads it back in
+   * insertion order. The two agree for every chart that writes its channels where they belong, and
+   * part company the moment one is *moved* — an `angle` on an `arc` is read as `theta` at the place
+   * the angle was written, and this engine then put the colour's scale before the slice's.
+   */
   fun scaledChannels(): List<Pair<String, ChannelDef>> =
-    spec.encoding.entries
-      .mapNotNull { (channel, def) ->
-        if (channel !in Channels.SCALE_CHANNELS) null else scaledDef(def)?.let { channel to it }
+    Channels.SCALE_CHANNELS.mapNotNull { channel ->
+        spec.encoding[channel]?.let { def -> scaledDef(def)?.let { channel to it } }
       }
       .filter { (_, def) -> !def.scaleDisabled }
       // An outline has no scale: `geojson` is not a measurement, and a `shape` channel carrying one

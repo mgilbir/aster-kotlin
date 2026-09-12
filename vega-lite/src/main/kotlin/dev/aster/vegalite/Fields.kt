@@ -370,6 +370,16 @@ internal object Fields {
   /** `a.b` stays one nested path in a transform's output; the dots are literal there. */
   private fun removePathFromField(path: String): String = splitAccessPath(path).joinToString(".")
 
+  /**
+   * [removePathFromField], for a name assembled by hand rather than read off a [ChannelDef].
+   *
+   * The composite marks build their own output names — `mean_Body Mass (g)`, `year_a b` — before
+   * there is a definition to ask, and they have to be the same names `vgField(…, {forAs: true})`
+   * would have given: a space and a bracket are kept, a **path** is flattened, and nothing is
+   * turned into an underscore.
+   */
+  fun flatFieldName(path: String): String = removePathFromField(path)
+
   /** Everywhere else a dot is escaped, because Vega reads an unescaped one as a path step. */
   /**
    * `replacePathInField`: every path step joined by an **escaped** dot, each step escaped in turn.

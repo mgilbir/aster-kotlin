@@ -258,9 +258,21 @@ private class Compilation(
     if (selection.type != "interval") {
       // A click on another selection's **brush** is not a pick: the rectangle belongs to the brush
       // that owns it, and a click on it would otherwise pick whatever row lies under the drag.
+      //
+      // Every interval selection on the same view, whatever it is bound to. Upstream asks only its
+      // type:
+      //
+      //     vals(model.component.selection ?? {})
+      //       .reduce((acc, cmpt) => cmpt.type === 'interval' ? acc.concat(cmpt.name + BRUSH) :
+      // acc, [])
+      //
+      // A **scale-bound** interval was excluded here on the reasoning that it draws no brush, so
+      // there is no rectangle to click — but `indexof` on a name nothing carries is simply always
+      // less than zero, and the guard costs nothing. Upstream writes it, so a chart that pans its
+      // axes while picking points disagreed on the one signal that does the picking.
       val brushes =
         selections
-          .filter { it.type == "interval" && !it.bindsScales && it.owner === selection.owner }
+          .filter { it.type == "interval" && it.owner === selection.owner }
           .map { "${it.name}_brush" }
       return selection.signals(
         unit = selection.unitName(views.firstOrNull().takeIf { facet != null }, facet),
@@ -270,8 +282,11 @@ private class Compilation(
     }
     val view = selection.owner ?: views.firstOrNull() ?: return emptyList()
     val unit = selection.unitName(views.firstOrNull().takeIf { facet != null }, facet)
-    return selection.intervalSignals(view, selection.initial) +
-      selection.intervalTail(view, unit = unit, initial = selection.initial)
+    return selection.intervalSignals(
+      view,
+      selection.initial,
+      pushesOutward = pushesOutward(view),
+    ) + selection.intervalTail(view, unit = unit, initial = selection.initial)
   }
 
   /**
@@ -370,6 +385,11 @@ private class Compilation(
     reportSchemaVersion()
     reportUnsupportedTopLevel()
 
+    // **Vega-Lite 4's `selection` first**, because upstream runs its compatibility normalizer
+    // before
+    // the core one — `coreNormalizer.map(selectionCompatNormalizer.map(spec))` — and everything
+    // below here is written against `params`. See `SelectionCompat`.
+    if (SelectionCompat.applies(spec)) spec = SelectionCompat.normalize(spec)
     // A repetition is rewritten into a concatenation before anything is compiled, exactly as
     // upstream normalizes it, so there is nothing further down that knows what `repeat` is.
     if (spec.has("repeat")) spec = Repeat.normalize(spec, diagnostics) ?: return failed()
@@ -471,16 +491,26 @@ private class Compilation(
         return failed()
       }
     }
-    // A **projection** belongs to the unit whose places it puts on the page. A view with a
-    // geographic channel has one whether or not the specification stated any properties for it, and
-    // one that states properties has one whether or not it has drawn anything yet.
+    // A **projection** belongs to the unit whose places it puts on the page, and it is the
+    // *encoding* that says so:
+    //
+    //     function parseUnitProjection(model: UnitModel): ProjectionComponent {
+    //       if (model.hasProjection) { … }
+    //       return undefined;
+    //     }
+    //
+    // `hasProjection` is a `geoshape` mark or a geographic position channel — nothing else. A
+    // projection stated at the top of a chart does not make a plot that draws in `x` and `y`
+    // projected, and treating it as if it did put that plot's table into the `fit`: a map layered
+    // under a scatter of ordinary positions was scaled to cover both, so the map came out the
+    // wrong size.
     for (plot in plots) {
       for (view in plot.views) {
         val stated = view.spec.projection ?: plot.spec.obj("projection") ?: spec.obj("projection")
         val geographic =
           view.spec.encoding.keys.any { it in Channels.GEO_POSITION_CHANNELS } ||
             view.spec.mark == "geoshape"
-        if (!geographic && stated == null) continue
+        if (!geographic) continue
         view.projection = obj {
           config.raw.obj("projection")?.fields?.forEach { (key, value) -> put(key, value) }
           stated?.fields?.forEach { (key, value) -> put(key, value) }
@@ -511,8 +541,20 @@ private class Compilation(
       // `parseNonUnitProjections` runs for any composition, a **facet** as much as a layer: a grid
       // whose cells are maps has one projection, named for the grid and not for the cell, so every
       // cell is drawn at the same scale.
+      // A member with **no** projection does not stop the merge — `every` returns true for it:
+      //
+      //     const mergable = every(model.children, (child) => {
+      //       const projection = child.component.projection;
+      //       if (!projection) return true;          // child layer does not use a projection
+      //       …
+      //     });
+      //
+      // so one map under a scatter of ordinary positions is still a *layer's* projection, named for
+      // the layer. Requiring two geographic members left it named for the member, and the mark that
+      // reads it named the member's too.
       if (
-        (geographic.size > 1 || (plot.facet != null && geographic.isNotEmpty())) &&
+        (plot.views.size > 1 || plot.facet != null) &&
+          geographic.isNotEmpty() &&
           geographic.all { it.projection == geographic.first().projection }
       ) {
         val name =
@@ -620,19 +662,35 @@ private class Compilation(
             ?: continue
         val scale = view.scaleComponents[channel] ?: continue
         scale.properties["domainRaw"] = signalRef("$named[${quoted(field)}]")
-        view.clippedByScale = true
       }
     }
-    // `scaleClip`: a mark whose position scale is driven by a selection is **clipped**, or a pan
-    // that moves the domain past the data draws the rows that fell outside the plot. It asks about
-    // the *scale*, not the view: two plots sharing the panned scale are both clipped, which is what
-    // makes a pair of linked plots move together without either spilling over its neighbour.
-    for (selection in selections.filter { it.bindsScales }) {
-      val declaring = selection.owner ?: views.firstOrNull() ?: continue
-      val panned = selection.intervalChannels(declaring).map { declaring.scale(it.first) }.toSet()
-      for (view in views) {
-        if (setOf("x", "y").any { view.scale(it) in panned }) view.clippedByScale = true
-      }
+    // ```js
+    // export function scaleClip(model: UnitModel) {
+    //   const xScale = model.getScaleComponent('x');
+    //   const yScale = model.getScaleComponent('y');
+    //   return xScale?.get('selectionExtent') || yScale?.get('selectionExtent') ? true : undefined;
+    // }
+    // ```
+    //
+    // A mark whose position scale is driven by a selection is **clipped**, or a pan that moves the
+    // domain past the data draws the rows that fell outside the plot. The question is asked of the
+    // *scale* — which is why two plots sharing the panned scale are both clipped, and what makes a
+    // pair of linked plots move together without either spilling over its neighbour — and it is
+    // asked of the scale that was actually driven. Both loops above have already answered it: a
+    // `domainRaw` is what a driven scale carries, and it is written only where a selection can
+    // drive one. Asking the selection instead clipped a chart whose brush was **refused**: a
+    // categorical position has no halfway between two of its values, so binding one to the scales
+    // moves nothing, and upstream warns and passes over the channel.
+    // `getScaleComponent` walks **up** the model tree — a member that encodes no `y` of its own is
+    // still measured by its layer's — so the question is asked of the plot's position scales rather
+    // than of the view's own: a text label beside a panned scatter is clipped along with it.
+    for (plot in plots) {
+      val driven =
+        plot.scales.values.any {
+          // `x` and `y` alone, which is what `scaleClip` asks for: a polar position is not panned.
+          it.channel in setOf("x", "y") && it.properties.containsKey("domainRaw")
+        }
+      if (driven) plot.views.forEach { it.clippedByScale = true }
     }
 
     // The sizes are named before anything reads them, because what a concatenation calls them
@@ -761,8 +819,14 @@ private class Compilation(
         // A selection's **controls** are part of the page rather than of the drawing, so they sit
         // at
         // the top with `unit` and before the signal the tests read.
+        // In **reverse** order of declaration, each control being *unshifted* onto the list as the
+        // selections are walked: `signals.unshift({name: sgname, …})` in `inputBindings` and in
+        // `bindLegend` alike. So a chart with a control per parameter writes the last one's first,
+        // which is not a detail of the output — a reader looking down a column of drop-downs sees
+        // them in the order Vega lists them.
         selections
           .distinctBy { it.name }
+          .reversed()
           .flatMap {
             it.inputSignals(it.owner ?: views.firstOrNull()) +
               it.legendSignals(it.owner ?: views.firstOrNull())
@@ -891,8 +955,17 @@ private class Compilation(
       put("background", spec.fields["background"] ?: config.background)
       // A chart's own padding beats the theme's, as its background does: a specification stating
       // one is overriding what the configuration settled, not the other way about.
-      put("padding", spec.fields["padding"] ?: config.padding)
-      autosize(views)?.let { put("autosize", it) }
+      //
+      // The theme's is taken only where it is **truthy**, which is the one place the two differ: a
+      // `config: {"padding": 0}` reaches Vega as no padding at all, where a `"padding": 0` written
+      // on the chart itself reaches it as a zero. Upstream drops the falsy one while merging the
+      // configuration and takes the specification's as written, and this wrote a `padding: 0` that
+      // upstream does not.
+      put(
+        "padding",
+        spec.fields["padding"] ?: config.padding.takeIf { it.isTruthy() },
+      )
+      autosize(views, root)?.let { put("autosize", it) }
       put("width", mergedSize("width") ?: if (concat == null) root.width else null)
       put("height", mergedSize("height") ?: if (concat == null) root.height else null)
       // `cell` is the bordered plotting area; a chart with no Cartesian position — a pie — has no
@@ -1179,11 +1252,35 @@ private class Compilation(
    * its store, because every unit writes a tuple and the state is whichever unit moved last. The
    * signals themselves carry it instead, declared at the top and written from inside.
    */
+  /**
+   * `model.parent && !isTopLevelLayer(model)`: whether a view's bound-scale state is pushed
+   * outward.
+   *
+   * ```js
+   * function isTopLevelLayer(model: Model): boolean {
+   *   return model.parent && isLayerModel(model.parent) && (!model.parent.parent || isTopLevelLayer(model.parent.parent));
+   * }
+   * ```
+   *
+   * A view drawn by itself has nothing above it, and a member of a **single** layer at the root of
+   * the chart is drawn in the chart's own group — so in neither case is there an outer signal to
+   * push into. Everything else has one: a plot of a concatenation, a cell of a trellis, and a
+   * member of a *nested* layer, which is what a composite mark and a layer of layers both are.
+   *
+   * The nesting is read off the view's name, this compiler having no model tree to walk:
+   * `layer_0_layer_1` is a member of a layer inside a layer, where `layer_0` is a member of the
+   * chart's own.
+   */
+  private fun pushesOutward(view: UnitView): Boolean {
+    if (concat != null || facet != null) return true
+    return Regex("(^|_)layer_\\d+").findAll(view.name).count() >= 2
+  }
+
   private fun boundOutward(
     selection: Selection,
     views: List<UnitView>,
   ): List<Pair<String, String>> {
-    if (!selection.bindsScales || (concat == null && facet == null)) return emptyList()
+    if (!selection.bindsScales) return emptyList()
     // Every view that declares it, not just the one that owns the component. `topLevelSignals` is
     // called once per unit and **appends** the mappings it does not already have — "no single
     // selCmpt has a global view" — so a repeated plot's bound signal names every field any of its
@@ -1194,6 +1291,10 @@ private class Compilation(
       Selection.from(view.spec.params).any { it.name == selection.name }
     }
     val over = (listOfNotNull(selection.owner) + declaring).distinct().ifEmpty { views.take(1) }
+    // `if (!model.parent || isTopLevelLayer(model) || bound.length === 0) return signals` — a chart
+    // whose views push nothing outward has nothing to push *into*, and the state is read from the
+    // one view's own signals.
+    if (over.none { pushesOutward(it) }) return emptyList()
     val out = LinkedHashMap<String, String>()
     for (view in over) {
       selection.intervalChannels(view).forEach { (_, field) ->
@@ -1382,8 +1483,21 @@ private class Compilation(
   private fun style(views: List<UnitView>): VegaValue? {
     val styles = LinkedHashSet<String>()
     for (view in views) {
-      styles +=
-        if (view.spec.encoding["x"] != null || view.spec.encoding["y"] != null) "cell" else "view"
+      // `assembleGroupStyle` asks the view's own `view` block first: a chart that names its styles
+      // is drawn with **those**, and the `cell` a plotting area gets by default is a default like
+      // any other. A layer unions its members' answers, so a member naming one style and a member
+      // naming none come out as that style beside `cell`.
+      when (val stated = view.spec.viewBackground?.fields?.get("style")) {
+        null ->
+          styles +=
+            if (view.spec.encoding["x"] != null || view.spec.encoding["y"] != null) "cell"
+            else "view"
+        is VegaValue.Str -> styles += stated.value
+        is VegaValue.Arr -> styles += stated.values.mapNotNull { (it as? VegaValue.Str)?.value }
+        // A `"style": null` names no style and asks for no default either: `style !== undefined`
+        // is what the question is, and Vega is handed nothing.
+        else -> Unit
+      }
     }
     return when (styles.size) {
       0 -> null
@@ -1521,10 +1635,11 @@ private class Compilation(
         (spec.number("columns") ?: it.raw.number("columns"))?.toInt(),
         owner,
         config,
+        wrappedFacetLayout(level, it),
       )
     }
-    val row = channels["row"]?.let { Facet("row", it, owner) }
-    val column = channels["column"]?.let { Facet("column", it, owner) }
+    val row = channels["row"]?.let { Facet("row", it, owner, config) }
+    val column = channels["column"]?.let { Facet("column", it, owner, config) }
     if (row == null && column == null) {
       diagnostics.fatal(
         VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
@@ -1533,7 +1648,12 @@ private class Compilation(
       )
       return null
     }
-    return FacetGrid(row, column, owner)
+    return FacetGrid(
+      row,
+      column,
+      owner,
+      crossedFacetLayout(level, channels["row"], channels["column"]),
+    )
   }
 
   private fun plots(): List<Plot>? {
@@ -1563,7 +1683,10 @@ private class Compilation(
           // copies come out `child__b` rather than `concat_0`: upstream's model takes `spec.name`
           // over the name its parent offered it. Below the first level the names compose.
           val here =
-            entry.name ?: listOf(name, "concat_$index").filter { it.isNotEmpty() }.joinToString("_")
+            entry.name
+              ?: Fields.varName(
+                listOf(name, "concat_$index").filter { it.isNotEmpty() }.joinToString("_")
+              )
           // A concatenation's own transforms belong to *it*, not to each plot below it: they are
           // one chain in upstream's tree, forking at the plots, and naming them for each plot in
           // turn would leave three copies of one chain with nothing to fold them by.
@@ -1582,10 +1705,14 @@ private class Compilation(
     // which is one `child` per level: that is what makes its plots `child_concat_0` rather than
     // `concat_0`, and their scales and sizes follow the name.
     val root =
-      listOf(spec.string("name").orEmpty())
-        .plus(List(cellLevels.size) { "child" })
-        .filter { it.isNotEmpty() }
-        .joinToString("_")
+      if (cellLevels.isEmpty()) spec.string("name").orEmpty()
+      else
+        Fields.varName(
+          listOf(spec.string("name").orEmpty())
+            .plus(List(cellLevels.size) { "child" })
+            .filter { it.isNotEmpty() }
+            .joinToString("_")
+        )
     plotTree =
       build(
         root,
@@ -1843,8 +1970,91 @@ private class Compilation(
    * trellis of rows an inch apart still wants the configured gap between its columns, so the side
    * left out is filled in rather than dropped.
    */
+  /**
+   * `getFacetMappingAndLayout`: the composition-layout properties a **wrapped** facet carries.
+   *
+   * `align` and `center` are stated beside the facet in the operator form and on the channel in the
+   * encoding form, and upstream's normaliser lifts the one onto the other before either is read —
+   * the same two places `columns` is looked for.
+   */
+  private fun wrappedFacetLayout(owner: VegaValue.Obj, def: ChannelDef): VegaValue.Obj = obj {
+    // `bounds` is never lifted — a facet definition has no such property — so it is the chart's own
+    // and nothing else's.
+    owner.fields["bounds"]?.let { put("bounds", it) }
+    // `{...outerSpec, ...layout}`: the **lifted** properties are spread after the chart's own, so a
+    // `center` written on the facet channel outranks one written beside the chart. This asked the
+    // chart first and had the precedence the other way round.
+    for (key in listOf("align", "center")) {
+      (def.raw.fields[key] ?: owner.fields[key])?.let { put(key, it) }
+    }
+  }
+
+  /**
+   * `extractCompositionLayout` and the crossed half of `getFacetMappingAndLayout`, together.
+   *
+   * A **crossed** grid lifts its layout properties per channel:
+   * ```js
+   * for (const prop of ['align', 'center', 'spacing'] as const) {
+   *   if (def[prop] !== undefined) {
+   *     layout[prop] ??= {};
+   *     layout[prop][channel] = def[prop];
+   *   }
+   * }
+   * ```
+   *
+   * so a trellis whose *rows* state an alignment gets `{"align": {"row": …}}` — an object, which
+   * **replaces** whatever the chart itself said rather than filling in the other side. Row before
+   * column, the loop's own order.
+   *
+   * `bounds` is not lifted and comes from the chart alone. `spacing` is [statedFacetSpacing]'s, the
+   * layout's `padding` being a different key.
+   */
+  private fun crossedFacetLayout(
+    owner: VegaValue.Obj,
+    row: ChannelDef?,
+    column: ChannelDef?,
+  ): VegaValue.Obj = obj {
+    owner.fields["bounds"]?.let { put("bounds", it) }
+    for (key in listOf("align", "center")) {
+      val perChannel =
+        listOfNotNull("row" to row, "column" to column).mapNotNull { (channel, def) ->
+          def?.raw?.fields?.get(key)?.let { channel to it }
+        }
+      when {
+        perChannel.isNotEmpty() -> put(key, obj { perChannel.forEach { (c, v) -> put(c, v) } })
+        else -> owner.fields[key]?.let { put(key, it) }
+      }
+    }
+  }
+
+  /**
+   * `getFacetMappingAndLayout`: a facet **channel** carries its own `spacing`.
+   *
+   * The operator form writes it beside the facet and the encoding form writes it on the channel,
+   * and upstream's normaliser lifts the one onto the other before `assembleLayout` turns it into
+   * the layout's `padding` — the same two places `columns` and `align` are looked for.
+   *
+   * A wrapped facet's is a number, lifted whole. A crossed one's is written **per channel**,
+   * `layout[prop][channel] = def[prop]`, so a trellis whose rows state a gap and whose columns do
+   * not is a `{row, column}` pair with one side still to fill in.
+   */
+  private fun statedFacetSpacing(owner: VegaValue.Obj): VegaValue? {
+    owner.fields["spacing"]?.let {
+      return it
+    }
+    val encoding = owner.obj("encoding") ?: return null
+    encoding.obj("facet")?.fields?.get("spacing")?.let {
+      return it
+    }
+    val sides = LinkedHashMap<String, VegaValue>()
+    for (channel in listOf("row", "column")) {
+      encoding.obj(channel)?.fields?.get("spacing")?.let { sides[channel] = it }
+    }
+    return if (sides.isEmpty()) null else VegaValue.Obj(sides)
+  }
+
   private fun facetSpacing(owner: VegaValue.Obj): VegaValue {
-    val stated = owner.fields["spacing"] ?: config.raw.obj("facet")?.fields?.get("spacing")
+    val stated = statedFacetSpacing(owner) ?: config.raw.obj("facet")?.fields?.get("spacing")
     val configured = config.raw.obj("facet")?.number("spacing") ?: FACET_SPACING
     return if (stated is VegaValue.Obj)
       obj {
@@ -1861,9 +2071,16 @@ private class Compilation(
       // A plot inside a composition is still a unit or a layer, so its own title frames the group
       // — unless it is a **grid**, which is a composition itself and anchors its title to the
       // start rather than framing a plotting area it does not have.
-      plot.spec.fields["title"]?.let {
-        put("title", titleFor(it, composed = plot.facet != null))
-      }
+      //
+      // And a plot that is a **layer** promotes a title from one of its members, exactly as the
+      // chart does: `LayerModel.assembleTitle` is the same function whether the layer is the whole
+      // chart or one plot of a concatenation. Reading only the plot's own title left a
+      // concatenation of layers untitled, cell by cell, with the captions written on the layers
+      // that carry the text marks.
+      val title =
+        plot.spec.fields["title"]?.let { titleFor(it, composed = plot.facet != null) }
+          ?: layerTitle(plot.spec)
+      title?.let { put("title", it) }
       if (plot.facet == null) put("style", style(plot.views))
       // A **grid** has no plotting area to size: its layout places the cells, and the size the
       // plot's name carries is one cell's.
@@ -2001,14 +2218,16 @@ private class Compilation(
         above +
           List((part.array("transform").orEmpty().size - above.size).coerceAtLeast(0)) { prefix }
       return parts.flatMap { (name, part) ->
-        val here = listOf(prefix, name).filter { it.isNotEmpty() }.joinToString("_")
+        val here = Fields.varName(listOf(prefix, name).filter { it.isNotEmpty() }.joinToString("_"))
         val overlaid = normalize.pathOverlay(part)
         if (overlaid == null) {
           listOf(Triple(here, part, owners(part)))
         } else {
           overlaid.mapIndexed { index, view ->
             Triple(
-              listOf(here, "layer_$index").filter { it.isNotEmpty() }.joinToString("_"),
+              Fields.varName(
+                listOf(here, "layer_$index").filter { it.isNotEmpty() }.joinToString("_")
+              ),
               view,
               owners(view),
             )
@@ -2070,7 +2289,9 @@ private class Compilation(
           // `layer` relies on: its copies are `child__layer_b`, not `layer_0`.
           val here =
             child.string("name")
-              ?: listOf(prefix, "layer_$index").filter { it.isNotEmpty() }.joinToString("_")
+              ?: Fields.varName(
+                listOf(prefix, "layer_$index").filter { it.isNotEmpty() }.joinToString("_")
+              )
           val here2 = "$path.layer[$index]"
           // A transform belongs to the model it was **written on**, and that model's name is what
           // names the signals it publishes: a `bin` above a layer is the layer's, so its bounds are
@@ -2217,7 +2438,7 @@ private class Compilation(
     fun through(suffix: String) =
       Fields.varName(if (named.isEmpty()) suffix else "${named}_$suffix")
     fun channel(name: String) = views.firstNotNullOfOrNull { view ->
-      view.spec.encoding[name]?.takeIf { it.isFieldDef }?.let { Facet(name, it, named) }
+      view.spec.encoding[name]?.takeIf { it.isFieldDef }?.let { Facet(name, it, named, config) }
     }
     val row = channel("row")
     val column = channel("column")
@@ -2237,8 +2458,9 @@ private class Compilation(
           (spec.number("columns") ?: wrapped.raw.number("columns"))?.toInt(),
           named,
           config,
+          wrappedFacetLayout(spec, wrapped),
         )
-      else FacetGrid(row, column, named)
+      else FacetGrid(row, column, named, crossedFacetLayout(spec, row?.def, column?.def))
 
     return views.map { view ->
       val withoutFacet = view.spec.encoding.filterKeys { it !in Channels.FACET_CHANNELS }
@@ -2250,14 +2472,19 @@ private class Compilation(
             transforms = view.spec.transforms,
             width = view.spec.width,
             height = view.spec.height,
+            // A cell has a plotting area of its own, so what the view block says about styling it
+            // is the cell's — `assembleGroupStyle` is asked of the child model, which is this one.
+            viewBackground = view.spec.viewBackground,
           ),
           config,
           // `child` under the chart's own name and above the layer's: a named trellis of layers
           // reads `trellis_child_layer_0`, because the name belongs to the model the cell hangs
           // from and the layer's index to the view inside it.
-          listOf(named, "child", view.name.removePrefix(named).trimStart('_'))
-            .filter { it.isNotEmpty() }
-            .joinToString("_"),
+          Fields.varName(
+            listOf(named, "child", view.name.removePrefix(named).trimStart('_'))
+              .filter { it.isNotEmpty() }
+              .joinToString("_")
+          ),
           parentIsLayer = view.parentIsLayer,
         )
         .also {
@@ -2472,7 +2699,7 @@ private class Compilation(
           // A cell is styled by the same rule the chart's own group is: `cell` where it has a
           // Cartesian position to border, `view` where it has none. A trellis of pies has no
           // plotting area in any of its cells.
-          (style(views) as? VegaValue.Str)?.value ?: "cell",
+          style(views) ?: VegaValue.Str("cell"),
           cellCardinality,
           cellScales,
           viewEncode(),
@@ -2660,18 +2887,33 @@ private class Compilation(
    * `normalizeAutoSize` and `getTopLevelProperties`, which settle the same property in two places.
    *
    * A chart says nothing about sizing and gets `pad`, which is Vega's own default and so is written
-   * as nothing at all. Two things change that. A size of **`"container"`** asks the page for it, so
-   * the chart is *fitted* along that direction — and `contains: "padding"` with it, because the
-   * element's width includes the padding the chart would otherwise add outside it. And an axis
-   * whose orientation is driven by a **parameter** needs `resize`, since the drawing is re-laid out
-   * when the axis moves from one side to the other and a padded surface would keep the old extent.
+   * as nothing at all. Four things change that.
+   *
+   * A size of **`"container"`** asks the page for it, so the chart is *fitted* along that direction
+   * — and `contains: "padding"` with it, because the element's width includes the padding the chart
+   * would otherwise add outside it. A theme may state the sizing its document's charts share, which
+   * the chart's own then overrides property by property. An axis whose orientation is driven by a
+   * **parameter** needs `resize`, since the drawing is re-laid out when the axis moves from one
+   * side to the other and a padded surface would keep the old extent — and that one is added only
+   * where nothing else settled the sizing, `getTopLevelProperties` reaching it under `autosize ===
+   * undefined`.
+   *
+   * And a fit is given up where there is nothing to fit. Only a single view or a layer *has* one
+   * plotting area to stretch; and a plotting area derived from a **step** per category has a size
+   * of its own, so stretching it to the surface would contradict the step. Where one direction is
+   * stepped and the other is not, the fit survives along the other — a bar chart as wide as its
+   * bars is still fitted vertically.
    */
-  private fun autosize(views: List<UnitView>): VegaValue? {
+  private fun autosize(views: List<UnitView>, root: LayoutSize): VegaValue? {
+    // `isFitCompatible`: a grid or a row of plots is laid out from its parts, and none of them is
+    // the thing a fit would stretch.
+    val single = facet == null && concat == null
     val declared = spec.fields["autosize"]
-    val stated = (declared as? VegaValue.Str)?.let { obj { put("type", it.value) } } ?: declared
+    val stated = normalizedAutoSize(declared)
+    // A `"container"` size on a composition is discarded rather than fitted.
     val responsive =
       listOf("width" to "fit-x", "height" to "fit-y").filter {
-        spec.fields[it.first] == VegaValue.Str("container")
+        single && spec.fields[it.first] == VegaValue.Str("container")
       }
     val fitted =
       when {
@@ -2679,43 +2921,146 @@ private class Compilation(
         responsive.size == 1 -> responsive.single().second
         else -> null
       }
-    val resize = views.any { view -> Guides.hasSignalOrient(view) }
     val merged = obj {
       put("type", "pad")
       if (fitted != null) {
         put("type", fitted)
         put("contains", "padding")
       }
-      if (resize) put("resize", VegaValue.Bool(true))
-      (stated as? VegaValue.Obj)?.fields?.forEach { (key, value) -> put(key, value) }
+      normalizedAutoSize(config.autosize)?.fields?.forEach { (key, value) -> put(key, value) }
+      stated?.fields?.forEach { (key, value) -> put(key, value) }
     }
+    // A `"fit"` asks for the whole surface, which only a single view or a layer has one of.
+    val normalized =
+      if (merged.string("type") == "fit" && !single) {
+        obj {
+          merged.fields.forEach { (key, value) -> put(key, value) }
+          put("type", "pad")
+        }
+      } else {
+        merged
+      }
+    // Where all of that settles on Vega's own default, `normalize` has nothing to say and leaves
+    // the property the specification wrote **unnormalized** — it spreads its answer over the
+    // specification only when it has one. So a `"fit"` on a facet reaches the assembly as it was
+    // written, having been turned into a `pad` and then forgotten: the warning is the whole of what
+    // upstream does about it.
+    val settled = if (normalized.fields == PADDED) declared else normalized
+    val resize = views.any { view -> Guides.hasSignalOrient(view) }
+    val top =
+      when {
+        settled == null ->
+          obj {
+            put("type", "pad")
+            if (resize) put("resize", VegaValue.Bool(true))
+          }
+        // Anything but a name or a block is passed through as it stands: `keys` of a number is
+        // empty, so there is no type to read and nothing to settle.
+        else -> normalizedAutoSize(settled) ?: return settled
+      }
+    val fitting = droppedFit(top.string("type"), single, root)
+    val emitted =
+      if (fitting == null) top
+      else
+        obj {
+          top.fields.forEach { (key, value) -> put(key, value) }
+          put("type", fitting)
+        }
     // Vega's own default is written as nothing; a type on its own is written as the bare string.
-    if (merged.fields.keys == setOf("type")) {
-      val type = merged.string("type")
-      return if (type == "pad") null else VegaValue.Str(type.orEmpty())
+    val type = emitted.string("type")
+    if (emitted.fields.keys == setOf("type") && !type.isNullOrEmpty()) {
+      return if (type == "pad") null else VegaValue.Str(type)
     }
-    return merged
+    return emitted
+  }
+
+  /** `_normalizeAutoSize`: a name is the block that states only that name. */
+  private fun normalizedAutoSize(autosize: VegaValue?): VegaValue.Obj? =
+    when (autosize) {
+      null -> null
+      is VegaValue.Str -> obj { put("type", autosize.value) }
+      is VegaValue.Obj -> autosize
+      else -> null
+    }
+
+  /**
+   * The fit a **stepped** plotting area leaves, or null where the stated one stands.
+   *
+   * A size derived from a step per category is a size the data settles, so a fit along that
+   * direction is a contradiction: upstream drops it, and where only one direction is stepped it
+   * drops that half of the fit rather than the whole — `getFitType(inverseSizeType)`.
+   */
+  private fun droppedFit(type: String?, single: Boolean, root: LayoutSize): String? {
+    if (type !in setOf("fit", "fit-x", "fit-y")) return null
+    // A composition's own layout size is never settled — `parseChildrenLayoutSize` sizes the
+    // children and leaves the parent's alone — and the rule asks for both.
+    if (!single) return null
+    val stepped =
+      listOf("x" to "width", "y" to "height").filter { (channel, size) ->
+        root.values[channel] == null && spec.fields[size] != VegaValue.Str("container")
+      }
+    if (stepped.size == 2) return "pad"
+    val step = stepped.singleOrNull() ?: return null
+    return if (step.first == "x") "fit-y" else "fit-x"
+  }
+
+  /**
+   * Whether this specification makes a **composition** rather than a unit or a layer.
+   *
+   * `assembleTitle` reads the two kinds of model differently. A unit or layer anchors its title to
+   * the *group* rather than to the whole surface, which keeps it over the plotting area when an
+   * axis widens the drawing to its left. A composition cannot: its groups are laid out and there is
+   * no one plotting area to sit over, so it takes `anchor: "start"` instead — upstream's note is
+   * that a centred title "does not look nice" over a grid.
+   */
+  private fun isComposition(from: VegaValue.Obj): Boolean {
+    val encoding = from.obj("encoding")
+    return from.has("facet") ||
+      from.has("concat") ||
+      from.has("hconcat") ||
+      from.has("vconcat") ||
+      from.has("repeat") ||
+      // A facet channel is a facet written in the encoding, and the model it makes is a facet
+      // model — so its title is a composition's, laid out above a grid. All three channels:
+      // `facet` wraps one field's values, and a chart that wraps is as composed as one that
+      // crosses. Leaving it out framed such a title to a plotting area the chart does not have.
+      encoding?.has("row") == true ||
+      encoding?.has("column") == true ||
+      encoding?.has("facet") == true
   }
 
   private fun title(): VegaValue? {
-    val declared = spec.fields["title"] ?: return null
-    // `assembleTitle` reads the two kinds of model differently. A **unit or layer** anchors its
-    // title to the *group* rather than to the whole surface, which keeps it over the plotting area
-    // when an axis widens the drawing to its left. A **composition** cannot: its groups are laid
-    // out and there is no one plotting area to sit over, so it takes `anchor: "start"` instead —
-    // upstream's note is that a centred title "does not look nice" over a grid.
-    val encoding = spec.obj("encoding")
-    val composed =
-      spec.has("facet") ||
-        spec.has("concat") ||
-        spec.has("hconcat") ||
-        spec.has("vconcat") ||
-        spec.has("repeat") ||
-        // A `row`/`column` channel is a facet written in the encoding, and the model it makes is a
-        // facet model — so its title is a composition's, laid out above a grid.
-        encoding?.has("row") == true ||
-        encoding?.has("column") == true
-    return titleFor(declared, composed)
+    spec.fields["title"]?.let { declared ->
+      titleFor(declared, isComposition(spec))?.let {
+        return it
+      }
+    }
+    return layerTitle(spec)
+  }
+
+  /**
+   * `LayerModel.assembleTitle`: "if title does not provide layer, look into children".
+   *
+   * A layer's members are drawn in one group, so there is no child group for a title written on one
+   * of them to sit over — and rather than lose it, upstream promotes it to the chart's own. The
+   * first member that has one wins, depth first, and a title on the layer itself outranks all of
+   * them. A **concatenation** does not do this: its children have groups of their own, and a title
+   * written on one stays there.
+   */
+  private fun layerTitle(from: VegaValue.Obj): VegaValue? {
+    val layers = (from.fields["layer"] as? VegaValue.Arr)?.values ?: return null
+    for (member in layers) {
+      val child = member as? VegaValue.Obj ?: continue
+      child.fields["title"]?.let { declared ->
+        titleFor(declared, isComposition(child))?.let {
+          return it
+        }
+      }
+      layerTitle(child)?.let {
+        return it
+      }
+    }
+    return null
   }
 
   /** The chart group's own `encode`, which is where a top-level `view` block's paint lands. */
@@ -2740,26 +3085,96 @@ private class Compilation(
     }
   }
 
-  /** `assembleTitle`, for a title on any model: the group frame, or the composition's anchor. */
-  private fun titleFor(declared: VegaValue, composed: Boolean): VegaValue {
+  /**
+   * `extractTitleConfig(…).nonMarkTitleProperties`: the six a theme writes on the title *directive*
+   * rather than into a style block.
+   *
+   * Every other `config.title` property is paint and becomes the `group-title` style, which is why
+   * [Config] keeps these six out of it — and until now nothing put them back, so a theme whose
+   * `config.title.anchor` is `"start"` produced a centred title with a group frame instead.
+   *
+   * `angle` and `limit` come through wherever they are stated, the other four only where they are
+   * truthy: upstream spreads them as `...(anchor ? {anchor} : {})` against `...(angle !== undefined
+   * ? {angle} : {})`, and an `anchor: ""` is no anchor at all.
+   */
+  private fun nonMarkTitleProperties(): Map<String, VegaValue> {
+    val block = config.raw.obj("title") ?: return emptyMap()
+    val properties = LinkedHashMap<String, VegaValue>()
+    for (key in listOf("anchor", "frame", "offset", "orient", "angle", "limit")) {
+      val value = block.fields[key] ?: continue
+      if (key == "angle" || key == "limit" || value.isTruthy()) properties[key] = value
+    }
+    return properties
+  }
+
+  /**
+   * `assembleTitle`, for a title on any model: the group frame, or the composition's anchor.
+   *
+   * Nothing at all where there is no `text`, which is upstream's `if (title.text) { … } return
+   * undefined` — a block of title properties with nothing to say is not a title. And `isText`
+   * accepts an **array** of strings as readily as one string, a title written over several lines
+   * being a list of them.
+   */
+  private fun titleFor(declared: VegaValue, composed: Boolean): VegaValue? {
     val fields = (declared as? VegaValue.Obj)?.fields
-    val text = fields?.get("text") ?: declared.takeIf { it is VegaValue.Str }
-    if (text == null) return declared
-    return obj {
-      if (fields == null) put("text", text) else fields.forEach { (key, value) -> put(key, value) }
-      if (composed) {
-        if (fields?.containsKey("anchor") != true) put("anchor", "start")
-      } else {
-        val anchor = (fields?.get("anchor") as? VegaValue.Str)?.value
-        if ((anchor == null || anchor == "middle") && fields?.containsKey("frame") != true) {
-          put("frame", "group")
+    val text =
+      fields?.get("text")
+        ?: declared.takeIf {
+          it is VegaValue.Str || (it as? VegaValue.Arr)?.values?.firstOrNull() is VegaValue.Str
         }
+    // `if (title.text)`, and the empty string is falsy: a title of no words is no title, and
+    // writing one out reserved the space above the chart for it. `""` is what a specification
+    // written by a tool that always emits the key leaves behind.
+    if (text == null || !text.isTruthy()) return null
+    // `{...nonMarkTitleProperties, ...titleNoEncoding, ...(encoding ? {encode: …} : {})}`, and in
+    // that order: what the title itself states outranks what the theme did.
+    val title = LinkedHashMap<String, VegaValue>(nonMarkTitleProperties())
+    if (fields == null) title["text"] = text
+    // A title's `encoding` is a Vega `encode` block rather than a title property, which is the one
+    // key upstream destructures out before it spreads the rest.
+    else fields.forEach { (key, value) -> if (key != "encoding") title[key] = value }
+    fields?.get("encoding")?.let { title["encode"] = obj { put("update", it) } }
+    // The two defaults are applied to the assembled title, after everything it was spread from —
+    // so they read a theme's anchor as being as explicit as the title's own, and a `frame` lands
+    // last of all, which is where upstream's `??=` puts it.
+    if (composed) {
+      if (!title.containsKey("anchor")) title["anchor"] = VegaValue.Str("start")
+    } else {
+      val anchor = (title["anchor"] as? VegaValue.Str)?.value
+      if ((anchor == null || anchor == "middle") && !title.containsKey("frame")) {
+        title["frame"] = VegaValue.Str("group")
       }
     }
+    return VegaValue.Obj(title)
   }
 
   // -----------------------------------------------------------------------------------------
   // Data
+
+  /**
+   * How many **models** name each table, counted over the specification as written.
+   *
+   * `parseRoot` runs for the root and for every model that states its own `data`, and nowhere else:
+   * a layer member with no `data` block of its own reads its parent's flow rather than looking for
+   * a source. So this counts the `data` blocks in the tree, and a table two of them name is one
+   * `findSource` finds already standing — which [SourceNode.shared] explains is observable.
+   *
+   * A **`lookup`**'s joined table is not one of them: `LookupNode.make` calls the same `findSource`
+   * and only reuses what it finds, so a `transform` is not walked into.
+   */
+  private fun countStatedTables(node: VegaValue, into: MutableMap<VegaValue, Int>) {
+    when (node) {
+      is VegaValue.Obj -> {
+        node.fields["data"]?.let { into[it] = (into[it] ?: 0) + 1 }
+        for ((key, value) in node.fields) {
+          if (key == "data" || key == "datasets" || key == "transform") continue
+          countStatedTables(value, into)
+        }
+      }
+      is VegaValue.Arr -> node.values.forEach { countStatedTables(it, into) }
+      else -> {}
+    }
+  }
 
   private fun assembleData(views: List<UnitView>): List<VegaValue> {
     if (views.any { it.spec.data == null }) {
@@ -2783,6 +3198,10 @@ private class Compilation(
     // chart's table `source_0`. It is left out where nothing hangs off it, as an unused subtree is.
     spec.fields["data"]?.let { own -> if (views.any { it.spec.data == own }) order += own }
     val roots = LinkedHashMap<VegaValue, SourceNode>()
+    // How many **models** name each table, which is how many times `parseRoot` runs on it and
+    // therefore how many times it can be *found* already standing. See [SourceNode.shared].
+    val statedBy = LinkedHashMap<VegaValue, Int>()
+    countStatedTables(spec, statedBy)
     // Which selections are read as a **table** rather than as a test. `materializeSelections`
     // builds one for every selection upstream and lets its ref counting drop the unread ones; the
     // same answer is reached here by asking first, since an output nobody reads still costs a
@@ -2881,7 +3300,15 @@ private class Compilation(
           materialized = materialized,
           lookupOutputs = lookupOutputs,
         )
-        .build(roots.getOrPut(data) { SourceNode(data) })
+        // `parseRoot`: a source already standing is **found** rather than made, and finding one is
+        // observable — see [SourceNode.shared].
+        .build(
+          roots
+            .getOrPut(data) { SourceNode(data) }
+            .also {
+              if ((statedBy[data] ?: 0) >= 2) it.sharedAgain()
+            }
+        )
     }
     // Every view built its own chain onto its source, so a shared tree forks there; the shared
     // parse is hoisted above the fork before the tree is named and flattened.
@@ -2908,6 +3335,10 @@ private class Compilation(
         if (settled == previous) return@repeat
         previous = settled
       }
+      // Last, because it asks what each identifier's **parent** is and the folds above are what
+      // decide that: `RemoveUnnecessaryIdentifierNodes` is the one optimizer upstream runs after
+      // the loop rather than inside it.
+      root.pruneIdentifiers()
     }
     val datasets =
       DataAssembler()
@@ -3106,8 +3537,23 @@ private class Compilation(
         val contributed = ScaleComponent(channel, component.type, component.name())
         Scales.range(view, channel, def, component.type)?.let { contributed.set("range", it) }
         Scales.properties(view, channel, def, component.type, contributed)
+        // Which of them this view **stated**. A range is explicit where any of the four words that
+        // settle one was written: `parseScaleRange` records the whole property as explicit for
+        // `scheme` and the two ends as much as for `range` itself.
+        val statedKeys = def.scale?.fields?.keys.orEmpty()
+        val stated =
+          statedKeys +
+            if (statedKeys.any { it in setOf("range", "scheme", "rangeMin", "rangeMax") })
+              setOf("range")
+            else emptySet()
         contributed.properties.forEach { (key, value) ->
-          if (key !in component.properties) component.properties[key] = value
+          val explicitHere = key in stated
+          // `mergeValuesWithExplicit`: an explicit value beats a derived one whichever layer it
+          // arrives on, and between two of the same kind the first still wins.
+          if (explicitHere && key !in component.explicitProperties) {
+            component.properties[key] = value
+            component.explicitProperties += key
+          } else if (key !in component.properties) component.properties[key] = value
         }
         component.domainHasZero = Scales.domainHasZero(component)
       }
@@ -3122,78 +3568,127 @@ private class Compilation(
     component.properties.forEach { (key, value) -> if (key != "range") put(key, value) }
   }
 
-  /** One domain passes through; several become a `fields` union, which is what a layer needs. */
+  /**
+   * `mergeDomains` in `compile/scale/domain.ts`: one domain passes through, several become a
+   * `fields` union, and the *sort* is settled here rather than by each contributor.
+   *
+   * Settling it here is the point. Every view a scale is shared by contributes a domain carrying
+   * the sort its own encoding asked for, and Vega takes one sort for the whole scale: sorting the
+   * parts separately and concatenating them is a different answer from sorting the union. So the
+   * contributors' sorts are collected, the ones a union cannot express are given up, and what
+   * survives is written once — never inside a part.
+   */
   private fun domainValue(component: ScaleComponent): VegaValue? {
     val domains = component.domains
-    if (domains.isEmpty()) return null
-    if (domains.size == 1) {
-      val only = domains.first() as? VegaValue.Obj ?: return domains.first()
-      val sort = simplifySort(only["sort"], only.string("field")) ?: return only
+    // Two views may name the same column and disagree only about the order: that is one domain
+    // with two sorts, not two domains, and the sort is what the disagreement is settled over.
+    val uniqueDomains = domains.map { withoutSort(it) }.distinct()
+    val sorts = domains.mapNotNull { normalizedSort(it) }.distinct()
+    if (uniqueDomains.isEmpty()) return null
+
+    if (uniqueDomains.size == 1) {
+      val only = domains.first()
+      if (!isDataRef(only) || sorts.isEmpty()) return only
       return obj {
-        only.fields.forEach { (key, value) -> if (key != "sort") put(key, value) }
-        put("sort", sort.takeUnless { it == VegaValue.Bool(true) && only["sort"] == null })
+        (only as VegaValue.Obj).fields.forEach { (key, value) ->
+          if (key != "sort") put(key, value)
+        }
+        put("sort", settledSort(sorts, only.string("field")))
       }
     }
 
-    // A sort every entry agrees on belongs to the union rather than to each of its parts: sorting
-    // the pieces separately and concatenating them is a different answer from sorting the whole.
-    val sorts = domains.map { simplifySort(it["sort"], null) ?: it["sort"] }.distinct()
-    val sharedSort = if (sorts.size == 1) sorts.single() else null
-    val entries =
-      if (sharedSort == null) {
-        domains
-      } else {
-        domains.map { entry ->
-          obj { (entry as VegaValue.Obj).fields.forEach { (k, v) -> if (k != "sort") put(k, v) } }
+    // A union sorts by an aggregate Vega can compute *across* datasets, which is only the three
+    // that need no more than one pass over each: a `sum` would have to be re-totalled over the
+    // whole union and there is nothing to re-total it from, so the request is given up and the
+    // domain sorts naturally.
+    val unionSorts =
+      sorts
+        .map { sort ->
+          if (sort !is VegaValue.Obj || !sort.has("op")) sort
+          else if (sort.string("op") in UNION_DOMAIN_SORT_OPS) sort else VegaValue.Bool(true)
         }
+        .distinct()
+    // Sorts that disagree cannot be reconciled either, and the natural order is the answer that
+    // does not privilege one of them.
+    val sort =
+      when {
+        unionSorts.size == 1 -> unionSorts.single()
+        unionSorts.size > 1 -> VegaValue.Bool(true)
+        else -> null
       }
 
     // Several fields of one dataset collapse further, into one reference with a field list.
-    val sameData = entries.all {
-      it is VegaValue.Obj && it.string("data") == entries.first().string("data") && it.has("field")
-    }
-    return if (sameData) {
+    val data = domains.map { if (isDataRef(it)) it.string("data") else null }.distinct()
+    return if (data.size == 1 && data.single() != null) {
       obj {
-        put("data", entries.first().string("data"))
-        put("fields", strings(entries.map { it.string("field")!! }))
-        put("sort", sharedSort)
+        put("data", data.single())
+        put("fields", strings(uniqueDomains.map { it.string("field")!! }))
+        put("sort", sort)
       }
     } else {
       obj {
-        put("fields", arr(entries))
-        put("sort", sharedSort)
+        put("fields", arr(uniqueDomains))
+        put("sort", sort)
       }
     }
   }
 
   /**
-   * The three ways a domain sort says less than it was built with — `assembleDomain` in
-   * `compile/scale/domain.ts`.
+   * The sort a single domain settles on, of the [sorts] its contributors asked for.
    *
-   * Each removes something that is either implied or meaningless: a `count` has no field to count
-   * *of*, `ascending` is the default order, and a sort on the domain's own field is the natural
-   * order with at most a direction to it. They matter because the output is compared property by
-   * property, and a sort saying the same thing twice is a different specification.
-   *
-   * @param domainField the field this domain is *of*, or null where several are being merged and no
-   *   single one is.
-   * @return the simplified sort, or null when there was nothing to simplify.
+   * One sort is taken as it stands, but for two the op is what tells them apart: a `min` is the
+   * default a plain `"descending"` expands into, so a single non-`min` request among them is a
+   * choice somebody made and the others are defaults it outranks. Anything less clear-cut than that
+   * is left to the natural order.
    */
-  private fun simplifySort(sort: VegaValue?, domainField: String?): VegaValue? {
-    val obj = sort as? VegaValue.Obj ?: return null
-    var simplified = obj
-    if (obj.string("op") == "count" && obj.has("field")) {
-      simplified = obj { simplified.fields.forEach { (k, v) -> if (k != "field") put(k, v) } }
+  private fun settledSort(sorts: List<VegaValue>, domainField: String?): VegaValue {
+    if (sorts.size > 1) {
+      val stated = sorts.filter { it is VegaValue.Obj && it.has("op") && it.string("op") != "min" }
+      val allAggregate = sorts.all { it is VegaValue.Obj && it.has("op") }
+      return if (allAggregate && stated.size == 1) stated.single() else VegaValue.Bool(true)
     }
-    if (simplified.string("order") == "ascending") {
-      simplified = obj { simplified.fields.forEach { (k, v) -> if (k != "order") put(k, v) } }
+    val sort = sorts.single()
+    // Sorting a domain by its own column is the natural order with at most a direction to it: the
+    // aggregate picks one value of a column out of the rows that all carry the same one.
+    if (sort is VegaValue.Obj && sort.has("field") && sort.string("field") == domainField) {
+      val order = sort.string("order") ?: return VegaValue.Bool(true)
+      return obj { put("order", order) }
     }
-    if (domainField != null && simplified.string("field") == domainField) {
-      val order = simplified.string("order")
-      simplified = if (order == null) return VegaValue.Bool(true) else obj { put("order", order) }
-    }
-    return if (simplified.fields == obj.fields) null else simplified
+    return sort
   }
+
+  /**
+   * A contributor's sort as it counts towards the merge, or null where it asked for none.
+   *
+   * A `count` counts rows rather than values, so the field it was written beside says nothing, and
+   * `ascending` is the order a sort has anyway. Both are dropped before the sorts are compared, so
+   * that two contributors spelling the same request differently are seen to agree.
+   */
+  private fun normalizedSort(domain: VegaValue): VegaValue? {
+    val sort = (domain as? VegaValue.Obj)?.get("sort") ?: return null
+    val stated = sort as? VegaValue.Obj ?: return sort
+    val dropped =
+      setOfNotNull(
+        "field".takeIf { stated.string("op") == "count" },
+        "order".takeIf { stated.string("order") == "ascending" },
+      )
+    if (dropped.isEmpty()) return stated
+    return obj { stated.fields.forEach { (key, value) -> if (key !in dropped) put(key, value) } }
+  }
+
+  /** The domain without its sort, which is what makes two contributors the same domain. */
+  private fun withoutSort(domain: VegaValue): VegaValue {
+    if (!isDataRef(domain)) return domain
+    return obj {
+      (domain as VegaValue.Obj).fields.forEach { (key, value) ->
+        if (key != "sort") put(key, value)
+      }
+    }
+  }
+
+  /** `isDataRefDomain`: a reference to a column of a dataset, rather than a list or a signal. */
+  private fun isDataRef(domain: VegaValue): Boolean =
+    domain is VegaValue.Obj && domain.has("field") && domain.has("data")
 
   // -----------------------------------------------------------------------------------------
   // Guides
@@ -3219,9 +3714,19 @@ private class Compilation(
           else component.name()
         val existing = components[key]
         if (existing == null) {
+          parsed.explicitProperties += def.axis?.fields?.keys.orEmpty()
           components[key] = channel to parsed
         } else {
           val merged = existing.second
+          // An axis one layer switched off is switched off for the scale, whichever side of the
+          // merge it arrives on: `mergeValuesWithExplicit` keeps the explicit `disable` and there
+          // is no tie-breaker that could put it back.
+          if (parsed.disabled) merged.disabled = true
+          if (parsed.explicitGrid) merged.explicitGrid = true
+          // A layer stating that the axis has no caption says so for the axis, whichever side of
+          // the merge it arrives on — `mergeTitleComponent` answers `null` for either side being
+          // it, whatever the other side says.
+          if (parsed.nulledTitle) merged.nulledTitle = true
           when {
             // An explicit title wins outright rather than joining: a layer that names its axis has
             // said what the axis measures, and the other layer's derived name adds nothing.
@@ -3243,10 +3748,24 @@ private class Compilation(
           // lifts its bucketing out into a transform, so its own axis says nothing about buckets,
           // while the line's still asks for a `%Y` format and a tick step a year wide. Taking the
           // first layer's answer for everything dropped both.
-          parsed.properties.forEach { (name, value) -> merged.set(name, value) }
+          //
+          // And a property the specification **stated** beats one this compiler derived, whichever
+          // layer states it. Filling only the gaps meant a layer writing `"axis": {"grid": false}`
+          // lost to an earlier layer that never mentioned gridlines — a quantitative position has
+          // them by default, so the earlier layer's silence became a decision.
+          val statedHere = def.axis?.fields?.keys.orEmpty()
+          parsed.properties.forEach { (name, value) ->
+            if (name in statedHere && name !in merged.explicitProperties) {
+              merged.override(name, value)
+              merged.explicitProperties += name
+            } else merged.set(name, value)
+          }
         }
       }
     }
+    // `if (disable) return axisComponent`, read on the way out: the component took part in the
+    // merge and has nothing to assemble.
+    components.entries.removeAll { it.value.second.disabled }
     faceOff(components.values.toList())
     // Which axes will fall back to a *name* for the extent they draw their grid across:
     // `assembleAxisSignals` asks each component without a `gridScale`, and a plot inside a
@@ -3308,8 +3827,18 @@ private class Compilation(
         }
         counts[orient] = (counts[orient] ?: 0) + 1
       }
+      // `if (index > 0 && !!axisCmpt.get('grid') && !axisCmpt.explicit.grid)` — only a **derived**
+      // grid is taken away. Two layers that each write `"axis": {"grid": true}` have each asked for
+      // gridlines and get them, however busy that reads; two that merely happen to have them,
+      // because a quantitative position has them by default or a theme turned them on, get one set
+      // between them. Taking them off regardless left a dual-axis chart with one layer's gridlines
+      // where its specification had asked for three.
       for ((index, axis) in onChannel.withIndex()) {
-        if (index > 0 && (axis.properties["grid"] as? VegaValue.Bool)?.value == true) {
+        if (
+          index > 0 &&
+            (axis.properties["grid"] as? VegaValue.Bool)?.value == true &&
+            !axis.explicitGrid
+        ) {
           axis.override("grid", bool(false))
         }
       }
@@ -3332,6 +3861,8 @@ private class Compilation(
   ): LinkedHashMap<String, VegaValue> {
     val legends = LinkedHashMap<String, LinkedHashMap<String, VegaValue>>()
     val explicitlyTitled = mutableSetOf<String>()
+    /** Whether each key's merged legend is switched off, and whether that was stated. */
+    val disableOf = LinkedHashMap<String, Pair<Boolean, Boolean>>()
     for (view in views) {
       for (channel in Channels.LEGEND_CHANNELS) {
         // The same definition the *scale* was built from, which for a channel written entirely as
@@ -3339,7 +3870,6 @@ private class Compilation(
         // needs a key saying what its colours mean.
         val def = view.spec.encoding[channel]?.let { view.scaledDef(it) } ?: continue
         val component = view.scaleComponents[channel] ?: continue
-        val built = Guides.legend(view, channel, def, component.type) as? VegaValue.Obj ?: continue
         // Keyed by the **field**, not by the scale — `assembleLegends` groups by
         // `field:<name>`. One field encoded twice, as a colour *and* as a size, is one key to the
         // reader and one legend whose swatches carry both; keying by the scale gave it two, side by
@@ -3383,6 +3913,34 @@ private class Compilation(
             else -> ""
           }
         val key = "$prefix|${def.field?.let { fieldKey } ?: channel}|$discrete|$ownChild"
+        // A **disabled** legend is still a component, and its disable is folded into the merged
+        // one: a layer writing `"legend": null` takes the whole key away rather than only its own
+        // share of it. See [Guides.legendDisable] for which way round the explicitness goes.
+        val (disabled, explicitDisable) = Guides.legendDisable(view, def)
+        val standing = disableOf[key]
+        if (standing == null) {
+          disableOf[key] = disabled to explicitDisable
+        } else if (!standing.second && explicitDisable) {
+          disableOf[key] = disabled to true
+        }
+        // A disabled legend is still a **component**, and a component carries its scale from the
+        // moment it is made: `new LegendComponent({}, getLegendDefWithScale(model, channel))` runs
+        // before the disable is read. So a channel switched off still tells the legend it merges
+        // into which scale draws its swatches — a chart telling its lines apart by colour and by
+        // dash pattern keeps one key, and that key shows both dashes and colours however the
+        // dashes' own legend was refused.
+        if (disabled) {
+          val entry = legends.getOrPut(key) { LinkedHashMap() }
+          if (key !in scaleOf) {
+            scaleOf[key] = component.name()
+            ownPlot?.let { plotOf[key] = it }
+          }
+          // `putIfAbsent` is a JVM extension, and this file is compiled for five targets.
+          val scaled = Guides.legendScaleChannel(view, channel)
+          if (scaled !in entry) entry[scaled] = str(component.name())
+          continue
+        }
+        val built = Guides.legend(view, channel, def, component.type) as? VegaValue.Obj ?: continue
         // `mergeValuesWithExplicit` settles a property before any tie-breaker runs: a value the
         // specification stated beats one this compiler derived. A field encoded as both a colour
         // and a size, with a title written on only one of them, is titled by the one that was
@@ -3411,6 +3969,10 @@ private class Compilation(
     }
     val out = LinkedHashMap<String, VegaValue>()
     legends.forEach { (name, fields) ->
+      // `if (disable) return undefined` — `assembleLegend` answers nothing for a disabled
+      // component, and the merge is what decided it: a key another layer supplied every property of
+      // still goes where one layer said it was not to be drawn.
+      if (disableOf[name]?.first == true) return@forEach
       settle(fields)
       out[name] = obj { fields.forEach { (key, value) -> put(key, value) } }
     }
@@ -3426,17 +3988,50 @@ private class Compilation(
    * runs after the merge, because it is the *merged* legend's own channels that decide it.
    */
   private fun settle(fields: LinkedHashMap<String, VegaValue>) {
-    // "title schema doesn't include null" — `assembleLegend` drops the property rather than
-    // writing an empty one, which is how `"legend": {"title": null}` takes a key's caption off.
-    if (fields["title"].let { it == null || it == VegaValue.Null }) fields.remove("title")
+    // `if (!legend.title) delete legend.title` — "title schema doesn't include null, ''". Any
+    // **falsy** caption, so `"legend": {"title": ""}` takes a key's caption off exactly as
+    // `null` does; a key captioned with the empty string is a key with no caption, and writing one
+    // out reserved the space for it.
+    //
+    // It has to happen *here*, after the merge, and not where a title is read. The caption is what
+    // `mergeValuesWithExplicit` settled between the layers, and a stated `null` is what wins that:
+    // one layer naming its colour `null` and another leaving it derived is one uncaptioned key.
+    // Dropping it earlier takes the key away and the merge then fills it in from the other layer.
+    if (!fields["title"].isTruthy()) fields.remove("title")
+    // `const {disable, labelExpr, selections, ...legend} = legendCmpt.combine()`, and then:
+    //
+    //     if (labelExpr !== undefined) {
+    //       let expr = labelExpr;
+    //       if (legend.encode?.labels?.update && isSignalRef(legend.encode.labels.update.text)) {
+    //         expr = util.replaceAll(labelExpr, 'datum.label',
+    // legend.encode.labels.update.text.signal);
+    //       }
+    //       …
+    //     }
+    //
+    // After the merge, so every layer's encode is in hand: the expression composes with a text the
+    // encode already states rather than replacing whatever was there.
+    (fields.remove("labelExpr") as? VegaValue.Str)?.let { expression ->
+      fields["encode"] = Guides.withLabelText(fields["encode"], expression.value)
+    }
     val symbols = fields["encode"]?.get("symbols")?.get("update") as? VegaValue.Obj ?: return
     val remaining =
       symbols.fields.filterKeys { it !in Channels.LEGEND_SCALE_CHANNELS || !fields.containsKey(it) }
     if (remaining.size == symbols.fields.size) return
+    // Upstream deletes from the swatch's own update **in place** — `delete out[property]` — so
+    // every other part of the encode is untouched. Rebuilding the whole `encode` from the swatch
+    // discarded the rest of it: a legend whose labels carry an expression lost them the moment a
+    // scale channel was dropped from its swatch.
+    val whole = fields["encode"] as? VegaValue.Obj
+    val swatches = (whole?.fields?.get("symbols") as? VegaValue.Obj)?.fields.orEmpty()
     fields["encode"] = obj {
+      whole?.fields?.forEach { (key, value) -> if (key != "symbols") put(key, value) }
       put(
         "symbols",
-        obj { put("update", obj { remaining.forEach { (key, value) -> put(key, value) } }) },
+        obj {
+          swatches.forEach { (key, value) -> if (key != "update") put(key, value) }
+          put("update", obj { remaining.forEach { (key, value) -> put(key, value) } })
+        },
       )
     }
   }
@@ -3501,8 +4096,25 @@ private class Compilation(
     /** The Vega-Lite major version these rules implement, and the fixtures are checked against. */
     const val VEGA_LITE_MAJOR_VERSION = 6
 
+    /**
+     * `{type: 'pad'}` — the sizing Vega does anyway, which upstream compares against by value.
+     *
+     * `deepEqual(autosize, {type: 'pad'})` is how `normalizeAutoSize` decides it has nothing to
+     * say: a chart that asks to be padded and nothing else has asked for the default.
+     */
+    val PADDED = mapOf("type" to VegaValue.Str("pad"))
+
     /** `https://vega.github.io/schema/vega-lite/v6.json` — the major version out of the URL. */
     val SCHEMA_VERSION_PATTERN = Regex("""vega-lite/v(\d+)""")
+
+    /**
+     * `MULTIDOMAIN_SORT_OP_INDEX` — the aggregates a **unioned** domain can be sorted by.
+     *
+     * Each of the three is a running answer: a union's count is the counts added up, its minimum
+     * the smallest of the minima. An op that has to see all the rows at once — a `sum` per
+     * category, a `mean` — has no such answer once the categories come from several datasets.
+     */
+    val UNION_DOMAIN_SORT_OPS = setOf("count", "min", "max")
 
     val TOP_LEVEL_PROPERTIES =
       setOf(

@@ -68,6 +68,19 @@ internal data class ChannelDef(
   val stack: VegaValue? = null,
   val explicitTitle: VegaValue? = null,
   /**
+   * Whether this definition was **added after the stack was computed**.
+   *
+   * `UnitModel`'s constructor runs `this.stack = stack(mark, encoding)` and only then
+   * `this.alignStackOrderWithColorDomain()`, which may write an `order` channel of its own. So the
+   * `stackBy` list — the channels that split a column into segments — was settled without it, and
+   * the sort-index column it names is not one of the stack's own dimensions however much `order`
+   * counts as a non-position channel.
+   *
+   * The ordering is the whole rule, and this flag is how a one-pass compiler says it: everything
+   * else reads the encoding as it finally stands.
+   */
+  val addedAfterStack: Boolean = false,
+  /**
    * `condition` — the definitions that apply only when their own test passes, in order.
    *
    * Each is an ordinary channel definition with a [test] beside it, because a condition may name a
@@ -132,20 +145,24 @@ internal data class ChannelDef(
   val scale: VegaValue.Obj?
     get() = raw["scale"] as? VegaValue.Obj
 
+  /**
+   * `specifiedScale !== null && specifiedScale !== false`: the scale names the two values it
+   * refuses, rather than asking whether what it was given is truthy the way the guides do.
+   */
   val scaleDisabled: Boolean
-    get() = raw.fields["scale"] == VegaValue.Null
+    get() = raw.fields["scale"].let { it == VegaValue.Null || it == VegaValue.Bool(false) }
 
   val axis: VegaValue.Obj?
     get() = raw["axis"] as? VegaValue.Obj
 
   val axisDisabled: Boolean
-    get() = raw.fields["axis"] == VegaValue.Null
+    get() = isFalsy(raw.fields["axis"])
 
   val legend: VegaValue.Obj?
     get() = raw["legend"] as? VegaValue.Obj
 
   val legendDisabled: Boolean
-    get() = raw.fields["legend"] == VegaValue.Null
+    get() = isFalsy(raw.fields["legend"])
 
   val format: VegaValue?
     get() = raw["format"] ?: axis?.get("format") ?: legend?.get("format")
@@ -156,7 +173,43 @@ internal data class ChannelDef(
   /** `type: "quantitative"` and not binned — the shape that decides stacking and zero-baselines. */
   val isUnbinnedQuantitative: Boolean =
     isFieldDef && type == MeasureType.QUANTITATIVE && bin == null
+
+  private companion object {
+    /** Whether a guide was switched off, which upstream asks as `!axis` and `!legend`. */
+    fun isFalsy(value: VegaValue?): Boolean = value != null && !value.isTruthy()
+  }
 }
+
+/**
+ * JavaScript truthiness, which several of upstream's rules turn on directly.
+ *
+ * A guide is disabled by `!axis` or `!legend`; a legend's caption is dropped by `if (!legend.title)
+ * delete legend.title`; and `extractTitleConfig` spreads four of its six properties as `...(anchor
+ * ? {anchor} : {})`. Each of those is this question and not a comparison against `null`, which is
+ * why `"legend": false` and `"title": ""` mean what they mean.
+ *
+ * An empty object and an empty array are **truthy**, which is what makes `"axis": {}` a guide with
+ * no properties rather than no guide.
+ */
+/**
+ * `isNullOrFalse`: the two ways a property says "not this", which is narrower than falsiness.
+ *
+ * `order: false` and `order: null` both ask for the items unsorted, and `order: 0` — a number, and
+ * falsy — is not that request at all. Upstream tells the two questions apart, and the properties
+ * asked this one are the switches: an *absent* property has not answered it.
+ */
+internal fun VegaValue?.isNullOrFalse(): Boolean =
+  this == VegaValue.Null || this == VegaValue.Bool(false)
+
+internal fun VegaValue?.isTruthy(): Boolean =
+  when (this) {
+    null,
+    VegaValue.Null -> false
+    is VegaValue.Bool -> value
+    is VegaValue.Num -> value != 0.0
+    is VegaValue.Str -> value.isNotEmpty()
+    else -> true
+  }
 
 /** The mark, with the defaults upstream fills in before anything else reads them. */
 internal data class MarkDef(
@@ -193,6 +246,16 @@ internal class UnitSpec(
    * The `projection` this view's places are put on the page by, where it states or inherits one.
    */
   val projection: VegaValue.Obj? = null,
+  /**
+   * The `view` block this view states, of which only the **style** is read from here.
+   *
+   * `assembleGroupStyle` asks the unit for its `view.style` before deciding anything: a view that
+   * names its own styles is drawn with those instead of the `cell` a plotting area gets by default.
+   * The rest of the block is painted onto the group that owns the plotting area, which in a layer
+   * is the layer's rather than the member's — so it is read from the model being assembled and this
+   * one is only asked for the style.
+   */
+  val viewBackground: VegaValue.Obj? = null,
 ) {
   val mark: String
     get() = markDef.type
@@ -268,6 +331,106 @@ internal object Channels {
   /** The channels that name a place on the globe rather than a position on the page. */
   val GEO_POSITION_CHANNELS = setOf("longitude", "latitude", "longitude2", "latitude2")
 
+  /** The primitive marks — `Mark` in `mark.ts`, which is what a support table is indexed by. */
+  val MARKS =
+    setOf(
+      "arc",
+      "area",
+      "bar",
+      "circle",
+      "geoshape",
+      "image",
+      "line",
+      "rule",
+      "point",
+      "rect",
+      "square",
+      "trail",
+      "text",
+      "tick",
+    )
+
+  /**
+   * `getSupportedMark`: whether a channel means anything for a mark, and when.
+   *
+   * `"always"`, `"binned"` or nothing at all. Most channels apply to every mark — a colour, a
+   * tooltip, an order — and the rest are only meaningful for the marks that have the thing they
+   * set: only a `text` mark has text, only an `image` has a URL, only a `point` or a `geoshape` has
+   * a shape to choose. A channel a mark has no use for is **dropped from the encoding**, and
+   * dropping it is not cosmetic: it would otherwise group an aggregate, name a scale and appear in
+   * the chart's spoken description.
+   *
+   * `"binned"` is the second edge of an interval on a mark that draws a **point** rather than a
+   * span: a `point` gets an `x2` only to say where the bin it sits in ends, so the primary channel
+   * has to be one whose data arrived binned. Anywhere else there is nothing for a second edge to
+   * mean.
+   */
+  fun supportsMark(channel: String, mark: String): String? =
+    when (channel) {
+      // `ALL_MARKS`, which is every mark there is.
+      "color",
+      "fill",
+      "stroke",
+      "description",
+      "detail",
+      "key",
+      "tooltip",
+      "href",
+      "order",
+      "opacity",
+      "fillOpacity",
+      "strokeOpacity",
+      "strokeWidth",
+      "facet",
+      "row",
+      "column" -> "always"
+      // A `geoshape` is placed by its projection and not by a position channel.
+      "x",
+      "y",
+      "xOffset",
+      "yOffset",
+      "latitude",
+      "longitude",
+      "time" -> if (mark == "geoshape") null else "always"
+      "x2",
+      "y2",
+      "latitude2",
+      "longitude2" ->
+        when (mark) {
+          "area",
+          "bar",
+          "image",
+          "rect",
+          "rule" -> "always"
+          "circle",
+          "point",
+          "square",
+          "tick",
+          "line",
+          "trail" -> "binned"
+          else -> null
+        }
+      "size" ->
+        if (
+          mark in setOf("point", "tick", "rule", "circle", "square", "bar", "text", "line", "trail")
+        )
+          "always"
+        else null
+      "strokeDash" ->
+        if (mark in setOf("line", "point", "tick", "rule", "circle", "square", "bar", "geoshape"))
+          "always"
+        else null
+      "shape" -> if (mark == "point" || mark == "geoshape") "always" else null
+      "text" -> if (mark == "text") "always" else null
+      "angle" -> if (mark in setOf("point", "square", "text")) "always" else null
+      "url" -> if (mark == "image") "always" else null
+      "theta",
+      "radius" -> if (mark == "text" || mark == "arc") "always" else null
+      "theta2",
+      "radius2" -> if (mark == "arc") "always" else null
+      else -> null
+    }
+
   /**
    * `getPositionChannelFromLatLong`: the position a place ends up drawn at.
    *
@@ -284,30 +447,48 @@ internal object Channels {
       else -> null
     }
 
-  /** Every channel that can own a scale, in the order upstream iterates them. */
+  /**
+   * Every channel that can own a scale, **in the order upstream iterates them**.
+   *
+   * ```js
+   * const SCALE_CHANNEL_INDEX = {
+   *   ...POSITION_SCALE_CHANNEL_INDEX,      // x, y
+   *   ...POLAR_POSITION_SCALE_CHANNEL_INDEX,// theta, radius
+   *   ...OFFSET_SCALE_CHANNEL_INDEX,        // xOffset, yOffset
+   *   ...NONPOSITION_SCALE_CHANNEL_INDEX,   // the rest, in UNIT_CHANNELS order
+   * };
+   * ```
+   *
+   * The order is the order the scales are **assembled** in, `parseUnitScaleCore` filling the
+   * component dictionary by walking this list. It is also read as a set in five places, which is
+   * why being wrong here went unnoticed: a polar position sits in its own slot in every chart that
+   * writes one, so encoding order and this order only part company when something *moves* a channel
+   * — an `angle` on an `arc`, which is read as `theta` at the place the angle was written.
+   *
+   * The clock a chart is **animated** by is a scale like any other: a band over the column the
+   * frames run through, stepped at the frame rate. Nothing is drawn with it — it is read by the
+   * signals that advance the frame — and it sits where `UNIT_CHANNELS` puts it, after the stroke.
+   */
   val SCALE_CHANNELS =
     listOf(
       "x",
       "y",
+      "theta",
+      "radius",
       "xOffset",
       "yOffset",
       "color",
       "fill",
       "stroke",
+      "time",
       "opacity",
       "fillOpacity",
       "strokeOpacity",
       "strokeWidth",
-      "size",
-      "shape",
       "strokeDash",
+      "size",
       "angle",
-      "theta",
-      "radius",
-      // The clock a chart is **animated** by is a scale like any other: a band over the column the
-      // frames run through, stepped at the frame rate. Nothing is drawn with it — it is read by the
-      // signals that advance the frame — which is why it is last, and why it has no guide.
-      "time",
+      "shape",
     )
 
   /**

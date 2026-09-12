@@ -314,7 +314,13 @@ internal class DataPipeline(
     parse.putAll(
       Transforms(diagnostics, selections = view.selections).implicitParses(view.spec.transforms)
     )
-    for ((_, def) in view.spec.encoding) {
+    // `forEach(this.getMapping(), …)` walks a **list** channel entry by entry — a tooltip naming
+    // four columns is four definitions, not one — and `getFieldDef` reaches into a `condition`.
+    // Reading only the channel's own definition left every column after the first unparsed, so a
+    // tooltip's second nested field was looked for under a name no row has.
+    val everyDefinition =
+      view.spec.encoding.values.flatMap { listOf(it) + it.siblings + it.conditions }
+    for (def in everyDefinition) {
       val field = def.field
       if (!def.isFieldDef || field == null) continue
       // A time unit buckets a *date*, so the column still has to be read as one first — and a time
@@ -354,12 +360,31 @@ internal class DataPipeline(
     // and an explicit parse wins over one this compiler inferred — `Split(explicit, implicit)`.
     // On a table written out in the specification Vega has already ingested the rows, so this is
     // a formula like any other rather than an instruction to the loader.
-    view.spec.data
-      ?.takeIf { it.string("url") == null }
-      ?.obj("format")
-      ?.obj("parse")
-      ?.fields
-      ?.forEach { (field, kind) -> (kind as? VegaValue.Str)?.let { parse[field] = it.value } }
+    //
+    // For a table read from a **url** as much as for one written out: `ParseNode.makeExplicit`
+    // asks `model.data.format.parse` whatever the table is, and the node then decides where its
+    // work lands — `format.parse` on the loader where it sits directly under the source, a formula
+    // where it does not. The source node itself carries `omit(data.format, ['parse'])`, so a url's
+    // parse reaches Vega through the node rather than by being copied across.
+    view.spec.data?.obj("format")?.obj("parse")?.fields?.forEach { (field, kind) ->
+      when (kind) {
+        is VegaValue.Str -> parse[field] = kind.value
+        // `"parse": {"«field»": null}` is how a specification says **do not** parse a column.
+        // Upstream keeps the null in the ancestor's record — so nothing below adds a parse for
+        // that field — and then copies only the non-null parses into the node itself:
+        // ```js
+        // // copy only non-null parses
+        // for (const key of keys(parse.combine())) {
+        //   const val = parse.get(key);
+        //   if (val !== null) { p[key] = val; }
+        // }
+        // ```
+        // Written out, it asked Vega's loader to parse a column as `null`, which it reported and
+        // then ignored.
+        VegaValue.Null -> parse.remove(field)
+        else -> {}
+      }
+    }
     // A column a transform computed is *derived*: it has the type its transform gave it, and the
     // loader has never seen it.
     parse.keys.removeAll(
@@ -419,8 +444,9 @@ internal class DataPipeline(
     // `forEachFieldDef` walks the facet as it was **written**, which is what orders the two
     // formulas a crossed grid needs.
     val channels =
-      view.spec.encoding.entries.map { it.key to it.value } +
-        if (belowFacet) emptyList() else view.facetDeclared.map { it.channel to it }
+      view.spec.encoding.entries.flatMap { (channel, def) ->
+        (listOf(def) + def.siblings + def.conditions).map { channel to it }
+      } + if (belowFacet) emptyList() else view.facetDeclared.map { it.channel to it }
     val transforms = channels.mapNotNull { (channel, def) ->
       val order = def.sort as? VegaValue.Arr ?: return@mapNotNull null
       val field = def.field ?: return@mapNotNull null
@@ -455,57 +481,63 @@ internal class DataPipeline(
       // The **facet's** own channels first, as with the time units: a trellis broken down by
       // buckets of a column has to bucket that column, and the facet's encoding was lifted out of
       // the cell's before anything else looked at it.
-      (view.facetDefs + view.spec.encoding.values).mapNotNull { def ->
-        val bin = def.bin as? Binning.Bin ?: return@mapNotNull null
-        val field = def.field ?: return@mapNotNull null
-        val key = "${Fields.binToString(bin.params)}_$field"
-        // A facet's bucketing belongs to the **facet** model, which sits above the cell: its
-        // signals are named plainly where a cell's carry the cell's prefix. And it needs no range
-        // formula — `binRequiresRange` asks about a *scale* channel, and a facet has no scale.
-        val facetted = def in view.facetDefs
-        // `parseSelectionExtent`: an extent naming a **selection** is not an extent Vega
-        // understands. The bucketing keeps the data's own, and how wide one bucket is becomes a
-        // `span` read off the brush — so dragging the brush narrower cuts finer buckets over the
-        // same range. The column is the one the selection projects onto, since that is the one the
-        // brush's numbers are in.
-        val selected = (bin.params.fields["extent"] as? VegaValue.Obj)?.string("param")
-        val span = selected?.let { name ->
-          val selection = view.selections.firstOrNull { it.name == name }
-          val on =
-            (bin.params.fields["extent"] as? VegaValue.Obj)?.string("field")
-              ?: selection?.owner?.let { owner ->
-                selection.projections(owner).firstOrNull()?.second
-              }
-              ?: field
-          "${Fields.varName(name)}[${quoted(on)}]"
+      (view.facetDefs +
+          view.spec.encoding.values.flatMap { listOf(it) + it.siblings + it.conditions })
+        .mapNotNull { def ->
+          val bin = def.bin as? Binning.Bin ?: return@mapNotNull null
+          val field = def.field ?: return@mapNotNull null
+          val key = "${Fields.binToString(bin.params)}_$field"
+          // A facet's bucketing belongs to the **facet** model, which sits above the cell: its
+          // signals are named plainly where a cell's carry the cell's prefix. And it needs no range
+          // formula — `binRequiresRange` asks about a *scale* channel, and a facet has no scale.
+          val facetted = def in view.facetDefs
+          // `parseSelectionExtent`: an extent naming a **selection** is not an extent Vega
+          // understands. The bucketing keeps the data's own, and how wide one bucket is becomes a
+          // `span` read off the brush — so dragging the brush narrower cuts finer buckets over the
+          // same range. The column is the one the selection projects onto, since that is the one
+          // the
+          // brush's numbers are in.
+          val selected = (bin.params.fields["extent"] as? VegaValue.Obj)?.string("param")
+          val span = selected?.let { name ->
+            val selection = view.selections.firstOrNull { it.name == name }
+            val on =
+              (bin.params.fields["extent"] as? VegaValue.Obj)?.string("field")
+                ?: selection?.owner?.let { owner ->
+                  selection.projections(owner).firstOrNull()?.second
+                }
+                ?: field
+            "${Fields.varName(name)}[${quoted(on)}]"
+          }
+          BinComponent(
+            field = field,
+            params = bin.params,
+            span = span,
+            output =
+              listOf(
+                Fields.vgField(def, forAs = true),
+                Fields.vgField(def, suffix = "end", forAs = true),
+              ),
+            signal = if (facetted) "${key}_bins" else view.prefixed("${key}_bins"),
+            extentSignal = if (facetted) "${key}_extent" else view.prefixed("${key}_extent"),
+            extent = bin.params.fields["extent"]?.takeIf { selected == null },
+            // `binRequiresRange`: a binned field the specification forced onto a **discrete** scale
+            // needs its range written out as text, because that text is what the axis labels and
+            // the
+            // legend entries then read — there is no numeric axis left to derive them from.
+            rangeFormula =
+              if (
+                !facetted && (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL)
+              ) {
+                val start = Fields.datumAccess(def)
+                val end = Fields.datumAccess(def, suffix = "end")
+                val format = (def.format as? VegaValue.Str)?.value ?: view.config.numberFormat ?: ""
+                "!isValid($start) || !isFinite(+$start) ? \"null\" : " +
+                  "format($start, \"$format\") + \" – \" + format($end, \"$format\")"
+              } else {
+                null
+              },
+          )
         }
-        BinComponent(
-          field = field,
-          params = bin.params,
-          span = span,
-          output =
-            listOf(
-              Fields.vgField(def, forAs = true),
-              Fields.vgField(def, suffix = "end", forAs = true),
-            ),
-          signal = if (facetted) "${key}_bins" else view.prefixed("${key}_bins"),
-          extentSignal = if (facetted) "${key}_extent" else view.prefixed("${key}_extent"),
-          extent = bin.params.fields["extent"]?.takeIf { selected == null },
-          // `binRequiresRange`: a binned field the specification forced onto a **discrete** scale
-          // needs its range written out as text, because that text is what the axis labels and the
-          // legend entries then read — there is no numeric axis left to derive them from.
-          rangeFormula =
-            if (!facetted && (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL)) {
-              val start = Fields.datumAccess(def)
-              val end = Fields.datumAccess(def, suffix = "end")
-              val format = (def.format as? VegaValue.Str)?.value ?: view.config.numberFormat ?: ""
-              "!isValid($start) || !isFinite(+$start) ? \"null\" : " +
-                "format($start, \"$format\") + \" – \" + format($end, \"$format\")"
-            } else {
-              null
-            },
-        )
-      }
     return if (bins.isEmpty()) null else BinNode(bins.distinctBy { it.signal })
   }
 
@@ -700,21 +732,27 @@ internal class DataPipeline(
   private fun timeUnitNode(): TimeUnitNode? {
     // The facet's own channels first: their transform belongs to the facet model, which sits above
     // the cell's, so a trellis broken down by year buckets the year before it buckets the quarter.
-    val units =
-      (view.facetDefs + view.spec.encoding.entries.map { it.value }).mapNotNull { def ->
-        val timeUnit =
-          def.timeUnit?.takeIf { !Fields.isBinnedTimeUnit(it) } ?: return@mapNotNull null
-        val field = def.field ?: return@mapNotNull null
-        val channel = view.spec.encoding.entries.firstOrNull { it.value === def }?.key
-        TimeUnitComponent(
-          field,
-          Fields.timeUnitParts(timeUnit),
-          Fields.vgField(def, forAs = true),
-          step = Fields.timeUnitStep(timeUnit),
-          utc = timeUnit.startsWith("utc"),
-          offsettedRect = channel?.let { offsettedRectFormulas(def, it) }.orEmpty(),
-        )
-      }
+    // `model.reduceFieldDef` spreads a **list** channel before it folds — a `tooltip` naming four
+    // columns is four definitions — so an instant bucketed on the second entry of one is bucketed.
+    // Reading only the channel's own definition left the transform unwritten, and the tooltip then
+    // read a column no step in the flow produces.
+    val defs =
+      view.facetDefs.map { null to it } +
+        view.spec.encoding.entries.flatMap { (channel, def) ->
+          (listOf(def) + def.siblings + def.conditions).map { channel to it }
+        }
+    val units = defs.mapNotNull { (channel, def) ->
+      val timeUnit = def.timeUnit?.takeIf { !Fields.isBinnedTimeUnit(it) } ?: return@mapNotNull null
+      val field = def.field ?: return@mapNotNull null
+      TimeUnitComponent(
+        field,
+        Fields.timeUnitParts(timeUnit),
+        Fields.vgField(def, forAs = true),
+        step = Fields.timeUnitStep(timeUnit),
+        utc = timeUnit.startsWith("utc"),
+        offsettedRect = channel?.let { offsettedRectFormulas(def, it) }.orEmpty(),
+      )
+    }
     // Two channels bucketing one column the same way are one bucket: an x and a tooltip over
     // `yearmonthdate(date)` write the same column, and writing it twice is the same transform
     // emitted twice. `TimeUnitNode`'s components are a set upstream, keyed by what they produce.
@@ -728,7 +766,7 @@ internal class DataPipeline(
   private fun aggregateNode(): AggregateNode? {
     if (
       view.spec.encoding.values.none { def ->
-        (listOf(def) + def.conditions).any { it.aggregate != null }
+        (listOf(def) + def.siblings + def.conditions).any { it.aggregate != null }
       }
     ) {
       return null
@@ -1132,6 +1170,27 @@ internal class DataPipeline(
     return ordinals
   }
 
+  /**
+   * The date parse a `timeUnit` transform's input needs, inserted above the transform itself.
+   *
+   * ```js
+   * } else if (isTimeUnit(t)) {
+   *   const parsedAs = ancestorParse.getWithExplicit(t.field);
+   *   if (parsedAs.value === undefined) {
+   *     head = new ParseNode(head, {[t.field]: 'date'});
+   *     ancestorParse.set(t.field, 'date', false);
+   *   }
+   *   transformNode = head = TimeUnitNode.makeFromTransform(head, t);
+   * }
+   * ```
+   */
+  private fun timeUnitInputParse(transform: VegaValue, index: Int): ParseNode? {
+    val transforms = Transforms(diagnostics, selections = view.selections)
+    val earlier = transforms.producedFields(view.spec.transforms.take(index), view.spec.data)
+    val field = transforms.timeUnitInput(transform, earlier) ?: return null
+    return ParseNode(linkedMapOf(field to "date"))
+  }
+
   private fun userTransforms(head: DataNode, which: Written = Written.ALL): DataNode {
     var last = head
     val lookupOrdinals = lookupOrdinals()
@@ -1158,6 +1217,11 @@ internal class DataPipeline(
       // filters on that brush has to have a `month_date` to be tested against — which it does not,
       // unless it buckets one, however little its own encoding has to do with months.
       selectionTimeUnits(transform)?.let { last = last.then(it) }
+      // "Create parse node because the input to time unit is always date." The parse belongs
+      // **above** the transform, which is what lets a `{"field": "ts", "timeUnit": …, "as": "ts"}`
+      // work at all: read as text the bucketing has nothing to bucket, and a parse written below
+      // the transform is a parse of the transform's own output.
+      timeUnitInputParse(transform, index)?.let { last = last.then(it) }
       for (emitted in transforms.translateAt(transform, path)) {
         // An `aggregate` a specification *states* is the same node as one an encoding asks for —
         // `AggregateNode.makeFromTransform` beside `makeFromEncoding` — and being the same node is

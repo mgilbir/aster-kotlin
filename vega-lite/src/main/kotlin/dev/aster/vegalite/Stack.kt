@@ -70,6 +70,11 @@ internal object Stack {
       Channels.NONPOSITION_CHANNELS.mapNotNull { channel ->
         if (channel == "tooltip") return@mapNotNull null
         val def = spec.encoding[channel]?.takeIf { it.isFieldDef } ?: return@mapNotNull null
+        // `stack()` runs before `alignStackOrderWithColorDomain`, so a channel that rule added is
+        // not one of the stack's own dimensions — see [ChannelDef.addedAfterStack]. Counting it
+        // put the sort-index column into the `impute` a stacked area is given, and every colour's
+        // missing values were then filled per index rather than per colour.
+        if (def.addedAfterStack) return@mapNotNull null
         if (def.aggregate != null) return@mapNotNull null
         val name = Fields.vgField(def)
         if (name.isEmpty() || name !in groupbyFields) def else null
@@ -110,7 +115,17 @@ internal object Stack {
    * carry the aggregate in a `transform` and encode the summarised columns directly, so they are
    * not aggregating encodings and a tick among them still takes a scatter's reduced opacity.
    */
-  fun isAggregate(spec: UnitSpec): Boolean = spec.encoding.values.any { it.aggregate != null }
+  fun isAggregate(spec: UnitSpec): Boolean =
+    // `isAggregate` spreads a list channel like every other reader of an encoding:
+    //
+    //     if (isArray(channelDef)) {
+    //       return some(channelDef, (fieldDef) => !!fieldDef.aggregate);
+    //     }
+    //
+    // so a `tooltip` whose second entry asks for a mean makes the view an aggregating one.
+    spec.encoding.values.any { def ->
+      (listOf(def) + def.siblings + def.conditions).any { it.aggregate != null }
+    }
 
   private fun isPathMark(mark: String): Boolean =
     mark == "line" || mark == "area" || mark == "trail"

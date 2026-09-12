@@ -937,12 +937,22 @@ internal class Selection(
   fun inputSignals(view: UnitView?): List<VegaValue> {
     val bind = inputs ?: return emptyList()
     val projected = view?.let { projections(it) } ?: fields.map { null to it }
-    val started = (initial as? VegaValue.Arr)?.values?.firstOrNull() as? VegaValue.Obj
+    // `const init = array(selDef.value)` in `parseSelectionProject`, and `selCmpt.init?.[0]` here:
+    // the value a selection opens with is a **list** of tuples, of which a bound control shows the
+    // first — "can only exist on single selections (one initial value)". A lone tuple is a list of
+    // one, which is how a Vega-Lite 4 selection arrives: its `init` is a single object and the
+    // compatibility pass hands it over as the parameter's `value` unchanged. Reading only the list
+    // form left such a control starting at nothing, which is a chart that opens showing every row
+    // where the specification asked for one.
+    val started = ((initial as? VegaValue.Arr)?.values?.firstOrNull() ?: initial) as? VegaValue.Obj
     return projected
       .map { (channel, field) ->
         obj {
           put("name", Fields.varName("${name}_$field"))
-          val start = started?.fields?.get(field)
+          // `v[p.geoChannel || p.channel] !== undefined ? v[…] : v[p.field]`: a tuple may name
+          // the channel it starts on rather than the column, which is how a selection over a
+          // renamed or bucketed field says where it opens.
+          val start = channel?.let { started?.fields?.get(it) } ?: started?.fields?.get(field)
           if (start != null) put("init", literal(start)) else put("value", VegaValue.Null)
           // The control is written **into** by the chart as well as by the reader: a pick still
           // moves the widget. `disableDirectManipulation` takes the pointer streams off unless the
@@ -1459,11 +1469,15 @@ internal class Selection(
     }
   }
 
-  fun intervalSignals(view: UnitView, initial: VegaValue?): List<VegaValue> {
+  fun intervalSignals(
+    view: UnitView,
+    initial: VegaValue?,
+    pushesOutward: Boolean = false,
+  ): List<VegaValue> {
     val out = mutableListOf<VegaValue>()
     val projected = intervalChannels(view)
     if (projected.isEmpty()) return out
-    if (bindsScales) return boundScaleSignals(view, projected)
+    if (bindsScales) return boundScaleSignals(view, projected, pushesOutward)
     val dragStreams = dragStreams()
     val items = intervalProjections(view)
     val geo = throughProjection()
@@ -1627,6 +1641,14 @@ internal class Selection(
     // A change of *scale* rewrites the brush rather than clearing it: the trigger fires whenever a
     // scale it reads is rebuilt, and every channel whose data extent no longer matches its pixels
     // pushes the pixels back into step.
+    //
+    // The **visual** signal is the one inverted, and its name is [IntervalProjection]'s rather than
+    // the channel's: where the field and the channel are called the same thing — a brush over
+    // columns named `x` and `y`, which a hand-written specification often has — the data name is
+    // claimed first and the visual one becomes `«name»_x_1`. Spelling the name out here read the
+    // *data* signal through `invert`, so the trigger compared a data extent with itself and never
+    // fired, and a brush kept its pixels while the scale under it moved.
+    val named = intervalProjections(view).associateBy { it.channel }
     out += obj {
       put("name", "${name}_scale_trigger")
       put("value", VegaValue.EmptyObject)
@@ -1642,8 +1664,8 @@ internal class Selection(
               put(
                 "update",
                 projected.joinToString(" && ") { (channel, field) ->
-                  val data = "${name}_${Fields.varName(field)}"
-                  val pixels = "${name}_$channel"
+                  val data = named[channel]?.data ?: Fields.varName("${name}_$field")
+                  val pixels = named[channel]?.visual ?: "${name}_$channel"
                   val scale = quoted(view.scale(channel))
                   // The `+` coerces the two sides to numbers, which is only meaningful — and only
                   // correct — where the scale's domain is numeric: a band scale inverts to a
@@ -1703,10 +1725,33 @@ internal class Selection(
   private fun boundScaleSignals(
     view: UnitView,
     projected: List<Pair<String, String>>,
+    /**
+     * Whether this view's state is **pushed outward** to a signal standing above it.
+     *
+     * ```js
+     * // Nested signals need only push to top-level signals with multiview displays.
+     * if (model.parent && !isTopLevelLayer(model)) {
+     *   for (const proj of selCmpt.scales) {
+     *     const signal: any = signals.find((s) => s.name === proj.signals.data);
+     *     signal.push = 'outer';
+     *     delete signal.value;
+     *     delete signal.update;
+     *   }
+     * }
+     * ```
+     *
+     * `vlSelectionResolve` knows nothing about bound scales, so in a chart of several views the
+     * state has to be reassembled from what each view pushes out — and the empty signal it pushes
+     * into is [VegaLiteCompiler.boundOutward]'s.
+     */
+    pushesOutward: Boolean,
   ): List<VegaValue> {
     val out = mutableListOf<VegaValue>()
     for ((channel, field) in projected) {
-      val data = "${name}_${Fields.varName(field)}"
+      // `varName(`${name}_${suffix}`)` — the **join** is cleaned, not the field on its own. A
+      // column called `2020_21` starts with a digit, so cleaning it alone prefixes an underscore
+      // and the joined name comes out `grid__2020_21` where upstream writes `grid_2020_21`.
+      val data = Fields.varName("${name}_$field")
       val size = if (channel == "x") view.widthSignal else view.heightSignal
       val domain = "domain(${quoted(view.scale(channel))})"
       val type = view.scaleType(channel)
@@ -1740,6 +1785,7 @@ internal class Selection(
       val sign = if (channel == "x") "-" else ""
       out += obj {
         put("name", data)
+        if (pushesOutward) put("push", "outer")
         put(
           "on",
           arr(
@@ -1913,15 +1959,38 @@ internal class Selection(
     val original = written.filter { channel ->
       view.spec.fieldDef(channel)?.let { it.aggregate == null && it.field != null } == true
     }
+    // `signalName` claims the names from **one** set as it walks, the data name of each projection
+    // before its visual one, and appends the first free counter to a name already taken:
+    //
+    //     let sg = varName(`${name}_${suffix}`);
+    //     for (let counter = 1; signals.has(sg); counter++) {
+    //       sg = varName(`${name}_${suffix}_${counter}`);
+    //     }
+    //
+    // So the suffix is not a property of the *visual* name at all: a brush over columns named `x`
+    // and `y` gives `brush_x` to the data and `brush_x_1` to the pixels, and a brush whose **y**
+    // reads a column called `x` gives `brush_x` to the x channel's pixels and `brush_x_1` to the y
+    // channel's data. Comparing each projection's two names to each other caught the first and not
+    // the second, and the chart then had two signals of one name.
+    val claimed = mutableSetOf<String>()
+    fun claim(suffix: String): String {
+      var chosen = Fields.varName("${name}_$suffix")
+      var counter = 1
+      while (!claimed.add(chosen)) {
+        chosen = Fields.varName("${name}_${suffix}_$counter")
+        counter++
+      }
+      return chosen
+    }
     return remapped.mapIndexed { index, (channel, field) ->
       val written = original.getOrNull(index) ?: channel
-      val data = Fields.varName("${name}_$field")
-      val visual = Fields.varName("${name}_$written")
+      val data = claim(field)
+      val visual = claim(written)
       IntervalProjection(
         channel = channel,
         written = written,
         field = field,
-        visual = if (visual == data) "${visual}_1" else visual,
+        visual = visual,
         data = if (geo) null else data,
       )
     }

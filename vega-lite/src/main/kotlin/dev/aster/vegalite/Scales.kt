@@ -25,6 +25,16 @@ internal class ScaleComponent(val channel: String, val type: String, private val
   var explicitDomain: Boolean = false
 
   /**
+   * The properties some view **stated**, which settle them for the whole scale.
+   *
+   * The same rule as [explicitDomain] and the same function behind it — `parseNonUnitScaleProperty`
+   * folds each property with `mergeValuesWithExplicit`, and an explicit value beats a derived one
+   * whichever layer it arrives on. Taking the first layer's answer for everything meant a colour
+   * range listed on the *second* member of a layer lost to the first member's default scheme.
+   */
+  val explicitProperties: MutableSet<String> = mutableSetOf()
+
+  /**
    * Whether the domain includes zero — `definitely`, `definitely-not`, or `maybe`.
    *
    * Three answers rather than two, because the third is the common one and it is *not* the same as
@@ -458,7 +468,13 @@ internal object Scales {
                 },
               )
             } else {
-              bool(true)
+              // Not a channel, and not a word `domainSort` knows. Upstream's chain has no arm for
+              // it — `contains(['ascending', undefined], sort)` is the last test and an unknown
+              // string fails it — so the whole function falls through to `undefined` and the scale
+              // sorts its domain however the data arrived. `"-"` and `""` are both in the wild
+              // corpus, and reading them as the default ascending order sorted a chart that
+              // upstream leaves alone.
+              null
             }
           }
         }
@@ -475,6 +491,11 @@ internal object Scales {
         // Sorting by another channel's aggregate reads the pre-aggregation table, so the ordering
         // is computed independently of the values being drawn.
         val encoding = sort.string("encoding")
+        // `isSortField(sort)` is `sort.op === 'count' || 'field' in sort`, and `isSortByEncoding`
+        // is `'encoding' in sort`. An object holding none of the three is not a sort upstream
+        // recognises, and the chain falls past every arm to `undefined`. An empty `{}` is the
+        // shape in the wild, and this built an `{"op": "min"}` over no field at all.
+        if (encoding == null && sort.string("op") != "count" && !sort.has("field")) return null
         val field = sort.string("field") ?: encoding?.let { view.spec.fieldDef(it)?.field }
         val op = sort.string("op") ?: encoding?.let { view.spec.fieldDef(it)?.aggregate }
         obj {
@@ -483,7 +504,8 @@ internal object Scales {
           put("order", sort.string("order"))
         }
       }
-      else -> bool(true)
+      // A number, or a boolean other than the `null` above: nothing `domainSort` has an arm for.
+      else -> null
     }
   }
 
@@ -639,6 +661,16 @@ internal object Scales {
         if (type == "point" || type == "band") {
           val declared = if (channel == "x") view.spec.width else view.spec.height
           val step = (declared as? VegaValue.Obj)?.number("step")
+          // `getDiscretePositionSize`: the specification's own size where it states one, and the
+          // **theme's** discrete size otherwise — which is a step only where the theme states no
+          // number. A document that sizes every plot with `config.view.discreteWidth` (or `width`,
+          // its older name) has said how wide a band chart is, so its range runs the whole way
+          // across rather than being one step per category. 21 specifications in the wild corpus
+          // differ on this key alone.
+          val themed = if (channel == "x") view.config.discreteWidth else view.config.discreteHeight
+          if (declared == null && themed != null) {
+            return arr(num(0), signalRef(view.sizeSignal(channel)))
+          }
           if (declared == null || step != null) {
             // The step signal is named after the *scale*, not the channel: inside a concatenation
             // each plot counts its own categories, so a row of band charts reads
@@ -805,6 +837,35 @@ internal object Scales {
    * output grows properties that Vega ignores on some scales and honours on others, which is the
    * worst of both: harmless here, wrong there, and invisible until it is wrong.
    */
+  /**
+   * `NON_TYPE_DOMAIN_RANGE_VEGA_SCALE_PROPERTIES`: every scale property read off the stated block.
+   *
+   * `SCALE_PROPERTIES` without the six that are settled elsewhere — the `type`, the `domain`, the
+   * `range` and its two ends, and the `scheme` — which is what upstream walks when it copies a
+   * scale's stated properties onto the component.
+   */
+  private val NON_TYPE_DOMAIN_RANGE_PROPERTIES =
+    listOf(
+      "domainMax",
+      "domainMin",
+      "domainMid",
+      "domainRaw",
+      "align",
+      "bins",
+      "reverse",
+      "round",
+      "clamp",
+      "nice",
+      "base",
+      "exponent",
+      "constant",
+      "interpolate",
+      "zero",
+      "padding",
+      "paddingInner",
+      "paddingOuter",
+    )
+
   private fun supportsProperty(type: String, property: String): Boolean {
     val continuous = type in setOf("linear", "log", "pow", "sqrt", "symlog", "time", "utc")
     return when (property) {
@@ -819,6 +880,19 @@ internal object Scales {
       "nice" -> continuous || type == "quantize" || type == "threshold"
       "zero" ->
         hasContinuousDomain(type) && type !in setOf("log", "time", "utc", "threshold", "quantile")
+      // The rest of `scaleTypeSupportProperty`, which had been left out. A `base` is a logarithm's
+      // and an `exponent` a power's; the ends of a domain and a `clamp` need a continuous one to be
+      // ends of.
+      "rangeMin",
+      "rangeMax" -> continuous || type in setOf("point", "band")
+      "domainMin",
+      "domainMid",
+      "domainMax",
+      "domainRaw",
+      "clamp" -> continuous
+      "exponent" -> type == "pow"
+      "base" -> type == "log"
+      "constant" -> type == "symlog"
       else -> true
     }
   }
@@ -856,14 +930,27 @@ internal object Scales {
     }
 
     // `nice` rounds a domain outwards to readable bounds, but only where the reader reads bounds:
-    // a position axis, with no binning (which already picked its edges), no stated domain, and not
-    // a time scale — d3's time ticks already land on calendar boundaries.
-    // A stated domain suppresses it only where it is an **array**: `isArray(specifiedDomain)`. A
-    // domain that names a selection is not a pair of bounds — it is empty until something is
-    // picked — so the scale still rounds the domain the data gave it.
+    // a position axis, with no binning (which already picked its edges), and not a time scale —
+    // d3's time ticks already land on calendar boundaries.
+    //
+    // What a *stated* domain does to it is upstream's list, and this had the shape of it and not
+    // the substance:
+    //
+    //     if (getFieldDef(fieldOrDatumDef)?.bin || isArray(specifiedDomain) ||
+    //         domainMax != null || domainMin != null ||
+    //         contains([ScaleType.TIME, ScaleType.UTC], scaleType)) return undefined;
+    //
+    // A domain suppresses it only where it is an **array**, a pair of bounds already chosen; a
+    // domain that names a dataset or a selection is not bounds at all, and the scale still rounds
+    // whatever the data turns out to give it. The two *ends* suppress it on their own, stated
+    // separately or together, because either one is a bound somebody picked. This asked instead
+    // whether a domain had been written at all — which suppressed a `{"data": …, "field": …}`
+    // domain that upstream nices — and never looked at the ends, which upstream does.
     if (
       def.bin == null &&
-        (specifiedDomain == null || (specifiedDomain as? VegaValue.Obj)?.has("param") == true) &&
+        specifiedDomain !is VegaValue.Arr &&
+        user?.fields?.get("domainMin") == null &&
+        user?.fields?.get("domainMax") == null &&
         channelIsPosition(channel) &&
         type != "time" &&
         type != "utc"
@@ -932,21 +1019,35 @@ internal object Scales {
 
     zero(view, channel, def, type, specifiedDomain)?.let { set("zero", bool(it)) }
 
-    // Anything else the specification stated on the scale passes through untouched.
-    user?.fields?.forEach { (key, value) ->
+    // The rest of what the specification stated on the scale, **asked for by name**:
+    //
+    //     for (const prop of NON_TYPE_DOMAIN_RANGE_VEGA_SCALE_PROPERTIES) {
+    //       parseScaleProperty(model, prop);
+    //     }
+    //
+    // and then only where the scale's *type* has such a property — `parseScaleProperty` asks
+    // `scaleTypeSupportProperty` of every property it is given, stated or derived, and drops the
+    // ones that do not apply with a warning: `x-scale's "zero" is dropped as it does not work with
+    // time scale`.
+    //
+    // Reading the block's **own keys** instead forwarded whatever else was written there. A
+    // `{"scale": {"legend": false}}` — a legend property misplaced inside the scale — reached Vega
+    // as a scale property, and so did `rangeStep`, which Vega-Lite had in version 2 and has not
+    // had since. Two specifications in the wild corpus carry one of those.
+    NON_TYPE_DOMAIN_RANGE_PROPERTIES.forEach { key ->
+      val value = user?.fields?.get(key) ?: return@forEach
+      if (!supportsProperty(type, key)) return@forEach
       // …except a **bound** on a temporal domain, which is an instant like any other end of one
       // and has to be written as the expression that builds it.
       if ((key == "domainMin" || key == "domainMax") && measuresTime(def)) {
         component.properties[key] = signalRef(instantExpression(value))
         return@forEach
       }
-      if (key !in setOf("type", "domain", "range", "scheme", "rangeMin", "rangeMax")) {
-        // `{"expr": …}` is a signal to Vega, which has no `expr` — a `domainRaw` written that way
-        // was read as an object and the scale left at its own domain.
-        val expression = (value as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }
-        component.properties[key] =
-          if (expression != null) signalRef(expression.string("expr").orEmpty()) else value
-      }
+      // `{"expr": …}` is a signal to Vega, which has no `expr` — a `domainRaw` written that way
+      // was read as an object and the scale left at its own domain.
+      val expression = (value as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }
+      component.properties[key] =
+        if (expression != null) signalRef(expression.string("expr").orEmpty()) else value
     }
   }
 

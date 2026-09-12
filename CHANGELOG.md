@@ -4,6 +4,909 @@ Notable changes, newest first. The release workflow reads the section for the
 version it is publishing and uses it as the release notes, so a version without a
 section here does not get released.
 
+## Unreleased
+
+### Fixed
+
+- **A selection bound to a control opens at the value it was given.** The value is a *list* of tuples
+  — `array(selDef.value)` in `parseSelectionProject` — of which a bound control shows the first, and
+  a lone tuple is a list of one. That is how a Vega-Lite 4 selection arrives: its `init` is a single
+  object, and the compatibility pass hands it over as the parameter's `value` unchanged. This engine
+  read only the list form, so such a control started at nothing — a chart that opens showing every
+  row where the specification asked for one, which is a different chart before anybody touches it.
+  **Six** specifications in the wild corpus open that way. The tuple is read by channel first and
+  then by column, which is how a selection over a renamed or bucketed field says where it opens.
+
+- **A channel whose legend is switched off still names its scale in the legend it merges into.** A
+  `LegendComponent` is built with `getLegendDefWithScale(model, channel)` *before* the disable is
+  read, and `assembleLegends` merges components by field whatever their disable says — so a chart
+  telling its lines apart by colour **and** by dash pattern keeps one key, and that key shows both:
+  the dashes' own `"legend": null` says only that there is no *second* key for them. This engine
+  passed over a disabled channel entirely, so such a key came out showing colours alone and the
+  dashed line in it was drawn solid. One specification in the wild corpus is that chart. Which
+  legend survives is settled as every merged property is, so the same two channels with nothing
+  stated on the colour still lose the key altogether.
+
+- **The far end of a position takes the base channel's nudge, unless the far end was spoken of.** A
+  mark nudged round the circle by a `thetaOffset` is nudged at *both* ends of its wedge, or the
+  wedge is drawn a different size rather than in a different place. This engine asked each end for
+  its own offset, so a donut rotated that way came out with its slices starting where they were
+  asked to and ending where they were not; one specification in the wild corpus is that donut, and a
+  stacked bar with an `xOffset` is the same shape in Cartesian coordinates. Upstream's test is for
+  the **channel** and not for its offset — `channel in encoding || channel in markDef` — so a
+  `theta2Offset` alone does not claim the far end.
+
+- **A `text` channel may be written as a condition, and goes through `wrapCondition` like every
+  other channel.** Its conditions are built by the same reference builder as its unconditional part
+  and become a Vega production rule — an array whose entries are tried in order, the last of them
+  untested. This engine read the unconditional part alone, so a label written *entirely* as a
+  condition came out with no text at all, and a label whose condition a selection drives came out
+  showing its fallback whatever was picked. Two specifications in the wild corpus label a chart that
+  way. A lone entry carrying a test is written as a list even so, upstream's own comment saying why:
+  "we must use array form valueRefs if test exists, otherwise Vega won't execute the test".
+
+- **A lookup produces the columns it brings in, so nothing loads them.** `ancestorParse` records what
+  each transform produces as it walks the list, and a produced column is dropped from the implicit
+  parse below it: it is not in the table being loaded, so asking the loader to read it as a date
+  names a column that source has never had. This engine looked for the brought-in columns under the
+  transform's own `lookup` property — which is the column of *this* table the lookup matches on, and
+  is a string — so it found none, and a date column arriving through a lookup had the loader asked to
+  parse it in a table it is not in. One specification in the wild corpus joins a table that way. The
+  names are the secondary table's `from.fields`, or the `as` that renames them, and it is one or the
+  other: a column renamed on the way in leaves the name it had free.
+
+- **A filter's comparison says nothing about its column when the comparison is falsy.**
+  `getImplicitFromFilterTransform` gates the whole reading on `if (val)`, so `{"gt": 0}` — the
+  commonest filter there is, *keep the rows that have a value* — leaves the column loaded as it was
+  found, and so do a comparison against the empty string and one against `false`. This engine asked
+  what kind the comparison was and got an answer for all three, so it asked the loader to parse a
+  column upstream leaves alone. One specification in the wild corpus filters that way. The
+  `timeUnit` is asked outside that gate and still settles the column whatever the comparison was.
+
+- **A stated `"title": null` on any layer takes the caption off the whole axis.** Two layers over one
+  axis each contribute a title and upstream joins them with a comma — a shared axis says what it is
+  showing — but a **null** is not a contribution to join: it is the statement that this axis has no
+  caption, and `mergeTitleComponent` answers `null` for either side being it, whatever the other
+  says. That is how a layer added to a titled chart leaves the titling to the chart. This engine took
+  the null as its own view's contribution and kept the sibling's, so such an axis came out captioned
+  with the other layer's field. One specification in the wild corpus differs for that.
+
+- **An axis reads the style blocks it names.** `getAxisConfig` asks `config.style` for the blocks the
+  axis named *before* any configuration family, which is how a document keeps its axis styling in one
+  place and points an axis at it by name — and the only way to reach a property no family can state,
+  a `labelExpr` in a style block writing the labels of every axis that names it. This engine asked
+  the families and not the styles, and **forwarded** the `style` property to Vega instead, which is
+  not one of `AXIS_COMPONENT_PROPERTIES` and never reaches an axis upstream. The two are not the
+  same chart: Vega applies a style block to the axis as a whole, where Vega-Lite resolves it first
+  and lets the axis's own properties and its own rules outrank it. A `"grid": false` in a style
+  block, for one, takes the gridlines off before there is an axis to put them on, so the whole grid
+  axis is never written. Two specifications in the wild corpus differ for that. A configuration
+  family may name style blocks too — `config.axisX.style` — and those are the *last* word rather
+  than the first, behind everything the families themselves state.
+
+- **A mark is clipped because the scale under it is driven by a selection, and only where one is.**
+  `scaleClip` asks the position scales whether they carry a `selectionExtent`; this engine asked the
+  *selection* whether it was bound to the scales. The two part company when the binding is
+  **refused**: a categorical position has no halfway between two of its values, so
+  `scaleBindings.parse` warns and passes over that channel, and a heatmap with a `"bind": "scales"`
+  interval over it is clipped for a pan that cannot happen. One specification in the wild corpus is
+  that chart. The question is now asked of the scale that was actually driven — a `domainRaw` is what
+  a driven scale carries — and asked of the **plot's** position scales rather than the view's, since
+  `getScaleComponent` walks up the model tree: a layer member that encodes no position of its own is
+  measured by its layer's, and a text label beside a panned scatter is clipped along with it.
+
+- **A `view` block names the style its plotting area is drawn with.** `assembleGroupStyle` asks the
+  view for its `view.style` before deciding anything, `cell` being a default like any other: a chart
+  writing `{"view": {"style": "myStyle"}}` is asking for its own style block instead, which is how a
+  document paints the paper behind one chart of a row differently from its neighbours. This engine
+  derived `cell` or `view` from the encoding and never asked, so such a chart was drawn with the
+  default and its style block applied to nothing. One specification in the wild corpus is a row of
+  three plots, the last of which names two styles of its own — and several is what a cell of a
+  trellis may now be drawn with too, its style having been narrowed to a single name on the way in.
+
+- **A mark may ask not to be sorted, and says so on the mark.** A path is drawn along its own
+  dimension by default, or nothing would keep it from doubling back; a chart whose path is a
+  *route* — a trail whose width tells a story about a journey — has to be drawn in the order its
+  table holds, and `{"mark": {"type": "trail", "order": false}}` is how it asks. `getSort` reads
+  that through `getMarkPropOrConfig`, so a style or the theme may ask for it too. This engine read
+  only half of the other way to say it, a `null` written on the `order` **channel**, where upstream
+  reads `isNullOrFalse` there and on the mark both — so such a chart was sorted left to right and
+  its route came out re-drawn. One specification in the wild corpus is that chart.
+
+- **A header may ask for its bands without their captions.** `"header": {"labels": false}` takes the
+  captions off and keeps the heading over the grid, where `"header": null` — the only shape this
+  engine read — takes both. The band itself stays either way: it is also where a shared axis is
+  drawn, and `if (title || hasAxes)` is what decides whether there is a band at all. So a grid whose
+  cells name themselves, a small-multiples chart whose colour legend already says which row is
+  which, was captioned twice. Two specifications in the wild corpus ask for it. The flag is read
+  from the header and from `config.header` and from nowhere else: it is the one header property that
+  does not go through `getHeaderProperty`, so a theme naming one direction alone does not turn them
+  off.
+
+- **The side a header hangs off decides which band of the grid it is in.** `getHeaderChannel` asks
+  the header's own orientation, not the channel it captions: a column facet whose header is moved to
+  the right is a **row** header, running down the side of the grid, and its heading is roled, turned
+  and anchored as a row's. This engine read the channel, so such a heading was laid out across a
+  grid it runs down. Two consequences of the same reading were wrong with it. A caption whose side
+  points *across* its own band is not drawn in that band — there is one caption per band and nowhere
+  along a band running the other way to put it — and `assembleLabelTitle` moves it onto the **cell**
+  instead; this engine drew it in the band and left the cells uncaptioned. And a heading moved to a
+  trailing side is anchored at the end of the band it moved into, which is asked of the *heading's*
+  own side rather than the captions': a header may move its captions and leave its heading where it
+  was. Two specifications in the wild corpus differ for that. `header.orient` — the shortcut that
+  sets both sides at once — is now expanded into `labelOrient` and `titleOrient` where
+  `normalizeFieldDef` expands it, which is also what carries the side onto the caption.
+
+- **How a chart is sized is settled twice, and the second pass knows what the first cannot.**
+  `normalizeAutoSize` runs before anything is compiled and knows the *shape* of the chart —
+  whether there is one plotting area a fit could stretch — while `getTopLevelProperties` runs last
+  and knows the *size* it came out as. Only the second can drop a fit that a **step** per category
+  has already settled: a bar chart as wide as its bars has a width of its own, and stretching it to
+  the surface would contradict the step. Where one direction is stepped and the other is not, the
+  fit survives along the other — `getFitType(inverseSizeType)`. This engine ran one merge and
+  neither rule, so such a chart asked Vega for both at once; one specification in the wild corpus
+  differs for that. Three more rules of the same pair were missing: a `"container"` size on a
+  composition is *discarded* rather than fitted, since a grid has no one area to fill; a theme's
+  `config.autosize` is read between the container default and the chart's own, which then overrides
+  it property by property; and the `resize` an axis oriented by a parameter needs is added only
+  where nothing else settled the sizing, which is the one branch `getTopLevelProperties` reaches
+  under `autosize === undefined`.
+
+- **A domain's sort is settled where the domains are merged.** Every view a shared scale is built
+  from contributes a domain carrying the sort its own encoding asked for, and Vega takes one sort
+  for the whole scale — sorting the parts and concatenating them is a different answer from sorting
+  the union. `mergeDomains` therefore collects the contributors' sorts and gives up what a union
+  cannot express: an aggregate other than `count`, `min` or `max` has no running answer across
+  several datasets, and sorts that disagree are settled by the natural order rather than by
+  privileging one of them. This engine kept both, so a scale shared by two layers came out asking
+  Vega to total a column *across* two tables, and a disagreement came out as a sort inside each part
+  of the union — which sorts the pieces. Two specifications in the wild corpus differ for that. Two
+  contributors that name the same column and differ only in their sort are also **one** domain, not
+  a union of two, and a single stated aggregate among them outranks the `min` a plain
+  `"descending"` expands into.
+
+- **A scale and an axis are read by asking them for the properties scales and axes have.** Upstream
+  walks `NON_TYPE_DOMAIN_RANGE_VEGA_SCALE_PROPERTIES` and `AXIS_COMPONENT_PROPERTIES` and asks the
+  stated block for each, so a block holding anything else is never looked at. This copied the
+  block's own keys and forwarded them — the third and fourth time that shape has been found here,
+  after the mark's and the legend's property lists, and it fails the same way: a denylist cannot be
+  finished because what it has to exclude is every word nobody has written yet. What the wild corpus
+  carries is words from **older versions**, a `rangeStep` inside a scale (Vega-Lite 2) and an
+  `axisWidth` inside an axis (Vega-Lite 1), and one `{"scale": {"legend": false}}` — a legend
+  property misplaced inside the scale. Vega reported `PARSE_UNKNOWN_PROPERTY` for all three.
+
+- **A brush's two signals per channel are named from one set of claimed names.** `signalName` takes
+  the *data* name from the field and the *visual* one from the channel, claims the data name first,
+  and appends the first free counter to a name already taken. So the `_1` is not a property of the
+  visual signal: a brush over columns called `x` and `y` gives `br_x` to the data and `br_x_1` to
+  the pixels, while a brush whose **y** reads a column called `x` gives `br_x` to the x channel's
+  pixels and `br_x_1` to the y channel's data. Comparing each projection's two names to each other
+  caught the first shape and not the second, so such a chart had two signals of one name. The scale
+  trigger also spelled the pixel name out by hand, so it inverted the *data* signal and compared an
+  extent with itself — the brush kept its pixels while the scale under it moved. Two specifications
+  in the wild corpus differ for that. A selection **bound to the scales** names its signals from the
+  same join, and cleaned the field alone: a column called `2020_21` starts with a digit, so the name
+  came out `grid__2020_21` where upstream writes `grid_2020_21`.
+
+- **A tooltip's lines come out in the order JavaScript iterates an object's keys.** `tooltipData`
+  collects them into a plain object keyed by the caption, and both the tooltip and the chart's
+  description read it back with `entries(data)` — `Object.keys`, whose order is *not* insertion
+  order: a key that is the canonical decimal form of an **array index** comes first, in ascending
+  numeric order, and everything else follows as written. A column called `2020` is such a key, so a
+  chart of yearly columns describes itself starting with the years however its encoding was written;
+  two specifications in the wild corpus are tables with a year per column. `01`, `-1` and `1.5` are
+  not indices — a leading zero, a sign and a fraction each make the key an ordinary string — which
+  is what makes this a rule about the canonical form rather than about looking numeric.
+
+- **A view inside a nested layer pushes its bound-scale state outward, as a plot of a concatenation
+  does.** `vlSelectionResolve` knows nothing about bound scales, so in a chart of several views the
+  state is reassembled from what each view pushes into an empty signal declared above it —
+  `model.parent && !isTopLevelLayer(model)`, where a *top-level* layer is one whose members are
+  drawn in the chart's own group. A view drawn by itself and a member of a single layer at the root
+  push nothing; everything else does, and a **nested** layer is what a layer of layers and a
+  composite mark both are. This did it for a concatenation and a trellis only, so a nested layer
+  whose members pan and zoom their own axes was missing both the outer declaration and the
+  `push: "outer"` on its own signal. Two specifications in the wild corpus differ by exactly those
+  eight signals.
+
+- **An `identifier` survives only where new rows were made.** `RemoveUnnecessaryIdentifierNodes`
+  keeps one whose parent is a table, an aggregate or a parse — the three steps after which a row is a
+  new row with no identity of its own — and removes every other, upstream writing one at the head of
+  each flow and taking it out again there. It tells where a **fork** has moved: a chart that joins
+  against the table it also draws from gets a named point on that table, and `MergeOutputs` then
+  hangs the drawing's own steps below that point, so the identifier at their head is no longer on
+  the table. This kept it, and the extra transform was the only difference in two specifications of
+  the wild corpus.
+
+- **A swatch takes the mark's opacity as it stands, and only where that opacity is truthy.** `const
+  opacity = getMaxValue(encoding.opacity) ?? markDef.opacity; if (opacity) { out.opacity = {value:
+  opacity} }` — so a mark saying `"opacity": "1"`, a string a hand-written specification may well
+  hold, gives a swatch drawn at that string, where reading it as a number answered nothing and left
+  the swatch undrawn; and a mark drawn at **zero** has no swatch opacity written at all rather than a
+  swatch drawn at nothing. `point: "transparent"` on a line is the second case, the overlay being
+  `{opacity: 0}` and its legend the line's own key. Two specifications in the wild corpus are each
+  one of the two.
+
+- **A composite mark's parts are named by their position among the parts actually drawn.** Upstream
+  builds the layer array from the enabled parts and every name follows the array, so a box plot with
+  its box switched off has its median at `layer_1_layer_0`, taking the box's place rather than
+  keeping its own. This wrote the names out by hand, so a part switched off left a hole and every
+  dataset, signal and mark name below it was one index too high. Two specifications in the wild
+  corpus switch a part off that way. The two *groups* keep their indices even where one comes out
+  empty; `outliers: false` is the one exception, and it is upstream's — with no outlier layer the
+  whiskers are the first group and every name below loses a level.
+
+- **A trellis's caption is written the way the column is typed, and the way its header says.**
+  `assembleLabelTitle` reads a `format` and a `formatType` off the header chain and hands them to
+  `formatSignalRef` — the same function a tooltip line goes through, whose third arm is `format ||
+  channelDefType === 'quantitative'`. This engine had the bucketed and temporal arms and not the
+  number one, so a grid split by a *measured* column captioned its cells with the raw value where
+  upstream writes `format(…, "")`; three specifications in the wild corpus. A stated format pulls
+  any column into that arm however it is typed, the specifier falls to `config.numberFormat`, and a
+  **custom** format type is the first arm of all — it calls the function the page registered rather
+  than `format`, with a specifier only where there is one to pass.
+
+- **A band scale's range is a step only where the size it is measured against is one.**
+  `getDiscretePositionSize` is the specification's own `width` where it states one and the theme's
+  discrete size otherwise, and `defaultRange` returns `{step}` only when that answer *is* a step. So
+  a document sizing every plot with `config.view.discreteWidth` — or with `width`, its older name —
+  has said how wide a band chart is: the scale runs the whole way across rather than one step per
+  category, and there is no `«scale»_step` signal at all. 21 specifications in the wild corpus
+  differ on this key alone. The specification's own size still outranks the theme, a stated
+  `{"step": …}` staying a step however the theme sizes the plot.
+
+- **`config.view.width` and `config.view.height` size a plot, as the names those properties had
+  before the continuous and discrete sizes were told apart.** Both of upstream's readers ask for
+  them first — "get width/height for backwards compatibility" — and this read only the newer names
+  on the continuous side, so a theme written against an older Vega-Lite had its charts drawn at the
+  default 300. Eight specifications in the wild corpus size themselves that way. The discrete reader
+  answers a **number** where the theme states one and `{step: …}` only otherwise, so a themed
+  discrete size replaces the step arithmetic entirely — every strip in the document is that deep,
+  with no `«scale»_step` signal to compute it from — while the specification's own `width` still
+  outranks the theme either way.
+
+- **A theme naming the side a legend sits on decides which way it runs.** `getDirection` is
+  `legend.direction ?? legendConfig[…] ?? defaultDirection(orient, legendType)` with `orient` being
+  `legend.orient || config.legend.orient || 'right'`, so `config.legend.orient: "top"` turns every
+  key in the document horizontal — and a ramp's length follows the width rather than the height.
+  This read the channel's own orient alone, so such a chart came out with its keys stacked
+  vertically along the top edge; four specifications in the wild corpus. Two quirks are reproduced
+  rather than repaired: `legendType` is `'symbol'` or `'gradient'` and both are truthy, so the
+  ternary always reads `gradientDirection` and `symbolDirection` is never consulted at all; and
+  `config.legend.direction` takes no part in the direction measured here, settling only what Vega
+  draws from its own config block.
+
+- **A condition that states no value is still a rule, and falls to the mark's own.** `wrapCondition`
+  builds one value ref per condition and spreads whatever the reference function answers into it —
+  `{test: conditionalTest(c, …), ...conditionValueRef}` — and for a non-position channel that
+  function carries the mark's own value as its default. So `{"condition": {"test": {"param": "p"}},
+  "value": 0}` reads *"whatever the mark draws it at while the box is ticked, and invisible
+  otherwise"*, which is how a chart hides its labels behind a checkbox; where the mark has no such
+  default the ref is the test alone. This dropped a condition it could get no value out of, so the
+  rule came out as the unconditional arm by itself and the checkbox did nothing. The default is the
+  mark's own property, then the theme's block for that mark type, then the faded 0.7 `initMarkdef`
+  writes onto a point-like mark — and the unconditional arm ends at the same value, `wrapCondition`
+  building both with the one function. Two specifications in the wild corpus are written that way.
+
+- **An axis property the theme states in a block Vega knows is left off the axis.** `config.axis`,
+  `config.axisX` and `config.axisBottom` all go out in Vega's own config block and Vega applies them
+  from there to every axis at once, so writing a *derived* value onto this axis as well would settle
+  the property for it alone — and settle it with a default. A theme asking for `labelOverlap: false`
+  was overruled by the `true` this compiler had worked out. The **Vega-Lite-only** blocks are the
+  other half: `config.axisQuantitative` and its per-direction twins are named after a kind of scale
+  rather than a place, Vega has never heard of them, and their values are therefore written onto the
+  axis instead. That is the axis half of the legend rule above. One arm is still not ported —
+  `propsToAlwaysIncludeConfig` has the theme's value written out even from a Vega block, where this
+  compiler writes its own derived one.
+
+- **A legend property the theme states is not written onto the legend at all.**
+  `parseLegendForChannel` guards every property it sets with `if (explicit || config.legend[property]
+  === undefined)`: `config.legend` goes out beside the chart in Vega's own config block and Vega
+  applies it from there to every legend at once, so writing a *derived* value onto this legend as
+  well would settle the property for it alone — and settle it with a default. `"config": {"legend":
+  {"title": false}}` therefore came out with every caption still drawn, the derived caption
+  outranking the theme that had turned captions off. A value the specification stated on the channel
+  is explicit and still wins, and for a caption that includes one written on the definition rather
+  than in its `legend` block. Two specifications in the wild corpus turn their captions off that
+  way.
+
+- **A name derived from a model's own is a variable name.** `getName` puts the whole joined string
+  through `varName` — `varName((this.name ? `${this.name}_` : '') + text)` — and it is how every
+  dataset, signal, scale and mark group is named, so a chart called `Amount Bar Chart` has a layer
+  called `Amount_Bar_Chart_layer_0`. This joined the parts and left them, and a chart whose name held
+  a space or a hyphen came out with names Vega cannot read as identifiers: a trellis's bands and the
+  dataset its headers are titled from, a concatenation's plots, a composite mark's parts, and the
+  expression a selection stores its unit under. `this.name` itself is *not* cleaned — `spec.name ??
+  parentGivenName` — so the `unit` a selection records is the name as written, spaces and all, which
+  is the other half of the same rule.
+
+- **A `field` is read as JavaScript reads it.** It is a string in the grammar and nothing upstream
+  checks that: the name is spelled into a template — `` `${expr}["${channelDef.field}"]` `` — and
+  into `vgField`'s regular expressions, both of which coerce whatever they are given. So `"field":
+  ["2021"]` names the column `2021`, `["a", "b"]` names one called `a,b`, and a number or a boolean
+  names itself. This read the property as a string and answered nothing for anything else, which
+  makes the definition not a field definition at all: the channel had no scale, and a map coloured
+  by a column written that way was drawn in one flat colour. Two specifications in the wild corpus
+  write the array form. An object is still refused rather than coerced, `[object Object]` being a
+  column no table has.
+
+- **`"parse": {"«field»": null}` says *do not* parse a column, and takes the implied parse with it.**
+  The stated `parse` belongs to the parse node rather than to the source — `format = data.format ?
+  {...omit(data.format, ['parse'])} : {}` — and the node decides where its work lands: back onto
+  `format.parse` where it sits directly under the source, into a formula where a transform stands
+  between. This copied a url's `format` across whole, so a `null` entry reached Vega as an
+  instruction to parse a column *as null*. The null is not merely dropped either: it is kept in the
+  ancestor's record so nothing below adds a parse for that field, and only then left out of the
+  node, so a temporal column told not to be parsed is not parsed at all. Three specifications in the
+  wild corpus write one.
+
+- **A trellis's stated `bounds`, `align` and `center` outrank the defaults computed beside them.**
+  `assembleLayout` is `{padding: spacing, ...this.assembleDefaultLayout(), ...layout}`, where
+  `layout` is `extractCompositionLayout(spec, 'facet', config)` — so `"bounds": "flush"` gets it,
+  however firmly the default says `full`. A crossed grid was reading none of them and two
+  specifications in the wild corpus were drawn with the wrong bounds.
+
+  A crossed grid also *lifts* `align` and `center` per channel: an alignment written on the `row`
+  channel becomes `{"align": {"row": …}}`, an object that **replaces** whatever the chart itself said
+  rather than filling in the other side, with row before column. And because the lifted properties
+  are spread after the chart's own, a property on the facet channel outranks the chart's — a wrapped
+  facet had that precedence the other way round.
+
+- **A wrapped trellis's heading is styled by its header's `title…` properties.** `assembleTitleGroup`
+  ends with `assembleHeaderProperties(config, facetFieldDef, channel, HEADER_TITLE_PROPERTIES, …)`,
+  exactly as each cell's caption ends with the `label…` half of the same table. This wrote the
+  heading's text and offset and nothing else, so a trellis sizing or colouring its heading — or a
+  document setting `config.header.titleFontSize` to size every heading at once — was drawn with the
+  default. Three specifications in the wild corpus differed for it.
+
+  The two maps are the same thirteen properties under two prefixes and are now one table. The cell
+  caption's half was missing `labelOrient` and `labelPadding`, which are the two that *move* a
+  caption rather than restyle it, and the padding was being overwritten by the built-in default of
+  ten rather than standing instead of it.
+
+- **A tooltip line reads the column as written, not the column the aggregate wrote.**
+  `addLineBreaksToTooltip` spells the definition's own field into the expression —
+  `${expr}["${channelDef.field}"]` — and for an `order` channel that *counts* the rows there is no
+  field to spell, so the description Vega is given reads `datum["undefined"]`. This read
+  `datum["__count"]` instead, which is the sensible thing and not what upstream emits. Reproduced
+  rather than repaired: the reason the discrete form is reached at all is that `initFieldDef` gives
+  an `order` definition no type, and `add` in `tooltip.ts` falls back to the main channel's — which
+  for an `order`, held as an array, is undefined. Two specifications in the wild corpus write an
+  order that way.
+
+- **The controls a chart is driven by come out in reverse order of declaration.**
+  `inputBindings.topLevelSignals` *unshifts* a signal for each of a selection's projections —
+  `signals.unshift({name: sgname, …})` — and `assembleTopLevelSignals` walks the selections in
+  declaration order, so the last parameter's control is written first and a selection projecting
+  onto two fields writes the second one first. `bindLegend` unshifts the same way. This wrote them
+  in declaration order; Vega renders bound inputs in the order it is given them, so a reader looking
+  down a column of drop-downs saw them in the wrong one. Four specifications in the wild corpus
+  differed for it.
+
+- **A legend one layer switches off stays off for the merged legend.** `parseLegendForChannel` builds
+  a component for a disabled legend rather than none, and records its `disable` as *explicit*
+  whenever the channel wrote a `legend` at all — `legendCmpt.set('disable', disable, legend !==
+  undefined)`. `mergeLegendComponent` folds that property like any other, so a layer writing
+  `"legend": null` takes the **merged** key away rather than only its own share of it. Dropping the
+  disabled component instead let the other layer's legend stand: four specifications in the wild
+  corpus drew a key their first layer had switched off, one of them captioned `gender, t, t` — the
+  three layers' titles joined. The rule cuts both ways: a layer writing `"legend": {}` says
+  explicitly that its legend is *not* disabled, and brings back a key `config.legend.disable` had
+  switched off.
+
+- **A table two models name is written out with a `format` block, whatever it comes to.** `parseRoot`
+  runs for the root and for every model that states its own `data`; where it finds a source already
+  standing it assigns `mergeDeep({}, model.data.format, existingSource.data.format)`
+  unconditionally, and that is `{}` when neither says anything. So two layers reading one table
+  leave an **empty** format behind where one layer leaves none at all — Vega ignores it, and a
+  comparison against upstream does not: 14 specifications in the wild corpus differed on that key
+  alone, five of them on nothing else. The merge reads the specification's own block rather than the
+  source node's stripped copy, so it also reinstates a `parse` the node had taken off an inline
+  table. A model that states no `data` never calls `parseRoot`, and a `lookup` reading the same
+  table reuses the source without merging.
+
+- **The scales come out in `SCALE_CHANNELS` order rather than in the order the encoding was
+  written.** `parseUnitScaleCore` walks that list and fills a dictionary keyed by channel, and
+  `assembleScales` reads it back in insertion order; the list is `x, y`, then the polar positions,
+  then the offsets, then every non-position channel in `UNIT_CHANNELS` order. This walked the
+  encoding instead, which agrees for every chart that writes its channels where they belong and
+  parts company the moment one is **moved** — a pie whose slice is written as an `angle` is read as
+  `theta` at the place the angle was written, and came out with its colour scale before its slice's.
+  `Channels.SCALE_CHANNELS` itself had `theta` and `radius` last and was missing `time`, which went
+  unnoticed because it had only ever been read as a set.
+
+- **A channel the mark has nothing to set from is dropped from the encoding.** `initEncoding` drops
+  four kinds before anything else reads one: a channel `markChannelCompatible` says the mark has no
+  use for — a `text` on a line, a `shape` on a bar, a position on a `geoshape`, a second edge on a
+  mark that draws a point rather than a span — a `size` that *aggregates* on a `line`, which is one
+  path of one thickness; a `color` beside whichever of `fill` and `stroke` that mark would have
+  painted with; and an offset nested inside a **continuous** position, there being no band to offset
+  within.
+
+  Dropping them is not cosmetic: a channel that stays groups an aggregate, names a scale of its own,
+  and appears in the chart's spoken description and its tooltip. A `line` whose shared layer states
+  the `text` its sibling label draws described every point by a column the line does not show. 11
+  specifications in the wild corpus differed for that family of reasons.
+
+  An `angle` on an `arc` is read as `theta` — the slice, not the rotation of a glyph that has none —
+  and the rewrite has to run **first**, since an `arc` supports no `angle` and a compatibility check
+  running before it would drop the very channel that carries the chart.
+
+- **An error bar's own channels now ask its summary for what they aggregate.** `errorBarParams`
+  hands the encoding to `extractTransformsFromEncoding` before anything is drawn from it, and the
+  measures that walk finds are the *first* entries of the summary — `[...oldAggregate,
+  ...errorBarSpecificAggregate]` — with the channel rewritten to read the column the summary writes.
+  This left the request on the channel, so a tooltip asking for a mean made the part view summarise
+  the summary, grouped by the interval's own bounds. The channel also carries the title it was asked
+  by, so such a line reads `Mean of Body Mass (g)` rather than `mean_Body Mass (g)`.
+
+  Two details of the upstream walk decide the answer. `forEach` spreads a **list** channel, so every
+  entry contributes its grouping or its measure — but the rewrite writes the *channel*, so only the
+  **last** entry is left standing and a two-column tooltip over an error bar reads one line; where
+  that last entry asks for nothing derived, upstream writes the list back whole instead, aggregating
+  entries and all, and the part view really does summarise twice. Both are kept as upstream has
+  them. The `bin` arm of that walk is still not ported: a bucketed channel of an error bar is
+  carried through as written and groups the summary by the raw column.
+
+- **A legend's label expression is applied to the merged legend, and no longer costs the swatch.**
+  `assembleLegend` destructures `labelExpr` off the component and applies it at assembly. The place
+  matters: a line with a point overlay is two layers, and only the point's legend has a swatch
+  encode, so an expression applied per layer let the line's `{labels: …}` reach the merge first and
+  the point's `{symbols: …}` was dropped behind it — the swatch lost the overlay's white fill.
+
+  Moving it uncovered a second fault in the same function. Upstream removes a scale channel from
+  the swatch with `delete out[property]`, **in place**, leaving the rest of the encode alone; this
+  rebuilt the whole `encode` from the swatch, so a legend whose labels carry an expression lost them
+  the moment a scale channel was dropped from its swatch.
+
+- **The last four readers of an encoding now spread a list channel too.** `forEachFieldDef` and
+  `reduceFieldDef` spread an array before they call, so a `tooltip` naming four columns is four
+  definitions to every pass that walks the encoding. The same shape had been fixed in five separate
+  places; these are the four that were left, found by sweeping for the pattern rather than waiting
+  for a specification to hit them: a `bin` on such an entry is compiled, a `sort` array gets its
+  index column, an `aggregate` makes the view aggregate, and `isAggregate` sees it — so a scatter
+  whose tooltip asks for a mean is no longer faded as though it had overlapping points.
+
+- **An instant bucketed on one entry of a list channel is bucketed.** `TimeUnitNode.makeFromEncoding`
+  folds the encoding with `reduceFieldDef`, which spreads an array before it folds, so a `tooltip`
+  naming four columns is four definitions. Reading only the channel's own definition left the
+  transform unwritten, and the tooltip then read a column no step in the flow produces — an empty
+  line where a date should be.
+
+- **The stack is computed before its order is aligned with the colour domain.** `UnitModel`'s
+  constructor runs `this.stack = stack(mark, encoding)` and only then
+  `alignStackOrderWithColorDomain()`, which may write an `order` channel of its own — so `stackBy`
+  was settled without it, and the `_«field»_sort_index` column that rule adds is not one of the
+  stack's own dimensions however much `order` counts as a non-position channel. A stacked **area**
+  is where it shows, `stackby` being the `impute` transform's groupby: counting the sort index
+  filled each colour's missing values per index instead of per colour. An order channel the
+  specification wrote still contributes, having been there when the stack was computed.
+
+- **`config.title` survives, holding its subtitle properties.** "Subtitle part can stay in
+  `config.title` since header titles do not use subtitle" — the paint has become the `group-title`
+  style, the placement the `group-subtitle` one and the six non-mark properties went onto the title
+  directive, and these seven stay for Vega's own title to read. This consumed the whole block, so a
+  theme setting `subtitleFont` had nowhere to say it and the subtitle was drawn in the title's face.
+
+- **`config.font` and `config.title` reach the styles they name.** `initConfig` lifts `font` out of
+  the configuration and merges `fontConfig(font)` in its place — `text`, `guide-label`,
+  `guide-title`, `group-title` and `group-subtitle` — *under* everything the specification wrote.
+  Vega has no top-level `config.font`, so a theme naming one reached the renderer with the font
+  where nothing reads it and the whole chart was drawn in the default face. `config.title`
+  contributes a `group-subtitle` style as well as a `group-title` one, from
+  `pick(titleConfig, ['align', 'baseline', 'dx', 'dy', 'limit'])`: a chart that moved its title
+  fifty units across had left its subtitle at the origin, under nothing.
+
+  Every style block now **merges** over what these contribute rather than replacing it, which is
+  what `mergeConfig` does — a `guide-label` that names a colour keeps the configured font beside it.
+
+- **A Vega-Lite 4 selection tested *inside* a predicate is compiled.** `normalizePredicate` reads a
+  condition's own `selection` **or** walks a `test` holding one, and
+  `{"condition": {"test": {"selection": "brush"}, "value": 60}}` is the second arm — how Vega-Lite 4
+  wrote a conditional value gated on a selection when it wanted a predicate rather than a bare name.
+  Returning early for an entry with no `selection` of its own left the reference in place, and the
+  condition was dropped for testing something Vega-Lite 5 has never heard of, so the chart lost the
+  half of its encoding that responds to the pointer.
+
+- **An empty format is no format.** `formatSignalRef` tests the format for *truth* — `format ||
+  channelDefType(…) === 'quantitative'` — and `numberFormat` hands a stated `""` straight back, so a
+  column with no type and `"format": ""` is read as text rather than run through `format()`. Writing
+  `"format": ""` beside a real format on the entry that needs one is how a document says "leave this
+  one alone"; testing only whether a format had been written turned such a column into
+  `format(datum["Item"], "")`, which reads a word as `NaN`. A quantitative column still formats with
+  an empty format, its type carrying that arm on its own.
+
+- **The encoding says whether a plot is projected, and one projected member makes it the layer's.**
+  `parseUnitProjection` runs `if (model.hasProjection)`, which is a `geoshape` mark or a geographic
+  position channel and nothing else — a projection stated at the top of a chart does not make a plot
+  drawing in `x` and `y` projected. Treating it as though it did put that plot's table into the
+  `fit`, so a map layered under a scatter of ordinary positions was scaled to cover both. And a
+  member with no projection does not stop the merge, so one map under such a scatter still has a
+  *layer's* projection, named for the layer; requiring two projected members named it for the member
+  instead, and the mark that reads it named the member's too.
+
+- **A swatch takes the opacity the mark took.** By the time a legend reads it, the reduced scatter
+  opacity is just `markDef.opacity`, which `initMarkDef` settles from *both* opacities — a mark
+  stating its `fillOpacity` has answered the question, so its swatch is not faded either. The legend
+  asked a narrower question than the mark: no `fillOpacity`, and the mark alone rather than the
+  mark, its styles and the configuration. The two now ask through the same lookup rather than
+  through two copies of it, which is what let them drift apart.
+
+- **A plot that is a layer titles its group from one of its members.** `LayerModel.assembleTitle` is
+  the same function whether the layer is the whole chart or one plot of a concatenation, so a
+  concatenated layer whose caption sits on the member carrying the text mark is captioned by it.
+  Reading only the plot's own title left a small-multiples chart untitled cell by cell — which is how
+  Altair writes one.
+
+- **A bucketed column reads as its span wherever it is read.** `formatSignalRef` works the far edge
+  of a bin out itself rather than being handed one, so no caller has to say so. A `tooltip` written
+  as a **list** goes through a different path here from the channels' own, and that path passed
+  nothing — so a bucket in a tooltip printed its lower edge as a bare number where the axis beside
+  it read `0 – 10`. A pre-binned column still needs its caller, its far edge being the secondary
+  channel's own field.
+
+- **An axis property one layer states settles the shared axis, whichever layer states it.**
+  `mergeAxisComponent` folds a shared axis property by property with `mergeValuesWithExplicit`, and
+  an explicit value beats a derived one; between two stated values the first still wins. Filling
+  only the gaps is right for two derived values and wrong the moment one was asked for — a layer
+  writing `"axis": {"grid": false}` lost to an earlier layer that never mentioned gridlines, whose
+  **silence** became a decision because a quantitative position has them by default.
+
+- **Every entry of a list channel breaks a composite mark's summary down by its own column.**
+  `extractTransformsFromEncoding` walks the encoding with `forEach`, which spreads an array before
+  it calls, so a `tooltip` naming four columns contributes four groupings. Reading only the
+  channel's own definition summarised across all of them — an error bar meant to draw one interval
+  per category drew one interval for everything. A box plot stays the exception, taking its tooltip
+  out of the encoding before the grouping is read.
+
+- **A repetition variable standing in a list channel is resolved.** `replaceRepeaterInMapping` maps
+  over an array channel rather than passing it along, so `{"field": {"repeat": "repeat"}}` written
+  as one entry of a `tooltip` resolves per repetition. This passed the array along, leaving the
+  entry naming a column that is an object rather than a name — dropped for having no field, so the
+  tooltip showed every column except the one the chart repeats over.
+
+- **An offset of nothing is no offset.** `positionOffset` writes one only where the stated value is
+  truthy, so a `"thetaOffset": 0` — what a chart written by a tool that always emits the key leaves
+  behind — moves nothing and is not written. An offset written as an expression is an object, and
+  objects are truthy, so it still applies.
+
+- **A colour ramp follows the plot only where it lies along the measure it would follow.** A
+  horizontal ramp is as long as the plot is wide when it sits above or below it, and otherwise
+  simply the shortest a horizontal ramp may be — one *beside* the plot has no width to follow, and
+  one placed by hand with `orient: "none"` has no side at all. A vertical ramp follows the height
+  wherever it sits. This clamped in every case, so a ramp laid out by hand grew and shrank with a
+  plot it is not beside.
+
+- **A scale property one layer states settles the shared scale, whichever layer states it.**
+  `parseNonUnitScaleProperty` folds a shared scale property by property with
+  `mergeValuesWithExplicit`, and an explicit value beats a derived one; between two of the same kind
+  the first still wins. This took the first layer's answer for everything, so a colour range listed
+  on the **second** member of a layer lost to the first member's default scheme and the chart was
+  drawn in category colours the specification had replaced. A `scheme` counts as stating the range,
+  as do `rangeMin` and `rangeMax`.
+
+- **A weekday written beside a year and a month is dropped, and no longer moves the date.**
+  `dateTimeParts` deletes a `day` whenever the object holds anything else, before it reads any of
+  the rest — upstream's comment is "day only works as a standalone unit", a weekday being a position
+  in a *week* and the `day + 1` that places it arithmetic that makes sense only when nothing else is
+  pinned. Carrying it there moved the date by a day: `{"year": 1900, "month": 1, "day": 1}` came out
+  as the second of January. A date-time literal in a predicate also goes through `dateTimeToExpr`
+  rather than its parts alone, which is what writes an instant marked `utc` as `utc(…)` instead of
+  as local time; both were wrong in the same line.
+
+- **A map is as tall as a continuous plot.** `defaultUnitSize`'s third arm is
+  `model.hasProjection || model.mark === 'arc'`, and this had only the `arc` half of it. A chart
+  drawn through a projection has no position scale on either channel, so it fell to the *discrete*
+  size and came out twenty units deep — a strip rather than a map. `hasProjection` is a `geoshape`
+  mark or a geographic position channel, so a point placed by latitude and longitude counts as much
+  as an outline does.
+
+- **A legend is read by asking it for the properties legends have.** `parseLegendForChannel` walks
+  `LEGEND_COMPONENT_PROPERTIES` and asks the `legend` block for each entry, so a block holding
+  anything else is never looked at. This copied the block's own keys and forwarded them, so a
+  `labxelExpr` written for `labelExpr` reached Vega — which reported `PARSE_UNKNOWN_PROPERTY` two
+  stages downstream and drew the labels untruncated. Three specifications in the wild corpus contain
+  that exact misspelling. It is the same rule as the mark's and fails the same way: a denylist
+  cannot be finished.
+
+  A `disable` written **inside** the block is honoured with it. It is one of the properties read off
+  the block, and `assembleLegend` answers nothing for a disabled component; dropping it as an
+  internal without honouring it first left the key drawn.
+
+- **A `timeUnit` transform reads its input as a date, above the transform rather than below it.**
+  `parseTransformArray` inserts the parse before the transform node — "create parse node because the
+  input to time unit is always date" — and only then records what the transform wrote. The order is
+  the whole of it: `{"field": "ts", "timeUnit": …, "as": "ts"}` reads a column and writes it back
+  under its own name, so taking the transform's output as derived took the parse with it and the
+  bucketing ran over text. The parse that was emitted landed *below* the transform, where it parses
+  the transform's own output.
+
+- **Every entry of a list channel is parsed, not just the first.** `getImplicitFromEncoding` walks
+  the encoding with `forEachFieldDef`, which iterates entry by entry — a `tooltip` naming four
+  columns is four definitions — and reaches into a `condition` for its field. This read only the
+  channel's own definition, so a tooltip's **second** nested field was never flattened into a column
+  of its own and Vega looked for it under a name no row has, leaving that line of the tooltip empty.
+  A date or a number in the same position went unparsed for the same reason.
+
+- **An axis caption may be several lines.** `assembleTitle` passes a title through untouched unless
+  it is an array that is *not* text — the list of field definitions a shared axis's merged titles
+  are, which it joins with commas. A list of **strings** is already text, and Vega draws it one line
+  per entry. This kept only single-string captions and dropped a list of lines entirely: four
+  specifications in the wild corpus caption an axis with an arrow over a phrase, which is how a
+  chart labels a direction, and came out with no caption at all.
+
+- **A padding the theme sets to nothing is no padding; one the chart sets to nothing is a zero.**
+  `getTopLevelProperties` spreads the configuration's top-level properties and then the
+  specification's, and the asymmetry is upstream of that: a falsy `padding` does not survive the
+  configuration merge, while the specification's is copied on a plain presence test. So
+  `config: {"padding": 0}` reaches Vega as no padding — leaving Vega's own default of five — and
+  `"padding": 0` on the chart reaches it as a zero. This took the theme's as written, and put a
+  `padding: 0` into five of the wild corpus's charts that upstream leaves alone.
+
+- **A scale keeps only the properties its type has.** `parseScaleProperty` asks
+  `scaleTypeSupportProperty` of every property it is given, derived or stated, and drops the rest
+  with a warning — a `base` belongs to a logarithm, an `exponent` to a power, a `constant` to a
+  symlog, and the ends of a domain and a `clamp` need a continuous domain to be the ends of. The
+  gate existed here but half of upstream's cases were missing from it, and the pass that copies
+  *stated* scale properties wrote them straight into the component, going round it entirely. A
+  `{"zero": false}` on a temporal scale therefore reached Vega, which has no zero on a time scale;
+  fourteen of the wild corpus's specifications state a `base` on a scale that is not a logarithm.
+
+- **A title of no words is no title.** `assembleTitle` guards everything it does with
+  `if (title.text)`, and the empty string is falsy, so `""` produces nothing. This wrote it out and
+  reserved the space above the chart for a heading that says nothing — `""` being what a
+  specification written by a tool that always emits the key leaves behind.
+
+- **Only a derived grid comes off the second of two independent axes.** Two sets of gridlines across
+  one plot measure different things and say neither, so upstream keeps the first — but its test is
+  `!axisCmpt.explicit.grid`, and a layer that writes `"axis": {"grid": true}` has *asked* for
+  gridlines and gets them however busy the result reads. A `config.axis.grid` that happens to
+  produce the same answer is not asking, `isExplicit` ending in `value === axis[property]`. This
+  took them off regardless, so a dual-axis chart whose layers each asked for gridlines was drawn
+  with one layer's.
+
+- **An axis one layer switches off is switched off for the scale.** `parseAxis` keeps a disabled
+  axis as a component rather than answering nothing, because `"axis": null` is an *explicit*
+  decision and an explicit value beats every sibling's in the merge. This returned nothing for such
+  a layer, so it did not contribute and the other layers put the axis back — a chart whose first
+  layer draws its own time axis and whose later layers share the scale came out with an axis
+  upstream does not draw.
+
+- **A `description` channel says what a mark is read out as.** `description()` has four arms — the
+  channel, the mark's own or the theme's, `config.aria: false`, and only then the summary assembled
+  from every encoded field. Just the last was implemented here, so a channel written precisely to
+  say what a screen reader should announce was ignored and the assembled summary spoken over it, and
+  a `description` on the mark was dropped outright — it is kept out of the mark's own properties
+  because it belongs here, and nothing then wrote it.
+
+  The two stated arms come **before** the `config.aria` test, which had been at the top of the whole
+  function. A chart that switches the accessibility tree off still gets a description it asked for by
+  name; only the derived summary goes. A conditional description becomes a production rule like any
+  other channel's.
+
+- **A trellis's captions take their styling from the theme.** `getHeaderProperty` reads three places
+  in order — the facet's own `header` block, then `config.headerRow`/`headerColumn`/`headerFacet`,
+  then `config.header` — so a facet that writes no header block at all still takes the theme's. This
+  read the facet's own block and gave up where there was none, leaving `config.header.titleFontSize`
+  — how a document sets the type size of every trellis caption at once — with nothing to apply to.
+  The wrapped facet's cell captions read the same chain.
+
+- **`align`, `baseline` and `theta` belong to a mark made of words.** Every mark compiler hands
+  `baseEncodeEntry` an `ignore` argument, and across all thirteen of them these three are the only
+  entries that differ: `text.ts` says `include` and the other twelve say `ignore`, a mark that is
+  not words having nothing to anchor. This applied only the arc's `theta` exception and forwarded
+  the rest, so a hand-written `{"type": "line", "align": false}` reached Vega as a channel a line has
+  no use for. `radius` is nobody's exception and still goes out on any mark.
+
+- **A `sort` upstream does not recognise orders nothing.** `domainSort` is a chain of arms — an
+  array, a sort field, a sort by encoding, `"descending"`, then `ascending`-or-nothing — and
+  anything failing all of them falls out of the bottom as `undefined`, leaving the domain in
+  whatever order the data arrived. This had a default at the end of each arm instead: an unknown
+  string became the ascending order, and an object with nothing in it became an `{"op": "min"}` over
+  no field at all. Three shapes that turn up in hand-written specifications — `"-"`, `""` and `{}` —
+  sorted charts upstream leaves alone, in seven of the wild corpus's specifications.
+
+- **Every interval selection's brush guards a point pick, whatever it is bound to.** A click on a
+  brush belongs to the brush rather than to whatever row lies under the drag, and upstream's guard
+  asks a selection only its type. This also asked what it was bound to and excluded a scale-bound
+  interval, on the reasoning that such a selection draws no brush and so has no rectangle to click.
+  The reasoning is sound and the conclusion is wrong: `indexof` on a name nothing carries is always
+  less than zero, the guard costs nothing, and upstream writes it. Six specifications in the wild
+  corpus pan their axes while picking points — a scale-bound interval beside a point selection is
+  the ordinary way to write that — and disagreed on the one signal that does the picking.
+
+- **A mark that says how solid its fill is keeps the reduced scatter opacity off.** `initMarkDef`
+  asks for both `opacity` and `fillOpacity` before applying the seven-tenths default that lets
+  overlapping points read through each other, and either one answering leaves the mark alone — a
+  mark that has already stated its fill would otherwise be drawn at `0.9 * 0.7`, fainter than either
+  number. This looked only at `opacity`, and only on the mark itself, so eight of the wild corpus's
+  scatters came out fainter than upstream draws them. Both are now read through the mark, its style
+  blocks and the configuration alike. `strokeOpacity` is not one of the two and still leaves the
+  default standing.
+
+- **A facet channel carries its own `spacing`.** `getFacetMappingAndLayout` lifts `align`, `center`,
+  `spacing` and `columns` off a facet definition, and `assembleLayout` then extracts the spacing and
+  writes it as the layout's `padding`. So the gap between a trellis's cells may be stated beside the
+  facet or on the channel that makes it, and this read only the first place, falling back to the
+  configured twenty for the second — exactly as it once read `columns` in only one place. A crossed
+  facet states it per channel, so a trellis whose rows name a gap and whose columns do not is a pair
+  with the other side filled in from the theme.
+
+- **`nice` follows a stated extent, not the mere presence of a domain.** Upstream suppresses the
+  rounding for a binned field, an **array** domain, a stated `domainMin` or `domainMax`, and a time
+  or UTC scale. Two of those five were wrong here, and the comment beside the code had upstream's
+  rule written out correctly while the code did something else: it asked whether a domain had been
+  written *at all*, which suppressed a `{"data": …, "field": …}` domain that upstream rounds — the
+  bounds are not known until the data is read — and it never looked at the two ends, so a scale
+  pinned to `domainMin: -1, domainMax: 7` was rounded past both of them.
+
+- **A label's anchors are derived from the angle that gets written out.** `defaultLabelAngle`
+  normalises what the specification wrote and hands *that* to `defaultLabelAlign` and
+  `defaultLabelBaseline`, both of which read the angle as a position on the circle. This normalised
+  it for the value it emitted and then compared the raw one, so a label at `labelAngle: -90` — a
+  label at 270°, which is how a column of dates is usually written — satisfied neither arm of the
+  baseline rule, fell through to `angle <= 45` (true of every negative angle) and was anchored by
+  its top instead of through its middle, hanging a line below its axis. The alignment was wrong with
+  it on the vertical axis. Ten specifications in the wild corpus turn their labels that way.
+
+- **A key captioned with nothing has no caption.** `assembleLegend` strips a falsy title on the way
+  out — `if (!legend.title) delete legend.title`, its own comment being "title schema doesn't
+  include null, ''". This dropped only the `null`, so `"title": ""` was written out and reserved the
+  space for a caption that says nothing. Eleven of the wild corpus's legends were captioned that
+  way, from the channel's own `title` and from the `legend` block's alike.
+
+  The rule stays at assembly, after the layers have been merged, because the caption is what
+  `mergeValuesWithExplicit` settled between them: a layer stating `"title": null` has been explicit,
+  and an explicit value beats a sibling's derived one, so one layer naming its colour `null` and
+  another leaving it derived is one uncaptioned key. Stripping it earlier takes the key away and the
+  merge fills the caption back in from the other layer.
+
+  The three rules that read JavaScript truthiness — a disabled guide, a falsy caption and
+  `extractTitleConfig`'s four spread properties — now share one helper rather than three copies of
+  the same `when`.
+
+- **A title written on one of a layer's members is the chart's title.** A layer's members are drawn
+  in one group, so there is no child group for such a title to sit over — and rather than lose it,
+  `LayerModel.assembleTitle` promotes it: "if title does not provide layer, look into children". The
+  first member that has one wins, depth first, and a title on the layer itself outranks every one of
+  them. A concatenation does not do this, its children having groups of their own. This dropped such
+  a title entirely, and 14 specifications in the wild corpus — Altair's output, which writes the
+  title on the layer carrying the text mark — came out untitled.
+
+  Two smaller facts of the same function went with it. A title needs `text` to be a title, so a
+  block of title properties with nothing to say is no longer written as an empty one; and `isText`
+  accepts an **array** of strings as readily as one string, so a title over several lines becomes
+  the title's `text` rather than standing as the title itself.
+
+- **A chart's title reads the theme, and a wrapped facet's title is a composition's.**
+  `assembleTitle` frames a **unit or layer** title to its plotting group, and gives a
+  **composition** `anchor: "start"` instead — upstream's note being that a centred title "does not
+  look nice" over a grid. A chart faceted by the `facet` channel was read as a unit where `row` and
+  `column` were already read as compositions, so its title was framed to a plotting area the chart
+  does not have.
+
+  `config.title`'s six non-mark properties — `anchor`, `frame`, `offset`, `orient`, `angle`,
+  `limit` — now reach the title directive. They are deliberately kept out of the `group-title`
+  style because that is where upstream puts them, and nothing then wrote them anywhere, so a theme
+  whose `config.title.anchor` is `"start"` produced a centred title with a group frame. The frame
+  and anchor defaults read the assembled title, so a theme's anchor is as explicit as the title's
+  own. A title's `encoding` also becomes an `encode.update` block rather than being passed through
+  under a name Vega has no title property for.
+
+- **A guide switched off with `false` is switched off.** `parseLegendForChannel` and `parseAxis`
+  both settle it as `legend !== undefined ? !legend : legendConfig.disable`, so the question is
+  JavaScript truthiness rather than a comparison against `null`. `"legend": false` is what
+  specifications in the wild write — the documented spelling is `null`, and the schema does not
+  admit `false` — and upstream honours it because `!false` is true. This compared against `null`
+  alone and left the key with a legend beside it. An empty object stays truthy, which is what makes
+  `"axis": {}` a guide with no properties rather than no guide.
+
+  The second arm of the same line is the theme's: where a channel says nothing about its legend,
+  `config.legend.disable` decides. The axis had honoured `config.axis.disable` all along. Together
+  the two arms account for 25 disagreements in the wild corpus, 18 of them a chart's only one.
+
+- **A rect-based mark's own `width` or `height` is its band size.** `getBandSize` settles the size
+  before it looks at the scale at all, and `getMarkPropOrConfig` reads the mark's **Vega** name
+  first — so `{"type": "bar", "width": 25}` is 25 wide, whatever its band or the configured band
+  size would have made it. This looked for `size` and never for the Vega name, so every such mark
+  came out at the configured band size.
+
+  The alignment follows: upstream centres a mark whose band size is not *relative*, so a `rect` on
+  a nominal scale with `"width": 20` is written `xc` with `band: 0.5` where one left to fill its
+  band gets `x` and a bandwidth. A `{"band": 0.5}` is a fraction rather than a size and still takes
+  the bandwidth path; a `width` in a **style block** is still not read, upstream looking a style up
+  under the Vega-Lite name only. 25 specifications in the wild corpus stated a width on the mark.
+
+- **A wrapped facet's cells are aligned only along a direction they can be.** `assembleDefaultLayout`
+  starts from `align: "all"` and drops to `"none"` where the scale along a direction is each cell's
+  own — the cells' plotting areas are then different sizes, and lining them up lines up nothing.
+  A *crossed* grid is aligned regardless, which is what upstream's `!row` and `!column` guards say;
+  a *wrapped* facet has neither, so either direction being independent is enough.
+
+  This wrote `align: "all"` on every wrapped facet and never read the resolution. A stated `align`
+  or `center` is now honoured as well: `getFacetMappingAndLayout` lifts them off the facet
+  definition and `assembleLayout` spreads them after the default, so what a specification says
+  outranks what was computed. 42 specifications in the wild corpus disagreed with upstream here,
+  most of them for this reason alone.
+
+- **A mark property Vega has no channel for is no longer forwarded to Vega.** `markDefProperties`
+  walks `VG_MARK_CONFIGS` and asks the mark for each of the 57 properties Vega actually has, so
+  anything else a specification wrote is never looked at. This engine iterated the *mark's own* keys
+  and skipped a list of known Vega-Lite-only ones instead, which meant every word not on that list
+  went out verbatim.
+
+  A denylist cannot be finished, because what it has to exclude is every word nobody has written
+  yet. In the wild corpus the word was `fontsize` — a misspelling of `fontSize`, which upstream
+  ignores and this emitted as `"fontsize": {"value": 7.5}` into a Vega mark that has no such
+  channel. A property from a later Vega-Lite, and a polar bound such as `theta2` on a mark with no
+  polar bounds, were forwarded the same way and are now dropped for the same reason.
+
+- **A stated colour domain orders a stack that says `stack: true`, not only one that aggregates.**
+  `alignStackOrderWithColorDomain` adds a `_«field»_sort_index` column so a chart listing its colour
+  domain is drawn in that order rather than merely having its legend in it. Upstream asks
+  `this.stack` — the properties its own stack code computed — and this asked the encoding instead,
+  approximating it as "a quantitative position that aggregates". A chart that stacks because it
+  *said* so, with nothing aggregated, got no ordering: 62 charts in the wild corpus differed from
+  upstream by exactly the one formula that costs.
+
+  Two more divergences went with it. The direction reads the mark's **resolved** `orient` — which
+  `initMarkDef` infers from the encoding — where this read the stated one, ordering a horizontal
+  stack backwards; the 627-example gallery caught that on the first run. And an offset channel that
+  already states a `sort` now falls through to the stack branch as upstream's `else` does, rather
+  than ending the rule.
+
+- **A `size` a rect-based mark cannot apply no longer moves it either.** Upstream honours `size` on
+  a rect-family mark only where the mark has an orientation to apply it along — always for a `tick`,
+  otherwise `horizontal` with `y` or `vertical` with `x` — and elsewhere logs
+  `cannotApplySizeToNonOrientedMark` and uses the band. The size was already gated that way here;
+  the **alignment** was not, so a mark that merely mentioned `size` was centred in its band. A
+  `rect` on two discrete scales came out on `xc`/`yc` at half a band where upstream writes `x`/`y`
+  across the band's width.
+
+  Upstream's test is `!hasSizeFromMarkOrEncoding`, and that flag is set only where the size was
+  actually used. Six of the ten smallest disagreements in the wild-corpus sweep were this one
+  specification shape.
+
+- **Vega-Lite 4's `selection` spelling compiles, instead of being ignored.** Vega-Lite 5 replaced
+  `selection` with `params` and upstream kept the old spelling working; this compiler did not, so a
+  selection it never saw produced no store dataset, no signals, no `interactive` on the marks it
+  applies to and no cursor.
+
+  In the wild-corpus sweep that was **237 charts matching upstream on none of them** — not slightly
+  off, categorically absent — and every top-ranked difference in that sweep was a symptom of it.
+  Those 237 now match at the same rate as the charts written in the v5 spelling, which is what says
+  the gap was the spelling and not the selections.
+
+  `SelectionCompat` is a port of upstream's `normalize/selectioncompat.ts` rather than an
+  interpretation of it, and the port matters: an experiment against upstream's compiler suggested a
+  straight `selection`→`param` rename, and reading the source showed **six** constructs and two
+  wrong answers. A condition becomes a `test` holding a predicate, not a `param`; and `empty` is
+  taken *out* of the select block and propagated to the predicates that test the selection. Bin
+  extents, lookup sources, scale domains and logical compositions like `{selection: {and: […]}}` are
+  the three shapes an experiment would not have found at all.
+
+  Emptiness is resolved in two passes rather than by upstream's back-patching, which is equivalent —
+  the value it converges on is the definition's, wherever it appeared — and is the only version that
+  works on an immutable tree.
+
+### Internal
+
+- **A sweep of Vega-Lite specifications other people wrote.** The gallery sweep compiles the 627
+  examples Vega-Lite ships, and those are upstream's own: written to demonstrate features, by the
+  people who built them, in the version that shipped them. `scripts/vega-lite-wild.sh` adds a
+  different distribution — 1981 charts collected from public GitHub repositories by
+  `hyungkwonko/chart-llm`, MIT licensed and pinned to a commit — where schema versions are older,
+  defaults are left unstated and features combine in ways no example demonstrates.
+
+  **A measurement, not a gate**, which is the shape the gallery sweep had until it earned the
+  promotion by going from 124 of 627 matching to all 627. `check.sh` does not call this and the test
+  skips when the corpus is absent: a fresh corpus of somebody else's charts would paint every branch
+  red for reasons unconnected to it. It reports a match rate and ranks the differences by how many
+  charts each affects, which is the input to deciding what to fix.
+
+  The first reading is **1273 of 1981, 64.3%**. Upstream refused none of them and neither did this
+  compiler, so every one of the 708 differences is a real disagreement rather than an invalid input.
+
 ## 0.6.0
 
 ### Changed
