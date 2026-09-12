@@ -40,6 +40,15 @@ internal class DataPipeline(
    */
   private val ownsIdentity: Boolean = false,
   /**
+   * Whether the model **named** here, or anything below it, remembers its rows by identity.
+   *
+   * `parseTransformArray` runs once per model and asks `requiresSelectionId(model)` of that model —
+   * which for a layer is `forEachSelection`, its own components and its members'. A transform
+   * written on a layer is that layer's however many members carry a copy of it, so the identifier
+   * below it is the layer's too.
+   */
+  private val identityUnder: (String) -> Boolean = { ownsIdentity },
+  /**
    * Where the flow **splits into cells**, or null where the whole chain is computed once.
    *
    * Supplied by the compiler, which knows whether the cell's chain can be hoisted above the facet:
@@ -1458,7 +1467,17 @@ internal class DataPipeline(
         // aggregate an *encoding* asked for. A brush over a map of aggregated places is where it
         // tells: the brush picks the circles it covers, and a circle with no `_vgsid_` cannot be
         // picked at all.
-        if (ownsIdentity && node is AggregateNode) {
+        // Asked of the **model the transform was written on**, not of the view carrying a copy of
+        // it: `parseTransformArray` runs once per model and `requiresSelectionId(model)` walks that
+        // model's own selections, which for a layer are its members' too. A layer that aggregates
+        // once for two members, one of which declares a selection, has one aggregate and one
+        // identifier below it — where asking each member left the one that declared nothing with a
+        // chain of its own, identical to its neighbour's but for the missing identifier, and so
+        // unable to fold with it: two copies of the same table, and a sorted domain reading the
+        // union of both.
+        if (
+          identityUnder(view.transformOwners.getOrNull(index) ?: view.name) && node is AggregateNode
+        ) {
           last = last.then(identifierNode()).also { it.fromAncestor = inherited }
         }
       }

@@ -4211,6 +4211,20 @@ private class Compilation(
           // as one that declared its own: the rows an aggregate makes are not the rows that went
           // in, and a selection that remembers by identity has nothing to remember them by.
           Selection.needsIdentity(selections.filter { it.owner === view || it.owner == null }),
+          // A transform written on a **layer** is that layer's, and the identifier below its
+          // aggregate is the layer's too: the question is whether anything at or below that model
+          // remembers its rows by identity, which is what `forEachSelection` walks.
+          identityUnder = { owner ->
+            Selection.needsIdentity(
+              selections.filter {
+                val declared = it.owner?.name
+                it.owner == null ||
+                  declared == owner ||
+                  owner.isEmpty() ||
+                  declared?.startsWith("${owner}_") == true
+              }
+            )
+          },
           // `moveFacetDown` hoists a cell's chain above the facet until it meets a named point the
           // scales read. The pre-aggregation table a sorted domain asks for is such a point, and
           // where there is one the chain stays below the facet and a copy of it — with the facet's

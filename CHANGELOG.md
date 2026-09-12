@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **The identifier below an aggregate belongs to the model that wrote the aggregate.**
+  `parseTransformArray` runs once per model and asks `requiresSelectionId(model)` of that model —
+  for a layer, `forEachSelection` over its own components and its members'. A transform written on a
+  layer is that layer's however many members carry a copy of it, so the aggregate is one node and
+  the identifier below it is one node too. This compiler asked each member instead: in a layer that
+  aggregates once and whose first member declares a selection, the member that declared none got a
+  chain of its own — identical to its neighbour's but for the missing identifier, and so unable to
+  fold with it. The table was computed twice, and a domain sorted by an aggregate read the union of
+  both copies rather than the one table. The identifier after an aggregate an *encoding* asks for is
+  still the view's own, that aggregate being the unit's. One specification in the wild corpus
+  aggregates once per plot and picks in one member of each.
 - **Two identical sibling bucketings of an instant fold the way two aggregates do.** The same pair of
   optimizers reaches them and they keep opposite ends: `MergeTimeUnits` runs first in each round and
   keeps the *last* of what is already sibling when it runs — `timeUnitChildren.pop()` — where
