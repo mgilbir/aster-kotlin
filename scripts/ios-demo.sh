@@ -103,6 +103,18 @@ if [ "$MODE" = "--test" ]; then
   }
   trap cleanup_simulator EXIT INT TERM
 
+  # **Booted here, not by `xcodebuild`.** Given a shut-down device `xcodebuild` boots it on the way
+  # into the run, and that first boot is charged to the *first test's* launch: on 2026-09-12 CI
+  # failed with "Failed to get launch progress … Timed out while requesting launch progress" after
+  # 116 seconds, and the next test in the same run launched in seven. Nothing was wrong with the
+  # build — the gate had simply made one test wait for the machine.
+  #
+  # `bootstatus -b` boots the device if it is down and blocks until it is ready, so the wait belongs
+  # to the gate rather than to a test's timeout. `|| true` because a device that is already booted
+  # is not an error, and because a failure here is better reported by the run that follows.
+  echo "==> Booting $DEVICE_NAME and waiting for it to be ready"
+  xcrun simctl bootstatus "$DEVICE_NAME" -b >/dev/null 2>&1 || true
+
   echo "==> Running the UI tests on $DEVICE_NAME"
   # `set -e` is on, so the exit code is captured rather than allowed to end the script: the JUnit
   # XML below has to be written for a *failing* run too, or a red suite renders in
