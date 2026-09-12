@@ -6,6 +6,41 @@ section here does not get released.
 
 ## Unreleased
 
+### Internal
+
+- **A sweep of Vega specifications other people wrote.** `scripts/oracle.sh` renders the 198
+  fixtures under `test-fixtures/specs`, and those are this repository's own: written to pin down a
+  reading of Vega's semantics, one behaviour at a time, by the person implementing it.
+  `scripts/deneb.sh` adds a different distribution — the 63 `avatorl/Deneb-Vega-Templates`, MIT
+  licensed and pinned to a commit — where features combine in ways no fixture combines them and a
+  layout depends on three transforms agreeing.
+
+  They are Deneb templates rather than plain Vega, so four things are undone before either engine
+  sees them, each in the open in `oracle-js/src/deneb-prepare.js`: rows are synthesised from the
+  column declaration each template carries, since Power BI injects the table at run time;
+  `pbiColor(n)` is replaced by the literal colour it returns, Deneb defining it and upstream Vega
+  not; one template is JSON with comments; and `width`/`height`, computed from `containerSize()`,
+  fall back to the size the template itself declares, there being no container headless.
+
+  Seven templates are **not comparable** and are recorded as such rather than fudged. One needs a
+  second Deneb function this corpus will not invent. Six use `vega-label`, which places labels by
+  rasterising the marks and so needs a real canvas the oracle deliberately does not have — adding
+  one would switch upstream's text measurement and move every reference in the repository. Worth
+  saying plainly: `label` is the one transform here that no fixture uses, and it is the one that
+  cannot be referenced, so this corpus adds combinations rather than transform types.
+
+  **A measurement, not a gate**, which is the shape both Vega-Lite sweeps had until they earned the
+  promotion. `check.sh` does not call this and the test skips when the corpus is absent.
+
+  The first reading is **0 of 56**. The two largest causes are one root, confirmed against a
+  minimal specification rather than inferred: a title property written as a **signal** is not
+  resolved, so the colour falls back to the default — 54 templates — and a signal-valued `subtitle`
+  produces no subtitle mark at all, the same 54. Written as literals both work. After that,
+  `"reverse": true` on a scale, which this engine does not read at all, and a disagreement about
+  `autosize: "fit"` that moves 37 scale ranges and the geometry under them. One template,
+  `part-to-whole__voronoi`, this engine declines to draw and says nothing about why, which is its
+  own bug.
+
 ### Fixed
 
 - **A parse climbs in the order `MoveParseUp` climbs it, and the branches are numbered in that
