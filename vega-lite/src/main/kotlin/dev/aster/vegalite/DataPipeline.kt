@@ -493,11 +493,36 @@ internal class DataPipeline(
         parse.getOrPut(field) { "number" }
       }
     }
-    // A column a transform computed is *derived*: it has the type its transform gave it, and the
-    // loader has never seen it.
-    parse.keys.removeAll(
+    // ```js
+    // const parsedAs = ancestorParse.getWithExplicit(field);
+    // if (parsedAs.value !== undefined) {
+    //   if (parsedAs.explicit || parsedAs.value === implicit[field] ||
+    //       parsedAs.value === 'derived' || implicit[field] === 'flatten') {
+    //     delete implicit[field];
+    //   } else {
+    //     ancestorParse.set(field, implicit[field], false);
+    //   }
+    // }
+    // ```
+    //
+    // A column a transform computed is not simply *derived*: `parseTransformArray` records what
+    // each transform says it wrote — a number for a `bin`, an `aggregate`, a `window` and a
+    // `joinaggregate`, a date for a time unit, and an opaque `derived` for the rest. The implicit
+    // parse is dropped only where the two **agree**, or where nothing is claimed about the value at
+    // all, or where all that was wanted was to flatten a path. Dropped whenever a transform wrote
+    // the column, a box plot of an *instant* lost the step that reads its own summary back as a
+    // date: the quartiles came out of the aggregate as milliseconds and were drawn, labelled and
+    // compared as numbers, with a time axis measuring a span of epoch integers.
+    val derived =
       Transforms(diagnostics, selections = view.selections)
-        .producedFields(view.spec.transforms, view.spec.data)
+        .derivedTypes(view.spec.transforms, view.spec.data)
+    parse.keys.removeAll(
+      parse
+        .filter { (field, wanted) ->
+          val already = derived[field] ?: return@filter false
+          already == "derived" || already == wanted || wanted == "flatten"
+        }
+        .keys
     )
     // The specification's own `data.format.parse` — the **explicit** half — and it comes *first*.
     //

@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A column a transform wrote is read back as what the encoding says, unless the transform already
+  said the same thing.** `parseTransformArray` records what each transform claims it wrote — a
+  *number* for a `bin`, an `aggregate`, a `window` and a `joinaggregate`, a *date* for a time unit,
+  and an opaque `derived` for the rest — and `makeWithAncestors` drops the implicit parse only where
+  the two agree, where nothing is claimed about the value, or where all that was wanted was to
+  flatten a path. This compiler dropped it whenever any transform wrote the column, so a box plot of
+  an instant lost the step that reads its own summary back as a date: the quartiles came out of the
+  aggregate as milliseconds and were drawn, labelled and compared as numbers, with a time axis
+  measuring a span of epoch integers. One specification in the wild corpus box-plots an instant.
 - **The identifier below an aggregate belongs to the model that wrote the aggregate.**
   `parseTransformArray` runs once per model and asks `requiresSelectionId(model)` of that model —
   for a layer, `forEachSelection` over its own components and its members'. A transform written on a

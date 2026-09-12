@@ -720,6 +720,49 @@ internal class Transforms(
    * `density` computed is already a number, and asking the loader to parse it would name a column
    * the source table never had.
    */
+  /**
+   * What each transform **says** the columns it writes hold — `derivedType` in
+   * `parseTransformArray`.
+   *
+   * ```js
+   * } else if (isAggregate(t)) {
+   *   transformNode = head = AggregateNode.makeFromTransform(head, t);
+   *   derivedType = 'number';
+   * …
+   * if (transformNode && derivedType !== undefined) {
+   *   for (const field of transformNode.producedFields() ?? []) {
+   *     ancestorParse.set(field, derivedType, false);
+   *   }
+   * }
+   * ```
+   *
+   * It is not simply "derived": a `bin`, an `aggregate`, a `window` and a `joinaggregate` all write
+   * **numbers**, and a time unit writes a **date**. That matters where an encoding asks for
+   * something else — a box plot of an instant reads its own `lower_box_t` back as a date, and
+   * `makeWithAncestors` keeps that parse because what the aggregate derived was a number.
+   */
+  fun derivedTypes(transforms: List<VegaValue>, source: VegaValue? = null): Map<String, String> {
+    val derived = LinkedHashMap<String, String>()
+    source?.obj("sequence")?.let { derived[it.string("as") ?: "data"] = "derived" }
+    for (transform in transforms) {
+      // A `filter` and a `sample` write nothing and derive nothing; every other kind names the
+      // type it produces, and the ones not listed here are `'derived'` — an opaque value the
+      // encoding is trusted about.
+      val kind =
+        when {
+          transform.has("filter") || transform.has("sample") -> continue
+          transform.has("bin") ||
+            transform.has("aggregate") ||
+            transform.has("window") ||
+            transform.has("joinaggregate") -> "number"
+          transform.has("timeUnit") -> "date"
+          else -> "derived"
+        }
+      producedFields(listOf(transform)).forEach { derived[it] = kind }
+    }
+    return derived
+  }
+
   fun producedFields(transforms: List<VegaValue>, source: VegaValue? = null): Set<String> {
     val produced = LinkedHashSet<String>()
     // A generated column is derived too: nothing loaded it, so nothing has to parse it.
