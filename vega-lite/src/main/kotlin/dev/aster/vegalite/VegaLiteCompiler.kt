@@ -1285,7 +1285,7 @@ private class Compilation(
       return Fields.varName("${view.childName}_$channel")
     }
     if (!independent) return prefixed(channel)
-    val owner = independenceOwner(view)
+    val owner = declaredIndependenceOwner(view, channel)
     return if (owner.isEmpty()) channel else "${owner}_$channel"
   }
 
@@ -1296,6 +1296,21 @@ private class Compilation(
    * concatenation's plots or a facet's single cell — never the layers *inside* one. A trellis of
    * layers that measures its `x` per cell has one `child_x`, not one scale per layer: the layers
    * are one model to the facet, and two scales there would be two axes over the same picture.
+   *
+   * ```js
+   * resolve.scale[channel] ??= defaultScaleResolve(channel, model);
+   * if (resolve.scale[channel] === 'shared') { ... merge ... }
+   * ```
+   *
+   * And every level asks **its own** `resolve`, `parseScaleCore` running per model down the tree. A
+   * concatenation of concatenations is two levels, and a channel the chart resolves independently
+   * may still be shared by the level below: colour defaults to shared everywhere, so a chart that
+   * states `"resolve": {"scale": {"color": "independent"}}` over a column whose second entry is a
+   * row of plots gives that row **one** colour scale, not one per plot in it. Positions default to
+   * independent at every level and so do go all the way down.
+   *
+   * Named from the innermost plot regardless, such a chart came out with a colour scale — and a
+   * legend — for every plot in the row, where the specification asked for one for the row.
    */
   private fun independenceOwner(view: UnitView): String =
     when {
@@ -1303,6 +1318,60 @@ private class Compilation(
       facet != null -> prefixed("child")
       else -> view.childName
     }
+
+  /**
+   * The same, for independence the specification **declares** rather than one forced on it.
+   *
+   * Every level asks its own `resolve`, `parseScaleCore` running per model down the tree, so a
+   * concatenation of concatenations is two questions. A channel the chart resolves independently
+   * may still be shared by the level below: colour defaults to shared everywhere, so a chart that
+   * states `"resolve": {"scale": {"color": "independent"}}` over a column whose second entry is a
+   * row of plots gives that row **one** colour scale, not one per plot in it. Positions default to
+   * independent at every level and so do go all the way down.
+   *
+   * Named from the innermost plot regardless, such a chart came out with a colour scale — and a
+   * legend — for every plot in the row, where the specification asked for one for the row.
+   *
+   * Independence a **disagreement** forces is not this: there the owner is the child of the level
+   * whose children disagreed, whatever any `resolve` says, and [independenceOwner] answers for it.
+   */
+  private fun declaredIndependenceOwner(view: UnitView, channel: String): String {
+    if (concat == null) return independenceOwner(view)
+    var owner = ""
+    // The chart's own `resolve` settles the first level; below it, each level's own does.
+    var here = resolve
+    for ((name, below) in levelsTo(view)) {
+      // `defaultScaleResolve` for a concatenation: a plot measures its own positions and its own
+      // polar extents, and shares everything else.
+      val defaultIndependent =
+        channel in Channels.POSITION_SCALE_CHANNELS || channel == "theta" || channel == "radius"
+      if (!here.scaleIsIndependent(channel, defaultIndependent)) break
+      owner = name
+      here = Resolve(below.obj("resolve"))
+    }
+    return owner
+  }
+
+  /**
+   * The levels from the chart down to this view's plot: each one's name and the spec it was built
+   * from, which is where that level's own `resolve` is written.
+   */
+  private fun levelsTo(view: UnitView): List<Pair<String, VegaValue.Obj>> {
+    val target = plotOf(view)
+    fun walk(node: Node): List<Pair<String, VegaValue.Obj>>? =
+      when (node) {
+        is Node.Leaf -> if (node.plot.name == target) emptyList() else null
+        is Node.Nest ->
+          node.children.firstNotNullOfOrNull { child ->
+            walk(child)?.let { below ->
+              val name = if (child is Node.Nest) child.name else (child as Node.Leaf).plot.name
+              val spec = if (child is Node.Nest) child.spec else (child as Node.Leaf).plot.spec
+              listOf(name to spec) + below
+            }
+          }
+      }
+    return walk(plotTree).orEmpty()
+  }
 
   /** Per channel, the column a cell counts its own categories in — empty for every other chart. */
   private var cellCardinality: Map<String, String> = emptyMap()

@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **Independence is asked of every level, and a level below may still share what the chart split.**
+  `parseScaleCore` runs per model down the tree, so a concatenation of concatenations is two
+  questions. Colour defaults to shared everywhere: a chart that states
+  `"resolve": {"scale": {"color": "independent"}}` over a column whose second entry is a *row* of
+  plots gives that row one colour scale, named for the row, where positions default to independent
+  at every level and so do go all the way down. Named from the innermost plot regardless, such a
+  chart came out with a colour scale for every plot in the row where the specification asked for one
+  for the row — a legend each instead of one, and each drawn from a fraction of the rows. One
+  specification in the wild corpus resolves its colours that way; its key is still drawn on the
+  row's first plot rather than on the row, so the count is unchanged.
+
 - **A grid's own bucketing of an instant stands above its cells' transforms.**
   `parseData` runs per model, top-down: a facet model writes its own steps and then its child writes
   its, so the column a grid is cut by is computed before any step the cell asked for. A chart written
