@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A scale stands at the level that owns it, and a level stands before its children.**
+  `assembleScales` walks the model tree and writes each model's own components before it recurses,
+  so the order of a chart's scales is the order of its levels. A nested concatenation is a level of
+  its own and may own a scale — one its plots share while the chart's other children do not — and
+  ordering by the *plots* alone put such a scale among the scales of the first plot under it, which
+  is after the level that owns it rather than before. Which level owns a scale is read off its name,
+  a scale a level owns being called after it; one named for something the composition cannot see — a
+  layer inside a plot — keeps its place after the levels. One specification in the wild corpus is a
+  column whose second entry is a row of plots sharing a colour scale, and agreement with upstream
+  goes from 1947 to 1948 of 1981.
+
 - **Independence is asked of every level, and a level below may still share what the chart split.**
   `parseScaleCore` runs per model down the tree, so a concatenation of concatenations is two
   questions. Colour defaults to shared everywhere: a chart that states

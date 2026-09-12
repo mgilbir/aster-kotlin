@@ -1184,11 +1184,16 @@ private class Compilation(
       // The projections a chart's places are put on the page by, which stand before the marks that
       // read them — `assembleProjections`, walking the model tree.
       projections(views).takeIf { it.isNotEmpty() }?.let { put("projections", arr(it)) }
-      // Shared scales first, then each plot's own, which is the order upstream's assembly walks the
-      // model tree in: the composition's own components before it recurses into its children.
+      // Shared scales first, then each level's own, which is the order upstream's assembly walks
+      // the model tree in: a composition's own components before it recurses into its children.
+      //
+      // By **level**, not by plot. A nested concatenation is a level of its own and may own a
+      // scale — one its plots share while the chart's other children do not — and ordering by the
+      // plots alone put such a scale among the scales of the first plot under it, which is after
+      // the level that owns it rather than before.
       val scales =
-        (allScales.values.filter { owner[it.name()] == null } +
-            plots.flatMap { plot -> allScales.values.filter { owner[it.name()] === plot } })
+        allScales.values
+          .sortedBy { levelOfScale(it.name(), it.channel) }
           // A facet's independently resolved scales are built inside its cells, where the rows
           // they measure are, so they are not written beside the grid as well.
           .filterNot { facet != null && concat == null && it.name() != prefixed(it.channel) }
@@ -1350,6 +1355,39 @@ private class Compilation(
       here = Resolve(below.obj("resolve"))
     }
     return owner
+  }
+
+  /**
+   * Every level of the chart, in the order upstream's assembly walks them: a level before its
+   * children. The chart itself is first and is named by the empty string.
+   */
+  private fun levelNames(node: Node = plotTree): List<String> =
+    when (node) {
+      is Node.Leaf -> listOf(node.plot.name)
+      is Node.Nest -> listOf(node.name) + node.children.flatMap { levelNames(it) }
+    }
+
+  /**
+   * Which level a scale belongs to, as a place in that walk.
+   *
+   * Read off the **name**, which is where the answer already is: a scale a level owns is called
+   * after it. The longest level name the scale's own begins with is the one that owns it, so
+   * `concat_1_concat_0_x` belongs to the plot and `concat_1_color` to the row above it, and a scale
+   * still called by its plain channel belongs to the chart.
+   */
+  private fun levelOfScale(name: String, channel: String): Int {
+    // The chart's own, which stands before every level of it.
+    if (name == prefixed(channel)) return -1
+    val levels = levelNames()
+    return levels
+      .withIndex()
+      .filter { (_, level) -> level.isNotEmpty() && name.startsWith("${level}_") }
+      .maxByOrNull { it.value.length }
+      ?.index
+      // A scale named for something that is not a level of the composition — a **layer** inside a
+      // plot, which the composition does not see — keeps its place after the levels, in the order
+      // the scales were built.
+      ?: levels.size
   }
 
   /**
