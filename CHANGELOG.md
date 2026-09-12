@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A time unit written as an object is named in the order its parameters were written.**
+  `timeUnitToString` walks `keys` of the normalized object, whose own order `normalizeTimeUnit`
+  preserves — its one rewrite is `{...timeUnit, ...{unit}}`, and putting an existing key back leaves
+  it where it was. So `{"step": 5, "unit": "minutes"}` is called `_step_5minutes` and
+  `{"unit": "minutes", "step": 5}` is called `minutes_step_5`: the same bucketing, two names. The
+  name is what every column and every expression downstream is spelled with, so a specification that
+  wrote its step first named a column upstream never writes — the transform wrote one column, the
+  mark read another, and every row came out empty. `utc` is not a parameter but a prefix, being
+  destructured out before the walk, and this compiler merely skipped it: a UTC bucketing asked for
+  as an object was named as a local one. One specification in the wild corpus writes its step first,
+  and agreement with upstream goes from 1945 to 1946 of 1981.
+
 - **A channel the mark does not grow along reads its column as it stands, stack or no stack.**
   `positionAndSize` hands `midPoint` the stack, but only so that an imputed bin can be read by its
   middle: nowhere in that function does a stack put an `_end` on the column. The two ends of a stack

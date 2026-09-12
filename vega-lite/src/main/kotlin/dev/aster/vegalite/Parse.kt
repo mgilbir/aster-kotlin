@@ -534,25 +534,39 @@ internal class Parse(
   /**
    * `timeUnitToString`: a time unit written as an **object** spelled back into a name.
    *
-   * `{"unit": "year", "step": 2}` buckets two years at a time, and the column it writes is called
-   * `year_step_2_date` — the unit, then every other parameter as `_<name>_<value>`. Keeping the
-   * name is what lets everything downstream go on treating a time unit as a word: the parts are
-   * still read off the front of it, and the step is read back out where the transform needs it.
+   * ```js
+   * const {utc, ...rest} = normalizeTimeUnit(tu);
+   * return (utc ? 'utc' : '') +
+   *   keys(rest).map((p) => varName(`${p === 'unit' ? '' : `_${p}_`}${rest[p]}`)).join('');
+   * ```
+   *
+   * The parameters are walked **in the order they were written** — `keys` of an object whose own
+   * order `normalizeTimeUnit` preserves, its one rewrite being `{...timeUnit, ...{unit}}`, which
+   * puts an existing key back where it already was. So `{"step": 2, "unit": "year"}` is called
+   * `_step_2year` and `{"unit": "year", "step": 2}` is called `year_step_2`: the same bucketing,
+   * two names, and the name is what every column and every expression downstream is spelled with.
+   * Written unit-first regardless, a specification that put the step first named a column upstream
+   * never writes, and every reader of it read a column that is not there.
+   *
+   * `utc` is not a parameter but a **prefix**, being destructured out before the walk.
+   *
+   * `binned` is left out because this compiler carries a time unit as a word and reads that word
+   * for its binned-ness — `binnedyearmonth`. Upstream would spell it `yearmonth_binned_true` here,
+   * but never asks: a binned unit is answered before `timeUnitToString` is reached. That the object
+   * form of a binned unit is not recognised as binned at all is a gap of its own, and not this
+   * rule's.
    */
   private fun timeUnitName(params: VegaValue.Obj?): String? {
-    val unit = params?.string("unit") ?: return null
+    if (params?.string("unit") == null) return null
     return buildString {
-      append(unit)
+      if (params.fields["utc"] == VegaValue.Bool(true)) append("utc")
       params.fields.forEach { (key, value) ->
-        if (key != "unit" && key != "utc" && key != "binned") {
-          append(
-            Fields.varName(
-              "_${key}_${(value as? VegaValue.Num)?.value?.let {
+        if (key == "utc" || key == "binned") return@forEach
+        val text =
+          (value as? VegaValue.Num)?.value?.let {
             if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString()
-          } ?: (value as? VegaValue.Str)?.value ?: value.toString()}"
-            )
-          )
-        }
+          } ?: (value as? VegaValue.Str)?.value ?: value.toString()
+        append(Fields.varName(if (key == "unit") text else "_${key}_$text"))
       }
     }
   }
