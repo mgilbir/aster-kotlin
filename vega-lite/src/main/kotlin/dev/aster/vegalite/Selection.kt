@@ -1960,7 +1960,19 @@ internal class Selection(
       val sign = if (channel == "x") "-" else ""
       out += obj {
         put("name", data)
-        if (pushesOutward) put("push", "outer")
+        // ```js
+        // for (const proj of selCmpt.scales) {
+        //   const signal = signals.find((s) => s.name === proj.signals.data);
+        //   signal.push = 'outer';
+        // }
+        // ```
+        //
+        // Only what is **bound** pushes outward, and `scaleBindings.parse` binds only a scale with
+        // a continuous domain: there is no halfway between two categories to drag to. A channel it
+        // left out still writes its signal here — the selection remembers what was picked along it
+        // — but it is this view's own and there is nothing above for it to push into. Pushed
+        // regardless, such a signal was written into a top-level one that was never declared.
+        if (pushesOutward && isContinuous(type)) put("push", "outer")
         put(
           "on",
           arr(

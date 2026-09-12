@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A binding to the scales binds only what can be panned.**
+  `scaleBindings.parse` keeps a projection only where its scale has a continuous domain — there is
+  no halfway between two categories to drag to — and only what it keeps publishes a signal at the
+  top of the chart or pushes one outward. This compiler bound every projected channel, so a chart of
+  several views that bound a categorical axis declared a signal at the top that nothing ever wrote
+  and pushed the view's own out to meet it: the view's own value was discarded on every pan and the
+  axis it belonged to never moved. Three specifications in the wild corpus bind a categorical axis
+  that way, and agreement with upstream goes from 1960 to 1963 of 1981.
+
 - **A plot's grid is a grid: its cell is the unit, and what a unit carries is carried there.**
   `assembleUnitSelectionSignals` runs on the unit model, and inside a grid the unit is the cell: the
   marks a selection watches are drawn there, the scales it reads are the cell's, and the `facet`

@@ -1583,7 +1583,21 @@ private class Compilation(
     if (over.none { pushesOutward(it) }) return emptyList()
     val out = LinkedHashMap<String, String>()
     for (view in over) {
-      selection.intervalChannels(view).forEach { (_, field) ->
+      selection.intervalChannels(view).forEach { (channel, field) ->
+        // ```js
+        // if (!scale || !hasContinuousDomain(scaleType)) {
+        //   log.warn(log.message.SCALE_BINDINGS_CONTINUOUS);
+        //   continue;
+        // }
+        // ```
+        //
+        // A binding binds only what can be **panned**: `scaleBindings.parse` keeps a projection
+        // only where its scale has a continuous domain, there being no halfway between two
+        // categories to drag to. A channel it leaves out is still projected — the selection
+        // remembers what was picked along it — but it publishes no signal of its own and pushes
+        // nothing outward. Bound regardless, a chart binding a categorical axis declared a signal
+        // at the top that nothing ever wrote, and pushed the cell's own out to meet it.
+        if (view.scaleType(channel)?.let { Selection.isContinuous(it) } != true) return@forEach
         out.getOrPut(field) { Fields.varName("${selection.name}_$field") }
       }
     }
