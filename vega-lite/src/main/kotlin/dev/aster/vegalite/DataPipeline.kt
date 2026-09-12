@@ -229,6 +229,11 @@ internal class DataPipeline(
       implicitParse(scope)?.let { head = head.then(it) }
       binNode(scope)?.let { head = head.then(it) }
     }
+    // The grid's own bucketing of an **instant** belongs to the same pass, and so stands above the
+    // cell's transforms rather than below them: `parseData` runs per model, top-down, and a column
+    // the grid is cut by is computed before any step of the cell's. Written with the cell's, a
+    // trellis whose columns are years listed its `timeunit` after a `calculate` the cell asked for.
+    if (scope.facet) timeUnitNode(Scope.FACET)?.let { head = head.then(it) }
     if (scope.own) {
       // A layer's member buckets its field before **its own** transforms: upstream calls it a hack
       // "equivalent for merging bin extent for union scale", and it is what lets two layers over
@@ -247,7 +252,7 @@ internal class DataPipeline(
       geoPointNodes().forEach { head = head.then(it) }
       if (!view.parentIsLayer) binNode(scope)?.let { head = head.then(it) }
     }
-    timeUnitNode(scope)?.let { head = head.then(it) }
+    if (scope.own) timeUnitNode(Scope.OWN)?.let { head = head.then(it) }
     if (scope.own) binnedTimeUnitNode()?.let { head = head.then(it) }
     sortIndexNodes(scope).forEach { head = head.then(it) }
     // The key a crossed grid's cells are ordered by is written onto every row *above* the facet,

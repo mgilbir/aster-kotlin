@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A grid's own bucketing of an instant stands above its cells' transforms.**
+  `parseData` runs per model, top-down: a facet model writes its own steps and then its child writes
+  its, so the column a grid is cut by is computed before any step the cell asked for. A chart written
+  with the `column` shorthand has no cell of its own to ask, and its transforms are the grid's,
+  standing above the bucketing instead. This compiler wrote the two models' bucketings together at
+  the foot of the chain, so a trellis of years listed its `timeunit` after a `calculate` the cell
+  asked for. One specification in the wild corpus is such a trellis, its cells ordering a stack by a
+  stated colour domain, and agreement with upstream goes from 1946 to 1947 of 1981.
+
 - **A time unit written as an object is named in the order its parameters were written.**
   `timeUnitToString` walks `keys` of the normalized object, whose own order `normalizeTimeUnit`
   preserves — its one rewrite is `{...timeUnit, ...{unit}}`, and putting an existing key back leaves
