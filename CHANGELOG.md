@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **Two identical sibling aggregates fold into whichever end the optimizer that reaches them first
+  keeps.** `MergeAggregates` runs first in each round and keeps the *last* of the aggregates that
+  are already siblings when it runs — `mergeableAggs.pop()`. `MergeIdenticalNodes` runs later in the
+  same round, hashes every node by what it emits, aggregates included, and keeps the *first* —
+  `nodes.shift()`; it works top-down and descends straight into a node it has just merged, so a pair
+  of aggregates that only *becomes* siblings because the steps above them folded is folded by it, in
+  the same pass. This compiler gave an aggregate no identity at all and left every such fold to its
+  own `MergeAggregates` a round later, so the branches came out reversed and each mark read its
+  neighbour's dataset. Which of the two applies depends in turn on the identifier a selection needs:
+  `parseData` writes one in every model's pipeline, so the chart's sits above the fork from the
+  start and the views' copies are taken out again. Written once per view here, they were one node
+  only when the fold reached them, which is a round too late. Six specifications in the wild corpus
+  fold an aggregate that way.
 - **A bucketing that says neither how many buckets nor how wide gets the default count.**
   `normalizeBin` has three arms and this compiler read two: `bin: true` and the empty object. A
   stated bucketing that says something *else* — an `anchor`, a `base` — was left without a count, so

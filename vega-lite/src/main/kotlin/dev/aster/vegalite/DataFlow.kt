@@ -109,6 +109,15 @@ internal sealed class DataNode {
       is BinNode -> "bin:${transforms()}"
       is ImputeNode -> "impute:${transforms()}"
       is StackNode -> "stack:${transforms()}|$component"
+      // An **aggregate** too, and it is the one kind two optimizers can fold: `MergeAggregates`
+      // runs first in each round and keeps the *last* of the aggregates that are already siblings
+      // when it runs, and this keeps the *first* of whatever is identical once the folds above have
+      // brought them together. `MergeIdenticalNodes` works top-down and descends straight into a
+      // node it has just merged, so a pair of aggregates that only becomes siblings because their
+      // own steps folded is folded here, in the same pass, before `MergeAggregates` sees them at
+      // all. Left with no identity, every such pair waited a round and folded the other way about:
+      // the branches came out reversed and each mark read its neighbour's dataset.
+      is AggregateNode -> "aggregate:$dimensions|$ops|$fields|$outputs"
       else -> null
     }
 
@@ -519,13 +528,15 @@ internal sealed class DataNode {
     }
     for (group in grouped.values) {
       if (group.size < 2) continue
-      // Exact duplicates fold into the **first**, and the rest into the *last*. The two rules are
-      // one rule upstream: a composite mark states its aggregate once, on the layer above the
-      // views it expands into, so upstream never has two identical sibling aggregates to merge and
-      // the branches below the single node stay in the order the views were written. This compiler
-      // gives each expanded view its own copy, and folding them into the first restores that tree.
-      // Genuinely different aggregates are `MergeAggregates` proper — `mergeableAggs.pop()` keeps
-      // the last, which is why an error bar's own aggregate ends up *under* the mean drawn over it.
+      // The copies of an aggregate an ancestor wrote fold into the **first**, and everything else
+      // into the *last*. A composite mark states its aggregate once, on the layer above the views
+      // it expands into; this compiler gives each expanded view its own copy, and folding them into
+      // the first restores the tree upstream has. Everything else is `MergeAggregates` proper —
+      // `mergeableAggs.pop()` keeps the last, which is why an error bar's own aggregate ends up
+      // *under* the mean drawn over it.
+      //
+      // Two aggregates that are **identical** and not copies are folded by whichever optimizer
+      // reaches them first, and the two keep opposite ends — see [identity].
       val distinct = foldCopies(group) { a, b -> a.sameAs(b) }
       if (distinct.size < 2) continue
       val kept = distinct.last()

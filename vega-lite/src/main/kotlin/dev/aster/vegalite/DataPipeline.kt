@@ -215,7 +215,24 @@ internal class DataPipeline(
     hoistedOver: List<String> = emptyList(),
   ): DataNode {
     var head: DataNode = parent
-    if (needsIdentity && parent is SourceNode) head = head.then(identifierNode())
+    // ```js
+    // // Default discrete selections require an identifer transform to
+    // // uniquely identify data points. Add this transform at the head of
+    // // the pipeline such that the identifier field is available for all
+    // // subsequent datasets.
+    // head = new IdentifierNode(head);
+    // ```
+    //
+    // `parseData` runs for **every model**, so the identifier at the head of the flow is written by
+    // the model above the views — one node, above the fork — and each view's own copy is taken out
+    // again by `RemoveUnnecessaryIdentifierNodes`, its parent being that model's output rather than
+    // a table. Written once per view here, the copies are one node only when the fold reaches them,
+    // which is a round later than upstream: everything below them was still forked while the round
+    // that settles which of two identical steps survives was running, and a pair of aggregates
+    // upstream folds into the last folded into the first instead. Marked as the ancestor's, they
+    // are folded before the optimizer loop begins, which is where upstream starts.
+    if (needsIdentity && parent is SourceNode)
+      head = head.then(identifierNode()).also { it.fromAncestor = true }
 
     // What an **ancestor** wrote — a facet's own transforms above its cell's — stands first: that
     // model's pass ran first, and a step of the cell's cannot climb above one that computes the
