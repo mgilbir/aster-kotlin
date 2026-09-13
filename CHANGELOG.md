@@ -291,6 +291,25 @@ section here does not get released.
 
 ### Internal
 
+- **A sweep of the surface Vega's schema declares, rather than of the charts people draw.** The four
+  corpora here — the 200 fixtures, Vega-Lite's 627 examples, 1981 specifications from GitHub, 63
+  Deneb templates — all agree with upstream on everything they cover, which is the point at which a
+  corpus of *used* features stops finding anything. None of them reaches a property nobody happened
+  to set, or a value of it nobody happened to choose.
+
+  `vega/build/vega-schema.json` is the list of those, and it is machine-readable.
+  `scripts/property-sweep.sh` walks it and writes one small bar chart per (property, value) pair
+  across `axis`, `legend`, `title` and `scale` — the same chart every time with one property changed,
+  so a difference names its own cause — renders each with upstream, and `PropertySweepTest` reports
+  the tally and the causes ranked by how many cases each affects. A property whose schema says too
+  little to choose a value honestly is skipped **and counted**, with the reason, in the manifest.
+
+  605 cases, 587 of them rendered by upstream, and **540 agree** on the first run. The 47 that do not
+  are what the sweep is for: seven specifications this engine refuses outright where upstream draws
+  one, and forty differences across `fontWeight`, `labelLimit`, `zindex`, `clipHeight`, `columns`,
+  `symbolLimit`, `symbolDash`, the title's `dx`/`dy`/`orient` and the two `line-…` baselines. A
+  measurement and not a gate, the same course the gallery and Deneb sweeps took.
+
 - **A sweep of Vega specifications other people wrote.** `scripts/oracle.sh` renders the 198
   fixtures under `test-fixtures/specs`, and those are this repository's own: written to pin down a
   reading of Vega's semantics, one behaviour at a time, by the person implementing it.
