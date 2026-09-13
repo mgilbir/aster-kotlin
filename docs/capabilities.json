@@ -537,11 +537,12 @@
       "status": "**Supported**",
       "tests": [
         "FixtureDifferentialTest",
+        "MarkClipShapeTest",
         "MarkClipTest",
         "VegaLiteFixtureTest"
       ],
-      "tests_text": "`VegaLiteFixtureTest`, `MarkClipTest`, `FixtureDifferentialTest` (`mark-clip`)",
-      "notes": "A Vega mark property, not a Vega-Lite-only one, so it is emitted rather than stripped, and the runtime applies it to a non-group mark as upstream does: the mark's items are drawn under a clip of `(0, 0, group.width, group.height)` — the *enclosing* group's extent, not the mark's own bounds — and the same rectangle is intersected with its bounds. It is a paint-time cut and not a filter, so an item outside it is still in the scene and still announced — but it is **not** under a finger placed where it would have been drawn, because upstream's `pick` returns from a clipped group before testing its contents at all",
+      "tests_text": "`VegaLiteFixtureTest`, `MarkClipTest`, `MarkClipShapeTest`, `FixtureDifferentialTest` (`mark-clip`, `mark-clip-shape`)",
+      "notes": "A Vega mark property, not a Vega-Lite-only one, so it is emitted rather than stripped, and the runtime applies it as upstream does. `clip: true` draws the mark's items under a clip of `(0, 0, group.width, group.height)` — the *enclosing* group's extent, not the mark's own bounds — and the same rectangle is intersected with its bounds, the mark's bounds once rather than each item's, so an item lying wholly outside leaves the window's edge rather than disappearing from the measurement. A clip is also a **shape**: `{\"path\": …}` clips to that path, `{\"sphere\": …}` to a projection's globe, and `{\"signal\": …}` to whatever the signal says — upstream folds all three into one expression and lets its value decide, so a signal answering a path *string* still clips to the rectangle (it asks whether the value is a function) and a clip enclosing nothing clips the mark away rather than leaving it whole. A shape clip is measured by the path's bounding box, which is `boundContext`'s answer, and drawn through the path itself by the SVG and Android renderers; the Compose-multiplatform and Swift walks clip to that bounding box, which is stated in `SceneWalk`. It is a paint-time cut and not a filter, so an item outside it is still in the scene and still announced — but it is **not** under a finger placed where it would have been drawn, because upstream's `pick` returns from a clipped group before testing its contents at all",
       "milestone": "—"
     },
     {

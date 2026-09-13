@@ -8,6 +8,24 @@ section here does not get released.
 
 ### Fixed
 
+- **A mark's `clip` is a shape, not a boolean.** `{"path": …}` clips to that path, `{"sphere": …}` to
+  a projection's globe, and `{"signal": …}` to whatever the signal says — upstream folds all three
+  into one expression and lets its value decide. Each was read here for its *truthiness*, so a clip
+  a control had switched off still clipped, and a mark clipped to an outline was clipped to the
+  plotting rectangle instead. The path reaches the renderers, which already knew how to clip by one,
+  and it is the path's own bounding box that bounds the mark — so a chart sized by its content is
+  sized by what the clip left. Two readings were probed rather than reasoned about: a signal
+  answering a path *string* still clips to the rectangle, because upstream asks whether the value is
+  a function; and a clip that encloses nothing — a `{"sphere"}` naming no projection — clips the
+  mark away rather than leaving it whole.
+
+  **API.** `MarkSpec.clip` is a `MarkClip` — `None`, `Rect`, `Signal` or `Shape` — where it was a
+  `Boolean`, so a host reading a parsed specification sees what the clip actually says.
+- **A clipped mark's bounds are the mark's, cut back once.** `boundClip` intersects `mark.bounds`,
+  which is already the union over its items, and this cut each item separately: an item lying wholly
+  outside the clip was dropped instead of leaving the window's own edge, so a panel measured to the
+  last item *inside* it and came out narrower than the clip that defines it.
+
 - **An unprojected `geopath` draws points, features and geometry collections.** It had a reader of
   its own that understood four geometry types, and the ones it did not understand are the ones a
   column of decoded GeoJSON is most likely to hold: a `Point` is a **circle** of the current

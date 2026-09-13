@@ -22,6 +22,7 @@ import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.spec.ChannelValue
 import dev.aster.vega.model.spec.EncodeEntry
 import dev.aster.vega.model.spec.FieldRef
+import dev.aster.vega.model.spec.MarkClip
 import dev.aster.vega.model.spec.MarkSpec
 import dev.aster.vega.model.spec.MarkType
 import dev.aster.vega.model.time.TimeFormat
@@ -404,12 +405,18 @@ public class MarkEncoder(
         // `clip` is both a mark property and an encode channel, and real specifications use the
         // channel: `overview-plus-detail` writes `clip: {value: true}` into `enter`, and it is what
         // keeps the detail view's line inside its own panel. Either says the group clips.
+        //
+        // A group clipped to a **shape** still *measures* as its rectangle: upstream's `bound` for
+        // a group mark is `bounds.add(0, 0).add(group.width, group.height)` whenever `group.clip`
+        // is truthy, function or not, and its hit test is the same rectangle. Only the drawing
+        // follows the path, which is what [GroupNode.clipPath] carries.
         clip =
-          if (spec.clip || boolean(channels["clip"], datum) == true) {
+          if (resolvedClip(spec) != ResolvedClip.None || boolean(channels["clip"], datum) == true) {
             RectD(0.0, 0.0, extent.width, extent.height)
           } else {
             null
           },
+        clipPath = (resolvedClip(spec) as? ResolvedClip.Shape)?.path,
         fill = style.fill,
         stroke = style.stroke,
         opacity = style.opacity,
@@ -1873,6 +1880,68 @@ public class MarkEncoder(
     }
 
   /**
+   * A mark's `clip`, resolved to the shape it actually is; see [MarkClip].
+   *
+   * The expression is evaluated **once per mark** and memoized, because that is what upstream does
+   * — `clip` is a parameter of the `Mark` operator, not a channel of an item — and because
+   * `geoShape` on a sphere projects an outline, which is not work to repeat per datum.
+   *
+   * `pathShape` and `geoShape` answer with the path *string* in this engine, which is the one part
+   * of upstream's closure a value model can hold and is exactly the part a clip needs. A string
+   * that will not parse, an empty one and a null all mean **no clip**, which is upstream's
+   * `pathShape('')` returning null and `!!null` being false — not a fallback to the rectangle.
+   */
+  internal fun resolvedClip(spec: MarkSpec): ResolvedClip =
+    clips.getOrPut(spec.clip) {
+      when (val clip = spec.clip) {
+        MarkClip.None -> ResolvedClip.None
+        MarkClip.Rect -> ResolvedClip.Rect
+        // A signal decides between the rectangle and no clip, and **nothing else**: upstream asks
+        // `isFunction(clip)`, so a signal answering a path string clips to the rectangle like any
+        // other truthy value.
+        is MarkClip.Signal ->
+          when (val value = evaluateExpression(clip.expression, VegaValue.Null)) {
+            null -> ResolvedClip.None
+            else -> if (JsSemantics.truthy(value)) ResolvedClip.Rect else ResolvedClip.None
+          }
+        is MarkClip.Shape -> shapeClip(spec, clip.expression)
+      }
+    }
+
+  /**
+   * The path a `{"path"}` or `{"sphere"}` clip names.
+   *
+   * **A path of nothing is still a clip**, and it encloses no area — so the mark is clipped away
+   * rather than left whole. That is upstream's own answer for a `{"sphere"}` naming a projection
+   * the specification never declared: the clip function exists, draws nothing, and the mark's
+   * bounds come back empty. Probed, along with the path that will not parse: upstream throws there
+   * and produces no scene at all, so there is nothing to agree with and the nearer of the two
+   * answers is the one that hides the mark rather than the one that shows what was to be cut off.
+   */
+  private fun shapeClip(spec: MarkSpec, expression: String): ResolvedClip {
+    val source = (evaluateExpression(expression, VegaValue.Null) as? VegaValue.Str)?.value
+    if (source.isNullOrEmpty()) return ResolvedClip.Shape(PathData.Empty)
+    val parsed = SvgPath.parse(source)
+    if (!parsed.complete) {
+      reportOnce(
+        "clip:$expression",
+        dev.aster.vega.model.VegaDiagnostic(
+          severity = dev.aster.vega.model.DiagnosticSeverity.WARNING,
+          code = DiagnosticCodes.ENCODE_INVALID_VALUE,
+          message =
+            "The clip path '$source' is not one this engine could read; upstream refuses such a " +
+              "specification outright, and the mark it belongs to was clipped away",
+          operator = spec.name,
+        ),
+      )
+      return ResolvedClip.Shape(PathData.Empty)
+    }
+    return ResolvedClip.Shape(parsed.path)
+  }
+
+  private val clips = mutableMapOf<MarkClip, ResolvedClip>()
+
+  /**
    * Evaluates an expression against a datum, reporting a failure once rather than per datum.
    *
    * Returns `null` on failure so the caller can leave the channel unset, which is what Vega does
@@ -2337,4 +2406,22 @@ public class MarkEncoder(
     private val SPATIAL_AXES =
       listOf(SpatialAxis("x", "x2", "xc", "width"), SpatialAxis("y", "y2", "yc", "height"))
   }
+}
+
+/**
+ * What a mark's `clip` turned out to be, once its expression was evaluated.
+ *
+ * Three cases rather than two because a clip is a *shape*: upstream's `util/canvas/clip.js` tests
+ * `isFunction(clip)` and clips to the path the function draws, falling back to the enclosing
+ * group's rectangle for anything else truthy.
+ */
+internal sealed interface ResolvedClip {
+  /** No clip: the mark is drawn whole. */
+  object None : ResolvedClip
+
+  /** The enclosing group's rectangle, `(0, 0, group.width, group.height)`. */
+  object Rect : ResolvedClip
+
+  /** A path, from `{"path": …}` or `{"sphere": …}`. */
+  data class Shape(val path: PathData) : ResolvedClip
 }

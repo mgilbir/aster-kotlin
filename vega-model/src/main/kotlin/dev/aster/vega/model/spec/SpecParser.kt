@@ -3437,10 +3437,45 @@ public class SpecParser {
       interactive = obj.fields["interactive"]?.asBoolean() ?: true,
       aria = obj.fields["aria"]?.asBoolean() ?: true,
       description = obj.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
-      clip = obj.fields["clip"]?.asBoolean() ?: false,
+      clip = markClip(obj.fields["clip"]),
       configBelowDefaults = below.fields,
       configAboveDefaults = above.fields,
     )
+  }
+
+  /**
+   * A mark's `clip`, read the way upstream's `parsers/marks/clip.js` reads it; see [MarkClip].
+   *
+   * The three object forms become one expression, and the sub-value of a `path` or a `sphere` may
+   * itself be a signal — upstream's `param()` inlines `value.signal` and quotes anything else. A
+   * string is quoted as a JSON literal, which is what `stringValue` does there.
+   */
+  private fun markClip(written: VegaValue?): MarkClip {
+    val obj =
+      written as? VegaValue.Obj
+        ?: return if (written != null && written.asBoolean()) MarkClip.Rect else MarkClip.None
+    // `else if (clip.path)`: the sub-value has to be **truthy** to take the branch, so `{"path":
+    // ""}` is not a path clip at all — it falls through to `!!clip`, and an object is truthy, so
+    // such a mark clips to the rectangle. Probed, because "an empty path clips nothing" is the
+    // tempting reading and it is the opposite of what happens.
+    fun param(key: String): String? {
+      val value = obj.fields[key]?.takeIf { it.asBoolean() } ?: return null
+      return (value as? VegaValue.Obj)?.let { (it.fields["signal"] as? VegaValue.Str)?.value }
+        // `stringValue` is `JSON.stringify` for a string, so the quoting is the JSON one and a
+        // path with a quote in it stays one argument.
+        ?: VegaJson.write(VegaValue.Str(value.asString()))
+    }
+    (obj.fields["signal"] as? VegaValue.Str)?.value?.let {
+      return MarkClip.Signal(it)
+    }
+    param("path")?.let {
+      return MarkClip.Shape("pathShape($it)")
+    }
+    param("sphere")?.let {
+      return MarkClip.Shape("geoShape($it, {type: \"Sphere\"})")
+    }
+    // An object saying none of those three is still an object, and every object is truthy.
+    return MarkClip.Rect
   }
 
   /** A mark's `style`, which names `config.style` blocks and accepts one or several. */

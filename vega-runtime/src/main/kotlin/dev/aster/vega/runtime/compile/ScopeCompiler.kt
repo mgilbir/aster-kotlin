@@ -482,19 +482,31 @@ internal class ScopeCompiler(
         exposeItems {
           withBounds(transformedItems ?: encoder.items(mark, rows), built[index].orEmpty())
         }
-        // `boundMark`: a **clipped** mark reaches no further than the group it is drawn in,
-        // whatever
-        // its items do. A detail plot whose domain is driven by a brush has rows on either side of
-        // that domain, and without this they push the surface out to cover rows nobody can see.
-        val window = RectD(0.0, 0.0, extent.width, extent.height)
-        for (node in built[index].orEmpty()) {
-          val reach = node.transformedBounds
-          content = content.union(if (mark.clip) intersectReach(reach, window) else reach)
-        }
+        // `boundClip`: a **clipped** mark reaches no further than the window it is clipped to,
+        // whatever its items do. A detail plot whose domain is driven by a brush has rows on either
+        // side of that domain, and without this they push the surface out to cover rows nobody can
+        // see. The window is the group's rectangle for a plain `clip: true`, and the path's own
+        // bounding box for a clip that is a shape — `clip(boundContext(clipBounds.clear()))` — so a
+        // mark clipped to a sphere reaches no further than that sphere.
+        val window =
+          when (val clip = encoder.resolvedClip(mark)) {
+            ResolvedClip.None -> null
+            ResolvedClip.Rect -> RectD(0.0, 0.0, extent.width, extent.height)
+            is ResolvedClip.Shape -> clip.path.bounds
+          }
+        // The **mark's** reach is cut back, not each item's: `boundClip` intersects
+        // `mark.bounds`, which is already the union over every item, and the two are different
+        // answers wherever an item falls outside the window entirely. Cutting item by item drops
+        // such an item altogether, where upstream keeps the window's own edge — a scatter plot with
+        // one point past the right of its panel then measured to the last point *inside* it, and
+        // the panel came out narrower than the clip that was supposed to define it.
+        var reach = RectD.Empty
+        for (node in built[index].orEmpty()) reach = reach.union(node.transformedBounds)
+        content = content.union(if (window != null) intersectReach(reach, window) else reach)
       }
     }
     for (index in paintOrder(marks)) {
-      built[index]?.let { nodes -> children += clipped(marks[index], nodes, extent) }
+      built[index]?.let { nodes -> children += clipped(marks[index], nodes, extent, encoder) }
     }
     if (layout != null) {
       val placed =
@@ -590,19 +602,39 @@ internal class ScopeCompiler(
    * `bound/boundClip.js` intersects the mark's bounds with the same rectangle. A group mark is a
    * different path and already clips itself; see `MarkEncoder.encodeGroup`.
    *
+   * Unless the clip is a **shape**, which upstream's `isFunction(clip)` branch draws through
+   * instead: `{"path": …}` and `{"sphere": …}` clip to a path, and then both the drawing and the
+   * measurement follow it; see [MarkClip].
+   *
    * The clip arrives as a container because that is the only node in this scene model that carries
    * one, and it matches the structure upstream's SVG renderer emits — a `clip-path` on the mark's
    * own group element. It paints nothing itself: with no fill and no stroke a [GroupNode]'s
    * `paintRect` is null, and its bounds are its children's cut back to the clip, which is
    * upstream's `boundClip` by construction rather than by a second arithmetic path.
    */
-  private fun clipped(mark: MarkSpec, nodes: List<SceneNode>, extent: PlotSize): List<SceneNode> {
-    if (!mark.clip || mark.type == MarkType.GROUP || nodes.isEmpty()) return nodes
+  private fun clipped(
+    mark: MarkSpec,
+    nodes: List<SceneNode>,
+    extent: PlotSize,
+    encoder: MarkEncoder,
+  ): List<SceneNode> {
+    if (mark.type == MarkType.GROUP || nodes.isEmpty()) return nodes
+    // A **shape** clip carries the path for the renderers and the path's bounding box for
+    // everything that measures: upstream draws through the path and bounds through
+    // `boundContext`, which is that box. Hit testing follows the box as well, which is the same
+    // rectangular approximation a clipped group already gets here.
+    val (window, path) =
+      when (val clip = encoder.resolvedClip(mark)) {
+        ResolvedClip.None -> return nodes
+        ResolvedClip.Rect -> RectD(0.0, 0.0, extent.width, extent.height) to null
+        is ResolvedClip.Shape -> clip.path.bounds to clip.path
+      }
     return listOf(
       GroupNode(
         id = ids.allocate(),
         children = nodes,
-        clip = RectD(0.0, 0.0, extent.width, extent.height),
+        clip = window,
+        clipPath = path,
         // Not a mark of its own: it is the clip the mark is drawn under, so it carries no role, no
         // datum and no accessibility of its own, and a reader meets the items inside it unchanged.
         metadata = NodeMetadata.None,
