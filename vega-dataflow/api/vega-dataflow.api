@@ -104,7 +104,8 @@ public final class dev/aster/vega/dataflow/TupleIdAllocator {
 }
 
 public final class dev/aster/vega/dataflow/transform/AggregateKt {
-	public static final fun aggregateOver (Ldev/aster/vega/dataflow/transform/AggregateOp;Ljava/lang/String;Ljava/util/List;)Ldev/aster/vega/model/VegaValue;
+	public static final fun aggregateOver (Ldev/aster/vega/dataflow/transform/AggregateOp;Ljava/lang/String;Ljava/util/List;Ljava/lang/Double;)Ldev/aster/vega/model/VegaValue;
+	public static synthetic fun aggregateOver$default (Ldev/aster/vega/dataflow/transform/AggregateOp;Ljava/lang/String;Ljava/util/List;Ljava/lang/Double;ILjava/lang/Object;)Ldev/aster/vega/model/VegaValue;
 	public static final fun groupKey (Ldev/aster/vega/model/VegaValue;Ljava/util/List;)Ldev/aster/vega/dataflow/transform/GroupKey;
 	public static final fun groupTuples (Ljava/util/List;Ljava/util/List;)Ljava/util/Map;
 }

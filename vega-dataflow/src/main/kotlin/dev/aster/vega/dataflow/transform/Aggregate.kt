@@ -242,7 +242,15 @@ public fun aggregateOver(
   op: AggregateOp,
   fieldPath: String?,
   tuples: List<VegaValue>,
-): VegaValue = Measure(op, fieldPath, outputName = "").compute(tuples)
+  /**
+   * The decay rate the two exponential operations take, which upstream calls `aggregate_params`.
+   *
+   * Null is "none named", and it is the right default for every caller here: a `pivot` forwards no
+   * rate to the aggregate it builds, and neither does a scale domain's sort. See [exponentialRates]
+   * for what upstream then computes.
+   */
+  rate: Double? = null,
+): VegaValue = Measure(op, fieldPath, outputName = "", rate = rate).compute(tuples)
 
 // ---- shared machinery -------------------------------------------------------
 
@@ -253,12 +261,9 @@ internal class Measure(
   val outputName: String,
   /**
    * The decay rate for [AggregateOp.EXPONENTIAL] and [AggregateOp.EXPONENTIALB]; ignored by the
-   * rest.
-   *
-   * Zero, which is upstream's fallback, makes the mean the last value alone — every earlier row is
-   * weighted by a power of zero.
+   * rest, and **null where the specification named none**; see [exponentialRates].
    */
-  private val rate: Double = 0.0,
+  private val rate: Double? = null,
 ) {
   fun compute(
     tuples: List<VegaValue>,
@@ -369,7 +374,12 @@ internal class Measure(
       // groups of different sizes.
       AggregateOp.EXPONENTIAL,
       AggregateOp.EXPONENTIALB -> {
-        val r = rate
+        // **NaN where there is no rate**, which is upstream's uninitialised accumulator and not a
+        // degenerate mean: `init` is called as `op.init(this)` when the parameter is absent, so
+        // `exp_r` is `undefined` and every piece of arithmetic below it is NaN. Reading a missing
+        // rate as zero answered "the last value in the group" for a specification upstream answers
+        // nothing for — a plausible number in place of a blank. See [exponentialRates].
+        val r = rate ?: Double.NaN
         val accumulated = numbers.fold(0.0) { acc, v -> r * acc + v }
         val n = numbers.size
         VegaValue.Num(
@@ -509,6 +519,48 @@ internal class Measure(
 }
 
 /**
+ * Which rate each exponential measure actually runs at, given `ops`, `fields` and
+ * `aggregate_params`.
+ *
+ * Three separate pieces of upstream's `compileMeasures` decide this, and none of them is what the
+ * parameter's name suggests:
+ * * **A rate of zero is no rate at all.** Both transforms read `aggregate_params[i] || null`, so a
+ *   zero, a NaN and an absent entry arrive identically.
+ * * **With no rate the accumulator is never initialised.** `init` runs as `op.init(this)` rather
+ *   than `op.init(this, param)`, leaving `exp_r` undefined, and `exp * (1 - undefined) / (1 -
+ *   undefined ** n)` is NaN. An `exponential` with no rate therefore answers nothing — not the last
+ *   value in the group, which is what reading the missing rate as zero computes.
+ * * **One accumulator per operation name per field.** `resolve()` keys its map by `a.name`, so two
+ *   `exponential` measures over the same field share one running total *and* one rate, the last one
+ *   declared — and both report the same number. `exponentialb` has no accumulator of its own at
+ *   all: it is declared `req: ['exponential']` and reads that state, so its own `aggregate_params`
+ *   entry is never read, and a specification asking for `exponentialb` *alone* gets the
+ *   uninitialised accumulator and a column of NaN.
+ *
+ * Returns the rate to give a measure of [op] over [path], or null for "upstream never initialised
+ * one". Verified against upstream: `exponentialb` with a rate of 0.5 and no `exponential` beside it
+ * is NaN, and beside `exponential` at 0.9 it is `exp(0.9) * 0.1` rather than `exp(0.5) * 0.5`.
+ */
+internal fun exponentialRates(
+  ops: List<String>,
+  fields: List<String>,
+  rates: List<Double>,
+): (AggregateOp, String?) -> Double? {
+  val byField = HashMap<String, Double?>()
+  for (index in 0 until maxOf(ops.size, fields.size)) {
+    if (AggregateOp.fromName(ops.getOrNull(index) ?: "") != AggregateOp.EXPONENTIAL) continue
+    val path = fields.getOrNull(index)?.takeIf { it.isNotEmpty() } ?: continue
+    // Recorded even when there is no usable rate, because the *last* declaration is the one whose
+    // `init` runs: an `exponential` with a rate followed by one without leaves both of them NaN.
+    byField[path] = rates.getOrNull(index)?.takeIf { it != 0.0 && !it.isNaN() }
+  }
+  return { op, path ->
+    if (op == AggregateOp.EXPONENTIAL || op == AggregateOp.EXPONENTIALB) path?.let { byField[it] }
+    else null
+  }
+}
+
+/**
  * Reads the `fields`, `ops` and `as` parameters into measures.
  *
  * With no `ops`, Vega defaults to a single `count`, which is why `{"type": "aggregate"}` alone
@@ -518,11 +570,7 @@ internal fun measures(params: VegaValue.Obj, context: TransformContext): List<Me
   val fields = params.stringList("fields")
   val opNames = params.stringList("ops")
   val names = params.stringList("as")
-  // `aggregate_params` is positional alongside `ops`, and only the two exponential operations read
-  // it. Upstream's `_.aggregate_params[i] || null` treats a zero as absent as well, which is why
-  // the
-  // fallback below is the same for both.
-  val rates = params.numberList("aggregate_params")
+  val exponential = exponentialRates(opNames, fields, params.numberList("aggregate_params"))
 
   if (opNames.isEmpty() && fields.isEmpty()) {
     return listOf(Measure(AggregateOp.COUNT, null, names.getOrNull(0) ?: "count"))
@@ -552,9 +600,7 @@ internal fun measures(params: VegaValue.Obj, context: TransformContext): List<Me
     }
     // Upstream names a fieldless count just "count", and everything else "{op}_{field}".
     val defaultName = if (path == null) op.opName else "${op.opName}_$path"
-    measures.add(
-      Measure(op, path, names.getOrNull(index) ?: defaultName, rates.getOrNull(index) ?: 0.0)
-    )
+    measures.add(Measure(op, path, names.getOrNull(index) ?: defaultName, exponential(op, path)))
   }
   return measures
 }

@@ -33,7 +33,7 @@ AccessibleElement.role
 AccessibleElement.roleDescription
 AccessibleElement.selected
 AggregateKt
-AggregateKt.aggregateOver(op:fieldPath:tuples:)
+AggregateKt.aggregateOver(op:fieldPath:tuples:rate:)
 AggregateKt.groupKey(datum:groupBy:)
 AggregateKt.groupTuples(input:groupBy:)
 AggregateOp

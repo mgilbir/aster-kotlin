@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A `window` reads `aggregate_params`, and a missing decay rate is not a rate of zero.** The two
+  exponential operations take their rate from that parameter, which `window` declares and nothing
+  read — so every windowed exponential ran at a rate of zero. Upstream's own reading of it is
+  narrower than it looks: `aggregate_params[i] || null` makes a zero and an absent entry the same
+  thing, and that thing leaves the accumulator uninitialised, so the answer is NaN rather than "the
+  last value in the group". `exponentialb` has no accumulator of its own at all — it is declared
+  `req: ['exponential']` — so it runs at the transform's `exponential` rate and never at the one
+  written beside it. `aggregateOver` takes the rate as a trailing optional parameter, which renames
+  the Swift selector to `aggregateOver(op:fieldPath:tuples:rate:)`.
+
 - **`bin` reads the `span` it was given.** `span = _.span || (max - min) || Math.abs(min) || 1` is
   what the step is chosen from, and only the second term of that chain was read: a specification
   stating a span — which is how a chart keeps its bins a fixed width while a brush or a filter
