@@ -59,7 +59,10 @@ public object StackTransform : Transform {
     for ((key, positions) in groups) {
       val ordered =
         if (comparator == null) positions
-        else positions.sortedWith { a, b -> comparator.compare(input[a], input[b]) }
+        // Ties by creation order, upstream's `stableCompare` — see
+        // [TransformContext.creationOrder]. It decides which of two equal rows is stacked nearer
+        // the baseline.
+        else positions.sortedWith(byCreation(input, comparator, context))
       val total = totals[key] ?: 0.0
 
       when (offset) {

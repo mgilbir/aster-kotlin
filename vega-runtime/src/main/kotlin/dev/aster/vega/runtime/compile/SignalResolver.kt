@@ -703,9 +703,19 @@ public class SignalResolver(
     signals: List<SignalSpec>,
     values: MutableMap<String, VegaValue>,
     pinned: Map<String, VegaValue> = emptyMap(),
+    /**
+     * Values the **view** decided, which replace a declared signal of the same name outright.
+     *
+     * `width` and `height` under `autosize: "fit"`, and nothing else: upstream's `resizeView`
+     * writes those two signals itself and skips their updates — `view.signal(Width, width, {skip:
+     * true})` — so a chart whose width is declared as a signal fits exactly like one that declares
+     * the property. Separate from [pinned], which is a handler's doing and is warned about when it
+     * shadows an `update`; this is the engine's own answer and there is nothing to warn about.
+     */
+    viewSize: Map<String, VegaValue> = emptyMap(),
     /** Where a `setdata` in one of these signals puts its rows. */
     datasetSink: ((String, List<VegaValue>) -> Unit)? = null,
-  ): Resolution = Resolution(signals, values, pinned, datasetSink)
+  ): Resolution = Resolution(signals, values, pinned, viewSize, datasetSink)
 
   /**
    * One resolution pass. Holds the mutable bookkeeping so the resolver itself stays reusable.
@@ -718,6 +728,7 @@ public class SignalResolver(
     signals: List<SignalSpec>,
     private val values: MutableMap<String, VegaValue>,
     pinned: Map<String, VegaValue>,
+    viewSize: Map<String, VegaValue> = emptyMap(),
     private val datasetSink: ((String, List<VegaValue>) -> Unit)? = null,
   ) {
     private val specs = LinkedHashMap<String, SignalSpec>()
@@ -728,6 +739,12 @@ public class SignalResolver(
       // Seeded as already settled, so `resolve` returns before evaluating anything.
       values.putAll(pinned)
       settled.addAll(pinned.keys)
+      // After the handler's, because the view's own answer is arrived at *from* it: a fitted size
+      // is
+      // measured on a pass that already had the handler's width in it, so the fitted number is the
+      // later word on the same question.
+      values.putAll(viewSize)
+      settled.addAll(viewSize.keys)
       for (signal in signals) {
         if (specs.containsKey(signal.name)) {
           diagnostics.warn(

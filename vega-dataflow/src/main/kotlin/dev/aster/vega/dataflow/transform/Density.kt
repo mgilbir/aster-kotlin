@@ -280,8 +280,16 @@ public object DotBinTransform : Transform {
           .values
           .toList()
       }
+    // Ties by **creation order**, which is what upstream's `stableCompare` breaks them by — the
+    // order decides which of two equal values is stacked nearer the baseline of the dot plot. See
+    // [TransformContext.creationOrder].
+    val creation = context.creationOrder()?.takeIf { it.size == input.size }
     for (group in groups) {
-      val sorted = group.sortedBy { (_, row) -> row.field(field).asDouble() }
+      val sorted =
+        group.sortedWith(
+          compareBy<IndexedValue<VegaValue>> { (_, row) -> row.field(field).asDouble() }
+            .thenBy { (index, _) -> creation?.getOrNull(index) ?: index }
+        )
       val bins = stack(sorted.map { (_, row) -> row.field(field).asDouble() }, step, smooth)
       sorted.forEachIndexed { position, (index, _) -> placed[index] = bins[position] }
     }

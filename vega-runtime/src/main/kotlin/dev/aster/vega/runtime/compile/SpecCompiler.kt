@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.dataflow.transform.LayoutMemory
 import dev.aster.vega.dataflow.transform.ProjectionDefinition
 import dev.aster.vega.expression.CachingExpressionCompiler
 import dev.aster.vega.expression.Clock
@@ -471,9 +472,17 @@ public class SpecCompiler(
     // only
     // to be measured — its diagnostics are thrown away, because the second pass reports the same
     // ones against the size that is actually drawn.
+    // Shared by both passes, and only both passes: a `resquarify` treemap keeps the rows its
+    // measuring pass chose, which is what upstream's long-lived nodes do for it. See
+    // [LayoutMemory].
+    val layoutMemory = LayoutMemory()
+    // The same for the random draws, for the same reason: upstream's generator is the view's, not
+    // the render's, so the pass that is drawn continues the sequence the measuring pass started.
+    val randomStream = RandomStream(randomSeed)
     val fit =
       if (spec.autosize.type.isFit) {
-        measure(
+        fitted(
+          spec,
           compileOnce(
             spec,
             signalOverrides,
@@ -482,7 +491,9 @@ public class SpecCompiler(
             itemEncodes,
             scopedOverrides,
             pinnedDomains,
-          )
+            layoutMemory,
+            randomStream,
+          ),
         )
       } else {
         null
@@ -495,6 +506,8 @@ public class SpecCompiler(
         itemEncodes,
         scopedOverrides,
         pinnedDomains,
+        layoutMemory,
+        randomStream,
       )
       .compiled
   }
@@ -526,15 +539,51 @@ public class SpecCompiler(
     )
   }
 
+  /**
+   * What a measuring pass leaves for the pass that gets drawn: the room there is, and the overhang
+   * to take out of it.
+   *
+   * [base] is the **size the first pass was actually drawn at**, not the size property behind it.
+   * Upstream fits against `view._width`, which is a handler on the `width` *signal* — so a chart
+   * that declares `{"name": "width", "value": 400}` rather than `"width": 400` fits exactly the
+   * same, and one whose width is an `update` expression fits against what the expression produced.
+   * This engine read the property, which for such a chart is not there at all, so fitting had
+   * nothing to bite on and the plotting area kept its full width. Every Deneb template is written
+   * that way, Power BI supplying the size at run time, and so is anything else sized by a
+   * parameter.
+   *
+   * `contains: "padding"` is taken off here rather than when the size signals are seeded, because
+   * `viewSizeLayout` subtracts it from `view._width` *after* the first render — so the pass that is
+   * measured is drawn at the full size, and only the room left for the second one is reduced.
+   */
+  private class Fitted(val base: PlotSize, val over: Overflow)
+
+  private fun fitted(spec: VegaSpec, pass: Pass): Fitted {
+    val containsPadding = spec.autosize.contains.equals("padding", ignoreCase = true)
+    return Fitted(
+      PlotSize(
+        width =
+          pass.plot.width - if (containsPadding) spec.padding.left + spec.padding.right else 0.0,
+        height =
+          pass.plot.height - if (containsPadding) spec.padding.top + spec.padding.bottom else 0.0,
+      ),
+      measure(pass),
+    )
+  }
+
   private fun compileOnce(
     spec: VegaSpec,
     signalOverrides: Map<String, VegaValue>,
     diagnostics: DiagnosticCollector,
     /** What the first pass measured, or null when this *is* the first pass. */
-    fit: Overflow?,
+    fit: Fitted?,
     itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
     scopedOverrides: Map<String, Map<String, VegaValue>> = emptyMap(),
     pinnedDomains: Map<String, List<Double>> = emptyMap(),
+    /** Shared with the other pass of a fitted chart; see [LayoutMemory]. */
+    layoutMemory: LayoutMemory = LayoutMemory(),
+    /** The chart's one sequence of random draws, shared by both passes; see below. */
+    randomStream: RandomStream = RandomStream(randomSeed),
   ): Pass {
     val ids = SceneNodeIdAllocator()
 
@@ -563,23 +612,36 @@ public class SpecCompiler(
     val containsPadding =
       spec.autosize.contains.equals("padding", ignoreCase = true) &&
         spec.autosize.type != AutosizeType.PAD
+    // A **fitted** chart takes it off later instead, in [fitted]: upstream reduces `view._width`
+    // for
+    // the padding inside `viewSizeLayout`, which runs on a drawing that has already been made at
+    // the
+    // full size. So the pass that gets measured here is drawn at the size the specification asked
+    // for, and only the room left for the pass that gets drawn is reduced.
+    val reducedHere = containsPadding && !spec.autosize.type.isFit
     // What the surface is measured against, before any fitting: upstream's
     // `viewWidth`/`viewHeight`.
     val viewWidth =
-      if (containsPadding) declaredWidth - spec.padding.left - spec.padding.right else declaredWidth
+      if (reducedHere) declaredWidth - spec.padding.left - spec.padding.right else declaredWidth
     val viewHeight =
-      if (containsPadding) declaredHeight - spec.padding.top - spec.padding.bottom
-      else declaredHeight
+      if (reducedHere) declaredHeight - spec.padding.top - spec.padding.bottom else declaredHeight
     // A padding wider than the size it is measured inside leaves a **negative** plotting area.
     // Upstream does the same — probed: `width: 50, padding: 40, contains: "padding"` publishes a
     // `width` signal of −30 — so this is not clamped, because clamping would draw a chart upstream
     // does not. What it was not doing is saying so, and a chart whose plotting area came out
     // negative is one nobody can read for a reason that is nowhere in the picture.
-    if (viewWidth < 0.0 || viewHeight < 0.0) {
+    // Measured against what is left *after* the padding whichever pass takes it off, so a fitted
+    // chart is told the same thing as any other rather than being told nothing.
+    val insideWidth =
+      if (containsPadding) declaredWidth - spec.padding.left - spec.padding.right else declaredWidth
+    val insideHeight =
+      if (containsPadding) declaredHeight - spec.padding.top - spec.padding.bottom
+      else declaredHeight
+    if (insideWidth < 0.0 || insideHeight < 0.0) {
       diagnostics.warn(
         DiagnosticCodes.COMPILE_LIMIT_EXCEEDED,
         "autosize.contains is 'padding' and the padding is wider than the declared size, so the " +
-          "plotting area is $viewWidth by $viewHeight. Upstream publishes the same negative " +
+          "plotting area is $insideWidth by $insideHeight. Upstream publishes the same negative " +
           "size, and nothing will be visible.",
       )
     }
@@ -592,15 +654,37 @@ public class SpecCompiler(
     // mark position are all measured against them.
     val width =
       if (fit != null && spec.autosize.type != AutosizeType.FIT_Y) {
-        maxOf(0.0, viewWidth - fit.left - fit.right)
+        maxOf(0.0, fit.base.width - fit.over.left - fit.over.right)
       } else {
         viewWidth
       }
     val height =
       if (fit != null && spec.autosize.type != AutosizeType.FIT_X) {
-        maxOf(0.0, viewHeight - fit.top - fit.bottom)
+        maxOf(0.0, fit.base.height - fit.over.top - fit.over.bottom)
       } else {
         viewHeight
+      }
+    // The fitted size is the **view's** answer, not the specification's, so it replaces a declared
+    // `width` or `height` signal for this pass rather than being overwritten by it:
+    //
+    // ```js
+    // view.signal(Width, width, Skip); // set width, skip update calc
+    // view._resizeWidth.skip(true);    // skip width resize handler
+    // ```
+    //
+    // `resizeView` writes the signal itself and skips its update, which is why a chart whose width
+    // is a signal — a value, or an expression — still fits. Seeded as settled below; everything
+    // that
+    // reads `width` downstream, a scale range and a mark position included, then reads the fitted
+    // number.
+    val fittedSignals =
+      if (fit == null) {
+        emptyMap()
+      } else {
+        buildMap {
+          if (spec.autosize.type != AutosizeType.FIT_Y) put("width", VegaValue.Num(width))
+          if (spec.autosize.type != AutosizeType.FIT_X) put("height", VegaValue.Num(height))
+        }
       }
 
     // Vega exposes width, height and padding as implicit signals, so expressions can size things
@@ -666,9 +750,12 @@ public class SpecCompiler(
 
     // One stream for the whole compile, seeded the same way every time. Every scope built below
     // shares it, so the draws form a single sequence the way upstream's module-level generator
-    // does. A `fit` chart compiles twice and each pass starts the sequence again, which is what
-    // makes the second pass draw the chart the first one measured.
-    val stream = RandomStream(randomSeed)
+    // does — and **both passes** of a fitted chart draw from that one sequence, because upstream's
+    // generator lives as long as the view and its second render asks it for fresh numbers. A dot
+    // strip plot that jitters its dots with `random()` is where it shows: upstream's twelve dots
+    // take draws 13 to 24 of the seeded sequence, this took 1 to 12 of a stream restarted for the
+    // drawn pass, and every dot sat a fraction of a band away from upstream's.
+    val stream = randomStream
 
     // The state the order fills in, and the reason each piece is shared rather than copied:
     // `signalValues` because a transform may *publish* a signal, and everything after it must see
@@ -688,6 +775,7 @@ public class SpecCompiler(
         spec.signals,
         signalValues,
         signalOverrides,
+        fittedSignals,
       ) { name, rows ->
         resolved = resolved.withDataset(name, rows)
       }
@@ -699,7 +787,17 @@ public class SpecCompiler(
     val unresolvedSignals = spec.signals.mapTo(mutableSetOf()) { it.name }
     val unbuiltScales = spec.scales.mapTo(mutableSetOf()) { it.name }
 
-    val data = DataResolver(diagnostics, expressions, loader, stream, clock, timeZone, hostData)
+    val data =
+      DataResolver(
+        diagnostics,
+        expressions,
+        loader,
+        stream,
+        clock,
+        timeZone,
+        hostData,
+        layoutMemory,
+      )
     for (operator in order.order) {
       when (operator) {
         is Operator.Signal -> {
@@ -879,7 +977,7 @@ public class SpecCompiler(
 
     val content = frame(spec, scope.nodes, plot, root, ids, diagnostics, expressions)
 
-    val scene = layout(spec, scope.bounds, content, plot, ids, diagnostics, fit)
+    val scene = layout(spec, scope.bounds, content, plot, ids, diagnostics, fit?.over)
     // Reported after everything has been compiled, because an expression reading the container size
     // can be anywhere: a signal's `update`, an encode channel, a transform parameter.
     reportUnansweredContainerSize(

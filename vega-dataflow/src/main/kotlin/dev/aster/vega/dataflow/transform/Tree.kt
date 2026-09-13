@@ -90,6 +90,18 @@ internal class TreeNode(index: Int, val datum: VegaValue?) : TreeSource {
   var height: Int = 0
 
   /**
+   * The **creation ordinals** of the rows this tree was built from, by their position then.
+   *
+   * A node names its row by the position it had when the tree was built, and a `collect` between
+   * the tree and the layout moves the rows out from under it. This is what lets the layout find
+   * them again: the ordinals the pipeline tracks are the one thing about a row that survives a sort
+   * — see `TransformContext.creationOrder` — so a row's ordinal now says where it sat then. Null
+   * where nothing was tracking them, and the layout then goes by position, which is right whenever
+   * the rows have not moved.
+   */
+  var buildOrder: IntArray? = null
+
+  /**
    * How many rows the hierarchy transform handed on, recorded on the root and meaningless
    * elsewhere.
    *
@@ -250,6 +262,72 @@ internal object TreeLayouts {
    * treemap made of slivers does not communicate the quantity it encodes. The cost is that sibling
    * order is not preserved in any readable way, which `dice`, `slice` and `binary` do keep.
    */
+  /**
+   * One row of a squarified tiling: how many children went into it, and which way it was cut.
+   *
+   * ```js
+   * rows.push(row = {value: sumValue, dice: dx < dy, children: nodes.slice(i0, i1)});
+   * ```
+   *
+   * `resquarify` keeps these and re-applies them to the same children at a new size, which is what
+   * makes a treemap hold still while its numbers change. Recorded as a count rather than as the
+   * nodes themselves, because the nodes are rebuilt between the two passes a fitted chart compiles
+   * and only their *order* survives — which is all the replay needs.
+   */
+
+  /**
+   * Re-applies rows an earlier layout produced: upstream's `resquarify` when it has rows to reuse.
+   *
+   * ```js
+   * if ((rows = parent._squarify) && (rows.ratio === ratio)) {
+   *   while (++j < m) {
+   *     row = rows[j], nodes = row.children;
+   *     for (i = row.value = 0, n = nodes.length; i < n; ++i) row.value += nodes[i].value;
+   *     if (row.dice) treemapDice(row, x0, y0, x1, value ? y0 += (y1 - y0) * row.value / value : y1);
+   *     else treemapSlice(row, x0, y0, value ? x0 += (x1 - x0) * row.value / value : x1, y1);
+   *     value -= row.value;
+   *   }
+   * }
+   * ```
+   *
+   * Each row's value is summed afresh, so the rectangles follow the data; the *grouping* and the
+   * cut direction are the ones already chosen. Returns false when the counts do not fit the
+   * children this time, and the caller then tiles from scratch.
+   */
+  internal fun replaySquarified(
+    rows: List<TileRowShape>,
+    parent: TreeNode,
+    left: Double,
+    top: Double,
+    right: Double,
+    bottom: Double,
+  ): Boolean {
+    val nodes = parent.children ?: return false
+    if (rows.sumOf { it.count } != nodes.size) return false
+    var x0 = left
+    var y0 = top
+    var value = parent.value
+    var start = 0
+    for (entry in rows) {
+      val members = nodes.subList(start, start + entry.count)
+      start += entry.count
+      val row = TreeNode(-1, null)
+      row.value = members.sumOf { it.value }
+      row.children = members.toMutableList()
+      if (entry.dice) {
+        val edge = if (value != 0.0) y0 + (bottom - y0) * row.value / value else bottom
+        dice(row, x0, y0, right, edge)
+        y0 = edge
+      } else {
+        val edge = if (value != 0.0) x0 + (right - x0) * row.value / value else right
+        slice(row, x0, y0, edge, bottom)
+        x0 = edge
+      }
+      value -= row.value
+    }
+    return true
+  }
+
   internal fun squarify(
     ratio: Double,
     parent: TreeNode,
@@ -257,6 +335,8 @@ internal object TreeLayouts {
     top: Double,
     right: Double,
     bottom: Double,
+    /** Where the rows chosen here are recorded, for a `resquarify` that comes after. */
+    record: ((List<TileRowShape>) -> Unit)? = null,
   ) {
     val nodes = parent.children ?: return
     val n = nodes.size
@@ -267,6 +347,7 @@ internal object TreeLayouts {
     var value = parent.value
     var i0 = 0
     var i1 = 0
+    val chosen = if (record == null) null else mutableListOf<TileRowShape>()
 
     while (i0 < n) {
       val dx = x1 - x0
@@ -303,6 +384,7 @@ internal object TreeLayouts {
       val row = TreeNode(-1, null)
       row.value = sumValue
       row.children = nodes.subList(i0, i1).toMutableList()
+      chosen?.add(TileRowShape(i1 - i0, dice = dx < dy))
       if (dx < dy) {
         val edge = if (value != 0.0) y0 + dy * sumValue / value else y1
         dice(row, x0, y0, x1, edge)
@@ -315,6 +397,7 @@ internal object TreeLayouts {
       value -= sumValue
       i0 = i1
     }
+    chosen?.let { record?.invoke(it) }
   }
 
   /**

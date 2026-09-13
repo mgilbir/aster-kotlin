@@ -31,7 +31,6 @@ import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.runtime.scale.formatTickLabel
 import dev.aster.vega.scene.AccessibilityDescriptor
-import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.NodeMetadata
 import dev.aster.vega.scene.RectD
@@ -430,14 +429,16 @@ public class AxisBuilder(
             // already resolved their encode per item through `strokeFor`; the labels resolved only
             // their text and position, so a conditional `fill` fell back to the default colour for
             // every tick and nothing said so.
+            // The **colour** may come from the label's own encode — which is also where a
+            // `labelColor` written as a signal or through a scale lands — and the *opacity* is a
+            // channel of its own either way: upstream adds `fill` and `fillOpacity` as separate
+            // encoders, so one arriving from the block does not take the other with it.
             fill =
-              labelString(spec, "fill", tick)
-                ?.let { SceneColor.parse(it) }
-                ?.let {
-                  ScenePaint.Solid(it)
-                }
-                ?.let { Fill(paint = it) }
-                ?: GuideStyle.fill(spec.labelStyle, AxisDefaults.labelColor),
+              GuideStyle.fill(spec.labelStyle, AxisDefaults.labelColor).let { styled ->
+                labelString(spec, "fill", tick)
+                  ?.let { SceneColor.parse(it) }
+                  ?.let { styled.copy(paint = ScenePaint.Solid(it)) } ?: styled
+              },
             // A label's own `encode` may hide it on a rule the axis has no property for — a
             // calendar shows the month name on the first week of each month and blanks the rest.
             // It still measures: upstream bounds a text item from its geometry whatever its
@@ -719,7 +720,10 @@ public class AxisBuilder(
             Orient.RIGHT -> 90.0
             else -> 0.0
           },
-      fill = GuideStyle.fill(spec.titleStyle, AxisDefaults.titleColor),
+      fill =
+        GuideStyle.fill(spec.titleStyle, AxisDefaults.titleColor).let { styled ->
+          titleColour(spec)?.let { styled.copy(paint = ScenePaint.Solid(it)) } ?: styled
+        },
       metadata =
         partMetadata(
           spec,
@@ -991,6 +995,21 @@ public class AxisBuilder(
     return encoder.channelText(entry, VegaValue.EmptyObject)?.takeIf { it.isNotEmpty() }
   }
 
+  /**
+   * A colour the axis title's **own encode block** carries, which is where a signal-valued or
+   * scaled `titleColor` lands.
+   *
+   * `parseAxis` turns every title property into an encoder — `fill: _('titleColor')` — so a title
+   * coloured through a scale (`{"scale": "c", "signal": "'Left'"}`, which is how a back-to-back bar
+   * chart colours each side's heading) arrives as a channel rather than as a word. The style the
+   * axis resolved once is the fallback, and is what a literal `titleColor` still takes.
+   */
+  private fun titleColour(spec: AxisSpec): SceneColor? {
+    val encoder = channels ?: return null
+    val entry = spec.encode["title"]?.update?.get("fill") ?: return null
+    return encoder.channelColor(entry, VegaValue.EmptyObject)
+  }
+
   private fun titleNumber(spec: AxisSpec, channel: String): Double? {
     val encoder = channels ?: return null
     val entry = spec.encode["title"]?.update?.get(channel) ?: return null
@@ -1079,8 +1098,19 @@ public class AxisBuilder(
     fun at(name: String) = block[name]?.let { encoder.channelNumber(it, datum) }
     val x1 = at("x")
     val y1 = at("y")
-    val x2 = at("x2")
-    val y2 = at("y2")
+    // ```js
+    // enter.x = update.x = ifX(orient, pos0, zero);
+    // enter.x2 = update.x2 = ifX(orient, pos1);
+    // ```
+    //
+    // Each of these lines is encoded with **one** end on its cross axis and none at all on the
+    // other: a vertical axis's domain has an `x` and no `x2`, a vertical tick has a `y` and no
+    // `y2`. So an `encode` that moves that coordinate moves the whole line, where this held the
+    // other end where it was and drew a line across the chart. A back-to-back bar chart puts its
+    // shared axis down the middle exactly that way.
+    val crossIsX = if (part == "domain") spec.orient.isVertical else !spec.orient.isVertical
+    val x2 = at("x2") ?: x1?.takeIf { crossIsX }
+    val y2 = at("y2") ?: y1?.takeIf { !crossIsX }
     if (x1 == null && y1 == null && x2 == null && y2 == null) return node
     return node.copy(
       x1 = x1 ?: node.x1,

@@ -63,7 +63,10 @@ public object WindowTransform : Transform {
     for ((_, positions) in partitions) {
       val ordered =
         if (comparator == null) positions
-        else positions.sortedWith { left, right -> comparator.compare(input[left], input[right]) }
+        // Ties by creation order, which is what upstream's `stableCompare` breaks them by — see
+        // [TransformContext.creationOrder]. A window's own sort decides which row a `row_number`
+        // lands on, so a tie resolved the other way hands two rows each other's answer.
+        else positions.sortedWith(byCreation(input, comparator, context))
       val computed = process(ordered.map { input[it] }, operations, frame, comparator, ignorePeers)
       for ((slot, updated) in ordered.zip(computed)) results[slot] = updated
     }

@@ -165,11 +165,18 @@ public class LinearScale(
     if (stops == 2) return interpolate(d0, d1, range[0], range[stops - 1], input)
 
     // Piecewise: find the segment containing the input, then interpolate within it.
+    // The segment is upstream's `bisect(domain, x, 1, j) - 1`, which is a **right** bisection: a
+    // value sitting exactly on an interior stop belongs to the segment that *starts* there, not to
+    // the one that ends there. The two agree everywhere except where a stop is repeated — and that
+    // is not a curiosity, it is what `domainMid` builds whenever the middle lands on an end of the
+    // data: a diverging bar chart over values that are all positive has the domain `[0, 0, 95.4]`,
+    // and zero belongs to the second segment. Read off d3, which answers 42 there where the first
+    // segment's midpoint is 21.
     val ascending = d1 > d0
     var segment = 0
     while (segment < stops - 2) {
       val upper = domain[segment + 1]
-      val past = if (ascending) input > upper else input < upper
+      val past = if (ascending) input >= upper else input <= upper
       if (!past) break
       segment++
     }
@@ -200,6 +207,17 @@ public class LinearScale(
 
   /** The data value that maps to range position [y]. Only defined for a two-point domain. */
   override fun invert(position: Double): Double {
+    // ```js
+    // scale.invert = function(y) {
+    //   return clamp(untransform((input || (input = piecewise(range, domain.map(transform),
+    // interpolateNumber)))(y)));
+    // };
+    // ```
+    //
+    // The same piecewise machinery with the two swapped, so a scale of **more than two stops**
+    // inverts as readily as it maps — which is what a brush or a tooltip over a diverging axis
+    // needs. This answered `NaN` for every such scale, so a pointer over one read nothing at all.
+    if (stops > 2) return invertPiecewise(position)
     if (stops != 2) return Double.NaN
     val r0 = range[0]
     val r1 = range[1]
@@ -211,6 +229,29 @@ public class LinearScale(
     val clamped = if (clamp) position.coerceIn(minOf(r0, r1), maxOf(r0, r1)) else position
     val t = (clamped - r0) / (r1 - r0)
     return domain[0] + t * (domain[1] - domain[0])
+  }
+
+  /** [invert] over a domain of more than two stops; see there for why it is the forward walk. */
+  private fun invertPiecewise(position: Double): Double {
+    val r0 = range[0]
+    val rn = range[stops - 1]
+    if (r0 == rn) return Double.NaN
+    val input = if (clamp) position.coerceIn(minOf(r0, rn), maxOf(r0, rn)) else position
+    // A **right** bisection over the range, as the forward walk does over the domain: a position
+    // exactly on an interior stop belongs to the segment that starts there.
+    val ascending = rn > r0
+    var segment = 0
+    while (segment < stops - 2) {
+      val upper = range[segment + 1]
+      val past = if (ascending) input >= upper else input <= upper
+      if (!past) break
+      segment++
+    }
+    val from = range[segment]
+    val to = range[segment + 1]
+    if (from == to) return domain[segment]
+    val t = (input - from) / (to - from)
+    return domain[segment] * (1 - t) + domain[segment + 1] * t
   }
 
   public fun ticks(count: Int = DEFAULT_TICK_COUNT): List<Double> =
@@ -493,11 +534,13 @@ public abstract class TransformedScale(
     // linear one does. This read only the first and last, which is not a rounding difference: a
     // three-stop power scale over `[4, 2, 1] -> [1, 2, 4]` answered 3.5 for 1.5 where upstream
     // answers 3, because it interpolated straight across both segments.
+    // A right bisection, for the reason [LinearScale] gives: a value on an interior stop belongs to
+    // the segment that starts there.
     val ascending = dn > d0
     var segment = 0
     while (segment < stops - 2) {
       val upper = forward(domain[segment + 1])
-      val past = if (ascending) t > upper else t < upper
+      val past = if (ascending) t >= upper else t <= upper
       if (!past) break
       segment++
     }
@@ -1140,11 +1183,48 @@ public class BinOrdinalScale(
 }
 
 /**
+ * The monotonic space a continuous scale measures in, for a colour ramp built on one.
+ *
+ * A positional scale carries its transform in its own class — [PowScale], [LogScale], [SymlogScale]
+ * — because the transform *is* most of what such a scale does. A colour scale over the same domain
+ * does the same arithmetic and then reads a ramp rather than a range of numbers, so it takes the
+ * transform as a value instead of as a subclass.
+ */
+public sealed interface ScaleTransform {
+  public fun forward(value: Double): Double
+
+  /** The numbers as they are, which is `linear`, `time`, `utc` and `sequential`. */
+  public data object Linear : ScaleTransform {
+    override fun forward(value: Double): Double = value
+  }
+
+  /** `pow` and `sqrt`, the latter being an exponent of a half. Negative values keep their sign. */
+  public data class Pow(public val exponent: Double) : ScaleTransform {
+    override fun forward(value: Double): Double =
+      if (value < 0.0) -((-value).pow(exponent)) else value.pow(exponent)
+  }
+
+  /** `log`, which is only defined for a domain that stays on one side of zero. */
+  public data class Log(public val base: Double = 10.0) : ScaleTransform {
+    private val logBase = ln(base)
+
+    override fun forward(value: Double): Double = ln(abs(value)) / logBase
+  }
+
+  /** `symlog`, which does handle zero and both signs: `sign(x) * ln(1 + |x| / constant)`. */
+  public data class Symlog(public val constant: Double = 1.0) : ScaleTransform {
+    override fun forward(value: Double): Double =
+      if (value < 0.0) -ln(1.0 + abs(value) / constant) else ln(1.0 + value / constant)
+  }
+}
+
+/**
  * A continuous scale whose range is a colour ramp.
  *
- * Covers Vega's `sequential` type and a `linear` scale given a colour range. The position along the
- * ramp comes from the same normalization a numeric scale uses, so a colour scale and a positional
- * one over the same domain stay in step.
+ * Covers Vega's `sequential` type, and any continuous scale given a colour range: `linear`, `time`,
+ * `utc`, and the transformed ones through [ScaleTransform]. The position along the ramp comes from
+ * the same normalization a numeric scale of that type uses, so a colour scale and a positional one
+ * over the same domain stay in step.
  */
 public class SequentialColorScale(
   override val name: String,
@@ -1154,6 +1234,32 @@ public class SequentialColorScale(
   /** `interpolate: {"type": "rgb", "gamma": y}` — only the RGB space has one. */
   public val gamma: Double = 1.0,
   public val clamp: Boolean = true,
+  /**
+   * The space the ramp is walked in, for a colour scale built on a **transformed** scale type.
+   *
+   * A `pow`, `sqrt`, `log` or `symlog` scale whose range is colours rather than numbers is a colour
+   * scale like any other, and d3 interpolates it in the scale's own space: `scaleSqrt` over `[0,
+   * 100]` paints 25 the exact midpoint colour, because `√25 / √100` is a half. Read off a live
+   * view, which answers `rgb(128, 0, 128)` there.
+   *
+   * [ScaleTransform.Linear] for every other kind, which is what a `linear`, `time` or `sequential`
+   * colour scale wants and is why this is last with a default.
+   */
+  public val transform: ScaleTransform = ScaleTransform.Linear,
+  /**
+   * Which slice of the ramp the scale uses, as two fractions of it — upstream's `schemeExtent`.
+   *
+   * ```js
+   * return (isFunction(scheme) && (extent || reverse))
+   *   ? interpolateRange(scheme, flip(extent || [0, 1], reverse))
+   *   : scheme;
+   * ```
+   *
+   * `[0, 1]` is the whole ramp and is what a range written out as colours always gets. Written
+   * backwards it reads the ramp backwards, which is how `reverse` acts on a scheme — and how the
+   * named range `diverging` differs from the `blueorange` scheme it is made of.
+   */
+  public val rampExtent: List<Double> = listOf(0.0, 1.0),
 ) : VegaScale {
 
   init {
@@ -1177,8 +1283,11 @@ public class SequentialColorScale(
    */
   internal fun position(x: Double): Double {
     if (domain.size < 3) {
-      val lo = domain.first()
-      val hi = domain.last()
+      // In the scale's **own** space, which for everything but a transformed colour scale is the
+      // one the numbers are already in; see [transform].
+      val x = transform.forward(x)
+      val lo = transform.forward(domain.first())
+      val hi = transform.forward(domain.last())
       // A **zero-width domain sits in the middle of the ramp**, not at its start. d3's `normalize`
       // answers `constant(0.5)` when the ends coincide, so a colour scale over a column that turns
       // out to be constant paints the middle colour — the one that says "nothing to compare" —
@@ -1206,7 +1315,10 @@ public class SequentialColorScale(
     val raw = position(x)
     // Sequential scales clamp by default, since a colour past the end of a ramp has no meaning.
     if (!clamp && (raw < 0.0 || raw > 1.0)) return null
-    return ColorSpaces.sample(colors, raw.coerceIn(0.0, 1.0), space, gamma)
+    val along = raw.coerceIn(0.0, 1.0)
+    val from = rampExtent.firstOrNull() ?: 0.0
+    val to = rampExtent.getOrNull(1) ?: 1.0
+    return ColorSpaces.sample(colors, from + along * (to - from), space, gamma)
   }
 
   override fun scale(value: VegaValue): VegaValue {

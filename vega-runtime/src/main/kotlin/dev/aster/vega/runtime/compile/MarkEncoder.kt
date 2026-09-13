@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.dataflow.transform.compareFieldValues
 import dev.aster.vega.expression.CachingExpressionCompiler
 import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.expression.ExpressionEvaluationException
@@ -16,6 +17,7 @@ import dev.aster.vega.model.field
 import dev.aster.vega.model.isMissing
 import dev.aster.vega.model.isNullish
 import dev.aster.vega.model.locale.VegaLocale
+import dev.aster.vega.model.parseFieldPath
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.spec.ChannelValue
 import dev.aster.vega.model.spec.EncodeEntry
@@ -946,8 +948,19 @@ public class MarkEncoder(
       segments(data, channels) { datum ->
         val x = centred(channels, datum, "x", "xc") ?: 0.0
         val y = centred(channels, datum, "y", "yc") ?: 0.0
-        val x2 = position(channels["x2"], datum) ?: x
-        val y2 = position(channels["y2"], datum) ?: y
+        // ```js
+        // xw = item => (item.x || 0) + (item.width || 0),
+        // yh = item => (item.y || 0) + (item.height || 0),
+        // areavShape = d3_area().x(x).y1(y).y0(yh)
+        // ```
+        //
+        // The second boundary is the first **plus the extent**, not `y2`: upstream's
+        // `adjustSpatial` turns an encoded `y2` into a height and the shape reads the height, so
+        // the two agree wherever `y2` was written — and differ wherever the specification wrote
+        // the extent instead. A violin plot writes the extent, its halves being scaled densities,
+        // and every one of them came out a flat line.
+        val x2 = extentAcross(channels, datum, "x", x)
+        val y2 = extentAcross(channels, datum, "y", y)
         PointD(x, y) to PointD(x2, y2)
       }
     if (pairs.isEmpty()) return null
@@ -1165,10 +1178,24 @@ public class MarkEncoder(
           ?: defaults
             .colour("fill", MarkDefaults.fillFor(spec.type).takeIf { !paintsItself })
             ?.let { ScenePaint.Solid(it) }
+    // ```js
+    // if (item.stroke && item.opacity !== 0 && item.strokeOpacity !== 0) { … bounds.expand(e); }
+    // ```
+    //
+    // `boundStroke` asks whether the item **has** a stroke, not whether that stroke is a colour, so
+    // a mark whose stroke is a string nothing can parse is still measured as stroked. That is not a
+    // hypothetical: a templated dashboard writes `{"name": "strokeColor", "value": "'#FFFFFF'"}`,
+    // quotes and all, and upstream carries the quoted string through to the scenegraph. Dropping it
+    // here left every such mark a stroke-width narrower than upstream's — which under `fit` moves
+    // the plotting area, the scale ranges and every mark in the chart, not just the outline.
+    //
+    // Transparent, because that is what the drawing comes to: a renderer handed a colour it cannot
+    // read paints nothing with it — SVG ignores the attribute and the initial stroke is `none`. The
+    // warning above still says so.
     val strokeColour =
       if (paintedNothing(channels["stroke"], datum)) null
       else
-        paintOf(channels["stroke"], datum, "stroke", spec)
+        paintOf(channels["stroke"], datum, "stroke", spec, keepUnreadable = true)
           ?: defaults
             .colour("stroke", MarkDefaults.strokeFor(spec.type).takeIf { !paintsItself })
             ?.let { ScenePaint.Solid(it) }
@@ -1682,9 +1709,28 @@ public class MarkEncoder(
    *
    * The fields are the *item's* properties, which for a row is where that row resolves to.
    */
-  private fun ordered(spec: MarkSpec, data: List<VegaValue>): List<VegaValue> {
-    val sort = spec.sort ?: return data
-    if (data.size < 2) return data
+  private fun ordered(spec: MarkSpec, data: List<VegaValue>): List<VegaValue> =
+    itemOrder(spec, data).map { data[it] }
+
+  /**
+   * The order a mark's items are drawn in, as indices into its rows.
+   *
+   * ```js
+   * if (mod) pulse.source.sort(stableCompare(_.sort));
+   * ```
+   *
+   * Upstream inserts a `SortItems` operator for **any** mark that declares a `sort`, and it sorts
+   * the items themselves — so the order reaches the scene, not only a path's vertices. This engine
+   * applied it to a line and an area, where the vertices are the only thing an order can mean, and
+   * ignored it everywhere else: a text mark asking to be drawn in value order was drawn in data
+   * order, and nothing said so.
+   *
+   * Ties keep the order the rows arrived in, which is what upstream's tuple ids amount to here: an
+   * item is created when its row is reached, so the ids ascend in the order the mark was handed.
+   */
+  public fun itemOrder(spec: MarkSpec, data: List<VegaValue>): List<Int> {
+    val sort = spec.sort ?: return data.indices.toList()
+    if (data.size < 2) return data.indices.toList()
     val channels = spec.encode.effective
     // Indices, so an unorderable pair can fall back to **declaration order** rather than to zero.
     // A comparator that answers zero for a pair it cannot order is not a total order — a row whose
@@ -1695,9 +1741,9 @@ public class MarkEncoder(
     val order =
       data.indices.sortedWith { a, b ->
         for ((index, field) in sort.fields.withIndex()) {
-          val left = rowPosition(channels, data[a], field) ?: continue
-          val right = rowPosition(channels, data[b], field) ?: continue
-          val comparison = left.compareTo(right)
+          val left = sortKey(spec, channels, data[a], field) ?: continue
+          val right = sortKey(spec, channels, data[b], field) ?: continue
+          val comparison = compareFieldValues(left, right)
           if (comparison != 0) {
             val descending = sort.orders.getOrNull(index)?.startsWith("desc") == true
             return@sortedWith if (descending) -comparison else comparison
@@ -1705,16 +1751,55 @@ public class MarkEncoder(
         }
         a.compareTo(b)
       }
-    return order.map { data[it] }
+    return order
   }
 
-  /** Where a row lands on one axis, as the sort sees it. */
-  private fun rowPosition(channels: EncodeEntry, datum: VegaValue, field: String): Double? =
-    when (field) {
-      "x" -> centred(channels, datum, "x", "xc")
-      "y" -> centred(channels, datum, "y", "yc")
-      else -> null
+  /**
+   * One sort key, read off the item a row will become.
+   *
+   * A mark's `sort` fields are **paths into the scene item**, which `vega-util`'s `field()` walks:
+   * `x` and `y` name where the item ended up, any other channel names what the encoding resolved
+   * for it, and anything under `datum` reaches through the item to the row it was bound to —
+   * `datum.year` and `datum["year"]` being the same reach. This understood `x` and `y` and answered
+   * *nothing* for everything else, which is not a tie but a sort that quietly did not happen: a
+   * line sorted by `datum["date"]` was drawn in the order its rows arrived in.
+   *
+   * A path this engine cannot follow is reported, for the same reason: a tie looks exactly like a
+   * sort that worked.
+   */
+  private fun sortKey(
+    spec: MarkSpec,
+    channels: EncodeEntry,
+    datum: VegaValue,
+    field: String,
+  ): VegaValue? {
+    val path = parseFieldPath(field)
+    if (path.firstOrNull() == "datum") {
+      return path.drop(1).fold(datum) { value, segment -> value.field(segment) }
     }
+    if (path.size == 1) {
+      when (val channel = path.first()) {
+        "x" -> return centred(channels, datum, "x", "xc")?.let { VegaValue.Num(it) }
+        "y" -> return centred(channels, datum, "y", "yc")?.let { VegaValue.Num(it) }
+        else ->
+          channels[channel]?.let {
+            return channelValue(it, datum)
+          }
+      }
+    }
+    reportOnce(
+      "mark-sort:${spec.name}:$field",
+      dev.aster.vega.model.VegaDiagnostic(
+        severity = dev.aster.vega.model.DiagnosticSeverity.WARNING,
+        code = DiagnosticCodes.ENCODE_INVALID_VALUE,
+        message =
+          "A mark's sort names '$field', which is neither a channel this mark encodes nor a path " +
+            "under 'datum'; the items were left in the order their rows arrived in",
+        operator = spec.name,
+      ),
+    )
+    return null
+  }
 
   /**
    * The position of a mark that has no extent of its own — a symbol, a text, a line's vertex.
@@ -1728,7 +1813,17 @@ public class MarkEncoder(
     channel: String,
     centerChannel: String,
   ): Double? =
+    // ```js
+    // if (encode.yc) { code += 'o.y=o.yc-(o.height||0)/2;'; }
+    // ```
+    //
+    // A centre is where the mark's **middle** goes, so the start is half its extent back from it —
+    // `adjustSpatial` does that for every mark type but `rule`, and with no extent encoded the half
+    // is zero and the centre is the start. A violin plot is the case that shows it: each half is an
+    // area with `yc` and a scaled `height`, and reading the centre as the start drew every one of
+    // them flat along its own middle.
     position(channels[centerChannel], datum)
+      ?.minus((position(channels[EXTENT_OF[channel]], datum) ?: 0.0) / 2.0)
       ?: position(channels[channel], datum)
       // An `x2` or `y2` with no start is still a position, and upstream's `adjustSpatial` reads it
       // as one: `start = end - extent`, and a mark with no extent of its own leaves the end where
@@ -1740,6 +1835,29 @@ public class MarkEncoder(
 
   /** The far edge that stands in for a missing start, per axis. */
   private val END_OF = mapOf("x" to "x2", "y" to "y2")
+
+  /** The extent a centre is measured against, per axis; see [centred]. */
+  private val EXTENT_OF = mapOf("x" to "width", "y" to "height")
+
+  /**
+   * The far edge of an area's band on one axis: the near edge plus the extent.
+   *
+   * `adjustSpatial` derives the extent from an encoded `x2`/`y2` — `o.width = o.x2 - o.x` — so a
+   * specification that writes the far edge and one that writes the extent arrive here the same way.
+   * With neither, the extent is zero and the band has no depth, which is the line an area degrades
+   * to.
+   */
+  private fun extentAcross(
+    channels: EncodeEntry,
+    datum: VegaValue,
+    axis: String,
+    near: Double,
+  ): Double {
+    position(channels[END_OF[axis]], datum)?.let {
+      return it
+    }
+    return near + (position(channels[EXTENT_OF[axis]], datum) ?: 0.0)
+  }
 
   /** Resolves a positional channel to a number, applying its scale and band offset. */
   private fun position(channel: ChannelValue?, datum: VegaValue): Double? =
@@ -1956,13 +2074,15 @@ public class MarkEncoder(
     datum: VegaValue,
     channelName: String,
     spec: MarkSpec,
+    /** See [style]: whether a value that is present and is not a colour still counts as paint. */
+    keepUnreadable: Boolean = false,
   ): ScenePaint? {
     channelValue(channel, datum)?.let { value ->
       gradientPaint(value)?.let {
         return it
       }
     }
-    return paint(channel, datum, channelName, spec)?.let { ScenePaint.Solid(it) }
+    return paint(channel, datum, channelName, spec, keepUnreadable)?.let { ScenePaint.Solid(it) }
   }
 
   /**
@@ -2013,6 +2133,7 @@ public class MarkEncoder(
     datum: VegaValue,
     channelName: String,
     spec: MarkSpec,
+    keepUnreadable: Boolean = false,
   ): SceneColor? {
     val resolved =
       when (channel) {
@@ -2041,11 +2162,12 @@ public class MarkEncoder(
         is ChannelValue.Signal -> evaluateExpression(channel.expression, datum) ?: return null
         is ChannelValue.Conditional -> {
           val selected = selectRule(channel, datum) ?: return null
-          return paint(selected, datum, channelName, spec)
+          return paint(selected, datum, channelName, spec, keepUnreadable)
         }
         // Arithmetic on a colour is arithmetic on a string, which upstream turns into NaN. The
         // adjustments are dropped rather than applied so at least the colour survives.
-        is ChannelValue.Adjusted -> return paint(channel.base, datum, channelName, spec)
+        is ChannelValue.Adjusted ->
+          return paint(channel.base, datum, channelName, spec, keepUnreadable)
       }
     // A colour that resolves to **nothing** is no paint, not a bad colour. `{"value": null}` and a
     // field a row has not got both mean "leave this channel unset", which is how a specification
@@ -2067,6 +2189,9 @@ public class MarkEncoder(
           operator = spec.name,
         ),
       )
+      // Present, and not a colour — which is **not** the same as absent, because a mark is measured
+      // by whether it has a stroke rather than by what colour it is. See [style].
+      if (keepUnreadable && text.isNotEmpty()) return SceneColor.Transparent
     }
     return colour
   }

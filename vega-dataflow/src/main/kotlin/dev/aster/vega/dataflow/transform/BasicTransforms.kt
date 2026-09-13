@@ -67,7 +67,9 @@ public object FormulaTransform : Transform {
  * `collect`: sorts the dataset.
  *
  * Missing values sort first in ascending order, matching upstream — the opposite of the SQL
- * convention. Sorting is stable, so tuples that compare equal keep their input order.
+ * convention. A tie is broken by the order the rows were **created** in, which is upstream's
+ * `stableCompare` and is not the same as the order they are in; see
+ * [TransformContext.creationOrder].
  */
 public object CollectTransform : Transform {
   override val type: String = "collect"
@@ -78,7 +80,7 @@ public object CollectTransform : Transform {
     context: TransformContext,
   ): List<VegaValue> {
     val comparator = sortComparator(params.fields["sort"]) ?: return input
-    return input.sortedWith(comparator)
+    return sortStably(input, comparator, context)
   }
 }
 

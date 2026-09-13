@@ -90,6 +90,59 @@ sealed interface dev.aster.vega.runtime.scale/PositionScale : dev.aster.vega.run
     abstract fun position(dev.aster.vega.model/VegaValue): kotlin/Double // dev.aster.vega.runtime.scale/PositionScale.position|position(dev.aster.vega.model.VegaValue){}[0]
 }
 
+sealed interface dev.aster.vega.runtime.scale/ScaleTransform { // dev.aster.vega.runtime.scale/ScaleTransform|null[0]
+    abstract fun forward(kotlin/Double): kotlin/Double // dev.aster.vega.runtime.scale/ScaleTransform.forward|forward(kotlin.Double){}[0]
+
+    final class Log : dev.aster.vega.runtime.scale/ScaleTransform { // dev.aster.vega.runtime.scale/ScaleTransform.Log|null[0]
+        constructor <init>(kotlin/Double = ...) // dev.aster.vega.runtime.scale/ScaleTransform.Log.<init>|<init>(kotlin.Double){}[0]
+
+        final val base // dev.aster.vega.runtime.scale/ScaleTransform.Log.base|{}base[0]
+            final fun <get-base>(): kotlin/Double // dev.aster.vega.runtime.scale/ScaleTransform.Log.base.<get-base>|<get-base>(){}[0]
+
+        final fun component1(): kotlin/Double // dev.aster.vega.runtime.scale/ScaleTransform.Log.component1|component1(){}[0]
+        final fun copy(kotlin/Double = ...): dev.aster.vega.runtime.scale/ScaleTransform.Log // dev.aster.vega.runtime.scale/ScaleTransform.Log.copy|copy(kotlin.Double){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.runtime.scale/ScaleTransform.Log.equals|equals(kotlin.Any?){}[0]
+        final fun forward(kotlin/Double): kotlin/Double // dev.aster.vega.runtime.scale/ScaleTransform.Log.forward|forward(kotlin.Double){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.runtime.scale/ScaleTransform.Log.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.runtime.scale/ScaleTransform.Log.toString|toString(){}[0]
+    }
+
+    final class Pow : dev.aster.vega.runtime.scale/ScaleTransform { // dev.aster.vega.runtime.scale/ScaleTransform.Pow|null[0]
+        constructor <init>(kotlin/Double) // dev.aster.vega.runtime.scale/ScaleTransform.Pow.<init>|<init>(kotlin.Double){}[0]
+
+        final val exponent // dev.aster.vega.runtime.scale/ScaleTransform.Pow.exponent|{}exponent[0]
+            final fun <get-exponent>(): kotlin/Double // dev.aster.vega.runtime.scale/ScaleTransform.Pow.exponent.<get-exponent>|<get-exponent>(){}[0]
+
+        final fun component1(): kotlin/Double // dev.aster.vega.runtime.scale/ScaleTransform.Pow.component1|component1(){}[0]
+        final fun copy(kotlin/Double = ...): dev.aster.vega.runtime.scale/ScaleTransform.Pow // dev.aster.vega.runtime.scale/ScaleTransform.Pow.copy|copy(kotlin.Double){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.runtime.scale/ScaleTransform.Pow.equals|equals(kotlin.Any?){}[0]
+        final fun forward(kotlin/Double): kotlin/Double // dev.aster.vega.runtime.scale/ScaleTransform.Pow.forward|forward(kotlin.Double){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.runtime.scale/ScaleTransform.Pow.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.runtime.scale/ScaleTransform.Pow.toString|toString(){}[0]
+    }
+
+    final class Symlog : dev.aster.vega.runtime.scale/ScaleTransform { // dev.aster.vega.runtime.scale/ScaleTransform.Symlog|null[0]
+        constructor <init>(kotlin/Double = ...) // dev.aster.vega.runtime.scale/ScaleTransform.Symlog.<init>|<init>(kotlin.Double){}[0]
+
+        final val constant // dev.aster.vega.runtime.scale/ScaleTransform.Symlog.constant|{}constant[0]
+            final fun <get-constant>(): kotlin/Double // dev.aster.vega.runtime.scale/ScaleTransform.Symlog.constant.<get-constant>|<get-constant>(){}[0]
+
+        final fun component1(): kotlin/Double // dev.aster.vega.runtime.scale/ScaleTransform.Symlog.component1|component1(){}[0]
+        final fun copy(kotlin/Double = ...): dev.aster.vega.runtime.scale/ScaleTransform.Symlog // dev.aster.vega.runtime.scale/ScaleTransform.Symlog.copy|copy(kotlin.Double){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.runtime.scale/ScaleTransform.Symlog.equals|equals(kotlin.Any?){}[0]
+        final fun forward(kotlin/Double): kotlin/Double // dev.aster.vega.runtime.scale/ScaleTransform.Symlog.forward|forward(kotlin.Double){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.runtime.scale/ScaleTransform.Symlog.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.runtime.scale/ScaleTransform.Symlog.toString|toString(){}[0]
+    }
+
+    final object Linear : dev.aster.vega.runtime.scale/ScaleTransform { // dev.aster.vega.runtime.scale/ScaleTransform.Linear|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.runtime.scale/ScaleTransform.Linear.equals|equals(kotlin.Any?){}[0]
+        final fun forward(kotlin/Double): kotlin/Double // dev.aster.vega.runtime.scale/ScaleTransform.Linear.forward|forward(kotlin.Double){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.runtime.scale/ScaleTransform.Linear.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.runtime.scale/ScaleTransform.Linear.toString|toString(){}[0]
+    }
+}
+
 sealed interface dev.aster.vega.runtime.scale/VegaScale { // dev.aster.vega.runtime.scale/VegaScale|null[0]
     abstract val name // dev.aster.vega.runtime.scale/VegaScale.name|{}name[0]
         abstract fun <get-name>(): kotlin/String // dev.aster.vega.runtime.scale/VegaScale.name.<get-name>|<get-name>(){}[0]
@@ -520,6 +573,7 @@ final class dev.aster.vega.runtime.compile/MarkEncoder { // dev.aster.vega.runti
     final fun channelText(dev.aster.vega.model.spec/ChannelValue, dev.aster.vega.model/VegaValue): kotlin/String? // dev.aster.vega.runtime.compile/MarkEncoder.channelText|channelText(dev.aster.vega.model.spec.ChannelValue;dev.aster.vega.model.VegaValue){}[0]
     final fun encode(dev.aster.vega.model.spec/MarkSpec, kotlin.collections/List<dev.aster.vega.model/VegaValue>, kotlin.collections/List<kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue>> = ...): kotlin.collections/List<dev.aster.vega.scene/SceneNode> // dev.aster.vega.runtime.compile/MarkEncoder.encode|encode(dev.aster.vega.model.spec.MarkSpec;kotlin.collections.List<dev.aster.vega.model.VegaValue>;kotlin.collections.List<kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>>){}[0]
     final fun encodeGroup(dev.aster.vega.model.spec/MarkSpec, kotlin.collections/List<dev.aster.vega.model/VegaValue>, kotlin/Function4<dev.aster.vega.model/VegaValue, kotlin/Int, dev.aster.vega.scene/SizeD, dev.aster.vega.scene/PointD, kotlin.collections/List<dev.aster.vega.scene/SceneNode>>): kotlin.collections/List<dev.aster.vega.scene/SceneNode> // dev.aster.vega.runtime.compile/MarkEncoder.encodeGroup|encodeGroup(dev.aster.vega.model.spec.MarkSpec;kotlin.collections.List<dev.aster.vega.model.VegaValue>;kotlin.Function4<dev.aster.vega.model.VegaValue,kotlin.Int,dev.aster.vega.scene.SizeD,dev.aster.vega.scene.PointD,kotlin.collections.List<dev.aster.vega.scene.SceneNode>>){}[0]
+    final fun itemOrder(dev.aster.vega.model.spec/MarkSpec, kotlin.collections/List<dev.aster.vega.model/VegaValue>): kotlin.collections/List<kotlin/Int> // dev.aster.vega.runtime.compile/MarkEncoder.itemOrder|itemOrder(dev.aster.vega.model.spec.MarkSpec;kotlin.collections.List<dev.aster.vega.model.VegaValue>){}[0]
     final fun items(dev.aster.vega.model.spec/MarkSpec, kotlin.collections/List<dev.aster.vega.model/VegaValue>): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.runtime.compile/MarkEncoder.items|items(dev.aster.vega.model.spec.MarkSpec;kotlin.collections.List<dev.aster.vega.model.VegaValue>){}[0]
 }
 
@@ -566,7 +620,7 @@ final class dev.aster.vega.runtime.compile/SignalResolver { // dev.aster.vega.ru
     constructor <init>(dev.aster.vega.model/DiagnosticCollector, dev.aster.vega.expression/ExpressionCompiler = ..., dev.aster.vega.expression/RandomStream = ..., dev.aster.vega.expression/Clock = ...) // dev.aster.vega.runtime.compile/SignalResolver.<init>|<init>(dev.aster.vega.model.DiagnosticCollector;dev.aster.vega.expression.ExpressionCompiler;dev.aster.vega.expression.RandomStream;dev.aster.vega.expression.Clock){}[0]
 
     final fun resolve(kotlin.collections/List<dev.aster.vega.model.spec/SignalSpec>, kotlin.collections/Map<kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>>, kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.scale/VegaScale> = ..., kotlin.collections/Set<kotlin/String> = ...): dev.aster.vega.runtime.compile/SignalScope // dev.aster.vega.runtime.compile/SignalResolver.resolve|resolve(kotlin.collections.List<dev.aster.vega.model.spec.SignalSpec>;kotlin.collections.Map<kotlin.String,kotlin.collections.List<dev.aster.vega.model.VegaValue>>;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<kotlin.String,dev.aster.vega.runtime.scale.VegaScale>;kotlin.collections.Set<kotlin.String>){}[0]
-    final fun session(kotlin.collections/List<dev.aster.vega.model.spec/SignalSpec>, kotlin.collections/MutableMap<kotlin/String, dev.aster.vega.model/VegaValue>, kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ..., kotlin/Function2<kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>, kotlin/Unit>? = ...): dev.aster.vega.runtime.compile/SignalResolver.Resolution // dev.aster.vega.runtime.compile/SignalResolver.session|session(kotlin.collections.List<dev.aster.vega.model.spec.SignalSpec>;kotlin.collections.MutableMap<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.Function2<kotlin.String,kotlin.collections.List<dev.aster.vega.model.VegaValue>,kotlin.Unit>?){}[0]
+    final fun session(kotlin.collections/List<dev.aster.vega.model.spec/SignalSpec>, kotlin.collections/MutableMap<kotlin/String, dev.aster.vega.model/VegaValue>, kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ..., kotlin/Function2<kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>, kotlin/Unit>? = ...): dev.aster.vega.runtime.compile/SignalResolver.Resolution // dev.aster.vega.runtime.compile/SignalResolver.session|session(kotlin.collections.List<dev.aster.vega.model.spec.SignalSpec>;kotlin.collections.MutableMap<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.Function2<kotlin.String,kotlin.collections.List<dev.aster.vega.model.VegaValue>,kotlin.Unit>?){}[0]
 
     final inner class Resolution { // dev.aster.vega.runtime.compile/SignalResolver.Resolution|null[0]
         final fun resolve(kotlin/String, kotlin.collections/Map<kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>>, kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.scale/VegaScale> = ..., kotlin.collections/Set<kotlin/String> = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.dataflow.transform/ProjectionDefinition> = ...) // dev.aster.vega.runtime.compile/SignalResolver.Resolution.resolve|resolve(kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.collections.List<dev.aster.vega.model.VegaValue>>;kotlin.collections.Map<kotlin.String,dev.aster.vega.runtime.scale.VegaScale>;kotlin.collections.Set<kotlin.String>;kotlin.collections.Map<kotlin.String,dev.aster.vega.dataflow.transform.ProjectionDefinition>){}[0]
@@ -1039,7 +1093,7 @@ final class dev.aster.vega.runtime.scale/QuantizeScale : dev.aster.vega.runtime.
 }
 
 final class dev.aster.vega.runtime.scale/SequentialColorScale : dev.aster.vega.runtime.scale/VegaScale { // dev.aster.vega.runtime.scale/SequentialColorScale|null[0]
-    constructor <init>(kotlin/String, kotlin.collections/List<kotlin/Double>, kotlin.collections/List<dev.aster.vega.scene/SceneColor>, dev.aster.vega.scene/ColorSpaces.Interpolation = ..., kotlin/Double = ..., kotlin/Boolean = ...) // dev.aster.vega.runtime.scale/SequentialColorScale.<init>|<init>(kotlin.String;kotlin.collections.List<kotlin.Double>;kotlin.collections.List<dev.aster.vega.scene.SceneColor>;dev.aster.vega.scene.ColorSpaces.Interpolation;kotlin.Double;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/String, kotlin.collections/List<kotlin/Double>, kotlin.collections/List<dev.aster.vega.scene/SceneColor>, dev.aster.vega.scene/ColorSpaces.Interpolation = ..., kotlin/Double = ..., kotlin/Boolean = ..., dev.aster.vega.runtime.scale/ScaleTransform = ..., kotlin.collections/List<kotlin/Double> = ...) // dev.aster.vega.runtime.scale/SequentialColorScale.<init>|<init>(kotlin.String;kotlin.collections.List<kotlin.Double>;kotlin.collections.List<dev.aster.vega.scene.SceneColor>;dev.aster.vega.scene.ColorSpaces.Interpolation;kotlin.Double;kotlin.Boolean;dev.aster.vega.runtime.scale.ScaleTransform;kotlin.collections.List<kotlin.Double>){}[0]
 
     final val clamp // dev.aster.vega.runtime.scale/SequentialColorScale.clamp|{}clamp[0]
         final fun <get-clamp>(): kotlin/Boolean // dev.aster.vega.runtime.scale/SequentialColorScale.clamp.<get-clamp>|<get-clamp>(){}[0]
@@ -1051,8 +1105,12 @@ final class dev.aster.vega.runtime.scale/SequentialColorScale : dev.aster.vega.r
         final fun <get-gamma>(): kotlin/Double // dev.aster.vega.runtime.scale/SequentialColorScale.gamma.<get-gamma>|<get-gamma>(){}[0]
     final val name // dev.aster.vega.runtime.scale/SequentialColorScale.name|{}name[0]
         final fun <get-name>(): kotlin/String // dev.aster.vega.runtime.scale/SequentialColorScale.name.<get-name>|<get-name>(){}[0]
+    final val rampExtent // dev.aster.vega.runtime.scale/SequentialColorScale.rampExtent|{}rampExtent[0]
+        final fun <get-rampExtent>(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/SequentialColorScale.rampExtent.<get-rampExtent>|<get-rampExtent>(){}[0]
     final val space // dev.aster.vega.runtime.scale/SequentialColorScale.space|{}space[0]
         final fun <get-space>(): dev.aster.vega.scene/ColorSpaces.Interpolation // dev.aster.vega.runtime.scale/SequentialColorScale.space.<get-space>|<get-space>(){}[0]
+    final val transform // dev.aster.vega.runtime.scale/SequentialColorScale.transform|{}transform[0]
+        final fun <get-transform>(): dev.aster.vega.runtime.scale/ScaleTransform // dev.aster.vega.runtime.scale/SequentialColorScale.transform.<get-transform>|<get-transform>(){}[0]
 
     final fun colorAt(kotlin/Double): dev.aster.vega.scene/SceneColor? // dev.aster.vega.runtime.scale/SequentialColorScale.colorAt|colorAt(kotlin.Double){}[0]
     final fun formatTick(kotlin/Double, kotlin/Int = ..., dev.aster.vega.model.locale/VegaLocale = ...): kotlin/String // dev.aster.vega.runtime.scale/SequentialColorScale.formatTick|formatTick(kotlin.Double;kotlin.Int;dev.aster.vega.model.locale.VegaLocale){}[0]

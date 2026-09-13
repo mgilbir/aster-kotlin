@@ -498,6 +498,22 @@ public sealed interface RangeSpec {
     val count: Int? = null,
     /** `{"count": {"signal": "levels"}}` — a chart whose reader chooses how many buckets. */
     val countSignal: String? = null,
+    /**
+     * `extent` — the slice of the ramp to use, as two fractions of it.
+     *
+     * ```js
+     * return (isFunction(scheme) && (extent || reverse))
+     *   ? interpolateRange(scheme, flip(extent || [0, 1], reverse))
+     *   : scheme;
+     * ```
+     *
+     * `{"scheme": "blues", "extent": [0.3, 0.7]}` asks for the middle of the ramp, which is how a
+     * chart keeps its palest and darkest shades legible against a background. Written backwards it
+     * reads the ramp backwards, and that is not a curiosity: `"range": "diverging"` *is*
+     * `blueorange` with an extent of `[1, 0]`, so a chart asking for the named range and one asking
+     * for the scheme get opposite colours.
+     */
+    val extent: List<Double>? = null,
   ) : RangeSpec
 
   /**
@@ -777,6 +793,16 @@ public data class TitleSpec(
    * and it is normalised to `title` here so there is one shape to read.
    */
   val encode: Map<String, EncodeSpec> = emptyMap(),
+  /**
+   * An expression producing the subtitle, the counterpart of [textExpression].
+   *
+   * Whether a subtitle exists at all is decided by the **property**, not by the words it resolves
+   * to: upstream builds the mark under `if (spec.subtitle)`, and a signal reference is an object,
+   * so it is truthy however it evaluates. That is why this is a field of its own rather than an
+   * empty [subtitle] — an empty *literal* means no subtitle, while a signal that evaluates to
+   * nothing means a subtitle with no words in it, and the two are different drawings.
+   */
+  val subtitleExpression: String? = null,
 )
 
 /**

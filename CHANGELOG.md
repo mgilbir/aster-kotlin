@@ -8,6 +8,265 @@ section here does not get released.
 
 ### Fixed
 
+- **The Deneb corpus agrees with upstream on every template it can compare: 54 of 54.** The sweep
+  of specifications other people wrote started at 0, and closing it turned up fourteen root causes,
+  each read off upstream's source or off a live view and each fixed where it belongs rather than
+  where it showed:
+
+  - **A sort breaks its ties by the order the rows were created in**, not by the order they are in —
+    upstream's `stableCompare` resolves a tie by tuple id. A table sorted by one field and then by
+    another goes back to the order the rows arrived in, which decides which seat of a parliament
+    diagram gets which colour. The ordinals are tracked through a pipeline, since a row here is a
+    value and has nothing to write an identity on.
+  - **A layout's answer belongs to the row it was computed for**, and a `collect` between the tree
+    and the layout moves the rows out from under it. A treemap ordered by size gave every rectangle
+    to the wrong category.
+  - **`resquarify` reuses the rows an earlier pass chose.** A fitted chart is compiled twice, so its
+    second pass re-applies the first pass's tiling at the fitted size rather than tiling afresh.
+  - **A treemap `ratio` at or below one is one**, not the default: d3 clamps it, and one asks for
+    squares rather than golden rectangles.
+  - **A continuous colour scale may be transformed**: `pow`, `sqrt`, `log` and `symlog` interpolate
+    their range in their own space, colours included. Refusing them left a choropleth with no colour
+    scale at all and three `scale()` calls reported as naming a scale the specification did not
+    define.
+  - **A scale's `scheme` may be written at the top level**, not only inside `range`.
+  - **`reverse` flips an ordinal scale's range**, as it already flipped every other family's.
+  - **A value on a repeated domain stop belongs to the segment that starts there** — upstream's
+    bisection is a right one. It is what `domainMid` builds whenever the middle lands on an end of
+    the data, and a diverging bar chart's baseline sat a quarter of the way across without it.
+  - **An axis's string properties may be signals, or whole encoders.** `parseAxis` builds each part
+    out of encoders, so `labelAlign`, `labelColor`, `titleColor` and their kin take a signal — or a
+    scaled channel — wherever they take a word.
+  - **An axis part's line is encoded with one end on its cross axis**, so an `encode` that moves that
+    coordinate moves the whole line rather than stretching it across the chart.
+  - **A `field` parameter may be an expression.** `linkpath`'s four endpoints are field parameters,
+    and a sankey writes scale lookups there; read as strings, every link came out `MNaN,NaN…`.
+  - **A centre is where a mark's middle goes**, so its start is half its extent back from it — and an
+    area's second boundary is its first plus the extent, not its `y2`. A violin plot writes the
+    extent, and every half of it came out a flat line.
+  - **A fitted chart draws fresh random numbers for the pass that is drawn**, upstream's generator
+    belonging to the view rather than to a render; and the items a mark exposes for another mark to
+    read are now built **on demand**, where before every chart paid a second evaluation of every
+    channel — which also drew twice as many random numbers as upstream.
+  - **A stroke that is not a colour is still a stroke**, which was the first of these to land and is
+    what the rest were measured against.
+
+  Two of the corpus's comparisons were measuring the harness rather than the engine, and are fixed
+  too: a view that **throws mid-run** leaves a crash snapshot rather than a drawing, and is now
+  recorded as a specification there is no reference for — which is what upstream's own network and
+  flow-map templates do; and a number the reference happens to hold as a *string* is read as a
+  number, upstream coercing when it draws where this engine coerces when it reads.
+
+  Then an audit of each of those causes against upstream's own implementation, which is where a
+  fixed bug usually has siblings. Fourteen more, none of which the corpus had reached:
+
+  - **A mark's `sort` orders its items, whatever kind of mark it is** — upstream gives any mark that
+    declares one a `SortItems` operator. This applied it to a line and an area, where the vertices
+    are the only thing an order can mean, and ignored it everywhere else; and it understood only `x`
+    and `y`, so a line sorted by `datum["date"]` was drawn in the order its rows arrived in. A path
+    that is neither a channel nor a `datum` reach is now reported rather than treated as a tie.
+  - **`dotbin` breaks its ties by creation order** too, which decides which of two equal values is
+    stacked nearer the baseline.
+  - **`treelinks` finds its rows the way the layouts do**, so a `collect` between the tree and the
+    links no longer pairs each edge with whichever rows have since moved into those places.
+  - **A band scale's paddings are clamped to `[0, 1]`, all three of them.** Vega's band scale is its
+    own rather than d3's: where d3 clamps only the top of `paddingInner` and leaves `paddingOuter`
+    alone, this clamps both ends of both, so a padding of 3 is one whole step rather than three.
+  - **`rangeStep`** is `{"range": {"step": …}}` written at the top level and is still read; unread,
+    a scale that wrote one had no range at all and was not built.
+  - **A continuous scale of more than two stops inverts**, which is the forward walk with domain and
+    range swapped — a brush or a tooltip over a diverging axis got `NaN`.
+  - **A scheme's `extent`** narrows the ramp to a stretch of itself, and `reverse` flips that stretch
+    rather than the list of stops. It is not a curiosity: the named range **`diverging` is
+    `blueorange` with an extent of `[1, 0]`**, so every chart asking for it was painted the wrong way
+    round.
+  - **A legend's string properties may be signals, or whole encoders**, part by part, exactly as an
+    axis's are — with the one exception upstream builds in: a channel the legend has a *scale* for is
+    written from that scale afterwards, so the scale still wins.
+  - **A field parameter may be written as `{"field": …}`** in every transform that takes one, which
+    is the longhand of a column name; read as a string it became the name `field:amount`, which no
+    row has. The `{"expr": …}` spelling is evaluated by the five transforms that meet it in the wild
+    and **reported** by the rest, where it would otherwise be a silently empty answer.
+  - **An area's second boundary is its first plus the extent** — `y0 = item.y + item.height` — not
+    its `y2`, which `adjustSpatial` has already turned into that height.
+
+  And one of them was in the **harness**: the oracle recorded an area's back boundary from `x2`/`y2`,
+  which agrees wherever a specification writes the far edge and records a *flat* boundary wherever it
+  writes the extent. None of the 199 Vega fixtures writes the extent, so it had never shown; the
+  violin plot does, and the reference it produced was a line. Fixed at the source, and the 199
+  references are unchanged by it.
+
+  Left deliberately: an unreadable **fill** still paints nothing here, where a browser handed an
+  invalid `fill` attribute paints black. The stroke's case was fixed because geometry rides on it —
+  a stroke widens a mark's bounds — and nothing rides on the fill but the colour itself. No
+  specification in the 2243 compared here writes one.
+
+  **API:** `TransformContext` gains `creationOrder`, `reordered`, `layoutMemory` and `layoutScope`,
+  all with defaults, and `vega-dataflow` gains `LayoutMemory` and `TileRowShape`. `ScaleTransform`
+  joins `vega-runtime`'s scale package, and `SequentialColorScale` takes one.
+
+- **An item a mark is drawn *from* carries the bounds of what was drawn.** Vega marks share a
+  namespace with datasets, so `"from": {"data": "labels"}` names the items the `labels` mark
+  produced — and those items are scene items, which have been through the bounder. `item.bounds` is
+  a `Bounds` with `x1`, `y1`, `x2` and `y2` on it, and reading it is how a specification places
+  something against what a mark *came out* as rather than against what it was told: a box behind a
+  label, a dot at the centre of one, a leader line from the edge of one.
+
+  The items this engine exposed carried the encoded channels and the row behind them, and no bounds,
+  so `(datum.bounds.x1 + datum.bounds.x2) / 2` was arithmetic on nothing. A parliament diagram that
+  lays three hundred seats out as text items and then draws a circle on each put every one of them on
+  the origin. It was the largest single disagreement in the Deneb corpus — 1579 differences, three
+  quarters of the whole — and it falls to **six**; the corpus total falls from 2165 to **592**.
+
+  Two details came off upstream's own items rather than out of reasoning. The bounds are the item's
+  **turned** box, so a label at 45° reports the extent it actually occupies. And a `line`, an `area`
+  or a `trail` — one node here, a nested mark with one box there — hands **every** item drawn from it
+  that single box.
+
+  What is left on that diagram is six differences from a **tie-break**: upstream's `collect` sorts
+  with `stableCompare`, which resolves ties by tuple id — the order the rows were *created* in, not
+  the order they are currently in — so a second sort over a re-ordered table breaks its ties
+  differently here. Recorded rather than fixed: this engine has no tuple identity to break them with,
+  and giving it one is a change to the data model rather than to a sort.
+
+- **A stroke that is not a colour is still a stroke, as far as the measuring goes.** `boundStroke`
+  asks whether the item *has* a stroke — `if (item.stroke && item.opacity !== 0 && item.strokeOpacity
+  !== 0)` — not whether that stroke is a colour, so upstream measures a mark stroked `"banana"`
+  exactly as it measures one stroked `"#ffffff"`, and carries the word through to its scenegraph
+  unchanged. An **empty** string is falsy there and is no stroke at all; so is `null`. All three read
+  off a live upstream view.
+
+  This engine read an unparseable colour as no paint, said so, and drew the mark without a stroke.
+  Under `autosize: "fit"` a stroke-width of difference is not cosmetic: it moves the measured
+  overhang, which moves the plotting area, which moves every scale range and every mark in the chart.
+  A templated dashboard reaches it by a route nobody designs — `{"name": "strokeColor", "value":
+  "'#FFFFFF'"}`, quotes and all, because the author was writing an expression and the tool stored it
+  as a value — and six of the sixty-three Deneb templates were out by exactly that. One of them fell
+  from 97 differences to 36.
+
+  The colour is **transparent**, because that is what the drawing comes to: a renderer handed a
+  colour it cannot read paints nothing with it. The warning naming the colour is still reported, and
+  the scenegraph still differs from upstream's in one respect — upstream records the unreadable
+  string where this records the transparency it amounts to.
+
+  What is left on that template is its `random()` jitter, which no comparison between two engines can
+  settle: upstream's `random()` is `Math.random`.
+
+- **A Voronoi diagram of points that coincide draws the cells upstream draws, instead of taking the
+  whole chart down.** One or two distinct points have no triangle at all, and the triangulation
+  `Delaunay` builds for that case carries `-1` where a vertex index would be — upstream's own shape,
+  `new Int32Array(3).fill(-1)`. Upstream then reads past the front of its coordinate array, gets
+  `undefined`, and every circumcentre comes out `NaN`; nothing reads them, because such a cell is
+  taken from the clip box instead. Kotlin throws on that read. The compile was caught as a defect in
+  this engine — correctly, it was one — and the chart was not drawn at all.
+
+  A scatter plot reaches this whenever its points collapse: a plotting area fitted to nothing, a
+  scale whose domain excludes all the data, a table of one row. One of the sixty-three Deneb
+  templates does exactly that, its `domainMax` of 10 sitting under data that runs to 90 — upstream
+  draws twelve dots at the origin and twelve empty cells, and this engine drew nothing whatever.
+  Every template the corpus asks for is now drawn, and it stands at **36 of 56**.
+
+  The corpus report was hiding it, too: it looked for a diagnostic of exactly `ERROR` severity and a
+  compile that *threw* reports FATAL, so the loudest failure there is read as a silent refusal. It
+  asks for `>= ERROR` now.
+
+- **`autosize: "fit"` fits against the `width` signal, not the `width` property.** Upstream's view
+  has no notion of a width property: `parseView` seeds a `width` **signal** from it, `_resizeWidth`
+  follows that signal, and `viewSizeLayout` fits against what it currently says. So a chart that
+  declares the signal itself — `{"name": "width", "value": 400}`, or an `update` expression — is
+  fitted exactly like one that writes `"width": 400`. This engine read the property, which such a
+  chart does not have, so the fit had nothing to bite on: the plotting area kept its full width and
+  every scale range, axis and mark under it was out by the width of the axes. That is how a chart
+  sized by its host is written, the size arriving at run time, and it is how all sixty-three Deneb
+  templates are written.
+
+  Two consequences came with it, both read off upstream rather than reasoned about. The fitted size
+  **replaces** the declared signal for the pass that is drawn — `view.signal(Width, width, {skip:
+  true})` writes it and skips that signal's own update — so everything downstream, a `width / 2`
+  signal included, settles against the fitted number; a live view answers 350 for a chart that
+  declared 400. And `contains: "padding"` comes off the room left rather than off the pass being
+  measured, since `viewSizeLayout` subtracts it from a drawing that has already been made at full
+  size. A width a *handler* set is fitted too, the handler deciding how much room there is and the
+  view how much of it the plotting area gets.
+
+  **API:** `SignalResolver.session` takes a `viewSize` map — the values the view itself decided,
+  which replace a declared signal of the same name rather than being overwritten by it. Kept apart
+  from the pinned map, which is a handler's doing and is warned about when it shadows an `update`;
+  this is the engine's own answer and there is nothing to warn about. The Obj-C selector changes with
+  it, so a Swift caller of that function names one more argument.
+
+  **A host reading the `width` signal of a responsive chart now reads the fitted width.** A
+  Vega-Lite `width: "container"` chart is `fit-x`, so a container of 300 publishes 240 and the axis
+  has the rest — which is what a live upstream view answers for the same specification. The number
+  did not change because the meaning did; it changed because it was wrong.
+
+  The Deneb corpus moves from **3 of 56 to 35**, and the largest remaining cause falls from
+  thirty-seven templates to six.
+
+- **Any property of a title may be written as a signal, and whether there is a subtitle is decided
+  by the property rather than by the words.** Upstream's `parseTitle` never reads a title's
+  properties as values: `addEncoders` turns each of them into an **encoder** on the text mark it
+  belongs to, which is why a signal is accepted wherever a word is. This engine read the string ones
+  as strings, so `{"signal": …}` parsed to nothing — the heading fell back to black and a
+  signal-valued `subtitle` produced no mark at all. That is how a templated dashboard names its
+  heading: sixty-one of the sixty-three Deneb templates do it, and their subtitles were missing
+  entirely rather than merely unstyled.
+
+  Three rules came out of reading upstream and were checked against it one at a time. A signal goes
+  to the **`update`** set however it was written — `addEncode` says so in as many words — so a
+  property given as a signal beats a specification's own `enter` block for the same channel and
+  loses to its `update`, while a literal property goes to `enter` and loses to both. A subtitle
+  exists exactly when the `subtitle` *property* is truthy: a signal reference is an object, so one
+  that evaluates to nothing still draws an empty subtitle, where an empty literal draws none and an
+  `encode.subtitle` block on its own is not a subtitle at all. And `{"signal": ""}` is left alone,
+  since folding an empty expression in would fail the parse and cost the whole chart where upstream
+  merely leaves the words unpainted.
+
+  **API:** `TitleSpec` gains `subtitleExpression`, the counterpart of the existing `textExpression`,
+  because an empty `subtitle` and a subtitle written as a signal are different drawings and one
+  nullable string cannot say which. Added last, so every other component keeps its position.
+
+  The Deneb corpus moves from **0 of 56 to 3**, and the title causes leave the ranked list: what
+  remains of the heading is where the subtitle is *placed*, which follows the `autosize: "fit"`
+  disagreement still at the top of that list.
+
+### Internal
+
+- **A sweep of Vega specifications other people wrote.** `scripts/oracle.sh` renders the 198
+  fixtures under `test-fixtures/specs`, and those are this repository's own: written to pin down a
+  reading of Vega's semantics, one behaviour at a time, by the person implementing it.
+  `scripts/deneb.sh` adds a different distribution — the 63 `avatorl/Deneb-Vega-Templates`, MIT
+  licensed and pinned to a commit — where features combine in ways no fixture combines them and a
+  layout depends on three transforms agreeing.
+
+  They are Deneb templates rather than plain Vega, so four things are undone before either engine
+  sees them, each in the open in `oracle-js/src/deneb-prepare.js`: rows are synthesised from the
+  column declaration each template carries, since Power BI injects the table at run time;
+  `pbiColor(n)` is replaced by the literal colour it returns, Deneb defining it and upstream Vega
+  not; one template is JSON with comments; and `width`/`height`, computed from `containerSize()`,
+  fall back to the size the template itself declares, there being no container headless.
+
+  Seven templates are **not comparable** and are recorded as such rather than fudged. One needs a
+  second Deneb function this corpus will not invent. Six use `vega-label`, which places labels by
+  rasterising the marks and so needs a real canvas the oracle deliberately does not have — adding
+  one would switch upstream's text measurement and move every reference in the repository. Worth
+  saying plainly: `label` is the one transform here that no fixture uses, and it is the one that
+  cannot be referenced, so this corpus adds combinations rather than transform types.
+
+  **A measurement, not a gate**, which is the shape both Vega-Lite sweeps had until they earned the
+  promotion. `check.sh` does not call this and the test skips when the corpus is absent.
+
+  The first reading is **0 of 56**. The two largest causes are one root, confirmed against a
+  minimal specification rather than inferred: a title property written as a **signal** is not
+  resolved, so the colour falls back to the default — 54 templates — and a signal-valued `subtitle`
+  produces no subtitle mark at all, the same 54. Written as literals both work. After that,
+  `"reverse": true` on a scale, which this engine does not read at all, and a disagreement about
+  `autosize: "fit"` that moves 37 scale ranges and the geometry under them. One template,
+  `part-to-whole__voronoi`, this engine declines to draw and says nothing about why, which is its
+  own bug.
+
+### Fixed
+
 - **A parse climbs in the order `MoveParseUp` climbs it, and the branches are numbered in that
   order.** Two things decide the shape it leaves behind. The node depths are measured *once*, before
   anything moves, so a node is visited at the depth it had then — a parse that has already climbed
