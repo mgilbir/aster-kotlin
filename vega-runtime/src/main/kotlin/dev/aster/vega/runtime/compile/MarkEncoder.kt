@@ -1165,10 +1165,24 @@ public class MarkEncoder(
           ?: defaults
             .colour("fill", MarkDefaults.fillFor(spec.type).takeIf { !paintsItself })
             ?.let { ScenePaint.Solid(it) }
+    // ```js
+    // if (item.stroke && item.opacity !== 0 && item.strokeOpacity !== 0) { … bounds.expand(e); }
+    // ```
+    //
+    // `boundStroke` asks whether the item **has** a stroke, not whether that stroke is a colour, so
+    // a mark whose stroke is a string nothing can parse is still measured as stroked. That is not a
+    // hypothetical: a templated dashboard writes `{"name": "strokeColor", "value": "'#FFFFFF'"}`,
+    // quotes and all, and upstream carries the quoted string through to the scenegraph. Dropping it
+    // here left every such mark a stroke-width narrower than upstream's — which under `fit` moves
+    // the plotting area, the scale ranges and every mark in the chart, not just the outline.
+    //
+    // Transparent, because that is what the drawing comes to: a renderer handed a colour it cannot
+    // read paints nothing with it — SVG ignores the attribute and the initial stroke is `none`. The
+    // warning above still says so.
     val strokeColour =
       if (paintedNothing(channels["stroke"], datum)) null
       else
-        paintOf(channels["stroke"], datum, "stroke", spec)
+        paintOf(channels["stroke"], datum, "stroke", spec, keepUnreadable = true)
           ?: defaults
             .colour("stroke", MarkDefaults.strokeFor(spec.type).takeIf { !paintsItself })
             ?.let { ScenePaint.Solid(it) }
@@ -1956,13 +1970,15 @@ public class MarkEncoder(
     datum: VegaValue,
     channelName: String,
     spec: MarkSpec,
+    /** See [style]: whether a value that is present and is not a colour still counts as paint. */
+    keepUnreadable: Boolean = false,
   ): ScenePaint? {
     channelValue(channel, datum)?.let { value ->
       gradientPaint(value)?.let {
         return it
       }
     }
-    return paint(channel, datum, channelName, spec)?.let { ScenePaint.Solid(it) }
+    return paint(channel, datum, channelName, spec, keepUnreadable)?.let { ScenePaint.Solid(it) }
   }
 
   /**
@@ -2013,6 +2029,7 @@ public class MarkEncoder(
     datum: VegaValue,
     channelName: String,
     spec: MarkSpec,
+    keepUnreadable: Boolean = false,
   ): SceneColor? {
     val resolved =
       when (channel) {
@@ -2041,11 +2058,12 @@ public class MarkEncoder(
         is ChannelValue.Signal -> evaluateExpression(channel.expression, datum) ?: return null
         is ChannelValue.Conditional -> {
           val selected = selectRule(channel, datum) ?: return null
-          return paint(selected, datum, channelName, spec)
+          return paint(selected, datum, channelName, spec, keepUnreadable)
         }
         // Arithmetic on a colour is arithmetic on a string, which upstream turns into NaN. The
         // adjustments are dropped rather than applied so at least the colour survives.
-        is ChannelValue.Adjusted -> return paint(channel.base, datum, channelName, spec)
+        is ChannelValue.Adjusted ->
+          return paint(channel.base, datum, channelName, spec, keepUnreadable)
       }
     // A colour that resolves to **nothing** is no paint, not a bad colour. `{"value": null}` and a
     // field a row has not got both mean "leave this channel unset", which is how a specification
@@ -2067,6 +2085,9 @@ public class MarkEncoder(
           operator = spec.name,
         ),
       )
+      // Present, and not a colour — which is **not** the same as absent, because a mark is measured
+      // by whether it has a stroke rather than by what colour it is. See [style].
+      if (keepUnreadable && text.isNotEmpty()) return SceneColor.Transparent
     }
     return colour
   }

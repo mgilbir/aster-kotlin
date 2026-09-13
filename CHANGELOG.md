@@ -8,6 +8,29 @@ section here does not get released.
 
 ### Fixed
 
+- **A stroke that is not a colour is still a stroke, as far as the measuring goes.** `boundStroke`
+  asks whether the item *has* a stroke — `if (item.stroke && item.opacity !== 0 && item.strokeOpacity
+  !== 0)` — not whether that stroke is a colour, so upstream measures a mark stroked `"banana"`
+  exactly as it measures one stroked `"#ffffff"`, and carries the word through to its scenegraph
+  unchanged. An **empty** string is falsy there and is no stroke at all; so is `null`. All three read
+  off a live upstream view.
+
+  This engine read an unparseable colour as no paint, said so, and drew the mark without a stroke.
+  Under `autosize: "fit"` a stroke-width of difference is not cosmetic: it moves the measured
+  overhang, which moves the plotting area, which moves every scale range and every mark in the chart.
+  A templated dashboard reaches it by a route nobody designs — `{"name": "strokeColor", "value":
+  "'#FFFFFF'"}`, quotes and all, because the author was writing an expression and the tool stored it
+  as a value — and six of the sixty-three Deneb templates were out by exactly that. One of them fell
+  from 97 differences to 36.
+
+  The colour is **transparent**, because that is what the drawing comes to: a renderer handed a
+  colour it cannot read paints nothing with it. The warning naming the colour is still reported, and
+  the scenegraph still differs from upstream's in one respect — upstream records the unreadable
+  string where this records the transparency it amounts to.
+
+  What is left on that template is its `random()` jitter, which no comparison between two engines can
+  settle: upstream's `random()` is `Math.random`.
+
 - **A Voronoi diagram of points that coincide draws the cells upstream draws, instead of taking the
   whole chart down.** One or two distinct points have no triangle at all, and the triangulation
   `Delaunay` builds for that case carries `-1` where a vertex index would be — upstream's own shape,
