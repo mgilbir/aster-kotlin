@@ -192,12 +192,14 @@ public object GeoShapeTransform : Transform {
     val path = params.string("field") ?: defaultField
     // The mark's own `pointRadius` wins; otherwise the projection's, which upstream sets on the
     // path generator the projection carries. Either way a projected city is a dot of that radius.
-    val radius = params.number("pointRadius") ?: definition.pointRadius
+    // Written as an expression it is evaluated per geometry, not per row; see [pointRadiusOf].
+    val radius = pointRadiusOf(params, context, type)
 
     return input.map { item ->
       val sink = PathStringSink(digits = null)
-      radius?.let { sink.pointRadius(it) }
-      GeoJsonStream.stream(if (path == null) item else item.field(path), projection.stream(sink))
+      val geometry = if (path == null) item else item.field(path)
+      (radius?.invoke(geometry) ?: definition.pointRadius)?.let { sink.pointRadius(it) }
+      GeoJsonStream.stream(geometry, projection.stream(sink))
       val drawn = sink.result()
       // Null, not an empty string: upstream's path generator returns null when nothing was drawn,
       // and a mark measures a null path as a point rather than as empty bounds.

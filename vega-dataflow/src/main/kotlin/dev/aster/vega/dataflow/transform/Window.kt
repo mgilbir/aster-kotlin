@@ -201,6 +201,8 @@ public object WindowTransform : Transform {
     private val fieldPath: String?,
     private val param: Double?,
     private val aggregate: AggregateOp?,
+    /** `aggregate_params`, for the two exponential operations; see [exponentialRates]. */
+    private val rate: Double? = null,
   ) {
     enum class Kind {
       ROW_NUMBER,
@@ -259,7 +261,7 @@ public object WindowTransform : Transform {
           valueAt(at)
         }
         Kind.AGGREGATE ->
-          aggregateOver(aggregate!!, fieldPath, data.subList(i0.coerceAtMost(i1), i1))
+          aggregateOver(aggregate!!, fieldPath, data.subList(i0.coerceAtMost(i1), i1), rate)
       }
     }
   }
@@ -269,6 +271,12 @@ public object WindowTransform : Transform {
     val fields = params.stringList("fields")
     val names = params.stringList("as")
     val values = (params.fields["params"] as? VegaValue.Arr)?.values
+    // `aggregate_params` is the *aggregate* operations' parameter, positional alongside `ops`, and
+    // a window takes the same operations — so an `exponential` in a window has its rate here where
+    // a `ntile` has its count in `params`. Upstream declares both on this transform and compiles
+    // the aggregate ones with the very same machinery; [exponentialRates] is that machinery's
+    // reading of the parameter.
+    val rates = exponentialRates(ops, fields, params.numberList("aggregate_params"))
 
     val result = mutableListOf<Operation>()
     for ((index, op) in ops.withIndex()) {
@@ -314,7 +322,16 @@ public object WindowTransform : Transform {
       val name =
         names.getOrNull(index)?.takeIf { it.isNotEmpty() }
           ?: if (path == null) op else "${op}_$path"
-      result.add(Operation(name, kind ?: Operation.Kind.AGGREGATE, path, param, aggregate))
+      result.add(
+        Operation(
+          name,
+          kind ?: Operation.Kind.AGGREGATE,
+          path,
+          param,
+          aggregate,
+          if (aggregate == null) null else rates(aggregate, path),
+        )
+      )
     }
     return result
   }

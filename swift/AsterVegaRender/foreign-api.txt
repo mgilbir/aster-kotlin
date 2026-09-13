@@ -33,9 +33,9 @@ AccessibleElement.role
 AccessibleElement.roleDescription
 AccessibleElement.selected
 AggregateKt
-AggregateKt.aggregateOver(op:fieldPath:tuples:)
-AggregateKt.groupKey(datum:groupBy:)
-AggregateKt.groupTuples(input:groupBy:)
+AggregateKt.aggregateOver(op:fieldPath:tuples:rate:)
+AggregateKt.groupKey(datum:groupBy:key:)
+AggregateKt.groupTuples(input:groupBy:key:)
 AggregateOp
 AggregateOp.Companion
 AggregateOp.Companion.fromName(name:)
@@ -263,7 +263,7 @@ BinTransform.BinSettings.step
 BinTransform.BinSettings.stop
 BinTransform.DEFAULT_MAXBINS
 BinTransform.apply(input:params:context:)
-BinTransform.binSettings(min:max:maxbins:base:step:steps:divide:minstep:nice:anchor:)
+BinTransform.binSettings(min:max:maxbins:base:step:steps:divide:minstep:nice:anchor:span:)
 BinTransform.init()
 BinTransform.publishesSignal
 BinTransform.shared
@@ -1515,7 +1515,7 @@ GraticuleTransform.type
 GroupKey
 GroupKey.description()
 GroupKey.hash()
-GroupKey.init(values:)
+GroupKey.init(values:identityValues:)
 GroupKey.isEqual(_:)
 GroupKey.values
 GroupNode

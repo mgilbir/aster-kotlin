@@ -117,7 +117,7 @@ public object AggregateTransform : Transform {
     val groupBy = params.stringList("groupby")
     val measures = measures(params, context) ?: return input
 
-    val groups = groupTuples(input, groupBy)
+    val groups = groupTuples(input, groupBy, params.string("key"))
     // `cross: true` asks for a cell per **combination** of the group-by values, not just per
     // combination that occurs: a heatmap with a gap wants the gap drawn, so the empty cells are
     // emitted with a zero count rather than left out. Upstream's own documentation is the rule —
@@ -127,7 +127,10 @@ public object AggregateTransform : Transform {
     // upstream's own aggregate vectors, where two rows produce four cells.
     val crossed =
       if (params.fields["cross"]?.asBoolean() == true && groupBy.isNotEmpty()) {
-        crossProduct(groups.keys.toList(), groupBy.size).filterNot { it in groups }
+        // Compared against the group-by values the observed cells **report**, which is the same
+        // set as the cells' own keys unless a `key` renamed them; see [GroupKey].
+        val observed = groups.keys.map { GroupKey(it.values) }.toSet()
+        crossProduct(groups.keys.toList(), groupBy.size).filterNot { it in observed }
       } else {
         emptyList()
       }
@@ -213,8 +216,9 @@ public object JoinAggregateTransform : Transform {
   ): List<VegaValue> {
     val groupBy = params.stringList("groupby")
     val measures = measures(params, context) ?: return input
+    val cellKey = params.string("key")
 
-    val groups = groupTuples(input, groupBy)
+    val groups = groupTuples(input, groupBy, cellKey)
     val summaries = HashMap<GroupKey, Map<String, VegaValue>>(groups.size)
     for ((key, tuples) in groups) {
       // The **same** bootstrap closure `aggregate` builds. Without one, `Measure.compute` had
@@ -222,10 +226,19 @@ public object JoinAggregateTransform : Transform {
       // asking for a confidence interval wrote nulls onto every row of its group and the error
       // bars it was for were drawn nowhere.
       val confidence = bootstrapFor(tuples, context)
-      summaries[key] = measures.associate { it.outputName to it.compute(tuples, confidence) }
+      // The **cell's whole tuple** is written back, group-by values included: upstream's
+      // `extend(t, cells[cellkey(t)].tuple)` copies every property the cell carries, and the cell
+      // carries the group-by values of the first row that reached it. Identical to the row's own
+      // values in the ordinary case — and not identical under a `key`, where rows with different
+      // group-by values share a cell and all of them come out carrying the first row's.
+      summaries[key] =
+        LinkedHashMap<String, VegaValue>(groupBy.size + measures.size).apply {
+          groupBy.forEachIndexed { index, path -> put(path, key.values[index]) }
+          measures.forEach { put(it.outputName, it.compute(tuples, confidence)) }
+        }
     }
     return input.map { datum ->
-      datum.withFields(summaries[groupKey(datum, groupBy)] ?: emptyMap())
+      datum.withFields(summaries[groupKey(datum, groupBy, cellKey)] ?: emptyMap())
     }
   }
 }
@@ -242,7 +255,15 @@ public fun aggregateOver(
   op: AggregateOp,
   fieldPath: String?,
   tuples: List<VegaValue>,
-): VegaValue = Measure(op, fieldPath, outputName = "").compute(tuples)
+  /**
+   * The decay rate the two exponential operations take, which upstream calls `aggregate_params`.
+   *
+   * Null is "none named", and it is the right default for every caller here: a `pivot` forwards no
+   * rate to the aggregate it builds, and neither does a scale domain's sort. See [exponentialRates]
+   * for what upstream then computes.
+   */
+  rate: Double? = null,
+): VegaValue = Measure(op, fieldPath, outputName = "", rate = rate).compute(tuples)
 
 // ---- shared machinery -------------------------------------------------------
 
@@ -253,12 +274,9 @@ internal class Measure(
   val outputName: String,
   /**
    * The decay rate for [AggregateOp.EXPONENTIAL] and [AggregateOp.EXPONENTIALB]; ignored by the
-   * rest.
-   *
-   * Zero, which is upstream's fallback, makes the mean the last value alone — every earlier row is
-   * weighted by a power of zero.
+   * rest, and **null where the specification named none**; see [exponentialRates].
    */
-  private val rate: Double = 0.0,
+  private val rate: Double? = null,
 ) {
   fun compute(
     tuples: List<VegaValue>,
@@ -369,7 +387,12 @@ internal class Measure(
       // groups of different sizes.
       AggregateOp.EXPONENTIAL,
       AggregateOp.EXPONENTIALB -> {
-        val r = rate
+        // **NaN where there is no rate**, which is upstream's uninitialised accumulator and not a
+        // degenerate mean: `init` is called as `op.init(this)` when the parameter is absent, so
+        // `exp_r` is `undefined` and every piece of arithmetic below it is NaN. Reading a missing
+        // rate as zero answered "the last value in the group" for a specification upstream answers
+        // nothing for — a plausible number in place of a blank. See [exponentialRates].
+        val r = rate ?: Double.NaN
         val accumulated = numbers.fold(0.0) { acc, v -> r * acc + v }
         val n = numbers.size
         VegaValue.Num(
@@ -509,6 +532,48 @@ internal class Measure(
 }
 
 /**
+ * Which rate each exponential measure actually runs at, given `ops`, `fields` and
+ * `aggregate_params`.
+ *
+ * Three separate pieces of upstream's `compileMeasures` decide this, and none of them is what the
+ * parameter's name suggests:
+ * * **A rate of zero is no rate at all.** Both transforms read `aggregate_params[i] || null`, so a
+ *   zero, a NaN and an absent entry arrive identically.
+ * * **With no rate the accumulator is never initialised.** `init` runs as `op.init(this)` rather
+ *   than `op.init(this, param)`, leaving `exp_r` undefined, and `exp * (1 - undefined) / (1 -
+ *   undefined ** n)` is NaN. An `exponential` with no rate therefore answers nothing — not the last
+ *   value in the group, which is what reading the missing rate as zero computes.
+ * * **One accumulator per operation name per field.** `resolve()` keys its map by `a.name`, so two
+ *   `exponential` measures over the same field share one running total *and* one rate, the last one
+ *   declared — and both report the same number. `exponentialb` has no accumulator of its own at
+ *   all: it is declared `req: ['exponential']` and reads that state, so its own `aggregate_params`
+ *   entry is never read, and a specification asking for `exponentialb` *alone* gets the
+ *   uninitialised accumulator and a column of NaN.
+ *
+ * Returns the rate to give a measure of [op] over [path], or null for "upstream never initialised
+ * one". Verified against upstream: `exponentialb` with a rate of 0.5 and no `exponential` beside it
+ * is NaN, and beside `exponential` at 0.9 it is `exp(0.9) * 0.1` rather than `exp(0.5) * 0.5`.
+ */
+internal fun exponentialRates(
+  ops: List<String>,
+  fields: List<String>,
+  rates: List<Double>,
+): (AggregateOp, String?) -> Double? {
+  val byField = HashMap<String, Double?>()
+  for (index in 0 until maxOf(ops.size, fields.size)) {
+    if (AggregateOp.fromName(ops.getOrNull(index) ?: "") != AggregateOp.EXPONENTIAL) continue
+    val path = fields.getOrNull(index)?.takeIf { it.isNotEmpty() } ?: continue
+    // Recorded even when there is no usable rate, because the *last* declaration is the one whose
+    // `init` runs: an `exponential` with a rate followed by one without leaves both of them NaN.
+    byField[path] = rates.getOrNull(index)?.takeIf { it != 0.0 && !it.isNaN() }
+  }
+  return { op, path ->
+    if (op == AggregateOp.EXPONENTIAL || op == AggregateOp.EXPONENTIALB) path?.let { byField[it] }
+    else null
+  }
+}
+
+/**
  * Reads the `fields`, `ops` and `as` parameters into measures.
  *
  * With no `ops`, Vega defaults to a single `count`, which is why `{"type": "aggregate"}` alone
@@ -518,11 +583,7 @@ internal fun measures(params: VegaValue.Obj, context: TransformContext): List<Me
   val fields = params.stringList("fields")
   val opNames = params.stringList("ops")
   val names = params.stringList("as")
-  // `aggregate_params` is positional alongside `ops`, and only the two exponential operations read
-  // it. Upstream's `_.aggregate_params[i] || null` treats a zero as absent as well, which is why
-  // the
-  // fallback below is the same for both.
-  val rates = params.numberList("aggregate_params")
+  val exponential = exponentialRates(opNames, fields, params.numberList("aggregate_params"))
 
   if (opNames.isEmpty() && fields.isEmpty()) {
     return listOf(Measure(AggregateOp.COUNT, null, names.getOrNull(0) ?: "count"))
@@ -552,9 +613,7 @@ internal fun measures(params: VegaValue.Obj, context: TransformContext): List<Me
     }
     // Upstream names a fieldless count just "count", and everything else "{op}_{field}".
     val defaultName = if (path == null) op.opName else "${op.opName}_$path"
-    measures.add(
-      Measure(op, path, names.getOrNull(index) ?: defaultName, rates.getOrNull(index) ?: 0.0)
-    )
+    measures.add(Measure(op, path, names.getOrNull(index) ?: defaultName, exponential(op, path)))
   }
   return measures
 }
@@ -578,9 +637,22 @@ internal fun measures(params: VegaValue.Obj, context: TransformContext): List<Me
  * [values] are the **first** row's, which is where upstream reads a group's own fields from too, so
  * a group formed from a string and a number carries the spelling that arrived first.
  */
-public class GroupKey(public val values: List<VegaValue>) {
+public class GroupKey(
+  public val values: List<VegaValue>,
+  /**
+   * What decides which cell a row falls into, where that is **not** the group-by values.
+   *
+   * `aggregate`, `joinaggregate` and `pivot` all declare a `key` parameter, and upstream reads it
+   * as `this.cellkey = _.key ? _.key : groupkey(this._dims)` — one cell per distinct value of that
+   * field, however many group-by fields there are. The cell still *reports* group-by values, taken
+   * from the first row that reached it, so the two are genuinely different lists: `{"groupby":
+   * ["a"], "key": "b"}` over rows `(x, p), (y, p), (z, q)` gives two cells, and the first says `a:
+   * "x"` for a pair of rows whose `a` values differ.
+   */
+  identityValues: List<VegaValue> = values,
+) {
 
-  private val identity: List<String> = values.map { it.asComparableKey() }
+  private val identity: List<String> = identityValues.map { it.asComparableKey() }
 
   override fun equals(other: Any?): Boolean = other is GroupKey && other.identity == identity
 
@@ -592,6 +664,10 @@ public class GroupKey(public val values: List<VegaValue>) {
 public fun groupTuples(
   input: List<VegaValue>,
   groupBy: List<String>,
+  /**
+   * The cell key, where the specification names one instead of grouping by value; see [GroupKey].
+   */
+  key: String? = null,
 ): Map<GroupKey, List<VegaValue>> {
   // No `groupby` means one group over everything — but only if there is something. An aggregate
   // over nothing produces **no rows**, not a row of nulls: upstream never invents a group it saw no
@@ -599,16 +675,21 @@ public fun groupTuples(
   // dataset, which is every tooltip and every brush — a row of nulls there draws the tooltip's
   // frame at the origin over a chart nobody is pointing at.
   if (input.isEmpty()) return emptyMap()
-  if (groupBy.isEmpty()) return mapOf(GroupKey(emptyList()) to input)
+  // A named key still splits the rows when there is no `groupby` at all, so the one-group shortcut
+  // is only a shortcut where nothing else decides the cell.
+  if (groupBy.isEmpty() && key == null) return mapOf(GroupKey(emptyList()) to input)
   val groups = LinkedHashMap<GroupKey, MutableList<VegaValue>>()
   for (datum in input) {
-    groups.getOrPut(groupKey(datum, groupBy)) { mutableListOf() }.add(datum)
+    groups.getOrPut(groupKey(datum, groupBy, key)) { mutableListOf() }.add(datum)
   }
   return groups
 }
 
-public fun groupKey(datum: VegaValue, groupBy: List<String>): GroupKey =
-  GroupKey(groupBy.map { datum.field(it) })
+public fun groupKey(datum: VegaValue, groupBy: List<String>, key: String? = null): GroupKey =
+  GroupKey(
+    groupBy.map { datum.field(it) },
+    if (key == null) groupBy.map { datum.field(it) } else listOf(datum.field(key)),
+  )
 
 /**
  * A value usable as a map key.

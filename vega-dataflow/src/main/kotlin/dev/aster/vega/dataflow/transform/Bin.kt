@@ -96,6 +96,13 @@ public object BinTransform : Transform {
         divide = params.numberList("divide").takeIf { it.isNotEmpty() } ?: listOf(5.0, 2.0),
         minstep = params.number("minstep") ?: 0.0,
         nice = params.boolean("nice") ?: true,
+        // `const span = _.span || (max - min) || Math.abs(min) || 1;` — a **stated** span is what
+        // the step is chosen from, whatever the data happens to cover. It is how a chart keeps its
+        // bins the same width while a filter narrows the rows under them; unread, the bins moved
+        // with the data and the chart re-binned itself on every interaction.
+        // `|| ` exactly: a zero and a NaN are falsy and fall through to the extent, an infinity is
+        // not and is taken as stated — which then produces an infinite step, as it does upstream.
+        span = params.number("span")?.takeIf { it != 0.0 && !it.isNaN() },
         anchor = params.number("anchor"),
       )
 
@@ -230,9 +237,11 @@ public object BinTransform : Transform {
     nice: Boolean,
     /** A value a bin boundary must land on; slides the whole grid so that one does. */
     anchor: Double? = null,
+    /** The width the step is chosen from, where a specification states one; see the call site. */
+    span: Double? = null,
   ): BinSettings {
     val logBase = ln(base)
-    val span = (max - min).takeIf { it != 0.0 } ?: abs(min).takeIf { it != 0.0 } ?: 1.0
+    val span = span ?: (max - min).takeIf { it != 0.0 } ?: abs(min).takeIf { it != 0.0 } ?: 1.0
 
     var chosen: Double
     if (step != null && step > 0.0) {

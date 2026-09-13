@@ -107,7 +107,9 @@ public object PivotTransform : Transform {
         .map { it.asString() }
         .let { if (limit > 0) it.take(limit) else it }
 
-    return groupTuples(input, groupBy).map { (groupKey, rows) ->
+    // `key` is forwarded because a pivot *is* an aggregate upstream — `Pivot` builds one and hands
+    // it `key: _.key` — so the cell it groups into is decided the same way; see [GroupKey].
+    return groupTuples(input, groupBy, params.string("key")).map { (groupKey, rows) ->
       val fields = LinkedHashMap<String, VegaValue>(groupBy.size + columns.size)
       groupBy.forEachIndexed { index, path -> fields[path] = groupKey.values[index] }
       for (column in columns) {

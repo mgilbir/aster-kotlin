@@ -8,6 +8,42 @@ section here does not get released.
 
 ### Fixed
 
+- **An unprojected `geopath` draws points, features and geometry collections.** It had a reader of
+  its own that understood four geometry types, and the ones it did not understand are the ones a
+  column of decoded GeoJSON is most likely to hold: a `Point` is a **circle** of the current
+  `pointRadius`, a `MultiPoint` one per coordinate, and a `Feature` or `GeometryCollection` is
+  unwrapped rather than skipped. It now walks the geometry with the same reader the projected path
+  uses. `pointRadius` is read as well, on both transforms and including the `{"expr": …}` form —
+  which d3 evaluates against the **geometry**, not the row.
+
+- **`aggregate`, `joinaggregate` and `pivot` group into the cell their `key` names.** All three
+  declare the parameter — `this.cellkey = _.key ? _.key : groupkey(this._dims)` — and all three were
+  ignoring it, so a specification naming a key got a different number of cells than upstream, each
+  holding different rows. A cell still *reports* group-by values, taken from the first row that
+  reached it, which is what makes the parameter more than a renaming: `joinaggregate` writes the
+  cell's whole tuple back onto every row in it, group-by values included. `GroupKey` carries the two
+  lists separately and `groupTuples`/`groupKey` take the key as a trailing optional parameter, which
+  renames the Swift selectors to `GroupKey.init(values:identityValues:)`,
+  `groupTuples(input:groupBy:key:)` and `groupKey(datum:groupBy:key:)`.
+
+- **A `window` reads `aggregate_params`, and a missing decay rate is not a rate of zero.** The two
+  exponential operations take their rate from that parameter, which `window` declares and nothing
+  read — so every windowed exponential ran at a rate of zero. Upstream's own reading of it is
+  narrower than it looks: `aggregate_params[i] || null` makes a zero and an absent entry the same
+  thing, and that thing leaves the accumulator uninitialised, so the answer is NaN rather than "the
+  last value in the group". `exponentialb` has no accumulator of its own at all — it is declared
+  `req: ['exponential']` — so it runs at the transform's `exponential` rate and never at the one
+  written beside it. `aggregateOver` takes the rate as a trailing optional parameter, which renames
+  the Swift selector to `aggregateOver(op:fieldPath:tuples:rate:)`.
+
+- **`bin` reads the `span` it was given.** `span = _.span || (max - min) || Math.abs(min) || 1` is
+  what the step is chosen from, and only the second term of that chain was read: a specification
+  stating a span — which is how a chart keeps its bins a fixed width while a brush or a filter
+  narrows the rows under them — re-binned itself against whatever the data happened to cover. The
+  `||` is transcribed rather than paraphrased, so a span of zero is no span and falls through to the
+  extent. `BinTransform.binSettings` takes the span as a trailing optional parameter, which renames
+  the Swift selector to `binSettings(min:max:maxbins:base:step:steps:divide:minstep:nice:anchor:span:)`.
+
 - **The Deneb corpus agrees with upstream on every template it can compare: 54 of 54.** The sweep
   of specifications other people wrote started at 0, and closing it turned up fourteen root causes,
   each read off upstream's source or off a live view and each fixed where it belongs rather than
