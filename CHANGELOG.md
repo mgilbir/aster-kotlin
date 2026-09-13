@@ -8,6 +8,24 @@ section here does not get released.
 
 ### Fixed
 
+- **A Voronoi diagram of points that coincide draws the cells upstream draws, instead of taking the
+  whole chart down.** One or two distinct points have no triangle at all, and the triangulation
+  `Delaunay` builds for that case carries `-1` where a vertex index would be — upstream's own shape,
+  `new Int32Array(3).fill(-1)`. Upstream then reads past the front of its coordinate array, gets
+  `undefined`, and every circumcentre comes out `NaN`; nothing reads them, because such a cell is
+  taken from the clip box instead. Kotlin throws on that read. The compile was caught as a defect in
+  this engine — correctly, it was one — and the chart was not drawn at all.
+
+  A scatter plot reaches this whenever its points collapse: a plotting area fitted to nothing, a
+  scale whose domain excludes all the data, a table of one row. One of the sixty-three Deneb
+  templates does exactly that, its `domainMax` of 10 sitting under data that runs to 90 — upstream
+  draws twelve dots at the origin and twelve empty cells, and this engine drew nothing whatever.
+  Every template the corpus asks for is now drawn, and it stands at **36 of 56**.
+
+  The corpus report was hiding it, too: it looked for a diagnostic of exactly `ERROR` severity and a
+  compile that *threw* reports FATAL, so the loudest failure there is read as a silent refusal. It
+  asks for `>= ERROR` now.
+
 - **`autosize: "fit"` fits against the `width` signal, not the `width` property.** Upstream's view
   has no notion of a width property: `parseView` seeds a `width` **signal** from it, `_resizeWidth`
   follows that signal, and `viewSizeLayout` fits against what it currently says. So a chart that

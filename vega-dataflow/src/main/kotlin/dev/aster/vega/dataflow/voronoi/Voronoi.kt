@@ -184,6 +184,21 @@ internal class VoronoiDiagram(
   private val circumcenters: DoubleArray
   private val vectors = DoubleArray(delaunay.coords.size * 2)
 
+  /**
+   * A triangle vertex's coordinate, or **not a number** where the triangle has no such vertex.
+   *
+   * One or two distinct points have no triangle at all, and the triangulation `Delaunay` builds for
+   * that case carries `-1` where a vertex index would be — upstream's own shape, since `_init`
+   * writes `new Int32Array(3).fill(-1)` and then fills in what it has. JavaScript reads past the
+   * front of the coordinate array there and gets `undefined`, so every step of the arithmetic below
+   * yields `NaN` and the circumcentre is `NaN`; nothing reads it, because such a cell is taken from
+   * the clip box instead. Kotlin throws on that read, so a chart of coincident points — which is
+   * what a scatter plot fitted to nothing becomes — died with an `ArrayIndexOutOfBoundsException`
+   * and drew no chart at all. The `NaN` is produced here directly rather than read for.
+   */
+  private fun coordinate(points: DoubleArray, index: Int): Double =
+    if (index < 0) Double.NaN else points[index]
+
   init {
     val points = delaunay.coords
     val triangles = delaunay.triangles
@@ -197,12 +212,12 @@ internal class VoronoiDiagram(
       val t1 = triangles[i] * 2
       val t2 = triangles[i + 1] * 2
       val t3 = triangles[i + 2] * 2
-      val x1 = points[t1]
-      val y1 = points[t1 + 1]
-      val x2 = points[t2]
-      val y2 = points[t2 + 1]
-      val x3 = points[t3]
-      val y3 = points[t3 + 1]
+      val x1 = coordinate(points, t1)
+      val y1 = coordinate(points, t1 + 1)
+      val x2 = coordinate(points, t2)
+      val y2 = coordinate(points, t2 + 1)
+      val x3 = coordinate(points, t3)
+      val y3 = coordinate(points, t3 + 1)
 
       val dx = x2 - x1
       val dy = y2 - y1

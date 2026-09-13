@@ -97,9 +97,13 @@ class DenebCorpusTest {
             // A specification this engine declines to draw at all, which is a difference like any
             // other and a louder one: upstream produced a scene. Reported by the diagnostic that
             // explains it rather than as a bare refusal, because that is what says where to look.
+            // `>= ERROR`, not `== ERROR`. A compile that *threw* reports FATAL, and asking for the
+            // one severity read that as a silent refusal: the voronoi crash was listed here as "no
+            // scene and no diagnostic" while the diagnostic naming the exception sat beside it. A
+            // report that hides the loudest failure is worse than none.
             val why =
               compiled.diagnostics
-                .firstOrNull { it.severity == DiagnosticSeverity.ERROR }
+                .firstOrNull { it.severity >= DiagnosticSeverity.ERROR }
                 ?.let { "${it.code}: ${shape(it.message)}" } ?: "no scene and no diagnostic"
             drewNothing[name] = why
             oursRefused++
