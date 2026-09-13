@@ -8,6 +8,30 @@ section here does not get released.
 
 ### Fixed
 
+- **An item a mark is drawn *from* carries the bounds of what was drawn.** Vega marks share a
+  namespace with datasets, so `"from": {"data": "labels"}` names the items the `labels` mark
+  produced — and those items are scene items, which have been through the bounder. `item.bounds` is
+  a `Bounds` with `x1`, `y1`, `x2` and `y2` on it, and reading it is how a specification places
+  something against what a mark *came out* as rather than against what it was told: a box behind a
+  label, a dot at the centre of one, a leader line from the edge of one.
+
+  The items this engine exposed carried the encoded channels and the row behind them, and no bounds,
+  so `(datum.bounds.x1 + datum.bounds.x2) / 2` was arithmetic on nothing. A parliament diagram that
+  lays three hundred seats out as text items and then draws a circle on each put every one of them on
+  the origin. It was the largest single disagreement in the Deneb corpus — 1579 differences, three
+  quarters of the whole — and it falls to **six**; the corpus total falls from 2165 to **592**.
+
+  Two details came off upstream's own items rather than out of reasoning. The bounds are the item's
+  **turned** box, so a label at 45° reports the extent it actually occupies. And a `line`, an `area`
+  or a `trail` — one node here, a nested mark with one box there — hands **every** item drawn from it
+  that single box.
+
+  What is left on that diagram is six differences from a **tie-break**: upstream's `collect` sorts
+  with `stableCompare`, which resolves ties by tuple id — the order the rows were *created* in, not
+  the order they are currently in — so a second sort over a re-ordered table breaks its ties
+  differently here. Recorded rather than fixed: this engine has no tuple identity to break them with,
+  and giving it one is a change to the data model rather than to a sort.
+
 - **A stroke that is not a colour is still a stroke, as far as the measuring goes.** `boundStroke`
   asks whether the item *has* a stroke — `if (item.stroke && item.opacity !== 0 && item.strokeOpacity
   !== 0)` — not whether that stroke is a colour, so upstream measures a mark stroked `"banana"`

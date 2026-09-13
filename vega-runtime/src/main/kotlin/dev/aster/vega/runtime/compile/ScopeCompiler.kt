@@ -460,7 +460,9 @@ internal class ScopeCompiler(
 
         // The items a mark's own transforms produced, not the ones its encoding alone would: a
         // label drawn from a force-directed mark reads the position the simulation settled on.
-        exposeItems(transformed.items ?: encoder.items(mark, rows))
+        exposeItems(
+          withBounds(transformed.items ?: encoder.items(mark, rows), built[index].orEmpty())
+        )
         // `boundMark`: a **clipped** mark reaches no further than the group it is drawn in,
         // whatever
         // its items do. A detail plot whose domain is driven by a brush has rows on either side of
@@ -1465,6 +1467,61 @@ internal class ScopeCompiler(
     signals[name]?.asNumberOrNull()?.takeIf { !it.isNaN() }
 
   /** The rows a non-group mark iterates. A mark with no data draws once. */
+  /**
+   * Stamps each exposed item with the **bounds** of the node it was drawn as.
+   *
+   * An item another mark reads back is a scene item, and a scene item has been through the bounder:
+   * `item.bounds` is a `Bounds` with `x1`, `y1`, `x2` and `y2` on it, and reading it is how a
+   * specification places something against what a mark *came out* as rather than against what it
+   * was told. A parliament diagram does exactly that — it lays its seats out as text items and then
+   * draws a circle at `(datum.bounds.x1 + datum.bounds.x2) / 2` — and with no bounds to read, every
+   * one of its three hundred seats landed on the origin.
+   *
+   * Only where the two lists correspond one for one. A `line` or an `area` collapses its whole
+   * series into a single node, so there is no item-to-node pairing to make and the items go out as
+   * they were; upstream has the same shape there, one item carrying the series.
+   */
+  private fun withBounds(items: List<VegaValue>, nodes: List<SceneNode>): List<VegaValue> {
+    val boundsAt: (Int) -> RectD =
+      when {
+        items.size == nodes.size -> { index ->
+          nodes[index].bounds
+        }
+        // A line, an area or a trail draws its whole series as **one** node, and upstream's items
+        // for such a mark all carry the *mark's* bounds rather than a box of their own — read off a
+        // three-point line, whose three items each report the line's own box. So one node stands
+        // for every item it was drawn from.
+        nodes.size == 1 -> { _ ->
+          nodes[0].bounds
+        }
+        // Neither: some rows produced no node at all, so there is no pairing to make and guessing
+        // at one would hand an item the box of a different row. The items go out without bounds,
+        // which is the honest answer — and the mark having fewer nodes than rows is itself a
+        // difference from upstream, which makes an item for every row whatever it can resolve.
+        else -> return items
+      }
+    return items.mapIndexed { index, item ->
+      val fields = (item as? VegaValue.Obj)?.fields ?: return@mapIndexed item
+      val bounds = boundsAt(index)
+      if (bounds.isEmpty) return@mapIndexed item
+      VegaValue.Obj(
+        LinkedHashMap(fields).apply {
+          put(
+            "bounds",
+            VegaValue.Obj(
+              linkedMapOf(
+                "x1" to VegaValue.Num(bounds.left),
+                "y1" to VegaValue.Num(bounds.top),
+                "x2" to VegaValue.Num(bounds.right),
+                "y2" to VegaValue.Num(bounds.bottom),
+              )
+            ),
+          )
+        }
+      )
+    }
+  }
+
   private fun markData(mark: MarkSpec, scope: CompileScope): List<VegaValue> {
     val dataName = mark.from?.data ?: return listOf(VegaValue.EmptyObject)
     val rows = scope.datasets[dataName]
