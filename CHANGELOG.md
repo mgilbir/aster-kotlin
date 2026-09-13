@@ -8,6 +8,39 @@ section here does not get released.
 
 ### Fixed
 
+- **`autosize: "fit"` fits against the `width` signal, not the `width` property.** Upstream's view
+  has no notion of a width property: `parseView` seeds a `width` **signal** from it, `_resizeWidth`
+  follows that signal, and `viewSizeLayout` fits against what it currently says. So a chart that
+  declares the signal itself — `{"name": "width", "value": 400}`, or an `update` expression — is
+  fitted exactly like one that writes `"width": 400`. This engine read the property, which such a
+  chart does not have, so the fit had nothing to bite on: the plotting area kept its full width and
+  every scale range, axis and mark under it was out by the width of the axes. That is how a chart
+  sized by its host is written, the size arriving at run time, and it is how all sixty-three Deneb
+  templates are written.
+
+  Two consequences came with it, both read off upstream rather than reasoned about. The fitted size
+  **replaces** the declared signal for the pass that is drawn — `view.signal(Width, width, {skip:
+  true})` writes it and skips that signal's own update — so everything downstream, a `width / 2`
+  signal included, settles against the fitted number; a live view answers 350 for a chart that
+  declared 400. And `contains: "padding"` comes off the room left rather than off the pass being
+  measured, since `viewSizeLayout` subtracts it from a drawing that has already been made at full
+  size. A width a *handler* set is fitted too, the handler deciding how much room there is and the
+  view how much of it the plotting area gets.
+
+  **API:** `SignalResolver.session` takes a `viewSize` map — the values the view itself decided,
+  which replace a declared signal of the same name rather than being overwritten by it. Kept apart
+  from the pinned map, which is a handler's doing and is warned about when it shadows an `update`;
+  this is the engine's own answer and there is nothing to warn about. The Obj-C selector changes with
+  it, so a Swift caller of that function names one more argument.
+
+  **A host reading the `width` signal of a responsive chart now reads the fitted width.** A
+  Vega-Lite `width: "container"` chart is `fit-x`, so a container of 300 publishes 240 and the axis
+  has the rest — which is what a live upstream view answers for the same specification. The number
+  did not change because the meaning did; it changed because it was wrong.
+
+  The Deneb corpus moves from **3 of 56 to 35**, and the largest remaining cause falls from
+  thirty-seven templates to six.
+
 - **Any property of a title may be written as a signal, and whether there is a subtitle is decided
   by the property rather than by the words.** Upstream's `parseTitle` never reads a title's
   properties as values: `addEncoders` turns each of them into an **encoder** on the text mark it

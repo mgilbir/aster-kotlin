@@ -44,6 +44,16 @@ class ContainerSizeTest {
     """
       .trimIndent()
 
+  /**
+   * The `width` signal as the chart publishes it, which for these is the **fitted** width.
+   *
+   * Vega-Lite sizes a responsive chart with `autosize: {"type": "fit-x", "contains": "padding"}`,
+   * so the room the host reports is what the drawing as a whole gets and the plotting area is what
+   * is left of it once the y-axis has had its 60 units. Upstream publishes that fitted number on
+   * the same signal — `view.signal('width')` answers **240** for the 300 fallback, read off a live
+   * view running this very specification — which is why these expectations are the room minus the
+   * axis rather than the room.
+   */
   private fun widthOf(containerSize: SizeD?): Double {
     val vega = requireNotNull(VegaLiteInput.toVega(responsive).vegaJson) { "no Vega" }
     val compiled =
@@ -55,13 +65,14 @@ class ContainerSizeTest {
   fun `without a container the chart takes upstream's own fallback`() {
     // `config.view.continuousWidth`, which is 300. Not zero and not the surface's size: this is
     // what
-    // upstream draws with no page to ask, and the differential fixtures depend on it.
-    assertEquals(300.0, widthOf(null))
+    // upstream draws with no page to ask, and the differential fixtures depend on it. 240 of it
+    // reaches the plotting area, the axis taking the rest — upstream's own answer for this chart.
+    assertEquals(240.0, widthOf(null))
   }
 
   @Test
   fun `a host's width is the chart's width`() {
-    assertEquals(412.0, widthOf(SizeD(412.0, 900.0)))
+    assertEquals(352.0, widthOf(SizeD(412.0, 900.0)))
   }
 
   @Test
@@ -84,7 +95,7 @@ class ContainerSizeTest {
   fun `a dimension a host does not know is left to the fallback`() {
     // A chart in a scrolling list has a width and as much height as it asks for, so a host answers
     // the half it knows and zero means "not this one".
-    assertEquals(412.0, widthOf(SizeD(412.0, 0.0)))
+    assertEquals(352.0, widthOf(SizeD(412.0, 0.0)))
   }
 
   @Test
@@ -238,7 +249,9 @@ class ContainerSizeTest {
     assertEquals(SizeD(412.0, 900.0), controller.containerSize)
 
     controller.setSpec(requireNotNull(VegaLiteInput.toVega(responsive).vegaJson))
-    assertEquals(412.0, (controller.lastCompiled!!.signals.signal("width") as VegaValue.Num).value)
+    // The fitted width for a container of 412: the responsive chart is `fit-x`, so the axis takes
+    // its 60 units out of the room the host reported. See [widthOf].
+    assertEquals(352.0, (controller.lastCompiled!!.signals.signal("width") as VegaValue.Num).value)
   }
 
   /**

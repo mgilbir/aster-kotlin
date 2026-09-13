@@ -3867,7 +3867,7 @@ SignalResolver.Resolution.resolve(name:datasets:scales:pendingScales:projections
 SignalResolver.Resolution.scope(datasets:scales:projections:)
 SignalResolver.init(diagnostics:expressions:random:clock:)
 SignalResolver.resolve(signals:datasets:implicit:pinned:enclosingScales:pendingScales:)
-SignalResolver.session(signals:values:pinned:datasetSink:)
+SignalResolver.session(signals:values:pinned:viewSize:datasetSink:)
 SignalScope
 SignalScope.applyScale(name:value:)
 SignalScope.dataset(name:)
