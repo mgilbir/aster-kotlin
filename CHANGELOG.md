@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **`aggregate`, `joinaggregate` and `pivot` group into the cell their `key` names.** All three
+  declare the parameter — `this.cellkey = _.key ? _.key : groupkey(this._dims)` — and all three were
+  ignoring it, so a specification naming a key got a different number of cells than upstream, each
+  holding different rows. A cell still *reports* group-by values, taken from the first row that
+  reached it, which is what makes the parameter more than a renaming: `joinaggregate` writes the
+  cell's whole tuple back onto every row in it, group-by values included. `GroupKey` carries the two
+  lists separately and `groupTuples`/`groupKey` take the key as a trailing optional parameter, which
+  renames the Swift selectors to `GroupKey.init(values:identityValues:)`,
+  `groupTuples(input:groupBy:key:)` and `groupKey(datum:groupBy:key:)`.
+
 - **A `window` reads `aggregate_params`, and a missing decay rate is not a rate of zero.** The two
   exponential operations take their rate from that parameter, which `window` declares and nothing
   read — so every windowed exponential ran at a rate of zero. Upstream's own reading of it is

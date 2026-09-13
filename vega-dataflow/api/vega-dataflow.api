@@ -106,8 +106,10 @@ public final class dev/aster/vega/dataflow/TupleIdAllocator {
 public final class dev/aster/vega/dataflow/transform/AggregateKt {
 	public static final fun aggregateOver (Ldev/aster/vega/dataflow/transform/AggregateOp;Ljava/lang/String;Ljava/util/List;Ljava/lang/Double;)Ldev/aster/vega/model/VegaValue;
 	public static synthetic fun aggregateOver$default (Ldev/aster/vega/dataflow/transform/AggregateOp;Ljava/lang/String;Ljava/util/List;Ljava/lang/Double;ILjava/lang/Object;)Ldev/aster/vega/model/VegaValue;
-	public static final fun groupKey (Ldev/aster/vega/model/VegaValue;Ljava/util/List;)Ldev/aster/vega/dataflow/transform/GroupKey;
-	public static final fun groupTuples (Ljava/util/List;Ljava/util/List;)Ljava/util/Map;
+	public static final fun groupKey (Ldev/aster/vega/model/VegaValue;Ljava/util/List;Ljava/lang/String;)Ldev/aster/vega/dataflow/transform/GroupKey;
+	public static synthetic fun groupKey$default (Ldev/aster/vega/model/VegaValue;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/dataflow/transform/GroupKey;
+	public static final fun groupTuples (Ljava/util/List;Ljava/util/List;Ljava/lang/String;)Ljava/util/Map;
+	public static synthetic fun groupTuples$default (Ljava/util/List;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Ljava/util/Map;
 }
 
 public final class dev/aster/vega/dataflow/transform/AggregateOp : java/lang/Enum {
@@ -324,7 +326,8 @@ public final class dev/aster/vega/dataflow/transform/GraticuleTransform : dev/as
 }
 
 public final class dev/aster/vega/dataflow/transform/GroupKey {
-	public fun <init> (Ljava/util/List;)V
+	public fun <init> (Ljava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getValues ()Ljava/util/List;
 	public fun hashCode ()I

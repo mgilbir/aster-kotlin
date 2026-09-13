@@ -34,8 +34,8 @@ AccessibleElement.roleDescription
 AccessibleElement.selected
 AggregateKt
 AggregateKt.aggregateOver(op:fieldPath:tuples:rate:)
-AggregateKt.groupKey(datum:groupBy:)
-AggregateKt.groupTuples(input:groupBy:)
+AggregateKt.groupKey(datum:groupBy:key:)
+AggregateKt.groupTuples(input:groupBy:key:)
 AggregateOp
 AggregateOp.Companion
 AggregateOp.Companion.fromName(name:)
@@ -1515,7 +1515,7 @@ GraticuleTransform.type
 GroupKey
 GroupKey.description()
 GroupKey.hash()
-GroupKey.init(values:)
+GroupKey.init(values:identityValues:)
 GroupKey.isEqual(_:)
 GroupKey.values
 GroupNode
