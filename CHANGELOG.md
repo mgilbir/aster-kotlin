@@ -6,6 +6,35 @@ section here does not get released.
 
 ## Unreleased
 
+### Fixed
+
+- **Any property of a title may be written as a signal, and whether there is a subtitle is decided
+  by the property rather than by the words.** Upstream's `parseTitle` never reads a title's
+  properties as values: `addEncoders` turns each of them into an **encoder** on the text mark it
+  belongs to, which is why a signal is accepted wherever a word is. This engine read the string ones
+  as strings, so `{"signal": …}` parsed to nothing — the heading fell back to black and a
+  signal-valued `subtitle` produced no mark at all. That is how a templated dashboard names its
+  heading: sixty-one of the sixty-three Deneb templates do it, and their subtitles were missing
+  entirely rather than merely unstyled.
+
+  Three rules came out of reading upstream and were checked against it one at a time. A signal goes
+  to the **`update`** set however it was written — `addEncode` says so in as many words — so a
+  property given as a signal beats a specification's own `enter` block for the same channel and
+  loses to its `update`, while a literal property goes to `enter` and loses to both. A subtitle
+  exists exactly when the `subtitle` *property* is truthy: a signal reference is an object, so one
+  that evaluates to nothing still draws an empty subtitle, where an empty literal draws none and an
+  `encode.subtitle` block on its own is not a subtitle at all. And `{"signal": ""}` is left alone,
+  since folding an empty expression in would fail the parse and cost the whole chart where upstream
+  merely leaves the words unpainted.
+
+  **API:** `TitleSpec` gains `subtitleExpression`, the counterpart of the existing `textExpression`,
+  because an empty `subtitle` and a subtitle written as a signal are different drawings and one
+  nullable string cannot say which. Added last, so every other component keeps its position.
+
+  The Deneb corpus moves from **0 of 56 to 3**, and the title causes leave the ranked list: what
+  remains of the heading is where the subtitle is *placed*, which follows the `autosize: "fit"`
+  disagreement still at the top of that list.
+
 ### Internal
 
 - **A sweep of Vega specifications other people wrote.** `scripts/oracle.sh` renders the 198

@@ -2756,6 +2756,96 @@ public class SpecParser {
     return blocks
   }
 
+  /**
+   * The **string** properties of a title's two text marks, and the channel each one becomes.
+   *
+   * ```js
+   * addEncoders(encode, {
+   *   text:       text,
+   *   …
+   *   fill:       _('color'),
+   *   font:       _('font'),
+   *   fontStyle:  _('fontStyle'),
+   *   fontWeight: _('fontWeight'),
+   * }, { align: _('align'), baseline: _('baseline') });
+   * ```
+   *
+   * `parseTitle` upstream does not read a title's properties as values at all: it turns every one
+   * of them into an **encoder** on the text mark it belongs to. That is the whole reason any title
+   * property may be written as a signal — an encode channel takes one wherever it appears — and it
+   * is why `if (spec.subtitle)` builds a subtitle for `{"signal": …}` as readily as for a word.
+   *
+   * The numeric properties here already carry a signal of their own, through [numberOrSignal], and
+   * the words of both headings have a field apiece — [TitleSpec.textExpression] and
+   * [TitleSpec.subtitleExpression]. The remaining string ones were read as strings, so a signal
+   * parsed to nothing at all and the colour fell back to the default. Sixty-one of the sixty-three
+   * Deneb templates name their title that way.
+   */
+  private val TITLE_SIGNAL_CHANNELS =
+    mapOf(
+      "title" to
+        mapOf(
+          "color" to "fill",
+          "font" to "font",
+          "fontStyle" to "fontStyle",
+          "fontWeight" to "fontWeight",
+          "align" to "align",
+          "baseline" to "baseline",
+        ),
+      "subtitle" to
+        mapOf(
+          "subtitleColor" to "fill",
+          "subtitleFont" to "font",
+          "subtitleFontStyle" to "fontStyle",
+          "subtitleFontWeight" to "fontWeight",
+        ),
+    )
+
+  /**
+   * Folds the title properties **written as signals** into the encode blocks that carry them.
+   *
+   * ```js
+   * // Always assign signal to update, even if the signal is from the enter block
+   * if (isEncoder) {
+   *   object.update[name] = value;
+   * } else {
+   *   object[set || 'enter'][name] = {value: value};
+   * }
+   * ```
+   *
+   * `update`, not `enter`, and that is not a detail: a specification may write its own block for
+   * the same channel, and `extendEncode` merges the two **within a block**. So a property given as
+   * a signal beats the specification's `enter` — which upstream never had the chance to see, the
+   * signal having gone to `update` — and loses to its `update`. A literal property goes to `enter`
+   * and loses to both, which is what the fields already do by being read after the encode block.
+   *
+   * Only the signals are folded here; a literal property is left to the field it parses into, so
+   * nothing that works today takes a new path.
+   */
+  private fun withTitleSignals(
+    blocks: Map<String, EncodeSpec>,
+    own: VegaValue.Obj,
+  ): Map<String, EncodeSpec> {
+    val folded = LinkedHashMap(blocks)
+    for ((part, channels) in TITLE_SIGNAL_CHANNELS) {
+      val added = LinkedHashMap<String, ChannelValue>()
+      for ((property, channel) in channels) {
+        val signal = (own.fields[property] as? VegaValue.Obj)?.fields?.get("signal")?.asString()
+        // `{"signal": ""}` is not an expression. Upstream evaluates it to nothing and draws the
+        // heading with no fill at all; folding it in here would instead put an empty expression
+        // through the parser, which reports an error and costs the whole chart. Left to the field,
+        // so the words keep the default colour and the drawing survives.
+        if (signal == null || signal.isEmpty()) continue
+        if (blocks[part]?.update?.containsKey(channel) == true) continue
+        added[channel] = ChannelValue.Signal(signal)
+      }
+      if (added.isEmpty()) continue
+      val existing = folded[part] ?: EncodeSpec()
+      folded[part] = existing.copy(update = added + existing.update)
+    }
+    return folded
+  }
+
   private fun titleNudge(obj: VegaValue.Obj, channel: String, path: String): NumberValue? {
     obj.numberOrSignal(channel, "$path.$channel")?.let {
       return it
@@ -2814,6 +2904,8 @@ public class SpecParser {
           is VegaValue.Arr -> sub.values.joinToString("\n") { it.asString() }
           else -> sub?.takeIf { it is VegaValue.Str }?.asString()
         },
+      subtitleExpression =
+        (obj.fields["subtitle"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
       orient =
         obj.enumOrNull("orient", path, "title orientation") { Orient.fromName(it) } ?: Orient.TOP,
       anchor =
@@ -2831,7 +2923,7 @@ public class SpecParser {
           else -> null
         },
       subtitleFontSize = obj.numberOrSignal("subtitleFontSize", "$path.subtitleFontSize"),
-      encode = titleEncode(own, "$path.encode"),
+      encode = withTitleSignals(titleEncode(own, "$path.encode"), obj),
       fontStyle = obj.fields["fontStyle"]?.takeIf { it is VegaValue.Str }?.asString(),
       subtitleFontStyle =
         obj.fields["subtitleFontStyle"]?.takeIf { it is VegaValue.Str }?.asString(),

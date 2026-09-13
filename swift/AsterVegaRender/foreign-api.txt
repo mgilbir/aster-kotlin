@@ -4373,7 +4373,7 @@ TitleSpec.aria
 TitleSpec.baseline
 TitleSpec.color
 TitleSpec.description()
-TitleSpec.doCopy(text:textExpression:subtitle:orient:anchor:frame:offset:subtitlePadding:fontSize:fontWeight:fontStyle:subtitleFontStyle:color:font:subtitleColor:subtitleFont:subtitleFontWeight:lineHeight:subtitleLineHeight:align:angle:baseline:limit:aria:name:interactive:dx:dy:subtitleFontSize:zindex:encode:)
+TitleSpec.doCopy(text:textExpression:subtitle:orient:anchor:frame:offset:subtitlePadding:fontSize:fontWeight:fontStyle:subtitleFontStyle:color:font:subtitleColor:subtitleFont:subtitleFontWeight:lineHeight:subtitleLineHeight:align:angle:baseline:limit:aria:name:interactive:dx:dy:subtitleFontSize:zindex:encode:subtitleExpression:)
 TitleSpec.dx
 TitleSpec.dy
 TitleSpec.encode
@@ -4383,7 +4383,7 @@ TitleSpec.fontStyle
 TitleSpec.fontWeight
 TitleSpec.frame
 TitleSpec.hash()
-TitleSpec.init(text:textExpression:subtitle:orient:anchor:frame:offset:subtitlePadding:fontSize:fontWeight:fontStyle:subtitleFontStyle:color:font:subtitleColor:subtitleFont:subtitleFontWeight:lineHeight:subtitleLineHeight:align:angle:baseline:limit:aria:name:interactive:dx:dy:subtitleFontSize:zindex:encode:)
+TitleSpec.init(text:textExpression:subtitle:orient:anchor:frame:offset:subtitlePadding:fontSize:fontWeight:fontStyle:subtitleFontStyle:color:font:subtitleColor:subtitleFont:subtitleFontWeight:lineHeight:subtitleLineHeight:align:angle:baseline:limit:aria:name:interactive:dx:dy:subtitleFontSize:zindex:encode:subtitleExpression:)
 TitleSpec.interactive
 TitleSpec.isEqual(_:)
 TitleSpec.limit
@@ -4393,6 +4393,7 @@ TitleSpec.offset
 TitleSpec.orient
 TitleSpec.subtitle
 TitleSpec.subtitleColor
+TitleSpec.subtitleExpression
 TitleSpec.subtitleFont
 TitleSpec.subtitleFontSize
 TitleSpec.subtitleFontStyle

@@ -208,8 +208,28 @@ internal class TitleBuilder(
       )
 
     val children = mutableListOf<SceneNode>(title)
-    spec.subtitle
-      ?.takeIf { it.isNotEmpty() }
+    // ```js
+    // if (spec.subtitle) {
+    //   children.push(buildSubTitle(spec, _, encode.subtitle, dataRef));
+    // }
+    // ```
+    //
+    // Whether there is a subtitle at all is decided by the **property**, and only by it. A signal
+    // reference is an object, so it is truthy however it evaluates: a parameter that resolves to
+    // nothing still draws an empty subtitle, where an empty literal draws none. A block under
+    // `encode.subtitle` is not a subtitle either — it styles one the property asked for, and
+    // upstream never reaches `buildSubTitle` without that property. All three were read off
+    // upstream rather than reasoned about.
+    //
+    // Asking only for a literal string left a chart whose heading comes from a parameter — which is
+    // how a templated dashboard writes one — with the words missing entirely rather than merely
+    // unstyled.
+    val declaresSubtitle = spec.subtitleExpression != null || spec.subtitle?.isNotEmpty() == true
+    (if (!declaresSubtitle) null
+      else
+        text(spec, "subtitle", "text")
+          ?: spec.subtitleExpression?.let { numbers.resolveText(it, "title") }
+          ?: spec.subtitle)
       ?.let { text ->
         // The subtitle is offset along whichever direction the title's own box grew in, which after
         // a
