@@ -1862,6 +1862,57 @@ public data class LayoutSpec(
 }
 
 /**
+ * A mark's `clip`, which is not a boolean: it is a **shape**.
+ *
+ * ```js
+ * if (isObject(clip)) {
+ *   if (clip.signal)      expr = clip.signal;
+ *   else if (clip.path)   expr = 'pathShape(' + param(clip.path) + ')';
+ *   else if (clip.sphere) expr = 'geoShape(' + param(clip.sphere) + ', {type: "Sphere"})';
+ * }
+ * return expr ? scope.signalRef(expr) : !!clip;
+ * ```
+ *
+ * Upstream folds all three object forms into **one expression** and lets its value decide, which is
+ * why this carries an expression rather than three cases: a value that is a path clips the mark to
+ * that path, anything else truthy clips it to the enclosing group's rectangle, and a falsy one does
+ * not clip at all. A `{"sphere": "projection"}` is therefore the globe's own outline and a
+ * `{"signal": "…"}` is a clip a control can switch off — where reading the object for its
+ * *truthiness*, as this did, clips to the rectangle always and can never be switched off.
+ */
+public sealed interface MarkClip {
+  /** No `clip`, or one written `false`. */
+  public data object None : MarkClip
+
+  /** `clip: true` — the enclosing group's rectangle, `(0, 0, group.width, group.height)`. */
+  public data object Rect : MarkClip
+
+  /**
+   * `clip: {"signal": …}` — the rectangle, or no clip, depending on what the signal says.
+   *
+   * One of the several `Signal` cases in this file, and the same shape as every other: an
+   * expression the compiler resolves when the chart's signals exist.
+   *
+   * **Truthiness decides, and only truthiness.** A signal answering a path string still clips to
+   * the rectangle: upstream tests `isFunction(clip)`, and a string is not a function however much
+   * it looks like a path. Probed, because the opposite reading is the tempting one.
+   */
+  public data class Signal(val expression: String) : MarkClip
+
+  /**
+   * `clip: {"path": …}` or `{"sphere": …}` — an expression whose **value is the path** itself.
+   *
+   * Built here rather than resolved here, because `pathShape` and `geoShape` need the chart's
+   * signals and projections and a specification is parsed before either exists.
+   *
+   * A value of nothing — an unknown projection, a path that draws nothing — clips the mark away
+   * entirely rather than leaving it unclipped: upstream still has a clip function, it simply
+   * encloses no area, and the mark's bounds come back empty. Probed.
+   */
+  public data class Shape(val expression: String) : MarkClip
+}
+
+/**
  * A mark definition.
  *
  * A `group` mark is also a scope: [data], [signals], [scales], [axes] and [marks] declared on it
@@ -1942,7 +1993,7 @@ public data class MarkSpec(
    * own `description` channel is the other half of the pair and names one bar.
    */
   val description: String? = null,
-  val clip: Boolean = false,
+  val clip: MarkClip = MarkClip.None,
   /**
    * Appearance defaults from `config`, either side of the engine's own built-in per-type block.
    *

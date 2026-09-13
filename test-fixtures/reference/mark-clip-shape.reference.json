@@ -1,0 +1,99 @@
+{
+  "marks": [
+    {
+      "fill": "steelblue",
+      "role": "mark",
+      "shapeHeight": 17.320508,
+      "shapeLeft": -48.660254,
+      "shapeTop": 51.339746,
+      "shapeWidth": 17.320508,
+      "size": 300,
+      "type": "symbol",
+      "x": -40,
+      "y": 60
+    },
+    {
+      "fill": "steelblue",
+      "role": "mark",
+      "shapeHeight": 17.320508,
+      "shapeLeft": 51.339746,
+      "shapeTop": 31.339746,
+      "shapeWidth": 17.320508,
+      "size": 300,
+      "type": "symbol",
+      "x": 60,
+      "y": 40
+    },
+    {
+      "fill": "steelblue",
+      "role": "mark",
+      "shapeHeight": 17.320508,
+      "shapeLeft": 141.339746,
+      "shapeTop": 81.339746,
+      "shapeWidth": 17.320508,
+      "size": 300,
+      "type": "symbol",
+      "x": 150,
+      "y": 90
+    },
+    {
+      "fill": "steelblue",
+      "role": "mark",
+      "shapeHeight": 17.320508,
+      "shapeLeft": 251.339746,
+      "shapeTop": 51.339746,
+      "shapeWidth": 17.320508,
+      "size": 300,
+      "type": "symbol",
+      "x": 260,
+      "y": 60
+    },
+    {
+      "fill": "#e45756",
+      "fillOpacity": 0.5,
+      "height": 100,
+      "role": "mark",
+      "type": "rect",
+      "width": 6,
+      "x": -40,
+      "y": 10
+    },
+    {
+      "fill": "#e45756",
+      "fillOpacity": 0.5,
+      "height": 100,
+      "role": "mark",
+      "type": "rect",
+      "width": 6,
+      "x": 60,
+      "y": 10
+    },
+    {
+      "fill": "#e45756",
+      "fillOpacity": 0.5,
+      "height": 100,
+      "role": "mark",
+      "type": "rect",
+      "width": 6,
+      "x": 150,
+      "y": 10
+    },
+    {
+      "fill": "#e45756",
+      "fillOpacity": 0.5,
+      "height": 100,
+      "role": "mark",
+      "type": "rect",
+      "width": 6,
+      "x": 260,
+      "y": 10
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 130,
+    "width": 298.660254
+  },
+  "spec": "mark-clip-shape.vg.json",
+  "vegaVersion": "6.3.1"
+}

@@ -147,12 +147,13 @@ public class SceneWalk {
   private fun walkGroup(node: GroupNode, local: Transform2D, target: SceneDrawTarget) {
     // A group's clip is in its own space, so it is mapped through the transform just composed.
     //
-    // **`clipPath` is not implemented here**, and this comment is the whole of the report: a group
-    // whose `encode` block gives it a `path` clips to that outline on the Android canvas and in
-    // exported SVG, and to nothing at all in this renderer. `SceneDrawTarget.beginGroup` takes a
-    // rectangle, so honouring one means widening that seam — and widening it for the Swift walk in
-    // the same step, since the two are compared call for call. Until then a chart using it draws
-    // *more* than it should here rather than less, which is visible rather than silent.
+    // **`clipPath` is not implemented here**, and this comment is the whole of the report: a mark
+    // clipped to a shape — `clip: {"path": …}` or `{"sphere": …}` — clips to that outline on the
+    // Android canvas and in exported SVG, and to the outline's **bounding box** in this renderer,
+    // since that is what the scene node carries beside the path. `SceneDrawTarget.beginGroup` takes
+    // a rectangle, so honouring the path means widening that seam — and widening it for the Swift
+    // walk in the same step, since the two are compared call for call. Until then a chart using one
+    // draws *more* than it should here rather than less, which is visible rather than silent.
     target.beginGroup(node.clip?.let { local.applyTo(it) })
 
     // A group with its own paint draws a rectangle of its declared size, and this is the only thing

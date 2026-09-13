@@ -673,6 +673,46 @@ sealed interface dev.aster.vega.model.spec/FieldRef { // dev.aster.vega.model.sp
     }
 }
 
+sealed interface dev.aster.vega.model.spec/MarkClip { // dev.aster.vega.model.spec/MarkClip|null[0]
+    final class Shape : dev.aster.vega.model.spec/MarkClip { // dev.aster.vega.model.spec/MarkClip.Shape|null[0]
+        constructor <init>(kotlin/String) // dev.aster.vega.model.spec/MarkClip.Shape.<init>|<init>(kotlin.String){}[0]
+
+        final val expression // dev.aster.vega.model.spec/MarkClip.Shape.expression|{}expression[0]
+            final fun <get-expression>(): kotlin/String // dev.aster.vega.model.spec/MarkClip.Shape.expression.<get-expression>|<get-expression>(){}[0]
+
+        final fun component1(): kotlin/String // dev.aster.vega.model.spec/MarkClip.Shape.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): dev.aster.vega.model.spec/MarkClip.Shape // dev.aster.vega.model.spec/MarkClip.Shape.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.model.spec/MarkClip.Shape.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.model.spec/MarkClip.Shape.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.model.spec/MarkClip.Shape.toString|toString(){}[0]
+    }
+
+    final class Signal : dev.aster.vega.model.spec/MarkClip { // dev.aster.vega.model.spec/MarkClip.Signal|null[0]
+        constructor <init>(kotlin/String) // dev.aster.vega.model.spec/MarkClip.Signal.<init>|<init>(kotlin.String){}[0]
+
+        final val expression // dev.aster.vega.model.spec/MarkClip.Signal.expression|{}expression[0]
+            final fun <get-expression>(): kotlin/String // dev.aster.vega.model.spec/MarkClip.Signal.expression.<get-expression>|<get-expression>(){}[0]
+
+        final fun component1(): kotlin/String // dev.aster.vega.model.spec/MarkClip.Signal.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): dev.aster.vega.model.spec/MarkClip.Signal // dev.aster.vega.model.spec/MarkClip.Signal.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.model.spec/MarkClip.Signal.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.model.spec/MarkClip.Signal.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.model.spec/MarkClip.Signal.toString|toString(){}[0]
+    }
+
+    final object None : dev.aster.vega.model.spec/MarkClip { // dev.aster.vega.model.spec/MarkClip.None|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.model.spec/MarkClip.None.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.model.spec/MarkClip.None.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.model.spec/MarkClip.None.toString|toString(){}[0]
+    }
+
+    final object Rect : dev.aster.vega.model.spec/MarkClip { // dev.aster.vega.model.spec/MarkClip.Rect|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.model.spec/MarkClip.Rect.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.model.spec/MarkClip.Rect.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.model.spec/MarkClip.Rect.toString|toString(){}[0]
+    }
+}
+
 sealed interface dev.aster.vega.model.spec/NumberList { // dev.aster.vega.model.spec/NumberList|null[0]
     final class Items : dev.aster.vega.model.spec/NumberList { // dev.aster.vega.model.spec/NumberList.Items|null[0]
         constructor <init>(kotlin.collections/List<dev.aster.vega.model.spec/NumberValue>) // dev.aster.vega.model.spec/NumberList.Items.<init>|<init>(kotlin.collections.List<dev.aster.vega.model.spec.NumberValue>){}[0]
@@ -2074,14 +2114,14 @@ final class dev.aster.vega.model.spec/MarkSort { // dev.aster.vega.model.spec/Ma
 }
 
 final class dev.aster.vega.model.spec/MarkSpec { // dev.aster.vega.model.spec/MarkSpec|null[0]
-    constructor <init>(dev.aster.vega.model.spec/MarkType, kotlin/String? = ..., kotlin/String? = ..., dev.aster.vega.model.spec/FromSpec? = ..., kotlin/String? = ..., dev.aster.vega.model.spec/MarkSort? = ..., kotlin.collections/List<dev.aster.vega.model/VegaValue> = ..., dev.aster.vega.model.spec/EncodeSpec = ..., kotlin.collections/List<dev.aster.vega.model.spec/MarkSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/ProjectionSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/AxisSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/DataSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/SignalSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/ScaleSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/LegendSpec> = ..., dev.aster.vega.model.spec/LayoutSpec? = ..., dev.aster.vega.model.spec/TitleSpec? = ..., kotlin/Int = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ...) // dev.aster.vega.model.spec/MarkSpec.<init>|<init>(dev.aster.vega.model.spec.MarkType;kotlin.String?;kotlin.String?;dev.aster.vega.model.spec.FromSpec?;kotlin.String?;dev.aster.vega.model.spec.MarkSort?;kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.spec.EncodeSpec;kotlin.collections.List<dev.aster.vega.model.spec.MarkSpec>;kotlin.collections.List<dev.aster.vega.model.spec.ProjectionSpec>;kotlin.collections.List<dev.aster.vega.model.spec.AxisSpec>;kotlin.collections.List<dev.aster.vega.model.spec.DataSpec>;kotlin.collections.List<dev.aster.vega.model.spec.SignalSpec>;kotlin.collections.List<dev.aster.vega.model.spec.ScaleSpec>;kotlin.collections.List<dev.aster.vega.model.spec.LegendSpec>;dev.aster.vega.model.spec.LayoutSpec?;dev.aster.vega.model.spec.TitleSpec?;kotlin.Int;kotlin.Boolean;kotlin.Boolean;kotlin.String?;kotlin.Boolean;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>){}[0]
+    constructor <init>(dev.aster.vega.model.spec/MarkType, kotlin/String? = ..., kotlin/String? = ..., dev.aster.vega.model.spec/FromSpec? = ..., kotlin/String? = ..., dev.aster.vega.model.spec/MarkSort? = ..., kotlin.collections/List<dev.aster.vega.model/VegaValue> = ..., dev.aster.vega.model.spec/EncodeSpec = ..., kotlin.collections/List<dev.aster.vega.model.spec/MarkSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/ProjectionSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/AxisSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/DataSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/SignalSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/ScaleSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/LegendSpec> = ..., dev.aster.vega.model.spec/LayoutSpec? = ..., dev.aster.vega.model.spec/TitleSpec? = ..., kotlin/Int = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String? = ..., dev.aster.vega.model.spec/MarkClip = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ...) // dev.aster.vega.model.spec/MarkSpec.<init>|<init>(dev.aster.vega.model.spec.MarkType;kotlin.String?;kotlin.String?;dev.aster.vega.model.spec.FromSpec?;kotlin.String?;dev.aster.vega.model.spec.MarkSort?;kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.spec.EncodeSpec;kotlin.collections.List<dev.aster.vega.model.spec.MarkSpec>;kotlin.collections.List<dev.aster.vega.model.spec.ProjectionSpec>;kotlin.collections.List<dev.aster.vega.model.spec.AxisSpec>;kotlin.collections.List<dev.aster.vega.model.spec.DataSpec>;kotlin.collections.List<dev.aster.vega.model.spec.SignalSpec>;kotlin.collections.List<dev.aster.vega.model.spec.ScaleSpec>;kotlin.collections.List<dev.aster.vega.model.spec.LegendSpec>;dev.aster.vega.model.spec.LayoutSpec?;dev.aster.vega.model.spec.TitleSpec?;kotlin.Int;kotlin.Boolean;kotlin.Boolean;kotlin.String?;dev.aster.vega.model.spec.MarkClip;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>){}[0]
 
     final val aria // dev.aster.vega.model.spec/MarkSpec.aria|{}aria[0]
         final fun <get-aria>(): kotlin/Boolean // dev.aster.vega.model.spec/MarkSpec.aria.<get-aria>|<get-aria>(){}[0]
     final val axes // dev.aster.vega.model.spec/MarkSpec.axes|{}axes[0]
         final fun <get-axes>(): kotlin.collections/List<dev.aster.vega.model.spec/AxisSpec> // dev.aster.vega.model.spec/MarkSpec.axes.<get-axes>|<get-axes>(){}[0]
     final val clip // dev.aster.vega.model.spec/MarkSpec.clip|{}clip[0]
-        final fun <get-clip>(): kotlin/Boolean // dev.aster.vega.model.spec/MarkSpec.clip.<get-clip>|<get-clip>(){}[0]
+        final fun <get-clip>(): dev.aster.vega.model.spec/MarkClip // dev.aster.vega.model.spec/MarkSpec.clip.<get-clip>|<get-clip>(){}[0]
     final val configAboveDefaults // dev.aster.vega.model.spec/MarkSpec.configAboveDefaults|{}configAboveDefaults[0]
         final fun <get-configAboveDefaults>(): kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> // dev.aster.vega.model.spec/MarkSpec.configAboveDefaults.<get-configAboveDefaults>|<get-configAboveDefaults>(){}[0]
     final val configBelowDefaults // dev.aster.vega.model.spec/MarkSpec.configBelowDefaults|{}configBelowDefaults[0]
@@ -2139,7 +2179,7 @@ final class dev.aster.vega.model.spec/MarkSpec { // dev.aster.vega.model.spec/Ma
     final fun component2(): kotlin/String? // dev.aster.vega.model.spec/MarkSpec.component2|component2(){}[0]
     final fun component20(): kotlin/Boolean // dev.aster.vega.model.spec/MarkSpec.component20|component20(){}[0]
     final fun component21(): kotlin/String? // dev.aster.vega.model.spec/MarkSpec.component21|component21(){}[0]
-    final fun component22(): kotlin/Boolean // dev.aster.vega.model.spec/MarkSpec.component22|component22(){}[0]
+    final fun component22(): dev.aster.vega.model.spec/MarkClip // dev.aster.vega.model.spec/MarkSpec.component22|component22(){}[0]
     final fun component23(): kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> // dev.aster.vega.model.spec/MarkSpec.component23|component23(){}[0]
     final fun component24(): kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> // dev.aster.vega.model.spec/MarkSpec.component24|component24(){}[0]
     final fun component3(): kotlin/String? // dev.aster.vega.model.spec/MarkSpec.component3|component3(){}[0]
@@ -2149,7 +2189,7 @@ final class dev.aster.vega.model.spec/MarkSpec { // dev.aster.vega.model.spec/Ma
     final fun component7(): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.model.spec/MarkSpec.component7|component7(){}[0]
     final fun component8(): dev.aster.vega.model.spec/EncodeSpec // dev.aster.vega.model.spec/MarkSpec.component8|component8(){}[0]
     final fun component9(): kotlin.collections/List<dev.aster.vega.model.spec/MarkSpec> // dev.aster.vega.model.spec/MarkSpec.component9|component9(){}[0]
-    final fun copy(dev.aster.vega.model.spec/MarkType = ..., kotlin/String? = ..., kotlin/String? = ..., dev.aster.vega.model.spec/FromSpec? = ..., kotlin/String? = ..., dev.aster.vega.model.spec/MarkSort? = ..., kotlin.collections/List<dev.aster.vega.model/VegaValue> = ..., dev.aster.vega.model.spec/EncodeSpec = ..., kotlin.collections/List<dev.aster.vega.model.spec/MarkSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/ProjectionSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/AxisSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/DataSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/SignalSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/ScaleSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/LegendSpec> = ..., dev.aster.vega.model.spec/LayoutSpec? = ..., dev.aster.vega.model.spec/TitleSpec? = ..., kotlin/Int = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ...): dev.aster.vega.model.spec/MarkSpec // dev.aster.vega.model.spec/MarkSpec.copy|copy(dev.aster.vega.model.spec.MarkType;kotlin.String?;kotlin.String?;dev.aster.vega.model.spec.FromSpec?;kotlin.String?;dev.aster.vega.model.spec.MarkSort?;kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.spec.EncodeSpec;kotlin.collections.List<dev.aster.vega.model.spec.MarkSpec>;kotlin.collections.List<dev.aster.vega.model.spec.ProjectionSpec>;kotlin.collections.List<dev.aster.vega.model.spec.AxisSpec>;kotlin.collections.List<dev.aster.vega.model.spec.DataSpec>;kotlin.collections.List<dev.aster.vega.model.spec.SignalSpec>;kotlin.collections.List<dev.aster.vega.model.spec.ScaleSpec>;kotlin.collections.List<dev.aster.vega.model.spec.LegendSpec>;dev.aster.vega.model.spec.LayoutSpec?;dev.aster.vega.model.spec.TitleSpec?;kotlin.Int;kotlin.Boolean;kotlin.Boolean;kotlin.String?;kotlin.Boolean;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>){}[0]
+    final fun copy(dev.aster.vega.model.spec/MarkType = ..., kotlin/String? = ..., kotlin/String? = ..., dev.aster.vega.model.spec/FromSpec? = ..., kotlin/String? = ..., dev.aster.vega.model.spec/MarkSort? = ..., kotlin.collections/List<dev.aster.vega.model/VegaValue> = ..., dev.aster.vega.model.spec/EncodeSpec = ..., kotlin.collections/List<dev.aster.vega.model.spec/MarkSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/ProjectionSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/AxisSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/DataSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/SignalSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/ScaleSpec> = ..., kotlin.collections/List<dev.aster.vega.model.spec/LegendSpec> = ..., dev.aster.vega.model.spec/LayoutSpec? = ..., dev.aster.vega.model.spec/TitleSpec? = ..., kotlin/Int = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String? = ..., dev.aster.vega.model.spec/MarkClip = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ...): dev.aster.vega.model.spec/MarkSpec // dev.aster.vega.model.spec/MarkSpec.copy|copy(dev.aster.vega.model.spec.MarkType;kotlin.String?;kotlin.String?;dev.aster.vega.model.spec.FromSpec?;kotlin.String?;dev.aster.vega.model.spec.MarkSort?;kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.spec.EncodeSpec;kotlin.collections.List<dev.aster.vega.model.spec.MarkSpec>;kotlin.collections.List<dev.aster.vega.model.spec.ProjectionSpec>;kotlin.collections.List<dev.aster.vega.model.spec.AxisSpec>;kotlin.collections.List<dev.aster.vega.model.spec.DataSpec>;kotlin.collections.List<dev.aster.vega.model.spec.SignalSpec>;kotlin.collections.List<dev.aster.vega.model.spec.ScaleSpec>;kotlin.collections.List<dev.aster.vega.model.spec.LegendSpec>;dev.aster.vega.model.spec.LayoutSpec?;dev.aster.vega.model.spec.TitleSpec?;kotlin.Int;kotlin.Boolean;kotlin.Boolean;kotlin.String?;dev.aster.vega.model.spec.MarkClip;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.model.spec/MarkSpec.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.aster.vega.model.spec/MarkSpec.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.aster.vega.model.spec/MarkSpec.toString|toString(){}[0]
