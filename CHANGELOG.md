@@ -8,6 +8,11 @@ section here does not get released.
 
 ### Fixed
 
+- **A test compared `Math.pow` results by identity, and CI is not a Mac.** The exponential rate
+  assertions pinned `0.9^4` to the last bit, which the JDK only promises to within one ulp — green on
+  macOS, two failures on Linux. The values are compared to `1e-12` now; a rate read from the wrong
+  place is out by percent, not by `1e-15`.
+
 - **A mark's `clip` is a shape, not a boolean.** `{"path": …}` clips to that path, `{"sphere": …}` to
   a projection's globe, and `{"signal": …}` to whatever the signal says — upstream folds all three
   into one expression and lets its value decide. Each was read here for its *truthiness*, so a clip

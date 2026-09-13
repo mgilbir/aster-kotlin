@@ -74,6 +74,26 @@ class ExponentialRateTest {
     (it.field(name) as? VegaValue.Num)?.value ?: Double.NaN
   }
 
+  /**
+   * Asserts a column, to within a last-bit tolerance.
+   *
+   * **Not exact, and the reason is the operation itself.** The normalisation divides by `1 - r^n`,
+   * and `Math.pow` is not required to be correctly rounded — the JDK promises within one ulp and
+   * `StrictMath` is the one that promises more. `0.9^4` therefore comes out a bit apart on macOS
+   * and on Linux, which is where this first failed: the value was right on both hosts and the
+   * `assertEquals` that compares doubles by identity was what was wrong. A rate read from the wrong
+   * place is out by percent rather than by `1e-15`, so the tolerance costs the test nothing.
+   *
+   * Upstream has the same freedom in the other direction — JavaScript's `Math.pow` is equally
+   * implementation-defined — which is why the differential harness compares at six digits.
+   */
+  private fun assertColumn(expected: List<Double>, actual: List<Double>, what: String) {
+    assertEquals(expected.size, actual.size, "$what: column length")
+    expected.zip(actual).forEachIndexed { index, (want, got) ->
+      assertEquals(want, got, 1e-12, "$what[$index]")
+    }
+  }
+
   @Test
   fun `an aggregate exponential uses the rate it was given`() {
     val out =
@@ -81,7 +101,7 @@ class ExponentialRateTest {
         AggregateTransform,
         """{"ops": ["exponential"], "fields": ["v"], "aggregate_params": [0.5], "as": ["e"]}""",
       )
-    assertEquals(listOf(7.133333333333334), column(out, "e"))
+    assertColumn(listOf(7.133333333333334), column(out, "e"), "e")
   }
 
   @Test
@@ -120,8 +140,8 @@ class ExponentialRateTest {
         """{"ops": ["exponential", "exponentialb"], "fields": ["v", "v"],
             "aggregate_params": [0.5, 0.5], "as": ["e", "eb"]}""",
       )
-    assertEquals(listOf(7.133333333333334), column(both, "e"))
-    assertEquals(listOf(6.6875), column(both, "eb"))
+    assertColumn(listOf(7.133333333333334), column(both, "e"), "e")
+    assertColumn(listOf(6.6875), column(both, "eb"), "eb")
 
     // The same pair with the rates disagreeing: both operations run at the **exponential** one's.
     val mixed =
@@ -130,8 +150,8 @@ class ExponentialRateTest {
         """{"ops": ["exponentialb", "exponential"], "fields": ["v", "v"],
             "aggregate_params": [0.5, 0.9], "as": ["eb", "e"]}""",
       )
-    assertEquals(listOf(5.367548706019193), column(mixed, "e"))
-    assertEquals(listOf(1.8458999999999997), column(mixed, "eb"))
+    assertColumn(listOf(5.367548706019193), column(mixed, "e"), "e")
+    assertColumn(listOf(1.8458999999999997), column(mixed, "eb"), "eb")
   }
 
   @Test
@@ -144,8 +164,8 @@ class ExponentialRateTest {
         """{"ops": ["exponential", "exponential"], "fields": ["v", "v"],
             "aggregate_params": [0.5, 0.9], "as": ["a", "b"]}""",
       )
-    assertEquals(listOf(5.367548706019193), column(out, "a"))
-    assertEquals(listOf(5.367548706019193), column(out, "b"))
+    assertColumn(listOf(5.367548706019193), column(out, "a"), "a")
+    assertColumn(listOf(5.367548706019193), column(out, "b"), "b")
   }
 
   @Test
@@ -157,7 +177,7 @@ class ExponentialRateTest {
       )
     // The default frame is `[null, 0]`, so each row's answer is the exponential mean of the rows up
     // to and including it.
-    assertEquals(listOf(1.0, 2.3333333333333335, 5.0, 7.133333333333334), column(out, "e"))
+    assertColumn(listOf(1.0, 2.3333333333333335, 5.0, 7.133333333333334), column(out, "e"), "e")
   }
 
   @Test
@@ -174,6 +194,6 @@ class ExponentialRateTest {
         """{"ops": ["exponential", "exponentialb"], "fields": ["v", "v"],
             "aggregate_params": [0.5, 0.5], "as": ["e", "eb"]}""",
       )
-    assertEquals(listOf(0.5, 1.75, 4.375, 6.6875), column(out, "eb"))
+    assertColumn(listOf(0.5, 1.75, 4.375, 6.6875), column(out, "eb"), "eb")
   }
 }
