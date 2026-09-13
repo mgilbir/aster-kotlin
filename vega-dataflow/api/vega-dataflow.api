@@ -386,6 +386,12 @@ public final class dev/aster/vega/dataflow/transform/LabelTransform : dev/aster/
 	public fun getType ()Ljava/lang/String;
 }
 
+public final class dev/aster/vega/dataflow/transform/LayoutMemory {
+	public fun <init> ()V
+	public final fun recall (Ljava/lang/String;)Ljava/util/List;
+	public final fun remember (Ljava/lang/String;Ljava/util/List;)V
+}
+
 public final class dev/aster/vega/dataflow/transform/LinkPathTransform : dev/aster/vega/dataflow/transform/Transform {
 	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/LinkPathTransform;
 	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
@@ -543,6 +549,19 @@ public final class dev/aster/vega/dataflow/transform/StratifyTransform : dev/ast
 	public fun getType ()Ljava/lang/String;
 }
 
+public final class dev/aster/vega/dataflow/transform/TileRowShape {
+	public fun <init> (IZ)V
+	public final fun component1 ()I
+	public final fun component2 ()Z
+	public final fun copy (IZ)Ldev/aster/vega/dataflow/transform/TileRowShape;
+	public static synthetic fun copy$default (Ldev/aster/vega/dataflow/transform/TileRowShape;IZILjava/lang/Object;)Ldev/aster/vega/dataflow/transform/TileRowShape;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCount ()I
+	public final fun getDice ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class dev/aster/vega/dataflow/transform/TimeUnitTransform : dev/aster/vega/dataflow/transform/Transform {
 	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/TimeUnitTransform;
 	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
@@ -561,22 +580,30 @@ public final class dev/aster/vega/dataflow/transform/Transform$DefaultImpls {
 }
 
 public abstract interface class dev/aster/vega/dataflow/transform/TransformContext {
+	public fun creationOrder ()[I
 	public abstract fun getDiagnostics ()Ldev/aster/vega/model/DiagnosticCollector;
 	public abstract fun getExpressions ()Ldev/aster/vega/expression/ExpressionCompiler;
+	public fun getLayoutMemory ()Ldev/aster/vega/dataflow/transform/LayoutMemory;
+	public fun getLayoutScope ()Ljava/lang/String;
 	public abstract fun getScope ()Ldev/aster/vega/expression/ExpressionScope;
 	public fun getTimeZone ()Lkotlinx/datetime/TimeZone;
 	public abstract fun getTree ()Ldev/aster/vega/dataflow/transform/TreeSource;
 	public fun measureText (Ljava/lang/String;D)D
 	public fun projection (Ljava/lang/String;)Ldev/aster/vega/dataflow/transform/ProjectionDefinition;
+	public fun reordered ([I)V
 	public abstract fun scopeFor (Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/expression/ExpressionScope;
 	public abstract fun setSignal (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)V
 	public abstract fun setTree (Ldev/aster/vega/dataflow/transform/TreeSource;)V
 }
 
 public final class dev/aster/vega/dataflow/transform/TransformContext$DefaultImpls {
+	public static fun creationOrder (Ldev/aster/vega/dataflow/transform/TransformContext;)[I
+	public static fun getLayoutMemory (Ldev/aster/vega/dataflow/transform/TransformContext;)Ldev/aster/vega/dataflow/transform/LayoutMemory;
+	public static fun getLayoutScope (Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/lang/String;
 	public static fun getTimeZone (Ldev/aster/vega/dataflow/transform/TransformContext;)Lkotlinx/datetime/TimeZone;
 	public static fun measureText (Ldev/aster/vega/dataflow/transform/TransformContext;Ljava/lang/String;D)D
 	public static fun projection (Ldev/aster/vega/dataflow/transform/TransformContext;Ljava/lang/String;)Ldev/aster/vega/dataflow/transform/ProjectionDefinition;
+	public static fun reordered (Ldev/aster/vega/dataflow/transform/TransformContext;[I)V
 }
 
 public final class dev/aster/vega/dataflow/transform/TransformKt {

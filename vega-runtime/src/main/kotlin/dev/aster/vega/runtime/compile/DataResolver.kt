@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.dataflow.transform.LayoutMemory
 import dev.aster.vega.dataflow.transform.ProjectionDefinition
 import dev.aster.vega.dataflow.transform.TransformContext
 import dev.aster.vega.dataflow.transform.TransformPipeline
@@ -94,6 +95,14 @@ internal class DataResolver(
    * host should not have to reimplement a parse rule to get its own table through.
    */
   private val hostData: Map<String, List<VegaValue>>? = null,
+  /**
+   * What a layout leaves for the pass after it; see
+   * [dev.aster.vega.dataflow.transform.LayoutMemory].
+   *
+   * One per compile and shared by both passes of a fitted chart, which is the whole point: a
+   * `resquarify` treemap keeps the rows its measuring pass chose.
+   */
+  private val layoutMemory: LayoutMemory? = null,
 ) {
 
   /**
@@ -528,6 +537,7 @@ internal class DataResolver(
             projections,
             refreshProjections,
             timeZone,
+            layoutMemory,
           )
         values = pipeline.run(values, spec.transform, context)
         tree = context.tree
@@ -695,7 +705,14 @@ internal class DataResolver(
       ((Map<String, VegaValue>) -> Map<String, ProjectionDefinition>)?,
     /** What `timeunit: "local"` means in this compile; null is the device's own zone. */
     override val timeZone: TimeZone?,
+    override val layoutMemory: LayoutMemory?,
   ) : TransformContext {
+
+    /**
+     * A layout remembers itself under the dataset it runs in; see [TransformContext.layoutScope].
+     */
+    override val layoutScope: String
+      get() = dataset
 
     /**
      * The projections as they stand, rebuilt at most once per signal a transform writes.

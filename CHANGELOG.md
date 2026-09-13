@@ -8,6 +8,103 @@ section here does not get released.
 
 ### Fixed
 
+- **The Deneb corpus agrees with upstream on every template it can compare: 54 of 54.** The sweep
+  of specifications other people wrote started at 0, and closing it turned up fourteen root causes,
+  each read off upstream's source or off a live view and each fixed where it belongs rather than
+  where it showed:
+
+  - **A sort breaks its ties by the order the rows were created in**, not by the order they are in —
+    upstream's `stableCompare` resolves a tie by tuple id. A table sorted by one field and then by
+    another goes back to the order the rows arrived in, which decides which seat of a parliament
+    diagram gets which colour. The ordinals are tracked through a pipeline, since a row here is a
+    value and has nothing to write an identity on.
+  - **A layout's answer belongs to the row it was computed for**, and a `collect` between the tree
+    and the layout moves the rows out from under it. A treemap ordered by size gave every rectangle
+    to the wrong category.
+  - **`resquarify` reuses the rows an earlier pass chose.** A fitted chart is compiled twice, so its
+    second pass re-applies the first pass's tiling at the fitted size rather than tiling afresh.
+  - **A treemap `ratio` at or below one is one**, not the default: d3 clamps it, and one asks for
+    squares rather than golden rectangles.
+  - **A continuous colour scale may be transformed**: `pow`, `sqrt`, `log` and `symlog` interpolate
+    their range in their own space, colours included. Refusing them left a choropleth with no colour
+    scale at all and three `scale()` calls reported as naming a scale the specification did not
+    define.
+  - **A scale's `scheme` may be written at the top level**, not only inside `range`.
+  - **`reverse` flips an ordinal scale's range**, as it already flipped every other family's.
+  - **A value on a repeated domain stop belongs to the segment that starts there** — upstream's
+    bisection is a right one. It is what `domainMid` builds whenever the middle lands on an end of
+    the data, and a diverging bar chart's baseline sat a quarter of the way across without it.
+  - **An axis's string properties may be signals, or whole encoders.** `parseAxis` builds each part
+    out of encoders, so `labelAlign`, `labelColor`, `titleColor` and their kin take a signal — or a
+    scaled channel — wherever they take a word.
+  - **An axis part's line is encoded with one end on its cross axis**, so an `encode` that moves that
+    coordinate moves the whole line rather than stretching it across the chart.
+  - **A `field` parameter may be an expression.** `linkpath`'s four endpoints are field parameters,
+    and a sankey writes scale lookups there; read as strings, every link came out `MNaN,NaN…`.
+  - **A centre is where a mark's middle goes**, so its start is half its extent back from it — and an
+    area's second boundary is its first plus the extent, not its `y2`. A violin plot writes the
+    extent, and every half of it came out a flat line.
+  - **A fitted chart draws fresh random numbers for the pass that is drawn**, upstream's generator
+    belonging to the view rather than to a render; and the items a mark exposes for another mark to
+    read are now built **on demand**, where before every chart paid a second evaluation of every
+    channel — which also drew twice as many random numbers as upstream.
+  - **A stroke that is not a colour is still a stroke**, which was the first of these to land and is
+    what the rest were measured against.
+
+  Two of the corpus's comparisons were measuring the harness rather than the engine, and are fixed
+  too: a view that **throws mid-run** leaves a crash snapshot rather than a drawing, and is now
+  recorded as a specification there is no reference for — which is what upstream's own network and
+  flow-map templates do; and a number the reference happens to hold as a *string* is read as a
+  number, upstream coercing when it draws where this engine coerces when it reads.
+
+  Then an audit of each of those causes against upstream's own implementation, which is where a
+  fixed bug usually has siblings. Fourteen more, none of which the corpus had reached:
+
+  - **A mark's `sort` orders its items, whatever kind of mark it is** — upstream gives any mark that
+    declares one a `SortItems` operator. This applied it to a line and an area, where the vertices
+    are the only thing an order can mean, and ignored it everywhere else; and it understood only `x`
+    and `y`, so a line sorted by `datum["date"]` was drawn in the order its rows arrived in. A path
+    that is neither a channel nor a `datum` reach is now reported rather than treated as a tie.
+  - **`dotbin` breaks its ties by creation order** too, which decides which of two equal values is
+    stacked nearer the baseline.
+  - **`treelinks` finds its rows the way the layouts do**, so a `collect` between the tree and the
+    links no longer pairs each edge with whichever rows have since moved into those places.
+  - **A band scale's paddings are clamped to `[0, 1]`, all three of them.** Vega's band scale is its
+    own rather than d3's: where d3 clamps only the top of `paddingInner` and leaves `paddingOuter`
+    alone, this clamps both ends of both, so a padding of 3 is one whole step rather than three.
+  - **`rangeStep`** is `{"range": {"step": …}}` written at the top level and is still read; unread,
+    a scale that wrote one had no range at all and was not built.
+  - **A continuous scale of more than two stops inverts**, which is the forward walk with domain and
+    range swapped — a brush or a tooltip over a diverging axis got `NaN`.
+  - **A scheme's `extent`** narrows the ramp to a stretch of itself, and `reverse` flips that stretch
+    rather than the list of stops. It is not a curiosity: the named range **`diverging` is
+    `blueorange` with an extent of `[1, 0]`**, so every chart asking for it was painted the wrong way
+    round.
+  - **A legend's string properties may be signals, or whole encoders**, part by part, exactly as an
+    axis's are — with the one exception upstream builds in: a channel the legend has a *scale* for is
+    written from that scale afterwards, so the scale still wins.
+  - **A field parameter may be written as `{"field": …}`** in every transform that takes one, which
+    is the longhand of a column name; read as a string it became the name `field:amount`, which no
+    row has. The `{"expr": …}` spelling is evaluated by the five transforms that meet it in the wild
+    and **reported** by the rest, where it would otherwise be a silently empty answer.
+  - **An area's second boundary is its first plus the extent** — `y0 = item.y + item.height` — not
+    its `y2`, which `adjustSpatial` has already turned into that height.
+
+  And one of them was in the **harness**: the oracle recorded an area's back boundary from `x2`/`y2`,
+  which agrees wherever a specification writes the far edge and records a *flat* boundary wherever it
+  writes the extent. None of the 199 Vega fixtures writes the extent, so it had never shown; the
+  violin plot does, and the reference it produced was a line. Fixed at the source, and the 199
+  references are unchanged by it.
+
+  Left deliberately: an unreadable **fill** still paints nothing here, where a browser handed an
+  invalid `fill` attribute paints black. The stroke's case was fixed because geometry rides on it —
+  a stroke widens a mark's bounds — and nothing rides on the fill but the colour itself. No
+  specification in the 2243 compared here writes one.
+
+  **API:** `TransformContext` gains `creationOrder`, `reordered`, `layoutMemory` and `layoutScope`,
+  all with defaults, and `vega-dataflow` gains `LayoutMemory` and `TileRowShape`. `ScaleTransform`
+  joins `vega-runtime`'s scale package, and `SequentialColorScale` takes one.
+
 - **An item a mark is drawn *from* carries the bounds of what was drawn.** Vega marks share a
   namespace with datasets, so `"from": {"data": "labels"}` names the items the `labels` mark
   produced — and those items are scene items, which have been through the bounder. `item.bounds` is

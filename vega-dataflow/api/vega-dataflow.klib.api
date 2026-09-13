@@ -73,6 +73,10 @@ abstract interface dev.aster.vega.dataflow.transform/TransformContext { // dev.a
         abstract fun <get-expressions>(): dev.aster.vega.expression/ExpressionCompiler // dev.aster.vega.dataflow.transform/TransformContext.expressions.<get-expressions>|<get-expressions>(){}[0]
     abstract val scope // dev.aster.vega.dataflow.transform/TransformContext.scope|{}scope[0]
         abstract fun <get-scope>(): dev.aster.vega.expression/ExpressionScope // dev.aster.vega.dataflow.transform/TransformContext.scope.<get-scope>|<get-scope>(){}[0]
+    open val layoutMemory // dev.aster.vega.dataflow.transform/TransformContext.layoutMemory|{}layoutMemory[0]
+        open fun <get-layoutMemory>(): dev.aster.vega.dataflow.transform/LayoutMemory? // dev.aster.vega.dataflow.transform/TransformContext.layoutMemory.<get-layoutMemory>|<get-layoutMemory>(){}[0]
+    open val layoutScope // dev.aster.vega.dataflow.transform/TransformContext.layoutScope|{}layoutScope[0]
+        open fun <get-layoutScope>(): kotlin/String // dev.aster.vega.dataflow.transform/TransformContext.layoutScope.<get-layoutScope>|<get-layoutScope>(){}[0]
     open val timeZone // dev.aster.vega.dataflow.transform/TransformContext.timeZone|{}timeZone[0]
         open fun <get-timeZone>(): kotlinx.datetime/TimeZone? // dev.aster.vega.dataflow.transform/TransformContext.timeZone.<get-timeZone>|<get-timeZone>(){}[0]
 
@@ -82,8 +86,10 @@ abstract interface dev.aster.vega.dataflow.transform/TransformContext { // dev.a
 
     abstract fun scopeFor(dev.aster.vega.model/VegaValue): dev.aster.vega.expression/ExpressionScope // dev.aster.vega.dataflow.transform/TransformContext.scopeFor|scopeFor(dev.aster.vega.model.VegaValue){}[0]
     abstract fun setSignal(kotlin/String, dev.aster.vega.model/VegaValue) // dev.aster.vega.dataflow.transform/TransformContext.setSignal|setSignal(kotlin.String;dev.aster.vega.model.VegaValue){}[0]
+    open fun creationOrder(): kotlin/IntArray? // dev.aster.vega.dataflow.transform/TransformContext.creationOrder|creationOrder(){}[0]
     open fun measureText(kotlin/String, kotlin/Double): kotlin/Double // dev.aster.vega.dataflow.transform/TransformContext.measureText|measureText(kotlin.String;kotlin.Double){}[0]
     open fun projection(kotlin/String): dev.aster.vega.dataflow.transform/ProjectionDefinition? // dev.aster.vega.dataflow.transform/TransformContext.projection|projection(kotlin.String){}[0]
+    open fun reordered(kotlin/IntArray) // dev.aster.vega.dataflow.transform/TransformContext.reordered|reordered(kotlin.IntArray){}[0]
 }
 
 abstract interface dev.aster.vega.dataflow.transform/TreeSource { // dev.aster.vega.dataflow.transform/TreeSource|null[0]
@@ -110,6 +116,13 @@ final class dev.aster.vega.dataflow.transform/GroupKey { // dev.aster.vega.dataf
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.dataflow.transform/GroupKey.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.aster.vega.dataflow.transform/GroupKey.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.aster.vega.dataflow.transform/GroupKey.toString|toString(){}[0]
+}
+
+final class dev.aster.vega.dataflow.transform/LayoutMemory { // dev.aster.vega.dataflow.transform/LayoutMemory|null[0]
+    constructor <init>() // dev.aster.vega.dataflow.transform/LayoutMemory.<init>|<init>(){}[0]
+
+    final fun recall(kotlin/String): kotlin.collections/List<kotlin.collections/List<dev.aster.vega.dataflow.transform/TileRowShape>>? // dev.aster.vega.dataflow.transform/LayoutMemory.recall|recall(kotlin.String){}[0]
+    final fun remember(kotlin/String, kotlin.collections/List<kotlin.collections/List<dev.aster.vega.dataflow.transform/TileRowShape>>) // dev.aster.vega.dataflow.transform/LayoutMemory.remember|remember(kotlin.String;kotlin.collections.List<kotlin.collections.List<dev.aster.vega.dataflow.transform.TileRowShape>>){}[0]
 }
 
 final class dev.aster.vega.dataflow.transform/ProjectionDefinition { // dev.aster.vega.dataflow.transform/ProjectionDefinition|null[0]
@@ -173,6 +186,22 @@ final class dev.aster.vega.dataflow.transform/ProjectionDefinition { // dev.aste
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.dataflow.transform/ProjectionDefinition.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.aster.vega.dataflow.transform/ProjectionDefinition.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.aster.vega.dataflow.transform/ProjectionDefinition.toString|toString(){}[0]
+}
+
+final class dev.aster.vega.dataflow.transform/TileRowShape { // dev.aster.vega.dataflow.transform/TileRowShape|null[0]
+    constructor <init>(kotlin/Int, kotlin/Boolean) // dev.aster.vega.dataflow.transform/TileRowShape.<init>|<init>(kotlin.Int;kotlin.Boolean){}[0]
+
+    final val count // dev.aster.vega.dataflow.transform/TileRowShape.count|{}count[0]
+        final fun <get-count>(): kotlin/Int // dev.aster.vega.dataflow.transform/TileRowShape.count.<get-count>|<get-count>(){}[0]
+    final val dice // dev.aster.vega.dataflow.transform/TileRowShape.dice|{}dice[0]
+        final fun <get-dice>(): kotlin/Boolean // dev.aster.vega.dataflow.transform/TileRowShape.dice.<get-dice>|<get-dice>(){}[0]
+
+    final fun component1(): kotlin/Int // dev.aster.vega.dataflow.transform/TileRowShape.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // dev.aster.vega.dataflow.transform/TileRowShape.component2|component2(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Boolean = ...): dev.aster.vega.dataflow.transform/TileRowShape // dev.aster.vega.dataflow.transform/TileRowShape.copy|copy(kotlin.Int;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.dataflow.transform/TileRowShape.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.dataflow.transform/TileRowShape.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.dataflow.transform/TileRowShape.toString|toString(){}[0]
 }
 
 final class dev.aster.vega.dataflow.transform/TransformPipeline { // dev.aster.vega.dataflow.transform/TransformPipeline|null[0]

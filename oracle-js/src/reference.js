@@ -33,7 +33,21 @@ const view = new vega.View(vega.parse(spec), {
   renderer: 'none',
   loader: fileLoader(rootsFor(specPath)),
 });
+
+// A view **logs** a run-time error and carries on with a half-built scene: the operator that threw
+// produced nothing, everything downstream of it never ran, and what is left is whatever had been
+// built by then — marks with no bounds, marks that do not exist. That is a snapshot of a crash, not
+// a picture to be agreed with, so it is reported here and the caller records the specification as
+// one there is no reference for. A parse failure already throws; this is the other half.
+let failure = null;
+view.error = (error) => {
+  failure = error;
+};
 await view.runAsync();
+if (failure) {
+  console.error(`${specPath}: the view reported an error while running: ${failure.message ?? failure}`);
+  process.exit(3);
+}
 
 const scaleNames = (spec.scales || []).map((s) => s.name);
 const reference = {

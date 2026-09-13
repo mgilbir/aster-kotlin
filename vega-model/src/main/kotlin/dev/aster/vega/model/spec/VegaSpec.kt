@@ -498,6 +498,22 @@ public sealed interface RangeSpec {
     val count: Int? = null,
     /** `{"count": {"signal": "levels"}}` — a chart whose reader chooses how many buckets. */
     val countSignal: String? = null,
+    /**
+     * `extent` — the slice of the ramp to use, as two fractions of it.
+     *
+     * ```js
+     * return (isFunction(scheme) && (extent || reverse))
+     *   ? interpolateRange(scheme, flip(extent || [0, 1], reverse))
+     *   : scheme;
+     * ```
+     *
+     * `{"scheme": "blues", "extent": [0.3, 0.7]}` asks for the middle of the ramp, which is how a
+     * chart keeps its palest and darkest shades legible against a background. Written backwards it
+     * reads the ramp backwards, and that is not a curiosity: `"range": "diverging"` *is*
+     * `blueorange` with an extent of `[1, 0]`, so a chart asking for the named range and one asking
+     * for the scheme get opposite colours.
+     */
+    val extent: List<Double>? = null,
   ) : RangeSpec
 
   /**

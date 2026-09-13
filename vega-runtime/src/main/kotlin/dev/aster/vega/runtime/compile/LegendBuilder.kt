@@ -517,7 +517,7 @@ internal class LegendBuilder(
     // A legend over a *shape* scale draws each entry with the shape that scale gives it, rather
     // than one symbol repeated down the column. The legend exists to say which outline means which
     // category, so a column of identical circles is not a smaller version of the right answer.
-    val shapes = entries.map { symbolShapeFor(spec, it.value, shape) }
+    val shapes = entries.map { encodedShape(spec, it) ?: symbolShapeFor(spec, it.value, shape) }
     // A `strokeWidth` scale widens the swatch's outline per entry — and upstream's row-height
     // expression reads that scale, not the `symbolStrokeWidth` property, so a legend keyed to it
     // has
@@ -791,6 +791,18 @@ internal class LegendBuilder(
     val mapped = (shapeScale.scale(value) as? VegaValue.Str)?.value ?: return declared
     return namedShape(mapped) ?: declared
   }
+
+  /**
+   * The swatch's shape as the **symbols block** has it, which is where a signal-valued `symbolType`
+   * lands.
+   *
+   * `addEncoders(encode, {shape: _('symbolType'), …})`: upstream turns the property into an encoder
+   * on the swatch, so it takes a signal wherever it takes a word — and a legend whose swatch shape
+   * comes from a parameter is how a themed dashboard says "squares here, circles there". Read as a
+   * string alone, such a legend drew circles.
+   */
+  private fun encodedShape(spec: LegendSpec, entry: Entry): SymbolShape? =
+    entryText(spec, "symbols", "shape", entry)?.let { namedShape(it) }
 
   private fun symbolSizeFor(spec: LegendSpec, value: VegaValue, declared: Double): Double {
     val sizeScale = spec.size?.let { scales[it] } ?: return declared

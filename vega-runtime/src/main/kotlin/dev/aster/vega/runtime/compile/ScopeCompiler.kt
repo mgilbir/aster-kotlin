@@ -369,10 +369,16 @@ internal class ScopeCompiler(
     marks.forEachIndexed { index, mark ->
       // After building, not before: the items only exist once the channels have been resolved, and
       // a mark cannot read back its own output.
-      fun exposeItems(items: List<VegaValue>) {
-        mark.name?.takeIf { it in readBack }?.let { scope = scope.withMarkItems(it, items) }
+      //
+      // **Lazily**, and that is not only a saving. Building the items runs every channel a second
+      // time, so a mark whose encoding calls `random()` drew twice as many numbers as upstream and
+      // every draw after it in the chart came from the wrong place in the sequence — a jittered dot
+      // strip plot put each of its dots a fraction of a band out. Nothing reads most marks back, so
+      // most marks now pay nothing for it either.
+      fun exposeItems(items: () -> List<VegaValue>) {
+        mark.name?.takeIf { it in readBack }?.let { scope = scope.withMarkItems(it, items()) }
       }
-      fun expose(rows: List<VegaValue>) = exposeItems(encoder.items(mark, rows))
+      fun expose(rows: List<VegaValue>) = exposeItems { encoder.items(mark, rows) }
       if (mark.type == MarkType.GROUP) {
         val group = group(mark, scope, encoder, mark.name ?: "[$index]")
         expose(group.datums)
@@ -388,9 +394,23 @@ internal class ScopeCompiler(
           markReach = markReach.union(group.content.bounds)
         }
       } else {
-        val rows = markData(mark, scope)
-        val transformed = markTransformed(mark, rows, scope, encoder)
+        val unordered = markData(mark, scope)
+        val transformed = markTransformed(mark, unordered, scope, encoder)
         scope = transformed.scope
+        // A mark's `sort` orders the **items** it draws, whatever kind of mark it is — upstream
+        // gives any mark that declares one a `SortItems` operator. Applied to the rows here, and to
+        // everything indexed against them, so the nodes, the items a later mark reads back and the
+        // channels a mark transform wrote all share one order. A line and an area sort inside their
+        // own encoding as well, which is the same order arrived at twice and costs nothing.
+        val order = encoder.itemOrder(mark, unordered)
+        val rows = if (order.size == unordered.size) order.map { unordered[it] } else unordered
+        val written =
+          if (order.size == transformed.written.size) order.map { transformed.written[it] }
+          else transformed.written
+        val transformedItems =
+          transformed.items?.let { items ->
+            if (order.size == items.size) order.map { items[it] } else items
+          }
         // Encoded twice when the mark has a `hover` block: once as it rests, once as it looks under
         // the pointer. The allocator is rewound between the two so the pair share their ids — the
         // hit index and the selection key on them, and an item that changed its id under the
@@ -408,11 +428,11 @@ internal class ScopeCompiler(
         // positionally gave a different row than `items` does, and no differential fixture could
         // carry an item `zindex` at all: the record is compared position by position and upstream's
         // is in data order. `item-zindex` is that fixture, and it is what found this.
-        built[index] = markContainer(mark, encoder.encode(mark, rows, transformed.written), index)
+        built[index] = markContainer(mark, encoder.encode(mark, rows, written), index)
         if (mark.encode.hover.isNotEmpty()) {
           val after = ids.mark()
           ids.rewind(before)
-          val hovered = encoder.encode(hoverSpec(mark), rows, transformed.written)
+          val hovered = encoder.encode(hoverSpec(mark), rows, written)
           ids.rewind(after)
           val resting = built[index].orEmpty()
           if (hovered.size == resting.size) {
@@ -448,8 +468,7 @@ internal class ScopeCompiler(
           // for the same reason.
           val resume = ids.mark()
           ids.rewind(before)
-          val variant =
-            encoder.encode(overlaySpec(mark, state.set, state.fresh), rows, transformed.written)
+          val variant = encoder.encode(overlaySpec(mark, state.set, state.fresh), rows, written)
           ids.rewind(resume)
           val byId = variant.associateBy { it.id }
           built[index] =
@@ -460,9 +479,9 @@ internal class ScopeCompiler(
 
         // The items a mark's own transforms produced, not the ones its encoding alone would: a
         // label drawn from a force-directed mark reads the position the simulation settled on.
-        exposeItems(
-          withBounds(transformed.items ?: encoder.items(mark, rows), built[index].orEmpty())
-        )
+        exposeItems {
+          withBounds(transformedItems ?: encoder.items(mark, rows), built[index].orEmpty())
+        }
         // `boundMark`: a **clipped** mark reaches no further than the group it is drawn in,
         // whatever
         // its items do. A detail plot whose domain is driven by a brush has rows on either side of

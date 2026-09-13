@@ -788,19 +788,22 @@ sealed interface dev.aster.vega.model.spec/RangeSpec { // dev.aster.vega.model.s
     }
 
     final class Scheme : dev.aster.vega.model.spec/RangeSpec { // dev.aster.vega.model.spec/RangeSpec.Scheme|null[0]
-        constructor <init>(dev.aster.vega.model.spec/SchemeRef, kotlin/Int? = ..., kotlin/String? = ...) // dev.aster.vega.model.spec/RangeSpec.Scheme.<init>|<init>(dev.aster.vega.model.spec.SchemeRef;kotlin.Int?;kotlin.String?){}[0]
+        constructor <init>(dev.aster.vega.model.spec/SchemeRef, kotlin/Int? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/Double>? = ...) // dev.aster.vega.model.spec/RangeSpec.Scheme.<init>|<init>(dev.aster.vega.model.spec.SchemeRef;kotlin.Int?;kotlin.String?;kotlin.collections.List<kotlin.Double>?){}[0]
 
         final val count // dev.aster.vega.model.spec/RangeSpec.Scheme.count|{}count[0]
             final fun <get-count>(): kotlin/Int? // dev.aster.vega.model.spec/RangeSpec.Scheme.count.<get-count>|<get-count>(){}[0]
         final val countSignal // dev.aster.vega.model.spec/RangeSpec.Scheme.countSignal|{}countSignal[0]
             final fun <get-countSignal>(): kotlin/String? // dev.aster.vega.model.spec/RangeSpec.Scheme.countSignal.<get-countSignal>|<get-countSignal>(){}[0]
+        final val extent // dev.aster.vega.model.spec/RangeSpec.Scheme.extent|{}extent[0]
+            final fun <get-extent>(): kotlin.collections/List<kotlin/Double>? // dev.aster.vega.model.spec/RangeSpec.Scheme.extent.<get-extent>|<get-extent>(){}[0]
         final val scheme // dev.aster.vega.model.spec/RangeSpec.Scheme.scheme|{}scheme[0]
             final fun <get-scheme>(): dev.aster.vega.model.spec/SchemeRef // dev.aster.vega.model.spec/RangeSpec.Scheme.scheme.<get-scheme>|<get-scheme>(){}[0]
 
         final fun component1(): dev.aster.vega.model.spec/SchemeRef // dev.aster.vega.model.spec/RangeSpec.Scheme.component1|component1(){}[0]
         final fun component2(): kotlin/Int? // dev.aster.vega.model.spec/RangeSpec.Scheme.component2|component2(){}[0]
         final fun component3(): kotlin/String? // dev.aster.vega.model.spec/RangeSpec.Scheme.component3|component3(){}[0]
-        final fun copy(dev.aster.vega.model.spec/SchemeRef = ..., kotlin/Int? = ..., kotlin/String? = ...): dev.aster.vega.model.spec/RangeSpec.Scheme // dev.aster.vega.model.spec/RangeSpec.Scheme.copy|copy(dev.aster.vega.model.spec.SchemeRef;kotlin.Int?;kotlin.String?){}[0]
+        final fun component4(): kotlin.collections/List<kotlin/Double>? // dev.aster.vega.model.spec/RangeSpec.Scheme.component4|component4(){}[0]
+        final fun copy(dev.aster.vega.model.spec/SchemeRef = ..., kotlin/Int? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/Double>? = ...): dev.aster.vega.model.spec/RangeSpec.Scheme // dev.aster.vega.model.spec/RangeSpec.Scheme.copy|copy(dev.aster.vega.model.spec.SchemeRef;kotlin.Int?;kotlin.String?;kotlin.collections.List<kotlin.Double>?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.model.spec/RangeSpec.Scheme.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // dev.aster.vega.model.spec/RangeSpec.Scheme.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // dev.aster.vega.model.spec/RangeSpec.Scheme.toString|toString(){}[0]

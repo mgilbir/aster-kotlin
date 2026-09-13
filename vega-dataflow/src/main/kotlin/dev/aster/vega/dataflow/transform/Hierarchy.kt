@@ -179,6 +179,9 @@ public object NestTransform : Transform {
     build(input.withIndex().map { it.index to it.value }, 0, root)
     root.eachBefore { TreeNode.computeHeight(it) }
     root.sourceSize = input.size
+    // What the rows were called when the tree was built, so a sort after it can be undone; see
+    // [TreeNode.buildOrder].
+    root.buildOrder = context.creationOrder()?.copyOf()
     context.tree = root
     if (!generate) return input
 
@@ -331,7 +334,41 @@ internal fun applyTreeLayout(
       updates[node.index] = fields
     }
   }
-  return input.mapIndexed { index, row -> updates[index]?.let { row.withFields(it) } ?: row }
+  // The rows may have moved since the tree was built — `nest`, then `collect`, then `treemap` is
+  // how a treemap template orders its rectangles by size — and a node names its row by where it sat
+  // then. Looking the results up by position handed each row the layout of whichever row used to
+  // sit there: a treemap whose every rectangle was the wrong size, in the wrong place, for the
+  // wrong category.
+  val keysOf = rowKeys(input, context, root)
+  return input.mapIndexed { index, row ->
+    updates[keysOf(index)]?.let { row.withFields(it) } ?: row
+  }
+}
+
+/**
+ * Where each row sat **when the tree was built**, which is how a node names it.
+ *
+ * Upstream writes a layout's answer onto the tuple objects themselves, so a tuple that has moved
+ * still gets its own rectangle. Rows here are values and a node has to name one somehow, so it
+ * names a position — and a `collect` between the tree and the layout moves the rows out from under
+ * it. The creation ordinals the pipeline tracks are what survive that: the ordinals recorded when
+ * the tree was built say where each ordinal sat then, and a row's ordinal now says which of them it
+ * is. Falls back to the position wherever either is missing, which is right whenever the rows have
+ * not moved.
+ */
+private fun rowKeys(
+  input: List<VegaValue>,
+  context: TransformContext,
+  root: TreeNode,
+): (Int) -> Int {
+  val built = root.buildOrder ?: return { it }
+  val now = context.creationOrder()?.takeIf { it.size == input.size } ?: return { it }
+  // Where each ordinal sat when the tree was built. A row whose ordinal is not in there is one the
+  // tree never saw — `nest` with `generate` appends a row per interior node, and those are found by
+  // position as they always were.
+  val whereItWas = HashMap<Int, Int>(built.size)
+  for ((position, ordinal) in built.withIndex()) whereItWas[ordinal] = position
+  return { index -> whereItWas[now[index]] ?: index }
 }
 
 /** Numbers compare as numbers and everything else as text, which is how upstream's sort behaves. */
@@ -420,20 +457,54 @@ public object TreemapTransform : Transform {
     params: VegaValue.Obj,
     context: TransformContext,
   ): ((TreeNode, Double, Double, Double, Double) -> Unit)? {
-    val ratio = params.number("ratio")?.takeIf { it > 1 } ?: TreeLayouts.PHI
+    // ```js
+    // custom.ratio = function(x) { return custom((x = +x) > 1 ? x : 1); };
+    // ```
+    //
+    // A ratio **at or below one is one**, not the default. d3 clamps it, and one is a meaningful
+    // setting — it asks for squares rather than golden rectangles, which is what a treemap meant to
+    // be read by area wants. Rejecting it fell back to φ and tiled a whole chart differently: the
+    // Deneb treemap template writes `"ratio": 1` and came out with every rectangle in a different
+    // place, 72 differences from one comparison.
+    val ratio = params.number("ratio")?.let { maxOf(it, 1.0) } ?: TreeLayouts.PHI
     val squarify: (TreeNode, Double, Double, Double, Double) -> Unit = { p, a, b, c, d ->
       TreeLayouts.squarify(ratio, p, a, b, c, d)
     }
     return when (val method = params.string("method") ?: "squarify") {
       "squarify" -> squarify
+      // `resquarify` **reuses** the rows an earlier pass chose, which is what keeps a treemap still
+      // while its numbers move. A fitted chart compiles twice — once to be measured, once to be
+      // drawn — and upstream's second pass therefore re-applies the first pass's rows at the fitted
+      // size rather than tiling afresh. Verified on the Deneb template: with `squarify` it lands
+      // where a fresh tiling of the fitted box lands, and with `resquarify` it keeps the shape the
+      // 400x400 measuring pass gave it.
+      //
+      // With nothing remembered — a chart that compiles once — this is a plain squarify, which is
+      // what upstream does on its own first pass.
       "resquarify" -> {
-        context.diagnostics.warn(
-          DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
-          "treemap method 'resquarify' keeps rectangles stable across an animation; nothing " +
-            "animates here, so it tiled as 'squarify'",
-          operator = type,
-        )
-        squarify
+        val memory = context.layoutMemory
+        val key = context.layoutScope
+        // Copied, because the list below replaces it under the same name as the tiling proceeds.
+        val remembered = memory?.recall(key)?.toList()
+        // Filled in as each parent is tiled and handed to the memory now: the reference is what is
+        // stored, so it is complete by the time anything reads it back.
+        val recorded = mutableListOf<List<TileRowShape>>()
+        memory?.remember(key, recorded)
+        // Parents are tiled in `eachBefore` order, which is the same order in both passes, so the
+        // rows are found again by their place in that walk. A row list that does not fit the
+        // children this time is dropped and the parent tiled afresh, which is `replaySquarified`
+        // answering false.
+        var step = 0
+        val tile: (TreeNode, Double, Double, Double, Double) -> Unit = { p, a, b, c, d ->
+          val rows = remembered?.getOrNull(step)
+          step++
+          if (rows != null && TreeLayouts.replaySquarified(rows, p, a, b, c, d)) {
+            recorded += rows
+          } else {
+            TreeLayouts.squarify(ratio, p, a, b, c, d) { recorded += it }
+          }
+        }
+        tile
       }
       "binary" -> { p, a, b, c, d ->
         TreeLayouts.binary(p, a, b, c, d)

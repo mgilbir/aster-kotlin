@@ -33,6 +33,7 @@ import dev.aster.vega.runtime.scale.PointScale
 import dev.aster.vega.runtime.scale.PowScale
 import dev.aster.vega.runtime.scale.QuantileScale
 import dev.aster.vega.runtime.scale.QuantizeScale
+import dev.aster.vega.runtime.scale.ScaleTransform
 import dev.aster.vega.runtime.scale.SequentialColorScale
 import dev.aster.vega.runtime.scale.SymlogScale
 import dev.aster.vega.runtime.scale.ThresholdScale
@@ -109,10 +110,22 @@ public class ScaleResolver(
       // so
       // a channel that wants a scale can be handed coordinates that are already final.
       ScaleType.IDENTITY -> IdentityScale(spec.name)
-      ScaleType.LOG -> buildLog(spec)
-      ScaleType.POW -> buildPow(spec, defaultExponent = 1.0)
-      ScaleType.SQRT -> buildPow(spec, defaultExponent = 0.5)
-      ScaleType.SYMLOG -> buildSymlog(spec)
+      // A **transformed** scale with a colour range is a colour scale too, and the ramp is walked
+      // in the scale's own space: `sqrt` over `[0, 100]` paints 25 the midpoint colour, because the
+      // square roots make it the midpoint. Read off a live view. Refusing these left a choropleth
+      // shaded by a `pow` scale with no colour scale at all — three `scale()` calls reported as
+      // naming a scale the specification does not define, and a map drawn in the default fill.
+      ScaleType.LOG ->
+        if (hasColorRange(spec)) buildSequentialColor(spec, logSpace(spec)) else buildLog(spec)
+      ScaleType.POW ->
+        if (hasColorRange(spec)) buildSequentialColor(spec, powSpace(spec, 1.0))
+        else buildPow(spec, defaultExponent = 1.0)
+      ScaleType.SQRT ->
+        if (hasColorRange(spec)) buildSequentialColor(spec, powSpace(spec, 0.5))
+        else buildPow(spec, defaultExponent = 0.5)
+      ScaleType.SYMLOG ->
+        if (hasColorRange(spec)) buildSequentialColor(spec, symlogSpace(spec))
+        else buildSymlog(spec)
       // A **time** scale with a colour range is a colour scale as much as a linear one is: the
       // domain is still a pair of instants and the ramp is still walked between them, and a chart
       // that shades its lines by quarter asks for exactly that.
@@ -244,7 +257,22 @@ public class ScaleResolver(
       else -> false
     }
 
-  private fun buildSequentialColor(spec: ScaleSpec): SequentialColorScale? {
+  /** The space a `log` colour ramp is walked in; see [ScaleTransform]. */
+  private fun logSpace(spec: ScaleSpec): ScaleTransform =
+    ScaleTransform.Log(numbers.resolve(spec.base, spec.name) ?: 10.0)
+
+  /** The same for `pow` and `sqrt`, whose default exponents differ. */
+  private fun powSpace(spec: ScaleSpec, defaultExponent: Double): ScaleTransform =
+    ScaleTransform.Pow(numbers.resolve(spec.exponent, spec.name) ?: defaultExponent)
+
+  /** And for `symlog`, whose constant scales the linear region around zero. */
+  private fun symlogSpace(spec: ScaleSpec): ScaleTransform =
+    ScaleTransform.Symlog(numbers.resolve(spec.constant, spec.name) ?: 1.0)
+
+  private fun buildSequentialColor(
+    spec: ScaleSpec,
+    transform: ScaleTransform = ScaleTransform.Linear,
+  ): SequentialColorScale? {
     val colors = colorRange(spec) ?: return null
     // `nice` applies to a colour scale exactly as it does to a positional one: it rounds the
     // *domain*. Skipping it leaves the ramp stretched over the raw extent, so every colour is a
@@ -277,12 +305,28 @@ public class ScaleResolver(
             }
         } ?: ColorSpaces.Interpolation.RGB
 
+    // ```js
+    // return (isFunction(scheme) && (extent || reverse))
+    //   ? interpolateRange(scheme, flip(extent || [0, 1], reverse))
+    //   : scheme;
+    // ```
+    //
+    // A **ramp** is re-parameterised rather than reversed: `reverse` and `extent` both act on the
+    // stretch of it the scale reads, which is why they compose — `extent: [0.3, 0.7]` with
+    // `reverse` reads the middle backwards. A range written out as colours has no ramp to
+    // re-parameterise and is reversed as a list, which is what upstream's `flip` does to it.
+    val ramp = (effectiveRange(spec) as? RangeSpec.Scheme)?.let { rampFor(spec, it) } != null
+    val extent = (effectiveRange(spec) as? RangeSpec.Scheme)?.extent
     return SequentialColorScale(
       name = spec.name,
       domain = domain,
-      colors = if (reversed(spec)) colors.reversed() else colors,
+      colors = if (reversed(spec) && !ramp) colors.reversed() else colors,
       space = space,
       gamma = spec.interpolateGamma ?: 1.0,
+      transform = transform,
+      rampExtent =
+        if (!ramp) listOf(0.0, 1.0)
+        else (extent ?: listOf(0.0, 1.0)).let { if (reversed(spec)) it.reversed() else it },
     )
   }
 
@@ -305,8 +349,10 @@ public class ScaleResolver(
       "ordinal" -> RangeSpec.Scheme(SchemeRef.Named("blues"))
       "ramp" -> RangeSpec.Scheme(SchemeRef.Named("blues"))
       "heatmap" -> RangeSpec.Scheme(SchemeRef.Named("yellowgreenblue"))
-      // Upstream pairs this one with `extent: [1, 0]`, which reads the scheme backwards.
-      "diverging" -> RangeSpec.Scheme(SchemeRef.Named("blueorange"))
+      // Upstream pairs this one with `extent: [1, 0]`, which reads the scheme **backwards** — so
+      // `"range": "diverging"` and `{"scheme": "blueorange"}` are opposite colours, verified on a
+      // live view: the first paints its low end orange and the second paints it blue.
+      "diverging" -> RangeSpec.Scheme(SchemeRef.Named("blueorange"), extent = listOf(1.0, 0.0))
       "symbol" ->
         RangeSpec.Literal(
           listOf(
@@ -389,9 +435,27 @@ public class ScaleResolver(
    * legend of two never comes out as "the palest blue and the darkest". Upstream's loop is
    * `samples[i] = interpolator(++i / n)` with `n = count + 1`, and every colour depends on it.
    */
-  private fun quantizeRamp(stops: List<SceneColor>, count: Int): List<SceneColor> {
+  /**
+   * The stretch of a scheme's ramp a scale reads, `reverse` having flipped it; see `rampExtent`.
+   */
+  private fun rampSlice(spec: ScaleSpec, range: RangeSpec.Scheme): List<Double> =
+    (range.extent ?: listOf(0.0, 1.0)).let { if (reversed(spec)) it.reversed() else it }
+
+  private fun quantizeRamp(
+    stops: List<SceneColor>,
+    count: Int,
+    extent: List<Double> = listOf(0.0, 1.0),
+  ): List<SceneColor> {
     if (count <= 0) return emptyList()
-    return (1..count).map { ColorSpaces.sample(stops, it.toDouble() / (count + 1)) }
+    // `quantizeInterpolator(adjustScheme(scheme, extent), count)`: the samples are taken off the
+    // ramp **after** the extent has narrowed it, so a five-bucket scale over the middle of `blues`
+    // gets five middling blues rather than five spread end to end.
+    val from = extent.firstOrNull() ?: 0.0
+    val to = extent.getOrNull(1) ?: 1.0
+    return (1..count).map {
+      val along = it.toDouble() / (count + 1)
+      ColorSpaces.sample(stops, from + along * (to - from))
+    }
   }
 
   /** A scheme's name, whether it was written down or arrived through a signal. */
@@ -771,13 +835,24 @@ public class ScaleResolver(
     val domain = discreteDomain(spec.domain, spec.name) ?: return null
     // `padding` is shorthand for both inner and outer; explicit values win.
     val padding = numbers.resolve(spec.padding, spec.name)
+    // ```js
+    // scale.paddingOuter = function(_) { paddingOuter = Math.max(0, Math.min(1, _)); … };
+    // ```
+    //
+    // **Clamped to `[0, 1]`, all three of them.** Vega's band scale is its own rather than d3's,
+    // and where d3 clamps only the top of `paddingInner` and leaves `paddingOuter` alone, this
+    // clamps both ends of both — so a padding of 3 is a padding of one whole step, not three. A
+    // chart that writes one gets bands a quarter of the way in upstream and half way in here, and
+    // the alignment moves with them.
     return BandScale(
       name = spec.name,
       domain = domain,
       range = oriented(range, reversed(spec)),
-      paddingInner = numbers.resolve(spec.paddingInner, spec.name) ?: padding ?: 0.0,
-      paddingOuter = numbers.resolve(spec.paddingOuter, spec.name) ?: padding ?: 0.0,
-      align = numbers.resolve(spec.align, spec.name) ?: 0.5,
+      paddingInner =
+        (numbers.resolve(spec.paddingInner, spec.name) ?: padding ?: 0.0).coerceIn(0.0, 1.0),
+      paddingOuter =
+        (numbers.resolve(spec.paddingOuter, spec.name) ?: padding ?: 0.0).coerceIn(0.0, 1.0),
+      align = (numbers.resolve(spec.align, spec.name) ?: 0.5).coerceIn(0.0, 1.0),
       round = spec.round,
     )
   }
@@ -789,11 +864,14 @@ public class ScaleResolver(
       name = spec.name,
       domain = domain,
       range = oriented(range, reversed(spec)),
+      // Clamped to `[0, 1]` as a band's is, a point scale being a band with all of its padding
+      // outside; see [buildBand].
       padding =
-        numbers.resolve(spec.paddingOuter, spec.name)
-          ?: numbers.resolve(spec.padding, spec.name)
-          ?: 0.0,
-      align = numbers.resolve(spec.align, spec.name) ?: 0.5,
+        (numbers.resolve(spec.paddingOuter, spec.name)
+            ?: numbers.resolve(spec.padding, spec.name)
+            ?: 0.0)
+          .coerceIn(0.0, 1.0),
+      align = (numbers.resolve(spec.align, spec.name) ?: 0.5).coerceIn(0.0, 1.0),
       round = spec.round,
     )
   }
@@ -828,9 +906,11 @@ public class ScaleResolver(
         // cycling its stops — which is the difference between sixteen shades of blue and the same
         // eleven twice over.
         is RangeSpec.Scheme ->
-          (rampFor(spec, r)?.let { quantizeRamp(it, domain.size) } ?: colorRange(spec))?.map {
-            VegaValue.Str(it.toCssHex())
-          } ?: return null
+          (rampFor(spec, r)?.let { quantizeRamp(it, domain.size, rampSlice(spec, r)) }
+              ?: colorRange(spec))
+            ?.map {
+              VegaValue.Str(it.toCssHex())
+            } ?: return null
         // A column of the data, read the way a data-driven *domain* is: the scale becomes a lookup
         // table the rows themselves define — `id` in, `name` out. Distinct values in first-seen
         // order, so it lines up with a domain read the same way from the same rows.
@@ -844,7 +924,20 @@ public class ScaleResolver(
           return null
         }
       }
-    return OrdinalScale(spec.name, domain, range, implicit = spec.domainImplicit)
+    // ```js
+    // if (range) scale.range(flip(range, _.reverse));
+    // ```
+    //
+    // `reverse` flips the **range** of every scale that has one, an ordinal scale included, and it
+    // is the ordinary way to say "darkest first" without rewriting the list. This applied it to
+    // every other family and not to this one, so an area chart asking for its opacities in reverse
+    // got them the right way round and shaded every band wrongly.
+    return OrdinalScale(
+      spec.name,
+      domain,
+      if (reversed(spec)) range.reversed() else range,
+      implicit = spec.domainImplicit,
+    )
   }
 
   /**
@@ -866,7 +959,8 @@ public class ScaleResolver(
         val ramp = rampFor(spec, r)
         val wanted = schemeCount(spec, r) ?: buckets ?: ramp?.let { DEFAULT_SCHEME_COUNT } ?: 0
         val colors =
-          if (ramp != null) quantizeRamp(ramp, wanted) else colorRange(spec) ?: return null
+          if (ramp != null) quantizeRamp(ramp, wanted, rampSlice(spec, r))
+          else colorRange(spec) ?: return null
         val taken =
           if (ramp == null && colors.size > wanted) sampleEvenly(colors, wanted) else colors
         (if (reversed(spec)) taken.reversed() else taken).map { VegaValue.Str(it.toCssHex()) }

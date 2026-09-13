@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.dataflow.transform.LayoutMemory
 import dev.aster.vega.dataflow.transform.ProjectionDefinition
 import dev.aster.vega.expression.CachingExpressionCompiler
 import dev.aster.vega.expression.Clock
@@ -471,6 +472,13 @@ public class SpecCompiler(
     // only
     // to be measured — its diagnostics are thrown away, because the second pass reports the same
     // ones against the size that is actually drawn.
+    // Shared by both passes, and only both passes: a `resquarify` treemap keeps the rows its
+    // measuring pass chose, which is what upstream's long-lived nodes do for it. See
+    // [LayoutMemory].
+    val layoutMemory = LayoutMemory()
+    // The same for the random draws, for the same reason: upstream's generator is the view's, not
+    // the render's, so the pass that is drawn continues the sequence the measuring pass started.
+    val randomStream = RandomStream(randomSeed)
     val fit =
       if (spec.autosize.type.isFit) {
         fitted(
@@ -483,6 +491,8 @@ public class SpecCompiler(
             itemEncodes,
             scopedOverrides,
             pinnedDomains,
+            layoutMemory,
+            randomStream,
           ),
         )
       } else {
@@ -496,6 +506,8 @@ public class SpecCompiler(
         itemEncodes,
         scopedOverrides,
         pinnedDomains,
+        layoutMemory,
+        randomStream,
       )
       .compiled
   }
@@ -568,6 +580,10 @@ public class SpecCompiler(
     itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
     scopedOverrides: Map<String, Map<String, VegaValue>> = emptyMap(),
     pinnedDomains: Map<String, List<Double>> = emptyMap(),
+    /** Shared with the other pass of a fitted chart; see [LayoutMemory]. */
+    layoutMemory: LayoutMemory = LayoutMemory(),
+    /** The chart's one sequence of random draws, shared by both passes; see below. */
+    randomStream: RandomStream = RandomStream(randomSeed),
   ): Pass {
     val ids = SceneNodeIdAllocator()
 
@@ -734,9 +750,12 @@ public class SpecCompiler(
 
     // One stream for the whole compile, seeded the same way every time. Every scope built below
     // shares it, so the draws form a single sequence the way upstream's module-level generator
-    // does. A `fit` chart compiles twice and each pass starts the sequence again, which is what
-    // makes the second pass draw the chart the first one measured.
-    val stream = RandomStream(randomSeed)
+    // does — and **both passes** of a fitted chart draw from that one sequence, because upstream's
+    // generator lives as long as the view and its second render asks it for fresh numbers. A dot
+    // strip plot that jitters its dots with `random()` is where it shows: upstream's twelve dots
+    // take draws 13 to 24 of the seeded sequence, this took 1 to 12 of a stream restarted for the
+    // drawn pass, and every dot sat a fraction of a band away from upstream's.
+    val stream = randomStream
 
     // The state the order fills in, and the reason each piece is shared rather than copied:
     // `signalValues` because a transform may *publish* a signal, and everything after it must see
@@ -768,7 +787,17 @@ public class SpecCompiler(
     val unresolvedSignals = spec.signals.mapTo(mutableSetOf()) { it.name }
     val unbuiltScales = spec.scales.mapTo(mutableSetOf()) { it.name }
 
-    val data = DataResolver(diagnostics, expressions, loader, stream, clock, timeZone, hostData)
+    val data =
+      DataResolver(
+        diagnostics,
+        expressions,
+        loader,
+        stream,
+        clock,
+        timeZone,
+        hostData,
+        layoutMemory,
+      )
     for (operator in order.order) {
       when (operator) {
         is Operator.Signal -> {

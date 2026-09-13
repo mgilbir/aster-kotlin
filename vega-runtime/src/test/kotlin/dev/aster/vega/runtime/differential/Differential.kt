@@ -258,7 +258,18 @@ public object Differential {
           if (key == "type" || key == "role") continue
           when (value) {
             is VegaValue.Num -> numbers[key] = value.value
-            is VegaValue.Str -> strings[key] = value.value
+            // A **number written as a string** is a number. Upstream's items are property bags and
+            // it coerces at draw time, so a specification whose signal holds `"3"` rather than `3`
+            // puts the string on the item and its renderer writes `stroke-width="3"`. This engine
+            // coerces when it reads the channel, so its node carries 3. The drawings are the same
+            // and only the *reading* differed — a parallel-coordinates template reported twelve
+            // widths as "3 vs absent", the width sitting in the other map.
+            is VegaValue.Str ->
+              if (key in NUMERIC_CHANNELS && value.value.toDoubleOrNull() != null) {
+                numbers[key] = value.value.toDouble()
+              } else {
+                strings[key] = value.value
+              }
             // A **gradient**, which used to fall into an `else -> Unit` and be lost.
             is VegaValue.Obj ->
               if (value.fields["gradient"] != null) gradients[key] = gradientReference(value)
@@ -948,7 +959,7 @@ public object Differential {
       if (channel in ignored) continue
       val got = actual.numbers[channel] ?: defaultFor(channel)
       if (got == null) {
-        if (unpaintedStroke(expected, channel)) continue
+        if (unpaintedStroke(expected, channel) || inertFill(expected, channel)) continue
         out.add(Difference("$where.$channel", fmt(wanted), "absent"))
         continue
       }
@@ -1038,6 +1049,7 @@ public object Differential {
       // `butt`: upstream wrote it, this left it out, and the comparison called that a difference.
       val got = actual.strings[channel] ?: IMPLIED_BY_ABSENCE[channel]
       if (got == null) {
+        if (inertFill(expected, channel)) continue
         out.add(Difference("$where.$channel", wanted, "absent"))
         continue
       }
@@ -1049,7 +1061,18 @@ public object Differential {
           channel in COLOUR_CHANNELS -> {
             val a = SceneColor.parse(wanted)
             val b = SceneColor.parse(got)
-            a != null && b != null && a.toCssHex() == b.toCssHex()
+            when {
+              a != null && b != null -> a.toCssHex() == b.toCssHex()
+              // A reference value that is **not a colour** — a templated dashboard writes
+              // `"'#FFFFFF'"`, quotes and all — is one nothing can paint with. Upstream keeps the
+              // string on its item and its SVG renderer emits an attribute a browser ignores; this
+              // engine keeps the stroke, so the mark measures the same, and paints it with nothing.
+              // The two describe the same drawing, and the *geometry* either produced is still
+              // compared exactly. Nothing else is let through: our side has to be transparent, not
+              // merely different.
+              a == null -> b != null && b.alpha == 0.0
+              else -> false
+            }
           }
           // A point list is geometry, so it compares numerically within tolerance. Comparing the
           // text
@@ -1200,6 +1223,26 @@ public object Differential {
    *
    * Narrow on purpose. A reference carrying a stroke colour still demands a stroke of that width.
    */
+  /**
+   * A **fill** on a mark that has no interior to fill.
+   *
+   * ```js
+   * function draw(context, scene, bounds) {
+   *   visit(scene, item => { … if (opacity && path(context, item, opacity)) { … context.stroke(); } });
+   * }
+   * ```
+   *
+   * A `rule` is a line: upstream draws it by stroking, never by filling, and its SVG tag is `line`,
+   * whose fill paints nothing either. So a specification that encodes a rule's fill — a waterfall
+   * colouring its connectors by sign is one — puts a colour on the item that no renderer uses.
+   * Upstream's items are property bags and record it; a scene node here holds what a renderer
+   * needs, and [RuleNode] has no fill to hold. The two describe the same drawing.
+   *
+   * Narrow on purpose: only `fill` and its opacity, and only on a rule.
+   */
+  private fun inertFill(expected: Mark, channel: String): Boolean =
+    expected.type == "rule" && (channel == "fill" || channel == "fillOpacity")
+
   private fun unpaintedStroke(expected: Mark, channel: String): Boolean =
     (channel == "strokeWidth" || channel == "strokeOpacity") &&
       !expected.strings.containsKey("stroke")
@@ -1585,6 +1628,42 @@ public object Differential {
       "shapeWidth",
       "shapeHeight",
     )
+
+  /**
+   * The channels that are **numbers**, whatever the reference happens to hold them as.
+   *
+   * Upstream coerces a channel when it draws rather than when it reads, so a signal holding `"3"`
+   * reaches the item as `"3"` and the width is a string in the reference. Reading those as numbers
+   * is what lets them meet this engine's, which coerced on the way in. Colours are deliberately not
+   * here: `"0"` is not a colour and never was.
+   */
+  private val NUMERIC_CHANNELS =
+    GEOMETRY_CHANNELS +
+      CORNER_CHANNELS +
+      setOf(
+        "strokeWidth",
+        "strokeOpacity",
+        "strokeDashOffset",
+        "strokeMiterLimit",
+        "fillOpacity",
+        "opacity",
+        "angle",
+        "fontSize",
+        "limit",
+        "dx",
+        "dy",
+        "padAngle",
+        "startAngle",
+        "endAngle",
+        "cornerRadius",
+        "theta",
+        "radius",
+        "tension",
+        "lineHeight",
+        "aspect",
+        "smooth",
+        "bandwidth",
+      )
 
   /** What `canonicalNumber` writes where a number is not finite. */
   private val NON_FINITE = setOf("NaN", "Infinity", "-Infinity")

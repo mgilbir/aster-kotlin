@@ -671,6 +671,7 @@ public final class dev/aster/vega/runtime/compile/MarkEncoder {
 	public final fun encode (Ldev/aster/vega/model/spec/MarkSpec;Ljava/util/List;Ljava/util/List;)Ljava/util/List;
 	public static synthetic fun encode$default (Ldev/aster/vega/runtime/compile/MarkEncoder;Ldev/aster/vega/model/spec/MarkSpec;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Ljava/util/List;
 	public final fun encodeGroup (Ldev/aster/vega/model/spec/MarkSpec;Ljava/util/List;Lkotlin/jvm/functions/Function4;)Ljava/util/List;
+	public final fun itemOrder (Ldev/aster/vega/model/spec/MarkSpec;Ljava/util/List;)Ljava/util/List;
 	public final fun items (Ldev/aster/vega/model/spec/MarkSpec;Ljava/util/List;)Ljava/util/List;
 }
 
@@ -1215,6 +1216,58 @@ public final class dev/aster/vega/runtime/scale/QuantizeScale : dev/aster/vega/r
 	public fun scale (Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
 }
 
+public abstract interface class dev/aster/vega/runtime/scale/ScaleTransform {
+	public abstract fun forward (D)D
+}
+
+public final class dev/aster/vega/runtime/scale/ScaleTransform$Linear : dev/aster/vega/runtime/scale/ScaleTransform {
+	public static final field INSTANCE Ldev/aster/vega/runtime/scale/ScaleTransform$Linear;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun forward (D)D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/runtime/scale/ScaleTransform$Log : dev/aster/vega/runtime/scale/ScaleTransform {
+	public fun <init> ()V
+	public fun <init> (D)V
+	public synthetic fun <init> (DILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()D
+	public final fun copy (D)Ldev/aster/vega/runtime/scale/ScaleTransform$Log;
+	public static synthetic fun copy$default (Ldev/aster/vega/runtime/scale/ScaleTransform$Log;DILjava/lang/Object;)Ldev/aster/vega/runtime/scale/ScaleTransform$Log;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun forward (D)D
+	public final fun getBase ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/runtime/scale/ScaleTransform$Pow : dev/aster/vega/runtime/scale/ScaleTransform {
+	public fun <init> (D)V
+	public final fun component1 ()D
+	public final fun copy (D)Ldev/aster/vega/runtime/scale/ScaleTransform$Pow;
+	public static synthetic fun copy$default (Ldev/aster/vega/runtime/scale/ScaleTransform$Pow;DILjava/lang/Object;)Ldev/aster/vega/runtime/scale/ScaleTransform$Pow;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun forward (D)D
+	public final fun getExponent ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/runtime/scale/ScaleTransform$Symlog : dev/aster/vega/runtime/scale/ScaleTransform {
+	public fun <init> ()V
+	public fun <init> (D)V
+	public synthetic fun <init> (DILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()D
+	public final fun copy (D)Ldev/aster/vega/runtime/scale/ScaleTransform$Symlog;
+	public static synthetic fun copy$default (Ldev/aster/vega/runtime/scale/ScaleTransform$Symlog;DILjava/lang/Object;)Ldev/aster/vega/runtime/scale/ScaleTransform$Symlog;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun forward (D)D
+	public final fun getConstant ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class dev/aster/vega/runtime/scale/ScalesKt {
 	public static final fun formatNumber (DI)Ljava/lang/String;
 	public static final fun formatTickLabel (DILdev/aster/vega/model/locale/VegaLocale;)Ljava/lang/String;
@@ -1224,8 +1277,8 @@ public final class dev/aster/vega/runtime/scale/ScalesKt {
 }
 
 public final class dev/aster/vega/runtime/scale/SequentialColorScale : dev/aster/vega/runtime/scale/VegaScale {
-	public fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/scene/ColorSpaces$Interpolation;DZ)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/scene/ColorSpaces$Interpolation;DZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/scene/ColorSpaces$Interpolation;DZLdev/aster/vega/runtime/scale/ScaleTransform;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/scene/ColorSpaces$Interpolation;DZLdev/aster/vega/runtime/scale/ScaleTransform;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun colorAt (D)Ldev/aster/vega/scene/SceneColor;
 	public final fun formatTick (DILdev/aster/vega/model/locale/VegaLocale;)Ljava/lang/String;
 	public static synthetic fun formatTick$default (Ldev/aster/vega/runtime/scale/SequentialColorScale;DILdev/aster/vega/model/locale/VegaLocale;ILjava/lang/Object;)Ljava/lang/String;
@@ -1236,7 +1289,9 @@ public final class dev/aster/vega/runtime/scale/SequentialColorScale : dev/aster
 	public final fun getDomain ()Ljava/util/List;
 	public final fun getGamma ()D
 	public fun getName ()Ljava/lang/String;
+	public final fun getRampExtent ()Ljava/util/List;
 	public final fun getSpace ()Ldev/aster/vega/scene/ColorSpaces$Interpolation;
+	public final fun getTransform ()Ldev/aster/vega/runtime/scale/ScaleTransform;
 	public fun scale (Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
 	public final fun tickLabels (ILdev/aster/vega/model/locale/VegaLocale;)Ljava/util/List;
 	public static synthetic fun tickLabels$default (Ldev/aster/vega/runtime/scale/SequentialColorScale;ILdev/aster/vega/model/locale/VegaLocale;ILjava/lang/Object;)Ljava/util/List;

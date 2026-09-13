@@ -343,11 +343,24 @@ function seriesRecord(type, marktype, dx, dy, precision) {
   const primary = items.map(i => [i.x || 0, i.y || 0, i.defined !== false]);
   const drawn = expandCurve(primary, curve);
   if (type === 'area') {
+    // ```js
+    // xw = item => (item.x || 0) + (item.width || 0),
+    // yh = item => (item.y || 0) + (item.height || 0),
+    // areavShape = d3_area().x(x).y1(y).y0(yh),
+    // areahShape = d3_area().y(y).x1(x).x0(xw),
+    // ```
+    //
+    // The second boundary is the first **plus the extent**, and on the extent's own axis: never
+    // `x2`/`y2`, which `adjustSpatial` has already turned into a width or a height. Reading those
+    // instead agreed wherever a specification wrote the far edge — the usual way — and recorded a
+    // *flat* boundary wherever it wrote the extent. A violin plot writes the extent, its halves
+    // being scaled densities, so every one of its areas was referenced as a line.
+    const horizontal = first.orient === 'horizontal';
     const secondary = [...items]
       .reverse()
       .map(i => [
-        i.x2 !== undefined ? i.x2 : i.x || 0,
-        i.y2 !== undefined ? i.y2 : i.y || 0,
+        horizontal ? (i.x || 0) + (i.width || 0) : i.x || 0,
+        horizontal ? i.y || 0 : (i.y || 0) + (i.height || 0),
         i.defined !== false,
       ]);
     const back = expandCurve(

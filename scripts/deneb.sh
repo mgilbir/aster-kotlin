@@ -116,19 +116,21 @@ declare -a refused=()
 for spec in "$SPECS"/*.vg.json; do
   name="$(basename "$spec" .vg.json)"
   log="$REFERENCE_DIR/$name.stderr"
-  if (cd oracle-js && node src/reference.js "$spec" "$REFERENCE_DIR/$name.reference.json") \
-      >/dev/null 2>"$log"; then
-    # A render that *succeeded* while the canvas shim refused something produced a reference with a
-    # piece missing — `vega-label` draws no labels at all without a canvas. Comparing against that
-    # measures the shim, so it counts as a refusal like any other.
-    if grep -q "canvas-shim" "$log"; then
-      rm -f "$REFERENCE_DIR/$name.reference.json"
-      refused+=("$name	needs a real canvas: vega-label rasterises the marks to place labels")
-    else
-      rendered=$((rendered + 1))
-    fi
+  (cd oracle-js && node src/reference.js "$spec" "$REFERENCE_DIR/$name.reference.json") \
+      >/dev/null 2>"$log" && ok=1 || ok=0
+  # The canvas shim first, whether or not the render came back: `vega-label` rasterises the marks to
+  # place its labels, so without a canvas it either throws or quietly places none. Either way the
+  # reference has a piece missing and comparing against it measures the shim.
+  if grep -q "canvas-shim" "$log"; then
+    rm -f "$REFERENCE_DIR/$name.reference.json"
+    refused+=("$name	needs a real canvas: vega-label rasterises the marks to place labels")
+  elif [[ $ok -eq 1 ]]; then
+    rendered=$((rendered + 1))
   else
-    reason="$(grep -m1 -oE 'Unrecognized function: [A-Za-z]+|Error: .*' "$log" | head -1 | cut -c1-90)"
+    # `reported an error while running` is a view that threw **mid-run**: the operator that threw
+    # produced nothing and everything after it never ran, so the scene it left is a crash snapshot
+    # rather than a drawing. See `oracle-js/src/reference.js`.
+    reason="$(grep -m1 -oE 'reported an error while running: .*|Unrecognized function: [A-Za-z]+|Error: .*' "$log" | head -1 | cut -c1-90)"
     refused+=("$name	${reason:-upstream refused it}")
   fi
   rm -f "$log"

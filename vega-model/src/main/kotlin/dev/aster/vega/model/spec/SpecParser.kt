@@ -443,6 +443,12 @@ private val SCALE_CONSUMED =
     "constant",
     "interpolate",
     "bins",
+    // The three a scale may write **instead of** putting them inside `range`; see
+    // `topLevelScheme`. Upstream reads them as parameters of the scale operator itself.
+    "scheme",
+    "schemeCount",
+    "schemeExtent",
+    "rangeStep",
   )
 
 /**
@@ -1947,7 +1953,23 @@ public class SpecParser {
       domainMin = obj.numberOrSignal("domainMin", "$path.domainMin"),
       domainMax = obj.numberOrSignal("domainMax", "$path.domainMax"),
       domainMid = obj.numberOrSignal("domainMid", "$path.domainMid"),
-      range = parseRange(obj.fields["range"], "$path.range"),
+      // A **top-level** `scheme` is the same thing as one inside `range`: upstream's scale operator
+      // reads `_.scheme` as a parameter of its own — `configureScheme(type, _, count)` — and a
+      // specification may write either. Verified on a live view, which resolves
+      // `{"type": "ordinal", "scheme": "category10"}` to the ten colours. Read here rather than in
+      // the resolver so there is one shape of range downstream; a `range` written as well wins,
+      // because upstream's `configureRange` reaches `_.range` first.
+      range =
+        parseRange(obj.fields["range"], "$path.range").takeIf { it != RangeSpec.Unset }
+          ?: parseRange(topLevelScheme(obj), "$path.scheme").takeIf { it != RangeSpec.Unset }
+          // `rangeStep` is `{"range": {"step": …}}` written at the top level, which is the older
+          // spelling and still what upstream reads: `if (_.rangeStep != null) range =
+          // configureRangeStep(type, _, count)`. Band and point only — upstream errors on any other
+          // family — and unread here, a scale that wrote it got no range at all and was not built.
+          ?: obj.fields["rangeStep"]?.let {
+            parseRange(VegaValue.Obj(linkedMapOf("step" to it)), "$path.rangeStep")
+          }
+          ?: RangeSpec.Unset,
       reverse = obj.fields["reverse"]?.takeIf { it !is VegaValue.Obj }?.asBoolean() ?: false,
       reverseSignal = (obj.fields["reverse"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
       round = obj.fields["round"]?.asBoolean() ?: false,
@@ -2212,6 +2234,17 @@ public class SpecParser {
     }
   }
 
+  /** A scale's own `scheme`, `schemeCount` and `schemeExtent`, as the `range` object they equal. */
+  private fun topLevelScheme(obj: VegaValue.Obj): VegaValue.Obj? {
+    val scheme = obj.fields["scheme"] ?: return null
+    val fields = linkedMapOf("scheme" to scheme)
+    obj.fields["schemeCount"]?.let { fields["count"] = it }
+    obj.fields["schemeExtent"]?.let { fields["extent"] = it }
+    // `count` beside `scheme` means the same as `schemeCount`, and the more specific name wins.
+    obj.fields["count"]?.let { if ("count" !in fields) fields["count"] = it }
+    return VegaValue.Obj(fields)
+  }
+
   private fun parseRange(value: VegaValue?, path: String): RangeSpec =
     when (value) {
       null -> RangeSpec.Unset
@@ -2254,6 +2287,12 @@ public class SpecParser {
               },
               (count as? VegaValue.Num)?.value?.toInt(),
               countSignal,
+              // Two fractions of the ramp, and only two: anything else is left to the default,
+              // which is the whole of it.
+              (value.fields["extent"] as? VegaValue.Arr)
+                ?.values
+                ?.map { it.asDouble() }
+                ?.takeIf { it.size == 2 && it.all { end -> end.isFinite() } },
             )
           !signal.isNullOrEmpty() -> RangeSpec.Signal(signal)
           step != null ->
@@ -2409,9 +2448,13 @@ public class SpecParser {
       minExtent = obj.numberOrSignal("minExtent", "$path.minExtent"),
       maxExtent = obj.numberOrSignal("maxExtent", "$path.maxExtent"),
       encode =
-        (obj.fields["encode"] as? VegaValue.Obj)?.fields.orEmpty().mapValues { (part, block) ->
-          parseEncode(block, "$path.encode.$part")
-        },
+        withGuideSignals(
+          (obj.fields["encode"] as? VegaValue.Obj)?.fields.orEmpty().mapValues { (part, block) ->
+            parseEncode(block, "$path.encode.$part")
+          },
+          obj,
+          AXIS_SIGNAL_CHANNELS,
+        ),
       labelStyle = obj.guideStroke("label", "Axis", path),
       tickStyle = obj.guideStroke("tick", "Axis", path),
       gridStyle = obj.guideStroke("grid", "Axis", path),
@@ -2781,6 +2824,92 @@ public class SpecParser {
    * parsed to nothing at all and the colour fell back to the default. Sixty-one of the sixty-three
    * Deneb templates name their title that way.
    */
+  /**
+   * A **legend**'s string properties, and the channel each one becomes on the part it styles.
+   *
+   * ```js
+   * addEncoders(encode, {
+   *   fill: _('symbolFillColor', baseFill), shape: _('symbolType'),
+   *   stroke: _('symbolStrokeColor', baseStroke), …
+   * }, { opacity: _('symbolOpacity') });
+   * ```
+   *
+   * The same arrangement an axis has, part by part: `legend-symbol-groups` builds the swatches and
+   * their labels out of encoders, `legend-title` the heading, `legend-gradient` the bar. So each of
+   * these takes a signal — or a whole encoder — wherever it takes a word.
+   *
+   * A gradient legend's labels are deliberately **not** here: upstream derives their alignment from
+   * where along the bar they sit and never reads `labelAlign` for them, which is why the property
+   * is on the symbol labels only.
+   */
+  private val LEGEND_SIGNAL_CHANNELS =
+    mapOf(
+      "symbols" to
+        mapOf(
+          "symbolFillColor" to "fill",
+          "symbolStrokeColor" to "stroke",
+          "symbolType" to "shape",
+        ),
+      "labels" to
+        mapOf(
+          "labelAlign" to "align",
+          "labelBaseline" to "baseline",
+          "labelColor" to "fill",
+          "labelFont" to "font",
+          "labelFontStyle" to "fontStyle",
+          "labelFontWeight" to "fontWeight",
+        ),
+      "title" to
+        mapOf(
+          "titleAlign" to "align",
+          "titleBaseline" to "baseline",
+          "titleColor" to "fill",
+          "titleFont" to "font",
+          "titleFontStyle" to "fontStyle",
+          "titleFontWeight" to "fontWeight",
+        ),
+      "gradient" to mapOf("gradientStrokeColor" to "stroke"),
+      "legend" to mapOf("fillColor" to "fill", "strokeColor" to "stroke"),
+    )
+
+  /**
+   * An **axis**'s string properties, and the channel each one becomes on the part it styles.
+   *
+   * ```js
+   * addEncoders(encode, {
+   *   angle: _('labelAngle'), fill: _('labelColor'), font: _('labelFont'), …
+   * }, { align: labelAlign, baseline: labelBaseline });
+   * ```
+   *
+   * `parseAxis` builds each part of an axis out of encoders, exactly as `parseTitle` builds a
+   * heading, so every one of these takes a signal as readily as a word. The numeric ones already
+   * carry one through [numberOrSignal]; these were read as strings and a signal became nothing.
+   */
+  private val AXIS_SIGNAL_CHANNELS =
+    mapOf(
+      "labels" to
+        mapOf(
+          "labelAlign" to "align",
+          "labelBaseline" to "baseline",
+          "labelColor" to "fill",
+          "labelFont" to "font",
+          "labelFontStyle" to "fontStyle",
+          "labelFontWeight" to "fontWeight",
+        ),
+      "title" to
+        mapOf(
+          "titleAlign" to "align",
+          "titleBaseline" to "baseline",
+          "titleColor" to "fill",
+          "titleFont" to "font",
+          "titleFontStyle" to "fontStyle",
+          "titleFontWeight" to "fontWeight",
+        ),
+      "ticks" to mapOf("tickColor" to "stroke"),
+      "grid" to mapOf("gridColor" to "stroke"),
+      "domain" to mapOf("domainColor" to "stroke"),
+    )
+
   private val TITLE_SIGNAL_CHANNELS =
     mapOf(
       "title" to
@@ -2825,19 +2954,44 @@ public class SpecParser {
   private fun withTitleSignals(
     blocks: Map<String, EncodeSpec>,
     own: VegaValue.Obj,
+  ): Map<String, EncodeSpec> = withGuideSignals(blocks, own, TITLE_SIGNAL_CHANNELS)
+
+  /**
+   * The same for any guide: its string properties, folded into the blocks that carry them.
+   *
+   * An axis and a legend are built the way a title is — `parseAxis` turns `labelAlign`,
+   * `labelColor` and their kin into encoders on the label mark — so each of them takes a signal
+   * wherever it takes a word, and each of them was dropping one. A lollipop chart writes
+   * `"labelAlign": {"signal": "'left'"}` and had its labels aligned the other way, which moved the
+   * measured axis extent, which moved the fitted plotting area, which moved every mark in the
+   * chart: 50 differences from one unread property.
+   */
+  private fun withGuideSignals(
+    blocks: Map<String, EncodeSpec>,
+    own: VegaValue.Obj,
+    table: Map<String, Map<String, String>>,
   ): Map<String, EncodeSpec> {
     val folded = LinkedHashMap(blocks)
-    for ((part, channels) in TITLE_SIGNAL_CHANNELS) {
+    for ((part, channels) in table) {
       val added = LinkedHashMap<String, ChannelValue>()
       for ((property, channel) in channels) {
-        val signal = (own.fields[property] as? VegaValue.Obj)?.fields?.get("signal")?.asString()
+        // ```js
+        // const isEncoder = (isObject(value) && !isArray(value)) || (isArray(value) && ...);
+        // if (isEncoder) { object.update[name] = value; }
+        // ```
+        //
+        // **Any object is an encoder**, not only a signal: `{"scale": "c", "signal": "'Left'"}` is
+        // how a back-to-back bar chart colours each side's axis title through its own colour scale,
+        // and it reaches the mark as a scaled channel. Read as a string, the whole thing was
+        // dropped and both titles came out black.
+        val written = own.fields[property] as? VegaValue.Obj ?: continue
         // `{"signal": ""}` is not an expression. Upstream evaluates it to nothing and draws the
         // heading with no fill at all; folding it in here would instead put an empty expression
         // through the parser, which reports an error and costs the whole chart. Left to the field,
         // so the words keep the default colour and the drawing survives.
-        if (signal == null || signal.isEmpty()) continue
+        if (written.fields["signal"]?.asString()?.isEmpty() == true) continue
         if (blocks[part]?.update?.containsKey(channel) == true) continue
-        added[channel] = ChannelValue.Signal(signal)
+        added[channel] = parseChannel(channel, written, "$property") ?: continue
       }
       if (added.isEmpty()) continue
       val existing = folded[part] ?: EncodeSpec()
@@ -3080,9 +3234,27 @@ public class SpecParser {
         labelSeparation = obj.numberOrSignal("labelSeparation", "$path.labelSeparation"),
         labelLimit = obj.numberOrSignal("labelLimit", "$path.labelLimit"),
         encode =
-          (obj.fields["encode"] as? VegaValue.Obj)?.fields.orEmpty().mapValues { (part, block) ->
-            parseEncode(block, "$path.encode.$part")
-          },
+          withGuideSignals(
+            (obj.fields["encode"] as? VegaValue.Obj)?.fields.orEmpty().mapValues { (part, block) ->
+              parseEncode(block, "$path.encode.$part")
+            },
+            obj,
+            // ```js
+            // LegendScales.forEach(scale => {
+            //   if (spec[scale]) { update[scale] = enter[scale] = {scale: spec[scale], field:
+            // Value}; }
+            // });
+            // ```
+            //
+            // A channel the legend has a **scale** for is written from that scale *after* the
+            // properties have been folded in, so the scale wins: a legend over a `fill` scale
+            // paints its swatches from the scale however `symbolFillColor` is set. Folding the
+            // property in regardless would have reversed that.
+            LEGEND_SIGNAL_CHANNELS.mapValues { (part, channels) ->
+              if (part != "symbols") channels
+              else channels.filterValues { channel -> obj.fields[channel] == null }
+            },
+          ),
         labelStyle = obj.guideStroke("label", "Legend", path),
         titleStyle = obj.guideStroke("title", "Legend", path),
         // `symbolStrokeColor`/`symbolStrokeWidth` rather than `symbolColor`/`symbolWidth`, so the

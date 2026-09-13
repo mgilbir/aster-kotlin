@@ -49,6 +49,23 @@ public object TreeLinksTransform : Transform {
       ) ?: return emptyList()
     context.tree = null
 
+    // A node names its row by where it sat when the tree was built, and a `collect` between the two
+    // moves the rows out from under it — the same reach `applyTreeLayout` makes, for the same
+    // reason. See [TreeNode.buildOrder].
+    val built = root.buildOrder
+    val now = context.creationOrder()?.takeIf { it.size == input.size }
+    val rowAt: (Int) -> VegaValue? =
+      if (built == null || now == null) {
+        { index -> input.getOrNull(index) }
+      } else {
+        val whereItIsNow = HashMap<Int, Int>(now.size)
+        for ((position, ordinal) in now.withIndex()) whereItIsNow[ordinal] = position
+        { index ->
+          built.getOrNull(index)?.let { ordinal -> whereItIsNow[ordinal] }?.let { input[it] }
+            ?: input.getOrNull(index)
+        }
+      }
+
     val links = mutableListOf<VegaValue>()
     val queue = ArrayDeque<TreeNode>()
     queue.addLast(root)
@@ -62,7 +79,12 @@ public object TreeLinksTransform : Transform {
       // without `generate` — is absent in exactly that sense.
       if (node.index in input.indices && parent.index in input.indices) {
         links +=
-          VegaValue.Obj(linkedMapOf("source" to input[parent.index], "target" to input[node.index]))
+          VegaValue.Obj(
+            linkedMapOf(
+              "source" to (rowAt(parent.index) ?: continue),
+              "target" to (rowAt(node.index) ?: continue),
+            )
+          )
       }
     }
     return links
@@ -112,16 +134,23 @@ public object LinkPathTransform : Transform {
       )
     }
 
-    val sourceX = params.accessor("sourceX", "source.x")
-    val sourceY = params.accessor("sourceY", "source.y")
-    val targetX = params.accessor("targetX", "target.x")
-    val targetY = params.accessor("targetY", "target.y")
+    // Each endpoint is a **field parameter**, so it may be a column name or an expression; see
+    // [fieldAccessor]. A sankey writes the second — its coordinates are scale lookups rather than
+    // columns — and reading only the first left every link path `MNaN,NaN…`.
+    fun endpoint(key: String, fallback: String): Pair<String, (VegaValue) -> VegaValue> =
+      (fieldAccessor(params, key, context, type)?.let { key to it })
+        ?: (fallback to { row: VegaValue -> row.field(fallback) })
+
+    val sourceX = endpoint("sourceX", "source.x")
+    val sourceY = endpoint("sourceY", "source.y")
+    val targetX = endpoint("targetX", "target.x")
+    val targetY = endpoint("targetY", "target.y")
     val output = params.accessor("as", "path")
 
     var unresolved: String? = null
-    fun read(row: VegaValue, accessor: String): Double {
-      val value = row.field(accessor).asDouble()
-      if (value.isNaN() && unresolved == null) unresolved = accessor
+    fun read(row: VegaValue, accessor: Pair<String, (VegaValue) -> VegaValue>): Double {
+      val value = accessor.second(row).asDouble()
+      if (value.isNaN() && unresolved == null) unresolved = accessor.first
       return value
     }
 
