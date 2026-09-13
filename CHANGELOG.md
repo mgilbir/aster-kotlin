@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **`bin` reads the `span` it was given.** `span = _.span || (max - min) || Math.abs(min) || 1` is
+  what the step is chosen from, and only the second term of that chain was read: a specification
+  stating a span — which is how a chart keeps its bins a fixed width while a brush or a filter
+  narrows the rows under them — re-binned itself against whatever the data happened to cover. The
+  `||` is transcribed rather than paraphrased, so a span of zero is no span and falls through to the
+  extent. `BinTransform.binSettings` takes the span as a trailing optional parameter, which renames
+  the Swift selector to `binSettings(min:max:maxbins:base:step:steps:divide:minstep:nice:anchor:span:)`.
+
 - **The Deneb corpus agrees with upstream on every template it can compare: 54 of 54.** The sweep
   of specifications other people wrote started at 0, and closing it turned up fourteen root causes,
   each read off upstream's source or off a live view and each fixed where it belongs rather than

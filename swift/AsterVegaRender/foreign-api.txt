@@ -263,7 +263,7 @@ BinTransform.BinSettings.step
 BinTransform.BinSettings.stop
 BinTransform.DEFAULT_MAXBINS
 BinTransform.apply(input:params:context:)
-BinTransform.binSettings(min:max:maxbins:base:step:steps:divide:minstep:nice:anchor:)
+BinTransform.binSettings(min:max:maxbins:base:step:steps:divide:minstep:nice:anchor:span:)
 BinTransform.init()
 BinTransform.publishesSignal
 BinTransform.shared

@@ -158,8 +158,8 @@ public final class dev/aster/vega/dataflow/transform/BinTransform : dev/aster/ve
 	public static final field DEFAULT_MAXBINS I
 	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/BinTransform;
 	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
-	public final fun binSettings (DDIDLjava/lang/Double;Ljava/util/List;Ljava/util/List;DZLjava/lang/Double;)Ldev/aster/vega/dataflow/transform/BinTransform$BinSettings;
-	public static synthetic fun binSettings$default (Ldev/aster/vega/dataflow/transform/BinTransform;DDIDLjava/lang/Double;Ljava/util/List;Ljava/util/List;DZLjava/lang/Double;ILjava/lang/Object;)Ldev/aster/vega/dataflow/transform/BinTransform$BinSettings;
+	public final fun binSettings (DDIDLjava/lang/Double;Ljava/util/List;Ljava/util/List;DZLjava/lang/Double;Ljava/lang/Double;)Ldev/aster/vega/dataflow/transform/BinTransform$BinSettings;
+	public static synthetic fun binSettings$default (Ldev/aster/vega/dataflow/transform/BinTransform;DDIDLjava/lang/Double;Ljava/util/List;Ljava/util/List;DZLjava/lang/Double;Ljava/lang/Double;ILjava/lang/Object;)Ldev/aster/vega/dataflow/transform/BinTransform$BinSettings;
 	public fun getPublishesSignal ()Z
 	public fun getType ()Ljava/lang/String;
 }
