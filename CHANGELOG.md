@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **An unprojected `geopath` draws points, features and geometry collections.** It had a reader of
+  its own that understood four geometry types, and the ones it did not understand are the ones a
+  column of decoded GeoJSON is most likely to hold: a `Point` is a **circle** of the current
+  `pointRadius`, a `MultiPoint` one per coordinate, and a `Feature` or `GeometryCollection` is
+  unwrapped rather than skipped. It now walks the geometry with the same reader the projected path
+  uses. `pointRadius` is read as well, on both transforms and including the `{"expr": …}` form —
+  which d3 evaluates against the **geometry**, not the row.
+
 - **`aggregate`, `joinaggregate` and `pivot` group into the cell their `key` names.** All three
   declare the parameter — `this.cellkey = _.key ? _.key : groupkey(this._dims)` — and all three were
   ignoring it, so a specification naming a key got a different number of cells than upstream, each
