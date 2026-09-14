@@ -106,10 +106,23 @@ public class ScaleResolver(
       // A linear scale with a colour range is a colour scale, not a positional one.
       ScaleType.LINEAR -> if (hasColorRange(spec)) buildSequentialColor(spec) else buildLinear(spec)
       ScaleType.SEQUENTIAL -> buildSequentialColor(spec)
-      // Nothing to build: an identity scale has no domain, no range and no interpolation. It exists
-      // so
-      // a channel that wants a scale can be handed coordinates that are already final.
-      ScaleType.IDENTITY -> IdentityScale(spec.name)
+      // Nothing to *map*: an identity scale hands back the coordinate it was given, which is what
+      // it exists for. It does have a **domain** all the same — d3 gives `domain` and `range` the
+      // same array and then makes the scale `linearish` — and an axis drawn against one is ticked
+      // over it like any other. Discarding it left that axis empty.
+      ScaleType.IDENTITY ->
+        IdentityScale(
+          spec.name,
+          // **Only when one is written.** An identity scale is the one kind a specification
+          // routinely declares with no domain at all — `{"name": "pos", "type": "identity"}` is the
+          // whole of it, because the coordinates are already final and nothing needs mapping — and
+          // d3 defaults the domain to `[0, 1]` there rather than refusing. Asking the ordinary
+          // resolver for a domain that is not there turned the commonest identity scale of all into
+          // a scale that would not build.
+          if (spec.domain == DomainSpec.Unset) listOf(0.0, 1.0)
+          else
+            continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null,
+        )
       // A **transformed** scale with a colour range is a colour scale too, and the ramp is walked
       // in the scale's own space: `sqrt` over `[0, 100]` paints 25 the midpoint colour, because the
       // square roots make it the midpoint. Read off a live view. Refusing these left a choropleth

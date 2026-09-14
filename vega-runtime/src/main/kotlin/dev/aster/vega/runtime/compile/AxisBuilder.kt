@@ -18,7 +18,9 @@ import dev.aster.vega.model.time.TimeStepper
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.BinOrdinalScale
 import dev.aster.vega.runtime.scale.BinnedScale
+import dev.aster.vega.runtime.scale.IdentityScale
 import dev.aster.vega.runtime.scale.LinearScale
+import dev.aster.vega.runtime.scale.OrdinalScale
 import dev.aster.vega.runtime.scale.PointScale
 import dev.aster.vega.runtime.scale.PositionScale
 import dev.aster.vega.runtime.scale.QuantileScale
@@ -895,6 +897,15 @@ public class AxisBuilder(
     when (scale) {
       is PositionScale -> scale.range
       is BinnedScale -> scale.rangeValues.mapNotNull { it.asNumberOrNull() }.takeIf { it.size >= 2 }
+      // The **first and last range entries**, which for an ordinal scale is not the same as its
+      // widest and narrowest: a range of `[10, 40, 80, 118, 90, 30]` spans its line from 10 to 30,
+      // because upstream asks the scale for range positions 0 and 1 rather than for an extent. Both
+      // of these fell through to null, so the line was drawn across the whole plotting area and the
+      // title was centred on that instead of on the axis — a spine twice the length upstream draws
+      // and a title twenty units out.
+      is OrdinalScale ->
+        scale.rangeValues.mapNotNull { it.asNumberOrNull() }.takeIf { it.size >= 2 }
+      is IdentityScale -> scale.range
       else -> null
     }
 
@@ -1371,6 +1382,42 @@ public class AxisBuilder(
           )
         }
       }
+      // An **ordinal** scale's ticks are its domain, each placed wherever the scale sends it. It is
+      // the discrete case the band and point branches already cover, and it had no branch at all —
+      // so an axis over one drew nothing. `tickCount` does not thin them: upstream hands a discrete
+      // scale's whole domain to the axis, and probed, `tickCount: 2` over a three-value domain
+      // still labels all three.
+      //
+      // The position is whatever the scale maps a value *to*, which for an ordinal scale ranging
+      // over colours is not a number: NaN then, as the binned branch does, and upstream writes the
+      // same NaN onto the item and draws nothing.
+      is OrdinalScale ->
+        scale.domain.map { value ->
+          val at = scale.scale(VegaValue.Str(value)).asNumberOrNull() ?: Double.NaN
+          // A discrete domain's values *are* its labels, which is the rule the binned scales follow
+          // too: upstream asks the scale for a `tickFormat`, an ordinal scale has none, and the
+          // fallback is plain string coercion.
+          Tick(value, at, VegaValue.Str(value))
+        }
+      // An **identity** scale is `linearish` in d3, so its ticks are a linear scale's over its own
+      // domain — and its position is the value itself, the scale being the identity. Upstream
+      // labels fourteen ticks on a domain of `[8, 76]` where this drew none.
+      is IdentityScale -> {
+        val count =
+          GuideFormat.countWithMinStep(
+            numbers.resolveTickCount(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT,
+            numbers.resolve(spec.tickMinStep, spec.scale),
+            scale.domain,
+            linear = true,
+          )
+        val low = scale.domain.first()
+        val high = scale.domain.last()
+        val label = numericLabeller(low, high, count, specifier, spec.formatType)
+        // The position **is** the value: that is the whole of what an identity scale does.
+        Ticks.ticks(low, high, count).map { value ->
+          Tick(label(VegaValue.Num(value)), value, VegaValue.Num(value))
+        }
+      }
       is LinearScale -> {
         val count =
           GuideFormat.countWithMinStep(
@@ -1508,23 +1555,45 @@ public class AxisBuilder(
     formatType: String?,
   ): (VegaValue) -> String {
     if (scale is QuantizeScale) {
-      GuideFormat.timeLabeller(specifier, formatType, locale, timeZone)?.let { write ->
-        return { value ->
-          val instant = value.asDouble()
-          if (instant.isNaN()) value.asString() else write(instant)
-        }
-      }
-      val low = scale.domain.firstOrNull() ?: 0.0
-      val high = scale.domain.lastOrNull() ?: 1.0
-      if (specifier != null) {
-        val labeller = Ticks.spanFormatter(specifier, low, high, count, locale)
-        return { value -> labeller(value.asDouble()) }
-      }
-      val step = Ticks.stepFrom(Ticks.tickIncrement(low, high, count))
-      val precision = if (step.isFinite()) Ticks.precisionForStep(step) else 0
-      return { value -> formatTickLabel(value.asDouble(), precision, locale) }
+      return numericLabeller(
+        scale.domain.firstOrNull() ?: 0.0,
+        scale.domain.lastOrNull() ?: 1.0,
+        count,
+        specifier,
+        formatType,
+      )
     }
     return { value -> value.asString() }
+  }
+
+  /**
+   * How a tick over a **continuous numeric domain** is written, when the scale has no say in it.
+   *
+   * A quantize scale gets one of these because d3 builds it on a linear scale and borrows that
+   * scale's `tickFormat`; an identity scale gets one because d3 makes it `linearish`, which is the
+   * same borrowing by another name. The precision comes from the step between ticks, so a domain
+   * stepped by five is labelled in whole numbers and one stepped by a tenth is not.
+   */
+  private fun numericLabeller(
+    low: Double,
+    high: Double,
+    count: Int,
+    specifier: String?,
+    formatType: String?,
+  ): (VegaValue) -> String {
+    GuideFormat.timeLabeller(specifier, formatType, locale, timeZone)?.let { write ->
+      return { value ->
+        val instant = value.asDouble()
+        if (instant.isNaN()) value.asString() else write(instant)
+      }
+    }
+    if (specifier != null) {
+      val labeller = Ticks.spanFormatter(specifier, low, high, count, locale)
+      return { value -> labeller(value.asDouble()) }
+    }
+    val step = Ticks.stepFrom(Ticks.tickIncrement(low, high, count))
+    val precision = if (step.isFinite()) Ticks.precisionForStep(step) else 0
+    return { value -> formatTickLabel(value.asDouble(), precision, locale) }
   }
 
   /**

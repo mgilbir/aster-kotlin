@@ -8,6 +8,35 @@ section here does not get released.
 
 ### Fixed
 
+- **An axis over an ordinal or an identity scale draws its ticks.** Both drew nothing at all:
+  `generatedTicks` had a branch for band, point, linear, transformed, time and the binned four, and
+  answered null for these two — so the guide was a bare line, or not even that.
+
+  Three things were missing, and the third only showed once the first two were right.
+
+  `IdentityScale` **discarded its declared domain**, holding `[0, 1]` whatever the specification
+  said. d3 gives `domain` and `range` the same array and then makes the scale `linearish`, so an
+  identity scale ticks exactly as a linear one does and formats its labels by the same
+  step-derived precision. It keeps the domain now — except where none was written, which is how the
+  commonest identity scale of all is spelled, `{"name": "pos", "type": "identity"}`, and where d3
+  defaults to `[0, 1]` rather than refusing.
+
+  The **ticks** themselves: an ordinal axis is ticked with its domain values at their range
+  positions, and `tickCount` does not thin them — probed, `tickCount: 2` over a three-value domain
+  still labels three. An identity axis is ticked like a linear one, each tick at the value itself.
+
+  And the **spine**: `rangeEnds` had no branch for either either, so the domain line ran the whole
+  height of the plot and the axis title was centred on that rather than on the axis — twenty units
+  out. Upstream asks the scale for range positions 0 and 1, which for an ordinal range of `[10, 40,
+  80, 118, 90, 30]` is 10 to 30 and deliberately not its widest extent.
+
+  Giving the scale a domain also changed what a **screen reader** hears, which the guide-caption
+  gate caught: upstream's `domainCaption` has no identity case, so one falls through to the
+  continuous branch and is read as "values from 1 to 5". This said "the values themselves", the
+  phrasing for a scale believed to have no domain to describe.
+
+  Fifteen of the sweep's differences down to seven.
+
 - **A discretizing scale takes a range keyword.** `range: "height"` on a quantize, threshold,
   quantile or bin-ordinal scale was refused outright — "needs an explicit range array or a scheme" —
   where upstream resolves the keyword *first* and then asks what kind of scale wanted it. Probed: a

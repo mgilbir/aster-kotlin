@@ -84,10 +84,44 @@ public sealed interface PositionScale : VegaScale {
  * that is not a number maps to **nothing** rather than to `NaN` — d3's `unknown`, which for a mark
  * means a channel left unset and a mark that does not draw.
  */
-public class IdentityScale(override val name: String) : VegaScale {
-  public val range: List<Double> = listOf(0.0, 1.0)
+public class IdentityScale(
+  override val name: String,
+  /**
+   * The declared domain, which an identity scale **does** have and which is also its range.
+   *
+   * ```js
+   * scale.domain = scale.range = function(_) { … };
+   * …
+   * return linearish(scale);
+   * ```
+   *
+   * d3 gives the two the same array and then makes the scale `linearish`, so an identity scale
+   * generates ticks over its domain exactly as a linear one does — and an axis drawn against one is
+   * ticked and labelled like any other. This carried `[0, 1]` whatever the specification said,
+   * which was harmless while nothing asked and wrong the moment an axis did: no domain, no ticks,
+   * no labels, an empty guide beside a chart upstream draws fourteen labels on.
+   */
+  public val domain: List<Double> = listOf(0.0, 1.0),
+) : VegaScale {
+  /** The same numbers as [domain]: d3 assigns the one accessor to both names. */
+  public val range: List<Double>
+    get() = domain
 
-  public val domain: List<Double> = listOf(0.0, 1.0)
+  /**
+   * A tick's label, by the same rule a linear scale uses, because `linearish` is what d3 makes it.
+   *
+   * The precision comes from the step between ticks rather than from the values, so a domain walked
+   * in fives is labelled in whole numbers.
+   */
+  public fun formatTick(
+    value: Double,
+    count: Int = LinearScale.DEFAULT_TICK_COUNT,
+    locale: VegaLocale = VegaLocale.EnglishUS,
+  ): String {
+    val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
+    val precision = if (step.isFinite()) Ticks.precisionForStep(step) else 0
+    return formatTickLabel(value, precision, locale)
+  }
 
   override fun scale(value: VegaValue): VegaValue {
     val number = value.asDouble()
