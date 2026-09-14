@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **A text box built from a negative measurement is still a box.** `Bounds.set` swaps a pair that
+  arrives the wrong way round, and a negative font size makes both pairs arrive that way — the
+  width estimate is `~~(0.8 * length * fontSize)`. A rectangle stored inverted reads as *empty*
+  here, and empty is absorbing: it is skipped by a union and unmoved by a translate. So an axis
+  whose labels were set at a negative size measured only its ticks, a guide's title contributed
+  nothing to the drawing's size, and every chart in the sweep that used one came out short. The
+  boxes are ordered now, which was the last of the schema sweep's differences: **587 of 587**.
+
 - **A title oriented `none` is placed by nothing.** It is upstream's fifth orientation and it
   reaches the `default:` branch of `titleLayout`'s switch, which leaves the group at the coordinates
   it already has — its own `encode`, or the origin. The heading then sits at the plotting area's

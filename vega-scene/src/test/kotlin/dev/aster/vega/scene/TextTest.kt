@@ -74,6 +74,29 @@ class TextTest {
   }
 
   @Test
+  fun `a box built from a negative measurement comes back the right way round`() {
+    // `Bounds.set` swaps a pair that arrives the wrong way round, and a negative font size makes
+    // both pairs arrive that way: the width estimate is `~~(0.8 * length * fontSize)`. A rectangle
+    // stored inverted reads as empty here, and empty is absorbing — it is skipped by `union` and
+    // unmoved by `translate` — so an axis whose labels were set that way measured only its ticks.
+    val mirrored =
+      TextMetrics(
+        width = -16.0,
+        height = -4.0,
+        ascent = -2.0,
+        descent = -2.0,
+        lineCount = 1,
+        lineHeight = -2.0,
+      )
+    val box = textBounds(TextRun("abcd", style, baseline = TextBaseline.TOP), mirrored)
+    assertEquals(-16.0, box.left, 1e-9)
+    assertEquals(-4.0, box.top, 1e-9)
+    assertEquals(0.0, box.right, 1e-9)
+    assertEquals(0.0, box.bottom, 1e-9)
+    assertTrue(!box.isEmpty, "a mirrored box is still a box")
+  }
+
+  @Test
   fun `baseline positions bounds vertically`() {
     val metrics = engine.measure(TextRun("abcd", style))
 
