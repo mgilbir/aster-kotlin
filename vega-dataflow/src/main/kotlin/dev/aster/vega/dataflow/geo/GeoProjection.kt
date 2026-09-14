@@ -284,7 +284,7 @@ internal class ResampleStream(
 internal class NoResampleStream(
   target: GeoStream,
   private val project: (Double, Double) -> DoubleArray,
-) : DelegatingStream(target) {
+) : TransformingStream(target) {
   override fun point(x: Double, y: Double) {
     val p = project(x, y)
     sink.point(p[0], p[1])
@@ -662,7 +662,7 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
 
   /** Degrees in, radians out, rotated: the first stage of the pipeline. */
   private class RotateStream(target: GeoStream, private val rotation: Rotation) :
-    DelegatingStream(target) {
+    TransformingStream(target) {
     override fun point(x: Double, y: Double) {
       val r = rotation.forward(x * RADIANS, y * RADIANS)
       sink.point(r[0], r[1])

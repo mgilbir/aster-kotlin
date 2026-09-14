@@ -168,6 +168,26 @@ internal open class DelegatingStream(protected val sink: GeoStream) : GeoStream(
 }
 
 /**
+ * A stream that **transforms** every point it passes on, which is `d3-geo`'s `transformer`.
+ *
+ * One thing separates it from a plain [DelegatingStream], and it is the marked point. Circle
+ * clipping emits its crossings as `point(x, y, 2)` so that [clipRejoin] can tell a ring that closes
+ * on itself from one whose ends merely landed together — a marker that belongs to the clip stage
+ * and is meaningless past it. d3's transform stream declares `point(x, y)` and JavaScript drops the
+ * third argument on the floor, so a crossing is projected like any vertex; a `DelegatingStream`
+ * forwards the marked form *unchanged*, which skips the subclass's own `point` and left a pair of
+ * **radians** in a path — `L0.894,0.647` where upstream had `L174.636,-12.315`.
+ *
+ * It only ever showed at `precision: 0`. The resampler is not built on this and projects a marked
+ * point through the same path as any other, so every other precision hid it.
+ */
+internal abstract class TransformingStream(target: GeoStream) : DelegatingStream(target) {
+  final override fun point(x: Double, y: Double, m: Double) {
+    point(x, y)
+  }
+}
+
+/**
  * Pushes a GeoJSON object through a stream, `d3-geo/src/stream.js`.
  *
  * The one detail worth knowing: a polygon's rings are streamed with their **last point dropped**,

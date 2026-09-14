@@ -1,0 +1,143 @@
+{
+  "marks": [
+    {
+      "fill": null,
+      "role": "mark",
+      "shapeHeight": 84.315274,
+      "shapeLeft": 21.682105,
+      "shapeTop": 22.842363,
+      "shapeWidth": 86.63579,
+      "stroke": "#b8c4cc",
+      "strokeWidth": 3,
+      "type": "shape"
+    },
+    {
+      "fill": null,
+      "role": "mark",
+      "shapeHeight": "-Infinity",
+      "shapeLeft": 1.7976931348623157e+308,
+      "shapeTop": 1.7976931348623157e+308,
+      "shapeWidth": "-Infinity",
+      "stroke": "#b8c4cc",
+      "strokeWidth": 3,
+      "type": "shape"
+    },
+    {
+      "fill": null,
+      "role": "mark",
+      "shapeHeight": 115.922948,
+      "shapeLeft": 26.952456,
+      "shapeTop": 7.038526,
+      "shapeWidth": 76.095088,
+      "stroke": "#b8c4cc",
+      "strokeWidth": 3,
+      "type": "shape"
+    },
+    {
+      "fill": null,
+      "role": "mark",
+      "shapeHeight": 75.115274,
+      "shapeLeft": 26.282105,
+      "shapeTop": 27.442363,
+      "shapeWidth": 77.43579,
+      "stroke": "#d36f2a",
+      "strokeWidth": 0.7,
+      "type": "shape"
+    },
+    {
+      "fill": null,
+      "role": "mark",
+      "shapeHeight": "-Infinity",
+      "shapeLeft": 1.7976931348623157e+308,
+      "shapeTop": 1.7976931348623157e+308,
+      "shapeWidth": "-Infinity",
+      "stroke": "#d36f2a",
+      "strokeWidth": 0.7,
+      "type": "shape"
+    },
+    {
+      "fill": null,
+      "role": "mark",
+      "shapeHeight": 106.722948,
+      "shapeLeft": 31.552456,
+      "shapeTop": 11.638526,
+      "shapeWidth": 66.895088,
+      "stroke": "#d36f2a",
+      "strokeWidth": 0.7,
+      "type": "shape"
+    },
+    {
+      "fill": null,
+      "role": "mark",
+      "shapeHeight": 88.543945,
+      "shapeLeft": 149.499923,
+      "shapeTop": 20.728027,
+      "shapeWidth": 91.000155,
+      "stroke": "#b8c4cc",
+      "strokeWidth": 3,
+      "type": "shape"
+    },
+    {
+      "fill": null,
+      "role": "mark",
+      "shapeHeight": 42.409346,
+      "shapeLeft": 164.457244,
+      "shapeTop": 9.779546,
+      "shapeWidth": 88.22585,
+      "stroke": "#b8c4cc",
+      "strokeWidth": 3,
+      "type": "shape"
+    },
+    {
+      "fill": null,
+      "role": "mark",
+      "shapeHeight": 122,
+      "shapeLeft": 134,
+      "shapeTop": 4,
+      "shapeWidth": 122,
+      "stroke": "#b8c4cc",
+      "strokeWidth": 3,
+      "type": "shape"
+    },
+    {
+      "fill": null,
+      "role": "mark",
+      "shapeHeight": 79.343945,
+      "shapeLeft": 154.099923,
+      "shapeTop": 25.328027,
+      "shapeWidth": 81.800155,
+      "stroke": "#7a4fb5",
+      "strokeWidth": 0.7,
+      "type": "shape"
+    },
+    {
+      "fill": null,
+      "role": "mark",
+      "shapeHeight": 33.209346,
+      "shapeLeft": 169.057244,
+      "shapeTop": 14.379546,
+      "shapeWidth": 79.02585,
+      "stroke": "#7a4fb5",
+      "strokeWidth": 0.7,
+      "type": "shape"
+    },
+    {
+      "fill": null,
+      "role": "mark",
+      "shapeHeight": 112.8,
+      "shapeLeft": 138.6,
+      "shapeTop": 8.6,
+      "shapeWidth": 112.8,
+      "stroke": "#7a4fb5",
+      "strokeWidth": 0.7,
+      "type": "shape"
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 140,
+    "width": 270
+  },
+  "spec": "projection-precision.vg.json",
+  "vegaVersion": "6.3.1"
+}
