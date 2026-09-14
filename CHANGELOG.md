@@ -8,6 +8,17 @@ section here does not get released.
 
 ### Fixed
 
+- **An axis title is measured where upstream measures it, not where it ends up.** Its box is
+  computed while it still sits at the axis's origin and `axisTitleLayout` translates the box
+  afterwards — `b.translate(-dx, -dy)` — and the two orderings are the same arithmetic but not the
+  same number. A quarter turn's cosine is 6.1e-17 rather than zero, and whether that crumb survives
+  depends on the size of the coordinate it lands beside: measured at the origin it is under half an
+  ulp and vanishes, measured where the title ends up it is not. A left axis title reached to
+  −46.00000000000001 instead of −46, and the legend beside it — anchored at `Math.floor` of that —
+  was placed a whole unit further out. Making the rotation *exact* was tried instead and is wrong:
+  upstream's crumb is real wherever an encoder places a rotated guide itself, and two trellis
+  fixtures depend on it surviving a `Math.ceil`.
+
 - **A title's `dx` and `dy` move its subtitle with it.** Upstream hands `buildSubTitle` the same
   `dx: _('dx'), dy: _('dy')` it hands `buildTitle`, so the pair is nudged together — while an
   `encode.title` block is merged into the heading's mark alone and moves only that. Both were
