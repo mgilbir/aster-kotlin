@@ -55,6 +55,35 @@ section here does not get released.
 
 ### Fixed
 
+- **An identity projection is not a sphere with the globe switched off.** `d3-geo`'s identity
+  projection is an affine transform — `transform(postclip(stream))` — with five setters: `scale`,
+  `translate`, `reflectX`, `reflectY` and `clipExtent`. It has no clip angle, no centre, no rotation
+  and no `precision`, and `vega-geo` applies a projection property only where the projection has a
+  setter of that name (`set` is `if (isFunction(proj[key])) proj[key](value)`), so all four are
+  dropped in silence upstream. Here the identity projection is the spherical one with a flag, so it
+  had every setter there is and honoured all four: a `clipAngle` clipped a floor plan to a circle, a
+  `center` or a `rotate` turned it.
+
+  The fifth thing it does not have is not a property and so could not be dropped like one: **there is
+  no resampling stage**. This one defaults to a threshold of 0.5 and subdivides every segment against
+  a *great-circle* midpoint — of coordinates that are already on the page. A straight edge from
+  `[-100, 20]` to `[-60, 20]` came out 1.7 pixels taller than the two points it joins, and a polygon
+  spanning the width of the world 40 wider than its own corners. Small geometry hid it: the existing
+  fixture spans 40 units and bulges by less than the comparison's tolerance.
+
+  `identity-projection` draws the same wide geometry twice, once plainly and once through a
+  projection that also asks for a clip angle, a centre, a rotation and a precision, and the two land
+  exactly on top of each other. **63 of the projection sweep's 68 differences, closed by this**;
+  4099 of 4104 charts now agree.
+
+  Holding it needed the fixture to draw at all. `identity-projection` and `config-group-projection`
+  put a mark-level `geoshape` on a **`path`** mark, and a `geoshape` writes `shape` where a `path`
+  mark reads `path` — so upstream emitted six empty `d` attributes, this engine emitted six empty
+  outlines, and the two agreed about nothing at zero bounds. Both are `shape` marks now, which is
+  the type `geoshape` feeds; every mutant of this change survived the fixture before that and none
+  survives it after. A fixture drawing nothing is not a fixture, and the two that were are the two
+  that covered the projection this change is about.
+
 - **`nice` reaches a quantize scale.** Upstream applies it by **capability** rather than by scale
   type — `configureScale` tests `_.nice && scale.nice` — and d3 gives a quantize scale a `nice`
   because it rounds the linear scale it is built on. This applied `nice` only where a continuous

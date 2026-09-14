@@ -53,7 +53,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `colour-interpolation` | 180 | rect, text | — | linear |
 | `colour-ramps` | 57 | rect, rule, text | — | band, linear |
 | `colour-scheme` | 39 | rect, rule, text | — | band, linear, ordinal |
-| `config-group-projection` | 2 | group, path | geoshape | — |
+| `config-group-projection` | 2 | group, shape | geoshape | — |
 | `config-marks` | 31 | rect, rule, symbol, text | — | band, linear |
 | `config-range` | 20 | rect, symbol, text | — | band, linear, ordinal |
 | `config-theme` | 42 | rect, rule, symbol, text | — | band, linear, ordinal |
@@ -105,7 +105,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `histogram` | 33 | rect, rule, text | aggregate, bin | linear |
 | `href-links` | 17 | rect, rule, symbol, text | — | band, linear, ordinal |
 | `hypothetical-outcome-plots` | 60 | rect, rule, text | formula, sequence | band, linear |
-| `identity-projection` | 7 | path, symbol, text | geopoint, geoshape | — |
+| `identity-projection` | 11 | shape, symbol, text | geopoint, geoshape | — |
 | `identity-scale` | 4 | symbol, text | — | identity, ordinal |
 | `image-marks` | 18 | image, symbol | — | — |
 | `impute-pivot` | 41 | rect, rule, symbol, text | impute, pivot, stack | band, linear, ordinal |
