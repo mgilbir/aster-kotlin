@@ -10104,6 +10104,14 @@
   "hidden": false
  },
  {
+  "fixture": "legend-columns",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "legend-discretizing",
   "kind": "group",
   "role": "graphics-object",
