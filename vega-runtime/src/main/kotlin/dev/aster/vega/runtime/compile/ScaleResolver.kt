@@ -965,15 +965,25 @@ public class ScaleResolver(
           if (ramp == null && colors.size > wanted) sampleEvenly(colors, wanted) else colors
         (if (reversed(spec)) taken.reversed() else taken).map { VegaValue.Str(it.toCssHex()) }
       }
-      else -> {
-        diagnostics.error(
-          DiagnosticCodes.SCALE_INVALID_DOMAIN,
-          "A '${spec.type.name.lowercase().replace('_', '-')}' scale needs an explicit range " +
-            "array or a scheme (scale '${spec.name}')",
-          operator = spec.name,
-        )
-        null
-      }
+      // A **range keyword** is a range like any other once it is resolved. `range: "height"` reads
+      // as `[height, 0]` — a two-element list, and two elements is a perfectly good set of buckets
+      // — and upstream resolves the keyword before it ever asks what kind of scale is asking:
+      // probed, a quantize scale over `range: "height"` in a 100-tall view reports a range of
+      // `[100, 0]` and buckets into it. This refused the whole scale instead, and a refused scale
+      // takes its axis with it: `VEGA_SCALE_NOT_BUILT`, no ticks, no labels, nothing drawn. The
+      // schema sweep found it because every scale type now gets a base chart, and every property of
+      // the quantize one differed alike.
+      else ->
+        numericRange(spec)?.map { VegaValue.Num(it) }
+          ?: run {
+            diagnostics.error(
+              DiagnosticCodes.SCALE_INVALID_DOMAIN,
+              "A '${spec.type.name.lowercase().replace('_', '-')}' scale needs an explicit range " +
+                "array, a range keyword or a scheme (scale '${spec.name}')",
+              operator = spec.name,
+            )
+            null
+          }
     }
 
   /** How many colours a scheme is asked for, which a signal may decide. */

@@ -428,6 +428,136 @@
       "y2": 0.5
     },
     {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": -57.5,
+      "x2": -62.5,
+      "y": 150.5,
+      "y2": 150.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": -57.5,
+      "x2": -62.5,
+      "y": 150.5,
+      "y2": 150.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": -57.5,
+      "x2": -62.5,
+      "y": 0.5,
+      "y2": 0.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": -57.5,
+      "x2": -62.5,
+      "y": 0.5,
+      "y2": 0.5
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "100",
+      "type": "text",
+      "x": -64.5,
+      "y": 150.5
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "200",
+      "type": "text",
+      "x": -64.5,
+      "y": 150.5
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "300",
+      "type": "text",
+      "x": -64.5,
+      "y": 0.5
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "400",
+      "type": "text",
+      "x": -64.5,
+      "y": 0.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-domain",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": -57.5,
+      "x2": -57.5,
+      "y": 150.5,
+      "y2": 0.5
+    },
+    {
+      "align": "center",
+      "angle": -90,
+      "baseline": "bottom",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "fontWeight": "bold",
+      "opacity": 1,
+      "role": "axis-title",
+      "text": "Quantize, keyword range",
+      "type": "text",
+      "x": -92.5,
+      "y": 75.5
+    },
+    {
       "fill": "#4c78a8",
       "role": "mark",
       "shapeHeight": 9.486833,
@@ -534,6 +664,26 @@
     }
   ],
   "scales": {
+    "buckets": {
+      "domain": [
+        4,
+        400
+      ],
+      "range": [
+        150,
+        0
+      ],
+      "ticks": [
+        50,
+        100,
+        150,
+        200,
+        250,
+        300,
+        350,
+        400
+      ]
+    },
     "power": {
       "domain": [
         0,
@@ -596,8 +746,8 @@
     }
   },
   "size": {
-    "height": 197,
-    "width": 311
+    "height": 218,
+    "width": 369
   },
   "spec": "scale-variants.vg.json",
   "vegaVersion": "6.3.1"
