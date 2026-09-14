@@ -8,6 +8,36 @@ section here does not get released.
 
 ### Fixed
 
+- **The sweep reads the vocabularies upstream keeps in code, not only the ones its schema states.**
+  The schema had been the sweep's whole source of values, and 121 of its 209 skips shared one
+  reason: "the schema declares no enumerable value here". That sentence covered two unlike things. A
+  property upstream **checks against a table** has a vocabulary — `interpolate` is one of seventeen
+  names in `curves.js`, `shape` one of twelve in `symbols.js`, and anything else silently draws
+  nothing — and the schema cannot say so, because a custom SVG path is a legal `shape` too. A
+  property upstream **passes through** has none: `fontStyle` is concatenated into the CSS font string
+  verbatim, so its legal values belong to the text engine and any word invented here would be testing
+  the platform.
+
+  The first kind is swept now, from lists **extracted from upstream's own pinned sources and then put
+  back through upstream's own lookups** — every name must satisfy `pathCurves` or `pathSymbols` or
+  the generator throws, so a broken extraction fails loudly rather than quietly sweeping nothing.
+  Nothing is transcribed, so a name added upstream arrives with the next `npm ci`. The second kind
+  keeps its skip and now carries its own reason instead of sharing one sentence 121 times.
+
+  Three smaller gaps closed with it. **`strokeDash` was never swept at all**: its `value` branch is a
+  bare `{"type": "array"}` and the generator required `items.type === 'number'`, so the one
+  array-valued channel there is was dropped from all nine mark types. An axis's `domainCap`, `gridCap`
+  and `tickCap` are **stated under another name** — the schema declines to enumerate them and
+  enumerates `strokeCap`, the same three words for the same canvas property, so the enumeration is
+  aliased rather than copied. And `dir` is a two-valued test in `text.js`.
+
+  **2861 charts, up from 2549**, and the widening found one difference: upstream records `dir: "ltr"`
+  where this engine records nothing. `textMetrics` asks `item.dir === 'rtl'`, so left-to-right is
+  what every other answer means — probed, the `<text>` element and the bounds are identical with it,
+  without it and with no `dir` at all, and only a `limit` makes direction visible by truncating from
+  the other end. It joins `strokeCap` and `strokeJoin` in `IMPLIED_BY_ABSENCE`, asserted in both
+  directions: the stated default agrees with silence, and an `rtl` this engine missed still fails.
+
 - **A rect is compared by the numbers it carries, not by the box they imply.** `width: -4` at `x:
   40` is a number a specification may write and upstream keeps: the item says exactly that and the
   drawing is `M40,20h-4v30h4Z`, a real rectangle four units to the *left* of the anchor, with only

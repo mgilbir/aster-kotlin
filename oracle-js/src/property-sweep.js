@@ -50,6 +50,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import * as vega from 'vega';
+import { pathCurves, pathSymbols } from 'vega-scenegraph';
 import { pinDeterminism } from './determinism.js';
 import { canonicalJson, canonicalNumber } from './canonical.js';
 import { normalizeScales, normalizeScene } from './normalize.js';
@@ -335,9 +336,39 @@ const SHARED_SKIP = {
   // Channels that need a value the schema does not carry.
   url: 'an image to load, which a static comparison has nowhere to fetch from',
   path: 'an SVG path, and the schema says only that it is a string',
-  shape: 'a symbol shape, and the schema says only that it is a string',
   text: 'the text of a text mark',
   tooltip: 'a value no static scene shows',
+};
+
+/**
+ * Properties that really are open strings, and what makes each one open.
+ *
+ * The distinction this draws is the point of [VOCABULARY]: a property upstream *checks* against a
+ * table has a vocabulary and belongs in the sweep, and a property upstream *passes through* has
+ * none and cannot be swept honestly. A font name is the clearest case — `fontStyle` is concatenated
+ * straight into the CSS font string, so the set of legal values belongs to the text engine on the
+ * other side rather than to Vega, and any word this invented would be testing the platform.
+ *
+ * Recorded per property so the manifest says which kind of gap each skip is, rather than repeating
+ * one sentence 121 times.
+ */
+const FREE_STRINGS = {
+  font: 'a font family, resolved by whatever engine measures the text rather than by Vega',
+  labelFont: 'a font family; see `font`',
+  titleFont: 'a font family; see `font`',
+  subtitleFont: 'a font family; see `font`',
+  fontStyle: 'concatenated into the CSS font string verbatim; Vega checks it against nothing',
+  labelFontStyle: 'concatenated into the CSS font string verbatim; see `fontStyle`',
+  titleFontStyle: 'concatenated into the CSS font string verbatim; see `fontStyle`',
+  subtitleFontStyle: 'concatenated into the CSS font string verbatim; see `fontStyle`',
+  cursor: 'a CSS cursor name, emitted verbatim; no pointer in a static render reads it',
+  ariaRole: 'an ARIA role, emitted verbatim',
+  ariaRoleDescription: 'an ARIA role description, emitted verbatim',
+  description: 'prose, emitted verbatim',
+  title: 'the guide title itself, which is text rather than a setting',
+  ellipsis: "the string a truncated label ends with; `item.ellipsis || '…'` accepts any",
+  lineBreak: 'the separator `text.split(item.lineBreak)` uses; any string is one',
+  gridScale: 'names a second scale for the grid to span, which is structure rather than style',
 };
 
 /** Skips that belong to **one** family, where the same name means something else in another. */
@@ -387,6 +418,85 @@ function propertiesOf(family) {
   return merged;
 }
 
+/**
+ * The keys of a lookup table in one of upstream's own source files.
+ *
+ * Several properties the schema types as a bare `string` have a **closed vocabulary** all the same,
+ * kept in upstream's code rather than in its schema: `interpolate` is one of seventeen curve names
+ * and `shape` is one of twelve symbol names, and anything else is silently not drawn. The schema
+ * cannot say so — a custom SVG path is also a legal `shape` — so a sweep that reads only the schema
+ * skips the whole of both, which is 26 cases of real geometry.
+ *
+ * Read out of the pinned source rather than transcribed here, so the list cannot drift from the
+ * package: a name added upstream appears in the sweep on the next `npm ci`. Every name is then put
+ * back through upstream's own lookup by [verified], so a broken extraction fails loudly instead of
+ * quietly sweeping nothing.
+ */
+function tableKeys(file, declaration) {
+  const source = readFileSync(new URL(file, import.meta.url), 'utf8');
+  const start = source.indexOf(declaration);
+  if (start < 0) throw new Error(`the table '${declaration}' is not in ${file}`);
+  const body = source.slice(start);
+  const table = body.slice(0, body.indexOf('\n};'));
+  // Top-level quoted keys only — two spaces, a quoted name, a colon — so the nested `draw` and
+  // `tension` entries inside each record are not mistaken for names of their own.
+  const keys = [...table.matchAll(/^ {2}'([^']+)':/gm)].map((match) => match[1]);
+  if (!keys.length) throw new Error(`no keys found in '${declaration}' of ${file}`);
+  return keys;
+}
+
+/** Every name upstream's own lookup accepts, which is the check that the extraction still works. */
+function verified(names, lookup, what) {
+  const accepted = names.filter((name) => lookup(name) != null);
+  if (accepted.length !== names.length) {
+    const rejected = names.filter((name) => lookup(name) == null);
+    throw new Error(`upstream does not know these ${what}: ${rejected.join(', ')}`);
+  }
+  return accepted;
+}
+
+/**
+ * Vocabularies the schema leaves open and upstream's code closes, with where each one comes from.
+ *
+ * Keyed by property name, and applied wherever the schema has nothing enumerable to say. The skips
+ * these replace were honest when the sweep only read the schema; they were also the largest single
+ * hole in it.
+ */
+const VOCABULARY = {
+  // `vega-scenegraph/src/path/curves.js`, whose `lookup` is the whole of what `interpolate` may be.
+  interpolate: verified(
+    tableKeys('../node_modules/vega-scenegraph/src/path/curves.js', 'const lookup = {'),
+    pathCurves,
+    'curves',
+  ),
+  // `vega-scenegraph/src/path/symbols.js`. A `shape` may also be an SVG path — `symbols()` falls
+  // back to `customSymbol` — and `path-marks` covers that; these are the named twelve.
+  shape: verified(
+    tableKeys('../node_modules/vega-scenegraph/src/path/symbols.js', 'const builtins = {'),
+    pathSymbols,
+    'symbols',
+  ),
+  // `item.dir === 'rtl'` in `vega-scenegraph/src/util/text.js`, which is a two-valued test: a
+  // right-to-left run is laid out from the other end, and every other string means left-to-right.
+  dir: ['ltr', 'rtl'],
+};
+
+/** `symbolType` is a legend's word for the same twelve names. */
+VOCABULARY.symbolType = VOCABULARY.shape;
+
+/**
+ * Properties whose vocabulary the schema states **under another name**.
+ *
+ * An axis's `domainCap` is a stroke cap; the schema declines to enumerate it and enumerates
+ * `strokeCap` — the same three words, for the same canvas property — two definitions away. Taking
+ * the enumeration from there keeps this schema-driven rather than transcribed.
+ */
+const VOCABULARY_ALIAS = {
+  domainCap: 'strokeCap',
+  gridCap: 'strokeCap',
+  tickCap: 'strokeCap',
+};
+
 /** The numbers tried for a `number`-typed property, and why these. */
 const NUMBERS = [0, 0.5, 8, -4];
 
@@ -421,8 +531,28 @@ function branchesOf(fragment, depth = 0) {
   return [fragment];
 }
 
+/**
+ * Collects the candidate values for a property: what the schema declares, or what upstream fixes.
+ *
+ * The schema is asked first and always. [VOCABULARY] only answers where it has nothing enumerable
+ * to say, so a property the schema *does* enumerate can never be overridden by a list kept here.
+ */
+function valuesFor(fragment, property) {
+  const declared = declaredValues(fragment);
+  if (declared) return declared;
+
+  const alias = VOCABULARY_ALIAS[property];
+  if (alias) {
+    const aliased = declaredValues(schema.definitions.encodeEntry.properties[alias]);
+    if (aliased) return { ...aliased, kind: `enum (as ${alias})` };
+  }
+  const known = VOCABULARY[property];
+  if (known) return { kind: 'enum (upstream)', values: known };
+  return null;
+}
+
 /** Collects the candidate values a schema fragment declares, or null where there are none. */
-function valuesFor(fragment) {
+function declaredValues(fragment) {
   const branches = branchesOf(fragment);
   for (const branch of branches) {
     // `null` is in several of these enumerations as "unset", which is what leaving the property out
@@ -444,8 +574,13 @@ function valuesFor(fragment) {
   if (JSON.stringify(fragment).includes('colorValue')) {
     return { kind: 'colour', values: [COLOUR] };
   }
+  // An array, **whether or not it says what is in it**. `strokeDash` is the case that matters and
+  // its `value` branch is a bare `{"type": "array"}`: requiring `items.type === 'number'` dropped
+  // the dash pattern from every one of the nine mark types, which is the one array-valued channel
+  // there is. A property this offers a dash tuple to and cannot use records a refusal, which is
+  // what the manifest is for.
   for (const branch of branches) {
-    if (branch.type === 'array' && branch.items && branch.items.type === 'number') {
+    if (branch.type === 'array' && (!branch.items || branch.items.type === 'number')) {
       return { kind: 'array', values: [[4, 2]] };
     }
   }
@@ -481,9 +616,15 @@ for (const [family, apply] of Object.entries(FAMILIES)) {
       skipped.push({ family, property, reason });
       continue;
     }
-    const candidates = valuesFor(fragment);
+    const candidates = valuesFor(fragment, property);
     if (!candidates) {
-      skipped.push({ family, property, reason: 'the schema declares no enumerable value here' });
+      skipped.push({
+        family,
+        property,
+        reason:
+          FREE_STRINGS[property] ||
+          'the schema declares no enumerable value here, and upstream fixes no vocabulary for it',
+      });
       continue;
     }
     for (const value of candidates.values) {

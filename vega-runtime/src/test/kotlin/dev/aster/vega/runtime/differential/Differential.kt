@@ -514,8 +514,16 @@ public object Differential {
    * Deliberately short. A channel added here stops being compared where upstream states the default
    * and this omits it, which is right for a cap and would be wrong for anything whose absence means
    * "nothing was drawn".
+   *
+   * `dir` is the third, and it is the same shape: `textMetrics` asks `item.dir === 'rtl'`, so
+   * left-to-right is what every other answer means and `dir: "ltr"` is the default written down.
+   * Probed — a text mark drawn with `dir: "ltr"`, with `"rtl"` and with no `dir` at all emits the
+   * identical `<text>` element and the identical bounds; only a *limit* makes the direction
+   * visible, by truncating from the other end. This side records the direction only when it is
+   * `rtl`, which is the one case that changes what is drawn.
    */
-  private val IMPLIED_BY_ABSENCE = mapOf("strokeCap" to "butt", "strokeJoin" to "miter")
+  private val IMPLIED_BY_ABSENCE =
+    mapOf("strokeCap" to "butt", "strokeJoin" to "miter", "dir" to "ltr")
 
   private fun strokeDetails(stroke: Stroke, into: MutableMap<String, String>) {
     if (stroke.cap != StrokeCap.BUTT) into["strokeCap"] = stroke.cap.name.lowercase()
