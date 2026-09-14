@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A `zindex` is a number, and any of them raises.** `visit` partitions on `if (item.zindex)` and
+  only then sorts by `a.zindex - b.zindex || a.index - b.index`, so a **negative** zindex does not
+  sink a mark or an axis below its neighbours — it raises it above all of them and puts it at the
+  bottom of the raised ones. Axes were partitioned by sign here, so `zindex: -2` sank; and a
+  fractional one was truncated to an integer, so `zindex: 0.5` was read as none at all. The raised
+  axes are now ordered among themselves by upstream's own comparator rather than by declaration.
+
+  **API.** `zindex` is a `Double` on the mark, axis, legend and title specs, where it was an `Int`.
+
 - **A legend's `clipHeight` clips the swatch, not the row.** Upstream puts `clip: true` on the
   *symbol* mark and gives the entry group a rectangle of its own — `height: height ? encoder(height)
   : zero`, with `noBound` switched off — so three things follow that this engine had wrong: a label

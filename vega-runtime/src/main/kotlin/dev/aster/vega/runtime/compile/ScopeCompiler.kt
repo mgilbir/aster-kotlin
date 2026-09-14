@@ -342,8 +342,23 @@ internal class ScopeCompiler(
     // half-pixel reason legend placement does.
     var content = RectD(0.0, 0.0, extent.width, extent.height)
 
-    // Vega draws axes below marks unless an axis opts into a higher zindex, and legends above both.
-    val (underlay, overlay) = axes.partition { it.zindex <= 0 }
+    // Vega draws axes below marks unless an axis opts into a zindex, and legends above both.
+    //
+    // **Any** zindex raises it, including a negative one: `visit` partitions on `if (item.zindex)`
+    // and only then sorts, so the test is truthiness and not sign. An axis asking to be drawn
+    // behind its neighbours with `zindex: -4` is drawn in front of them — and a fractional one is
+    // raised too, which is why this is a number rather than a count. See [paintOrder], which is the
+    // same rule for marks.
+    val underlay = axes.filter { it.zindex == 0.0 }
+    // Sorted by `a.zindex - b.zindex || a.index - b.index`, which is upstream's own comparator:
+    // the raised axes are ordered among themselves by what they asked for and then by where they
+    // were declared, so two axes sharing a zindex keep their order and a lower one goes under.
+    val overlay =
+      axes
+        .withIndex()
+        .filter { it.value.zindex != 0.0 }
+        .sortedWith(compareBy({ it.value.zindex }, { it.index }))
+        .map { it.value }
     var guides = GuideBounds.of(extent)
     // How far this scope's *group* marks reach, which a legend is pushed past along with the axes.
     //
@@ -1662,11 +1677,11 @@ internal class ScopeCompiler(
    * the whole list; a plain sort would agree everywhere except on that sign.
    */
   private fun paintOrder(marks: List<MarkSpec>): List<Int> {
-    if (marks.none { it.zindex != 0 }) return marks.indices.toList()
-    val level = marks.indices.filter { marks[it].zindex == 0 }
+    if (marks.none { it.zindex != 0.0 }) return marks.indices.toList()
+    val level = marks.indices.filter { marks[it].zindex == 0.0 }
     val raised =
       marks.indices
-        .filter { marks[it].zindex != 0 }
+        .filter { marks[it].zindex != 0.0 }
         .sortedWith(compareBy({ marks[it].zindex }, { it }))
     return level + raised
   }
