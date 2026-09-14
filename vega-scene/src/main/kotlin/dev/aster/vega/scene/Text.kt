@@ -41,7 +41,13 @@ public data class TextStyle(
   val direction: TextDirection = TextDirection.LTR,
 ) {
   init {
-    require(fontSize >= 0.0 && fontSize.isFinite()) { "fontSize must be finite and >= 0" }
+    // **Finite, and nothing more.** A negative font size is a number a specification may write and
+    // upstream draws something for it: the measured width comes out negative, so the text reaches
+    // *backwards* from its anchor and the line band mirrors about it — probed, `fontSize: -4` at
+    // `x = 10` bounds `[-6, 10]` where `+4` bounds `[10, 26]`. Requiring a non-negative one here
+    // turned a chart upstream draws into no chart at all: the exception escaped the encoder and
+    // the whole compile was reported as a defect in this engine.
+    require(fontSize.isFinite()) { "fontSize must be finite, was $fontSize" }
     require(fontWeight in 1..1000) { "fontWeight must be in 1..1000, was $fontWeight" }
   }
 }

@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A number a specification writes is data, not an invariant this engine may refuse.** Two values
+  took a whole chart down where upstream draws one, both found by the schema sweep. A **negative
+  font size** hit a `require(fontSize >= 0)` on `TextStyle` — upstream's `~~(0.8 * length *
+  fontSize)` simply comes out negative, so the text reaches backwards from its anchor and the chart
+  is drawn. And an axis whose **`maxExtent` is below its `minExtent`** hit a `coerceIn`, where
+  upstream's `Math.max(minExtent, Math.min(maxExtent, s))` answers the minimum: two operations in
+  that order agree with `coerceIn` wherever the bounds hold and differ by an exception where they
+  cross. The same transcription is now in `bin`'s clamp, where the bounds cannot cross today.
+
+  What a negative font size does to a *guide's* layout is not yet exact — four cases in the sweep
+  sit a few units apart, in the arithmetic that places an axis title and a legend title.
+
 - **A test compared `Math.pow` results by identity, and CI is not a Mac.** The exponential rate
   assertions pinned `0.9^4` to the last bit, which the JDK only promises to within one ulp — green on
   macOS, two failures on Linux. The values are compared to `1e-12` now; a rate read from the wrong
