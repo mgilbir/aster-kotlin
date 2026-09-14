@@ -1230,6 +1230,31 @@
   "caption": "Symbol legend titled 'again' for fill color with 3 values: alpha, beta, gamma"
  },
  {
+  "fixture": "legend-clip-height",
+  "kind": "axis",
+  "caption": "X-axis titled 'category' for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "legend-clip-height",
+  "kind": "axis",
+  "caption": "Y-axis titled 'amount' for a linear scale with values from 0 to 55"
+ },
+ {
+  "fixture": "legend-clip-height",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'clipped small' for size with values from 0 to 55"
+ },
+ {
+  "fixture": "legend-clip-height",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'clip of none' for fill color with 3 values: north, south, east"
+ },
+ {
+  "fixture": "legend-clip-height",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'clip below zero' for fill color with 3 values: north, south, east"
+ },
+ {
   "fixture": "legend-columns",
   "kind": "legend",
   "caption": "Symbol legend for fill color with 5 values: aa, bb, cc, dd, ee"

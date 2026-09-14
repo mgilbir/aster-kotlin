@@ -532,7 +532,10 @@ internal class LegendBuilder(
     // rows of different heights.
     val widths = entries.map { strokeWidthFor(spec, it.value, strokeWidth) }
     val dashes = entries.map { strokeDashFor(spec, it.value) }
-    val clipHeight = numbers.resolve(spec.clipHeight, scaleName)
+    // `height ? encoder(height) : zero`: a clip height of **zero** is falsy and clips nothing, so
+    // the entry keeps the ordinary `noBound` layout it would have had without the property.
+    val clipHeight =
+      numbers.resolve(spec.clipHeight, scaleName)?.takeIf { it != 0.0 && !it.isNaN() }
     // A row is as tall as the taller of its symbol and its label, and upstream rounds the symbol's
     // contribution up before comparing: this is the number every offset within a cell derives from.
     val measured = sizes.mapIndexed { index, size ->
@@ -690,10 +693,7 @@ internal class LegendBuilder(
   ): List<SceneNode> {
     val order = GridLayout.columnMajorOrder(cells.size, columns)
     val ordered = order.map { cells[it] }
-    val boxes = ordered.map { cell ->
-      val measured = cell.fold(RectD.Empty) { acc, node -> acc.union(node.bounds) }
-      if (clipHeight == null) measured else RectD(measured.left, 0.0, measured.right, clipHeight)
-    }
+    val boxes = ordered.map { cell -> cellBox(cell, clipHeight) }
     val align = GridLayout.Align.fromName(gridAlign)
     val offsets =
       GridLayout.place(
@@ -720,15 +720,15 @@ internal class LegendBuilder(
         entry?.let { entryText(spec, "entries", "fill", it) }?.let { SceneColor.parse(it) }
       GroupNode(
         id = ids.allocate(),
-        children = ordered[position],
+        children = clipped(ordered[position], clipHeight, boxes[position].right),
         fill = painted?.let { Fill.of(it) },
         transform = Transform2D.translate(offset.x, offset.y),
-        // With a `clipHeight` the entry is a **clipped** box: a symbol larger than the row spills
-        // out of it, and the legend is sized as though it had not. That is what the property is
-        // for — a size legend whose largest swatch is 5,000 units would otherwise be seventy units
-        // tall per row and as wide as its biggest circle.
-        size = clipHeight?.let { SizeD(boxes[position].width, it) },
-        clip = clipHeight?.let { RectD(0.0, 0.0, boxes[position].width, it) },
+        // With a `clipHeight` the entry has a rectangle of its own — `height: height ? encoder(…)`
+        // — and `g.width = Math.max(g.bounds.x2 - g.x, …)` fills the width in afterwards, so the
+        // row reaches from its **own origin** to whatever is furthest right in it. The row itself
+        // is **not** clipped: only the symbol inside it is, which is why a label longer than the
+        // row is drawn in full while a swatch taller than it is cut.
+        size = clipHeight?.let { SizeD(boxes[position].right, it) },
         // Upstream calls this a "scope" group; naming it for what it is keeps a legend entry
         // distinguishable from a group mark's cell, which shares that role.
         metadata =
@@ -739,6 +739,62 @@ internal class LegendBuilder(
           ),
       )
     }
+  }
+
+  /**
+   * A legend entry's children, with the **symbol** clipped where a `clipHeight` says so.
+   *
+   * ```js
+   * const symbols = guideMark({ type: SymbolMark, …, clip: height ? true : undefined, encode });
+   * ```
+   *
+   * The clip is on the symbol mark and not on the entry group, so a swatch taller than the row is
+   * cut and a label longer than it is not. Clipping the whole row cut the label too — and, where
+   * the clip height was negative, cut everything: the row measured as nothing and the legend came
+   * out as wide as its title.
+   */
+  private fun clipped(cell: List<SceneNode>, clipHeight: Double?, width: Double): List<SceneNode> {
+    if (clipHeight == null) return cell
+    return cell.map { node ->
+      if (node !is SymbolNode) node
+      else
+        GroupNode(
+          id = ids.allocate(),
+          children = listOf(node),
+          clip = RectD(0.0, 0.0, width, clipHeight),
+          metadata = NodeMetadata.None,
+        )
+    }
+  }
+
+  /**
+   * The box a legend entry is laid out by, which with a `clipHeight` is not the box it draws.
+   *
+   * ```js
+   * enter: {
+   *   noBound: {value: !height},   // ignore width/height in bounds calc
+   *   width: zero,
+   *   height: height ? encoder(height) : zero,
+   *   ...
+   * }
+   * ```
+   *
+   * With a clip height the entry group stops being `noBound`, so its **own rectangle** joins its
+   * bounds — and that rectangle is `0` wide, because the width is only filled in later, by
+   * `legendEntryLayout`. The symbol is `clip: true` and is therefore bounded against that same
+   * zero-width rectangle, so it contributes *nothing at all* to the layout. What is left is the
+   * label, plus a zero-wide strip as tall as the clip.
+   *
+   * Two things follow, and both were wrong here: a clipped row is as tall as its **label** rather
+   * than as tall as the clip — 10 units against a `clipHeight` of 8 — and it starts at the entry's
+   * own origin rather than at the symbol's left edge, so the legend is a unit wider. The drawing is
+   * unaffected: the symbol is still clipped to the finished row, which is what the property is for.
+   */
+  private fun cellBox(cell: List<SceneNode>, clipHeight: Double?): RectD {
+    if (clipHeight == null) return cell.fold(RectD.Empty) { acc, node -> acc.union(node.bounds) }
+    val withoutSymbol =
+      cell.filter { it !is SymbolNode }.fold(RectD.Empty) { acc, node -> acc.union(node.bounds) }
+    return withoutSymbol.union(RectD(0.0, 0.0, 0.0, clipHeight))
   }
 
   private fun symbolShape(spec: LegendSpec): SymbolShape? {

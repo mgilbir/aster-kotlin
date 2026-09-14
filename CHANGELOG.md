@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A legend's `clipHeight` clips the swatch, not the row.** Upstream puts `clip: true` on the
+  *symbol* mark and gives the entry group a rectangle of its own — `height: height ? encoder(height)
+  : zero`, with `noBound` switched off — so three things follow that this engine had wrong: a label
+  longer than the row is still drawn in full, a clipped row is as tall as its **label** rather than
+  as tall as the clip, and the symbol contributes nothing at all to the row's measurement, because
+  it is bounded against a rectangle whose width is not filled in until the layout runs. A
+  `clipHeight` of zero is falsy and clips nothing; a negative one used to cut the whole row away and
+  leave the legend as wide as its title.
+
 - **A legend's `columns: 0` means one column per entry, not one column.** Upstream reads the number
   twice and both readings are falsy at zero — the entry's column is `(columns) ? datum.index %
   max(1, columns) : datum.index` — so every entry takes a column of its own and the legend lies in a
