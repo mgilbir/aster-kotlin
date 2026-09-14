@@ -53,7 +53,7 @@ and what each was added to pin down. Every name in it is checked to still exist 
 | `reshape` | 30 | fold, project, collect with a two-key sort, identifier |
 | `share-of-total` | 26 | joinaggregate written back onto every row |
 | `area-gaps` | 22 | a band area between two fields, and a line through a null |
-| `axis-variants` | 34 | a top axis, an offset one, a grid above the marks, one with no domain or ticks |
+| `axis-variants` | 35 | a top axis, an offset one, a grid above the marks, one with no domain or ticks, and the two line-height baselines |
 | `band-padding` | 22 | inner and outer padding, alignment, rounding, a reversed range |
 | `flatten-arrays` | 25 | parallel array fields expanded and re-aggregated |
 | `time-axis` | 32 | a UTC scale ticking on months and another on hours, ISO dates read by `format.parse` |

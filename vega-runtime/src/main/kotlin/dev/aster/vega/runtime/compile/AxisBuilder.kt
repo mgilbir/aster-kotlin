@@ -824,14 +824,16 @@ public class AxisBuilder(
       else -> null
     }
 
-  private fun baselineOf(name: String?): TextBaseline? =
-    when (name?.lowercase()) {
-      "top" -> TextBaseline.TOP
-      "middle" -> TextBaseline.MIDDLE
-      "bottom" -> TextBaseline.BOTTOM
-      "alphabetic" -> TextBaseline.ALPHABETIC
-      else -> null
-    }
+  /**
+   * The **shared** baseline parser, not a copy of it.
+   *
+   * There was a copy here, and it had already drifted: it knew four of upstream's six names and
+   * answered null for `line-top` and `line-bottom`, so an axis asking for either got the default
+   * instead — and, since those two are the only baselines that depend on the line height, the axis
+   * measured eleven units short. The font-weight parsers went the same way before they were merged
+   * into one; see [GuideStyle.baselineOf].
+   */
+  private fun baselineOf(name: String?): TextBaseline? = GuideStyle.baselineOf(name)
 
   private fun labelAlign(orient: Orient): TextAlign =
     when (orient) {
