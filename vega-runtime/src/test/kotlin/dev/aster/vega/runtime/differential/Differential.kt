@@ -398,15 +398,27 @@ public object Differential {
     return if (gradients.isEmpty()) mark else mark.copy(gradients = gradients)
   }
 
+  /**
+   * A rect, reported by **the numbers the item carries** rather than by its ordered box.
+   *
+   * A negative extent is a number a specification may write and upstream keeps: `width: -4` at `x:
+   * 40` leaves the item saying exactly that, and draws `M40,20h-4v30h4Z` — a real rectangle, four
+   * units to the *left* of the anchor. Only the bounding box is ordered, by `Bounds.set`.
+   *
+   * This engine agrees, and the comparison could not see that it did: it read `node.rect`, which is
+   * the ordered box, so a rect written backwards was reported as `x: 36, width: 4` against
+   * upstream's `x: 40, width: -4`. The drawing was identical and the record was not, and a host
+   * reading the scene — for a tooltip, for hit testing, for an accessibility description — sees the
+   * item's own numbers, not the box. Nothing changes for a rect written the usual way round.
+   */
   private fun rectMark(node: RectNode, world: Transform2D): Mark {
-    val rect = node.rect
-    val origin = world.apply(rect.left, rect.top)
+    val origin = world.apply(node.x, node.y)
     val numbers =
       linkedMapOf(
         "x" to origin.x,
         "y" to origin.y,
-        "width" to rect.width,
-        "height" to rect.height,
+        "width" to node.width,
+        "height" to node.height,
       )
     return Mark(
       "rect",

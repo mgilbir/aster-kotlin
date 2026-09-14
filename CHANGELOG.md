@@ -8,6 +8,23 @@ section here does not get released.
 
 ### Fixed
 
+- **A rect is compared by the numbers it carries, not by the box they imply.** `width: -4` at `x:
+  40` is a number a specification may write and upstream keeps: the item says exactly that and the
+  drawing is `M40,20h-4v30h4Z`, a real rectangle four units to the *left* of the anchor, with only
+  the bounding box ordered by `Bounds.set`. This engine already agreed — probed, the scene node
+  carries `x = 40.0, width = -4.0` and orders its own box — and the differential harness could not
+  see that it did, because it read `node.rect`: the ordered box. A rect written backwards was
+  reported as `x: 36, width: 4` against upstream's `x: 40, width: -4`, so the drawing matched and
+  the record did not.
+
+  It is a comparison that was **lenient in one direction and wrong in the other**: a regression that
+  started normalising these away would have gone unnoticed, and a host reading the scene for a
+  tooltip, for hit testing or for an accessibility description sees the item's numbers rather than
+  its box. Nothing changes for a rect written the usual way round.
+
+  With this the schema sweep **agrees with upstream on every chart it draws**: 2549 of 2549, with
+  four cases set aside and named, each one upstream measuring a shape it refuses to render.
+
 - **A negative symbol size draws nothing, and a trail's zero size is one unit wide.** Two more of
   the sweep's negative numbers, and they are not the same rule twice.
 

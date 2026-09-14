@@ -194,6 +194,33 @@
       "type": "area"
     },
     {
+      "fill": "#bab0ac",
+      "height": 11,
+      "role": "mark",
+      "type": "rect",
+      "width": -12,
+      "x": 142.666667,
+      "y": 136
+    },
+    {
+      "fill": "#bab0ac",
+      "height": 11,
+      "role": "mark",
+      "type": "rect",
+      "width": -12,
+      "x": 256,
+      "y": 166
+    },
+    {
+      "fill": "#bab0ac",
+      "height": 11,
+      "role": "mark",
+      "type": "rect",
+      "width": -12,
+      "x": 369.333333,
+      "y": 116
+    },
+    {
       "fill": "#72b7b2",
       "height": 80,
       "role": "mark",
