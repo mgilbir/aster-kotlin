@@ -1024,8 +1024,15 @@ public class ScaleResolver(
 
   private fun buildQuantize(spec: ScaleSpec): QuantizeScale? {
     val range = binnedRange(spec, buckets = null) ?: return null
-    val domain =
+    // `nice` is applied by **capability**, not by scale type: `configureScale` in `vega-encode`
+    // tests `_.nice && scale.nice`, and of the four discretizing scales only a quantize scale has a
+    // `nice` — d3 gives it one because it rounds the linear scale it is built on. So this is the
+    // one place `nice` generalises past the continuous scales, and it must not generalise further:
+    // probed, a threshold, quantile or bin-ordinal scale asking for `nice: true` keeps its domain
+    // exactly as given.
+    var domain =
       continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null
+    if (spec.nice && !rawApplies(spec)) domain = niceOf(domain, spec)
     return QuantizeScale(spec.name, domain, range)
   }
 

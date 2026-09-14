@@ -44,7 +44,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `beeswarm` | 100 | rule, symbol, text | force | band, ordinal |
 | `bin-settings` | 36 | rect, rule, text | aggregate, bin, filter | linear |
 | `bin-to-ordinal` | 36 | rect, rule, text | aggregate, bin | bin-ordinal, linear |
-| `binned-scales` | 83 | rect, rule, text | — | bin-ordinal, linear, quantile, quantize, threshold |
+| `binned-scales` | 151 | rect, rule, symbol, text | — | bin-ordinal, linear, quantile, quantize, threshold |
 | `box-plot` | 32 | rect, rule, text | aggregate | band, linear |
 | `budget-forecasts` | 77 | line, rule, symbol, text | aggregate, filter, formula, lookup | band, linear |
 | `calendar-view` | 6311 | rect, text | aggregate, filter, formula, sequence, timeunit, window | band, linear |
