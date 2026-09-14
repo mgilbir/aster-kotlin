@@ -946,7 +946,7 @@ final class dev.aster.vega.runtime.scale/BinOrdinalScale : dev.aster.vega.runtim
 }
 
 final class dev.aster.vega.runtime.scale/IdentityScale : dev.aster.vega.runtime.scale/VegaScale { // dev.aster.vega.runtime.scale/IdentityScale|null[0]
-    constructor <init>(kotlin/String) // dev.aster.vega.runtime.scale/IdentityScale.<init>|<init>(kotlin.String){}[0]
+    constructor <init>(kotlin/String, kotlin.collections/List<kotlin/Double> = ...) // dev.aster.vega.runtime.scale/IdentityScale.<init>|<init>(kotlin.String;kotlin.collections.List<kotlin.Double>){}[0]
 
     final val domain // dev.aster.vega.runtime.scale/IdentityScale.domain|{}domain[0]
         final fun <get-domain>(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/IdentityScale.domain.<get-domain>|<get-domain>(){}[0]
@@ -955,6 +955,7 @@ final class dev.aster.vega.runtime.scale/IdentityScale : dev.aster.vega.runtime.
     final val range // dev.aster.vega.runtime.scale/IdentityScale.range|{}range[0]
         final fun <get-range>(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/IdentityScale.range.<get-range>|<get-range>(){}[0]
 
+    final fun formatTick(kotlin/Double, kotlin/Int = ..., dev.aster.vega.model.locale/VegaLocale = ...): kotlin/String // dev.aster.vega.runtime.scale/IdentityScale.formatTick|formatTick(kotlin.Double;kotlin.Int;dev.aster.vega.model.locale.VegaLocale){}[0]
     final fun scale(dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.runtime.scale/IdentityScale.scale|scale(dev.aster.vega.model.VegaValue){}[0]
 }
 

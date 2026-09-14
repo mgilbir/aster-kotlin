@@ -148,9 +148,17 @@ internal object GuideCaption {
     timeZone: TimeZone? = null,
   ): String =
     when (scale) {
-      // An identity scale has no domain to describe: it maps the value itself, so a guide over one
-      // is a guide over the data as it stands.
-      is IdentityScale -> locale.captions.identityDomain()
+      // An identity scale **does** have a domain, and upstream's `domainCaption` has no case for
+      // one: it is neither discretizing nor discrete, so it falls to the continuous branch and is
+      // read out as "values from … to …" like any other. This said "the values themselves" instead,
+      // which was the phrasing for a scale believed to have no domain at all — probed, an identity
+      // scale over a column of 1 to 5 is described by upstream as `values from 1 to 5`.
+      is IdentityScale ->
+        continuous(scale.domain.first(), scale.domain.last(), locale) { v, count ->
+          spokenInstant(v, format, formatType, locale, timeZone)
+            ?: spelled(format, scale.domain, locale)?.invoke(v)
+            ?: scale.formatTick(v, count, locale)
+        }
       is BinnedScale -> {
         // The same formatter the bands themselves use: the precision comes from the narrowest
         // interval, not from the whole span, so a reader hears "2.1%" and not "0.021429".

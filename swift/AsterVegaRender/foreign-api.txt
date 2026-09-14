@@ -1662,7 +1662,8 @@ IdentifierTransform.shared
 IdentifierTransform.type
 IdentityScale
 IdentityScale.domain
-IdentityScale.init(name:)
+IdentityScale.formatTick(value:count:locale:)
+IdentityScale.init(name:domain:)
 IdentityScale.name
 IdentityScale.range
 IdentityScale.scale(value:)

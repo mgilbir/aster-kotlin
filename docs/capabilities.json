@@ -1730,7 +1730,7 @@
         "ScalesTest"
       ],
       "tests_text": "`ScalesTest`, `FixtureDifferentialTest` (`scheme-forms`, `packed-bubble`)",
-      "notes": "An explicit range array, a column of the data, or a scheme. A **categorical** scheme is the range and cycles when the domain outruns it; a **continuous** one is a function, and upstream samples it once per domain value instead — sixteen categories over `blues` give sixteen shades, not the same eleven and then five again",
+      "notes": "An explicit range array, a column of the data, or a scheme. A **categorical** scheme is the range and cycles when the domain outruns it; a **continuous** one is a function, and upstream samples it once per domain value instead — sixteen categories over `blues` give sixteen shades, not the same eleven and then five again. An axis over one is ticked and labelled: an ordinal axis with its domain values at their range positions, `tickCount` not thinning them, and an identity axis like a linear one — d3 makes it `linearish` — with each tick at the value itself. The domain line spans the scale's first and last range entries, which for an ordinal scale is not its widest extent",
       "milestone": "3"
     },
     {
@@ -4880,8 +4880,8 @@
         "FixtureDifferentialTest",
         "ScalesTest"
       ],
-      "tests_text": "`FixtureDifferentialTest` (`identity-scale`), `ScalesTest`",
-      "notes": "The last scale type upstream registers that this engine did not build, so `ScaleResolver`'s `when` no longer needs an `else` and the compiler now enforces that every type is handled. It maps the value itself, which is how a specification hands final coordinates to a channel that expects a scale; its `[0, 1]` domain is d3's and is never consulted, existing only so `domain('name')` answers something. A value that does not coerce maps to **nothing** rather than to NaN — d3's `unknown` — so the mark does not draw",
+      "tests_text": "`FixtureDifferentialTest` (`identity-scale`, `scale-variants`), `ScalesTest`",
+      "notes": "The last scale type upstream registers that this engine did not build, so `ScaleResolver`'s `when` no longer needs an `else` and the compiler now enforces that every type is handled. It maps the value itself, which is how a specification hands final coordinates to a channel that expects a scale; its `[0, 1]` domain is d3's and is never consulted, existing only so `domain('name')` answers something. A value that does not coerce maps to **nothing** rather than to NaN — d3's `unknown` — so the mark does not draw. It has a **domain** all the same — d3 gives `domain` and `range` the same array and then makes the scale `linearish` — so an axis over one is ticked and labelled like a linear axis, each tick sitting at the value itself, and a screen reader hears it described as `values from … to …`. With no domain written, which is how one is usually spelled, the default is `[0, 1]`",
       "milestone": "4"
     },
     {

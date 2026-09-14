@@ -1885,6 +1885,16 @@
   "caption": "Y-axis titled 'Quantize, keyword range' for a quantize scale with 1 boundary: 202"
  },
  {
+  "fixture": "scale-variants",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Ordinal' for a discrete scale with 5 values: a, b, c, d, e"
+ },
+ {
+  "fixture": "scale-variants",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Identity' for a identity scale with values from 1 to 5"
+ },
+ {
   "fixture": "scheme-forms",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 5 values: 0, 1, 2, 3, 4"

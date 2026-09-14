@@ -175,7 +175,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `scale-domain-implicit` | 13 | rect, rule, text | — | band, ordinal |
 | `scale-domain-raw` | 73 | rule, symbol, text | — | linear |
 | `scale-nice-intervals` | 47 | rule, symbol, text | — | linear, utc |
-| `scale-variants` | 53 | rule, symbol, text | — | point, pow, quantize, symlog |
+| `scale-variants` | 77 | rule, symbol, text | — | identity, ordinal, point, pow, quantize, symlog |
 | `scheme-forms` | 31 | rect, rule, text | — | band, linear, ordinal |
 | `scope-shadowing` | 11 | rect, rule, text | — | linear |
 | `sequence-lookup` | 27 | line, rect, rule, text | formula, lookup, sequence | band, linear |
