@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **`nice` reaches a quantize scale.** Upstream applies it by **capability** rather than by scale
+  type — `configureScale` tests `_.nice && scale.nice` — and d3 gives a quantize scale a `nice`
+  because it rounds the linear scale it is built on. This applied `nice` only where a continuous
+  scale was resolved, so a quantize scale kept the raw extent: `[8, 95]` where upstream has
+  `[0, 100]`. The cut points move with the domain, so four of five values change bucket, and an axis
+  over it labels nine ticks where upstream labels eleven. It reaches that scale and no other: probed,
+  a threshold, quantile or bin-ordinal scale asking for `nice: true` keeps its domain exactly as
+  given, having no `nice` to call. `binned-scales` carries the same quantize scale with and without
+  it, an axis over each, and a row of symbols placed by each.
+
+  The schema property sweep now agrees with upstream on all 2999 charts it compares.
+
 - **An axis whose scale can place nothing still draws its spine and its title.** A log scale whose
   domain touches zero really is unusable, and upstream agrees — every `scale(x)` on one answers
   null. But upstream *has* the scale all the same, so the axis that names it draws its line and its

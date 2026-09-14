@@ -1880,7 +1880,7 @@
         "FixtureDifferentialTest"
       ],
       "tests_text": "`BinnedScaleTest` (upstream vectors), `FixtureDifferentialTest` (`binned-scales`, `scale-variants`)",
-      "notes": "Equal-width intervals of the domain, so a skewed column crowds into one bucket. Cut points are computed in d3's own form rather than accumulated, so they do not drift across a wide domain. A **range keyword** is a range like any other: `range: \"height\"` resolves to `[height, 0]` before the scale is built, which is two buckets, and the same holds for a threshold, quantile or bin-ordinal scale. Refusing one cost the axis as well as the scale",
+      "notes": "Equal-width intervals of the domain, so a skewed column crowds into one bucket. Cut points are computed in d3's own form rather than accumulated, so they do not drift across a wide domain. A **range keyword** is a range like any other: `range: \"height\"` resolves to `[height, 0]` before the scale is built, which is two buckets, and the same holds for a threshold, quantile or bin-ordinal scale. Refusing one cost the axis as well as the scale. `nice` reaches it and only it of the four: upstream applies `nice` by **capability** — `_.nice && scale.nice` — and d3 gives a quantize scale a `nice` because it rounds the linear scale underneath, where a threshold, quantile or bin-ordinal scale has none and ignores the option entirely",
       "milestone": "6"
     },
     {

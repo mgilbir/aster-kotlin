@@ -91,7 +91,7 @@ and what each was added to pin down. Every name in it is checked to still exist 
 | `density-plot` | 40 | a kernel density over a dot plot, with the theoretical normal behind both |
 | `treemap` | 18 | one tree drawn twice: a squarified treemap and an icicle plot |
 | `tree-layouts` | 31 | a circle pack beside a tidy node-link diagram, with its links |
-| `binned-scales` | 83 | one skewed column through all four discretizing scales, and a threshold scale that folds zero into its cut points |
+| `binned-scales` | 151 | one skewed column through all four discretizing scales, a threshold scale that folds zero into its cut points, and a quantize scale with and without `nice` |
 | `local-time-dst` | 35 | a local time scale across the spring clock change, beside a UTC one |
 | `bin-to-ordinal` | 36 | the bin transform feeding a bin-ordinal scale, labels placed by `scale()` |
 | `image-marks` | 18 | every image align and baseline anchor, and one stretched rather than fitted |
