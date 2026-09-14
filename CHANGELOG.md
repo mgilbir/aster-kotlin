@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **`symbolLimit` is a number, not an entry count.** Upstream's test is `limit && values.length >
+  limit`, and what it keeps is `values.slice(0, limit - 1)` — JavaScript's `slice`, so a limit of 0.5
+  keeps nothing (`-0.5` truncates to `-0`, which is not negative) and a limit of −4 keeps nothing
+  either, both leaving a legend of one row reading `…3 entries`. A zero, being falsy, limits nothing
+  at all. This read the limit as an integer and ignored anything below one, so the whole legend
+  showed. The summary row is also excluded from the anchor every swatch is placed against — `offset`
+  is reduced over the surviving items and only then is the row pushed onto them — so a legend limited
+  to nothing anchors its one row at its own edge.
+
 - **A legend's anchor is rounded, and a far-edge one is measured against the whole grid.**
   `gridLayout` resolves the anchor — including the `End` adjustment that subtracts the grid's own
   extent — and then does `x = Math.round(x); y = Math.round(y)` before adding each cell's offset. So

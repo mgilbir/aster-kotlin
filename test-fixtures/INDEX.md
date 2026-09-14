@@ -125,7 +125,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `legend-left-of-axis` | 30 | rect, rule, symbol, text | — | band, linear, ordinal |
 | `legend-stroke-channels` | 24 | line, symbol, text | — | linear, ordinal |
 | `legend-style` | 30 | line, rule, symbol, text | — | linear, ordinal |
-| `legend-symbol-limit` | 39 | rect, symbol, text | — | band, linear, ordinal |
+| `legend-symbol-limit` | 76 | rect, symbol, text | — | band, linear, ordinal |
 | `legend-title-anchor` | 59 | rect, symbol, text | — | band, linear, ordinal |
 | `legends` | 28 | rect, rule, symbol, text | — | band, linear, ordinal |
 | `line-area` | 50 | area, line, rule, symbol, text | — | linear |
