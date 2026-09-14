@@ -8,6 +8,30 @@ section here does not get released.
 
 ### Fixed
 
+- **A log scale's `base` decides its ticks, never its geometry.** d3 transforms a log scale by the
+  **natural** log whatever base was asked for — `base` reaches the ticks, the labels and `nice` and
+  nothing else. This divided the transform by `ln(base)`, which is the same answer for a sane base,
+  because a continuous scale normalises between its transformed ends and a constant divisor cancels.
+  It stops being the same answer exactly where the constant stops being one: a base of 0 makes
+  `ln(base)` negative infinity and every position `-0`, a base of 1 makes it zero and every position
+  infinite, a negative base makes it NaN. `isValid` then required `base > 1` on top, so the scale
+  refused outright. Between them a chart upstream draws perfectly well lost its marks, its axis and
+  its own size — probed, upstream maps 3 to 120 and 900 to 0 for bases 10, 0, 0.5, -4 and 1 alike,
+  and only the *ticks* tell them apart.
+
+  The ticks were a second guard on the same number. `logTicks` short-circuited `base <= 1` to
+  nothing, where d3 tests the base by **shape** rather than by size: `!(base % 1)` picks the integer
+  branch and everything else falls to the other. This engine's port of both branches was already
+  faithful, the fallback included, and the guard simply stopped it running. Base 0 takes the integer
+  branch, generates nothing there because `k < base` never runs, and falls through the *fewer than
+  half the count* fallback to linear ticks across the domain — upstream's `[100, 200, … 900]`, which
+  this returned nothing for. Base 0.5 reaches the other branch through a negative count, and base 1
+  and a negative base through a NaN one; all three correctly yield nothing.
+
+  `scale-log-padding-0.5` went with them, padding being computed in the transformed space. Five of
+  the schema sweep's six differences down to two, and `log-scale` carries a base of 0 and a base of
+  a half beside its ordinary one.
+
 - **`zero` folds into a discretizing scale's domain.** `configureDomain` applies it by scale
   *option* rather than by scale type, so a threshold, quantile or bin-ordinal scale that asks for
   `zero: true` gets the same per-end treatment a linear one does — and this applied it only where a

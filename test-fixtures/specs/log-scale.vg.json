@@ -1,6 +1,6 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "Symbols over a logarithmic x scale and a sqrt y scale. The fourth differential fixture: the log axis exercises the tick algorithm's powers-and-multiples path, which is where a port most easily diverges.",
+  "description": "Symbols over a logarithmic x scale and a sqrt y scale. The fourth differential fixture: the log axis exercises the tick algorithm's powers-and-multiples path, which is where a port most easily diverges. Two more log axes carry a **degenerate** base, which is a number a specification may write and upstream draws: the base reaches the ticks, the labels and `nice` and never the geometry, d3 transforming by the natural log whatever base was asked for. A base of 0 takes d3's integer branch, generates nothing there because `k < base` never runs, and falls back to linear ticks across the domain; a base of 0.5 takes the other branch and legitimately yields none. Both place their marks exactly where a base-10 scale would.",
   "width": 300,
   "height": 150,
   "padding": 5,
@@ -18,10 +18,14 @@
   ],
   "scales": [
     {"name": "x", "type": "log", "domain": [1, 1000], "range": "width"},
+    {"name": "zeroBase", "type": "log", "base": 0, "domain": [3, 900], "range": "width"},
+    {"name": "halfBase", "type": "log", "base": 0.5, "domain": [3, 900], "range": "width"},
     {"name": "y", "type": "sqrt", "domain": [0, 100], "range": "height"}
   ],
   "axes": [
     {"orient": "bottom", "scale": "x"},
+    {"orient": "bottom", "scale": "zeroBase", "offset": 34, "title": "Base 0"},
+    {"orient": "bottom", "scale": "halfBase", "offset": 72, "title": "Base 0.5"},
     {"orient": "left", "scale": "y", "tickCount": 5}
   ],
   "marks": [
