@@ -8,6 +8,28 @@ section here does not get released.
 
 ### Fixed
 
+- **A negative symbol size draws nothing, and a trail's zero size is one unit wide.** Two more of
+  the sweep's negative numbers, and they are not the same rule twice.
+
+  A symbol's radius is `Math.sqrt(size) / 2`, so a **negative** size is NaN: every coordinate the
+  symbol table computes is NaN, the canvas draws none of them, and `Bounds.add` leaves the box
+  untouched because every comparison against a NaN is false. Probed on a live view for a circle, a
+  square, a triangle and a cross alike — upstream reports the empty bounds it started with. This
+  engine clamped the radius to zero, which is what `size: 0` means: a degenerate point at the anchor
+  that upstream *does* bound, and that still counts towards the drawing's reach under `autosize:
+  pad`. The two answers were one answer here.
+
+  A trail's half-width is the size itself, defaulted the way a path's `scaleX` is — `ts = item =>
+  item.size || 1` — so a trail asked for `size: 0` is drawn **one unit wide**, not as a hairline.
+  Being a filled shape rather than a stroked one, a width of zero had bounded it flat along its own
+  centre line.
+
+  A trail of *negative* size is **stated rather than reproduced**, and joins the two rotation cases
+  in `PropertySweepTest.KNOWN_DIFFERENCES`: its outline is a run of arcs of radius -2, and `d3-path`
+  refuses one — rendering that chart throws `negative radius: -2`, probed. Only upstream's *bound*
+  context survives it, by sampling `r * Math.cos(a) + cx` and reflecting each sample through the
+  centre. Those are bounds for a drawing that does not exist.
+
 - **A centre halves the extent a far edge derived, not only an encoded one.** `adjustSpatial` is
   four statements in order, not a set of alternatives:
 

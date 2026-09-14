@@ -17024,6 +17024,22 @@
   "hidden": false
  },
  {
+  "fixture": "trail",
+  "kind": "trail",
+  "role": "graphics-symbol",
+  "roleDescription": "trail mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "trail",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "tree-layouts",
   "kind": "group",
   "role": "graphics-object",

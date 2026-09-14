@@ -84,7 +84,7 @@ and what each was added to pin down. Every name in it is checked to still exist 
 | `curves` | 27 | monotone, natural, basis and cardinal over one series, and a monotone area |
 | `colour-ramps` | 57 | four continuous schemes across one domain, with a gradient legend |
 | `path-marks` | 38 | outlines from SVG path strings, on path marks and on symbols, one of them scaled by zero |
-| `trail` | 28 | a line whose thickness follows the data, beside a plain line through it |
+| `trail` | 35 | a line whose thickness follows the data, beside a plain line through it, a trail of zero size and symbols of negative size |
 | `reshape-matrix` | 33 | a heatmap crossed from one list, and a word-count chart beside it |
 | `statistics` | 28 | a least-squares line over its scatter, and the same values as quartile rules |
 | `trend-lines` | 33 | a quadratic fit sampled where it bends, a loess smoothing, the straight line |

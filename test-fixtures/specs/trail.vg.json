@@ -1,6 +1,6 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "A trail: a line whose thickness follows the data, drawn as a filled run of capsules rather than a stroke, beside a plain line through the same points.",
+  "description": "A trail: a line whose thickness follows the data, drawn as a filled run of capsules rather than a stroke, beside a plain line through the same points. One trail asks for `size: 0`, which upstream reads as **one** — `ts = item => item.size || 1`, the same falsy default a path's `scaleX` takes — so it is drawn a unit wide rather than as a hairline. A symbol beside it asks for a negative size, which upstream neither draws nor measures: its radius is `Math.sqrt(size) / 2`, and every coordinate computed from a NaN fails every comparison the bounding box makes.",
   "width": 240,
   "height": 130,
   "padding": 5,
@@ -59,6 +59,32 @@
           "y": {"scale": "y", "field": "v"},
           "stroke": {"value": "#333333"},
           "strokeWidth": {"value": 1}
+        }
+      }
+    },
+    {
+      "type": "trail",
+      "name": "zeroWidth",
+      "from": {"data": "table"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "x", "field": "t"},
+          "y": {"scale": "y", "field": "v", "offset": 30},
+          "size": {"value": 0},
+          "fill": {"value": "#e45756"}
+        }
+      }
+    },
+    {
+      "type": "symbol",
+      "name": "negativeSize",
+      "from": {"data": "table"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "x", "field": "t"},
+          "y": {"scale": "y", "field": "v", "offset": -20},
+          "size": {"value": -4},
+          "fill": {"value": "#54a24b"}
         }
       }
     }

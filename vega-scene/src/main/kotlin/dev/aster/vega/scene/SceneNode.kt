@@ -682,9 +682,18 @@ public data class SymbolNode(
   val blendMode: SceneBlendMode = SceneBlendMode.NORMAL,
 ) : SceneNode {
 
-  /** Half of `sqrt(size)`: the reference length every shape is built from, as upstream. */
+  /**
+   * Half of `sqrt(size)`: the reference length every shape is built from, as upstream.
+   *
+   * **Not a number** for a negative size, which is `Math.sqrt(-4)` and is the whole of upstream's
+   * handling: every coordinate the symbol table computes from it is NaN, every comparison against
+   * the bounding box is false, and the symbol is neither drawn nor measured. Clamping to zero
+   * instead made a negative size mean the same as `size: 0`, which upstream does bound — as a
+   * degenerate point at the anchor. The two are a different answer, and only one of them is a shape
+   * that is *there*.
+   */
   public val reference: Double
-    get() = if (size <= 0.0) 0.0 else kotlin.math.sqrt(size) / 2.0
+    get() = if (size == 0.0) 0.0 else kotlin.math.sqrt(size) / 2.0
 
   /** The symbol outline in scene coordinates, including rotation about ([x], [y]). */
   public val outline: PathData by lazy(LazyThreadSafetyMode.NONE) { buildSymbolPath(this) }
@@ -910,6 +919,12 @@ private fun scalePath(path: PathData, factor: Double): PathData =
 
 private fun buildSymbolPath(node: SymbolNode): PathData {
   val r = node.reference
+  // A **negative** size draws nothing at all, and is not the same as a size of zero. Upstream's
+  // radius is `Math.sqrt(size) / 2`, so a negative one is NaN; the path commands are all NaN, the
+  // canvas draws none of them, and `Bounds.add` leaves the box untouched because every comparison
+  // against a NaN is false. Probed on a live view: `size: -4` reports the empty bounds upstream
+  // starts with, for a circle, a square, a triangle and a cross alike.
+  if (!r.isFinite()) return PathData.Empty
   // A symbol sized to nothing is still *somewhere*: upstream bounds it as a degenerate point at its
   // anchor, not as an empty rectangle. The difference shows up when a size scale bottoms out — the
   // point still counts towards the chart's reach under `autosize: pad`, where an empty rectangle

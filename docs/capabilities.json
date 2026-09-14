@@ -1411,7 +1411,7 @@
         "SceneNodeTest"
       ],
       "tests_text": "`SceneNodeTest`, `FixtureDifferentialTest` (`log-scale` fixture)",
-      "notes": "All 12 of upstream's shapes, pinned by reference vectors. Sized upstream's way, from `sqrt(size) / 2`, **not** d3-shape's area convention — the two differ by 13% on a circle. A `shape` that is not one of the twelve names is read as an SVG path string, written in a unit box and scaled by the same reference length, so a custom outline sizes with `size` exactly as a built-in one does",
+      "notes": "All 12 of upstream's shapes, pinned by reference vectors. Sized upstream's way, from `sqrt(size) / 2`, **not** d3-shape's area convention — the two differ by 13% on a circle. A `shape` that is not one of the twelve names is read as an SVG path string, written in a unit box and scaled by the same reference length, so a custom outline sizes with `size` exactly as a built-in one does. A **negative** `size` draws nothing and measures as nothing — the radius is `Math.sqrt(size) / 2`, so every coordinate is NaN and the bounding box never updates — where a `size` of zero is a degenerate point at the anchor that does count towards the drawing's reach",
       "milestone": "3"
     },
     {
@@ -1473,7 +1473,7 @@
         "FixtureDifferentialTest"
       ],
       "tests_text": "`FixtureDifferentialTest` (`trail`)",
-      "notes": "A **filled** run of capsules, one per segment, overlapping at the shared points — not a stroke, since a stroke has one width. Its `size` is a **width**, halved to a radius, where a symbol's is a squared extent. Compared by the extent it covers rather than by its outline: the caps are semicircles, so this engine's cubics and upstream's true arcs differ in the last decimals, the same way an arc's do. A series with **nothing** defined keeps its item and draws no outline — upstream writes the element without a `d` — rather than dropping the mark",
+      "notes": "A **filled** run of capsules, one per segment, overlapping at the shared points — not a stroke, since a stroke has one width. Its `size` is a **width**, halved to a radius, where a symbol's is a squared extent. Compared by the extent it covers rather than by its outline: the caps are semicircles, so this engine's cubics and upstream's true arcs differ in the last decimals, the same way an arc's do. A series with **nothing** defined keeps its item and draws no outline — upstream writes the element without a `d` — rather than dropping the mark. `size` is the half-width doubled rather than a squared extent, and it is falsy-defaulted — `item.size || 1` — so a trail asked for `size: 0` is one unit wide. **A stated difference**: a *negative* size is a shape upstream cannot draw, `d3-path` throwing `negative radius`; only its bound context survives one, by reflecting each arc sample through the centre. This engine measures the capsule it draws",
       "milestone": "5"
     },
     {

@@ -209,7 +209,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `title-style-block` | 9 | rect, rule, text | — | band, linear |
 | `title-style` | 4 | rect, text | — | band, linear |
 | `titles` | 28 | rect, rule, symbol, text | — | band, linear, ordinal |
-| `trail` | 28 | line, rule, text, trail | — | linear |
+| `trail` | 35 | line, rule, symbol, text, trail | — | linear |
 | `tree-layouts` | 31 | rule, symbol, text | filter, formula, lookup, pack, stratify, tree | ordinal |
 | `treemap` | 18 | rect, text | filter, formula, partition, stratify, treemap | ordinal |
 | `trellis-bands` | 32 | rect, text | — | ordinal |

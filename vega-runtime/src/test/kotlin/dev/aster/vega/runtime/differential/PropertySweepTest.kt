@@ -202,18 +202,29 @@ class PropertySweepTest {
      * with the probe that established it.
      *
      * Kept here rather than quietly tolerated in the comparison: a difference nobody can name is a
-     * defect, and one that is named is a decision. Nothing else is excused — the list is three
-     * cases of one behaviour.
+     * defect, and one that is named is a decision. Nothing else is excused, and each of these is a
+     * case where upstream **measures a shape it will not draw**.
      */
     val KNOWN_DIFFERENCES: Map<String, String> =
-      listOf("encode-path-angle--4", "encode-path-angle-0.5", "encode-path-angle-8").associateWith {
-        "a rotated `path` mark is *measured* about the scene origin upstream, not about its own " +
-          "anchor: `pathRender(context, cache, x, y, sx, sy)` places the outline and the bound " +
-          "context's matrix then turns every point about (0, 0). Probed — a triangle drawn at " +
-          "`translate(100,50) rotate(90)` reports bounds of (-50, 92, -38, 108), which is nowhere " +
-          "near what it draws. Reproducing it would need a second transform per node whose only " +
-          "purpose is to be wrong; this engine measures what it draws"
-      }
+      listOf("encode-path-angle--4", "encode-path-angle-0.5", "encode-path-angle-8")
+        .associateWith {
+          "a rotated `path` mark is *measured* about the scene origin upstream, not about its own " +
+            "anchor: `pathRender(context, cache, x, y, sx, sy)` places the outline and the bound " +
+            "context's matrix then turns every point about (0, 0). Probed — a triangle drawn at " +
+            "`translate(100,50) rotate(90)` reports bounds of (-50, 92, -38, 108), which is " +
+            "nowhere near what it draws. Reproducing it would need a second transform per node " +
+            "whose only purpose is to be wrong; this engine measures what it draws"
+        }
+        .plus(
+          "encode-trail-size--4" to
+            ("a trail of negative size is a shape upstream **cannot draw**. Its half-width is the " +
+              "size itself rather than a square root — `ts = item => item.size || 1` — so the " +
+              "outline is a run of arcs of radius -2, and `d3-path` refuses one: rendering this " +
+              "chart throws `negative radius: -2`, probed. Only the *bound* context survives it, " +
+              "because it samples `r * Math.cos(a) + cx` and a negative radius merely reflects " +
+              "each sample through the centre, which is how upstream arrives at bounds for a " +
+              "drawing that does not exist. This engine measures the capsule it draws")
+        )
 
     val repositoryRoot: File = File(System.getProperty("user.dir")).parentFile
     val sweepDir = File(repositoryRoot, "build/property-sweep")

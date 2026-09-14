@@ -476,8 +476,18 @@ public class MarkEncoder(
     val channels = spec.encode.effective
     val segments =
       segments(data, channels) { datum ->
+        // ```js
+        // ts = item => item.size || 1
+        // ```
+        //
+        // **Falsy, not absent.** A trail's width is defaulted the way a path's `scaleX` is, so a
+        // trail asked for `size: 0` is drawn one unit wide rather than as a hairline — and, being a
+        // filled shape rather than a stroked one, a width of zero would have bounded it flat along
+        // its own centre line. A *negative* size is truthy and kept.
         point(channels, datum) to
-          (number(channels["size"], datum) ?: MarkConfig(spec).number("size") ?: 1.0)
+          ((number(channels["size"], datum) ?: MarkConfig(spec).number("size"))?.takeIf {
+            it != 0.0 && !it.isNaN()
+          } ?: 1.0)
       }
     // A trail with nothing defined keeps its item and draws no outline, as a line does; see the
     // note there. An empty path is not an absent mark.
