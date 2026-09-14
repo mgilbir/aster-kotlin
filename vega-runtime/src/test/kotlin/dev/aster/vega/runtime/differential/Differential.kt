@@ -1055,7 +1055,7 @@ public object Differential {
       // `butt`: upstream wrote it, this left it out, and the comparison called that a difference.
       val got = actual.strings[channel] ?: IMPLIED_BY_ABSENCE[channel]
       if (got == null) {
-        if (inertFill(expected, channel)) continue
+        if (inertFill(expected, channel) || unpaintedStroke(expected, channel)) continue
         out.add(Difference("$where.$channel", wanted, "absent"))
         continue
       }
@@ -1269,9 +1269,19 @@ public object Differential {
   private fun noLimit(expected: Mark, channel: String, wanted: Double): Boolean =
     expected.type == "text" && channel == "limit" && wanted == 0.0
 
+  /**
+   * A stroke *detail* on a mark the reference does not stroke, which paints nothing.
+   *
+   * `addEncoders` puts every property the specification names on the item whether or not anything
+   * will use it: a legend symbol given a `symbolDash` carries `strokeDash` even when the legend
+   * maps a fill and has no stroke colour at all, and upstream's renderer then strokes nothing. A
+   * scene node here holds what a renderer needs, so there is no stroke for the dash to hang on.
+   *
+   * The colour itself is **not** in this list, so a mark upstream strokes and this one does not is
+   * still reported — it is only the detail channels that are inert without one.
+   */
   private fun unpaintedStroke(expected: Mark, channel: String): Boolean =
-    (channel == "strokeWidth" || channel == "strokeOpacity") &&
-      !expected.strings.containsKey("stroke")
+    channel in UNPAINTED_WITHOUT_STROKE && !expected.strings.containsKey("stroke")
 
   /**
    * A continuous scale's three comparable facts, shared by every family that has them.
@@ -1617,6 +1627,18 @@ public object Differential {
       "lighter" -> 100
       else -> value.trim().toDoubleOrNull()?.toInt()
     }
+
+  /** The channels that describe a stroke rather than being one; see [unpaintedStroke]. */
+  private val UNPAINTED_WITHOUT_STROKE =
+    setOf(
+      "strokeWidth",
+      "strokeOpacity",
+      "strokeDash",
+      "strokeDashOffset",
+      "strokeCap",
+      "strokeJoin",
+      "strokeMiterLimit",
+    )
 
   private fun fmt(value: Double): String =
     if (value == value.toLong().toDouble()) value.toLong().toString() else value.toString()
