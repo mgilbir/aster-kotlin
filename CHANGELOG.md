@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **A title's `dx` and `dy` move its subtitle with it.** Upstream hands `buildSubTitle` the same
+  `dx: _('dx'), dy: _('dy')` it hands `buildTitle`, so the pair is nudged together — while an
+  `encode.title` block is merged into the heading's mark alone and moves only that. Both were
+  probed. The subtitle was staying put, which is not only its own position: the surface is measured
+  against what the heading block covers, so a heading nudged to line up with an axis made the whole
+  drawing the wrong height.
+
 - **A number a specification writes is data, not an invariant this engine may refuse.** Two values
   took a whole chart down where upstream draws one, both found by the schema sweep. A **negative
   font size** hit a `require(fontSize >= 0)` on `TextStyle` — upstream's `~~(0.8 * length *

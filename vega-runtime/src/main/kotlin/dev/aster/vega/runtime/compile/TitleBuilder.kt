@@ -241,11 +241,22 @@ internal class TitleBuilder(
             Orient.RIGHT -> -titleBounds.width - padding to 0.0
             else -> 0.0 to titleBounds.height + padding
           }
+        // **The title's own `dx`/`dy` are the subtitle's too**, and an `encode` block's are not.
+        // `buildSubTitle` is handed the same `dx: _('dx'), dy: _('dy')` as `buildTitle` — the
+        // *property*, read through the config lookup — while `encode.title` is merged into the
+        // heading's mark alone and `encode.subtitle` into the subtitle's. So a heading nudged to
+        // line up with an axis moves its subtitle with it, and one nudged by an `encode` block
+        // does not; both were probed, the second by a fixture that already had a `dx` in
+        // `encode.title` and no such shift on its subtitle.
+        //
+        // It matters beyond the subtitle's own position: the surface is measured against what the
+        // heading block covers, so a subtitle left behind makes the whole drawing the wrong
+        // height.
         children +=
           TextNode(
             id = ids.allocate(),
-            x = sx,
-            y = sy,
+            x = sx + (number(spec, "subtitle", "dx") ?: numbers.resolve(spec.dx, "title") ?: 0.0),
+            y = sy + (number(spec, "subtitle", "dy") ?: numbers.resolve(spec.dy, "title") ?: 0.0),
             layout =
               textEngine.layout(
                 run(

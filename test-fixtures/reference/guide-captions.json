@@ -2025,6 +2025,26 @@
   "caption": "Subtitle text 'with its own subtitle'"
  },
  {
+  "fixture": "title-nudge",
+  "kind": "axis",
+  "caption": "X-axis titled 'Segment' for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "title-nudge",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Amount' for a linear scale with values from 0 to 55"
+ },
+ {
+  "fixture": "title-nudge",
+  "kind": "title",
+  "caption": "Title text 'Revenue by segment'"
+ },
+ {
+  "fixture": "title-nudge",
+  "kind": "subtitle",
+  "caption": "Subtitle text '2026 to date'"
+ },
+ {
   "fixture": "title-style-block",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 2 values: a, b"
