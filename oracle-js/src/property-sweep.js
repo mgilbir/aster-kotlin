@@ -116,6 +116,125 @@ function baseSpec() {
 
 
 /**
+ * One chart per **scale type**, because a scale's properties are its type's.
+ *
+ * The scale family had been swept through the band branch of the schema's `oneOf` — one of twelve —
+ * and a `base` belongs to a log scale, an `exponent` to a power one and a `constant` to a symlog.
+ * Nine properties were unreachable that way: those three and `clamp`, `zero`, `nice`, `bins`,
+ * `domainImplicit` and `interpolate`. Scale arithmetic is also the least forgiving thing here — a
+ * tick sequence, a rounded domain, an inverted position — so an unswept branch is a quiet place for
+ * a difference to live.
+ *
+ * Each base puts the swept scale on the **y** axis with an axis drawn against it, so the ticks it
+ * generates, the labels they carry and the marks they place are all compared. The data suits the
+ * type: a log scale needs a domain clear of zero, a quantile needs enough values to have quantiles,
+ * a time scale needs dates. `identity` takes pixel values straight from the data.
+ */
+const SCALE_ROWS = {
+  positive: [
+    { c: 'alpha', v: 3, g: 'north' },
+    { c: 'beta', v: 40, g: 'south' },
+    { c: 'gamma', v: 900, g: 'east' },
+  ],
+  spread: [
+    { c: 'alpha', v: 8, g: 'north' },
+    { c: 'beta', v: 17, g: 'south' },
+    { c: 'gamma', v: 31, g: 'east' },
+    { c: 'delta', v: 54, g: 'north' },
+    { c: 'epsilon', v: 76, g: 'south' },
+    { c: 'zeta', v: 95, g: 'east' },
+  ],
+  dated: [
+    { c: 'alpha', v: '2024-01-07T00:00:00', g: 'north' },
+    { c: 'beta', v: '2024-03-19T00:00:00', g: 'south' },
+    { c: 'gamma', v: '2024-08-02T00:00:00', g: 'east' },
+  ],
+  pixels: [
+    { c: 'alpha', v: 20, g: 'north' },
+    { c: 'beta', v: 60, g: 'south' },
+    { c: 'gamma', v: 110, g: 'east' },
+  ],
+};
+
+/** The scale each base declares, keyed by the type the schema branch names. */
+const SCALE_BASES = {
+  linear: { rows: 'spread', scale: { type: 'linear', range: 'height' } },
+  sqrt: { rows: 'spread', scale: { type: 'sqrt', range: 'height' } },
+  log: { rows: 'positive', scale: { type: 'log', range: 'height' } },
+  pow: { rows: 'spread', scale: { type: 'pow', range: 'height' } },
+  symlog: { rows: 'spread', scale: { type: 'symlog', range: 'height' } },
+  time: { rows: 'dated', scale: { type: 'time', range: 'height' } },
+  utc: { rows: 'dated', scale: { type: 'utc', range: 'height' } },
+  quantize: { rows: 'spread', scale: { type: 'quantize', range: 'height' } },
+  threshold: {
+    rows: 'spread',
+    // A threshold scale's domain is the boundaries themselves, and its range is one longer.
+    scale: { type: 'threshold', domain: [20, 50, 80], range: [10, 40, 80, 118] },
+  },
+  quantile: { rows: 'spread', scale: { type: 'quantile', range: [10, 40, 80, 118] } },
+  'bin-ordinal': {
+    rows: 'spread',
+    scale: { type: 'bin-ordinal', domain: [0, 25, 50, 75, 100], range: [10, 40, 80, 118] },
+  },
+  ordinal: { rows: 'spread', scale: { type: 'ordinal', range: [10, 40, 80, 118, 90, 30] } },
+  point: { rows: 'spread', scale: { type: 'point', range: 'height' } },
+  identity: { rows: 'pixels', scale: { type: 'identity' } },
+};
+
+/**
+ * A chart whose **y** scale is of one type, with an axis and a symbol per row drawn against it.
+ *
+ * Symbols rather than bars, because half of these scales have no zero to draw a bar down to: a
+ * point placed by the scale is the one encoding every type here can satisfy. The band scale along
+ * the bottom stays as it is in the base chart, so a difference belongs to the scale being swept.
+ */
+function scaleBaseSpec(type) {
+  const base = SCALE_BASES[type];
+  const rows = SCALE_ROWS[base.rows];
+  const dated = base.rows === 'dated';
+  return {
+    $schema: 'https://vega.github.io/schema/vega/v6.json',
+    width: 200,
+    height: 120,
+    padding: 5,
+    background: 'white',
+    data: [
+      {
+        name: 't',
+        values: rows,
+        ...(dated ? { format: { parse: { v: 'date' } } } : {}),
+      },
+    ],
+    scales: [
+      {
+        name: 'y',
+        domain: base.scale.domain ?? { data: 't', field: 'v' },
+        ...base.scale,
+      },
+      { name: 'x', type: 'band', domain: { data: 't', field: 'c' }, range: 'width' },
+    ],
+    axes: [
+      { orient: 'left', scale: 'y', title: 'amount' },
+      { orient: 'bottom', scale: 'x' },
+    ],
+    marks: [
+      {
+        type: 'symbol',
+        from: { data: 't' },
+        encode: {
+          enter: {
+            x: { scale: 'x', field: 'c', band: 0.5 },
+            y: { scale: 'y', field: 'v' },
+            size: { value: 80 },
+            fill: { value: 'steelblue' },
+          },
+        },
+      },
+    ],
+  };
+}
+
+/**
  * One mark of each type, drawn from the same three rows, for the channel sweep.
  *
  * Deliberately plain: enough encoding to put the mark on the chart and nothing more, so a swept
@@ -256,6 +375,17 @@ const FAMILIES = {
   scale: (spec, property, value) => {
     spec.scales[0][property] = value;
   },
+  // One family per **scale type**, for the reason the mark types have one each: which properties
+  // mean anything is the type's own question, and the schema says so in twelve `oneOf` branches
+  // that nothing but the band one had been read from. See [SCALE_BASES].
+  ...Object.fromEntries(
+    Object.keys(SCALE_BASES).map((type) => [
+      `scale-${type}`,
+      (spec, property, value) => {
+        spec.scales[0][property] = value;
+      },
+    ]),
+  ),
   // The bar mark's own properties — `clip`, `interactive`, `aria` and the rest — rather than its
   // channels.
   mark: (spec, property, value) => {
@@ -322,7 +452,6 @@ const SHARED_SKIP = {
   scheme: 'a scheme name, swept through range instead',
   reverse: 'covered by the boolean sweep of the scale family',
   bins: 'needs bin boundaries of its own',
-  nice: 'takes a count or an interval as well as a boolean; not honestly enumerable here',
   init: 'an initial value for an interactive scale',
   on: 'event handlers, which a static render never fires',
   // A mark's own structure rather than its appearance: sweeping these builds a different chart
@@ -371,8 +500,30 @@ const FREE_STRINGS = {
   gridScale: 'names a second scale for the grid to span, which is structure rather than style',
 };
 
+/**
+ * The family a per-type one belongs to: `encode-rect` is an `encode`, `scale-log` is a `scale`.
+ *
+ * What a property *means* is the base family's question — a legend's `fill` names a scale whichever
+ * legend it is — and what it may be **worth** is often the specific one's. Keeping the two apart is
+ * why the skips and the vocabularies are looked up through here rather than by an exact name.
+ */
+function baseFamily(family) {
+  const dash = family.indexOf('-');
+  return dash < 0 ? family : family.slice(0, dash);
+}
+
 /** Skips that belong to **one** family, where the same name means something else in another. */
 const FAMILY_SKIP = {
+  scale: {
+    // A scale's `interpolate` is **not** a mark's: it is the space the *range* is interpolated
+    // through — `'interpolate' + type.split('-').map(titleCase).join('')` in `vega-scale` — and what
+    // may legally go there depends on what the range is made of. Every scale base here ranges over
+    // pixels, where a colour space means nothing; and of d3's interpolators, `transform-css` and
+    // `transform-svg` reach for a DOM and throw in a headless oracle, which would file an
+    // *environment* as a refusal and make this corpus say different things on different machines.
+    // It wants a colour-ranged base of its own, which is its own change.
+    interpolate: 'the space a range interpolates through, which needs a range that has one',
+  },
   legend: {
     fill: 'names the scale a legend describes',
     stroke: 'names the scale a legend describes',
@@ -390,13 +541,24 @@ const FAMILY_SKIP = {
  * Three spellings, and each one says something: an `axis` is a plain object; a `legend` is an
  * `allOf` of the shared part and the per-kind parts, so every branch's properties belong to it; and
  * a `title` or a `scale` is a `oneOf` — a title may be written as a bare string, and a scale is a
- * different object for every scale type. The band branch is the one taken here, because the band
- * scale is the one these are applied to.
+ * different object for every scale type.
+ *
+ * **Which branch of a `oneOf`** is the family's own question, and for a long time the answer was
+ * always the band one: a `scale-log` family reads the log branch and finds `base` there, where the
+ * band branch has never heard of it. Nine properties were reachable through no family at all until
+ * the scale types got one each.
  */
 function propertiesOf(family) {
   // Every `encode-<marktype>` family reads the same channel table; the mark type decides which of
   // them mean anything, not which of them exist.
-  const named = family.startsWith('encode-') ? 'encodeEntry' : family;
+  const named = family.startsWith('encode-')
+    ? 'encodeEntry'
+    : family.startsWith('scale-')
+      ? 'scale'
+      : family;
+  // A `scale-log` wants the branch that names `log`; everything else keeps the band branch, which
+  // is the scale the plain `scale` family applies its properties to.
+  const wanted = family.startsWith('scale-') ? family.slice('scale-'.length) : 'band';
   const definition = schema.definitions[named];
   const merged = {};
   const visit = (fragment) => {
@@ -405,10 +567,10 @@ function propertiesOf(family) {
     for (const branch of fragment.allOf || []) visit(branch);
     if (fragment.oneOf) {
       const branches = fragment.oneOf.filter((b) => b.properties);
-      const banded = branches.find(
-        (b) => b.properties.type && (b.properties.type.enum || []).includes('band'),
+      const chosen = branches.find(
+        (b) => b.properties.type && (b.properties.type.enum || []).includes(wanted),
       );
-      visit(banded || branches[0]);
+      visit(chosen || branches[0]);
     }
   };
   visit(definition);
@@ -484,6 +646,7 @@ const VOCABULARY = {
 /** `symbolType` is a legend's word for the same twelve names. */
 VOCABULARY.symbolType = VOCABULARY.shape;
 
+
 /**
  * Properties whose vocabulary the schema states **under another name**.
  *
@@ -537,7 +700,7 @@ function branchesOf(fragment, depth = 0) {
  * The schema is asked first and always. [VOCABULARY] only answers where it has nothing enumerable
  * to say, so a property the schema *does* enumerate can never be overridden by a list kept here.
  */
-function valuesFor(fragment, property) {
+function valuesFor(fragment, property, family) {
   const declared = declaredValues(fragment);
   if (declared) return declared;
 
@@ -610,13 +773,13 @@ for (const [family, apply] of Object.entries(FAMILIES)) {
   for (const [property, fragment] of Object.entries(definition)) {
     const reason =
       (FAMILY_SKIP[family] || {})[property] ||
-      (family.startsWith('encode-') ? (FAMILY_SKIP.encode || {})[property] : undefined) ||
+      (FAMILY_SKIP[baseFamily(family)] || {})[property] ||
       SHARED_SKIP[property];
     if (reason) {
       skipped.push({ family, property, reason });
       continue;
     }
-    const candidates = valuesFor(fragment, property);
+    const candidates = valuesFor(fragment, property, family);
     if (!candidates) {
       skipped.push({
         family,
@@ -628,7 +791,9 @@ for (const [family, apply] of Object.entries(FAMILIES)) {
       continue;
     }
     for (const value of candidates.values) {
-      const spec = baseSpec();
+      const spec = family.startsWith('scale-')
+        ? scaleBaseSpec(family.slice('scale-'.length))
+        : baseSpec();
       apply(spec, property, value);
       // A name that has already been used gets a number: two values can slug the same way — `0`
       // and `-0`, `"a b"` and `"a_b"` — and a second file overwriting the first would silently

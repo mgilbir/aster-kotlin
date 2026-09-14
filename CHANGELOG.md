@@ -8,6 +8,42 @@ section here does not get released.
 
 ### Fixed
 
+- **The sweep reads every scale type, not just the band one.** A scale is a `oneOf` of twelve
+  branches in the schema and `propertiesOf` had always taken the band one, so a `base` belongs to a
+  log scale, an `exponent` to a power one and a `constant` to a symlog — and nine properties were
+  reachable through no family at all: those three with `clamp`, `zero`, `nice`, `bins`,
+  `domainImplicit` and `interpolate`. Each scale type has its own base chart now, with data that
+  suits it and an axis drawn against it, so the ticks it generates and the labels they carry are
+  compared too. **3022 charts, up from 2861.**
+
+  `nice` had been skipped as "not honestly enumerable", which was true of one merged property table
+  and not of a branch: per type it is a boolean, and on a **time** scale it is an enum of eight
+  intervals. `interpolate` is skipped here and named — what a scale may interpolate *through*
+  depends on what its range is made of, and every base here ranges over pixels; sweeping d3's
+  interpolators at one produced `WebKitCSSMatrix is not defined`, which is a headless *oracle* rather
+  than upstream refusing a chart, and would make this corpus say different things on different
+  machines. It wants a colour-ranged base, which is its own change.
+
+  The widening found **twenty differences in five causes**, all real:
+
+  * a **quantize** scale refuses a range *keyword*. `range: "height"` is rejected here — "a
+    'quantize' scale needs an explicit range array or a scheme" — where upstream resolves the keyword
+    to `[100, 0]` first and buckets into it quite happily. The scale is never built, so the axis that
+    names it is skipped, which is why every property of that family differed alike;
+  * an axis against an **ordinal** or an **identity** scale draws no ticks and no labels. Both scales
+    *are* built; `generatedTicks` has no branch for either and answers null. Probed on minimal
+    specifications: upstream labels an ordinal axis with its domain values and an identity axis with
+    continuous ticks across the domain. Quantile and bin-ordinal axes already agree, so this is two
+    scale types and not five;
+  * a **threshold** scale with `zero: true` folds zero into its domain upstream — `0, 50, 80` where
+    this engine keeps `20, 50, 80`;
+  * a **log** scale with a degenerate `base` — zero, a half, a negative — generates a different tick
+    sequence here;
+  * a log scale's `padding` moves an axis tick by a unit.
+
+  Recorded rather than fixed in this change: the sweep is a measurement, and each of those is its
+  own defect with its own fix.
+
 - **The sweep reads the vocabularies upstream keeps in code, not only the ones its schema states.**
   The schema had been the sweep's whole source of values, and 121 of its 209 skips shared one
   reason: "the schema declares no enumerable value here". That sentence covered two unlike things. A
