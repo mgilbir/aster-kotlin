@@ -15016,6 +15016,30 @@
   "hidden": false
  },
  {
+  "fixture": "projection-degenerate",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-degenerate",
+  "kind": "shape",
+  "role": "graphics-symbol",
+  "roleDescription": "shape mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-degenerate",
+  "kind": "shape",
+  "role": "graphics-symbol",
+  "roleDescription": "shape mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "projection-families",
   "kind": "group",
   "role": "graphics-object",

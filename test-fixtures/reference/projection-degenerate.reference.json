@@ -1,0 +1,77 @@
+{
+  "marks": [
+    {
+      "fill": "#cfd8dc",
+      "role": "mark",
+      "shapeHeight": 8,
+      "shapeLeft": 61,
+      "shapeTop": 61,
+      "shapeWidth": 8,
+      "stroke": "#37474f",
+      "strokeWidth": 2,
+      "type": "shape"
+    },
+    {
+      "fill": "#cfd8dc",
+      "role": "mark",
+      "shapeHeight": 8,
+      "shapeLeft": 61,
+      "shapeTop": 61,
+      "shapeWidth": 8,
+      "stroke": "#37474f",
+      "strokeWidth": 2,
+      "type": "shape"
+    },
+    {
+      "fill": "#cfd8dc",
+      "role": "mark",
+      "shapeHeight": 8,
+      "shapeLeft": 61,
+      "shapeTop": 61,
+      "shapeWidth": 8,
+      "stroke": "#37474f",
+      "strokeWidth": 2,
+      "type": "shape"
+    },
+    {
+      "fill": null,
+      "role": "mark",
+      "shapeHeight": 485.860042,
+      "shapeLeft": 23.629237,
+      "shapeTop": -258.946,
+      "shapeWidth": 342.741527,
+      "stroke": "#7a4fb5",
+      "strokeWidth": 0.7,
+      "type": "shape"
+    },
+    {
+      "fill": null,
+      "role": "mark",
+      "shapeHeight": 62.8,
+      "shapeLeft": 189.642039,
+      "shapeTop": 33.6,
+      "shapeWidth": 10.715923,
+      "stroke": "#7a4fb5",
+      "strokeWidth": 0.7,
+      "type": "shape"
+    },
+    {
+      "fill": null,
+      "role": "mark",
+      "shapeHeight": 65.309961,
+      "shapeLeft": 161.342082,
+      "shapeTop": 32.34502,
+      "shapeWidth": 67.315836,
+      "stroke": "#7a4fb5",
+      "strokeWidth": 0.7,
+      "type": "shape"
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 495.860042,
+    "width": 376.370763
+  },
+  "spec": "projection-degenerate.vg.json",
+  "vegaVersion": "6.3.1"
+}
