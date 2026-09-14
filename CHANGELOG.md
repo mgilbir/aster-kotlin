@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **A legend's anchor is rounded, and a far-edge one is measured against the whole grid.**
+  `gridLayout` resolves the anchor — including the `End` adjustment that subtracts the grid's own
+  extent — and then does `x = Math.round(x); y = Math.round(y)` before adding each cell's offset. So
+  an `offset` of half a unit lands on a whole coordinate, and two legends on the left share the
+  *wider* one's left edge rather than lining up on the right, which is what measuring each by its own
+  width did here.
+
 - **An axis title is measured where upstream measures it, not where it ends up.** Its box is
   computed while it still sits at the axis's origin and `axisTitleLayout` translates the box
   afterwards — `b.translate(-dx, -dy)` — and the two orderings are the same arithmetic but not the

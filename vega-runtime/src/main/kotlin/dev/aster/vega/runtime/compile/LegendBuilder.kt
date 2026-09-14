@@ -1493,39 +1493,56 @@ internal class LegendBuilder(
       group.mapNotNull { numbers.resolve(it.spec.offset, it.spec.scale ?: "legend") }.maxOrNull()
         ?: LegendDefaults.OFFSET
     val stacksDown = orient == LegendOrient.LEFT || orient == LegendOrient.RIGHT
+    // The grid the legends of one orientation are laid out in: they stack along one direction with
+    // a margin between them, and the box around the stack is what an anchor at a far edge is
+    // measured from.
     val totalRun =
       if (stacksDown) group.sumOf { it.size.height } + LegendDefaults.MARGIN * (group.size - 1)
       else group.sumOf { it.size.width } + LegendDefaults.MARGIN * (group.size - 1)
+    val across = if (stacksDown) group.maxOf { it.size.width } else group.maxOf { it.size.height }
+    val gridWidth = if (stacksDown) across else totalRun
+    val gridHeight = if (stacksDown) totalRun else across
+
+    // **The anchor is rounded, and the stack's own offsets are not.** `gridLayout` resolves the
+    // anchor — including the `End` adjustment that subtracts the grid's own extent — and then does
+    // `x = Math.round(x); y = Math.round(y)` before adding each cell's offset. A legend `offset` of
+    // half a unit therefore lands on a whole one, and a legend whose neighbours make the grid a
+    // fraction wide is placed at a whole coordinate rather than at that fraction.
+    //
+    // The grid's extent is also what a far-edge anchor subtracts, **not** each legend's own width:
+    // two legends of different widths on the left share the wider one's left edge rather than
+    // lining up on the right. Probed on a live view — a 168-wide legend and a 32-wide one both sit
+    // at `x = -186`.
+    val anchorX =
+      when (orient) {
+        LegendOrient.LEFT -> roundHalfUp(floor(guides.vertical.left) - offset - gridWidth)
+        LegendOrient.RIGHT -> roundHalfUp(ceil(guides.vertical.right) + offset)
+        LegendOrient.TOP,
+        LegendOrient.BOTTOM,
+        LegendOrient.TOP_LEFT,
+        LegendOrient.BOTTOM_LEFT -> roundHalfUp(0.0)
+        LegendOrient.TOP_RIGHT,
+        LegendOrient.BOTTOM_RIGHT -> roundHalfUp(extent.width - offset - gridWidth)
+        LegendOrient.NONE -> 0.0
+      }
+    val anchorY =
+      when (orient) {
+        LegendOrient.LEFT,
+        LegendOrient.RIGHT -> roundHalfUp(0.0)
+        LegendOrient.TOP -> roundHalfUp(floor(guides.horizontal.top) - offset - gridHeight)
+        LegendOrient.BOTTOM -> roundHalfUp(ceil(guides.horizontal.bottom) + offset)
+        LegendOrient.TOP_LEFT,
+        LegendOrient.TOP_RIGHT -> roundHalfUp(offset)
+        LegendOrient.BOTTOM_LEFT,
+        LegendOrient.BOTTOM_RIGHT -> roundHalfUp(extent.height - offset - gridHeight)
+        LegendOrient.NONE -> 0.0
+      }
 
     val nodes = mutableListOf<SceneNode>()
     var run = 0.0
     for (built in group) {
-      val w = built.size.width
-      val h = built.size.height
-      val x =
-        when (orient) {
-          LegendOrient.LEFT -> floor(guides.vertical.left) - offset - w
-          LegendOrient.RIGHT -> ceil(guides.vertical.right) + offset
-          LegendOrient.TOP,
-          LegendOrient.BOTTOM,
-          LegendOrient.TOP_LEFT,
-          LegendOrient.BOTTOM_LEFT -> run
-          LegendOrient.TOP_RIGHT,
-          LegendOrient.BOTTOM_RIGHT -> extent.width - offset - totalRun + run
-          LegendOrient.NONE -> 0.0
-        }
-      val y =
-        when (orient) {
-          LegendOrient.LEFT,
-          LegendOrient.RIGHT -> run
-          LegendOrient.TOP -> floor(guides.horizontal.top) - offset - h
-          LegendOrient.BOTTOM -> ceil(guides.horizontal.bottom) + offset
-          LegendOrient.TOP_LEFT,
-          LegendOrient.TOP_RIGHT -> offset
-          LegendOrient.BOTTOM_LEFT,
-          LegendOrient.BOTTOM_RIGHT -> extent.height - offset - h
-          LegendOrient.NONE -> 0.0
-        }
+      val x = if (stacksDown) anchorX else anchorX + run
+      val y = if (stacksDown) anchorY + run else anchorY
       // A corner legend sits inside the plotting area, so it is inset from the edge rather than
       // measured from the axes.
       val insetX =
@@ -1535,7 +1552,7 @@ internal class LegendBuilder(
           else -> x
         }
       nodes += node(built, insetX, y)
-      run += (if (stacksDown) h else w) + LegendDefaults.MARGIN
+      run += (if (stacksDown) built.size.height else built.size.width) + LegendDefaults.MARGIN
     }
     return nodes
   }
