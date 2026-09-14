@@ -18,11 +18,12 @@
  *
  * ### What is swept, and what is left out
  *
- * Six families: `axis`, `legend`, `title`, `scale`, a **mark's own properties**, and the **encode
- * channels** every mark item carries. The first four are where this engine's code is densest — a
- * guide is a layout, a text measurement and half a dozen marks — and the last two are the widest
- * declared surface there is: sixty channels, most of which no chart in any corpus sets. A property
- * is swept when the schema says enough to choose values honestly:
+ * Seven families: `axis`, `legend`, `title`, `scale`, **projection**, a **mark's own properties**,
+ * and the **encode channels** every mark item carries. The first four are where this engine's code
+ * is densest — a guide is a layout, a text measurement and half a dozen marks — a projection is a
+ * formula and a clipping rule whose difference is invisible until it is drawn, and the last two are
+ * the widest declared surface there is: sixty channels, most of which no chart in any corpus sets. A
+ * property is swept when the schema says enough to choose values honestly:
  *
  *   * an **enum**, including one inside a `oneOf` beside a signal reference: every word it lists;
  *   * a **boolean**: both;
@@ -41,6 +42,10 @@
  * property is applied to *one* place in it — the bottom axis, the legend, the title, or the named
  * scale — so a difference the sweep reports names the property that caused it.
  *
+ * Three families bring their own, because the chart a property means anything on is the family's
+ * own question: a scale type gets [scaleBaseSpec], a mark type gets its entry in [MARK_BASES], and a
+ * projection gets [projectionBaseSpec], which is a small map rather than a bar chart.
+ *
  * A value upstream refuses is recorded as a refusal rather than dropped, the way the wild and Deneb
  * corpora record theirs: "upstream will not draw this either" is an agreement, and a sweep that
  * quietly dropped them would be reporting a match rate over a corpus nobody can name.
@@ -51,6 +56,7 @@ import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import * as vega from 'vega';
 import { pathCurves, pathSymbols } from 'vega-scenegraph';
+import { projectionProperties } from 'vega-projection';
 import { pinDeterminism } from './determinism.js';
 import { canonicalJson, canonicalNumber } from './canonical.js';
 import { normalizeScales, normalizeScene } from './normalize.js';
@@ -358,6 +364,191 @@ const MARK_BASES = {
 };
 
 /** Where each family's property is written into the base chart. */
+/**
+ * Every projection upstream registers, read from its own registry table.
+ *
+ * `vega-projection` exports a **lookup** and no enumeration — `projection(type)` answers one or
+ * null — so the names come out of the table that fills it, and each is then put back through that
+ * lookup by [verified]. The keys are written bare there rather than quoted, which is why the table
+ * reader takes a pattern.
+ *
+ * Seventeen, and the registry lowercases both what it stores and what it is asked for, so the
+ * spelling a specification uses never matters. `equalEarth` and `naturalEarth1` are written in the
+ * table with capitals and stored without them; the names here are the stored ones.
+ */
+const PROJECTION_TYPES = verified(
+  tableKeys(
+    '../node_modules/vega-projection/src/projections.js',
+    'const projections = {',
+    /^ {2}([A-Za-z0-9]+):/gm,
+  ).map((name) => name.toLowerCase()),
+  (name) => vega.projection(name),
+  'projections',
+);
+
+/**
+ * The geography every projection family draws, small enough to write down and chosen to be awkward.
+ *
+ * A projection is a formula plus a **clipping rule**, and the formula is the easy half. What
+ * separates one port from another is what happens at the edges: a polygon that reaches the pole,
+ * one that crosses the antimeridian and has to be cut in two and stitched to the seam, a line with
+ * no area to it, and a bare point, which is drawn by `pointRadius` rather than by the projection at
+ * all. Rings wind counter-clockwise, which is the exterior winding `d3-geo` reads as "the inside is
+ * the small part"; wound the other way each of these would mean the whole sphere except itself.
+ */
+const GEOGRAPHY = {
+  type: 'FeatureCollection',
+  features: [
+    {
+      type: 'Feature',
+      properties: { name: 'block' },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [-100, 20],
+            [-60, 20],
+            [-60, 50],
+            [-100, 50],
+            [-100, 20],
+          ],
+        ],
+      },
+    },
+    {
+      type: 'Feature',
+      properties: { name: 'cap' },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [-30, 70],
+            [30, 70],
+            [30, 88],
+            [-30, 88],
+            [-30, 70],
+          ],
+        ],
+      },
+    },
+    {
+      type: 'Feature',
+      properties: { name: 'seam' },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [160, -20],
+            [-160, -20],
+            [-160, 10],
+            [160, 10],
+            [160, -20],
+          ],
+        ],
+      },
+    },
+    {
+      type: 'Feature',
+      properties: { name: 'track' },
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [-120, -40],
+          [0, 0],
+          [120, 40],
+        ],
+      },
+    },
+    {
+      type: 'Feature',
+      properties: { name: 'dot' },
+      geometry: { type: 'Point', coordinates: [10, 45] },
+    },
+  ],
+};
+
+/** Four places to pin, which the `geopoint` transform turns into positions rather than outlines. */
+const PINS = [
+  { lon: -75, lat: 40 },
+  { lon: 0, lat: 0 },
+  { lon: 135, lat: -25 },
+  { lon: 20, lat: 78 },
+];
+
+/**
+ * The scale and translation a projection family starts from, so the map lands on the page.
+ *
+ * Every type's **own** defaults — `albers` at 1070 over a 960 by 500 page, `orthographic` at 249.5,
+ * `identity` at 1 — are already pinned coordinate by coordinate against `d3-geo`'s own path strings
+ * in `GeoProjectionTypesTest`, so nothing here is trying to test them again. What this is for is the
+ * properties, and a property is easier to read against a map that is on the canvas.
+ *
+ * `identity` is the exception: its input is pixels rather than degrees, and 60 pixels per pixel is
+ * not a map of anything.
+ */
+const PROJECTION_PLACEMENT = {
+  identity: { scale: 1, translate: [100, 60] },
+};
+
+/**
+ * A chart that draws [GEOGRAPHY] through one projection, with four pinned points beside it.
+ *
+ * Two comparisons rather than one, because a projection reaches the scene by two routes and they
+ * fail differently. The `geoshape` transform turns geometry into a **path string**, which is where
+ * clipping, resampling and winding live; the `geopoint` transform turns a longitude and a latitude
+ * into an **x and a y**, which is the formula alone with nothing to hide behind. A projection whose
+ * clip rule is wrong can still place every pin correctly, and a projection whose formula is off by a
+ * constant still draws a plausible-looking map.
+ */
+function projectionBaseSpec(type) {
+  return {
+    $schema: 'https://vega.github.io/schema/vega/v6.json',
+    width: 200,
+    height: 120,
+    padding: 5,
+    background: 'white',
+    data: [
+      { name: 'geo', values: GEOGRAPHY, format: { type: 'json', property: 'features' } },
+      {
+        name: 'pins',
+        values: PINS,
+        transform: [
+          { type: 'geopoint', projection: 'p', fields: ['lon', 'lat'], as: ['px', 'py'] },
+        ],
+      },
+    ],
+    projections: [
+      { name: 'p', type, scale: 60, translate: [100, 60], ...(PROJECTION_PLACEMENT[type] || {}) },
+    ],
+    marks: [
+      {
+        type: 'shape',
+        from: { data: 'geo' },
+        encode: {
+          enter: {
+            fill: { value: '#cfd8dc' },
+            stroke: { value: '#37474f' },
+            strokeWidth: { value: 0.5 },
+          },
+        },
+        transform: [{ type: 'geoshape', projection: 'p' }],
+      },
+      {
+        type: 'symbol',
+        from: { data: 'pins' },
+        encode: {
+          enter: {
+            x: { field: 'px' },
+            y: { field: 'py' },
+            size: { value: 30 },
+            fill: { value: '#b35a1f' },
+          },
+        },
+      },
+    ],
+  };
+}
+
 const FAMILIES = {
   // The **bottom** axis, which is the one with a band scale under it: half of what an axis property
   // decides — `tickBand`, `bandPosition`, `labelOverlap` — only means anything over bands.
@@ -383,6 +574,20 @@ const FAMILIES = {
       `scale-${type}`,
       (spec, property, value) => {
         spec.scales[0][property] = value;
+      },
+    ]),
+  ),
+  // One family per **projection type**, for the reason the scales have one each: which properties
+  // a projection has is the type's own question. `parallels` belongs to the four conics and to
+  // nothing else; `albersUsa` is three projections in a trenchcoat and has neither a centre nor a
+  // rotation to set; `identity` has no sphere and so no clip angle. Upstream's rule is a guard
+  // rather than a refusal — `if (_[prop] != null && proj[prop])` — so a property a type does not
+  // have is *ignored*, silently, and "ignored the same way" is exactly what wants comparing.
+  ...Object.fromEntries(
+    PROJECTION_TYPES.map((type) => [
+      `projection-${type}`,
+      (spec, property, value) => {
+        spec.projections[0][property] = value;
       },
     ]),
   ),
@@ -512,6 +717,21 @@ function baseFamily(family) {
   return dash < 0 ? family : family.slice(0, dash);
 }
 
+/**
+ * Why a property is not swept in a family, or nothing if it is.
+ *
+ * Three tables, most specific first, and the **first one that mentions the property** decides — so a
+ * family may state `null` and mean "swept here", which a shared skip cannot then override. That is
+ * not a nicety: `scale` names a scale everywhere in a specification except on a projection, where it
+ * is the zoom, and the shared skip had quietly taken the most consequential number a map has.
+ */
+function skipReason(family, property) {
+  for (const table of [FAMILY_SKIP[family], FAMILY_SKIP[baseFamily(family)], SHARED_SKIP]) {
+    if (table && property in table) return table[property];
+  }
+  return undefined;
+}
+
 /** Skips that belong to **one** family, where the same name means something else in another. */
 const FAMILY_SKIP = {
   scale: {
@@ -523,6 +743,16 @@ const FAMILY_SKIP = {
     // *environment* as a refusal and make this corpus say different things on different machines.
     // It wants a colour-ranged base of its own, which is its own change.
     interpolate: 'the space a range interpolates through, which needs a range that has one',
+  },
+  projection: {
+    name: 'names the projection every mark and transform here refers to',
+    // The family *is* the type: `projection-mercator` sets it, and sweeping it as a property would
+    // write a second type over the first and file the difference under the wrong one.
+    type: 'the family it belongs to already fixes it, one family per registered type',
+    // **Not** skipped here, against the shared rule. Everywhere else in a specification `scale` is
+    // the name of a scale; on a projection it is a number, the zoom, and it is the single property
+    // a map is most obviously wrong about.
+    scale: null,
   },
   legend: {
     fill: 'names the scale a legend describes',
@@ -555,7 +785,9 @@ function propertiesOf(family) {
     ? 'encodeEntry'
     : family.startsWith('scale-')
       ? 'scale'
-      : family;
+      : family.startsWith('projection-')
+        ? 'projection'
+        : family;
   // A `scale-log` wants the branch that names `log`; everything else keeps the band branch, which
   // is the scale the plain `scale` family applies its properties to.
   const wanted = family.startsWith('scale-') ? family.slice('scale-'.length) : 'band';
@@ -574,10 +806,40 @@ function propertiesOf(family) {
     }
   };
   visit(definition);
+  if (family.startsWith('projection-')) {
+    for (const property of projectionProperties) {
+      if (!merged[property]) merged[property] = codePropertyShape(property);
+    }
+  }
   if (!Object.keys(merged).length) {
     throw new Error(`the schema has no properties for '${family}'`);
   }
   return merged;
+}
+
+/**
+ * The shape of a projection property the schema does not declare, asked of the projection itself.
+ *
+ * `vega-projection` exports `projectionProperties`, nineteen names it forwards to whichever of them
+ * the projection turns out to have, and the schema declares only eight of those — `reflectX` and
+ * `reflectY` are missing from it, and so are the nine that belong to `d3-geo-projection`'s extended
+ * families. This is the same hole [VOCABULARY] fills for `interpolate` and `shape`: a vocabulary
+ * upstream keeps in code.
+ *
+ * The shape is **read off a live projection** rather than written down here — a fresh one is asked
+ * for its current value and the type of that answer is the type the setter takes. The nine extended
+ * properties have no owner among the seventeen registered types, so nothing in this package can be
+ * asked what they take; they are offered a number, and what is being compared there is that all
+ * seventeen ignore them, which is upstream's `if (_[prop] != null && proj[prop])`.
+ */
+function codePropertyShape(property) {
+  for (const type of PROJECTION_TYPES) {
+    const projection = vega.projection(type)();
+    if (typeof projection[property] === 'function') {
+      return typeof projection[property]() === 'boolean' ? { type: 'boolean' } : { type: 'number' };
+    }
+  }
+  return { type: 'number' };
 }
 
 /**
@@ -594,15 +856,16 @@ function propertiesOf(family) {
  * back through upstream's own lookup by [verified], so a broken extraction fails loudly instead of
  * quietly sweeping nothing.
  */
-function tableKeys(file, declaration) {
+function tableKeys(file, declaration, pattern = /^ {2}'([^']+)':/gm) {
   const source = readFileSync(new URL(file, import.meta.url), 'utf8');
   const start = source.indexOf(declaration);
   if (start < 0) throw new Error(`the table '${declaration}' is not in ${file}`);
   const body = source.slice(start);
   const table = body.slice(0, body.indexOf('\n};'));
   // Top-level quoted keys only — two spaces, a quoted name, a colon — so the nested `draw` and
-  // `tension` entries inside each record are not mistaken for names of their own.
-  const keys = [...table.matchAll(/^ {2}'([^']+)':/gm)].map((match) => match[1]);
+  // `tension` entries inside each record are not mistaken for names of their own. The projection
+  // registry writes its keys bare rather than quoted, which is the one place the pattern differs.
+  const keys = [...table.matchAll(pattern)].map((match) => match[1]);
   if (!keys.length) throw new Error(`no keys found in '${declaration}' of ${file}`);
   return keys;
 }
@@ -660,6 +923,61 @@ const VOCABULARY_ALIAS = {
   tickCap: 'strokeCap',
 };
 
+/**
+ * Values that belong to **one family**, where the schema declares a shape rather than a number.
+ *
+ * Unlike [VOCABULARY], which only answers where the schema is silent, these answer **first**. They
+ * exist for the properties whose schema declaration describes a *container* — "an object or an
+ * array", "an array of arrays" — where the generic rules either read it as a plain number pair or
+ * give up entirely. A projection's `rotate` is `[lambda, phi]` or `[lambda, phi, gamma]` of numbers
+ * or signals, and the array rule wants `items.type === 'number'` and finds a reference instead; its
+ * `clipExtent` is a rectangle written as two corners; its `fit` is a piece of geometry.
+ *
+ * `fit` is the one that matters most. It is how a chart says "make this map fill the page" without
+ * knowing a single constant, it resolves to `fitExtent` or `fitSize` depending on which of `extent`
+ * and `size` it is given, and it has been wrong here before: a composite projection was fitted by
+ * setting a scale and a translation the composite ignores, and drew at its unfitted default. Left to
+ * the array rule it was offered `[4, 2]`, which is not geometry at all.
+ */
+const FAMILY_VOCABULARY = {
+  projection: {
+    // Two and three, because the third is a **roll** about the axis the first two point along and
+    // reaches a different part of the rotation than either of the others.
+    rotate: {
+      kind: 'array (degrees about each axis)',
+      values: [
+        [60, -20],
+        [60, -20, 15],
+      ],
+    },
+    center: { kind: 'array (a longitude and a latitude)', values: [[-40, 25]] },
+    // Two standard parallels, which only the four conics have — and what the other thirteen do with
+    // a pair they have no setter for is the thing worth comparing.
+    parallels: { kind: 'array (two standard parallels)', values: [[20, 50]] },
+    translate: { kind: 'array (a point on the page)', values: [[110, 55]] },
+    size: { kind: 'array (a width and a height)', values: [[180, 100]] },
+    clipExtent: {
+      kind: 'array (a rectangle in page coordinates)',
+      values: [
+        [
+          [5, 5],
+          [150, 90],
+        ],
+      ],
+    },
+    extent: {
+      kind: 'array (a rectangle in page coordinates)',
+      values: [
+        [
+          [10, 10],
+          [190, 110],
+        ],
+      ],
+    },
+    fit: { kind: 'geojson', values: [GEOGRAPHY] },
+  },
+};
+
 /** The numbers tried for a `number`-typed property, and why these. */
 const NUMBERS = [0, 0.5, 8, -4];
 
@@ -701,6 +1019,13 @@ function branchesOf(fragment, depth = 0) {
  * to say, so a property the schema *does* enumerate can never be overridden by a list kept here.
  */
 function valuesFor(fragment, property, family) {
+  // A family answers **before** the schema for the few properties whose declaration is a container
+  // rather than a value: `fit` is "an object or an array", and the generic array rule reads that as
+  // a number pair and offers a projection `[4, 2]` to fit itself to. Everywhere else the order is
+  // the other way round and the schema decides; see [FAMILY_VOCABULARY].
+  const forFamily = (FAMILY_VOCABULARY[baseFamily(family)] || {})[property];
+  if (forFamily) return forFamily;
+
   const declared = declaredValues(fragment);
   if (declared) return declared;
 
@@ -771,10 +1096,7 @@ const used = new Map();
 for (const [family, apply] of Object.entries(FAMILIES)) {
   const definition = propertiesOf(family);
   for (const [property, fragment] of Object.entries(definition)) {
-    const reason =
-      (FAMILY_SKIP[family] || {})[property] ||
-      (FAMILY_SKIP[baseFamily(family)] || {})[property] ||
-      SHARED_SKIP[property];
+    const reason = skipReason(family, property);
     if (reason) {
       skipped.push({ family, property, reason });
       continue;
@@ -793,7 +1115,9 @@ for (const [family, apply] of Object.entries(FAMILIES)) {
     for (const value of candidates.values) {
       const spec = family.startsWith('scale-')
         ? scaleBaseSpec(family.slice('scale-'.length))
-        : baseSpec();
+        : family.startsWith('projection-')
+          ? projectionBaseSpec(family.slice('projection-'.length))
+          : baseSpec();
       apply(spec, property, value);
       // A name that has already been used gets a number: two values can slug the same way — `0`
       // and `-0`, `"a b"` and `"a_b"` — and a second file overwriting the first would silently
@@ -831,7 +1155,9 @@ for (const one of cases) {
     continue;
   }
 
-  const scaleNames = one.spec.scales.map((s) => s.name);
+  // A projection chart has no scales at all: geometry arrives already placed, which is the whole
+  // point of a projection.
+  const scaleNames = (one.spec.scales || []).map((s) => s.name);
   const reference = {
     vegaVersion: vega.version,
     spec: `${one.name}.vg.json`,
