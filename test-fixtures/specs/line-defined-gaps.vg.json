@@ -1,6 +1,6 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "A line and an area broken by `defined: false`, which is the one channel that makes a series draw as two subpaths rather than one. The differential model erased the difference — a moveTo and a lineTo both became a bare point — so a regression joining across the gap produced the identical record and passed. Nothing else in the corpus has an interior moveTo.",
+  "description": "A line and an area broken by `defined: false`, which is the one channel that makes a series draw as two subpaths rather than one. The differential model erased the difference — a moveTo and a lineTo both became a bare point — so a regression joining across the gap produced the identical record and passed. Nothing else in the corpus has an interior moveTo. Three more marks define *nothing*, which is the other end of the same channel: upstream keeps the item and writes an element with no `d` at all, where dropping the mark loses its container, its description and the colour it carries into a legend.",
   "width": 200,
   "height": 120,
   "padding": 0,
@@ -56,6 +56,47 @@
           "y": {"scale": "y", "field": "y"},
           "stroke": {"value": "#bbb"},
           "strokeDash": {"value": [3, 3]}
+        }
+      }
+    },
+    {
+      "type": "line",
+      "name": "noneDefined",
+      "from": {"data": "t"},
+      "encode": {
+        "update": {
+          "x": {"scale": "x", "field": "x"},
+          "y": {"scale": "y", "field": "y"},
+          "defined": {"value": false},
+          "stroke": {"value": "#e45756"}
+        }
+      }
+    },
+    {
+      "type": "area",
+      "name": "noneDefinedArea",
+      "from": {"data": "t"},
+      "encode": {
+        "update": {
+          "x": {"scale": "x", "field": "x"},
+          "y": {"scale": "y", "field": "y"},
+          "y2": {"scale": "y", "value": 0},
+          "defined": {"value": false},
+          "fill": {"value": "#f58518"}
+        }
+      }
+    },
+    {
+      "type": "trail",
+      "name": "noneDefinedTrail",
+      "from": {"data": "t"},
+      "encode": {
+        "update": {
+          "x": {"scale": "x", "field": "x"},
+          "y": {"scale": "y", "field": "y"},
+          "size": {"value": 6},
+          "defined": {"value": false},
+          "fill": {"value": "#54a24b"}
         }
       }
     }

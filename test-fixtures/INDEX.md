@@ -130,7 +130,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `legend-title-anchor` | 59 | rect, symbol, text | — | band, linear, ordinal |
 | `legends` | 28 | rect, rule, symbol, text | — | band, linear, ordinal |
 | `line-area` | 51 | area, line, rule, symbol, text | — | linear |
-| `line-defined-gaps` | 3 | area, line | — | linear |
+| `line-defined-gaps` | 6 | area, line, trail | — | linear |
 | `link-paths` | 77 | path, symbol, text | formula, linkpath, stratify, tree, treelinks | ordinal |
 | `local-time-dst` | 35 | line, rule, symbol, text | — | linear, time, utc |
 | `log-axis-labels` | 154 | rule, text | — | log |

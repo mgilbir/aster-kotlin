@@ -22,6 +22,29 @@
       "strokeDash": "3,3",
       "strokeWidth": 2,
       "type": "line"
+    },
+    {
+      "closed": 0,
+      "points": "",
+      "role": "mark",
+      "stroke": "#e45756",
+      "strokeWidth": 2,
+      "type": "line"
+    },
+    {
+      "fill": "#f58518",
+      "points": "",
+      "role": "mark",
+      "type": "area"
+    },
+    {
+      "fill": "#54a24b",
+      "role": "mark",
+      "shapeHeight": "-Infinity",
+      "shapeLeft": 1.7976931348623157e+308,
+      "shapeTop": 1.7976931348623157e+308,
+      "shapeWidth": "-Infinity",
+      "type": "trail"
     }
   ],
   "scales": {

@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **A series with nothing defined is still a mark.** `defined: false` on every datum leaves
+  `d3.line().defined(item => item.defined !== false)` with no subpath to begin, and upstream writes
+  the element anyway: `<path stroke="steelblue" stroke-width="2"/>`, an attribute short of a `d`,
+  with empty bounds. This engine returned no node at all — for a line, an area and a trail — so the
+  mark lost its container, its accessibility description and the colour it carries into a legend.
+  It is the same rule a `path` mark already followed for an outline that resolves to nothing.
+
+  The differential harness had **agreed with the wrong answer** here: `expandCurve` fell back to
+  reporting the raw item list whenever d3's recorder stayed empty, and the only case it stays empty
+  in is exactly this one — so it credited upstream with a full outline upstream never drew. A single
+  defined point does not reach that fallback, `curveLinear` emitting a `moveTo` for the first point
+  it is given, which is why nothing else in the corpus saw it.
+
 - **The schema sweep swept a cached answer.** `scripts/property-sweep.sh` writes its charts into
   `build/` and then runs `PropertySweepTest` to compare them, and nothing in that task's declared
   inputs mentions the charts — so a second run of a *changed* sweep was served `FROM-CACHE`, the test

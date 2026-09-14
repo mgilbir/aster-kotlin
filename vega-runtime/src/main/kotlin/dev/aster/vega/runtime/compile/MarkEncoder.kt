@@ -479,11 +479,11 @@ public class MarkEncoder(
         point(channels, datum) to
           (number(channels["size"], datum) ?: MarkConfig(spec).number("size") ?: 1.0)
       }
-    if (segments.isEmpty()) return null
+    // A trail with nothing defined keeps its item and draws no outline, as a line does; see the
+    // note there. An empty path is not an absent mark.
 
     val style = style(channels, data.first(), spec)
     val path = PathData(segments.flatMap { TrailPath.build(it).commands })
-    if (path.isEmpty) return null
     return PathNode(
       id = ids.allocate(),
       path = path,
@@ -916,8 +916,15 @@ public class MarkEncoder(
   private fun line(spec: MarkSpec, data: List<VegaValue>): SceneNode? {
     if (data.isEmpty()) return null
     val channels = spec.encode.effective
+    // **No run survived `defined`, and the mark is still a mark.** Upstream keeps every item and
+    // hands the whole list to `d3.line().defined(item => item.defined !== false)`, which begins no
+    // subpath at all: the SVG it writes is `<path stroke="steelblue" stroke-width="2"/>`, an
+    // element
+    // with no `d`, and the mark's bounds stay empty. Returning null here dropped the element, and
+    // with it the mark's place in the scene — its container, its accessibility description, and the
+    // colour it carries into a legend. This is the same rule the `path` mark already follows for an
+    // outline that resolves to nothing.
     val segments = segments(data, channels) { datum -> point(channels, datum) }
-    if (segments.isEmpty()) return null
 
     val style = style(channels, data.first(), spec)
     val interpolate = string(channels["interpolate"], data.first())
@@ -998,7 +1005,8 @@ public class MarkEncoder(
           else PointD(x, extentAcross(channels, datum, "y", y))
         PointD(x, y) to across
       }
-    if (pairs.isEmpty()) return null
+    // An area with nothing defined keeps its item and draws no outline, as a line does; see the
+    // note there.
 
     val style = style(channels, data.first(), spec)
     val interpolate = string(channels["interpolate"], data.first())
