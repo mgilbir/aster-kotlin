@@ -2243,5 +2243,25 @@
   "fixture": "window",
   "kind": "legend",
   "caption": "Symbol legend titled 'Series' for fill color with 2 values: north, south"
+ },
+ {
+  "fixture": "zindex-sign",
+  "kind": "axis",
+  "caption": "Y-axis titled 'amount' for a linear scale with values from 0 to 55"
+ },
+ {
+  "fixture": "zindex-sign",
+  "kind": "axis",
+  "caption": "X-axis titled 'category' for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "zindex-sign",
+  "kind": "axis",
+  "caption": "X-axis titled 'declared first, raised by a half' for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "zindex-sign",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 55"
  }
 ]

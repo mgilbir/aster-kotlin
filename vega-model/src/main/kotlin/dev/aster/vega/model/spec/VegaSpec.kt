@@ -784,7 +784,7 @@ public data class TitleSpec(
   val dx: NumberValue? = null,
   val dy: NumberValue? = null,
   val subtitleFontSize: NumberValue? = null,
-  val zindex: Int = 0,
+  val zindex: Double = 0.0,
   /**
    * `encode`, keyed by the part it addresses: `group`, `title` or `subtitle`.
    *
@@ -936,7 +936,7 @@ public data class AxisSpec(
   val titleAngle: NumberValue? = null,
   val titleAlign: String? = null,
   val titleBaseline: String? = null,
-  val zindex: Int = 0,
+  val zindex: Double = 0.0,
   /**
    * Explicit tick values, replacing the ones the scale would generate.
    *
@@ -1437,7 +1437,7 @@ public data class LegendSpec(
   val description: String? = null,
   val backgroundStrokeWidth: Double? = null,
   val backgroundStrokeDash: List<Double>? = null,
-  val zindex: Int = 0,
+  val zindex: Double = 0.0,
   /**
    * Appearance of the three parts, read the same way an axis reads its own.
    *
@@ -1976,7 +1976,7 @@ public data class MarkSpec(
   val layout: LayoutSpec? = null,
   /** A title for this group, which is how a trellis header labels its row or column. */
   val title: TitleSpec? = null,
-  val zindex: Int = 0,
+  val zindex: Double = 0.0,
   val interactive: Boolean = true,
   /**
    * `aria: false` hides this mark from a screen reader entirely.

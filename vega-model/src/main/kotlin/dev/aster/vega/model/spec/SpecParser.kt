@@ -2397,7 +2397,7 @@ public class SpecParser {
         (obj.fields["offset"] as? VegaValue.Obj)
           ?.takeIf { it.fields["signal"] == null }
           ?.let { parseChannel("offset", it, "$path.offset") },
-      zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
+      zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value ?: 0.0,
       values = (obj.fields["values"] as? VegaValue.Arr)?.values,
       labelOverlap = obj.fields["labelOverlap"]?.asString(),
       labelSeparation = obj.numberOrSignal("labelSeparation", "$path.labelSeparation"),
@@ -3100,7 +3100,7 @@ public class SpecParser {
       aria = obj.fields["aria"]?.asBoolean() ?: true,
       name = obj.fields["name"]?.asString()?.takeIf { it.isNotEmpty() },
       interactive = obj.fields["interactive"]?.asBoolean() ?: true,
-      zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
+      zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value ?: 0.0,
     )
   }
 
@@ -3229,7 +3229,7 @@ public class SpecParser {
             ?.values
             ?.map { it.asDouble() }
             ?.takeIf { list -> list.isNotEmpty() && list.all { it.isFinite() && it >= 0.0 } },
-        zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
+        zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value ?: 0.0,
         labelOverlap = obj.fields["labelOverlap"]?.asString(),
         labelSeparation = obj.numberOrSignal("labelSeparation", "$path.labelSeparation"),
         labelLimit = obj.numberOrSignal("labelLimit", "$path.labelLimit"),
@@ -3433,7 +3433,7 @@ public class SpecParser {
         parseArray(obj, "legends", path) { child, childPath -> parseLegend(child, childPath) },
       layout = obj.fields["layout"]?.let { parseLayout(it, "$path.layout") },
       title = obj.fields["title"]?.let { parseTitle(it, "$path.title") },
-      zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
+      zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value ?: 0.0,
       interactive = obj.fields["interactive"]?.asBoolean() ?: true,
       aria = obj.fields["aria"]?.asBoolean() ?: true,
       description = obj.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
