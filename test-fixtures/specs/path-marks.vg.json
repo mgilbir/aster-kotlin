@@ -1,6 +1,6 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "Outlines written as SVG path strings: a path mark placed once per datum and scaled, and symbols whose shape is a path rather than one of the twelve names.",
+  "description": "Outlines written as SVG path strings: a path mark placed once per datum and scaled, and symbols whose shape is a path rather than one of the twelve names. One of them asks for a scale of zero, which upstream reads as no scaling at all — `item.scaleX || 1` — rather than as a collapse.",
   "width": 240,
   "height": 130,
   "padding": 5,
@@ -72,6 +72,21 @@
           "shape": {"value": "M-1,-1 L1,-1 L0,1 Z"},
           "size": {"value": 200},
           "fill": {"value": "#54a24b"}
+        }
+      }
+    },
+    {
+      "type": "path",
+      "from": {"data": "table"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "x", "field": "c"},
+          "yc": {"value": 100},
+          "path": {"field": "d"},
+          "scaleX": {"value": 0},
+          "scaleY": {"value": 0},
+          "fill": {"value": "#4c78a8"},
+          "fillOpacity": {"value": 0.8}
         }
       }
     }

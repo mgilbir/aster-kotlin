@@ -10632,6 +10632,14 @@
   "hidden": false
  },
  {
+  "fixture": "line-area",
+  "kind": "area",
+  "role": "graphics-symbol",
+  "roleDescription": "area mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "line-defined-gaps",
   "kind": "group",
   "role": "graphics-object",
@@ -10660,6 +10668,30 @@
   "kind": "line",
   "role": "graphics-symbol",
   "roleDescription": "line mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "line-defined-gaps",
+  "kind": "line",
+  "role": "graphics-symbol",
+  "roleDescription": "line mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "line-defined-gaps",
+  "kind": "area",
+  "role": "graphics-symbol",
+  "roleDescription": "area mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "line-defined-gaps",
+  "kind": "trail",
+  "role": "graphics-symbol",
+  "roleDescription": "trail mark container",
   "label": null,
   "hidden": false
  },
@@ -14688,6 +14720,14 @@
   "hidden": false
  },
  {
+  "fixture": "path-marks",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "path-scaled-stroke",
   "kind": "group",
   "role": "graphics-object",
@@ -16160,6 +16200,86 @@
   "hidden": false
  },
  {
+  "fixture": "spatial-resolution",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "spatial-resolution",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "spatial-resolution",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "spatial-resolution",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "spatial-resolution",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "spatial-resolution",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "spatial-resolution",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "spatial-resolution",
+  "kind": "area",
+  "role": "graphics-symbol",
+  "roleDescription": "area mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "spatial-resolution",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "spatial-resolution",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "spherical-measures",
   "kind": "group",
   "role": "graphics-object",
@@ -16908,6 +17028,22 @@
   "kind": "line",
   "role": "graphics-symbol",
   "roleDescription": "line mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "trail",
+  "kind": "trail",
+  "role": "graphics-symbol",
+  "roleDescription": "trail mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "trail",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
   "label": null,
   "hidden": false
  },

@@ -278,12 +278,14 @@ function expandCurve(points, curve) {
     .x(p => p[0])
     .y(p => p[1])
     .context(context)(points);
-  return {
-    points: collected.length
-      ? collected
-      : points.map((p, i) => [i === 0 ? 'M' : 'L', p[0], p[1]]),
-    closed,
-  };
+  // **What d3 collected, even when it collected nothing.** This used to fall back to the raw item
+  // list whenever the recorder stayed empty, and the only way it stays empty is that *no* point was
+  // defined — so the one case the fallback fired in was the one where upstream drew nothing at all.
+  // It credited upstream with a full outline there: upstream's own SVG for a series with
+  // `defined: false` throughout is `<path stroke="steelblue" stroke-width="2"/>`, an element with no
+  // `d`. A single defined point does not reach it — `curveLinear` emits a `moveTo` for the first
+  // point it is given, so one point collects one command.
+  return { points: collected, closed };
 }
 
 /** Splits a command list into runs, each beginning at a `moveTo`. */

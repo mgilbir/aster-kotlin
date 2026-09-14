@@ -8,6 +8,114 @@ section here does not get released.
 
 ### Fixed
 
+- **A rect is compared by the numbers it carries, not by the box they imply.** `width: -4` at `x:
+  40` is a number a specification may write and upstream keeps: the item says exactly that and the
+  drawing is `M40,20h-4v30h4Z`, a real rectangle four units to the *left* of the anchor, with only
+  the bounding box ordered by `Bounds.set`. This engine already agreed — probed, the scene node
+  carries `x = 40.0, width = -4.0` and orders its own box — and the differential harness could not
+  see that it did, because it read `node.rect`: the ordered box. A rect written backwards was
+  reported as `x: 36, width: 4` against upstream's `x: 40, width: -4`, so the drawing matched and
+  the record did not.
+
+  It is a comparison that was **lenient in one direction and wrong in the other**: a regression that
+  started normalising these away would have gone unnoticed, and a host reading the scene for a
+  tooltip, for hit testing or for an accessibility description sees the item's numbers rather than
+  its box. Nothing changes for a rect written the usual way round.
+
+  With this the schema sweep **agrees with upstream on every chart it draws**: 2549 of 2549, with
+  four cases set aside and named, each one upstream measuring a shape it refuses to render.
+
+- **A negative symbol size draws nothing, and a trail's zero size is one unit wide.** Two more of
+  the sweep's negative numbers, and they are not the same rule twice.
+
+  A symbol's radius is `Math.sqrt(size) / 2`, so a **negative** size is NaN: every coordinate the
+  symbol table computes is NaN, the canvas draws none of them, and `Bounds.add` leaves the box
+  untouched because every comparison against a NaN is false. Probed on a live view for a circle, a
+  square, a triangle and a cross alike — upstream reports the empty bounds it started with. This
+  engine clamped the radius to zero, which is what `size: 0` means: a degenerate point at the anchor
+  that upstream *does* bound, and that still counts towards the drawing's reach under `autosize:
+  pad`. The two answers were one answer here.
+
+  A trail's half-width is the size itself, defaulted the way a path's `scaleX` is — `ts = item =>
+  item.size || 1` — so a trail asked for `size: 0` is drawn **one unit wide**, not as a hairline.
+  Being a filled shape rather than a stroked one, a width of zero had bounded it flat along its own
+  centre line.
+
+  A trail of *negative* size is **stated rather than reproduced**, and joins the two rotation cases
+  in `PropertySweepTest.KNOWN_DIFFERENCES`: its outline is a run of arcs of radius -2, and `d3-path`
+  refuses one — rendering that chart throws `negative radius: -2`, probed. Only upstream's *bound*
+  context survives it, by sampling `r * Math.cos(a) + cx` and reflecting each sample through the
+  centre. Those are bounds for a drawing that does not exist.
+
+- **A centre halves the extent a far edge derived, not only an encoded one.** `adjustSpatial` is
+  four statements in order, not a set of alternatives:
+
+  ```js
+  if (encode.y2) {
+    if (encode.y) { … code += 'o.height=o.y2-o.y;'; }
+    else { code += 'o.y=o.y2-(o.height||0);'; }
+  }
+  if (encode.yc) { code += 'o.y=o.yc-(o.height||0)/2;'; }
+  ```
+
+  So a far edge written **beside** a near one *replaces* whatever extent was encoded — probed, `{y:
+  40, y2: 100, height: 7}` leaves the item with a height of **60** — and everything after it reads
+  the replacement. Three things followed from reading only an encoded extent: a mark centred on a
+  band written as `y` and `y2` sat a half-height off, a `y2` written *without* a `y` put the mark at
+  the far edge instead of an extent back from it, and an area's back boundary was pinned where the
+  specification wrote it while its front moved, which is a band of the wrong depth. `areavShape`
+  reads `item.y + item.height`, and that `y` is the adjusted one.
+
+  Every corpus missed it because a specification that writes `yc` almost always writes an extent
+  beside it. The schema sweep writes one channel at a time, which is what it is for. New fixture:
+  `spatial-resolution`, one mark per combination.
+
+- **A series with nothing defined is still a mark.** `defined: false` on every datum leaves
+  `d3.line().defined(item => item.defined !== false)` with no subpath to begin, and upstream writes
+  the element anyway: `<path stroke="steelblue" stroke-width="2"/>`, an attribute short of a `d`,
+  with empty bounds. This engine returned no node at all — for a line, an area and a trail — so the
+  mark lost its container, its accessibility description and the colour it carries into a legend.
+  It is the same rule a `path` mark already followed for an outline that resolves to nothing.
+
+  The differential harness had **agreed with the wrong answer** here: `expandCurve` fell back to
+  reporting the raw item list whenever d3's recorder stayed empty, and the only case it stays empty
+  in is exactly this one — so it credited upstream with a full outline upstream never drew. A single
+  defined point does not reach that fallback, `curveLinear` emitting a `moveTo` for the first point
+  it is given, which is why nothing else in the corpus saw it.
+
+- **The schema sweep swept a cached answer.** `scripts/property-sweep.sh` writes its charts into
+  `build/` and then runs `PropertySweepTest` to compare them, and nothing in that task's declared
+  inputs mentions the charts — so a second run of a *changed* sweep was served `FROM-CACHE`, the test
+  never executed, no report was written, and the script printed the previous run's tally as though it
+  were this one's. The `sed` that pulls the report out of the log exits zero when it matches nothing,
+  so the guard meant to catch exactly this never fired. The task is rerun explicitly now and the
+  report is checked for content.
+
+- **The sweep's position channels, and the two skips that had gone stale.** `x`, `x2`, `xc`, `y`,
+  `y2`, `yc`, `width` and `height` were held back as "the geometry the base chart encodes from its
+  own data", which stopped being true when each mark type brought its own base chart: what a written
+  `x2` or `width` does is upstream's own two-of-three resolution rule, and a swept value replacing
+  one side of the pair is the case that rule is *for*. `defined` needed a line or an area to break
+  and now has both; `size` needed a symbol. The sweep is 2553 charts, up from 2211, and the widening
+  found **eleven** differences in five causes — a series with nothing defined, a negative rect width,
+  a negative symbol size, a trail's size floor, and an area's `yc`. Each is its own change.
+
+- **Four mark channels the sweep of every mark type turned up.** An **arc** never read its `angle`,
+  so a turned wedge was drawn upright — it is a `markItemPath` channel like a symbol's, not a
+  symbol's alone. A **path**'s `scaleX`/`scaleY` read a zero as a zero, where upstream's
+  `item.scaleX || 1` draws the path at its own size. An **area**'s `orient` decides which axis its
+  second boundary moves along and *only* that one, so one declared horizontal while carrying a `y2`
+  draws a line out and back rather than a filled region. And a **rotated mark is bounded by tracing
+  its outline**, not by turning the box around it: upstream traces every such mark through a rotated
+  bound context, and turning the upright box instead reported a triangular path at eight degrees as
+  14.1 units tall where upstream says 13.0.
+
+  Two differences are **stated rather than reproduced**, both the same upstream defect: a rotated
+  `path` mark is measured about the scene *origin* there, and a rotated arc's corner circles are
+  measured with their angles turned and their centres left behind. Neither matches what upstream
+  draws; this engine measures what it draws, and `SUPPORTED_FEATURES.md` and the sweep's own report
+  say so.
+
 - **A text box built from a negative measurement is still a box.** `Bounds.set` swaps a pair that
   arrives the wrong way round, and a negative font size makes both pairs arrive that way — the
   width estimate is `~~(0.8 * length * fontSize)`. A rectangle stored inverted reads as *empty*

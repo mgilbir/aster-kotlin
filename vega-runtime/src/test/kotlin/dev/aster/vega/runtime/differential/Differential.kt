@@ -36,6 +36,7 @@ import dev.aster.vega.scene.StrokeJoin
 import dev.aster.vega.scene.SymbolNode
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.Transform2D
+import dev.aster.vega.scene.transformedBounds
 import java.io.File
 import kotlin.math.abs
 
@@ -346,8 +347,9 @@ public object Differential {
       is RectNode -> out.add(withGradients(node, withOpacity(node, rectMark(node, world))))
       is RuleNode -> out.add(withGradients(node, withOpacity(node, ruleMark(node, world))))
       is TextNode -> out.add(withGradients(node, withOpacity(node, textMark(node, world))))
-      is SymbolNode -> out.add(withGradients(node, withOpacity(node, symbolMark(node, world))))
-      is PathNode -> out.add(withGradients(node, withOpacity(node, pathMark(node, world))))
+      is SymbolNode ->
+        out.add(withGradients(node, withOpacity(node, symbolMark(node, world, parent))))
+      is PathNode -> out.add(withGradients(node, withOpacity(node, pathMark(node, world, parent))))
       is ImageNode -> out.add(withGradients(node, withOpacity(node, imageMark(node, world))))
     }
   }
@@ -396,15 +398,27 @@ public object Differential {
     return if (gradients.isEmpty()) mark else mark.copy(gradients = gradients)
   }
 
+  /**
+   * A rect, reported by **the numbers the item carries** rather than by its ordered box.
+   *
+   * A negative extent is a number a specification may write and upstream keeps: `width: -4` at `x:
+   * 40` leaves the item saying exactly that, and draws `M40,20h-4v30h4Z` — a real rectangle, four
+   * units to the *left* of the anchor. Only the bounding box is ordered, by `Bounds.set`.
+   *
+   * This engine agrees, and the comparison could not see that it did: it read `node.rect`, which is
+   * the ordered box, so a rect written backwards was reported as `x: 36, width: 4` against
+   * upstream's `x: 40, width: -4`. The drawing was identical and the record was not, and a host
+   * reading the scene — for a tooltip, for hit testing, for an accessibility description — sees the
+   * item's own numbers, not the box. Nothing changes for a rect written the usual way round.
+   */
   private fun rectMark(node: RectNode, world: Transform2D): Mark {
-    val rect = node.rect
-    val origin = world.apply(rect.left, rect.top)
+    val origin = world.apply(node.x, node.y)
     val numbers =
       linkedMapOf(
         "x" to origin.x,
         "y" to origin.y,
-        "width" to rect.width,
-        "height" to rect.height,
+        "width" to node.width,
+        "height" to node.height,
       )
     return Mark(
       "rect",
@@ -620,6 +634,17 @@ public object Differential {
   private fun extentChannels(bounds: RectD, world: Transform2D): Map<String, Double> =
     extentChannels(if (bounds.isEmpty) bounds else world.mapBounds(bounds))
 
+  /**
+   * The box a mark covers in its **parent's** space, which is the scene's own answer.
+   *
+   * `transformedBounds` applies the node's own transform, and for a path-shaped mark it does so by
+   * tracing the outline rather than by turning its box — the two differ under rotation, and
+   * upstream traces. Everything above the mark is a group translation, so mapping the box the rest
+   * of the way is exact.
+   */
+  private fun extentOf(node: SceneNode, parent: Transform2D): Map<String, Double> =
+    extentChannels(node.transformedBounds, parent)
+
   private fun extentChannels(bounds: RectD): Map<String, Double> =
     if (bounds.isEmpty) {
       linkedMapOf(
@@ -637,14 +662,14 @@ public object Differential {
       )
     }
 
-  private fun symbolMark(node: SymbolNode, world: Transform2D): Mark {
+  private fun symbolMark(node: SymbolNode, world: Transform2D, parent: Transform2D): Mark {
     val centre = world.apply(node.x, node.y)
     val numbers =
       linkedMapOf(
         "x" to centre.x,
         "y" to centre.y,
         "size" to node.size,
-      ) + extentChannels(node.bounds, world)
+      ) + extentOf(node, parent)
     return Mark("symbol", node.metadata.role, numbers + paintNumbers(node), paintStrings(node))
   }
 
@@ -655,12 +680,12 @@ public object Differential {
    * whole outline as one node. Both sides therefore report a point list rather than per-item
    * coordinates — see `SERIES_TYPES` in `oracle-js/src/normalize.js`.
    */
-  private fun pathMark(node: PathNode, world: Transform2D): Mark {
+  private fun pathMark(node: PathNode, world: Transform2D, parent: Transform2D): Mark {
     val kind = node.metadata.markKind ?: "path"
     if (kind != "line" && kind != "area") {
       // An arc is compared by the wedge it drew rather than by a centre point, which says nothing
       // about its radii or its sweep.
-      val numbers = LinkedHashMap(extentChannels(node.bounds, world))
+      val numbers = LinkedHashMap(extentOf(node, parent))
       // A `path` mark also reports the anchor it was placed at, which upstream carries as the
       // item's own x and y — the outline itself is in the path string's coordinates.
       if (kind == "path") {
@@ -1722,8 +1747,15 @@ public object Differential {
    */
   public val DEFAULT_IGNORED_CHANNELS: Set<String> = emptySet()
 
-  /** Mark types whose drawn extent comes from a curve approximating a true circular arc. */
-  private val CURVE_EXTENT_TYPES = setOf("arc", "trail", "path")
+  /**
+   * Mark types whose drawn extent comes from a curve approximating a true circular arc.
+   *
+   * A **symbol** is one of them, which only shows once it turns: upstream traces a circle with
+   * `context.arc` and its bound context knows the exact extent of an arc, while this scene graph
+   * holds the four cubics that approximate one. Upright the two agree exactly — the cubics' extrema
+   * land on the radius — and at an angle they differ in the fourth decimal.
+   */
+  private val CURVE_EXTENT_TYPES = setOf("arc", "trail", "path", "symbol")
 
   private val COLOUR_CHANNELS = setOf("fill", "stroke")
 

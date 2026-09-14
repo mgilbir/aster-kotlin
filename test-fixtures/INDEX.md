@@ -6,7 +6,7 @@ Generated from the corpus by `FixtureIndexTest`, which fails when this file has 
 ./gradlew :vega-runtime:jvmTest -PupdateGoldens=true --rerun-tasks
 ```
 
-208 Vega differential fixtures and 283 Vega-Lite fixtures.
+209 Vega differential fixtures and 283 Vega-Lite fixtures.
 
 Every column is read off disk. A Vega fixture's mark count and mark types come from its
 **upstream** reference, so they are upstream's answer rather than this port's opinion of it.
@@ -129,8 +129,8 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `legend-symbol-limit` | 76 | rect, symbol, text | — | band, linear, ordinal |
 | `legend-title-anchor` | 59 | rect, symbol, text | — | band, linear, ordinal |
 | `legends` | 28 | rect, rule, symbol, text | — | band, linear, ordinal |
-| `line-area` | 50 | area, line, rule, symbol, text | — | linear |
-| `line-defined-gaps` | 3 | area, line | — | linear |
+| `line-area` | 51 | area, line, rule, symbol, text | — | linear |
+| `line-defined-gaps` | 6 | area, line, trail | — | linear |
 | `link-paths` | 77 | path, symbol, text | formula, linkpath, stratify, tree, treelinks | ordinal |
 | `local-time-dst` | 35 | line, rule, symbol, text | — | linear, time, utc |
 | `log-axis-labels` | 154 | rule, text | — | log |
@@ -153,7 +153,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `pacman` | 392 | arc, rect, symbol, text | collect, formula, sequence | band |
 | `parallel-coordinates` | 554 | line, rule, text | filter, formula | linear, point |
 | `parse-date-patterns` | 27 | line, rule, symbol, text | — | linear, utc |
-| `path-marks` | 34 | path, rule, symbol, text | — | linear, point |
+| `path-marks` | 38 | path, rule, symbol, text | — | linear, point |
 | `path-scaled-stroke` | 26 | path, rule, text | — | band |
 | `pi-monte-carlo` | 2148 | arc, group, rule, symbol, text | filter, formula, sequence, window | linear |
 | `pie` | 13 | arc, symbol, text | pie | ordinal |
@@ -185,6 +185,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `signal-transform-params` | 29 | rect, rule, text | aggregate, filter, window | band, linear |
 | `size-legend` | 36 | rule, symbol, text | — | linear, ordinal |
 | `sorted-domain` | 35 | rect, rule, symbol, text | aggregate | band, linear, ordinal |
+| `spatial-resolution` | 25 | area, rect, symbol, text | — | point |
 | `spherical-measures` | 19 | rule, text | formula | band |
 | `stack-diverging` | 45 | rect, rule, symbol, text | stack | band, linear, ordinal |
 | `stack-offsets` | 32 | area, rule, symbol, text | stack | linear, ordinal |
@@ -208,7 +209,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `title-style-block` | 9 | rect, rule, text | — | band, linear |
 | `title-style` | 4 | rect, text | — | band, linear |
 | `titles` | 28 | rect, rule, symbol, text | — | band, linear, ordinal |
-| `trail` | 28 | line, rule, text, trail | — | linear |
+| `trail` | 35 | line, rule, symbol, text, trail | — | linear |
 | `tree-layouts` | 31 | rule, symbol, text | filter, formula, lookup, pack, stratify, tree | ordinal |
 | `treemap` | 18 | rect, text | filter, formula, partition, stratify, treemap | ordinal |
 | `trellis-bands` | 32 | rect, text | — | ordinal |

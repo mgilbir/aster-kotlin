@@ -1,6 +1,6 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "Line, area, symbol and text marks over a shared pair of linear scales. The third differential fixture: covers the mark encoders that draw as connected series, per-datum symbols, and text with alignment and offsets.",
+  "description": "Line, area, symbol and text marks over a shared pair of linear scales. The third differential fixture: covers the mark encoders that draw as connected series, per-datum symbols, and text with alignment and offsets. A second area is declared horizontal, which moves its back boundary along x rather than y — `areahShape` reads `x0 = x + width` and leaves the height alone.",
   "width": 320,
   "height": 180,
   "padding": 5,
@@ -87,6 +87,21 @@
           "dy": {"value": -8},
           "fontSize": {"value": 12},
           "fill": {"value": "#333"}
+        }
+      }
+    },
+    {
+      "type": "area",
+      "name": "bandHorizontal",
+      "from": {"data": "series"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "x", "field": "t"},
+          "y": {"scale": "y", "field": "v"},
+          "y2": {"scale": "y", "value": 0},
+          "orient": {"value": "horizontal"},
+          "fill": {"value": "#e45756"},
+          "fillOpacity": {"value": 0.4}
         }
       }
     }

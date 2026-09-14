@@ -476,14 +476,24 @@ public class MarkEncoder(
     val channels = spec.encode.effective
     val segments =
       segments(data, channels) { datum ->
+        // ```js
+        // ts = item => item.size || 1
+        // ```
+        //
+        // **Falsy, not absent.** A trail's width is defaulted the way a path's `scaleX` is, so a
+        // trail asked for `size: 0` is drawn one unit wide rather than as a hairline — and, being a
+        // filled shape rather than a stroked one, a width of zero would have bounded it flat along
+        // its own centre line. A *negative* size is truthy and kept.
         point(channels, datum) to
-          (number(channels["size"], datum) ?: MarkConfig(spec).number("size") ?: 1.0)
+          ((number(channels["size"], datum) ?: MarkConfig(spec).number("size"))?.takeIf {
+            it != 0.0 && !it.isNaN()
+          } ?: 1.0)
       }
-    if (segments.isEmpty()) return null
+    // A trail with nothing defined keeps its item and draws no outline, as a line does; see the
+    // note there. An empty path is not an absent mark.
 
     val style = style(channels, data.first(), spec)
     val path = PathData(segments.flatMap { TrailPath.build(it).commands })
-    if (path.isEmpty) return null
     return PathNode(
       id = ids.allocate(),
       path = path,
@@ -548,8 +558,11 @@ public class MarkEncoder(
     }
     val x = centred(channels, datum, "x", "xc") ?: 0.0
     val y = centred(channels, datum, "y", "yc") ?: 0.0
-    val scaleX = number(channels["scaleX"], datum) ?: 1.0
-    val scaleY = number(channels["scaleY"], datum) ?: 1.0
+    // `var sx = item.scaleX || 1` — a **falsy** scale is one, so `scaleX: 0` draws the path at its
+    // own size rather than collapsing it to a line. Reading the zero as a zero made a path mark
+    // given one disappear, where upstream draws it untouched.
+    val scaleX = number(channels["scaleX"], datum)?.takeIf { it != 0.0 && !it.isNaN() } ?: 1.0
+    val scaleY = number(channels["scaleY"], datum)?.takeIf { it != 0.0 && !it.isNaN() } ?: 1.0
     val angle = number(channels["angle"], datum) ?: 0.0
     val style = style(channels, datum, spec)
 
@@ -618,9 +631,25 @@ public class MarkEncoder(
           number(channels["cornerRadius"], datum) ?: config.number("cornerRadius") ?: 0.0,
         padRadius = number(channels["padRadius"], datum) ?: config.number("padRadius"),
       )
+    // **`angle` turns an arc about its own centre.** Every mark built by `markItemPath` is drawn
+    // through `context.translate(x, y); context.rotate(angle)` and bounded through a rotated bound
+    // context, and an arc is one of them — the channel is not a symbol's alone. It was read for a
+    // symbol and for a path here and not for an arc, so a turned wedge was drawn upright.
+    //
+    // The path is built at the arc's own centre, so the turn is about that point rather than about
+    // the origin: `translate(cx, cy) · rotate · translate(-cx, -cy)`, which is the same thing as
+    // upstream's origin-centred shape rotated and then translated.
+    val angle = number(channels["angle"], datum) ?: 0.0
+    val turn =
+      if (angle == 0.0) Transform2D.Identity
+      else
+        Transform2D.translate(cx, cy)
+          .concat(Transform2D.rotateDegrees(angle))
+          .concat(Transform2D.translate(-cx, -cy))
     return PathNode(
       id = ids.allocate(),
       path = path,
+      transform = turn,
       // No fallback fill. The pairing rule in `style` has already decided: a mark that encodes
       // *either* paint channel gets neither default, so an arc drawn as a bare outline — Vega's
       // Monte Carlo quadrant is one — stays unfilled instead of being flooded with the built-in
@@ -897,8 +926,15 @@ public class MarkEncoder(
   private fun line(spec: MarkSpec, data: List<VegaValue>): SceneNode? {
     if (data.isEmpty()) return null
     val channels = spec.encode.effective
+    // **No run survived `defined`, and the mark is still a mark.** Upstream keeps every item and
+    // hands the whole list to `d3.line().defined(item => item.defined !== false)`, which begins no
+    // subpath at all: the SVG it writes is `<path stroke="steelblue" stroke-width="2"/>`, an
+    // element
+    // with no `d`, and the mark's bounds stay empty. Returning null here dropped the element, and
+    // with it the mark's place in the scene — its container, its accessibility description, and the
+    // colour it carries into a legend. This is the same rule the `path` mark already follows for an
+    // outline that resolves to nothing.
     val segments = segments(data, channels) { datum -> point(channels, datum) }
-    if (segments.isEmpty()) return null
 
     val style = style(channels, data.first(), spec)
     val interpolate = string(channels["interpolate"], data.first())
@@ -948,9 +984,17 @@ public class MarkEncoder(
     if (data.isEmpty()) return null
     val channels = spec.encode.effective
 
-    // `orient` needs no special case: building each boundary from the (x, y) and (x2, y2) pairs
-    // handles both orientations, because a vertical area leaves x2 defaulting to x and a horizontal
-    // one leaves y2 defaulting to y.
+    // ```js
+    // areavShape = d3_area().x(x).y1(y).y0(yh),
+    // areahShape = d3_area().y(y).x1(x).x0(xw)
+    // ```
+    //
+    // **`orient` decides which axis the second boundary moves along**, and only that one: a
+    // horizontal area's back edge is `(x + width, y)` and a vertical one's is `(x, y + height)`.
+    // Building it from both pairs at once agrees wherever a specification encodes the matching
+    // extent and parts company where it encodes the other — an area declared horizontal while
+    // carrying a `y2` came back as a filled region where upstream draws a line out and back.
+    val horizontal = string(channels["orient"], data.first())?.lowercase() == "horizontal"
     val pairs =
       segments(data, channels) { datum ->
         val x = centred(channels, datum, "x", "xc") ?: 0.0
@@ -966,15 +1010,16 @@ public class MarkEncoder(
         // the two agree wherever `y2` was written — and differ wherever the specification wrote
         // the extent instead. A violin plot writes the extent, its halves being scaled densities,
         // and every one of them came out a flat line.
-        val x2 = extentAcross(channels, datum, "x", x)
-        val y2 = extentAcross(channels, datum, "y", y)
-        PointD(x, y) to PointD(x2, y2)
+        val across =
+          if (horizontal) PointD(extentAcross(channels, datum, "x", x), y)
+          else PointD(x, extentAcross(channels, datum, "y", y))
+        PointD(x, y) to across
       }
-    if (pairs.isEmpty()) return null
+    // An area with nothing defined keeps its item and draws no outline, as a line does; see the
+    // note there.
 
     val style = style(channels, data.first(), spec)
     val interpolate = string(channels["interpolate"], data.first())
-    val horizontal = string(channels["orient"], data.first())?.lowercase() == "horizontal"
     val tension = number(channels["tension"], data.first())
     reportUnsupportedInterpolation(interpolate, spec)
 
@@ -1829,16 +1874,46 @@ public class MarkEncoder(
     // is zero and the centre is the start. A violin plot is the case that shows it: each half is an
     // area with `yc` and a scaled `height`, and reading the centre as the start drew every one of
     // them flat along its own middle.
-    position(channels[centerChannel], datum)
-      ?.minus((position(channels[EXTENT_OF[channel]], datum) ?: 0.0) / 2.0)
+    position(channels[centerChannel], datum)?.minus(spatialExtent(channels, datum, channel) / 2.0)
       ?: position(channels[channel], datum)
       // An `x2` or `y2` with no start is still a position, and upstream's `adjustSpatial` reads it
-      // as one: `start = end - extent`, and a mark with no extent of its own leaves the end where
-      // it
-      // is. Vega's stock index chart labels its index date that way — `y2` a fixed distance below
-      // the plot and no `y` — and dropping the mark lost the label *and*, because a `fit` chart is
-      // sized by how far it reaches, shrank the whole chart by less than upstream shrank it.
+      // as one: `o.y = o.y2 - (o.height||0)`, so a mark with no extent of its own leaves the end
+      // where it is, and one that has an extent sits that far back from it. Probed — `y2: 100` with
+      // `height: 25` and no `y` puts the item's `y` at 75. Vega's stock index chart labels its
+      // index
+      // date that way, `y2` a fixed distance below the plot and no `y`, and dropping the mark lost
+      // the label *and*, because a `fit` chart is sized by how far it reaches, shrank the whole
+      // chart by less than upstream shrank it.
       ?: position(channels[END_OF[channel] ?: return null], datum)
+        ?.minus(position(channels[EXTENT_OF[channel]], datum) ?: 0.0)
+
+  /**
+   * The extent an item has by the time `adjustSpatial` reads one, per axis.
+   *
+   * ```js
+   * if (encode.y2) {
+   *   if (encode.y) { … code += 'o.height=o.y2-o.y;'; }
+   *   else { code += 'o.y=o.y2-(o.height||0);'; }
+   * }
+   * if (encode.yc) { code += 'o.y=o.yc-(o.height||0)/2;'; }
+   * ```
+   *
+   * Statements in order, so a far edge written **beside** a near one *replaces* whatever extent was
+   * encoded — `o.height = o.y2 - o.y` is an assignment, not a fallback — and everything after it
+   * reads the replacement. Probed: `{y: 40, y2: 100, height: 7}` leaves the item with a height of
+   * **60**, the 7 overwritten.
+   *
+   * Reading only an encoded `height` here left the half at zero for the commonest band there is,
+   * one written as `y` and `y2`, so a mark asked to centre itself on that band sat a half-height
+   * off. It survived every corpus because a specification that writes `yc` usually writes an extent
+   * beside it; the schema sweep writes one channel at a time, which is what it is for.
+   */
+  private fun spatialExtent(channels: EncodeEntry, datum: VegaValue, axis: String): Double {
+    val far = END_OF[axis]?.let { position(channels[it], datum) }
+    val near = position(channels[axis], datum)
+    if (far != null && near != null) return far - near
+    return position(channels[EXTENT_OF[axis]], datum) ?: 0.0
+  }
 
   /** The far edge that stands in for a missing start, per axis. */
   private val END_OF = mapOf("x" to "x2", "y" to "y2")
@@ -1853,18 +1928,19 @@ public class MarkEncoder(
    * specification that writes the far edge and one that writes the extent arrive here the same way.
    * With neither, the extent is zero and the band has no depth, which is the line an area degrades
    * to.
+   *
+   * The **near edge plus the extent**, rather than the far channel read back off the encoding:
+   * `areavShape`'s back boundary is `item.y + item.height`, and that `y` is the adjusted one — a
+   * `yc` moves it after the height has been derived, and the far edge moves with it. Reading `y2`
+   * here pinned the back boundary where the specification wrote it while the front moved, which is
+   * a band of the wrong depth rather than a band in the wrong place.
    */
   private fun extentAcross(
     channels: EncodeEntry,
     datum: VegaValue,
     axis: String,
     near: Double,
-  ): Double {
-    position(channels[END_OF[axis]], datum)?.let {
-      return it
-    }
-    return near + (position(channels[EXTENT_OF[axis]], datum) ?: 0.0)
-  }
+  ): Double = near + spatialExtent(channels, datum, axis)
 
   /** Resolves a positional channel to a number, applying its scale and band offset. */
   private fun position(channel: ChannelValue?, datum: VegaValue): Double? =

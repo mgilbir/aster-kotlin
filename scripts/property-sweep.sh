@@ -13,9 +13,11 @@
 # writes one small bar chart per (property, value) pair — the same chart every time with one property
 # changed, so a difference names its own cause — renders each with upstream, and compares.
 #
-# Four families: `axis`, `legend`, `title` and `scale`. A property is swept where the schema says
-# enough to choose values honestly (an enum, a boolean, a number, a colour); anything else is skipped
-# **and counted**, with the reason, in the manifest. See `oracle-js/src/property-sweep.js`.
+# The families are `axis`, `legend`, `title`, `scale`, a mark's own properties, and one per **mark
+# type** for the encode channels every item carries — the widest declared surface there is. A
+# property is swept where the schema says enough to choose values honestly (an enum, a boolean, a
+# number, a colour); anything else is skipped **and counted**, with the reason, in the manifest. See
+# `oracle-js/src/property-sweep.js`.
 #
 # **A measurement, not a gate**, the same course the gallery and Deneb sweeps took: a sweep of a
 # surface nobody has finished porting would paint every branch red for reasons unconnected to it.
@@ -57,12 +59,21 @@ if [[ $references_only == true ]]; then
 fi
 
 echo "==> Comparing with the Kotlin runtime"
+# `--rerun`, because the charts are **not** an input Gradle knows about: they are written here, into
+# `build/`, and nothing in the test's declared inputs mentions them. Without it a sweep run twice
+# gets the second answer from the build cache — the task is reported `FROM-CACHE`, the test never
+# executes, no report is written, and the tally printed is the *previous* run's. Caught by a widened
+# sweep that printed nothing at all.
+#
 # `|| true`: this is a measurement, so a difference is the output rather than a failure. The test
 # prints the tally and the ranked causes, and writes a line per case to $SWEEP/report.tsv.
-./gradlew --console=plain :vega-runtime:jvmTest --tests '*PropertySweepTest*' -i \
+./gradlew --console=plain :vega-runtime:jvmTest --tests '*PropertySweepTest*' --rerun -i \
   > "$ROOT/build/property-sweep.log" 2>&1 || true
-sed -n '/==== schema property sweep ====/,/==== end ====/p' "$ROOT/build/property-sweep.log" || {
-  echo "The comparison produced no report. Details:" >&2
+report="$(sed -n '/==== schema property sweep ====/,/==== end ====/p' "$ROOT/build/property-sweep.log")"
+# Checked for **content** rather than for sed's exit code, which is zero when it matches nothing.
+if [[ -z $report ]]; then
+  echo "The comparison produced no report — the test did not run, or it was skipped. Details:" >&2
   echo "  $ROOT/build/property-sweep.log" >&2
   exit 1
-}
+fi
+printf '%s\n' "$report"

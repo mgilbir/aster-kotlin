@@ -54,5 +54,6 @@ group clip=-
     text "d" origin=(218.400,57.200) anchor=(222.000,59.600) ascent=9.600 font="sans-serif" size=12.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#333333ff stroke=- blend=normal
     text "e" origin=(282.400,80.600) anchor=(286.000,83.000) ascent=9.600 font="sans-serif" size=12.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#333333ff stroke=- blend=normal
     text "f" origin=(346.400,15.800) anchor=(350.000,18.200) ascent=9.600 font="sans-serif" size=12.000 weight=400 italic=0 angle=0.000 spacing=0.000 fill=#333333ff stroke=- blend=normal
+    path M(30.000,168.400)L(94.000,112.600)L(158.000,134.200)L(222.000,67.600)L(286.000,91.000)L(350.000,26.200)L(350.000,26.200)L(286.000,91.000)L(222.000,67.600)L(158.000,134.200)L(94.000,112.600)L(30.000,168.400)Z fill=#e4575666 stroke=- blend=normal
   end
 end

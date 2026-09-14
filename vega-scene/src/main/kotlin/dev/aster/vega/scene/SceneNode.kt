@@ -259,9 +259,42 @@ public sealed interface SceneNode {
   public val metadata: NodeMetadata
 }
 
-/** Bounds of a node in its parent's coordinate space. */
+/**
+ * Bounds of a node in its parent's coordinate space.
+ *
+ * A node whose geometry is a **path** is measured by mapping the path and bounding what comes out,
+ * rather than by mapping the box its own bounds are. The two differ under rotation — the box of a
+ * turned outline against the box of a turned rectangle — and upstream computes the first: every
+ * mark built by `markItemPath` is traced through a rotated bound context, `shape(context(bounds,
+ * item.angle), item)`. A triangular path at eight degrees measured 14.1 units tall here where
+ * upstream measures 13.0.
+ *
+ * The stroke allowance is added **after** the mapping, which is upstream's order too —
+ * `boundStroke(bounds, item, true)` runs on the traced box — and it is why [PathNode] pre-divides
+ * its own allowance by its scale: that division is undone by the mapping and cancels exactly.
+ */
 public val SceneNode.transformedBounds: RectD
-  get() = transform.mapBounds(bounds)
+  get() =
+    when {
+      transform.isIdentity -> bounds
+      this is PathNode && !absent -> tracedBounds(path, this, transform)
+      this is SymbolNode -> tracedBounds(outline, this, transform)
+      else -> transform.mapBounds(bounds)
+    }
+
+/** The mapped outline's own box, widened by whatever the stroke adds after the mapping. */
+private fun tracedBounds(path: PathData, node: SceneNode, transform: Transform2D): RectD {
+  val stroke =
+    when (node) {
+      is PathNode -> node.stroke
+      is SymbolNode -> node.stroke
+      else -> null
+    }
+  val traced = path.transformedBy(transform).bounds
+  if (traced.isEmpty) return transform.mapBounds(node.bounds)
+  val expansion = stroke?.wideningAt(node.opacity)?.boundsExpansion(miter = true) ?: 0.0
+  return (if (expansion > 0.0) traced.expand(expansion) else traced).normalized()
+}
 
 /** Stable lowercase type name used in snapshots, diagnostics and debug output. */
 public fun typeName(node: SceneNode): String =
@@ -649,9 +682,18 @@ public data class SymbolNode(
   val blendMode: SceneBlendMode = SceneBlendMode.NORMAL,
 ) : SceneNode {
 
-  /** Half of `sqrt(size)`: the reference length every shape is built from, as upstream. */
+  /**
+   * Half of `sqrt(size)`: the reference length every shape is built from, as upstream.
+   *
+   * **Not a number** for a negative size, which is `Math.sqrt(-4)` and is the whole of upstream's
+   * handling: every coordinate the symbol table computes from it is NaN, every comparison against
+   * the bounding box is false, and the symbol is neither drawn nor measured. Clamping to zero
+   * instead made a negative size mean the same as `size: 0`, which upstream does bound — as a
+   * degenerate point at the anchor. The two are a different answer, and only one of them is a shape
+   * that is *there*.
+   */
   public val reference: Double
-    get() = if (size <= 0.0) 0.0 else kotlin.math.sqrt(size) / 2.0
+    get() = if (size == 0.0) 0.0 else kotlin.math.sqrt(size) / 2.0
 
   /** The symbol outline in scene coordinates, including rotation about ([x], [y]). */
   public val outline: PathData by lazy(LazyThreadSafetyMode.NONE) { buildSymbolPath(this) }
@@ -877,6 +919,12 @@ private fun scalePath(path: PathData, factor: Double): PathData =
 
 private fun buildSymbolPath(node: SymbolNode): PathData {
   val r = node.reference
+  // A **negative** size draws nothing at all, and is not the same as a size of zero. Upstream's
+  // radius is `Math.sqrt(size) / 2`, so a negative one is NaN; the path commands are all NaN, the
+  // canvas draws none of them, and `Bounds.add` leaves the box untouched because every comparison
+  // against a NaN is false. Probed on a live view: `size: -4` reports the empty bounds upstream
+  // starts with, for a circle, a square, a triangle and a cross alike.
+  if (!r.isFinite()) return PathData.Empty
   // A symbol sized to nothing is still *somewhere*: upstream bounds it as a degenerate point at its
   // anchor, not as an empty rectangle. The difference shows up when a size scale bottoms out — the
   // point still counts towards the chart's reach under `autosize: pad`, where an empty rectangle
@@ -994,7 +1042,16 @@ private fun buildSymbolPath(node: SymbolNode): PathData {
   return local.transformedBy(placement)
 }
 
-/** Returns a copy of this path with every coordinate mapped through [transform]. */
+/**
+ * Returns a copy of this path with every coordinate mapped through [transform], which is **not**
+ * the same as mapping its bounds.
+ *
+ * Upstream bounds a rotated mark by tracing it through a rotated context — `shape(context(bounds,
+ * item.angle), item)` — so the box it reports is the box of the *turned outline*, extrema and all.
+ * Turning the upright box instead reports the box of the turned rectangle, which is larger wherever
+ * the shape does not fill its corners: a triangular path at eight degrees measured 14.1 units tall
+ * where upstream measures 13.0.
+ */
 public fun PathData.transformedBy(transform: Transform2D): PathData {
   if (transform.isIdentity) return this
   return PathData(
