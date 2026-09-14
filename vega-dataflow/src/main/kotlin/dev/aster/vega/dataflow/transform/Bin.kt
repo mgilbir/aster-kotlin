@@ -164,10 +164,10 @@ public object BinTransform : Transform {
         //
         // The clamp is upstream's too, and comes first: a value at the very top is pulled back to
         // the last bin's start rather than opening a bin past the end.
-        val clamped =
-          number
-            .coerceIn(settings.start, settings.stop - settings.step)
-            .coerceAtLeast(settings.start)
+        // `Math.max(start, Math.min(v, stop - step))` — upstream's two operations, in upstream's
+        // order. A `coerceIn` is the same answer wherever the bounds hold and an exception where
+        // they cross, which a degenerate extent can make them do.
+        val clamped = maxOf(settings.start, minOf(number, settings.stop - settings.step))
         val index = floor(BIN_EPSILON + (clamped - settings.start) / settings.step)
         val low = settings.start + index * settings.step
         datum.withFields(

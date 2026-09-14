@@ -614,17 +614,24 @@ public class AxisBuilder(
 
   /**
    * How far the ticks and labels stick out on the axis's own side, clamped as upstream clamps it.
+   *
+   * `Math.max(minExtent, Math.min(maxExtent, s))`, in **that** order and as two operations rather
+   * than as one `coerceIn`. The two agree wherever the bounds do not cross and part company where
+   * they do: upstream answers `minExtent` for a `maxExtent` below it, and `coerceIn` throws — which
+   * took the whole chart down over a number a specification is free to write.
    */
-  private fun depth(spec: AxisSpec, reach: RectD): Double =
-    when (spec.orient) {
-      Orient.BOTTOM -> reach.bottom
-      Orient.TOP -> -reach.top
-      Orient.LEFT -> -reach.left
-      Orient.RIGHT -> reach.right
-    }.coerceIn(
-      numbers.resolve(spec.minExtent, spec.scale) ?: AxisDefaults.MIN_EXTENT,
-      numbers.resolve(spec.maxExtent, spec.scale) ?: AxisDefaults.MAX_EXTENT,
-    )
+  private fun depth(spec: AxisSpec, reach: RectD): Double {
+    val extent =
+      when (spec.orient) {
+        Orient.BOTTOM -> reach.bottom
+        Orient.TOP -> -reach.top
+        Orient.LEFT -> -reach.left
+        Orient.RIGHT -> reach.right
+      }
+    val least = numbers.resolve(spec.minExtent, spec.scale) ?: AxisDefaults.MIN_EXTENT
+    val most = numbers.resolve(spec.maxExtent, spec.scale) ?: AxisDefaults.MAX_EXTENT
+    return maxOf(least, minOf(most, extent))
+  }
 
   /**
    * The axis title.

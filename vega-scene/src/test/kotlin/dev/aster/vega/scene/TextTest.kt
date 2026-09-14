@@ -97,12 +97,16 @@ class TextTest {
   }
 
   @Test
-  fun `invalid font size and weight are rejected`() {
-    org.junit.jupiter.api.assertThrows<IllegalArgumentException> { TextStyle(fontSize = -1.0) }
+  fun `a font size that is not a number is rejected, and a negative one is not`() {
     org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
       TextStyle(fontSize = Double.NaN)
     }
     org.junit.jupiter.api.assertThrows<IllegalArgumentException> { TextStyle(fontWeight = 0) }
+    // **Negative is allowed**, because upstream draws it: `~~(0.8 * length * fontSize)` comes out
+    // negative and the text reaches backwards from its anchor. Refusing it here turned a chart
+    // upstream draws into an exception that escaped the encoder and took the whole compile down;
+    // see `NegativeFontSizeTest`.
+    assertEquals(-4.0, TextStyle(fontSize = -4.0).fontSize)
   }
 
   @Test
