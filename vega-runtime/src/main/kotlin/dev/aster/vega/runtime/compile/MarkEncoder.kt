@@ -1864,16 +1864,46 @@ public class MarkEncoder(
     // is zero and the centre is the start. A violin plot is the case that shows it: each half is an
     // area with `yc` and a scaled `height`, and reading the centre as the start drew every one of
     // them flat along its own middle.
-    position(channels[centerChannel], datum)
-      ?.minus((position(channels[EXTENT_OF[channel]], datum) ?: 0.0) / 2.0)
+    position(channels[centerChannel], datum)?.minus(spatialExtent(channels, datum, channel) / 2.0)
       ?: position(channels[channel], datum)
       // An `x2` or `y2` with no start is still a position, and upstream's `adjustSpatial` reads it
-      // as one: `start = end - extent`, and a mark with no extent of its own leaves the end where
-      // it
-      // is. Vega's stock index chart labels its index date that way — `y2` a fixed distance below
-      // the plot and no `y` — and dropping the mark lost the label *and*, because a `fit` chart is
-      // sized by how far it reaches, shrank the whole chart by less than upstream shrank it.
+      // as one: `o.y = o.y2 - (o.height||0)`, so a mark with no extent of its own leaves the end
+      // where it is, and one that has an extent sits that far back from it. Probed — `y2: 100` with
+      // `height: 25` and no `y` puts the item's `y` at 75. Vega's stock index chart labels its
+      // index
+      // date that way, `y2` a fixed distance below the plot and no `y`, and dropping the mark lost
+      // the label *and*, because a `fit` chart is sized by how far it reaches, shrank the whole
+      // chart by less than upstream shrank it.
       ?: position(channels[END_OF[channel] ?: return null], datum)
+        ?.minus(position(channels[EXTENT_OF[channel]], datum) ?: 0.0)
+
+  /**
+   * The extent an item has by the time `adjustSpatial` reads one, per axis.
+   *
+   * ```js
+   * if (encode.y2) {
+   *   if (encode.y) { … code += 'o.height=o.y2-o.y;'; }
+   *   else { code += 'o.y=o.y2-(o.height||0);'; }
+   * }
+   * if (encode.yc) { code += 'o.y=o.yc-(o.height||0)/2;'; }
+   * ```
+   *
+   * Statements in order, so a far edge written **beside** a near one *replaces* whatever extent was
+   * encoded — `o.height = o.y2 - o.y` is an assignment, not a fallback — and everything after it
+   * reads the replacement. Probed: `{y: 40, y2: 100, height: 7}` leaves the item with a height of
+   * **60**, the 7 overwritten.
+   *
+   * Reading only an encoded `height` here left the half at zero for the commonest band there is,
+   * one written as `y` and `y2`, so a mark asked to centre itself on that band sat a half-height
+   * off. It survived every corpus because a specification that writes `yc` usually writes an extent
+   * beside it; the schema sweep writes one channel at a time, which is what it is for.
+   */
+  private fun spatialExtent(channels: EncodeEntry, datum: VegaValue, axis: String): Double {
+    val far = END_OF[axis]?.let { position(channels[it], datum) }
+    val near = position(channels[axis], datum)
+    if (far != null && near != null) return far - near
+    return position(channels[EXTENT_OF[axis]], datum) ?: 0.0
+  }
 
   /** The far edge that stands in for a missing start, per axis. */
   private val END_OF = mapOf("x" to "x2", "y" to "y2")
@@ -1888,18 +1918,19 @@ public class MarkEncoder(
    * specification that writes the far edge and one that writes the extent arrive here the same way.
    * With neither, the extent is zero and the band has no depth, which is the line an area degrades
    * to.
+   *
+   * The **near edge plus the extent**, rather than the far channel read back off the encoding:
+   * `areavShape`'s back boundary is `item.y + item.height`, and that `y` is the adjusted one — a
+   * `yc` moves it after the height has been derived, and the far edge moves with it. Reading `y2`
+   * here pinned the back boundary where the specification wrote it while the front moved, which is
+   * a band of the wrong depth rather than a band in the wrong place.
    */
   private fun extentAcross(
     channels: EncodeEntry,
     datum: VegaValue,
     axis: String,
     near: Double,
-  ): Double {
-    position(channels[END_OF[axis]], datum)?.let {
-      return it
-    }
-    return near + (position(channels[EXTENT_OF[axis]], datum) ?: 0.0)
-  }
+  ): Double = near + spatialExtent(channels, datum, axis)
 
   /** Resolves a positional channel to a number, applying its scale and band offset. */
   private fun position(channel: ChannelValue?, datum: VegaValue): Double? =

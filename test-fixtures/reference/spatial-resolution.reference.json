@@ -1,0 +1,245 @@
+{
+  "marks": [
+    {
+      "fill": "#4c78a8",
+      "fillOpacity": 0.7,
+      "height": 80,
+      "role": "mark",
+      "type": "rect",
+      "width": 18,
+      "x": 96.666667,
+      "y": 70
+    },
+    {
+      "fill": "#4c78a8",
+      "fillOpacity": 0.7,
+      "height": 90,
+      "role": "mark",
+      "type": "rect",
+      "width": 18,
+      "x": 210,
+      "y": 65
+    },
+    {
+      "fill": "#4c78a8",
+      "fillOpacity": 0.7,
+      "height": 70,
+      "role": "mark",
+      "type": "rect",
+      "width": 18,
+      "x": 323.333333,
+      "y": 75
+    },
+    {
+      "fill": "#f58518",
+      "role": "mark",
+      "shapeHeight": 10.954451,
+      "shapeLeft": 91.189441,
+      "shapeTop": 64.522774,
+      "shapeWidth": 10.954451,
+      "size": 120,
+      "type": "symbol",
+      "x": 96.666667,
+      "y": 70
+    },
+    {
+      "fill": "#f58518",
+      "role": "mark",
+      "shapeHeight": 10.954451,
+      "shapeLeft": 204.522774,
+      "shapeTop": 59.522774,
+      "shapeWidth": 10.954451,
+      "size": 120,
+      "type": "symbol",
+      "x": 210,
+      "y": 65
+    },
+    {
+      "fill": "#f58518",
+      "role": "mark",
+      "shapeHeight": 10.954451,
+      "shapeLeft": 317.856108,
+      "shapeTop": 69.522774,
+      "shapeWidth": 10.954451,
+      "size": 120,
+      "type": "symbol",
+      "x": 323.333333,
+      "y": 75
+    },
+    {
+      "fill": "#54a24b",
+      "height": 26,
+      "role": "mark",
+      "type": "rect",
+      "width": 14,
+      "x": 122.666667,
+      "y": 94
+    },
+    {
+      "fill": "#54a24b",
+      "height": 26,
+      "role": "mark",
+      "type": "rect",
+      "width": 14,
+      "x": 236,
+      "y": 134
+    },
+    {
+      "fill": "#54a24b",
+      "height": 26,
+      "role": "mark",
+      "type": "rect",
+      "width": 14,
+      "x": 349.333333,
+      "y": 64
+    },
+    {
+      "fill": "#e45756",
+      "height": 9,
+      "role": "mark",
+      "type": "rect",
+      "width": 30,
+      "x": 32.666667,
+      "y": 102
+    },
+    {
+      "fill": "#e45756",
+      "height": 9,
+      "role": "mark",
+      "type": "rect",
+      "width": 30,
+      "x": 146,
+      "y": 132
+    },
+    {
+      "fill": "#e45756",
+      "height": 9,
+      "role": "mark",
+      "type": "rect",
+      "width": 30,
+      "x": 259.333333,
+      "y": 82
+    },
+    {
+      "fill": "#9d755d",
+      "role": "mark",
+      "shapeHeight": 9.486833,
+      "shapeLeft": 104.92325,
+      "shapeTop": 81.256584,
+      "shapeWidth": 9.486833,
+      "size": 90,
+      "type": "symbol",
+      "x": 109.666667,
+      "y": 86
+    },
+    {
+      "fill": "#9d755d",
+      "role": "mark",
+      "shapeHeight": 9.486833,
+      "shapeLeft": 218.256584,
+      "shapeTop": 121.256584,
+      "shapeWidth": 9.486833,
+      "size": 90,
+      "type": "symbol",
+      "x": 223,
+      "y": 126
+    },
+    {
+      "fill": "#9d755d",
+      "role": "mark",
+      "shapeHeight": 9.486833,
+      "shapeLeft": 331.589917,
+      "shapeTop": 51.256584,
+      "shapeWidth": 9.486833,
+      "size": 90,
+      "type": "symbol",
+      "x": 336.333333,
+      "y": 56
+    },
+    {
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "0",
+      "type": "text",
+      "x": 82.666667,
+      "y": 28
+    },
+    {
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "1",
+      "type": "text",
+      "x": 196,
+      "y": 58
+    },
+    {
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "2",
+      "type": "text",
+      "x": 309.333333,
+      "y": 8
+    },
+    {
+      "fill": "#b279a2",
+      "fillOpacity": 0.5,
+      "points": "M 96.666667 150 L 210 145 L 323.333333 155 L 323.333333 225 L 210 235 L 96.666667 230",
+      "role": "mark",
+      "type": "area"
+    },
+    {
+      "fill": "#72b7b2",
+      "height": 80,
+      "role": "mark",
+      "type": "rect",
+      "width": 8,
+      "x": 66.666667,
+      "y": 40
+    },
+    {
+      "fill": "#72b7b2",
+      "height": 90,
+      "role": "mark",
+      "type": "rect",
+      "width": 8,
+      "x": 180,
+      "y": 70
+    },
+    {
+      "fill": "#72b7b2",
+      "height": 70,
+      "role": "mark",
+      "type": "rect",
+      "width": 8,
+      "x": 293.333333,
+      "y": 20
+    }
+  ],
+  "scales": {
+    "x": {
+      "bandwidth": 0,
+      "domain": [
+        0,
+        1,
+        2
+      ],
+      "range": [
+        40,
+        380
+      ],
+      "step": 113.333333
+    }
+  },
+  "size": {
+    "height": 246,
+    "width": 430
+  },
+  "spec": "spatial-resolution.vg.json",
+  "vegaVersion": "6.3.1"
+}

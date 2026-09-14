@@ -8,6 +8,29 @@ section here does not get released.
 
 ### Fixed
 
+- **A centre halves the extent a far edge derived, not only an encoded one.** `adjustSpatial` is
+  four statements in order, not a set of alternatives:
+
+  ```js
+  if (encode.y2) {
+    if (encode.y) { … code += 'o.height=o.y2-o.y;'; }
+    else { code += 'o.y=o.y2-(o.height||0);'; }
+  }
+  if (encode.yc) { code += 'o.y=o.yc-(o.height||0)/2;'; }
+  ```
+
+  So a far edge written **beside** a near one *replaces* whatever extent was encoded — probed, `{y:
+  40, y2: 100, height: 7}` leaves the item with a height of **60** — and everything after it reads
+  the replacement. Three things followed from reading only an encoded extent: a mark centred on a
+  band written as `y` and `y2` sat a half-height off, a `y2` written *without* a `y` put the mark at
+  the far edge instead of an extent back from it, and an area's back boundary was pinned where the
+  specification wrote it while its front moved, which is a band of the wrong depth. `areavShape`
+  reads `item.y + item.height`, and that `y` is the adjusted one.
+
+  Every corpus missed it because a specification that writes `yc` almost always writes an extent
+  beside it. The schema sweep writes one channel at a time, which is what it is for. New fixture:
+  `spatial-resolution`, one mark per combination.
+
 - **A series with nothing defined is still a mark.** `defined: false` on every datum leaves
   `d3.line().defined(item => item.defined !== false)` with no subpath to begin, and upstream writes
   the element anyway: `<path stroke="steelblue" stroke-width="2"/>`, an attribute short of a `d`,
