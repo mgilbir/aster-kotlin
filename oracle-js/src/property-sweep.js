@@ -18,9 +18,11 @@
  *
  * ### What is swept, and what is left out
  *
- * Four families: `axis`, `legend`, `title` and `scale`. They are where this engine's code is
- * densest — a guide is a layout, a text measurement and half a dozen marks — and where the schema is
- * cleanest to read. A property is swept when the schema says enough to choose values honestly:
+ * Six families: `axis`, `legend`, `title`, `scale`, a **mark's own properties**, and the **encode
+ * channels** every mark item carries. The first four are where this engine's code is densest — a
+ * guide is a layout, a text measurement and half a dozen marks — and the last two are the widest
+ * declared surface there is: sixty channels, most of which no chart in any corpus sets. A property
+ * is swept when the schema says enough to choose values honestly:
  *
  *   * an **enum**, including one inside a `oneOf` beside a signal reference: every word it lists;
  *   * a **boolean**: both;
@@ -129,6 +131,17 @@ const FAMILIES = {
   scale: (spec, property, value) => {
     spec.scales[0][property] = value;
   },
+  // The bar mark's own properties — `clip`, `interactive`, `aria` and the rest — rather than its
+  // channels.
+  mark: (spec, property, value) => {
+    spec.marks[0][property] = value;
+  },
+  // An **encode channel**, written into the mark's `enter` block as a literal value. Sixty of them
+  // are declared and a bar chart reads perhaps eight, so this is the widest gap between what the
+  // schema says and what any corpus exercises.
+  encode: (spec, property, value) => {
+    spec.marks[0].encode.enter[property] = { value };
+  },
 };
 
 /**
@@ -136,8 +149,12 @@ const FAMILIES = {
  *
  * Three kinds: what identifies a thing rather than styles it, what this base chart has nowhere to
  * put, and what needs a value no schema can supply.
+ *
+ * Keyed by **family first**, because the same name means different things in two of them: a
+ * legend's `fill` names the scale it describes and a mark's `fill` is a colour, and skipping the
+ * second for the first one's reason quietly dropped six channels from the sweep.
  */
-const SKIP = {
+const SHARED_SKIP = {
   name: 'names the object rather than styling it',
   scale: 'names the scale rather than styling it',
   type: 'the scale type; sweeping it rebuilds the chart rather than varying it',
@@ -153,13 +170,6 @@ const SKIP = {
   encode: 'a block of encoders rather than a value',
   style: 'names config blocks the base chart does not declare',
   interactive: 'no pointer in a static render',
-  fill: 'names the scale a legend describes',
-  stroke: 'names the scale a legend describes',
-  size: 'names the scale a legend describes',
-  shape: 'names the scale a legend describes',
-  opacity: 'names the scale a legend describes',
-  strokeDash: 'names the scale a legend describes',
-  strokeWidth: 'names the scale a legend describes',
   format: 'a format specifier, which the schema does not enumerate',
   formatType: 'meaningless without a matching format',
   text: 'the title text itself',
@@ -170,6 +180,46 @@ const SKIP = {
   nice: 'takes a count or an interval as well as a boolean; not honestly enumerable here',
   init: 'an initial value for an interactive scale',
   on: 'event handlers, which a static render never fires',
+  // A mark's own structure rather than its appearance: sweeping these builds a different chart
+  // instead of varying one.
+  from: 'names the data the mark is drawn from',
+  marks: 'nested marks, which is a different chart',
+  transform: 'a pipeline of its own',
+  sort: 'needs a field to sort by',
+  key: 'names the field items are matched by',
+  role: 'names what the mark is, which the engine derives',
+  // Channels that need something the base chart does not have, or that would replace its geometry.
+  url: 'an image to load, which a static comparison has nowhere to fetch from',
+  path: 'an SVG path, which belongs to a path mark rather than a rect',
+  shape: 'a symbol shape, which belongs to a symbol mark',
+  text: 'the text of a text mark',
+  defined: 'breaks a line or an area, neither of which this chart draws',
+  tooltip: 'a value no static scene shows',
+  x: 'the geometry the base chart encodes from its own data',
+  x2: 'the geometry the base chart encodes from its own data',
+  xc: 'the geometry the base chart encodes from its own data',
+  y: 'the geometry the base chart encodes from its own data',
+  y2: 'the geometry the base chart encodes from its own data',
+  yc: 'the geometry the base chart encodes from its own data',
+  width: 'the geometry the base chart encodes from its own data',
+  height: 'the geometry the base chart encodes from its own data',
+};
+
+/** Skips that belong to **one** family, where the same name means something else in another. */
+const FAMILY_SKIP = {
+  legend: {
+    fill: 'names the scale a legend describes',
+    stroke: 'names the scale a legend describes',
+    size: 'names the scale a legend describes',
+    shape: 'names the scale a legend describes',
+    opacity: 'names the scale a legend describes',
+    strokeDash: 'names the scale a legend describes',
+    strokeWidth: 'names the scale a legend describes',
+  },
+  encode: {
+    // A rect draws neither, and a sweep of a rect chart has nothing to say about them.
+    size: 'a symbol channel, which this chart has no symbol for',
+  },
 };
 
 /**
@@ -182,7 +232,7 @@ const SKIP = {
  * scale is the one these are applied to.
  */
 function propertiesOf(family) {
-  const definition = schema.definitions[family];
+  const definition = schema.definitions[family === 'encode' ? 'encodeEntry' : family];
   const merged = {};
   const visit = (fragment) => {
     if (!fragment) return;
@@ -220,13 +270,20 @@ const COLOUR = '#b35a1f';
  * finite rather than trusting that.
  */
 function branchesOf(fragment, depth = 0) {
-  if (!fragment || depth > 3) return [];
+  if (!fragment || depth > 8) return [];
   if (fragment.$ref) {
     const name = fragment.$ref.split('/').pop();
     return branchesOf(schema.definitions[name], depth + 1);
   }
-  const nested = fragment.oneOf || fragment.anyOf;
+  const nested = fragment.oneOf || fragment.anyOf || fragment.allOf;
   if (nested) return nested.flatMap((branch) => branchesOf(branch, depth + 1));
+  // An **encoder value**, which is where a channel's own enumeration lives: a channel is declared
+  // as `{"value": {"enum": […]}}` rather than as the enum itself, because a channel may equally be
+  // a field, a scale lookup or a signal. Following the `value` property is what makes the sixty
+  // encode channels reachable at all; without it every one of them read as unenumerable.
+  if (fragment.properties && fragment.properties.value) {
+    return branchesOf(fragment.properties.value, depth + 1);
+  }
   return [fragment];
 }
 
@@ -282,8 +339,9 @@ const used = new Map();
 for (const [family, apply] of Object.entries(FAMILIES)) {
   const definition = propertiesOf(family);
   for (const [property, fragment] of Object.entries(definition)) {
-    if (SKIP[property]) {
-      skipped.push({ family, property, reason: SKIP[property] });
+    const reason = (FAMILY_SKIP[family] || {})[property] || SHARED_SKIP[property];
+    if (reason) {
+      skipped.push({ family, property, reason });
       continue;
     }
     const candidates = valuesFor(fragment);

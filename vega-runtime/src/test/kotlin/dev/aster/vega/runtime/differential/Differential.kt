@@ -962,6 +962,7 @@ public object Differential {
         if (
           unpaintedStroke(expected, channel) ||
             inertFill(expected, channel) ||
+            unreadByThisMark(expected, channel) ||
             noLimit(expected, channel, wanted)
         ) {
           continue
@@ -1053,9 +1054,18 @@ public object Differential {
       // except where a specification explicitly writes the default, and there they disagreed for a
       // reason neither engine was wrong about. Found on a guide encode setting `strokeCap` to
       // `butt`: upstream wrote it, this left it out, and the comparison called that a difference.
+      // The inert channels are tested **before** the implied default, not after: a `strokeCap` on
+      // an unstroked mark is compared against the `butt` this side implies otherwise, and reads as
+      // a difference over a cap nothing draws.
+      if (
+        inertFill(expected, channel) ||
+          unpaintedStroke(expected, channel) ||
+          unreadByThisMark(expected, channel)
+      ) {
+        continue
+      }
       val got = actual.strings[channel] ?: IMPLIED_BY_ABSENCE[channel]
       if (got == null) {
-        if (inertFill(expected, channel) || unpaintedStroke(expected, channel)) continue
         out.add(Difference("$where.$channel", wanted, "absent"))
         continue
       }
@@ -1280,6 +1290,30 @@ public object Differential {
    * The colour itself is **not** in this list, so a mark upstream strokes and this one does not is
    * still reported — it is only the detail channels that are inert without one.
    */
+  /**
+   * A channel **this** mark type has no use for, which its renderer never reads.
+   *
+   * `addEncoders` writes whatever the specification names onto the item, and upstream's items are
+   * property bags: a rect given a `clip` carries one, and nothing looks at it — `item.clip` is read
+   * for a *group* item, in `marks/group.js`, and nowhere else. A `limit` is the same story with
+   * `textValue`, which only a text mark calls. A scene node here holds what a renderer needs, so
+   * neither has anywhere to live.
+   *
+   * Narrow on purpose, and stated per channel rather than by a rule: each entry names the mark type
+   * that *does* read it, and everything else about that mark is still compared.
+   */
+  private fun unreadByThisMark(expected: Mark, channel: String): Boolean =
+    when (channel) {
+      "clip",
+      "strokeForeground",
+      "strokeOffset" -> expected.type != "group"
+      "limit",
+      "ellipsis",
+      "lineBreak",
+      "dir" -> expected.type != "text"
+      else -> false
+    }
+
   private fun unpaintedStroke(expected: Mark, channel: String): Boolean =
     channel in UNPAINTED_WITHOUT_STROKE && !expected.strings.containsKey("stroke")
 
