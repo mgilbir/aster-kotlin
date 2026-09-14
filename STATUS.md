@@ -39,7 +39,7 @@ and what each was added to pin down. Every name in it is checked to still exist 
 | `bar` | 48 | band and linear scales, rect encoder, axes |
 | `stacked-bar` | 42 | stack and aggregate transforms, signals, signal-valued scale property, conditional fill, gridlines |
 | `line-area` | 51 | line, area, symbol and text encoders, and a second area declared horizontal |
-| `log-scale` | 97 | log axis with blanked labels, sqrt scale, and two log axes with a degenerate base |
+| `log-scale` | 99 | log axis with blanked labels, sqrt scale, two log axes with a degenerate base, and one whose domain touches zero |
 | `colour-scheme` | 39 | ordinal category10 scheme, interpolated sequential colour |
 | `facet-trellis` | 55 | faceted group marks, nested scopes, per-cell scales and axes, the `parent` signal |
 | `legends` | 28 | a symbol legend beside the chart and a gradient legend below it |

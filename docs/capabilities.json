@@ -1743,7 +1743,7 @@
         "TransformedScalesTest"
       ],
       "tests_text": "`TransformedScalesTest`, `FixtureDifferentialTest`",
-      "notes": "Configurable base; a domain spanning or touching zero is reported rather than adjusted. Ticks are the powers and their multiples, falling back to linear spacing when that is too sparse, and crowded labels are blanked as d3 does. The `base` reaches the ticks, the labels and `nice` and **never the geometry**: d3 transforms by the natural log whatever base was asked for, so a base of 0, 1, a half or a negative number places its marks exactly where a base-10 scale would and differs only in which ticks it generates. A domain touching zero is a different matter and has no positions at all, which is upstream's answer too",
+      "notes": "Configurable base; a domain spanning or touching zero is reported rather than adjusted. Ticks are the powers and their multiples, falling back to linear spacing when that is too sparse, and crowded labels are blanked as d3 does. The `base` reaches the ticks, the labels and `nice` and **never the geometry**: d3 transforms by the natural log whatever base was asked for, so a base of 0, 1, a half or a negative number places its marks exactly where a base-10 scale would and differs only in which ticks it generates. A domain touching zero is a different matter and has no positions at all, which is upstream's answer too; the scale is built regardless, so the axis that names it still draws its line and its title with nothing between them",
       "milestone": "3"
     },
     {
