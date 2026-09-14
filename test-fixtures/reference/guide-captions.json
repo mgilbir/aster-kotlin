@@ -257,7 +257,7 @@
  {
   "fixture": "axis-variants",
   "kind": "axis",
-  "caption": "Y-axis for a linear scale with values from 0 to 35"
+  "caption": "Y-axis titled 'amount' for a linear scale with values from 0 to 35"
  },
  {
   "fixture": "axis-variants",

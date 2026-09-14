@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **An axis reads the two baselines measured against the line height.** `line-top` and
+  `line-bottom` are two of upstream's six baseline names — the only two whose offset depends on
+  `lineHeight` rather than on the font size alone — and `AxisBuilder` had a private copy of the
+  baseline parser that knew four of them. An axis asking for either got `top` instead and measured
+  eleven units short. The copy is gone; there is one parser, as there is one for font weights since
+  the same drift was found in those.
+
 - **A `zindex` is a number, and any of them raises.** `visit` partitions on `if (item.zindex)` and
   only then sorts by `a.zindex - b.zindex || a.index - b.index`, so a **negative** zindex does not
   sink a mark or an axis below its neighbours — it raises it above all of them and puts it at the
