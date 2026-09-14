@@ -472,7 +472,15 @@ internal class LegendBuilder(
   // ---- symbol legends ---------------------------------------------------------
 
   /** One legend entry: the value the scale maps, and the text shown beside it. */
-  private class Entry(val value: VegaValue, val label: String)
+  /**
+   * One row of a symbol legend.
+   *
+   * [summary] marks the `…12 entries` row `symbolLimit` adds, which is not one of the values: it is
+   * appended **after** the anchor every swatch is placed against has been measured — upstream's
+   * `offset = items.reduce(…)` runs before the push — so it is excluded from that measurement and a
+   * legend limited to nothing at all anchors its one row at zero.
+   */
+  private class Entry(val value: VegaValue, val label: String, val summary: Boolean = false)
 
   /**
    * How many decimals a set of cut points needs to stay distinguishable.
@@ -536,7 +544,12 @@ internal class LegendBuilder(
     val boxes = measured.map { clipHeight ?: it }
     // A vertical legend aligns every label at the widest symbol; a horizontal one packs each entry
     // against its own symbol. That is upstream's `datum.offset` versus `datum.size`.
-    val widest = measured.max()
+    //
+    // The **summary** row is not part of that measurement: `offset` is reduced over the items that
+    // survived the limit and only then is the `…12 entries` row pushed onto them, so it inherits
+    // whatever they measured — which is zero when the limit kept none of them, and a legend of one
+    // summary row then anchors that row at its own left edge.
+    val widest = measured.filterIndexed { index, _ -> !entries[index].summary }.maxOrNull() ?: 0.0
 
     val labelStyle = GuideStyle.text(spec.labelStyle, labelFontSize, defaultWeight = 400)
     val labelLimit = numbers.resolve(spec.labelLimit, scaleName) ?: LegendDefaults.LABEL_LIMIT
@@ -1323,18 +1336,48 @@ internal class LegendBuilder(
   /**
    * `symbolLimit`: the most entries a symbol legend will show.
    *
+   * ```js
+   * limit = +_.limit;
+   * if (limit && values.length > limit) {
+   *   items = values.slice(0, limit - 1);
+   *   ellipsis = true;
+   * }
+   * ```
+   *
    * Upstream keeps `limit - 1` of them and spends the last slot on a summary — `…12 entries` — so a
    * limit of 5 shows four swatches and a fifth row saying how many were left out. The count in that
    * row is of the entries **not shown**, and the swatch beside it takes the *next* value's own
    * size, so a size legend's summary row is drawn at the size of the first thing it stands for. A
    * limit that the entries already fit inside does nothing at all.
+   *
+   * The limit is **not an entry count**, though every sane one is. `+_.limit` is a number and
+   * `slice` is JavaScript's, so a limit of 0.5 keeps `slice(0, -0.5)` — nothing, because `-0.5`
+   * truncates to `-0` and `-0 < 0` is false — and a limit of -4 keeps `slice(0, -5)`, which is also
+   * nothing. Both leave a legend of one row saying `…3 entries`, which is what upstream draws;
+   * reading the limit as an integer and ignoring anything below one left the whole legend showing.
    */
   private fun limited(spec: LegendSpec, entries: List<Entry>, scaleName: String): List<Entry> {
-    val limit = numbers.resolveInt(spec.symbolLimit, scaleName) ?: return entries
-    if (limit <= 0 || entries.size <= limit) return entries
-    val kept = entries.take(limit - 1)
+    val limit = numbers.resolve(spec.symbolLimit, scaleName) ?: return entries
+    // `if (limit && …)`: a zero and a NaN are both falsy, and neither limits anything.
+    if (limit == 0.0 || limit.isNaN() || entries.size <= limit) return entries
+    val kept = entries.take(sliceEnd(entries.size, limit - 1))
     val remainder = entries.size - kept.size
-    return kept + Entry(entries[kept.size].value, "\u2026$remainder entries")
+    return kept + Entry(entries[kept.size].value, "\u2026$remainder entries", summary = true)
+  }
+
+  /**
+   * How many elements `Array.prototype.slice(0, end)` keeps, for a possibly fractional `end`.
+   *
+   * `ToIntegerOrInfinity` truncates **toward zero**, which is what makes `-0.5` and `-0` the same
+   * thing and puts them on the *non-negative* side of the spec's `relativeEnd < 0` test — so `[a,
+   * b, c].slice(0, -0.5)` is empty where `slice(0, -1)` keeps two.
+   */
+  private fun sliceEnd(length: Int, end: Double): Int {
+    if (end.isNaN()) return 0
+    val relative = if (end < 0) ceil(end) else floor(end)
+    val final =
+      if (relative < 0.0) maxOf(length + relative, 0.0) else minOf(relative, length.toDouble())
+    return maxOf(final, 0.0).toInt()
   }
 
   /** Numeric entries, with the legend's own format applied when it named one. */

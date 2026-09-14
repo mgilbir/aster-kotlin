@@ -1,6 +1,6 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "symbolLimit is not a plain truncation: upstream keeps limit - 1 swatches and spends the last row saying how many entries it left out, with the swatch beside that row drawn from the next value. Beside them, a legend whose symbolType is an SVG **path** rather than one of the twelve names, which is how a specification asks for a swatch upstream does not ship \u2014 the same rule a mark's shape channel follows.",
+  "description": "symbolLimit is not a plain truncation: upstream keeps limit - 1 swatches and spends the last row saying how many entries it left out, with the swatch beside that row drawn from the next value. Beside them, a legend whose symbolType is an SVG **path** rather than one of the twelve names, which is how a specification asks for a swatch upstream does not ship \u2014 the same rule a mark's shape channel follows. A limit below one is the case that reads as a number rather than as a count: a zero is falsy and limits nothing, a negative one and a fractional one each keep no swatches at all, and the summary row that is left anchors at the legend's own edge because the anchor was measured before that row existed.",
   "width": 200,
   "height": 140,
   "padding": 5,
@@ -114,6 +114,24 @@
       "symbolStrokeColor": "#333333",
       "symbolStrokeWidth": 1.2,
       "symbolSize": 300
+    },
+    {
+      "fill": "colour",
+      "title": "none kept",
+      "orient": "left",
+      "symbolLimit": -4
+    },
+    {
+      "fill": "colour",
+      "title": "half a row",
+      "orient": "top-left",
+      "symbolLimit": 0.5
+    },
+    {
+      "fill": "colour",
+      "title": "unlimited",
+      "orient": "bottom-left",
+      "symbolLimit": 0
     }
   ],
   "marks": [

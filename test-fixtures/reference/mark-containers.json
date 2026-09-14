@@ -10408,6 +10408,30 @@
   "hidden": false
  },
  {
+  "fixture": "legend-symbol-limit",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "legend-symbol-limit",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "legend-symbol-limit",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "legend-title-anchor",
   "kind": "group",
   "role": "graphics-object",
