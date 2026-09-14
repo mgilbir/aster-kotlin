@@ -239,6 +239,10 @@ internal class TitleBuilder(
           when (spec.orient) {
             Orient.LEFT -> titleBounds.width + padding to 0.0
             Orient.RIGHT -> -titleBounds.width - padding to 0.0
+            // The subtitle's own switch has **no default**: an `orient: "none"` title leaves `sx`
+            // and `sy` at zero, so the subtitle is drawn on top of the heading rather than under
+            // it. Upstream's, and it follows from the same branch that leaves the group unplaced.
+            null -> 0.0 to 0.0
             else -> 0.0 to titleBounds.height + padding
           }
         // **The title's own `dx`/`dy` are the subtitle's too**, and an `encode` block's are not.
@@ -382,8 +386,22 @@ internal class TitleBuilder(
       Orient.BOTTOM -> along to reach.bottom + offset
       Orient.LEFT -> reach.left - box.width - offset to along
       Orient.RIGHT -> reach.right + box.width + offset to along
+      // `default: x = group.x; y = group.y` — an `orient: "none"` title is placed by nothing and
+      // keeps the coordinates it already has, which for a group nobody has encoded is the origin.
+      // Its **anchor** still decides its alignment, so a centred heading reaches back past the
+      // left edge of the plotting area and the drawing grows to hold it.
+      null -> encodedOrigin(spec)
     }
   }
+
+  /**
+   * Where an unplaced title sits: its own `encode.group` coordinates, or the origin.
+   *
+   * The group's `x` and `y` are what `titleLayout` leaves alone for `orient: "none"`, and the only
+   * thing that can have set them is the title's own encode block.
+   */
+  private fun encodedOrigin(spec: TitleSpec): Pair<Double, Double> =
+    (number(spec, "group", "x") ?: 0.0) to (number(spec, "group", "y") ?: 0.0)
 
   /** The title's own `fontWeight`, or a theme's, falling back to Vega's bold default. */
   private fun titleWeight(spec: TitleSpec): Int =

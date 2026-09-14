@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **A title oriented `none` is placed by nothing.** It is upstream's fifth orientation and it
+  reaches the `default:` branch of `titleLayout`'s switch, which leaves the group at the coordinates
+  it already has — its own `encode`, or the origin. The heading then sits at the plotting area's
+  corner with its anchor still deciding its alignment, so a centred one reaches back past the left
+  edge and the drawing grows to hold it. The subtitle's switch has no default either, so it is drawn
+  **on top of** the heading rather than under it. This engine reported the value as an unknown
+  orientation and placed the title at the top.
+
+  **API.** `TitleSpec.orient` is nullable, null being `none`; an axis has no such value.
+
 - **An axis reads the two baselines measured against the line height.** `line-top` and
   `line-bottom` are two of upstream's six baseline names — the only two whose offset depends on
   `lineHeight` rather than on the font size alone — and `AxisBuilder` had a private copy of the
