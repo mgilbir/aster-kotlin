@@ -1300,6 +1300,31 @@
   "caption": "Symbol legend titled 'none' for size with values from 0 to 2,500"
  },
  {
+  "fixture": "legend-grid-anchor",
+  "kind": "axis",
+  "caption": "X-axis titled 'category' for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "legend-grid-anchor",
+  "kind": "axis",
+  "caption": "Y-axis titled 'amount' for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "legend-grid-anchor",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'region' for fill color with 3 values: a much longer region name, south, east"
+ },
+ {
+  "fixture": "legend-grid-anchor",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'n' for size with values from 0 to 9"
+ },
+ {
+  "fixture": "legend-grid-anchor",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'amount' for fill color with values from 28 to 91"
+ },
+ {
   "fixture": "legend-left-of-axis",
   "kind": "axis",
   "caption": "X-axis titled 'category' for a discrete scale with 3 values: alpha, beta, gamma"
