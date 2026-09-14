@@ -117,7 +117,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `label-overlap` | 90 | rect, rule, text | — | band, linear |
 | `layout-center` | 12 | rect, text | — | ordinal |
 | `legend-background` | 19 | group, rect, symbol, text | — | band, linear, ordinal |
-| `legend-columns` | 10 | symbol, text | — | ordinal |
+| `legend-columns` | 21 | symbol, text | — | ordinal |
 | `legend-discretizing` | 66 | rect, rule, symbol, text | — | linear, quantile, quantize, threshold |
 | `legend-format-type` | 29 | rect, rule, symbol, text | — | linear, utc |
 | `legend-grid-align` | 45 | rect, symbol, text | — | band, linear |
