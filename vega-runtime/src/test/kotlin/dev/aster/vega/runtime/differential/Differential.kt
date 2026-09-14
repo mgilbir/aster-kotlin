@@ -959,7 +959,13 @@ public object Differential {
       if (channel in ignored) continue
       val got = actual.numbers[channel] ?: defaultFor(channel)
       if (got == null) {
-        if (unpaintedStroke(expected, channel) || inertFill(expected, channel)) continue
+        if (
+          unpaintedStroke(expected, channel) ||
+            inertFill(expected, channel) ||
+            noLimit(expected, channel, wanted)
+        ) {
+          continue
+        }
         out.add(Difference("$where.$channel", fmt(wanted), "absent"))
         continue
       }
@@ -1242,6 +1248,26 @@ public object Differential {
    */
   private fun inertFill(expected: Mark, channel: String): Boolean =
     expected.type == "rule" && (channel == "fill" || channel == "fillOpacity")
+
+  /**
+   * A `limit` of **zero**, which is upstream's own spelling of "do not truncate".
+   *
+   * ```js
+   * const text = line == null ? '' : (line + '').trim();
+   * return item.limit > 0 && text.length ? truncate(item, text) : text;
+   * ```
+   *
+   * Nothing above zero, nothing truncated — so a specification writing `labelLimit: 0` and one
+   * leaving it out draw the same label. Upstream's items are property bags and record the zero it
+   * was given; a [TextRun] here holds the same number and this harness omits it, because omitting
+   * it is how *this* side spells the same thing. The difference is in the reports and not in the
+   * drawings, and `text` is compared in full on both sides, so a limit that truncated when it
+   * should not is still caught.
+   *
+   * Narrow on purpose: only `limit`, and only when the reference's own value is zero.
+   */
+  private fun noLimit(expected: Mark, channel: String, wanted: Double): Boolean =
+    expected.type == "text" && channel == "limit" && wanted == 0.0
 
   private fun unpaintedStroke(expected: Mark, channel: String): Boolean =
     (channel == "strokeWidth" || channel == "strokeOpacity") &&
@@ -1568,13 +1594,27 @@ public object Differential {
   }
 
   /** A CSS font weight as the number a renderer resolves it to. */
+  /**
+   * A CSS font weight as the number a renderer draws with.
+   *
+   * `bolder` and `lighter` are relative to the **inherited** weight, and the chart is where that
+   * question gets an answer: upstream writes `font-weight` on the `<text>` element itself and puts
+   * none on any ancestor, so a browser resolves them against the initial `normal` — 700 and 100 by
+   * CSS Fonts 4's table. A canvas has no inheritance at all and resolves them the same way. This
+   * engine resolves them at compile time, in `FontWeights`, and stores the number on the scene
+   * node; upstream keeps the keyword on its item and leaves the resolving to the drawing layer.
+   *
+   * So the two describe the same drawing in two spellings, and this reads both as the number. It is
+   * an equivalence and not a relaxation: every other spelling still has to agree exactly, and a
+   * keyword resolved to the *wrong* number — `lighter` as 300, which is what all three of this
+   * engine's parsers said before they were merged — fails here.
+   */
   private fun cssWeight(value: String): Int? =
     when (value.trim().lowercase()) {
       "normal" -> 400
       "bold" -> 700
-      // `lighter` and `bolder` are relative to the parent and cannot be resolved from one item.
-      "lighter",
-      "bolder" -> null
+      "bolder" -> 700
+      "lighter" -> 100
       else -> value.trim().toDoubleOrNull()?.toInt()
     }
 
