@@ -669,27 +669,45 @@ public class LogScale(
   round: Boolean = false,
 ) : TransformedScale(name, domain, range, clamp, round) {
 
-  private val logBase = ln(base)
-
-  /** True when the domain lies entirely on one side of zero, i.e. the scale is usable. */
+  /**
+   * True when the domain lies entirely on one side of zero, i.e. the scale is usable.
+   *
+   * The **base has no say in this**. A log scale's transform is the natural log whatever base was
+   * asked for, so a base of 0, 1, a half or a negative number leaves the geometry perfectly well
+   * defined and changes only which ticks are generated — probed against upstream, which places the
+   * same marks for all of them. Requiring `base > 1` here turned every position into a NaN and took
+   * the marks, the axis and the chart's own size with it.
+   *
+   * A domain touching or straddling zero is a different matter, and upstream agrees: `zero: true`
+   * on a log scale gives a domain of `[0, 900]`, and every `scale(x)` on it answers null.
+   */
   public val isValid: Boolean =
-    base > 1.0 &&
-      domain.first() != 0.0 &&
-      domain.last() != 0.0 &&
-      (domain.first() > 0.0) == (domain.last() > 0.0)
+    domain.first() != 0.0 && domain.last() != 0.0 && (domain.first() > 0.0) == (domain.last() > 0.0)
 
+  /**
+   * The **natural** log, whatever the base is.
+   *
+   * d3's transform is `Math.log` and its inverse `Math.exp`; `base` reaches only the ticks, the
+   * labels and `nice`. That is not an approximation of dividing by `ln(base)` — it is the same
+   * answer, because a continuous scale normalises between the transformed ends and a constant
+   * divisor cancels. It stops being the same answer exactly where the constant stops being one: a
+   * base of 0 makes `ln(base)` negative infinity and every position `-0`, a base of 1 makes it zero
+   * and every position infinite, a negative base makes it NaN. Dividing here therefore threw away
+   * the whole geometry of a chart upstream draws perfectly well — probed, upstream maps 3 to 120
+   * and 900 to 0 for bases 10, 0, 0.5, -4 and 1 alike, and only the *ticks* differ between them.
+   */
   override fun forward(value: Double): Double {
     if (!isValid) return Double.NaN
     // A negative domain reflects: the log of the magnitude, negated, so ordering is preserved.
     return if (domain.first() < 0.0) {
-      if (value >= 0.0) Double.NaN else -ln(-value) / logBase
+      if (value >= 0.0) Double.NaN else -ln(-value)
     } else {
-      if (value <= 0.0) Double.NaN else ln(value) / logBase
+      if (value <= 0.0) Double.NaN else ln(value)
     }
   }
 
   override fun backward(value: Double): Double =
-    if (domain.first() < 0.0) -base.pow(-value) else base.pow(value)
+    if (domain.first() < 0.0) -exp(-value) else exp(value)
 
   override fun ticks(count: Int): List<Double> =
     Ticks.logTicks(domain.first(), domain.last(), base, count)
@@ -721,8 +739,13 @@ public class LogScale(
     }
   }
 
-  /** The log of the magnitude, which is what the mantissa is measured against. */
-  private fun logMagnitude(value: Double): Double = ln(kotlin.math.abs(value)) / logBase
+  /**
+   * The log of the magnitude, which is what the mantissa is measured against.
+   *
+   * **In the scale's own base**, unlike the transform: which labels are blank is a question about
+   * powers of the base, and this is the one place in the scale where that matters.
+   */
+  private fun logMagnitude(value: Double): Double = ln(kotlin.math.abs(value)) / ln(base)
 
   private companion object {
     /** d3 compares the mantissa against a fractional threshold; tolerate representation error. */

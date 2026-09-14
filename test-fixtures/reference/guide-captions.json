@@ -1542,6 +1542,16 @@
  {
   "fixture": "log-scale",
   "kind": "axis",
+  "caption": "X-axis titled 'Base 0' for a log scale with values from 3 to 900"
+ },
+ {
+  "fixture": "log-scale",
+  "kind": "axis",
+  "caption": "X-axis titled 'Base 0.5' for a log scale with values from 3 to 900"
+ },
+ {
+  "fixture": "log-scale",
+  "kind": "axis",
   "caption": "Y-axis for a sqrt scale with values from 0 to 100"
  },
  {
