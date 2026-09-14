@@ -1235,6 +1235,11 @@
   "caption": "Symbol legend for fill color with 5 values: aa, bb, cc, dd, ee"
  },
  {
+  "fixture": "legend-columns",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'no columns' for fill color with 5 values: aa, bb, cc, dd, ee"
+ },
+ {
   "fixture": "legend-discretizing",
   "kind": "axis",
   "caption": "X-axis for a linear scale with values from 0 to 100"

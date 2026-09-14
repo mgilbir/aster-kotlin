@@ -8,6 +8,11 @@ section here does not get released.
 
 ### Fixed
 
+- **A legend's `columns: 0` means one column per entry, not one column.** Upstream reads the number
+  twice and both readings are falsy at zero — the entry's column is `(columns) ? datum.index %
+  max(1, columns) : datum.index` — so every entry takes a column of its own and the legend lies in a
+  row. Clamping it to one stood the legend on end.
+
 - **`symbolLimit` is a number, not an entry count.** Upstream's test is `limit && values.length >
   limit`, and what it keeps is `values.slice(0, limit - 1)` — JavaScript's `slice`, so a limit of 0.5
   keeps nothing (`-0.5` truncates to `-0`, which is not negative) and a limit of −4 keeps nothing

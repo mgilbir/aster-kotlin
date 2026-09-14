@@ -632,8 +632,15 @@ internal class LegendBuilder(
       numbers.resolve(spec.columnPadding, scaleName) ?: LegendDefaults.COLUMN_PADDING
     // Upstream's default is one column when the entries run down and one row when they run across;
     // `columns` overrides either.
+    //
+    // **Zero means as many columns as there are entries**, not one. Upstream reads the number
+    // twice, and both readings are falsy at zero: the entry's column is
+    // `(columns) ? datum.index % max(1, columns) : datum.index`, so with none stated every entry
+    // gets a column of its own, and the grid is then handed `ncols = max(1, columns)` rows. A
+    // negative one says the same thing. Clamping to one turned `columns: 0` into a single column —
+    // a legend standing on end where upstream lays it in a row.
     val columns =
-      numbers.resolveInt(spec.columns, scaleName)?.coerceAtLeast(1)
+      numbers.resolveInt(spec.columns, scaleName)?.let { if (it > 0) it else cells.size }
         ?: if (vertical) 1 else cells.size
     return place(
       cells,
