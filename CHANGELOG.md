@@ -55,6 +55,27 @@ section here does not get released.
 
 ### Fixed
 
+- **A `NaN` in an outline is a coordinate to step over, not a reason to throw the outline away.**
+  Upstream never re-reads a path it generated: a projected geometry stays a *generator function* on
+  the scene item, and the bound context and the renderer consume its calls. Here it becomes a path
+  **string** and is read back to be measured and drawn, so a coordinate upstream merely skips arrives
+  as three letters — and the reader stopped at the first of them. A mercator at `scale: 0` writes a
+  polygon that begins `M100,NaN`, which left an empty outline where upstream measures a point.
+
+  Two halves, both of them round-trip invariants. The reader accepts `NaN` and `Infinity` where a
+  number is expected, because they are words this engine's own writer emits; anything else malformed
+  still stops the reading, which is what the warning at the call sites is for. And the bounds walk
+  takes a point **one axis at a time**, which is what `Bounds.add` in `vega-scenegraph` does — four
+  independent comparisons, every one of which a NaN loses, so the axis it is on is left as it was
+  while the other still widens. Taking the point as a degenerate rectangle and unioning it put the
+  NaN through `min`, which answers NaN, and poisoned the whole outline.
+
+  `projection-degenerate` is new: a mercator at `scale: 0`, which collapses the world onto its own
+  translate and clips to a rectangle of width zero, and a stereographic at `clipAngle: 0`, which
+  stops clipping to a cap and puts its own antipode — where the formula runs to infinity — back
+  inside the map. **The projection sweep's last three differences close with this: 4104 of 4104
+  charts agree.**
+
 - **A stream that transforms a point transforms the marked ones too.** Circle clipping emits its
   crossings as `point(x, y, 2)`, a marker `clipRejoin` reads to tell a ring that closes on itself
   from one whose two ends merely landed together. It belongs to the clip stage and is meaningless

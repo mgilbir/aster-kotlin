@@ -168,6 +168,24 @@ public class PathData(public val commands: List<PathCommand>) {
     return best
   }
 
+  /**
+   * One point into a running rectangle, **one axis at a time**, which is what a NaN needs.
+   *
+   * `Bounds.add` in `vega-scenegraph` is four independent comparisons — `if (x < this.x1) …` — and
+   * a NaN fails every one of them, so the axis it is on is left exactly as it was while the other
+   * axis still widens. A projected geometry really does carry them: a mercator at `scale: 0` writes
+   * `M100,NaN`, where upstream measures the x at 100 and leaves the y alone. Taking the point as a
+   * degenerate rectangle and unioning it instead put the NaN through `min`, which answers NaN, and
+   * poisoned the whole outline's bounds.
+   */
+  private fun RectD.adding(x: Double, y: Double): RectD =
+    RectD(
+      if (x < left) x else left,
+      if (y < top) y else top,
+      if (x > right) x else right,
+      if (y > bottom) y else bottom,
+    )
+
   private fun computeBounds(): RectD {
     var result = RectD.Empty
     var cursor = PointD.Origin
@@ -177,11 +195,11 @@ public class PathData(public val commands: List<PathCommand>) {
         is PathCommand.MoveTo -> {
           cursor = PointD(command.x, command.y)
           subpathStart = cursor
-          result = result.union(RectD(cursor.x, cursor.y, cursor.x, cursor.y))
+          result = result.adding(cursor.x, cursor.y)
         }
         is PathCommand.LineTo -> {
           cursor = PointD(command.x, command.y)
-          result = result.union(RectD(cursor.x, cursor.y, cursor.x, cursor.y))
+          result = result.adding(cursor.x, cursor.y)
         }
         is PathCommand.CubicTo -> {
           val end = PointD(command.x, command.y)
