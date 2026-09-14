@@ -328,6 +328,12 @@ section here does not get released.
 
 ### Internal
 
+- **A stroke's details are inert on a mark with no stroke.** `addEncoders` puts every property a
+  specification names on the item whether or not anything uses it, so a legend symbol given a
+  `symbolDash` carries a `strokeDash` even where the legend maps a fill and has no stroke colour —
+  and upstream's renderer strokes nothing with it. The harness read that as a difference; it now
+  reads the detail channels as inert *without* the colour, which is still reported.
+
 - **Two spellings the differential harness now reads as one value.** A `limit` of **zero** is
   upstream's own way of saying "do not truncate" — `item.limit > 0 && text.length ? truncate(…) :
   text` — and a `TextRun` here holds the same zero while the harness omits it, so `labelLimit: 0`

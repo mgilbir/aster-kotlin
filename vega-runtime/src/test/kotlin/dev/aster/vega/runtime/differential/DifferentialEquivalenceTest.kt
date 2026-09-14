@@ -14,6 +14,9 @@ import org.junit.jupiter.api.Test
  *   text` — upstream's own test — so a specification writing `labelLimit: 0` and one leaving it out
  *   draw the same label. Upstream's item records the zero it was given; a `TextRun` here holds the
  *   same number and the harness omits it.
+ * - **A stroke detail on an unstroked mark paints nothing.** `addEncoders` puts every property the
+ *   specification names on the item whether or not anything uses it, so a legend symbol given a
+ *   `symbolDash` carries a `strokeDash` even where the legend maps a fill and has no stroke colour.
  * - **`bolder` is 700 and `lighter` is 100.** Both are relative to the inherited weight, and
  *   upstream writes `font-weight` on the `<text>` element with none on any ancestor — so a browser
  *   resolves them against the initial `normal`. This engine resolves them at compile time instead.
@@ -39,6 +42,72 @@ class DifferentialEquivalenceTest {
     val ours = text(mapOf("x" to 10.0), mapOf("text" to "alpha"))
     assertEquals(
       listOf("text/axis-label[0].limit: expected 30, got absent"),
+      Differential.compareMarks(listOf(upstream), listOf(ours)).map { it.toString() },
+    )
+  }
+
+  @Test
+  fun `a dash on a mark with no stroke paints nothing`() {
+    val upstream =
+      Differential.Mark(
+        "symbol",
+        "legend-symbol",
+        mapOf("x" to 10.0, "size" to 100.0),
+        mapOf("fill" to "#4c78a8", "strokeDash" to "4,2"),
+      )
+    val ours =
+      Differential.Mark(
+        "symbol",
+        "legend-symbol",
+        mapOf("x" to 10.0, "size" to 100.0),
+        mapOf("fill" to "#4c78a8"),
+      )
+    assertEquals(
+      emptyList<Differential.Difference>(),
+      Differential.compareMarks(listOf(upstream), listOf(ours)),
+    )
+  }
+
+  @Test
+  fun `a dash on a mark that is stroked is still compared`() {
+    val upstream =
+      Differential.Mark(
+        "symbol",
+        "legend-symbol",
+        mapOf("x" to 10.0, "size" to 100.0),
+        mapOf("stroke" to "#333333", "strokeDash" to "4,2"),
+      )
+    val ours =
+      Differential.Mark(
+        "symbol",
+        "legend-symbol",
+        mapOf("x" to 10.0, "size" to 100.0),
+        mapOf("stroke" to "#333333"),
+      )
+    assertEquals(
+      listOf("symbol/legend-symbol[0].strokeDash: expected 4,2, got absent"),
+      Differential.compareMarks(listOf(upstream), listOf(ours)).map { it.toString() },
+    )
+  }
+
+  @Test
+  fun `a stroke the reference has and this side lacks is still a difference`() {
+    val upstream =
+      Differential.Mark(
+        "symbol",
+        "legend-symbol",
+        mapOf("x" to 10.0, "size" to 100.0),
+        mapOf("stroke" to "#333333", "strokeDash" to "4,2"),
+      )
+    val ours =
+      Differential.Mark("symbol", "legend-symbol", mapOf("x" to 10.0, "size" to 100.0), emptyMap())
+    // Both: the colour, because a mark upstream outlines and this one does not is a different
+    // drawing, and the dash with it, since the reference *does* stroke here.
+    assertEquals(
+      listOf(
+        "symbol/legend-symbol[0].stroke: expected #333333, got absent",
+        "symbol/legend-symbol[0].strokeDash: expected 4,2, got absent",
+      ),
       Differential.compareMarks(listOf(upstream), listOf(ours)).map { it.toString() },
     )
   }
