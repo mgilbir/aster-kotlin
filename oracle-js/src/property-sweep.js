@@ -113,6 +113,130 @@ function baseSpec() {
   };
 }
 
+
+/**
+ * One mark of each type, drawn from the same three rows, for the channel sweep.
+ *
+ * Deliberately plain: enough encoding to put the mark on the chart and nothing more, so a swept
+ * channel is the only thing that varies. `image` is absent — it needs a file to load, and a
+ * comparison that fetched one would be measuring the network.
+ */
+const MARK_BASES = {
+  rect: () => ({
+    type: 'rect',
+    from: { data: 't' },
+    encode: {
+      enter: {
+        x: { scale: 'x', field: 'c' },
+        width: { scale: 'x', band: 1 },
+        y: { scale: 'y', field: 'v' },
+        y2: { scale: 'y', value: 0 },
+        fill: { value: 'steelblue' },
+      },
+    },
+  }),
+  symbol: () => ({
+    type: 'symbol',
+    from: { data: 't' },
+    encode: {
+      enter: {
+        x: { scale: 'x', field: 'c', band: 0.5 },
+        y: { scale: 'y', field: 'v' },
+        size: { value: 200 },
+        fill: { value: 'steelblue' },
+      },
+    },
+  }),
+  text: () => ({
+    type: 'text',
+    from: { data: 't' },
+    encode: {
+      enter: {
+        x: { scale: 'x', field: 'c', band: 0.5 },
+        y: { scale: 'y', field: 'v' },
+        text: { field: 'c' },
+        fill: { value: '#333333' },
+      },
+    },
+  }),
+  line: () => ({
+    type: 'line',
+    from: { data: 't' },
+    encode: {
+      enter: {
+        x: { scale: 'x', field: 'c', band: 0.5 },
+        y: { scale: 'y', field: 'v' },
+        stroke: { value: 'steelblue' },
+        strokeWidth: { value: 2 },
+      },
+    },
+  }),
+  area: () => ({
+    type: 'area',
+    from: { data: 't' },
+    encode: {
+      enter: {
+        x: { scale: 'x', field: 'c', band: 0.5 },
+        y: { scale: 'y', field: 'v' },
+        y2: { scale: 'y', value: 0 },
+        fill: { value: 'steelblue' },
+      },
+    },
+  }),
+  arc: () => ({
+    type: 'arc',
+    from: { data: 't' },
+    encode: {
+      enter: {
+        x: { scale: 'x', field: 'c', band: 0.5 },
+        y: { value: 60 },
+        startAngle: { value: 0 },
+        endAngle: { value: 2 },
+        outerRadius: { value: 25 },
+        innerRadius: { value: 8 },
+        fill: { value: 'steelblue' },
+      },
+    },
+  }),
+  rule: () => ({
+    type: 'rule',
+    from: { data: 't' },
+    encode: {
+      enter: {
+        x: { scale: 'x', field: 'c', band: 0.5 },
+        y: { scale: 'y', field: 'v' },
+        y2: { scale: 'y', value: 0 },
+        stroke: { value: '#333333' },
+        strokeWidth: { value: 2 },
+      },
+    },
+  }),
+  path: () => ({
+    type: 'path',
+    from: { data: 't' },
+    encode: {
+      enter: {
+        x: { scale: 'x', field: 'c', band: 0.5 },
+        y: { scale: 'y', field: 'v' },
+        path: { value: 'M-8,0L0,-12L8,0Z' },
+        fill: { value: 'steelblue' },
+      },
+    },
+  }),
+  trail: () => ({
+    type: 'trail',
+    from: { data: 't' },
+    encode: {
+      enter: {
+        x: { scale: 'x', field: 'c', band: 0.5 },
+        y: { scale: 'y', field: 'v' },
+        size: { value: 6 },
+        fill: { value: 'steelblue' },
+      },
+    },
+  }),
+};
+
 /** Where each family's property is written into the base chart. */
 const FAMILIES = {
   // The **bottom** axis, which is the one with a band scale under it: half of what an axis property
@@ -139,9 +263,21 @@ const FAMILIES = {
   // An **encode channel**, written into the mark's `enter` block as a literal value. Sixty of them
   // are declared and a bar chart reads perhaps eight, so this is the widest gap between what the
   // schema says and what any corpus exercises.
-  encode: (spec, property, value) => {
-    spec.marks[0].encode.enter[property] = { value };
-  },
+  //
+  // One family per **mark type**, because which channels mean anything is the mark's own question:
+  // a rect ignores `tension`, a line ignores `cornerRadius`, and only an arc reads `padAngle`. The
+  // channel table is swept in full against each of them rather than against a guess at which pairs
+  // matter — a pair that draws nothing is an agreement like any other, and the one place it is not
+  // is exactly what this is for.
+  ...Object.fromEntries(
+    Object.entries(MARK_BASES).map(([type, mark]) => [
+      `encode-${type}`,
+      (spec, property, value) => {
+        spec.marks = [mark()];
+        spec.marks[0].encode.enter[property] = { value };
+      },
+    ]),
+  ),
 };
 
 /**
@@ -232,7 +368,10 @@ const FAMILY_SKIP = {
  * scale is the one these are applied to.
  */
 function propertiesOf(family) {
-  const definition = schema.definitions[family === 'encode' ? 'encodeEntry' : family];
+  // Every `encode-<marktype>` family reads the same channel table; the mark type decides which of
+  // them mean anything, not which of them exist.
+  const named = family.startsWith('encode-') ? 'encodeEntry' : family;
+  const definition = schema.definitions[named];
   const merged = {};
   const visit = (fragment) => {
     if (!fragment) return;
@@ -339,7 +478,10 @@ const used = new Map();
 for (const [family, apply] of Object.entries(FAMILIES)) {
   const definition = propertiesOf(family);
   for (const [property, fragment] of Object.entries(definition)) {
-    const reason = (FAMILY_SKIP[family] || {})[property] || SHARED_SKIP[property];
+    const reason =
+      (FAMILY_SKIP[family] || {})[property] ||
+      (family.startsWith('encode-') ? (FAMILY_SKIP.encode || {})[property] : undefined) ||
+      SHARED_SKIP[property];
     if (reason) {
       skipped.push({ family, property, reason });
       continue;

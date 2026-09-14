@@ -52,6 +52,7 @@
       "y": 40
     },
     {
+      "blend": "multiply",
       "closed": 0,
       "interpolate": "catmull-rom",
       "points": "M 0 104 C 0 104 C 25.925711 29.463162 C 40 28.6 C 52.727408 27.819441 C 67.198041 86.490921 C 80 85.8 C 93.965707 85.046272 C 106.034293 13.753728 C 120 13 C 132.801959 12.309079 C 144.861105 66.487071 C 160 70.2 C 172.167071 73.184067 C 200 49.4 C 200 49.4",
@@ -91,6 +92,7 @@
       "type": "line"
     },
     {
+      "blend": "screen",
       "fill": "#72b7b2",
       "fillOpacity": 0.35,
       "interpolate": "catmull-rom",
@@ -102,6 +104,7 @@
     {
       "align": "center",
       "baseline": "middle",
+      "blend": "multiply",
       "ellipsis": "~",
       "fill": "#333333",
       "font": "sans-serif",
@@ -116,6 +119,7 @@
     {
       "align": "center",
       "baseline": "middle",
+      "blend": "multiply",
       "ellipsis": "~",
       "fill": "#333333",
       "font": "sans-serif",
@@ -130,6 +134,7 @@
     {
       "align": "center",
       "baseline": "middle",
+      "blend": "multiply",
       "ellipsis": "~",
       "fill": "#333333",
       "font": "sans-serif",
@@ -144,6 +149,7 @@
     {
       "align": "center",
       "baseline": "middle",
+      "blend": "multiply",
       "ellipsis": "~",
       "fill": "#333333",
       "font": "sans-serif",
@@ -156,6 +162,7 @@
       "y": 200
     },
     {
+      "blend": "multiply",
       "clip": true,
       "cornerRadiusBottomRight": 18,
       "cornerRadiusTopLeft": 18,
@@ -177,6 +184,17 @@
       "x2": 540,
       "y": 55,
       "y2": 55
+    },
+    {
+      "blend": "difference",
+      "role": "mark",
+      "stroke": "#e45756",
+      "strokeWidth": 3,
+      "type": "rule",
+      "x": 10,
+      "x2": 120,
+      "y": 20,
+      "y2": 90
     }
   ],
   "scales": {

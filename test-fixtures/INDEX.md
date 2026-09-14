@@ -80,7 +80,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `ecma-trim` | 19 | rule, text | formula | band |
 | `edge-bundling` | 989 | line, symbol, text | filter, formula, stratify, tree | ordinal |
 | `encode-channels-tail` | 15 | group, image, line, path, rect, rule, symbol, text | — | — |
-| `encode-channels` | 15 | area, group, line, rect, rule, text | — | band, linear |
+| `encode-channels` | 16 | area, group, line, rect, rule, text | — | band, linear |
 | `error-bars` | 61 | rect, rule, symbol, text | aggregate, formula | band, linear |
 | `expressions` | 26 | rect, rule, text | extent, filter, formula | band, linear |
 | `facet-trellis` | 55 | group, rect, rule, text | — | band, linear |

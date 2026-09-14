@@ -28,6 +28,8 @@
       "points": "M 10 40 L 40 100 L 70 40 L 100 100 L 130 40",
       "role": "mark",
       "stroke": "#54a24b",
+      "strokeJoin": "miter",
+      "strokeMiterLimit": 1,
       "strokeWidth": 10,
       "type": "line"
     },
