@@ -548,8 +548,11 @@ public class MarkEncoder(
     }
     val x = centred(channels, datum, "x", "xc") ?: 0.0
     val y = centred(channels, datum, "y", "yc") ?: 0.0
-    val scaleX = number(channels["scaleX"], datum) ?: 1.0
-    val scaleY = number(channels["scaleY"], datum) ?: 1.0
+    // `var sx = item.scaleX || 1` — a **falsy** scale is one, so `scaleX: 0` draws the path at its
+    // own size rather than collapsing it to a line. Reading the zero as a zero made a path mark
+    // given one disappear, where upstream draws it untouched.
+    val scaleX = number(channels["scaleX"], datum)?.takeIf { it != 0.0 && !it.isNaN() } ?: 1.0
+    val scaleY = number(channels["scaleY"], datum)?.takeIf { it != 0.0 && !it.isNaN() } ?: 1.0
     val angle = number(channels["angle"], datum) ?: 0.0
     val style = style(channels, datum, spec)
 
@@ -618,9 +621,25 @@ public class MarkEncoder(
           number(channels["cornerRadius"], datum) ?: config.number("cornerRadius") ?: 0.0,
         padRadius = number(channels["padRadius"], datum) ?: config.number("padRadius"),
       )
+    // **`angle` turns an arc about its own centre.** Every mark built by `markItemPath` is drawn
+    // through `context.translate(x, y); context.rotate(angle)` and bounded through a rotated bound
+    // context, and an arc is one of them — the channel is not a symbol's alone. It was read for a
+    // symbol and for a path here and not for an arc, so a turned wedge was drawn upright.
+    //
+    // The path is built at the arc's own centre, so the turn is about that point rather than about
+    // the origin: `translate(cx, cy) · rotate · translate(-cx, -cy)`, which is the same thing as
+    // upstream's origin-centred shape rotated and then translated.
+    val angle = number(channels["angle"], datum) ?: 0.0
+    val turn =
+      if (angle == 0.0) Transform2D.Identity
+      else
+        Transform2D.translate(cx, cy)
+          .concat(Transform2D.rotateDegrees(angle))
+          .concat(Transform2D.translate(-cx, -cy))
     return PathNode(
       id = ids.allocate(),
       path = path,
+      transform = turn,
       // No fallback fill. The pairing rule in `style` has already decided: a mark that encodes
       // *either* paint channel gets neither default, so an arc drawn as a bare outline — Vega's
       // Monte Carlo quadrant is one — stays unfilled instead of being flooded with the built-in
@@ -948,9 +967,17 @@ public class MarkEncoder(
     if (data.isEmpty()) return null
     val channels = spec.encode.effective
 
-    // `orient` needs no special case: building each boundary from the (x, y) and (x2, y2) pairs
-    // handles both orientations, because a vertical area leaves x2 defaulting to x and a horizontal
-    // one leaves y2 defaulting to y.
+    // ```js
+    // areavShape = d3_area().x(x).y1(y).y0(yh),
+    // areahShape = d3_area().y(y).x1(x).x0(xw)
+    // ```
+    //
+    // **`orient` decides which axis the second boundary moves along**, and only that one: a
+    // horizontal area's back edge is `(x + width, y)` and a vertical one's is `(x, y + height)`.
+    // Building it from both pairs at once agrees wherever a specification encodes the matching
+    // extent and parts company where it encodes the other — an area declared horizontal while
+    // carrying a `y2` came back as a filled region where upstream draws a line out and back.
+    val horizontal = string(channels["orient"], data.first())?.lowercase() == "horizontal"
     val pairs =
       segments(data, channels) { datum ->
         val x = centred(channels, datum, "x", "xc") ?: 0.0
@@ -966,15 +993,15 @@ public class MarkEncoder(
         // the two agree wherever `y2` was written — and differ wherever the specification wrote
         // the extent instead. A violin plot writes the extent, its halves being scaled densities,
         // and every one of them came out a flat line.
-        val x2 = extentAcross(channels, datum, "x", x)
-        val y2 = extentAcross(channels, datum, "y", y)
-        PointD(x, y) to PointD(x2, y2)
+        val across =
+          if (horizontal) PointD(extentAcross(channels, datum, "x", x), y)
+          else PointD(x, extentAcross(channels, datum, "y", y))
+        PointD(x, y) to across
       }
     if (pairs.isEmpty()) return null
 
     val style = style(channels, data.first(), spec)
     val interpolate = string(channels["interpolate"], data.first())
-    val horizontal = string(channels["orient"], data.first())?.lowercase() == "horizontal"
     val tension = number(channels["tension"], data.first())
     reportUnsupportedInterpolation(interpolate, spec)
 

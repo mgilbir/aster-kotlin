@@ -38,7 +38,7 @@ and what each was added to pin down. Every name in it is checked to still exist 
 | --- | --- | --- |
 | `bar` | 48 | band and linear scales, rect encoder, axes |
 | `stacked-bar` | 42 | stack and aggregate transforms, signals, signal-valued scale property, conditional fill, gridlines |
-| `line-area` | 50 | line, area, symbol and text encoders |
+| `line-area` | 51 | line, area, symbol and text encoders, and a second area declared horizontal |
 | `log-scale` | 75 | log axis with blanked labels, sqrt scale |
 | `colour-scheme` | 39 | ordinal category10 scheme, interpolated sequential colour |
 | `facet-trellis` | 55 | faceted group marks, nested scopes, per-cell scales and axes, the `parent` signal |
@@ -83,7 +83,7 @@ and what each was added to pin down. Every name in it is checked to still exist 
 | `step-lines` | 24 | the three staircase interpolations and a stepped area |
 | `curves` | 27 | monotone, natural, basis and cardinal over one series, and a monotone area |
 | `colour-ramps` | 57 | four continuous schemes across one domain, with a gradient legend |
-| `path-marks` | 34 | outlines from SVG path strings, on path marks and on symbols |
+| `path-marks` | 38 | outlines from SVG path strings, on path marks and on symbols, one of them scaled by zero |
 | `trail` | 28 | a line whose thickness follows the data, beside a plain line through it |
 | `reshape-matrix` | 33 | a heatmap crossed from one list, and a word-count chart beside it |
 | `statistics` | 28 | a least-squares line over its scatter, and the same values as quartile rules |

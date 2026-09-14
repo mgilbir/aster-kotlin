@@ -58,6 +58,7 @@ class PropertySweepTest {
     var matched = 0
     var differed = 0
     var oursRefused = 0
+    val known = LinkedHashMap<String, String>()
     val causes = HashMap<String, MutableSet<String>>()
     val drewNothing = LinkedHashMap<String, String>()
     // The first difference is kept with the count, because a sweep of 600 cases is only useful if
@@ -105,6 +106,12 @@ class PropertySweepTest {
         perCase[name] = Triple("matched", 0, "")
         continue
       }
+      val excused = KNOWN_DIFFERENCES[name]
+      if (excused != null) {
+        known[name] = excused
+        perCase[name] = Triple("known", differences.size, differences.first().toString())
+        continue
+      }
       differed++
       perCase[name] = Triple("differed", differences.size, differences.first().toString())
       // One vote per shape per case, so a chart with fifty marks does not outvote fifty charts.
@@ -137,7 +144,15 @@ class PropertySweepTest {
     println("compared          $compared")
     println(String.format(Locale.ROOT, "matched           %d (%.1f%%)", matched, rate))
     println("differed          $differed")
+    println("known differences ${known.size}")
     println("we produced none  $oursRefused")
+    known
+      .takeIf { it.isNotEmpty() }
+      ?.let {
+        println()
+        println("known, and why each is not a defect to fix:")
+        it.forEach { (name, reason) -> println("  $name: $reason") }
+      }
     drewNothing
       .takeIf { it.isNotEmpty() }
       ?.let {
@@ -182,6 +197,24 @@ class PropertySweepTest {
       .take(140)
 
   private companion object {
+    /**
+     * Cases where upstream and this engine differ and **upstream is the one that is wrong**, each
+     * with the probe that established it.
+     *
+     * Kept here rather than quietly tolerated in the comparison: a difference nobody can name is a
+     * defect, and one that is named is a decision. Nothing else is excused — the list is three
+     * cases of one behaviour.
+     */
+    val KNOWN_DIFFERENCES: Map<String, String> =
+      listOf("encode-path-angle--4", "encode-path-angle-0.5", "encode-path-angle-8").associateWith {
+        "a rotated `path` mark is *measured* about the scene origin upstream, not about its own " +
+          "anchor: `pathRender(context, cache, x, y, sx, sy)` places the outline and the bound " +
+          "context's matrix then turns every point about (0, 0). Probed — a triangle drawn at " +
+          "`translate(100,50) rotate(90)` reports bounds of (-50, 92, -38, 108), which is nowhere " +
+          "near what it draws. Reproducing it would need a second transform per node whose only " +
+          "purpose is to be wrong; this engine measures what it draws"
+      }
+
     val repositoryRoot: File = File(System.getProperty("user.dir")).parentFile
     val sweepDir = File(repositoryRoot, "build/property-sweep")
     val specDir = File(sweepDir, "specs")

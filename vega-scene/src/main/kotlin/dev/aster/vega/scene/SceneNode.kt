@@ -259,9 +259,42 @@ public sealed interface SceneNode {
   public val metadata: NodeMetadata
 }
 
-/** Bounds of a node in its parent's coordinate space. */
+/**
+ * Bounds of a node in its parent's coordinate space.
+ *
+ * A node whose geometry is a **path** is measured by mapping the path and bounding what comes out,
+ * rather than by mapping the box its own bounds are. The two differ under rotation — the box of a
+ * turned outline against the box of a turned rectangle — and upstream computes the first: every
+ * mark built by `markItemPath` is traced through a rotated bound context, `shape(context(bounds,
+ * item.angle), item)`. A triangular path at eight degrees measured 14.1 units tall here where
+ * upstream measures 13.0.
+ *
+ * The stroke allowance is added **after** the mapping, which is upstream's order too —
+ * `boundStroke(bounds, item, true)` runs on the traced box — and it is why [PathNode] pre-divides
+ * its own allowance by its scale: that division is undone by the mapping and cancels exactly.
+ */
 public val SceneNode.transformedBounds: RectD
-  get() = transform.mapBounds(bounds)
+  get() =
+    when {
+      transform.isIdentity -> bounds
+      this is PathNode && !absent -> tracedBounds(path, this, transform)
+      this is SymbolNode -> tracedBounds(outline, this, transform)
+      else -> transform.mapBounds(bounds)
+    }
+
+/** The mapped outline's own box, widened by whatever the stroke adds after the mapping. */
+private fun tracedBounds(path: PathData, node: SceneNode, transform: Transform2D): RectD {
+  val stroke =
+    when (node) {
+      is PathNode -> node.stroke
+      is SymbolNode -> node.stroke
+      else -> null
+    }
+  val traced = path.transformedBy(transform).bounds
+  if (traced.isEmpty) return transform.mapBounds(node.bounds)
+  val expansion = stroke?.wideningAt(node.opacity)?.boundsExpansion(miter = true) ?: 0.0
+  return (if (expansion > 0.0) traced.expand(expansion) else traced).normalized()
+}
 
 /** Stable lowercase type name used in snapshots, diagnostics and debug output. */
 public fun typeName(node: SceneNode): String =
@@ -994,7 +1027,16 @@ private fun buildSymbolPath(node: SymbolNode): PathData {
   return local.transformedBy(placement)
 }
 
-/** Returns a copy of this path with every coordinate mapped through [transform]. */
+/**
+ * Returns a copy of this path with every coordinate mapped through [transform], which is **not**
+ * the same as mapping its bounds.
+ *
+ * Upstream bounds a rotated mark by tracing it through a rotated context — `shape(context(bounds,
+ * item.angle), item)` — so the box it reports is the box of the *turned outline*, extrema and all.
+ * Turning the upright box instead reports the box of the turned rectangle, which is larger wherever
+ * the shape does not fill its corners: a triangular path at eight degrees measured 14.1 units tall
+ * where upstream measures 13.0.
+ */
 public fun PathData.transformedBy(transform: Transform2D): PathData {
   if (transform.isIdentity) return this
   return PathData(

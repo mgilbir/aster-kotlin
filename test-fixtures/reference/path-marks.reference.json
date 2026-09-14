@@ -421,6 +421,54 @@
       "type": "symbol",
       "x": 210,
       "y": 117
+    },
+    {
+      "fill": "#4c78a8",
+      "fillOpacity": 0.8,
+      "role": "mark",
+      "shapeHeight": 14,
+      "shapeLeft": 30,
+      "shapeTop": 100,
+      "shapeWidth": 14,
+      "type": "path",
+      "x": 30,
+      "y": 100
+    },
+    {
+      "fill": "#4c78a8",
+      "fillOpacity": 0.8,
+      "role": "mark",
+      "shapeHeight": 14,
+      "shapeLeft": 90,
+      "shapeTop": 100,
+      "shapeWidth": 14,
+      "type": "path",
+      "x": 90,
+      "y": 100
+    },
+    {
+      "fill": "#4c78a8",
+      "fillOpacity": 0.8,
+      "role": "mark",
+      "shapeHeight": 13.5,
+      "shapeLeft": 150,
+      "shapeTop": 100.25,
+      "shapeWidth": 14,
+      "type": "path",
+      "x": 150,
+      "y": 100
+    },
+    {
+      "fill": "#4c78a8",
+      "fillOpacity": 0.8,
+      "role": "mark",
+      "shapeHeight": 13.999821,
+      "shapeLeft": 209.949999,
+      "shapeTop": 100,
+      "shapeWidth": 14.000002,
+      "type": "path",
+      "x": 210,
+      "y": 100
     }
   ],
   "scales": {

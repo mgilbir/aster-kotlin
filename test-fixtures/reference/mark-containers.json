@@ -10632,6 +10632,14 @@
   "hidden": false
  },
  {
+  "fixture": "line-area",
+  "kind": "area",
+  "role": "graphics-symbol",
+  "roleDescription": "area mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "line-defined-gaps",
   "kind": "group",
   "role": "graphics-object",
@@ -14684,6 +14692,14 @@
   "kind": "symbol",
   "role": "graphics-symbol",
   "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "path-marks",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
   "label": null,
   "hidden": false
  },

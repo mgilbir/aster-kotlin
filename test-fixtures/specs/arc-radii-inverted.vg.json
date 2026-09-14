@@ -1,6 +1,6 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "Arcs whose radii are the wrong way round, which d3 does not refuse: it swaps them, so an arc written inside-out draws exactly the ring an arc written the right way round would. The five here are the cases that separate swapping from rejecting — a normal ring, the same ring written inverted, an arc given only an inner radius (its outer radius defaults to zero, so swapping turns it into a solid wedge of that size), a negative outer radius, which collapses to a point at the centre, and a slice of no angle at all. Each still produces an item; the third is the one a specification is most likely to write by accident, and drawing nothing for it is the difference between a donut and an empty canvas.",
+  "description": "Arcs whose radii are the wrong way round, which d3 does not refuse: it swaps them, so an arc written inside-out draws exactly the ring an arc written the right way round would. The five here are the cases that separate swapping from rejecting — a normal ring, the same ring written inverted, an arc given only an inner radius (its outer radius defaults to zero, so swapping turns it into a solid wedge of that size), a negative outer radius, which collapses to a point at the centre, and a slice of no angle at all. Each still produces an item; the third is the one a specification is most likely to write by accident, and drawing nothing for it is the difference between a donut and an empty canvas. They are also turned by an `angle`, which every mark drawn through `markItemPath` takes and an arc is one of them — the wedge is rotated about its own centre, which for a shape d3 draws about the origin is the same as upstream's rotated bound context.",
   "width": 460,
   "height": 140,
   "padding": 5,
@@ -39,7 +39,8 @@
           "outerRadius": { "field": "outer" },
           "fill": { "scale": "colour", "field": "note" },
           "stroke": { "value": "#333333" },
-          "strokeWidth": { "value": 1 }
+          "strokeWidth": { "value": 1 },
+          "angle": { "value": 24 }
         }
       }
     }

@@ -8,6 +8,22 @@ section here does not get released.
 
 ### Fixed
 
+- **Four mark channels the sweep of every mark type turned up.** An **arc** never read its `angle`,
+  so a turned wedge was drawn upright — it is a `markItemPath` channel like a symbol's, not a
+  symbol's alone. A **path**'s `scaleX`/`scaleY` read a zero as a zero, where upstream's
+  `item.scaleX || 1` draws the path at its own size. An **area**'s `orient` decides which axis its
+  second boundary moves along and *only* that one, so one declared horizontal while carrying a `y2`
+  draws a line out and back rather than a filled region. And a **rotated mark is bounded by tracing
+  its outline**, not by turning the box around it: upstream traces every such mark through a rotated
+  bound context, and turning the upright box instead reported a triangular path at eight degrees as
+  14.1 units tall where upstream says 13.0.
+
+  Two differences are **stated rather than reproduced**, both the same upstream defect: a rotated
+  `path` mark is measured about the scene *origin* there, and a rotated arc's corner circles are
+  measured with their angles turned and their centres left behind. Neither matches what upstream
+  draws; this engine measures what it draws, and `SUPPORTED_FEATURES.md` and the sweep's own report
+  say so.
+
 - **A text box built from a negative measurement is still a box.** `Bounds.set` swaps a pair that
   arrives the wrong way round, and a negative font size makes both pairs arrive that way — the
   width estimate is `~~(0.8 * length * fontSize)`. A rectangle stored inverted reads as *empty*
