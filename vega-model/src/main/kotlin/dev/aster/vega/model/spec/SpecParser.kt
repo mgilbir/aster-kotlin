@@ -3061,7 +3061,10 @@ public class SpecParser {
       subtitleExpression =
         (obj.fields["subtitle"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
       orient =
-        obj.enumOrNull("orient", path, "title orientation") { Orient.fromName(it) } ?: Orient.TOP,
+        // `none` is a title's own fifth orientation and is carried as null; see [TitleSpec.orient].
+        if (obj.fields["orient"]?.asString()?.lowercase() == "none") null
+        else
+          obj.enumOrNull("orient", path, "title orientation") { Orient.fromName(it) } ?: Orient.TOP,
       anchor =
         obj.enumOrNull("anchor", path, "title anchor") { Anchor.fromName(it) } ?: Anchor.MIDDLE,
       frame = obj.fields["frame"]?.asString(),

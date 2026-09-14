@@ -2130,6 +2130,26 @@
   "caption": "Subtitle text '2026 to date'"
  },
  {
+  "fixture": "title-orient-none",
+  "kind": "axis",
+  "caption": "X-axis titled 'category' for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "title-orient-none",
+  "kind": "axis",
+  "caption": "Y-axis titled 'amount' for a linear scale with values from 0 to 55"
+ },
+ {
+  "fixture": "title-orient-none",
+  "kind": "title",
+  "caption": "Title text 'Revenue by segment'"
+ },
+ {
+  "fixture": "title-orient-none",
+  "kind": "subtitle",
+  "caption": "Subtitle text '2026 to date'"
+ },
+ {
   "fixture": "title-style-block",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 2 values: a, b"

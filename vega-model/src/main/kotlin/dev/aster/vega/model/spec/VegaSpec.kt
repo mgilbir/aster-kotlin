@@ -714,7 +714,25 @@ public data class TitleSpec(
    */
   val textExpression: String? = null,
   val subtitle: String? = null,
-  val orient: Orient = Orient.TOP,
+  /**
+   * Where the title hangs, which for a title alone may be **nowhere**.
+   *
+   * ```js
+   * switch (orient) {
+   *   case Top: … case Left: … case Right: … case Bottom: …
+   *   default: x = group.x; y = group.y;
+   * }
+   * ```
+   *
+   * `orient: "none"` is upstream's fifth value and the default branch is what it reaches: the title
+   * group keeps whatever coordinates it already has — its own `encode`, or the origin — and is
+   * placed by nothing. A heading written that way sits at the top-left corner of the plotting area
+   * and, since its anchor still decides its alignment, a centred one reaches back past it.
+   *
+   * Null is that case. An axis has no such value, which is why this is nullable rather than a fifth
+   * [Orient].
+   */
+  val orient: Orient? = Orient.TOP,
   val anchor: Anchor = Anchor.MIDDLE,
   val frame: String? = null,
   val offset: NumberValue? = null,
