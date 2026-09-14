@@ -95,6 +95,25 @@ public data class RectD(val left: Double, val top: Double, val right: Double, va
   public fun normalized(): RectD =
     RectD(normalizeZero(left), normalizeZero(top), normalizeZero(right), normalizeZero(bottom))
 
+  /**
+   * The same rectangle with its corners in order, which is how upstream stores every one.
+   *
+   * ```js
+   * set(x1, y1, x2, y2) {
+   *   if (x2 < x1) { this.x2 = x1; this.x1 = x2; } else { this.x1 = x1; this.x2 = x2; }
+   *   if (y2 < y1) { this.y2 = y1; this.y1 = y2; } else { this.y1 = y1; this.y2 = y2; }
+   * }
+   * ```
+   *
+   * `Bounds.set` swaps a pair that arrives the wrong way round, so a box built from a **negative**
+   * width or height is still a box. Here an inverted rectangle reads as [isEmpty], and empty is
+   * absorbing: it is skipped by [union] and unmoved by [translate]. A text item measured at a
+   * negative font size is exactly that box — the estimate `~~(0.8 * length * fontSize)` is negative
+   * — so an axis whose labels were set that way measured only its ticks.
+   */
+  public fun ordered(): RectD =
+    RectD(minOf(left, right), minOf(top, bottom), maxOf(left, right), maxOf(top, bottom))
+
   public companion object {
     public val Empty: RectD =
       RectD(

@@ -333,7 +333,10 @@ public fun textBounds(run: TextRun, metrics: TextMetrics): RectD {
       TextBaseline.BOTTOM -> -metrics.height
       TextBaseline.LINE_BOTTOM -> -metrics.height
     }
-  return RectD(left, top, left + metrics.width, top + metrics.height).normalized()
+  // **Ordered**, as `Bounds.set` orders every box it is given: a negative font size makes both the
+  // width and the line box negative, and a rectangle stored the wrong way round reads as empty
+  // everywhere it is used.
+  return RectD(left, top, left + metrics.width, top + metrics.height).ordered().normalized()
 }
 
 /**

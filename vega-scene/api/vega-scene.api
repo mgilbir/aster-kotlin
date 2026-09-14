@@ -859,6 +859,7 @@ public final class dev/aster/vega/scene/RectD {
 	public final fun intersects (Ldev/aster/vega/scene/RectD;)Z
 	public final fun isEmpty ()Z
 	public final fun normalized ()Ldev/aster/vega/scene/RectD;
+	public final fun ordered ()Ldev/aster/vega/scene/RectD;
 	public fun toString ()Ljava/lang/String;
 	public final fun translate (DD)Ldev/aster/vega/scene/RectD;
 	public final fun union (Ldev/aster/vega/scene/RectD;)Ldev/aster/vega/scene/RectD;

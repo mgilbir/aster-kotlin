@@ -3492,6 +3492,7 @@ RectD.isEmpty
 RectD.isEqual(_:)
 RectD.left
 RectD.normalized()
+RectD.ordered()
 RectD.right
 RectD.top
 RectD.translate(dx:dy:)

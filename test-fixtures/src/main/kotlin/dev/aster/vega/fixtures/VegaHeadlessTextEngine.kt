@@ -100,10 +100,11 @@ public class VegaHeadlessTextEngine : TextEngine {
         TextAlign.CENTER -> -metrics.width / 2.0
         TextAlign.RIGHT -> -metrics.width
       }
-    // **Normalised**, as `Bounds.set` normalises: it swaps a pair that arrives the wrong way round,
-    // and a negative font size makes both pairs arrive that way — the estimate is
+    // **Ordered**, as `Bounds.set` orders every box it is given: it swaps a pair that arrives the
+    // wrong way round, and a negative font size makes both pairs arrive that way — the estimate is
     // `~~(0.8 * length * fontSize)`, so the width is negative and the box reaches backwards from
-    // its anchor. Left as it came, the rectangle read as empty and the text measured as nothing.
-    return RectD(left, top, left + metrics.width, top + metrics.height).normalized()
+    // its anchor. Left as it came, the rectangle reads as empty, and empty is absorbing: an axis
+    // whose labels were set at a negative size measured only its ticks.
+    return RectD(left, top, left + metrics.width, top + metrics.height).ordered()
   }
 }
