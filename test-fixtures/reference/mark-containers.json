@@ -16640,6 +16640,22 @@
   "hidden": false
  },
  {
+  "fixture": "title-nudge",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "title-nudge",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "title-style-block",
   "kind": "group",
   "role": "graphics-object",
