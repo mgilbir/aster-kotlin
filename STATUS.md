@@ -58,7 +58,7 @@ and what each was added to pin down. Every name in it is checked to still exist 
 | `flatten-arrays` | 25 | parallel array fields expanded and re-aggregated |
 | `time-axis` | 32 | a UTC scale ticking on months and another on hours, ISO dates read by `format.parse` |
 | `timeunit` | 25 | rows bucketed into calendar months, then counted |
-| `legend-columns` | 10 | legend entries wrapped into two columns |
+| `legend-columns` | 21 | legend entries wrapped into two columns, and a second legend asking for none |
 | `trellis-layout` | 10 | five cells gridded by a layout, with row and column padding |
 | `trellis-headers` | 8 | a grid with row and column headers, each titled from its own datum |
 | `pie` | 13 | a donut chart: the pie transform feeding arc marks, with a legend |
