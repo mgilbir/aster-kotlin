@@ -8,6 +8,23 @@ section here does not get released.
 
 ### Fixed
 
+- **The schema sweep swept a cached answer.** `scripts/property-sweep.sh` writes its charts into
+  `build/` and then runs `PropertySweepTest` to compare them, and nothing in that task's declared
+  inputs mentions the charts — so a second run of a *changed* sweep was served `FROM-CACHE`, the test
+  never executed, no report was written, and the script printed the previous run's tally as though it
+  were this one's. The `sed` that pulls the report out of the log exits zero when it matches nothing,
+  so the guard meant to catch exactly this never fired. The task is rerun explicitly now and the
+  report is checked for content.
+
+- **The sweep's position channels, and the two skips that had gone stale.** `x`, `x2`, `xc`, `y`,
+  `y2`, `yc`, `width` and `height` were held back as "the geometry the base chart encodes from its
+  own data", which stopped being true when each mark type brought its own base chart: what a written
+  `x2` or `width` does is upstream's own two-of-three resolution rule, and a swept value replacing
+  one side of the pair is the case that rule is *for*. `defined` needed a line or an area to break
+  and now has both; `size` needed a symbol. The sweep is 2553 charts, up from 2211, and the widening
+  found **eleven** differences in five causes — a series with nothing defined, a negative rect width,
+  a negative symbol size, a trail's size floor, and an area's `yc`. Each is its own change.
+
 - **Four mark channels the sweep of every mark type turned up.** An **arc** never read its `angle`,
   so a turned wedge was drawn upright — it is a `markItemPath` channel like a symbol's, not a
   symbol's alone. A **path**'s `scaleX`/`scaleY` read a zero as a zero, where upstream's

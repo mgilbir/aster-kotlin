@@ -269,6 +269,14 @@ const FAMILIES = {
   // channel table is swept in full against each of them rather than against a guess at which pairs
   // matter — a pair that draws nothing is an agreement like any other, and the one place it is not
   // is exactly what this is for.
+  //
+  // **The position channels are swept too**, and they overwrite what the base chart encodes. They
+  // were held back while the base was a bar chart and the reason — "the geometry the base chart
+  // encodes from its own data" — stopped being true once each mark type brought its own base: what
+  // a written `x2`, `width` or `yc` does is upstream's own resolution rule, `x`/`x2`/`width` being
+  // two of three with the third derived, and it differs by mark type. A swept value replaces one
+  // side of that pair, which is the case the rule is *for*. Same for `defined`, which needs a line
+  // or an area to break and now has both, and for `size`, which needed a symbol.
   ...Object.fromEntries(
     Object.entries(MARK_BASES).map(([type, mark]) => [
       `encode-${type}`,
@@ -324,21 +332,12 @@ const SHARED_SKIP = {
   sort: 'needs a field to sort by',
   key: 'names the field items are matched by',
   role: 'names what the mark is, which the engine derives',
-  // Channels that need something the base chart does not have, or that would replace its geometry.
+  // Channels that need a value the schema does not carry.
   url: 'an image to load, which a static comparison has nowhere to fetch from',
-  path: 'an SVG path, which belongs to a path mark rather than a rect',
-  shape: 'a symbol shape, which belongs to a symbol mark',
+  path: 'an SVG path, and the schema says only that it is a string',
+  shape: 'a symbol shape, and the schema says only that it is a string',
   text: 'the text of a text mark',
-  defined: 'breaks a line or an area, neither of which this chart draws',
   tooltip: 'a value no static scene shows',
-  x: 'the geometry the base chart encodes from its own data',
-  x2: 'the geometry the base chart encodes from its own data',
-  xc: 'the geometry the base chart encodes from its own data',
-  y: 'the geometry the base chart encodes from its own data',
-  y2: 'the geometry the base chart encodes from its own data',
-  yc: 'the geometry the base chart encodes from its own data',
-  width: 'the geometry the base chart encodes from its own data',
-  height: 'the geometry the base chart encodes from its own data',
 };
 
 /** Skips that belong to **one** family, where the same name means something else in another. */
@@ -351,10 +350,6 @@ const FAMILY_SKIP = {
     opacity: 'names the scale a legend describes',
     strokeDash: 'names the scale a legend describes',
     strokeWidth: 'names the scale a legend describes',
-  },
-  encode: {
-    // A rect draws neither, and a sweep of a rect chart has nothing to say about them.
-    size: 'a symbol channel, which this chart has no symbol for',
   },
 };
 
