@@ -15512,6 +15512,46 @@
   "hidden": false
  },
  {
+  "fixture": "projection-precision",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-precision",
+  "kind": "shape",
+  "role": "graphics-symbol",
+  "roleDescription": "shape mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-precision",
+  "kind": "shape",
+  "role": "graphics-symbol",
+  "roleDescription": "shape mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-precision",
+  "kind": "shape",
+  "role": "graphics-symbol",
+  "roleDescription": "shape mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-precision",
+  "kind": "shape",
+  "role": "graphics-symbol",
+  "roleDescription": "shape mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "published-signals",
   "kind": "group",
   "role": "graphics-object",

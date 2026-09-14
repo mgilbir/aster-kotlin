@@ -55,6 +55,26 @@ section here does not get released.
 
 ### Fixed
 
+- **A stream that transforms a point transforms the marked ones too.** Circle clipping emits its
+  crossings as `point(x, y, 2)`, a marker `clipRejoin` reads to tell a ring that closes on itself
+  from one whose two ends merely landed together. It belongs to the clip stage and is meaningless
+  past it: d3's transform stream declares `point(x, y)` and JavaScript drops the third argument on
+  the floor, so a crossing is projected like any other vertex.
+
+  Here `DelegatingStream` forwards the marked form **unchanged**, which skips the subclass's own
+  `point` — so the one point a clip circle *put* on a line arrived at the path unprojected, in
+  radians: `L0.894,0.647` where upstream had `L174.636,-12.315`. A gnomonic map's border ran to the
+  top-left corner of the chart.
+
+  Only `precision: 0` showed it. The resampler is not built on the delegating stream and routes a
+  marked point through the same projection as any other, so every precision but zero hid it — and
+  zero is the one a chart asks for when it wants the raw vertices and nothing interpolated. Both
+  transforming streams are on a base of their own now, which is d3's `transformer`: the resampling
+  one and the rotation, which sits before the clip and so had never met a marker. A new fixture,
+  `projection-precision`, draws the same three lines twice through a gnomonic and twice through an
+  orthographic, once at each projection's default and once at zero: every line leaves the cap those
+  two clip to, so every one of them ends on a point the clip put there.
+
 - **An identity projection is not a sphere with the globe switched off.** `d3-geo`'s identity
   projection is an affine transform — `transform(postclip(stream))` — with five setters: `scale`,
   `translate`, `reflectX`, `reflectY` and `clipExtent`. It has no clip angle, no centre, no rotation
