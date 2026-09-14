@@ -8,6 +8,22 @@ section here does not get released.
 
 ### Fixed
 
+- **`zero` folds into a discretizing scale's domain.** `configureDomain` applies it by scale
+  *option* rather than by scale type, so a threshold, quantile or bin-ordinal scale that asks for
+  `zero: true` gets the same per-end treatment a linear one does — and this applied it only where a
+  continuous domain was resolved, so those three ignored it.
+
+  On a threshold scale it is the **cut points** that move: probed, `[20, 50, 80]` with `zero: true`
+  is reported by upstream as `[0, 50, 80]`, which puts every value below the old first cut into a
+  different bucket. In the sweep's chart that was a symbol thirty units up the plot from where
+  upstream draws it, not a shade of colour. A domain whose low end is already negative is left
+  alone, `[-5, 50, 80]` staying as it is, because the rule moves only a positive low end and a
+  negative high one.
+
+  Applied **positionally**, to the domain as written rather than to a sorted copy: a quantile scale
+  given the literal `[60, 8, 31]` comes back from upstream as `[0, 8, 31]`, the 60 replaced where it
+  stood rather than after sorting. `binned-scales` carries the threshold case.
+
 - **An axis over an ordinal or an identity scale draws its ticks.** Both drew nothing at all:
   `generatedTicks` had a branch for band, point, linear, transformed, time and the binned four, and
   answered null for these two — so the guide was a bare line, or not even that.

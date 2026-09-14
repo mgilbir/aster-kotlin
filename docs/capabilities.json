@@ -1906,7 +1906,7 @@
         "FixtureDifferentialTest"
       ],
       "tests_text": "`BinnedScaleTest` (upstream vectors), `FixtureDifferentialTest` (`binned-scales`)",
-      "notes": "The domain *is* the cut points, so there is one more range value than domain value. A mismatched count is reported rather than silently truncated",
+      "notes": "The domain *is* the cut points, so there is one more range value than domain value. A mismatched count is reported rather than silently truncated. `zero: true` folds zero into the **cut points** — `[10, 50]` becomes `[0, 50]` — because upstream applies `zero` by scale option rather than by scale type; a quantile and a bin-ordinal scale take it the same way",
       "milestone": "6"
     },
     {

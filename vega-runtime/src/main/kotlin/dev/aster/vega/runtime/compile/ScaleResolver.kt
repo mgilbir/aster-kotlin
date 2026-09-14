@@ -1111,7 +1111,27 @@ public class ScaleResolver(
       )
       return null
     }
-    return numbers
+    // **`zero` folds into these domains too.** `configureDomain` applies it by scale *option* and
+    // not by scale type, so a threshold, quantile or bin-ordinal scale that asks for it gets the
+    // same per-end treatment a linear one does — probed, `[20, 50, 80]` with `zero: true` is
+    // reported by upstream as `[0, 50, 80]` on all three, and `[-5, 50, 80]` is left alone because
+    // the low end is already past zero. It is the cut points that move, so every datum below the
+    // old first cut changes bucket: a symbol at the top of the plot instead of near the bottom.
+    //
+    // **Positionally**, on the domain as written rather than on a sorted copy: a quantile scale
+    // given the literal `[60, 8, 31]` comes back from upstream as `[0, 8, 31]`, the 60 replaced
+    // where it stood.
+    return withZero(numbers, spec)
+  }
+
+  /** Upstream's per-end `zero`: only a positive low end and a negative high end move. */
+  private fun withZero(domain: List<Double>, spec: ScaleSpec): List<Double> {
+    if (spec.zero != true || domain.isEmpty()) return domain
+    val folded = domain.toMutableList()
+    val last = folded.size - 1
+    if (folded[0] > 0.0) folded[0] = 0.0
+    if (folded[last] < 0.0) folded[last] = 0.0
+    return folded
   }
 
   // ---- domains --------------------------------------------------------------
