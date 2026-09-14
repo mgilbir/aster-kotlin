@@ -77,7 +77,7 @@ and what each was added to pin down. Every name in it is checked to still exist 
 | `arc-padding` | 10 | a padded, round-cornered donut beside a pie of the same data |
 | `window` | 43 | a running total and a three-point moving average, partitioned by series |
 | `sequence-lookup` | 27 | a curve generated from nothing, over bars joined to a second dataset |
-| `scale-variants` | 43 | a symlog axis over both signs, a pow axis, a reversed point scale |
+| `scale-variants` | 53 | a symlog axis over both signs, a pow axis, a reversed point scale, and a quantize scale whose range is a keyword |
 | `negative-labels` | 45 | where the minus sign applies and where the hyphen stays |
 | `label-limit` | 33 | labels truncated at the limit nobody set, and at an explicit one |
 | `step-lines` | 24 | the three staircase interpolations and a stepped area |

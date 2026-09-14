@@ -8,6 +8,24 @@ section here does not get released.
 
 ### Fixed
 
+- **A discretizing scale takes a range keyword.** `range: "height"` on a quantize, threshold,
+  quantile or bin-ordinal scale was refused outright — "needs an explicit range array or a scheme" —
+  where upstream resolves the keyword *first* and then asks what kind of scale wanted it. Probed: a
+  quantize scale over `range: "height"` in a hundred-tall view reports a range of `[100, 0]` and
+  buckets into it quite happily, and so do the other three.
+
+  A refused scale takes its axis with it — `VEGA_SCALE_NOT_BUILT`, no ticks, no labels, nothing
+  drawn — so the cost was a whole axis rather than a wrong colour. `binnedRange` accepted only a
+  literal or a scheme; `numericRange` beside it has always known how to resolve `width` and `height`,
+  and it was simply never asked. The direction comes out right by the rule already there: a keyword
+  descends for a continuous scale and ascends for a discrete one, and only `bin-ordinal` of these
+  four is discrete.
+
+  Found by the schema sweep's new scale families, where every property of the quantize family
+  differed alike — the sign that the base chart was already wrong before anything was swept. Twenty
+  differences down to fifteen; the one quantize case left is a different defect, `nice: true` on a
+  quantize scale.
+
 - **The sweep reads every scale type, not just the band one.** A scale is a `oneOf` of twelve
   branches in the schema and `propertiesOf` had always taken the band one, so a `base` belongs to a
   log scale, an `exponent` to a power one and a `constant` to a symlog — and nine properties were

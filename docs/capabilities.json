@@ -1879,8 +1879,8 @@
         "BinnedScaleTest",
         "FixtureDifferentialTest"
       ],
-      "tests_text": "`BinnedScaleTest` (upstream vectors), `FixtureDifferentialTest` (`binned-scales`)",
-      "notes": "Equal-width intervals of the domain, so a skewed column crowds into one bucket. Cut points are computed in d3's own form rather than accumulated, so they do not drift across a wide domain",
+      "tests_text": "`BinnedScaleTest` (upstream vectors), `FixtureDifferentialTest` (`binned-scales`, `scale-variants`)",
+      "notes": "Equal-width intervals of the domain, so a skewed column crowds into one bucket. Cut points are computed in d3's own form rather than accumulated, so they do not drift across a wide domain. A **range keyword** is a range like any other: `range: \"height\"` resolves to `[height, 0]` before the scale is built, which is two buckets, and the same holds for a threshold, quantile or bin-ordinal scale. Refusing one cost the axis as well as the scale",
       "milestone": "6"
     },
     {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "A symlog axis spanning both signs, a pow axis with an exponent other than one, and a reversed point scale — three scale types with no fixture of their own.",
+  "description": "A symlog axis spanning both signs, a pow axis with an exponent other than one, and a reversed point scale, and a quantize scale whose range is the keyword `height` — four scale types with no fixture of their own. A range keyword is a range like any other once it is resolved: `height` reads as `[height, 0]`, and two values are a perfectly good pair of buckets. This engine refused the whole scale instead, for wanting an explicit range array or a scheme, and a refused scale takes its axis with it.",
   "width": 240,
   "height": 150,
   "padding": 5,
@@ -39,12 +39,19 @@
       "range": "height",
       "padding": 0.5,
       "reverse": true
+    },
+    {
+      "name": "buckets",
+      "type": "quantize",
+      "domain": {"data": "table", "field": "p"},
+      "range": "height"
     }
   ],
   "axes": [
     {"orient": "bottom", "scale": "sym", "tickCount": 5, "title": "Symlog, both signs"},
     {"orient": "left", "scale": "power", "tickCount": 4, "title": "Pow 0.5"},
-    {"orient": "right", "scale": "steps"}
+    {"orient": "right", "scale": "steps"},
+    {"orient": "left", "scale": "buckets", "offset": 58, "tickCount": 4, "title": "Quantize, keyword range"}
   ],
   "marks": [
     {
