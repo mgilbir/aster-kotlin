@@ -385,6 +385,15 @@ section here does not get released.
 
 ### Internal
 
+- **The schema sweep reaches a mark's own properties and its sixty encode channels.** It swept four
+  guide families; it now sweeps six, and the widest of the two new ones is the channel table —
+  `strokeCap`, `blend`, `aria`, `smooth`, `padAngle`, `cornerRadiusTopLeft` and the rest, most of
+  which no chart in any corpus sets. Reaching them meant following the schema's *encoder value*
+  shape, where a channel's enumeration hides behind `{"value": {"enum": […]}}` because a channel may
+  equally be a field, a scale lookup or a signal; and keying the skip table by family, since a
+  legend's `fill` names a scale while a mark's is a colour. 789 cases now, 771 of them rendered by
+  upstream, and **all 771 agree**.
+
 - **A stroke's details are inert on a mark with no stroke.** `addEncoders` puts every property a
   specification names on the item whether or not anything uses it, so a legend symbol given a
   `symbolDash` carries a `strokeDash` even where the legend maps a fill and has no stroke colour —

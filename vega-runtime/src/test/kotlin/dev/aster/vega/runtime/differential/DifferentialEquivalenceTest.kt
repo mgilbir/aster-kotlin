@@ -17,6 +17,8 @@ import org.junit.jupiter.api.Test
  * - **A stroke detail on an unstroked mark paints nothing.** `addEncoders` puts every property the
  *   specification names on the item whether or not anything uses it, so a legend symbol given a
  *   `symbolDash` carries a `strokeDash` even where the legend maps a fill and has no stroke colour.
+ * - **A channel the mark type cannot read paints nothing.** `item.clip` is read for a *group* item
+ *   and nowhere else; a `limit` is read by `textValue`, which only a text mark calls.
  * - **`bolder` is 700 and `lighter` is 100.** Both are relative to the inherited weight, and
  *   upstream writes `font-weight` on the `<text>` element with none on any ancestor — so a browser
  *   resolves them against the initial `normal`. This engine resolves them at compile time instead.
@@ -108,6 +110,49 @@ class DifferentialEquivalenceTest {
         "symbol/legend-symbol[0].stroke: expected #333333, got absent",
         "symbol/legend-symbol[0].strokeDash: expected 4,2, got absent",
       ),
+      Differential.compareMarks(listOf(upstream), listOf(ours)).map { it.toString() },
+    )
+  }
+
+  @Test
+  fun `a channel the mark cannot read is not a difference`() {
+    val upstream =
+      Differential.Mark(
+        "rect",
+        "mark",
+        mapOf("x" to 10.0, "limit" to 8.0),
+        mapOf("fill" to "#4c78a8", "clip" to "true", "strokeCap" to "round"),
+      )
+    val ours = Differential.Mark("rect", "mark", mapOf("x" to 10.0), mapOf("fill" to "#4c78a8"))
+    assertEquals(
+      emptyList<Differential.Difference>(),
+      Differential.compareMarks(listOf(upstream), listOf(ours)),
+    )
+  }
+
+  @Test
+  fun `the same channel on the mark that does read it is compared`() {
+    val upstream =
+      Differential.Mark("text", "mark", mapOf("x" to 10.0, "limit" to 8.0), mapOf("text" to "a"))
+    val ours = Differential.Mark("text", "mark", mapOf("x" to 10.0), mapOf("text" to "a"))
+    assertEquals(
+      listOf("text/mark[0].limit: expected 8, got absent"),
+      Differential.compareMarks(listOf(upstream), listOf(ours)).map { it.toString() },
+    )
+  }
+
+  @Test
+  fun `a stroke cap on a stroked mark is compared against the implied default`() {
+    val upstream =
+      Differential.Mark(
+        "rect",
+        "mark",
+        mapOf("x" to 10.0),
+        mapOf("stroke" to "#333333", "strokeCap" to "round"),
+      )
+    val ours = Differential.Mark("rect", "mark", mapOf("x" to 10.0), mapOf("stroke" to "#333333"))
+    assertEquals(
+      listOf("rect/mark[0].strokeCap: expected round, got butt"),
       Differential.compareMarks(listOf(upstream), listOf(ours)).map { it.toString() },
     )
   }
