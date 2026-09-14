@@ -13,11 +13,11 @@
       "fill": "#4c78a8",
       "opacity": 0.6,
       "role": "mark",
-      "shapeHeight": 0,
-      "shapeLeft": 4,
-      "shapeTop": 4,
-      "shapeWidth": 0,
-      "type": "path"
+      "shapeHeight": 90,
+      "shapeLeft": 59,
+      "shapeTop": 14,
+      "shapeWidth": 90,
+      "type": "shape"
     }
   ],
   "scales": {},

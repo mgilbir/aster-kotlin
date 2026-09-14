@@ -98,7 +98,7 @@
       },
       "marks": [
         {
-          "type": "path",
+          "type": "shape",
           "from": {
             "data": "land"
           },

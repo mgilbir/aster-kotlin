@@ -1681,9 +1681,9 @@
  },
  {
   "fixture": "config-group-projection",
-  "kind": "path",
+  "kind": "shape",
   "role": "graphics-symbol",
-  "roleDescription": "path mark container",
+  "roleDescription": "shape mark container",
   "label": null,
   "hidden": false
  },
@@ -9665,25 +9665,41 @@
  },
  {
   "fixture": "identity-projection",
-  "kind": "path",
+  "kind": "shape",
   "role": "graphics-symbol",
-  "roleDescription": "path mark container",
+  "roleDescription": "shape mark container",
   "label": null,
   "hidden": false
  },
  {
   "fixture": "identity-projection",
-  "kind": "path",
+  "kind": "shape",
   "role": "graphics-symbol",
-  "roleDescription": "path mark container",
+  "roleDescription": "shape mark container",
   "label": null,
   "hidden": false
  },
  {
   "fixture": "identity-projection",
-  "kind": "path",
+  "kind": "shape",
   "role": "graphics-symbol",
-  "roleDescription": "path mark container",
+  "roleDescription": "shape mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "identity-projection",
+  "kind": "shape",
+  "role": "graphics-symbol",
+  "roleDescription": "shape mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "identity-projection",
+  "kind": "shape",
+  "role": "graphics-symbol",
+  "roleDescription": "shape mark container",
   "label": null,
   "hidden": false
  },
