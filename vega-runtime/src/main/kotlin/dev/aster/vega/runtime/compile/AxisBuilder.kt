@@ -582,7 +582,7 @@ public class AxisBuilder(
     val guide =
       extentRect(spec, scale, tickAndLabelReach)
         .union(tickAndLabelReach)
-        .union(titleNode?.bounds ?: RectD.Empty)
+        .union(titleMeasure(titleNode, spec))
         // The axis's own nudge onto the pixel grid is taken back out: upstream measures the axis at
         // `x` and only then places the item at `x + delta`, so the half pixel is in the drawing and
         // not in the measurement. `translate` is what that nudge is, which is why this reads it
@@ -590,6 +590,36 @@ public class AxisBuilder(
         // rather than subtracting a constant — a `translate: 0` axis has nothing to take out.
         .translate(placement.e - delta, placement.f - delta)
     return BuiltAxis(node, guide)
+  }
+
+  /**
+   * The title's box, measured where **upstream** measures it and then moved.
+   *
+   * ```js
+   * isYAxis ? dx = (title.x || 0) - (title.x = v) : dy = (title.y || 0) - (title.y = v);
+   * title.mark.bounds.clear().union(b.translate(-dx, -dy));
+   * ```
+   *
+   * A title's bounds are computed while it still sits at the axis's own origin — the encoder gives
+   * it only the coordinate *along* the axis — and `axisTitleLayout` then translates that box out to
+   * where the ticks and labels end. The two orderings are the same arithmetic and not the same
+   * number: a quarter turn's cosine is 6.1e-17 rather than zero, and whether that crumb survives
+   * depends on how big the coordinate it is added to happens to be. Measured at the origin it is
+   * smaller than half an ulp and vanishes; measured at `x = -35` it is not, and a left axis title
+   * reached to -46.00000000000001. The legend beside it is anchored at `Math.floor` of that, so it
+   * was placed a whole unit further out than upstream places it.
+   *
+   * Making the rotation exact instead was tried and is wrong: upstream's crumb is *real* wherever
+   * the encoder places a rotated guide itself, and two trellis fixtures depend on it surviving into
+   * a `Math.ceil`. The ordering is what has to match, not the ideal answer.
+   */
+  private fun titleMeasure(title: TextNode?, spec: AxisSpec): RectD {
+    if (title == null) return RectD.Empty
+    return if (spec.orient.isVertical) {
+      title.copy(x = 0.0).bounds.translate(title.x, 0.0)
+    } else {
+      title.copy(y = 0.0).bounds.translate(0.0, title.y)
+    }
   }
 
   /**

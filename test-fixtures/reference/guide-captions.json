@@ -1300,6 +1300,21 @@
   "caption": "Symbol legend titled 'none' for size with values from 0 to 2,500"
  },
  {
+  "fixture": "legend-left-of-axis",
+  "kind": "axis",
+  "caption": "X-axis titled 'category' for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "legend-left-of-axis",
+  "kind": "axis",
+  "caption": "Y-axis titled 'amount' for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "legend-left-of-axis",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'region' for fill color with 2 values: north, south"
+ },
+ {
   "fixture": "legend-stroke-channels",
   "kind": "legend",
   "caption": "Symbol legend titled 'style' for strokeDash with 3 values: alpha, beta, gamma"
