@@ -328,6 +328,16 @@ section here does not get released.
 
 ### Internal
 
+- **Two spellings the differential harness now reads as one value.** A `limit` of **zero** is
+  upstream's own way of saying "do not truncate" — `item.limit > 0 && text.length ? truncate(…) :
+  text` — and a `TextRun` here holds the same zero while the harness omits it, so `labelLimit: 0`
+  was reported as a difference in four sweep cases and is a difference in no drawing. And `bolder`
+  and `lighter` are **relative** weights: upstream writes them on the `<text>` element with none on
+  any ancestor, so a browser resolves them against the initial `normal`, which is the 700 and 100
+  this engine resolves them to at compile time. Both equivalences are asserted in both directions by
+  `DifferentialEquivalenceTest` — the pair that means the same thing agrees, and a weight resolved
+  to the wrong number still fails.
+
 - **A sweep of the surface Vega's schema declares, rather than of the charts people draw.** The four
   corpora here — the 200 fixtures, Vega-Lite's 627 examples, 1981 specifications from GitHub, 63
   Deneb templates — all agree with upstream on everything they cover, which is the point at which a
