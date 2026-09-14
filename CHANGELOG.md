@@ -6,6 +6,53 @@ section here does not get released.
 
 ## Unreleased
 
+### Changed
+
+- **The sweep reads every projection, which nothing else here reaches by property.** A projection is
+  the one part of a specification whose correctness is invisible until it is drawn: a formula, a
+  clipping rule and a resampler, and the whole of it lands in a path string. The corpora cover the
+  handful of maps people draw; `GeoProjectionTypesTest` pins each type's default constants against
+  `d3-geo`'s own path strings. Neither reaches a *property* — a `clipAngle` on a stereographic, a
+  `fit` on an `albersUsa`, a `precision` of zero.
+
+  One family per registered type, seventeen of them, read from `vega-projection`'s own registry
+  table rather than written down. Each draws the same small geography, chosen to be awkward: a
+  polygon at the pole, one across the antimeridian that has to be cut in two and stitched to the
+  seam, a line with no area and a bare point, which is drawn by `pointRadius` rather than by the
+  projection at all. Two comparisons rather than one — `geoshape` for the path string, where the
+  clipping and the resampling live, and `geopoint` for an x and a y, which is the formula with
+  nothing to hide behind. **4127 charts, up from 2999.**
+
+  Properties come from the schema *and* from `projectionProperties`, the nineteen names upstream
+  forwards in code: `reflectX` and `reflectY` are missing from the schema, and so are the nine that
+  belong to projection families `vega-projection` does not register. Their shape is read off a live
+  projection rather than written here. Two mechanisms were needed and both are general: a family may
+  now state values for a property whose schema declaration is a *container* rather than a value —
+  `fit` is "an object or an array", and the array rule was offering a projection `[4, 2]` to fit
+  itself to — and a family may now state that a property is **swept here** against a shared skip,
+  which `scale` needed: it names a scale everywhere in a specification except on a projection, where
+  it is the zoom, and the shared skip had quietly taken the most consequential number a map has.
+
+  The widening found **68 differences in five causes**, all real:
+
+  * the **identity** projection honours four things `d3-geo`'s does not have. Its identity is an
+    affine transform — `transform(postclip(stream))`, with setters for `scale`, `translate`,
+    `reflectX`, `reflectY` and `clipExtent` and nothing else — where this engine builds it out of
+    the spherical projection with a flag, so a clip angle clips it to a circle, a centre and a
+    rotation turn it, and the adaptive **resampler** runs on coordinates that are already on the
+    page: a straight edge from `[-100, 20]` to `[-60, 20]` bulges by 1.7 pixels, because the
+    midpoint it tests for is a great-circle midpoint. 63 of the 68;
+  * `precision: 0` on a gnomonic or an orthographic projection resamples differently;
+  * `scale: 0` on a mercator or a transverse mercator leaves this engine measuring `-Infinity` where
+    upstream draws a two-unit shape;
+  * `clipAngle: 0` on a stereographic projection clips to something different here;
+  * a projection's **`angle`** is applied here and ignored upstream — found by reading rather than by
+    the sweep, since the schema does not declare it. It is not in `projectionProperties`, so
+    `vega-geo` never forwards it, and probed: an `angle` of 30 moves nothing upstream.
+
+  Recorded rather than fixed in this change: the sweep is a measurement, and each of those is its own
+  defect with its own fix.
+
 ### Fixed
 
 - **`nice` reaches a quantize scale.** Upstream applies it by **capability** rather than by scale
