@@ -385,6 +385,17 @@ section here does not get released.
 
 ### Internal
 
+- **A blend mode, a cap and a join on the marks whose records left them out.** The comparison built
+  a rect's, a symbol's and a path's record from a shared paint table and hand-wrote the other four,
+  so a **blend** was compared on three mark types and not on a rule, a text, a line, an area or a
+  group — and the reference's own record for a line or an area carried neither the blend nor the
+  cap, the join or the mitre limit. A blended gridline agreed with a reference that says it is
+  blended and drew as though it were not. Both sides record them now, and the comparison is
+  **two-sided** for them: a blend this engine has and upstream does not is reported as loudly as the
+  other way round, which is the asymmetry that hid this for as long as it existed. Two real
+  differences fell out at once — a line's `strokeCap`, `strokeJoin` and `strokeMiterLimit` were
+  dropped from this side's record entirely.
+
 - **The schema sweep reaches a mark's own properties and its sixty encode channels.** It swept four
   guide families; it now sweeps six, and the widest of the two new ones is the channel table —
   `strokeCap`, `blend`, `aria`, `smooth`, `padAngle`, `cornerRadiusTopLeft` and the rest, most of

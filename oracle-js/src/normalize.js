@@ -54,6 +54,12 @@ const STYLE_CHANNELS = ['fill', 'stroke', 'strokeWidth', 'opacity', 'fillOpacity
 // `dir` and `lineBreak` change what is drawn without changing the anchor, and `lineHeight` changes
 // where the second line sits. All three were invisible while a text mark was compared by its anchor
 // and its font.
+// The channels that change what a **series** draws without changing its outline. A line or an area
+// is recorded once, from its first item, and these were not in that record at all: a blended line
+// agreed with a reference that does not say it is blended, and a dashed one with a reference that
+// does not say it is dashed. The item records have carried them since the day a round-capped rule
+// turned out to be longer than a butt-capped one.
+const SERIES_STYLE_CHANNELS = ['blend', 'strokeCap', 'strokeJoin', 'strokeMiterLimit'];
 const TEXT_CHANNELS = ['text', 'align', 'baseline', 'font', 'fontSize', 'fontWeight', 'fontStyle', 'angle', 'dir', 'lineBreak', 'lineHeight'];
 
 /**
@@ -307,9 +313,13 @@ function extentRecord(type, marktype, dx, dy, precision) {
     shapeWidth: canonicalNumber(b.x2 - b.x1, precision),
     shapeHeight: canonicalNumber(b.y2 - b.y1, precision),
   };
-  for (const channel of STYLE_CHANNELS) {
-    if (first[channel] !== undefined) entry[channel] = styleValue(first[channel], precision);
+  for (const channel of [...STYLE_CHANNELS, ...SERIES_STYLE_CHANNELS]) {
+    if (first[channel] !== undefined && first[channel] !== null) {
+      entry[channel] = styleValue(first[channel], precision);
+    }
   }
+  const dash = dashOf(first);
+  if (dash !== undefined) entry.strokeDash = dash;
   if (entry.fillOpacity !== undefined && entry.fill === undefined) delete entry.fillOpacity;
   if (entry.strokeOpacity !== undefined && entry.stroke === undefined) delete entry.strokeOpacity;
   return entry;
@@ -395,8 +405,10 @@ function seriesRecord(type, marktype, dx, dy, precision) {
   // and the channel itself still has to survive the round trip.
   if (first.tension !== undefined) entry.tension = canonicalNumber(first.tension, precision);
 
-  for (const channel of STYLE_CHANNELS) {
-    if (first[channel] !== undefined) entry[channel] = styleValue(first[channel], precision);
+  for (const channel of [...STYLE_CHANNELS, ...SERIES_STYLE_CHANNELS]) {
+    if (first[channel] !== undefined && first[channel] !== null) {
+      entry[channel] = styleValue(first[channel], precision);
+    }
   }
   const seriesDash = dashOf(first);
   if (seriesDash !== undefined) entry.strokeDash = seriesDash;

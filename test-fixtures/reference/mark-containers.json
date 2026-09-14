@@ -8904,6 +8904,14 @@
   "hidden": false
  },
  {
+  "fixture": "encode-channels",
+  "kind": "rule",
+  "role": "graphics-symbol",
+  "roleDescription": "rule mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "error-bars",
   "kind": "group",
   "role": "graphics-object",

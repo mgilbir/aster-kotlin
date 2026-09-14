@@ -463,6 +463,7 @@ public object Differential {
     solidColour(node.stroke.paint)?.let { strings["stroke"] = it.toCssHex() }
     dashOf(node.stroke)?.let { strings["strokeDash"] = it }
     strokeDetails(node.stroke, strings)
+    blendOf(node)?.let { strings["blend"] = it }
     return Mark("rule", node.metadata.role, numbers, strings)
   }
 
@@ -585,6 +586,7 @@ public object Differential {
       numbers["limit"] = run.limit
       strings["ellipsis"] = run.ellipsis
     }
+    blendOf(node)?.let { strings["blend"] = it }
     return Mark("text", node.metadata.role, numbers, strings)
   }
 
@@ -720,7 +722,12 @@ public object Differential {
       dashOf(st)?.let { strings["strokeDash"] = it }
       numbers["strokeWidth"] = st.width
       numbers["strokeOpacity"] = st.opacity
+      // The cap, the join and the mitre limit, which this record left out while every other one
+      // carried them: a round-capped line is longer than a butt-capped one by its own width.
+      strokeDetails(st, strings)
+      miterLimitOf(st)?.let { limit -> numbers["strokeMiterLimit"] = limit }
     }
+    blendOf(node)?.let { strings["blend"] = it }
     return Mark(kind, node.metadata.role, numbers, strings)
   }
 
@@ -809,6 +816,7 @@ public object Differential {
     // walk can tell a legend row from a plotting cell; upstream has no such distinction, so the
     // comparison reads them as one.
     val role = if (node.metadata.role == "legend-entry-item") "scope" else node.metadata.role
+    blendOf(node)?.let { strings["blend"] = it }
     return Mark("group", role, numbers + corners + paintNumbers(node), strings)
   }
 
@@ -876,7 +884,11 @@ public object Differential {
   /**
    * A blend mode, which changes every pixel a mark covers and was invisible to this comparison.
    *
-   * Absent for `normal`, which is what upstream leaves off the item.
+   * Absent for `normal`, which is what upstream leaves off the item. Recorded for **every** mark:
+   * it reached the rect, symbol and path records through their shared paint table and was missing
+   * from the four that build their own — a rule, a text, a line or area, and a group — so a blended
+   * gridline or label agreed with a reference that says it is blended and drew as though it were
+   * not.
    */
   private fun blendOf(node: SceneNode): String? {
     val mode =
@@ -957,16 +969,20 @@ public object Differential {
   ) {
     for ((channel, wanted) in expected.numbers) {
       if (channel in ignored) continue
+      // The inert channels are tested **before** the implied default, as they are for the strings:
+      // a `strokeOpacity` on a mark with no stroke is otherwise compared against the 1 this side
+      // implies, and reads as a difference over an opacity nothing paints with.
+      if (
+        unpaintedStroke(expected, channel) ||
+          unpaintedFill(expected, channel) ||
+          inertFill(expected, channel) ||
+          unreadByThisMark(expected, channel) ||
+          noLimit(expected, channel, wanted)
+      ) {
+        continue
+      }
       val got = actual.numbers[channel] ?: defaultFor(channel)
       if (got == null) {
-        if (
-          unpaintedStroke(expected, channel) ||
-            inertFill(expected, channel) ||
-            unreadByThisMark(expected, channel) ||
-            noLimit(expected, channel, wanted)
-        ) {
-          continue
-        }
         out.add(Difference("$where.$channel", fmt(wanted), "absent"))
         continue
       }
@@ -987,8 +1003,10 @@ public object Differential {
     }
     // Paint the reference does not have is as much a difference as paint it has and we lack: a mark
     // stroked here and unstroked upstream draws an outline that should not be there, and comparing
-    // only the reference's own channels would never notice.
-    for (channel in COLOUR_CHANNELS) {
+    // only the reference's own channels would never notice. The same asymmetry hid a **blend** and
+    // a **cap** for as long as the reference's series records left them out — this side recorded
+    // them and nothing looked, so the two disagreed in silence.
+    for (channel in ONE_SIDED_CHANNELS) {
       if (channel in ignored) continue
       if (channel !in expected.strings && channel in actual.strings) {
         out.add(Difference("$where.$channel", "absent", actual.strings.getValue(channel)))
@@ -1316,6 +1334,17 @@ public object Differential {
 
   private fun unpaintedStroke(expected: Mark, channel: String): Boolean =
     channel in UNPAINTED_WITHOUT_STROKE && !expected.strings.containsKey("stroke")
+
+  /**
+   * A fill **opacity** on a mark the reference does not fill, which paints nothing.
+   *
+   * The mirror of [unpaintedStroke], and it bites on the marks that are usually stroked: a line
+   * given a `fillOpacity` carries one whether or not it has a fill, and `drawPath` only reaches
+   * `context.fill()` when `item.fill` is set. The colour itself is not in this rule, so a mark
+   * upstream fills and this one does not is still reported.
+   */
+  private fun unpaintedFill(expected: Mark, channel: String): Boolean =
+    channel == "fillOpacity" && !expected.strings.containsKey("fill")
 
   /**
    * A continuous scale's three comparable facts, shared by every family that has them.
@@ -1697,6 +1726,17 @@ public object Differential {
   private val CURVE_EXTENT_TYPES = setOf("arc", "trail", "path")
 
   private val COLOUR_CHANNELS = setOf("fill", "stroke")
+
+  /**
+   * Channels checked in **both** directions: a value this side has and the reference does not is
+   * reported as loudly as the other way round.
+   *
+   * Only the ones both sides always record, which is what makes the reverse direction meaningful. A
+   * channel this harness records for its own reasons — `closed` on a line, an `ellipsis` — would
+   * read as a difference against every reference, so it is not here.
+   */
+  private val ONE_SIDED_CHANNELS =
+    COLOUR_CHANNELS + setOf("blend", "strokeCap", "strokeJoin", "strokeDash")
 
   private val CORNER_CHANNELS =
     setOf(
