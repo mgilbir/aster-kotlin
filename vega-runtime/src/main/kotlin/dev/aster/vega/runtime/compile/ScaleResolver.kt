@@ -585,13 +585,20 @@ public class ScaleResolver(
     val scale =
       LogScale(spec.name, domain, oriented(range, reversed(spec)), base, spec.clamp, spec.round)
     if (!scale.isValid) {
-      diagnostics.error(
+      // **The scale is still built.** A log domain that touches zero cannot place anything, and
+      // upstream agrees — every `scale(x)` on one answers null — but upstream *has* the scale all
+      // the same: the axis that names it still draws its line and its title, and only the marks go
+      // missing. Refusing it here took the axis with it and reported two further errors for the
+      // encodings that named it, so a chart upstream draws became no chart and three complaints
+      // about this engine. `isValid` already makes every position a NaN, which is the same nothing
+      // upstream's null is, so building it is both faithful and sufficient. It warns rather than
+      // errors: the odd thing here is the specification, and the drawing is upstream's.
+      diagnostics.warn(
         DiagnosticCodes.SCALE_INVALID_DOMAIN,
         "Log scale '${spec.name}' has a domain of $domain, which spans or touches zero; " +
           "marks using it cannot be positioned",
         operator = spec.name,
       )
-      return null
     }
     return scale
   }

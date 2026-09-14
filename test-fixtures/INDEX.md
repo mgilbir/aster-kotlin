@@ -134,7 +134,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `link-paths` | 77 | path, symbol, text | formula, linkpath, stratify, tree, treelinks | ordinal |
 | `local-time-dst` | 35 | line, rule, symbol, text | — | linear, time, utc |
 | `log-axis-labels` | 154 | rule, text | — | log |
-| `log-scale` | 97 | rule, symbol, text | — | log, sqrt |
+| `log-scale` | 99 | rule, symbol, text | — | log, sqrt |
 | `luminance-contrast` | 24 | rect, text | — | band |
 | `map-with-tooltip` | 3623 | group, rect, shape, text | filter, formula, geoshape, lookup | quantize |
 | `mark-clip-shape` | 8 | rect, symbol | — | — |

@@ -1027,6 +1027,32 @@
     },
     {
       "opacity": 1,
+      "role": "axis-domain",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": 300.5,
+      "y": 260.5,
+      "y2": 260.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "fontWeight": "bold",
+      "opacity": 1,
+      "role": "axis-title",
+      "text": "Domain touches zero",
+      "type": "text",
+      "x": 150.5,
+      "y": 264.5
+    },
+    {
+      "opacity": 1,
       "role": "axis-tick",
       "stroke": "#888",
       "strokeWidth": 1,
@@ -1265,6 +1291,17 @@
       ],
       "ticks": []
     },
+    "touchesZero": {
+      "domain": [
+        0,
+        900
+      ],
+      "range": [
+        0,
+        300
+      ],
+      "ticks": []
+    },
     "x": {
       "domain": [
         1,
@@ -1351,7 +1388,7 @@
     }
   },
   "size": {
-    "height": 252,
+    "height": 290,
     "width": 361
   },
   "spec": "log-scale.vg.json",

@@ -8,6 +8,16 @@ section here does not get released.
 
 ### Fixed
 
+- **An axis whose scale can place nothing still draws its spine and its title.** A log scale whose
+  domain touches zero really is unusable, and upstream agrees — every `scale(x)` on one answers
+  null. But upstream *has* the scale all the same, so the axis that names it draws its line and its
+  title with no ticks between them, and only the marks go missing. This refused to build the scale
+  at all, which took the axis with it and reported two further errors for the encodings that named
+  it: a chart upstream draws became no chart and three complaints about this engine. The scale is
+  now built and a warning takes the error's place, `isValid` already making every position a NaN —
+  the same nothing upstream's null is. `log-scale` carries a scale with a domain of `[0, 900]` and
+  the axis that names it.
+
 - **A log scale's `base` decides its ticks, never its geometry.** d3 transforms a log scale by the
   **natural** log whatever base was asked for — `base` reaches the ticks, the labels and `nice` and
   nothing else. This divided the transform by `ln(base)`, which is the same answer for a sane base,
