@@ -18576,6 +18576,22 @@
   "hidden": false
  },
  {
+  "fixture": "view-size-degenerate",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "view-size-degenerate",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "volcano-contours",
   "kind": "group",
   "role": "graphics-object",

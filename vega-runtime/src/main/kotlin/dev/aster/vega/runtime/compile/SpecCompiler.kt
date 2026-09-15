@@ -652,18 +652,30 @@ public class SpecCompiler(
     // way `pad` does. This is the whole of the second pass: seed `width` and `height` with the
     // fitted numbers and everything downstream follows, because a scale range, an axis extent and a
     // mark position are all measured against them.
+    // **Never negative**, however it was arrived at. `viewSizeLayout` measures the root group as
+    // `Math.max(0, group.width || 0)` and writes the result back into the `width` signal, so a
+    // specification asking for a width of -4 gets a plotting area of zero — and every scale ranging
+    // over `"width"` gets `[0, 0]` with it. Clamping only the fitted branches left the declared one
+    // handing a band scale a negative range to divide up, which came out as a bandwidth of 0.878
+    // where upstream's is 0.
     val width =
-      if (fit != null && spec.autosize.type != AutosizeType.FIT_Y) {
-        maxOf(0.0, fit.base.width - fit.over.left - fit.over.right)
-      } else {
-        viewWidth
-      }
+      maxOf(
+        0.0,
+        if (fit != null && spec.autosize.type != AutosizeType.FIT_Y) {
+          fit.base.width - fit.over.left - fit.over.right
+        } else {
+          viewWidth
+        },
+      )
     val height =
-      if (fit != null && spec.autosize.type != AutosizeType.FIT_X) {
-        maxOf(0.0, fit.base.height - fit.over.top - fit.over.bottom)
-      } else {
-        viewHeight
-      }
+      maxOf(
+        0.0,
+        if (fit != null && spec.autosize.type != AutosizeType.FIT_X) {
+          fit.base.height - fit.over.top - fit.over.bottom
+        } else {
+          viewHeight
+        },
+      )
     // The fitted size is the **view's** answer, not the specification's, so it replaces a declared
     // `width` or `height` signal for this pass rather than being overwritten by it:
     //

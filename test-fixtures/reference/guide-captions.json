@@ -2315,6 +2315,16 @@
   "caption": "Title text 'A Mile-Long Global Food Market: Mapping Cuisine from “The Ave”'"
  },
  {
+  "fixture": "view-size-degenerate",
+  "kind": "axis",
+  "caption": "X-axis titled 'category' for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "view-size-degenerate",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 55"
+ },
+ {
   "fixture": "window",
   "kind": "axis",
   "caption": "X-axis titled 'Step' for a discrete scale with 5 values: 1, 2, 3, 4, 5"
