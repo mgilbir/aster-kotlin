@@ -18,9 +18,9 @@
  *
  * ### What is swept, and what is left out
  *
- * Nine kinds of family: `axis`, `legend`, `title`, `scale`, **projection**, the **layout** of a
- * group of groups, the **config block** behind a guide or a mark, a **mark's own properties**, and
- * the **encode channels** every mark item carries. The
+ * Ten kinds of family: `axis`, `legend`, `title`, `scale`, **projection**, the **view** itself, the
+ * **layout** of a group of groups, the **config block** behind a guide or a mark, a **mark's own
+ * properties**, and the **encode channels** every mark item carries. The
  * guides are where this engine's code is densest — a guide is a layout, a text measurement and half
  * a dozen marks — a projection is a formula and a clipping rule whose difference is invisible until
  * it is drawn, a config is the same property table reached by a different piece of code, and the
@@ -72,8 +72,8 @@ import * as vega from 'vega';
 import { pathCurves, pathSymbols } from 'vega-scenegraph';
 import { projectionProperties } from 'vega-projection';
 import { pinDeterminism } from './determinism.js';
-import { canonicalJson, canonicalNumber } from './canonical.js';
-import { normalizeScales, normalizeScene } from './normalize.js';
+import { canonicalJson } from './canonical.js';
+import { normalizeScales, normalizeScene, surfaceSize } from './normalize.js';
 
 // Read rather than imported: the package does not export its build directory, and the schema is
 // data this reads rather than a module it depends on.
@@ -700,6 +700,13 @@ const FAMILIES = {
       },
     ]),
   ),
+  // The **view** itself: the five properties a specification writes beside its marks, which decide
+  // how big the drawing is rather than what is in it. Every case the sweep compares already checks
+  // the surface, so this is the one family whose whole subject is the number every other family
+  // checks in passing.
+  view: (spec, property, value) => {
+    spec[property] = value;
+  },
   // The **layout** of a group of groups, which is a subsystem no other family reaches: every other
   // chart here has one group or none, and a layout property is a relationship between cells.
   layout: (spec, property, value) => {
@@ -964,7 +971,20 @@ const FAMILY_SKIP = {
  * band branch has never heard of it. Nine properties were reachable through no family at all until
  * the scale types got one each.
  */
+/**
+ * The top-level properties, which the schema states in an `allOf` beside a `$ref` to a scope.
+ *
+ * `width`, `height`, `padding`, `autosize`, `background`, `style` and `description` — everything a
+ * specification says about the drawing as a whole rather than about anything in it.
+ */
+function viewProperties() {
+  const block = schema.allOf.find((branch) => branch.properties);
+  const { $schema: _ignored, config: _alsoIgnored, ...rest } = block.properties;
+  return rest;
+}
+
 function propertiesOf(family) {
+  if (family === 'view') return viewProperties();
   // Every `encode-<marktype>` family reads the same channel table; the mark type decides which of
   // them mean anything, not which of them exist.
   const named = family.startsWith('encode-')
@@ -1127,7 +1147,36 @@ const VOCABULARY_ALIAS = {
  * setting a scale and a translation the composite ignores, and drew at its unfitted default. Left to
  * the array rule it was offered `[4, 2]`, which is not geometry at all.
  */
+/** The one colour tried where the schema says a colour, chosen to be unlike every default. */
+const COLOUR = '#b35a1f';
+
 const FAMILY_VOCABULARY = {
+  view: {
+    // The schema declares `autosize` as **either** a word or an object, and the object is where
+    // `contains` and `resize` live: `contains: "padding"` makes the stated width include the
+    // padding rather than sit inside it, which moves every mark in the chart. Sweeping the enum
+    // alone — which is what the generic rules pick — leaves both unreached.
+    autosize: {
+      kind: 'enum and the object form',
+      values: [
+        'pad',
+        'fit',
+        'fit-x',
+        'fit-y',
+        'none',
+        { type: 'fit', contains: 'padding' },
+        { type: 'pad', contains: 'padding' },
+        { type: 'fit', resize: true },
+      ],
+    },
+    // Likewise: a number, or one number per side. A chart padded unevenly is the ordinary case for
+    // anything with a legend on one side.
+    padding: {
+      kind: 'number and the per-side form',
+      values: [0, 8, { top: 2, bottom: 12, left: 20, right: 4 }],
+    },
+    background: { kind: 'colour', values: [COLOUR] },
+  },
   projection: {
     // Two and three, because the third is a **roll** about the axis the first two point along and
     // reaches a different part of the rotation than either of the others.
@@ -1169,8 +1218,6 @@ const FAMILY_VOCABULARY = {
 /** The numbers tried for a `number`-typed property, and why these. */
 const NUMBERS = [0, 0.5, 8, -4];
 
-/** The one colour tried where the schema says a colour, chosen to be unlike every default. */
-const COLOUR = '#b35a1f';
 
 /**
  * Every branch a schema fragment can take, with `$ref`s followed.
@@ -1351,7 +1398,7 @@ for (const one of cases) {
   const reference = {
     vegaVersion: vega.version,
     spec: `${one.name}.vg.json`,
-    size: surfaceSize(view),
+    size: surfaceSize(view, one.spec),
     scales: normalizeScales(view, scaleNames),
     ...normalizeScene(view.scenegraph().root),
   };
@@ -1378,20 +1425,3 @@ writeFileSync(
 console.log(`Generated ${cases.length} case(s) from the schema: ${rendered} rendered, ${refused.length} refused by upstream.`);
 console.log(`${skipped.length} property(ies) skipped; see ${join(outDir, 'manifest.json')}.`);
 
-/** The rendered surface, as `reference.js` measures it: content bounds plus padding. */
-function surfaceSize(view) {
-  const padding = view.padding() || {};
-  const left = padding.left || 0;
-  const top = padding.top || 0;
-  const right = padding.right || 0;
-  const bottom = padding.bottom || 0;
-  const frame = view.scenegraph().root.items[0];
-  const bounds = frame && frame.bounds;
-  if (!bounds) {
-    return { width: view.width() + left + right, height: view.height() + top + bottom };
-  }
-  return {
-    width: canonicalNumber(bounds.x2 - bounds.x1 + left + right),
-    height: canonicalNumber(bounds.y2 - bounds.y1 + top + bottom),
-  };
-}
