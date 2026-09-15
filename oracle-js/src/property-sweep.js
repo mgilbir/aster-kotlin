@@ -18,8 +18,9 @@
  *
  * ### What is swept, and what is left out
  *
- * Eight families: `axis`, `legend`, `title`, `scale`, **projection**, the **config block** behind a
- * guide, a **mark's own properties**, and the **encode channels** every mark item carries. The
+ * Nine families: `axis`, `legend`, `title`, `scale`, **projection**, the **layout** of a group of
+ * groups, the **config block** behind a guide, a **mark's own properties**, and the **encode
+ * channels** every mark item carries. The
  * guides are where this engine's code is densest — a guide is a layout, a text measurement and half
  * a dozen marks — a projection is a formula and a clipping rule whose difference is invisible until
  * it is drawn, a config is the same property table reached by a different piece of code, and the
@@ -46,6 +47,9 @@
  * Three families bring their own, because the chart a property means anything on is the family's
  * own question: a scale type gets [scaleBaseSpec], a mark type gets its entry in [MARK_BASES], and a
  * projection gets [projectionBaseSpec], which is a small map rather than a bar chart.
+ *
+ * The `layout` family brings [layoutBaseSpec], a trellis: a layout property is a relationship
+ * between cells, and every other chart here has one group or none.
  *
  * A `config-<guide>` family keeps the base chart and writes the property into `config` instead of
  * onto the guide. It reaches **both** axes where the `axis` family reaches only the first, which is
@@ -554,6 +558,91 @@ function projectionBaseSpec(type) {
   };
 }
 
+/**
+ * A **trellis**, which is the only chart a `layout` means anything on.
+ *
+ * `layout` belongs to a group mark whose children are groups, and everything it decides is a
+ * relationship *between* cells: how they line up, how far apart they sit, whether a narrow one
+ * hugs the left of its column or floats in the middle of it. A chart with one group has no layout
+ * to get wrong, which is why the base chart cannot serve here and why none of the other families
+ * reaches this at all.
+ *
+ * Six cells of six different widths and two different heights, in a grid of three. The differences
+ * are the point: `align`, `bounds` and `center` all answer "what about the cell that does not fill
+ * its column", and every cell the same size is the one arrangement where their answers agree.
+ *
+ * Each cell carries a **title** so that `titleBand` and `titleAnchor` have a title to band and
+ * anchor, and a bottom **axis** so that `bounds: "full"` has something sticking out of the cell to
+ * measure — an axis is drawn outside its group's own rectangle, which is the whole difference
+ * between `full` and `flush`.
+ */
+function layoutBaseSpec() {
+  return {
+    $schema: 'https://vega.github.io/schema/vega/v6.json',
+    width: 300,
+    height: 170,
+    padding: 5,
+    background: 'white',
+    data: [
+      {
+        name: 't',
+        values: [
+          { c: 'a', w: 20, h: 30, v: 3 },
+          { c: 'b', w: 60, h: 44, v: 8 },
+          { c: 'c', w: 100, h: 30, v: 5 },
+          { c: 'd', w: 34, h: 44, v: 9 },
+          { c: 'e', w: 74, h: 30, v: 2 },
+          { c: 'f', w: 114, h: 44, v: 6 },
+        ],
+      },
+    ],
+    scales: [
+      { name: 'colour', type: 'ordinal', domain: { data: 't', field: 'c' }, range: 'category' },
+    ],
+    marks: [
+      {
+        type: 'group',
+        layout: { columns: 3, padding: 12 },
+        marks: [
+          {
+            type: 'group',
+            // Grouped by all three, so the facet's own datum carries `w` and `h`: a facet group's
+            // datum is the grouping key and nothing else, and a cell that reads `{field: 'w'}` off
+            // one grouped by `c` alone finds no width at all.
+            from: { facet: { data: 't', name: 'cell', groupby: ['c', 'w', 'h'] } },
+            title: { text: { signal: 'parent.c' }, fontSize: 8 },
+            encode: {
+              enter: {
+                width: { field: 'w' },
+                height: { field: 'h' },
+              },
+            },
+            scales: [
+              { name: 'x', type: 'linear', domain: [0, 10], range: { signal: '[0, width]' } },
+            ],
+            axes: [{ orient: 'bottom', scale: 'x', tickCount: 2 }],
+            marks: [
+              {
+                type: 'rect',
+                from: { data: 'cell' },
+                encode: {
+                  enter: {
+                    x: { value: 0 },
+                    width: { scale: 'x', field: 'v' },
+                    y: { value: 0 },
+                    height: { value: 10 },
+                    fill: { scale: 'colour', field: 'c' },
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
 const FAMILIES = {
   // The **bottom** axis, which is the one with a band scale under it: half of what an axis property
   // decides — `tickBand`, `bandPosition`, `labelOverlap` — only means anything over bands.
@@ -582,6 +671,11 @@ const FAMILIES = {
       },
     ]),
   ),
+  // The **layout** of a group of groups, which is a subsystem no other family reaches: every other
+  // chart here has one group or none, and a layout property is a relationship between cells.
+  layout: (spec, property, value) => {
+    spec.marks[0].layout[property] = value;
+  },
   // One family per **guide config block**, which is the same property table reached by a different
   // route. `config.axis.labelAngle` and an axis's own `labelAngle` are the same property and a
   // different piece of code: upstream reads every axis property through `lookup(spec, config)`,
@@ -1148,7 +1242,9 @@ for (const [family, apply] of Object.entries(FAMILIES)) {
         ? scaleBaseSpec(family.slice('scale-'.length))
         : family.startsWith('projection-')
           ? projectionBaseSpec(family.slice('projection-'.length))
-          : baseSpec();
+          : family === 'layout'
+            ? layoutBaseSpec()
+            : baseSpec();
       apply(spec, property, value);
       // A name that has already been used gets a number: two values can slug the same way — `0`
       // and `-0`, `"a b"` and `"a_b"` — and a second file overwriting the first would silently

@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Changed
 
+- **The sweep reads a group's `layout`, which is a subsystem no other family reaches.** Every other
+  chart the sweep writes has one group or none, and every one of the ten layout properties is a
+  relationship *between* cells: how they line up, how far apart they sit, whether a cell narrower
+  than its column hugs the left of it or floats in the middle. So the family brings a trellis of its
+  own — six cells of six widths and two heights in a grid of three, each with a title for
+  `titleBand` to band and an axis for `bounds: "full"` to measure, because the differences between
+  the cells are the only thing any of these properties can act on. **4733 charts, up from 4702.**
+
+  Four differences, all real and all fixed in this release. Writing the base chart found a fifth
+  thing worth knowing: a facet group's datum is its grouping key and nothing else, so a cell that
+  reads `{"field": "w"}` off a facet grouped by `c` alone finds no width at all — which is how the
+  `bounds: "flush"` case came to be measuring sizeless cells, and how the missing fallback surfaced.
+
 - **The sweep reads the `config` block, which is the same property table reached by different code.**
   `config.axis.labelAngle` and an axis's own `labelAngle` are one property and two pieces of code:
   upstream reads every axis property through `lookup(spec, config)`, which answers
