@@ -19,8 +19,8 @@
  * ### What is swept, and what is left out
  *
  * Ten kinds of family: `axis`, `legend`, `title`, `scale`, **projection**, the **view** itself, the
- * **layout** of a group of groups, the **config block** behind a guide or a mark, a **mark's own
- * properties**, and the **encode channels** every mark item carries. The
+ * **layout** of a group of groups, the **config block** behind a guide, a mark or a **range name**,
+ * a **mark's own properties**, and the **encode channels** every mark item carries. The
  * guides are where this engine's code is densest — a guide is a layout, a text measurement and half
  * a dozen marks — a projection is a formula and a clipping rule whose difference is invisible until
  * it is drawn, a config is the same property table reached by a different piece of code, and the
@@ -564,6 +564,87 @@ function projectionBaseSpec(type) {
 }
 
 /**
+ * The six range names upstream's own configuration fills in, read from where it fills them.
+ *
+ * `config.range.category` is how every theme sets a palette: a scale that says `"range": "category"`
+ * gets whatever the configuration put there, and upstream's default puts a scheme. The names are
+ * six and the schema knows none of them — `config` is declared as `{"type": "object"}` — so they
+ * come out of `vega-parser`'s own default configuration, at the one indent that holds the names
+ * rather than the schemes inside them.
+ */
+const RANGE_NAMES = tableKeys(
+  '../node_modules/vega-parser/src/config.js',
+  '    range: {',
+  /^ {6}([A-Za-z]+):/gm,
+);
+
+/**
+ * A chart with one scale per range name, so a `config.range` entry has something to land on.
+ *
+ * Six scales and three rows of marks: the four colour ranges paint rects, the symbol range shapes a
+ * row of symbols, and the diverging one paints a row of its own because its default carries an
+ * `extent` of `[1, 0]` — it is the one range whose default reverses the scheme, and a chart that
+ * reads the scheme and drops the extent is a chart with its colours the wrong way round.
+ */
+function rangeBaseSpec() {
+  return {
+    $schema: 'https://vega.github.io/schema/vega/v6.json',
+    width: 220,
+    height: 120,
+    padding: 5,
+    background: 'white',
+    data: [
+      {
+        name: 't',
+        values: [
+          { c: 'alpha', v: 10 },
+          { c: 'beta', v: 45 },
+          { c: 'gamma', v: 70 },
+          { c: 'delta', v: 95 },
+        ],
+      },
+    ],
+    scales: [
+      { name: 'x', type: 'band', domain: { data: 't', field: 'c' }, range: 'width', padding: 0.1 },
+      { name: 'category', type: 'ordinal', domain: { data: 't', field: 'c' }, range: 'category' },
+      { name: 'ordinal', type: 'ordinal', domain: { data: 't', field: 'c' }, range: 'ordinal' },
+      { name: 'heatmap', type: 'linear', domain: { data: 't', field: 'v' }, range: 'heatmap' },
+      { name: 'ramp', type: 'linear', domain: { data: 't', field: 'v' }, range: 'ramp' },
+      { name: 'diverging', type: 'linear', domain: { data: 't', field: 'v' }, range: 'diverging' },
+      { name: 'symbol', type: 'ordinal', domain: { data: 't', field: 'c' }, range: 'symbol' },
+    ],
+    marks: [
+      ...['category', 'ordinal', 'heatmap', 'ramp', 'diverging'].map((scale, row) => ({
+        type: 'rect',
+        from: { data: 't' },
+        encode: {
+          enter: {
+            x: { scale: 'x', field: 'c' },
+            width: { scale: 'x', band: 1 },
+            y: { value: row * 18 },
+            height: { value: 16 },
+            fill: { scale, field: scale === 'category' || scale === 'ordinal' ? 'c' : 'v' },
+          },
+        },
+      })),
+      {
+        type: 'symbol',
+        from: { data: 't' },
+        encode: {
+          enter: {
+            x: { scale: 'x', field: 'c', band: 0.5 },
+            y: { value: 102 },
+            size: { value: 90 },
+            shape: { scale: 'symbol', field: 'c' },
+            fill: { value: '#555555' },
+          },
+        },
+      },
+    ],
+  };
+}
+
+/**
  * A **trellis**, which is the only chart a `layout` means anything on.
  *
  * `layout` belongs to a group mark whose children are groups, and everything it decides is a
@@ -667,6 +748,9 @@ const CONFIG_BLOCKS = {
   // a name a mark carries; `config.<marktype>` is one type's.
   mark: { definition: 'encodeEntry', like: 'encode' },
   style: { definition: 'encodeEntry', like: 'encode' },
+  // `config.range` is its own thing: its properties are range *names* rather than any guide's or
+  // mark's, so nothing else's skips or vocabularies apply to it.
+  range: { definition: null, like: 'config-range' },
   ...Object.fromEntries(
     Object.keys(MARK_BASES).map((type) => [type, { definition: 'encodeEntry', like: 'encode' }]),
   ),
@@ -700,6 +784,13 @@ const FAMILIES = {
       },
     ]),
   ),
+  // `config.range.<name>`: the six palettes a theme sets, and the one place a chart says "whatever
+  // the theme thinks a category looks like" rather than naming colours itself. Its properties are
+  // the names rather than anything the schema declares, for the reason every `config` family has:
+  // the schema declares `config` as an object and says nothing about what goes in it.
+  'config-range': (spec, property, value) => {
+    spec.config = { range: { [property]: value } };
+  },
   // The **view** itself: the five properties a specification writes beside its marks, which decide
   // how big the drawing is rather than what is in it. Every case the sweep compares already checks
   // the surface, so this is the one family whose whole subject is the number every other family
@@ -985,6 +1076,9 @@ function viewProperties() {
 
 function propertiesOf(family) {
   if (family === 'view') return viewProperties();
+  // A range name is a *key*, not a declared property: the schema has no word for any of them, so
+  // there is no fragment to read values out of and [FAMILY_VOCABULARY] states them instead.
+  if (family === 'config-range') return Object.fromEntries(RANGE_NAMES.map((n) => [n, {}]));
   // Every `encode-<marktype>` family reads the same channel table; the mark type decides which of
   // them mean anything, not which of them exist.
   const named = family.startsWith('encode-')
@@ -1151,6 +1245,37 @@ const VOCABULARY_ALIAS = {
 const COLOUR = '#b35a1f';
 
 const FAMILY_VOCABULARY = {
+  // A range is set three ways and all three are ordinary: a **scheme** by name, the colours written
+  // **out**, and — for a diverging one — a scheme with an `extent` that reads part of it or turns
+  // it round. The defaults themselves use two of the three, `symbol` being a written-out list of
+  // shape names where the rest are schemes.
+  'config-range': {
+    category: {
+      kind: 'scheme, and the colours written out',
+      values: [{ scheme: 'dark2' }, ['#552255', '#225522', '#222255', '#552222']],
+    },
+    ordinal: { kind: 'scheme', values: [{ scheme: 'greens' }, { scheme: 'greys', count: 3 }] },
+    heatmap: { kind: 'scheme', values: [{ scheme: 'magma' }] },
+    ramp: { kind: 'scheme', values: [{ scheme: 'purples' }, { scheme: 'purples', extent: [1, 0] }] },
+    // `[1, 0]` rather than `[0, 1]`: an override *replaces* the default entry, so a diverging range
+    // given only a scheme already reads it forwards — the two cases would draw the same colours and
+    // compare nothing. Reversing it is the case worth having, and it is what the default itself
+    // does.
+    diverging: {
+      kind: 'scheme, with and without an extent',
+      values: [{ scheme: 'purplegreen' }, { scheme: 'purplegreen', extent: [1, 0] }],
+    },
+    // Shapes whose **outlines** differ, not merely their names: a cross, a diamond and a square all
+    // measure the same square box at a given size, so a row of them says nothing about which shape
+    // was drawn. The harness records an outline's bounds rather than the name it came from.
+    symbol: {
+      kind: 'the shape names written out',
+      values: [
+        ['circle', 'triangle-up', 'wedge'],
+        ['wedge', 'triangle'],
+      ],
+    },
+  },
   view: {
     // The schema declares `autosize` as **either** a word or an object, and the object is where
     // `contains` and `resize` live: `contains: "padding"` makes the stated width include the
@@ -1354,7 +1479,9 @@ for (const [family, apply] of Object.entries(FAMILIES)) {
           ? projectionBaseSpec(family.slice('projection-'.length))
           : family === 'layout'
             ? layoutBaseSpec()
-            : baseSpec();
+            : family === 'config-range'
+              ? rangeBaseSpec()
+              : baseSpec();
       apply(spec, property, value);
       // A name that has already been used gets a number: two values can slug the same way — `0`
       // and `-0`, `"a b"` and `"a_b"` — and a second file overwriting the first would silently
