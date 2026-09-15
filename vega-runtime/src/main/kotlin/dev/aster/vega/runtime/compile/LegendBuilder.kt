@@ -694,7 +694,13 @@ internal class LegendBuilder(
     val order = GridLayout.columnMajorOrder(cells.size, columns)
     val ordered = order.map { cells[it] }
     val boxes = ordered.map { cell -> cellBox(cell, clipHeight) }
-    val align = GridLayout.Align.fromName(gridAlign)
+    // **`each`**, which is a default of upstream's own rather than the grid's: its configuration
+    // carries `legend: {gridAlign: 'each'}`, and its legend layout hard-codes `align: Each` in the
+    // parameters it builds. The grid's own answer for an unstated alignment is *none* — which is
+    // what a group layout gets — so saying it here is the difference between a legend whose entries
+    // line up in columns and one whose entries each start where the last one ended. A stated
+    // `gridAlign`, from the legend or from `config.legend`, still wins.
+    val align = GridLayout.Align.fromName(gridAlign ?: "each")
     val offsets =
       GridLayout.place(
         boxes,

@@ -82,6 +82,34 @@ section here does not get released.
 
 ### Fixed
 
+- **Centring a trellis requires an alignment, and a falsy `columns` is one row.** Four defects in the
+  grid a `layout` lays out, all cited to `vega-view-transforms`' own `gridLayout`.
+
+  **Centring requires an alignment.** Upstream's centring steps read the alignment flag —
+  `if (alignCol && get(opt.center, Column) && nrows > 1)` — and the branch an *unstated* `align`
+  takes begins `for (alignCol = false, …)`, clearing it. So `align: "none"` and no `align` at all are
+  the same branch, and neither centres anything. This engine read an absent `align` as `each`, so
+  `center: true` nudged every short cell to the middle of its row where upstream leaves it alone.
+  The two arrangements differ by exactly the slack.
+
+  **A falsy `columns` means one row.** `ncols = opt.columns || groups.length`: zero, or none at all,
+  puts every cell in a single row. Coercing it up to one turned `columns: 0` into a single tall
+  column, which is the opposite arrangement — 322 units wide where upstream draws 1942.
+
+  **A sizeless cell flushes to nothing.** `bboxFlush` is `(0, 0, item.width || 0, item.height || 0)`
+  and has no fallback. Falling back to what the cell drew was a guess, and it is the one arrangement
+  in which `flush` and `full` cannot differ: measured, a trellis of sizeless cells came out
+  identical to its own `full` layout here where upstream drew it 624 units narrower.
+
+  **A legend's grid says `each` itself.** The first of those changed what an unstated alignment
+  means, and a legend was relying on it: upstream's legend layout hard-codes `align: Each` in the
+  parameters it builds and its default configuration carries `legend: {gridAlign: 'each'}`, so the
+  legend now says so rather than taking the grid's own answer. A stated `gridAlign`, from the legend
+  or from `config.legend`, still wins.
+
+  `layout-center` carries three more grids, one per rule, and each of the four mutants is killed by
+  it. **The sweep is back to 100%: 4733 of 4733.**
+
 - **An axis reads `tickOffset` whatever its scale, and `position` only from itself.** Three defects
   in how an axis meets the `config` block, found by sweeping the config route and all three cited to
   upstream's source rather than inferred from the drawing.
