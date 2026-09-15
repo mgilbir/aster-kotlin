@@ -14,7 +14,7 @@
 # changed, so a difference names its own cause — renders each with upstream, and compares.
 #
 # The families are `axis`, `legend`, `title`, one per **scale type**, one per **projection type**, the
-# `config` block behind each guide, a mark's own properties, and one per **mark type** for the encode
+# **layout** of a group of groups, the `config` block behind each guide, a mark's own properties, and one per **mark type** for the encode
 # channels every item carries — the widest declared surface there is. A property is swept where the schema says enough to choose values
 # honestly (an enum, a boolean, a number, a colour), or where upstream fixes a vocabulary its schema
 # leaves open; anything else is skipped **and counted**, with the reason, in the manifest. A scale
