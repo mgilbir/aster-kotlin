@@ -43,7 +43,6 @@ internal class ProjectionResolver(
         translate = numberList(spec.translate, spec.name),
         center = numberList(spec.center, spec.name),
         rotate = numberList(spec.rotate, spec.name),
-        angle = number(spec.angle, spec.name),
         precision = number(spec.precision, spec.name),
         // Upstream reads these as booleans; a signal delivering 0 or 1 reads the same way.
         reflectX = number(spec.reflectX, spec.name)?.let { it != 0.0 } ?: false,

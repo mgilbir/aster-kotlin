@@ -1522,8 +1522,6 @@ public data class ProjectionSpec(
   val translate: NumberList = NumberList.None,
   val center: NumberList = NumberList.None,
   val rotate: NumberList = NumberList.None,
-  /** Post-projection rotation of the plane, in degrees. */
-  val angle: NumberValue? = null,
   /** The subdivision threshold for adaptive resampling; `0` turns it off entirely. */
   val precision: NumberValue? = null,
   val clipAngle: NumberValue? = null,

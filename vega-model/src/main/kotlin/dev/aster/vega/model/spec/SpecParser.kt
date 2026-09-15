@@ -855,7 +855,6 @@ private val PROJECTION_CONSUMED =
     "translate",
     "center",
     "rotate",
-    "angle",
     "precision",
     "clipAngle",
     "clipExtent",
@@ -866,6 +865,22 @@ private val PROJECTION_CONSUMED =
     "fit",
     "extent",
     "size",
+  )
+
+/**
+ * Projection properties this engine deliberately does not apply, and what a reader should know.
+ *
+ * `angle` is d3's — a rotation of the *plane* after the projection, which every `d3-geo` projection
+ * has a setter for — and upstream never reaches it. `vega-geo`'s projection transform forwards the
+ * nineteen names in `vega-projection`'s `projectionProperties` and no others, and `angle` is not
+ * among them; probed, a projection given an `angle` of 30 places every point exactly where it did
+ * without one. This engine applied it, so a map upstream draws upright came out turned.
+ */
+private val PROJECTION_EXPLAINED =
+  mapOf(
+    "angle" to
+      "Upstream never applies a projection's 'angle': it is not one of the properties " +
+        "vega-geo forwards to the projection, so a map is drawn the same with it and without it"
   )
 
 /** Layout properties this engine reads; the rest are named in [SpecParser.parseLayout]. */
@@ -1873,7 +1888,7 @@ public class SpecParser {
     }
     val typeValue = obj.fields["type"]
     val typeSignal = (typeValue as? VegaValue.Obj)?.fields?.get("signal")?.asString()
-    obj.reportUnhandled("Projection", path, PROJECTION_CONSUMED)
+    obj.reportUnhandled("Projection", path, PROJECTION_CONSUMED, PROJECTION_EXPLAINED)
     return ProjectionSpec(
       name = name,
       type = if (typeSignal == null) typeValue?.asString()?.takeIf { it.isNotEmpty() } else null,
@@ -1882,7 +1897,6 @@ public class SpecParser {
       translate = numberList(obj.fields["translate"], "$path.translate"),
       center = numberList(obj.fields["center"], "$path.center"),
       rotate = numberList(obj.fields["rotate"], "$path.rotate"),
-      angle = obj.numberOrSignal("angle", "$path.angle"),
       precision = obj.numberOrSignal("precision", "$path.precision"),
       clipAngle = obj.numberOrSignal("clipAngle", "$path.clipAngle"),
       clipExtent = numberPairs(obj.fields["clipExtent"], "$path.clipExtent"),

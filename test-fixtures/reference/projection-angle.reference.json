@@ -1,0 +1,91 @@
+{
+  "marks": [
+    {
+      "fill": null,
+      "role": "mark",
+      "shapeHeight": 187.929189,
+      "shapeLeft": 16.035406,
+      "shapeTop": -28.964594,
+      "shapeWidth": 187.929189,
+      "stroke": "#b8c4cc",
+      "strokeWidth": 3,
+      "type": "shape"
+    },
+    {
+      "fill": null,
+      "role": "mark",
+      "shapeHeight": 59.756007,
+      "shapeLeft": 45.356937,
+      "shapeTop": 35.121997,
+      "shapeWidth": 129.286126,
+      "stroke": "#b8c4cc",
+      "strokeWidth": 3,
+      "type": "shape"
+    },
+    {
+      "fill": null,
+      "role": "mark",
+      "shapeHeight": 178.729189,
+      "shapeLeft": 20.635406,
+      "shapeTop": -24.364594,
+      "shapeWidth": 178.729189,
+      "stroke": "#d36f2a",
+      "strokeWidth": 0.7,
+      "type": "shape"
+    },
+    {
+      "fill": null,
+      "role": "mark",
+      "shapeHeight": 50.556007,
+      "shapeLeft": 49.956937,
+      "shapeTop": 39.721997,
+      "shapeWidth": 120.086126,
+      "stroke": "#d36f2a",
+      "strokeWidth": 0.7,
+      "type": "shape"
+    },
+    {
+      "fill": "#7a4fb5",
+      "role": "mark",
+      "shapeHeight": 6.324555,
+      "shapeLeft": 70.185808,
+      "shapeTop": 40.476252,
+      "shapeWidth": 6.324555,
+      "size": 40,
+      "type": "symbol",
+      "x": 73.348086,
+      "y": 43.63853
+    },
+    {
+      "fill": "#7a4fb5",
+      "role": "mark",
+      "shapeHeight": 6.324555,
+      "shapeLeft": 106.837722,
+      "shapeTop": 61.837722,
+      "shapeWidth": 6.324555,
+      "size": 40,
+      "type": "symbol",
+      "x": 110,
+      "y": 65
+    },
+    {
+      "fill": "#7a4fb5",
+      "role": "mark",
+      "shapeHeight": 6.324555,
+      "shapeLeft": 136.159254,
+      "shapeTop": 74.462232,
+      "shapeWidth": 6.324555,
+      "size": 40,
+      "type": "symbol",
+      "x": 139.321531,
+      "y": 77.624509
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 197.929189,
+    "width": 230
+  },
+  "spec": "projection-angle.vg.json",
+  "vegaVersion": "6.3.1"
+}

@@ -55,6 +55,23 @@ section here does not get released.
 
 ### Fixed
 
+- **A projection's `angle` is d3's, and upstream never reaches it.** Every `d3-geo` projection has an
+  `angle` setter — a rotation of the *plane* after the projection — and `vega-geo`'s projection
+  transform forwards the nineteen names `vega-projection` exports as `projectionProperties`, which
+  does not include it. Probed: a projection given an `angle` of 30 places every point exactly where
+  it did without one. This engine applied it, so a map upstream draws upright came out turned, and
+  every mark on it moved.
+
+  Found by reading rather than by the sweep: the schema does not declare `angle` either, so no sweep
+  driven by it can reach the property. `angle` is now reported as a property this engine deliberately
+  does not apply, with the reason, rather than silently dropped — the parser already had the
+  machinery and this is the first projection property to need it. `projection-angle` is new: the same
+  mercator twice, one of them asking for 30 degrees, landing exactly on top of each other.
+
+  **API:** `ProjectionSpec.angle` and `ProjectionDefinition.angle` are gone. A specification may
+  still carry `angle`; it is read, reported and not applied, which is upstream's behaviour minus the
+  silence.
+
 - **A `NaN` in an outline is a coordinate to step over, not a reason to throw the outline away.**
   Upstream never re-reads a path it generated: a projected geometry stays a *generator function* on
   the scene item, and the bound context and the renderer consume its calls. Here it becomes a path

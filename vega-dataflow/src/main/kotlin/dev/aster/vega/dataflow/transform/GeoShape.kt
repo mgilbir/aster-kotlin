@@ -35,7 +35,6 @@ public data class ProjectionDefinition(
   val translate: List<Double> = emptyList(),
   val center: List<Double> = emptyList(),
   val rotate: List<Double> = emptyList(),
-  val angle: Double? = null,
   val precision: Double? = null,
   val reflectX: Boolean = false,
   val reflectY: Boolean = false,
@@ -112,7 +111,6 @@ internal fun ProjectionDefinition.build(): GeoProjector? {
   if (center.size >= 2) projection.center(center[0], center[1])
   if (rotate.isNotEmpty()) projection.rotate(rotate.toDoubleArray())
   if (parallels.size >= 2) projection.parallels(parallels[0], parallels[1])
-  angle?.let { projection.angle(it) }
   if (reflectX || reflectY) projection.reflect(reflectX, reflectY)
   precision?.let { projection.precision(it) }
   fit?.let { features ->
