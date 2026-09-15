@@ -8,6 +8,28 @@ section here does not get released.
 
 ### Changed
 
+- **The sweep reads the view itself, and both harvesters measure the surface with one function.**
+  `width`, `height`, `padding`, `autosize` and `background`: the five properties a specification
+  writes beside its marks, which decide how big the drawing is rather than what is in it. Every case
+  the sweep compares already checks the surface, so this is the one family whose whole subject is the
+  number every other family checks in passing. **7499 charts, up from 7482.**
+
+  `autosize` and `padding` are each declared as *either* a word or an object, and the generic rules
+  pick the word: sweeping only that leaves `contains` and `resize` unreached, and
+  `contains: "padding"` moves every mark in the chart. Both forms are swept now.
+
+  The first difference it reported was its own. `reference.js` and `property-sweep.js` each had a
+  copy of `surfaceSize`, and only one of them knew that `autosize: none` takes the declared size
+  verbatim and lets the content overflow — so the sweep measured the reference by one rule and this
+  engine by another, and called the gap a defect. There is one definition now, in `normalize.js`,
+  and both harvesters import it. **A measurement worth making twice is worth defining once.**
+
+- **The sweep reads the mark config blocks, which reach every encode channel.** `config.rect.blend`
+  and a rect's own `blend` are the same channel and a different piece of code. Eleven families — one
+  per mark type, plus `config.mark` and `config.style.<name>` — each writing the channel table the
+  matching `encode-<type>` family writes, into `config` rather than onto the mark. **7482 charts, up
+  from 4733**, and 368 differences in 19 of the 57 channels a mark config can carry. Fixed below.
+
 - **The sweep reads a group's `layout`, which is a subsystem no other family reaches.** Every other
   chart the sweep writes has one group or none, and every one of the ten layout properties is a
   relationship *between* cells: how they line up, how far apart they sit, whether a cell narrower
