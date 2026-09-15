@@ -8,6 +8,38 @@ section here does not get released.
 
 ### Changed
 
+- **A schema sweep for Vega-Lite, comparing the Vega it compiles into.** The sister of the Vega
+  property sweep, one layer up. That one sweeps what Vega declares and compares the *scene*; this
+  sweeps what **Vega-Lite** declares and compares the **specification it emits**, because that is
+  where a Vega-Lite defect lives. Vega-Lite's whole value is the defaults it supplies — a scale type,
+  a stack transform, a tick count, a label angle, a band size — and every one of them is a property
+  of the Vega it produces. Comparing the emitted specification names the rule that drifted; comparing
+  the picture would say "some marks moved".
+
+  The surface is much larger than Vega's: 458 definitions, a `MarkDef` of 88 properties, an
+  `Encoding` of 38 channels, a `Config` of 72. The 283 fixtures cover what people draw; this covers
+  what the schema says can be written. One family per **mark type**, twelve of them, sweeping the
+  `MarkDef` table against a chart that suits the type — an arc gets a `theta`, a line an ordered `x`,
+  a text something to write. **8484 specifications, every one of which upstream compiles.**
+
+  `scripts/vega-lite-property-sweep.sh` runs it; `VegaLitePropertySweepTest` is the comparison, and
+  it is **a measurement rather than a gate**, the same course the other sweeps took.
+
+  It found **67 differences**, in five causes:
+
+  * **`cornerRadiusEnd` on a mark that is not a bar** — 44 of the 67. Upstream emits nothing for it
+    on an arc, an area, a circle or a point; this compiler writes `cornerRadiusTopLeft` and
+    `cornerRadiusTopRight` onto all of them;
+  * **`invalid`** — `break-paths-show` and `break-paths-filter` build a different data pipeline here:
+    a filter that upstream does not add, a source a scale's domain names differently, and one data
+    entry too many or too few;
+  * **`outerRadius` on a text mark** — upstream emits a `radius` and this does not;
+  * **`baseline` on a rect or a tick** — a `yc.band` missing from the emitted encoding;
+  * **`align`, `size` and `orient`** on one mark type each.
+
+  Recorded rather than fixed in this change: the sweep is a measurement, and each of those is its own
+  defect with its own fix.
+
 - **The sweep reads `config.range`, and agrees.** The six palettes a theme sets — `category`,
   `ordinal`, `heatmap`, `ramp`, `diverging`, `symbol` — read from `vega-parser`'s own default
   configuration, since the schema declares `config` as an object and says nothing about what goes in
