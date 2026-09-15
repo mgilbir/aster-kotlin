@@ -8,6 +8,20 @@ section here does not get released.
 
 ### Changed
 
+- **The sweep reads the `config` block, which is the same property table reached by different code.**
+  `config.axis.labelAngle` and an axis's own `labelAngle` are one property and two pieces of code:
+  upstream reads every axis property through `lookup(spec, config)`, which answers
+  `spec[p] ?? config[p]`, so a property this engine reads off the specification alone is honoured
+  there and ignored here — silently, and for every chart that sets a theme rather than an axis. The
+  schema has nothing to say about `config`: it declares it as `{"type": "object"}`, so the properties
+  come from the guide's own table and the *route* is what is being swept. **4702 charts, up from
+  4104.**
+
+  A config family also reaches **both** axes where the `axis` family reaches only `axes[0]`, which is
+  how the widening found a defect that has nothing to do with config at all. Three differences, all
+  real, and all now fixed in this release: `tickOffset` applied only to a band axis, `position` read
+  from the config, and the band correction sitting below `config.axis` instead of above it.
+
 - **The sweep reads every projection, which nothing else here reaches by property.** A projection is
   the one part of a specification whose correctness is invisible until it is drawn: a formula, a
   clipping rule and a resampler, and the whole of it lands in a path string. The corpora cover the
