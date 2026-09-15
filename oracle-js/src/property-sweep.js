@@ -18,9 +18,9 @@
  *
  * ### What is swept, and what is left out
  *
- * Nine families: `axis`, `legend`, `title`, `scale`, **projection**, the **layout** of a group of
- * groups, the **config block** behind a guide, a **mark's own properties**, and the **encode
- * channels** every mark item carries. The
+ * Nine kinds of family: `axis`, `legend`, `title`, `scale`, **projection**, the **layout** of a
+ * group of groups, the **config block** behind a guide or a mark, a **mark's own properties**, and
+ * the **encode channels** every mark item carries. The
  * guides are where this engine's code is densest — a guide is a layout, a text measurement and half
  * a dozen marks — a projection is a formula and a clipping rule whose difference is invisible until
  * it is drawn, a config is the same property table reached by a different piece of code, and the
@@ -54,6 +54,11 @@
  * A `config-<guide>` family keeps the base chart and writes the property into `config` instead of
  * onto the guide. It reaches **both** axes where the `axis` family reaches only the first, which is
  * how it found a `tickOffset` this engine applied to a band axis and no other.
+ *
+ * A `config-<marktype>` family writes the same *encode channel* the `encode-<marktype>` family
+ * writes, into `config` instead of onto the mark. Upstream folds those defaults into the mark's
+ * `enter` block — `applyDefaults` — so every channel reaches them through the one path it already
+ * uses, which is exactly what makes the route worth sweeping separately from the channel.
  *
  * A value upstream refuses is recorded as a refusal rather than dropped, the way the wild and Deneb
  * corpora record theirs: "upstream will not draw this either" is an agreement, and a sweep that
@@ -643,6 +648,30 @@ function layoutBaseSpec() {
   };
 }
 
+/**
+ * What a `config-<block>` family is a config **of**.
+ *
+ * Two things follow from the block's name and neither is derivable from it: which schema definition
+ * its properties come from, and which family's skips and vocabularies apply to it. A guide config
+ * carries that guide's own properties; a **mark** config carries *encode channels* — `fill`,
+ * `stroke`, `size`, the same table a mark item's encode block uses, which is not at all the table
+ * the plain `mark` family sweeps (`clip`, `interactive`, `aria`, a mark's own properties). Upstream
+ * says so itself: "defaults for basic mark types — each subset accepts mark properties (fill,
+ * stroke, etc)".
+ */
+const CONFIG_BLOCKS = {
+  axis: { definition: 'axis', like: 'axis' },
+  legend: { definition: 'legend', like: 'legend' },
+  title: { definition: 'title', like: 'title' },
+  // `config.mark` is every mark type's defaults; `config.style.<name>` is the same table reached by
+  // a name a mark carries; `config.<marktype>` is one type's.
+  mark: { definition: 'encodeEntry', like: 'encode' },
+  style: { definition: 'encodeEntry', like: 'encode' },
+  ...Object.fromEntries(
+    Object.keys(MARK_BASES).map((type) => [type, { definition: 'encodeEntry', like: 'encode' }]),
+  ),
+};
+
 const FAMILIES = {
   // The **bottom** axis, which is the one with a band scale under it: half of what an axis property
   // decides — `tickBand`, `bandPosition`, `labelOverlap` — only means anything over bands.
@@ -695,6 +724,40 @@ const FAMILIES = {
       },
     ]),
   ),
+  // The **mark** config blocks, which carry encode channels rather than a mark's own properties.
+  //
+  // Upstream resolves them as `extend({}, config.mark, config[type])` and then the mark's `style`
+  // names in order — but its *default* configuration has already filled `config[type]` in, with a
+  // rect's blue and a symbol's size of 64 and a text's font. So `config.mark` sits **below** those
+  // built-ins and everything else sits above, which is why setting `config.mark.fill` does not
+  // recolour a rect and setting `config.rect.fill` does. That ordering is the thing worth sweeping:
+  // it is not the order the names suggest, and it differs per channel depending on whether the
+  // type's built-in block mentions that channel at all.
+  //
+  // One family per type, for the reason the encode channels have one each: which channels mean
+  // anything is the mark's own question, and only the type's own block can answer for the ones its
+  // built-in already sets.
+  ...Object.fromEntries(
+    Object.keys(MARK_BASES).map((type) => [
+      `config-${type}`,
+      (spec, property, value) => {
+        spec.marks = [MARK_BASES[type]()];
+        spec.config = { [type]: { [property]: value } };
+      },
+    ]),
+  ),
+  'config-mark': (spec, property, value) => {
+    spec.marks = [MARK_BASES.rect()];
+    spec.config = { mark: { [property]: value } };
+  },
+  // A **style** is the same table again, reached by a name the mark carries. Upstream applies the
+  // named blocks after both mark blocks and in the order the mark lists them, so a style beats the
+  // built-in a type's own block supplies where `config.mark` does not.
+  'config-style': (spec, property, value) => {
+    spec.marks = [MARK_BASES.rect()];
+    spec.marks[0].style = 'swept';
+    spec.config = { style: { swept: { [property]: value } } };
+  },
   // One family per **projection type**, for the reason the scales have one each: which properties
   // a projection has is the type's own question. `parallels` belongs to the four conics and to
   // nothing else; `albersUsa` is three projections in a trenchcoat and has neither a centre nor a
@@ -835,7 +898,7 @@ function baseFamily(family) {
   // the reason a legend's own `fill` does, and the skips and vocabularies that belong to the guide
   // have to reach the config route too or the sweep starts offering a legend the name of a scale
   // that is not there.
-  if (family.startsWith('config-')) return baseFamily(family.slice('config-'.length));
+  if (family.startsWith('config-')) return CONFIG_BLOCKS[family.slice('config-'.length)].like;
   const dash = family.indexOf('-');
   return dash < 0 ? family : family.slice(0, dash);
 }
@@ -911,7 +974,7 @@ function propertiesOf(family) {
       : family.startsWith('projection-')
         ? 'projection'
         : family.startsWith('config-')
-          ? family.slice('config-'.length)
+          ? CONFIG_BLOCKS[family.slice('config-'.length)].definition
           : family;
   // A `scale-log` wants the branch that names `log`; everything else keeps the band branch, which
   // is the scale the plain `scale` family applies its properties to.
