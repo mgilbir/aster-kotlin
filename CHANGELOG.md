@@ -104,6 +104,17 @@ section here does not get released.
 
 ### Fixed
 
+- **A plotting area is never negative.** `viewSizeLayout` measures the root group as
+  `Math.max(0, group.width || 0)` and writes the answer back into the `width` signal, so a
+  specification asking for a width of -4 gets a plotting area of zero — and every scale ranging over
+  `"width"` gets `[0, 0]` with it. This engine clamped only the *fitted* branches, so a declared
+  negative size reached the scales intact and a band scale divided it up: a bandwidth of 0.878 where
+  upstream's is 0.
+
+  The clamp is where every measurement downstream reads it rather than in each of them, which is
+  where upstream puts it too. `view-size-degenerate` is new: a chart -4 wide and -12 tall, whose
+  bars are lines and whose bottom axis is a point.
+
 - **A mark's config reaches every channel, because it is folded into the encode.** Upstream does not
   read a mark's defaults channel by channel: `applyDefaults` builds
   `extend({}, config.mark, config[type])`, drops each key the mark's own encode already mentions,
