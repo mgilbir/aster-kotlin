@@ -18,12 +18,13 @@
  *
  * ### What is swept, and what is left out
  *
- * Seven families: `axis`, `legend`, `title`, `scale`, **projection**, a **mark's own properties**,
- * and the **encode channels** every mark item carries. The first four are where this engine's code
- * is densest — a guide is a layout, a text measurement and half a dozen marks — a projection is a
- * formula and a clipping rule whose difference is invisible until it is drawn, and the last two are
- * the widest declared surface there is: sixty channels, most of which no chart in any corpus sets. A
- * property is swept when the schema says enough to choose values honestly:
+ * Eight families: `axis`, `legend`, `title`, `scale`, **projection**, the **config block** behind a
+ * guide, a **mark's own properties**, and the **encode channels** every mark item carries. The
+ * guides are where this engine's code is densest — a guide is a layout, a text measurement and half
+ * a dozen marks — a projection is a formula and a clipping rule whose difference is invisible until
+ * it is drawn, a config is the same property table reached by a different piece of code, and the
+ * last two are the widest declared surface there is: sixty channels, most of which no chart in any
+ * corpus sets. A property is swept when the schema says enough to choose values honestly:
  *
  *   * an **enum**, including one inside a `oneOf` beside a signal reference: every word it lists;
  *   * a **boolean**: both;
@@ -45,6 +46,10 @@
  * Three families bring their own, because the chart a property means anything on is the family's
  * own question: a scale type gets [scaleBaseSpec], a mark type gets its entry in [MARK_BASES], and a
  * projection gets [projectionBaseSpec], which is a small map rather than a bar chart.
+ *
+ * A `config-<guide>` family keeps the base chart and writes the property into `config` instead of
+ * onto the guide. It reaches **both** axes where the `axis` family reaches only the first, which is
+ * how it found a `tickOffset` this engine applied to a band axis and no other.
  *
  * A value upstream refuses is recorded as a refusal rather than dropped, the way the wild and Deneb
  * corpora record theirs: "upstream will not draw this either" is an agreement, and a sweep that
@@ -577,6 +582,25 @@ const FAMILIES = {
       },
     ]),
   ),
+  // One family per **guide config block**, which is the same property table reached by a different
+  // route. `config.axis.labelAngle` and an axis's own `labelAngle` are the same property and a
+  // different piece of code: upstream reads every axis property through `lookup(spec, config)`,
+  // which answers `spec[prop] ?? config[prop]`, so a property this engine reads off the
+  // specification alone is honoured there and ignored here — silently, and for every chart that
+  // sets a theme rather than an axis.
+  //
+  // Five properties are the exception and they are the reason to sweep this rather than reason
+  // about it: `tickCount`, `values`, `tickMinStep`, `format` and `formatType` are read as
+  // `spec.tickCount` and never through the lookup, so upstream ignores them in a config too.
+  ...Object.fromEntries(
+    ['axis', 'legend', 'title'].map((guide) => [
+      `config-${guide}`,
+      (spec, property, value) => {
+        spec.config = spec.config || {};
+        spec.config[guide] = { [property]: value };
+      },
+    ]),
+  ),
   // One family per **projection type**, for the reason the scales have one each: which properties
   // a projection has is the type's own question. `parallels` belongs to the four conics and to
   // nothing else; `albersUsa` is three projections in a trenchcoat and has neither a centre nor a
@@ -713,6 +737,11 @@ const FREE_STRINGS = {
  * why the skips and the vocabularies are looked up through here rather than by an exact name.
  */
 function baseFamily(family) {
+  // A **config block** is the guide it configures: `config.legend.fill` names a scale for exactly
+  // the reason a legend's own `fill` does, and the skips and vocabularies that belong to the guide
+  // have to reach the config route too or the sweep starts offering a legend the name of a scale
+  // that is not there.
+  if (family.startsWith('config-')) return baseFamily(family.slice('config-'.length));
   const dash = family.indexOf('-');
   return dash < 0 ? family : family.slice(0, dash);
 }
@@ -787,7 +816,9 @@ function propertiesOf(family) {
       ? 'scale'
       : family.startsWith('projection-')
         ? 'projection'
-        : family;
+        : family.startsWith('config-')
+          ? family.slice('config-'.length)
+          : family;
   // A `scale-log` wants the branch that names `log`; everything else keeps the band branch, which
   // is the scale the plain `scale` family applies its properties to.
   const wanted = family.startsWith('scale-') ? family.slice('scale-'.length) : 'band';
