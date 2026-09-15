@@ -222,13 +222,14 @@ public object GraticuleTransform : Transform {
     context: TransformContext,
   ): List<VegaValue> {
     val graticule = Graticule()
-    params
-      .numberList("extent")
-      .takeIf { it.size >= 4 }
-      ?.let {
-        graticule.extentMajor(it[0], it[1], it[2], it[3])
-        graticule.extentMinor(it[0], it[1], it[2], it[3])
-      }
+    // `[[x0, y0], [x1, y1]]`, the same shape `extentMajor` and `extentMinor` take and the shape the
+    // schema declares for all three. This one was read as a flat run of four numbers, which no
+    // specification writes, so an `extent` was ignored in silence — and the graticule it was meant
+    // to bound ran to the pole, where a conic conformal projection is infinite.
+    pairs(params, "extent")?.let {
+      graticule.extentMajor(it[0], it[1], it[2], it[3])
+      graticule.extentMinor(it[0], it[1], it[2], it[3])
+    }
     pairs(params, "extentMajor")?.let { graticule.extentMajor(it[0], it[1], it[2], it[3]) }
     pairs(params, "extentMinor")?.let { graticule.extentMinor(it[0], it[1], it[2], it[3]) }
     params

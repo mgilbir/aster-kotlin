@@ -1,6 +1,6 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "The twelve projections no chart in the corpus had drawn, each given the same graticule and the same four cities so the differences between them are the only thing on screen. The three conics take their parallels from the specification, the azimuthals and the gnomonic clip to a cap around their centre, the orthographic shows only the hemisphere facing the reader, and the transverse Mercator is the ordinary one turned on its side. Nothing here is decorative: a projection is a pair of trigonometric formulas and a clip, and a wrong sign in either draws a plausible-looking map of somewhere else.",
+  "description": "The twelve projections no chart in the corpus had drawn, each given the same graticule and the same four cities so the differences between them are the only thing on screen. The three conics take their parallels from the specification, the azimuthals and the gnomonic clip to a cap around their centre, the orthographic shows only the hemisphere facing the reader, and the transverse Mercator is the ordinary one turned on its side. Nothing here is decorative: a projection is a pair of trigonometric formulas and a clip, and a wrong sign in either draws a plausible-looking map of somewhere else. Each `geopath` names its `field`: a mark-level transform visits **scene items** rather than rows, and `geopath` with no field falls back to the identity accessor — which hands a scene item, with its bounds and its mark and its datum, to a path generator that wants geometry. Upstream answers that with an empty `d` attribute, so every one of these twelve graticules was a mark with no outline in it and this fixture compared nothing but the cities. The graticule stops at 60 degrees north and south because `conicConformal` is infinite at one pole: taken to the default extent it draws a line half a million pixels long, and a canvas a million pixels wide is measured in units where the last digit of a double is worth more than the comparison's tolerance. What is being compared here is twelve projections of the same graticule, not what any of them does at a point where its formula has no value. Each panel clips, which is what a trellis of maps does: without it a projection that reaches past its own 90 by 62 box paints over its neighbours, and the chart sizes itself to whichever of the twelve reaches furthest.",
   "width": 280,
   "height": 260,
   "padding": 5,
@@ -14,6 +14,16 @@
           "step": [
             30,
             30
+          ],
+          "extent": [
+            [
+              -180,
+              -60
+            ],
+            [
+              180,
+              60
+            ]
           ]
         }
       ]
@@ -330,6 +340,7 @@
   "marks": [
     {
       "type": "group",
+      "clip": true,
       "encode": {
         "enter": {
           "x": {
@@ -371,7 +382,8 @@
           "transform": [
             {
               "type": "geopath",
-              "projection": "conicConformal"
+              "projection": "conicConformal",
+              "field": "datum"
             }
           ]
         },
@@ -423,6 +435,7 @@
     },
     {
       "type": "group",
+      "clip": true,
       "encode": {
         "enter": {
           "x": {
@@ -464,7 +477,8 @@
           "transform": [
             {
               "type": "geopath",
-              "projection": "conicEqualArea"
+              "projection": "conicEqualArea",
+              "field": "datum"
             }
           ]
         },
@@ -516,6 +530,7 @@
     },
     {
       "type": "group",
+      "clip": true,
       "encode": {
         "enter": {
           "x": {
@@ -557,7 +572,8 @@
           "transform": [
             {
               "type": "geopath",
-              "projection": "conicEquidistant"
+              "projection": "conicEquidistant",
+              "field": "datum"
             }
           ]
         },
@@ -609,6 +625,7 @@
     },
     {
       "type": "group",
+      "clip": true,
       "encode": {
         "enter": {
           "x": {
@@ -650,7 +667,8 @@
           "transform": [
             {
               "type": "geopath",
-              "projection": "azimuthalEqualArea"
+              "projection": "azimuthalEqualArea",
+              "field": "datum"
             }
           ]
         },
@@ -702,6 +720,7 @@
     },
     {
       "type": "group",
+      "clip": true,
       "encode": {
         "enter": {
           "x": {
@@ -743,7 +762,8 @@
           "transform": [
             {
               "type": "geopath",
-              "projection": "azimuthalEquidistant"
+              "projection": "azimuthalEquidistant",
+              "field": "datum"
             }
           ]
         },
@@ -795,6 +815,7 @@
     },
     {
       "type": "group",
+      "clip": true,
       "encode": {
         "enter": {
           "x": {
@@ -836,7 +857,8 @@
           "transform": [
             {
               "type": "geopath",
-              "projection": "gnomonic"
+              "projection": "gnomonic",
+              "field": "datum"
             }
           ]
         },
@@ -888,6 +910,7 @@
     },
     {
       "type": "group",
+      "clip": true,
       "encode": {
         "enter": {
           "x": {
@@ -929,7 +952,8 @@
           "transform": [
             {
               "type": "geopath",
-              "projection": "orthographic"
+              "projection": "orthographic",
+              "field": "datum"
             }
           ]
         },
@@ -981,6 +1005,7 @@
     },
     {
       "type": "group",
+      "clip": true,
       "encode": {
         "enter": {
           "x": {
@@ -1022,7 +1047,8 @@
           "transform": [
             {
               "type": "geopath",
-              "projection": "stereographic"
+              "projection": "stereographic",
+              "field": "datum"
             }
           ]
         },
@@ -1074,6 +1100,7 @@
     },
     {
       "type": "group",
+      "clip": true,
       "encode": {
         "enter": {
           "x": {
@@ -1115,7 +1142,8 @@
           "transform": [
             {
               "type": "geopath",
-              "projection": "transverseMercator"
+              "projection": "transverseMercator",
+              "field": "datum"
             }
           ]
         },
@@ -1167,6 +1195,7 @@
     },
     {
       "type": "group",
+      "clip": true,
       "encode": {
         "enter": {
           "x": {
@@ -1208,7 +1237,8 @@
           "transform": [
             {
               "type": "geopath",
-              "projection": "naturalEarth1"
+              "projection": "naturalEarth1",
+              "field": "datum"
             }
           ]
         },
@@ -1260,6 +1290,7 @@
     },
     {
       "type": "group",
+      "clip": true,
       "encode": {
         "enter": {
           "x": {
@@ -1301,7 +1332,8 @@
           "transform": [
             {
               "type": "geopath",
-              "projection": "equalEarth"
+              "projection": "equalEarth",
+              "field": "datum"
             }
           ]
         },
@@ -1353,6 +1385,7 @@
     },
     {
       "type": "group",
+      "clip": true,
       "encode": {
         "enter": {
           "x": {
@@ -1394,7 +1427,8 @@
           "transform": [
             {
               "type": "geopath",
-              "projection": "mollweide"
+              "projection": "mollweide",
+              "field": "datum"
             }
           ]
         },
