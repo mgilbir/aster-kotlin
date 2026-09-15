@@ -8,6 +8,23 @@ section here does not get released.
 
 ### Changed
 
+- **The sweep reads `config.range`, and agrees.** The six palettes a theme sets — `category`,
+  `ordinal`, `heatmap`, `ramp`, `diverging`, `symbol` — read from `vega-parser`'s own default
+  configuration, since the schema declares `config` as an object and says nothing about what goes in
+  it. A chart that says `"range": "category"` is saying "whatever the theme thinks a category looks
+  like", which is how every Vega-Lite chart gets its colours. Its own base chart, with one scale per
+  name so each entry has something to land on. **7510 charts, up from 7499.**
+
+  **No differences.** Recorded because a measurement that found nothing is still a measurement, and
+  the families stay as a net: all three forms a range is written in — a scheme by name, the colours
+  written out, and a scheme with an `extent` that reverses it — agree entry for entry.
+
+  Each case was checked to *change the drawing* before the agreement was believed. Two did not at
+  first: a diverging range given `extent: [0, 1]` draws what a plain one draws, because an override
+  replaces the default entry rather than merging into it and the default's `[1, 0]` goes with it;
+  and a cross, a diamond and a square all measure the same box, so a row of them says nothing about
+  which was drawn. A case that cannot fail is not evidence.
+
 - **The sweep reads the view itself, and both harvesters measure the surface with one function.**
   `width`, `height`, `padding`, `autosize` and `background`: the five properties a specification
   writes beside its marks, which decide how big the drawing is rather than what is in it. Every case
