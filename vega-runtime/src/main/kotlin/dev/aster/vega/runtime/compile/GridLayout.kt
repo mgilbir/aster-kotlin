@@ -34,12 +34,27 @@ internal object GridLayout {
     NONE;
 
     companion object {
+      /**
+       * Only the two words do anything; everything else, **absence included**, is [NONE].
+       *
+       * Upstream tests `alignCol === Each` and then `alignCol === All` and falls to an `else` that
+       * begins `for (alignCol = false, …)` — so an unstated `align` takes the same branch `"none"`
+       * does, and the flag it clears is the one the centring step then reads: `if (alignCol &&
+       * get(opt.center, Column) && nrows > 1)`. **Centring requires an alignment.** Reading an
+       * absent `align` as `each` here made `center: true` nudge every short cell to the middle of
+       * its row where upstream leaves it alone, and the two arrangements differ by exactly the
+       * slack.
+       *
+       * The layout itself agrees between `each` and the else branch whenever no cell overhangs its
+       * own box — `each` takes the column's largest lead and the else branch takes each cell's own,
+       * which is the same number until an axis hangs off one of them — so this hid everywhere but
+       * in the centring.
+       */
       fun fromName(name: String?): Align =
         when (name?.lowercase()) {
-          null -> EACH
+          "each" -> EACH
           "all" -> ALL
-          "none" -> NONE
-          else -> EACH
+          else -> NONE
         }
     }
   }
