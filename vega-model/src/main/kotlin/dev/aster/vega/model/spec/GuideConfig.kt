@@ -59,7 +59,25 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
     add(block("axis"))
     add(block(if (orient.isVertical) "axisY" else "axisX"))
     add(block("axis" + orient.name.lowercase().replaceFirstChar { it.uppercase() }))
-    if (band) add(block("axisBand"))
+    if (band) add(bandBlock())
+  }
+
+  /**
+   * `config.axisBand`, over the correction Vega's own default configuration already puts there.
+   *
+   * Upstream's default config is literally `axisBand: {tickOffset: -0.5}` — "correction for
+   * centering bias", the half pixel the axis group's own translation adds — and `axisBand` is the
+   * **last** block `extend({}, axis, xy, or, band)` merges. So it beats `config.axis.tickOffset`
+   * rather than losing to it, and a band axis in a theme that sets one keeps the -0.5.
+   *
+   * It was a fallback *below* the whole chain here, reached only when nothing else set a
+   * `tickOffset` — which is the same answer for an axis that sets its own, and the wrong one for a
+   * config that does. A specification's own `config.axisBand` still wins over the correction,
+   * property by property, as it does over any built-in.
+   */
+  private fun bandBlock(): VegaValue.Obj {
+    val declared = blocks["axisBand"]?.fields.orEmpty()
+    return VegaValue.Obj(LinkedHashMap(BUILT_IN_AXIS_BAND).apply { putAll(declared) })
   }
 
   /**
@@ -183,6 +201,10 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
      * does exactly that, and a trellis header drawn at a heading's thirteen points instead of a
      * label's ten is both the wrong size and, being measured, the wrong amount of chart.
      */
+    /** `config.axisBand` as Vega's own default configuration states it; see [bandBlock]. */
+    private val BUILT_IN_AXIS_BAND: Map<String, VegaValue> =
+      linkedMapOf("tickOffset" to VegaValue.Num(-0.5))
+
     private val BUILT_IN_STYLES: Map<String, VegaValue.Obj> =
       mapOf(
         // axis and legend labels

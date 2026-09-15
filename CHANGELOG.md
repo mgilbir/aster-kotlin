@@ -69,6 +69,36 @@ section here does not get released.
 
 ### Fixed
 
+- **An axis reads `tickOffset` whatever its scale, and `position` only from itself.** Three defects
+  in how an axis meets the `config` block, found by sweeping the config route and all three cited to
+  upstream's source rather than inferred from the drawing.
+
+  **`tickOffset` is not a band property.** Upstream reads it in `tickBand(_)` whatever the scale is
+  and hands the same offset to the tick mark and the label mark alike; only the *band position* it
+  sits beside needs a band to multiply. Here it was added inside the band offset, which answers zero
+  for everything but a band scale — so a linear, log, time or point axis given one ignored it
+  entirely. Probed: upstream moves a linear axis's ticks and labels by exactly the offset and leaves
+  its domain line where it was.
+
+  **`position` comes from the axis, never from the config.** Every entry in upstream's
+  `buildAxisEncode` is read through `lookup(spec, config)` except this one, which is written
+  `value(spec.position, 0)` — straight off the specification with a literal zero behind it. This
+  engine read it from the merged defaults, so a theme setting `config.axis.position` moved every axis
+  in the chart and upstream moved none of them.
+
+  **The band correction is a config block, not a fallback.** Vega's own default configuration is
+  literally `axisBand: {tickOffset: -0.5}`, and `axisBand` is the **last** block
+  `extend({}, axis, xy, or, band)` merges — so it beats `config.axis.tickOffset` rather than losing
+  to it. Here the `-0.5` was a fallback below the whole chain, reached only when nothing else set a
+  `tickOffset`: the same answer for an axis that sets its own, and the wrong one for a theme that
+  does. It now sits where upstream puts it, with a specification's own `config.axisBand` still
+  winning over it.
+
+  `config-theme` carries all three: the linear axis takes the theme's `tickOffset` while both band
+  axes keep the correction, the theme's `position` moves nothing, and the top axis's own `position`
+  moves that axis. Each of the three mutants is killed by it. **The sweep is back to 100%: 4702 of
+  4702.**
+
 - **A graticule's `extent` is a pair of corners, and twelve projections nobody was comparing.**
   `extent` was read as a flat run of four numbers, where the schema declares `[[x0, y0], [x1, y1]]`
   and `extentMajor` and `extentMinor` three lines away already took that shape. No specification

@@ -927,7 +927,28 @@ public class AxisBuilder(
    * which is none, and both labels read as whole numbers. Reproduced, because a specification
    * written against upstream is looking at those labels.
    */
-  private fun ticksFor(scale: VegaScale, spec: AxisSpec, specifier: String?): List<Tick>? {
+  private fun ticksFor(scale: VegaScale, spec: AxisSpec, specifier: String?): List<Tick>? =
+    rawTicks(scale, spec, specifier)?.let { ticks ->
+      // **`tickOffset` is not a band property.** Upstream reads it in `tickBand(_)` whatever the
+      // scale is and hands the same `offset` to the tick mark and the label mark alike; only the
+      // *band position* it sits beside needs a band to multiply. Here it was added inside
+      // [bandOffset], which answers zero for everything but a band scale — so a linear, log, time
+      // or point axis given a `tickOffset` ignored it, and upstream moved its ticks and its labels
+      // by exactly that much. Probed: a linear axis at `tickOffset: 8` has every tick 8 further
+      // along and its domain line exactly where it was.
+      //
+      // Applied here, once, rather than in each of the eight branches that build ticks. The extra
+      // tick [withExtraTick] appends is built from a raw scale position afterwards and adds the
+      // offset itself, which is why it is not shifted twice.
+      val offset = (scale as? PositionScale)?.let { tickOffset(it, spec) } ?: 0.0
+      if (offset == 0.0) ticks
+      else
+        ticks.map {
+          it.copy(position = it.position + offset, labelPosition = it.labelPosition?.plus(offset))
+        }
+    }
+
+  private fun rawTicks(scale: VegaScale, spec: AxisSpec, specifier: String?): List<Tick>? {
     // A scale with `bins` has its tick values already decided: upstream's `tickValues` returns the
     // boundaries themselves rather than asking the scale to generate any. An axis that *also* names
     // `values` still wins, as it does upstream, where `values` is checked first.
@@ -1249,20 +1270,20 @@ public class AxisBuilder(
   private fun bandOffset(scale: PositionScale, spec: AxisSpec): Double {
     if (scale !is BandScale) return 0.0
     val position = numbers.resolve(spec.bandPosition, spec.scale) ?: AxisDefaults.BAND_POSITION
-    return scale.bandwidth * position + tickOffset(scale, spec)
+    return scale.bandwidth * position
   }
 
   /**
    * `tickOffset`: how far a tick is nudged along the axis once its band position has placed it.
    *
-   * The default is upstream's, and it is **not** zero for a band scale: `config.axisBand` carries a
-   * `-0.5` that corrects the half-pixel the axis group's own translation adds, and it applies to a
-   * band scale only — a point or ordinal axis never sees that block. A specification aiming ticks
-   * at the band boundaries has to switch it off explicitly, which is why the property exists.
+   * The default is zero. A band axis's `-0.5` — the correction for the half pixel the axis group's
+   * own translation adds — is not a default here at all: it is `config.axisBand`, which the parser
+   * merges into the axis's properties **above** `config.axis` and below the axis's own, exactly
+   * where upstream's `extend({}, axis, xy, or, band)` puts it. Kept as a fallback here it was
+   * reached only when nothing else set a `tickOffset`, so a theme that set one lost the correction.
    */
   private fun tickOffset(scale: PositionScale, spec: AxisSpec): Double =
-    numbers.resolve(spec.tickOffset, spec.scale)
-      ?: if (scale is BandScale) -AxisDefaults.CRISP_OFFSET else 0.0
+    numbers.resolve(spec.tickOffset, spec.scale) ?: 0.0
 
   /**
    * Where a band axis's label sits, which is the band's **centre** whatever the ticks do.
@@ -1272,8 +1293,7 @@ public class AxisBuilder(
    * they were.
    */
   private fun labelOffsetAlong(scale: PositionScale, spec: AxisSpec): Double =
-    if (scale !is BandScale) 0.0
-    else scale.bandwidth * AxisDefaults.BAND_POSITION + tickOffset(scale, spec)
+    if (scale !is BandScale) 0.0 else scale.bandwidth * AxisDefaults.BAND_POSITION
 
   /**
    * How an explicit value is labelled.

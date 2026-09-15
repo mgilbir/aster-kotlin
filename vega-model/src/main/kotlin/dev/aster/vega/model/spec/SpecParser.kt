@@ -2453,7 +2453,14 @@ public class SpecParser {
         },
       aria = obj.fields["aria"]?.asBoolean() ?: true,
       description = obj.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
-      position = obj.numberOrSignal("position", "$path.position"),
+      // **The axis's own**, not the merged defaults. Every other entry in upstream's
+      // `buildAxisEncode` is read through `lookup(spec, config)`, which answers `spec[p] ??
+      // config[p]`
+      // — and `position` alone is written `value(spec.position, 0)`, straight off the specification
+      // with a literal zero behind it. So a `config.axis.position` is ignored there and was
+      // honoured
+      // here, which moved every axis in a chart that set a theme.
+      position = own.numberOrSignal("position", "$path.position"),
       translate = obj.numberOrSignal("translate", "$path.translate"),
       tickRound = obj.fields["tickRound"]?.asBoolean(),
       gridScale = obj.fields["gridScale"]?.takeIf { it is VegaValue.Str }?.asString(),
