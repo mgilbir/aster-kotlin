@@ -345,9 +345,9 @@
       "fill": "#cc6677",
       "fillOpacity": 0.75,
       "role": "mark",
-      "shapeHeight": 24.649111,
+      "shapeHeight": 22.954451,
       "shapeLeft": 29.983137,
-      "shapeTop": 51.675445,
+      "shapeTop": 50.697033,
       "shapeWidth": 24.649111,
       "size": 160,
       "stroke": "#334455",
@@ -360,9 +360,9 @@
       "fill": "#cc6677",
       "fillOpacity": 0.75,
       "role": "mark",
-      "shapeHeight": 24.649111,
+      "shapeHeight": 22.954451,
       "shapeLeft": 97.675445,
-      "shapeTop": -9.657889,
+      "shapeTop": -10.636301,
       "shapeWidth": 24.649111,
       "size": 160,
       "stroke": "#334455",
@@ -375,9 +375,9 @@
       "fill": "#cc6677",
       "fillOpacity": 0.75,
       "role": "mark",
-      "shapeHeight": 24.649111,
+      "shapeHeight": 22.954451,
       "shapeLeft": 165.367752,
-      "shapeTop": 26.342111,
+      "shapeTop": 25.363699,
       "shapeWidth": 24.649111,
       "size": 160,
       "stroke": "#334455",
@@ -396,6 +396,41 @@
       "x2": 220,
       "y": 53.333333,
       "y2": 53.333333
+    },
+    {
+      "angle": 8,
+      "fill": "#000",
+      "fillOpacity": 0.75,
+      "font": "sans-serif",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "role": "mark",
+      "stroke": "#334455",
+      "strokeWidth": 3,
+      "text": "themed",
+      "type": "text",
+      "x": 6,
+      "y": 14
+    },
+    {
+      "closed": 0,
+      "fillOpacity": 0.75,
+      "interpolate": "step",
+      "points": "M 42.307692 64 L 76.153846 64 L 76.153846 2.666667 L 143.846154 2.666667 L 143.846154 38.666667 L 177.692308 38.666667",
+      "role": "mark",
+      "stroke": "#4a7c1f",
+      "strokeWidth": 2,
+      "type": "line"
+    },
+    {
+      "role": "mark",
+      "shapeHeight": 36,
+      "shapeLeft": -4,
+      "shapeTop": 74,
+      "shapeWidth": 126,
+      "stroke": "#4c78a8",
+      "strokeWidth": 3,
+      "type": "path"
     }
   ],
   "scales": {
@@ -436,7 +471,7 @@
     }
   },
   "size": {
-    "height": 156.657889,
+    "height": 157.636301,
     "width": 254.5
   },
   "spec": "config-marks.vg.json",
