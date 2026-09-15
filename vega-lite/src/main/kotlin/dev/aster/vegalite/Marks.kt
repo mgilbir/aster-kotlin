@@ -726,10 +726,20 @@ internal object Marks {
 
   private fun markDefProperties(view: UnitView): VegaValue.Obj = obj {
     view.markDef.raw.fields["cornerRadiusEnd"]?.let { radius ->
-      val orient = view.markDef.orient ?: "vertical"
-      CORNER_RADIUS_END.getValue(orient).forEach { corner ->
-        put(corner, obj { put("value", radius) })
-      }
+      // **A bar, and one with an orientation.** `initMarkDef` guards the whole rule with
+      // `if (markDef.type === 'bar' && markDef.orient)`, so every other mark type ignores the
+      // property outright — an arc, an area, a circle, a point, a rect, a rule, a text, a tick and
+      // a trail all compiled to two rounded corners here and to nothing at all upstream.
+      if (view.spec.mark != "bar") return@let
+      val orient = view.markDef.orient ?: return@let
+      // A **ranged** bar rounds all four corners rather than two. One whose far end is an `x2` or a
+      // `y2` has two ends of its own and no *far* one to single out, so upstream writes the plain
+      // `cornerRadius` instead of the pair.
+      val ranged =
+        (orient == "horizontal" && view.spec.encoding["x2"] != null) ||
+          (orient == "vertical" && view.spec.encoding["y2"] != null)
+      val corners = if (ranged) listOf("cornerRadius") else CORNER_RADIUS_END.getValue(orient)
+      corners.forEach { corner -> put(corner, obj { put("value", radius) }) }
     }
     // A mark that links somewhere shows the pointer, there being nothing else about it that looks
     // clickable — `baseEncodeEntry`'s `cursor` rule, which is about the *encoding* and not a style.
