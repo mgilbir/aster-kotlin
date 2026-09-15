@@ -153,6 +153,20 @@ section here does not get released.
 
 ### Fixed
 
+- **`cornerRadiusEnd` is a bar's word and nothing else's.** `initMarkDef` guards the whole rule with
+  `if (markDef.type === 'bar' && markDef.orient)`, so an area, a point, a tick or a rule that asks
+  for one is compiled as though it had not — upstream emits no corner property at all for them. This
+  compiler wrote `cornerRadiusTopLeft` and `cornerRadiusTopRight` onto every mark type there is, and
+  the two corners then rounded whatever the mark happened to be.
+
+  A **ranged** bar is the second half of the same rule. One whose far end is an `x2` or a `y2` has
+  two ends of its own and no *far* one to single out, so upstream writes the plain `cornerRadius` —
+  all four corners — in place of the pair.
+
+  `corner-radius-end-only-a-bar` is new: an area, a point and a tick all asking for one and getting
+  nothing, layered with a ranged bar that gets all four corners. **44 of the Vega-Lite sweep's 67
+  differences close with this**, which is 8461 of 8484 specifications agreeing.
+
 - **A plotting area is never negative.** `viewSizeLayout` measures the root group as
   `Math.max(0, group.width || 0)` and writes the answer back into the `width` signal, so a
   specification asking for a width of -4 gets a plotting area of zero — and every scale ranging over
