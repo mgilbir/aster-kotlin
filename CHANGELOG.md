@@ -55,6 +55,32 @@ section here does not get released.
 
 ### Fixed
 
+- **A graticule's `extent` is a pair of corners, and twelve projections nobody was comparing.**
+  `extent` was read as a flat run of four numbers, where the schema declares `[[x0, y0], [x1, y1]]`
+  and `extentMajor` and `extentMinor` three lines away already took that shape. No specification
+  writes the flat form, so an `extent` was ignored in silence and the graticule ran to the pole.
+
+  It surfaced because of the fixture that should have caught it years ago. `projection-families`
+  draws twelve projections over one graticule, and each of its `geopath` transforms named no
+  `field` — a **mark-level** transform visits scene items rather than rows, and `geopath` with no
+  field falls back to the identity accessor, which hands a scene *item* to a path generator that
+  wants geometry. Upstream answers that with an empty `d` attribute. So upstream drew twelve empty
+  outlines, this engine drew twelve empty outlines, and the fixture named after the twelve
+  projections compared nothing but the four cities on top of them. Giving it `"field": "datum"` is
+  what makes it a fixture.
+
+  Two more things had to be true for the drawing to be comparable, and both are what a real chart
+  does. The graticule stops at 60 degrees north and south, because `conicConformal` is infinite at
+  one pole: taken to the default extent it draws a line half a million pixels long, and a canvas a
+  million pixels wide is measured in units where the last digit of a double outweighs the
+  comparison's tolerance. And each panel **clips**, without which a projection that overruns its own
+  box paints over its neighbours and the chart sizes itself to whichever of the twelve reaches
+  furthest.
+
+  What that buys: a mutant that moves the gnomonic's clip cap from 60 degrees to 50 is now caught,
+  where before it changed nothing this corpus could see — `geopoint` places a city whether the
+  projection would clip it or not, so the cities could never have found it.
+
 - **A projection's `angle` is d3's, and upstream never reaches it.** Every `d3-geo` projection has an
   `angle` setter — a rotation of the *plane* after the projection — and `vega-geo`'s projection
   transform forwards the nineteen names `vega-projection` exports as `projectionProperties`, which
