@@ -73,7 +73,7 @@ and what each was added to pin down. Every name in it is checked to still exist 
 | `label-overlap` | 90 | a parity axis, a greedy one, and a ramp that thins its labels unasked |
 | `axis-label-angle` | 33 | labels turned 45 degrees, hung Vega's way and corrected Vega-Lite's |
 | `config-theme` | 42 | a theme in `config`, every level of the precedence chain visible at once |
-| `config-marks` | 31 | a theme reaching the marks, and a rect that encodes only a stroke |
+| `config-marks` | 34 | a theme reaching the marks, a rect that encodes only a stroke, and a path taking the stroke Vega's own configuration gives it |
 | `arc-padding` | 10 | a padded, round-cornered donut beside a pie of the same data |
 | `window` | 43 | a running total and a three-point moving average, partitioned by series |
 | `sequence-lookup` | 27 | a curve generated from nothing, over bars joined to a second dataset |

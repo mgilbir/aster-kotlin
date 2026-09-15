@@ -3430,7 +3430,8 @@ public class SpecParser {
 
     obj.reportUnhandled("Mark", path, MARK_CONSUMED)
 
-    val (below, above) = config.markDefaults(typeName.lowercase(), markStyles(obj))
+    val defaults = config.markDefaults(typeName.lowercase())
+    val styleDefaults = config.styleDefaults(markStyles(obj))
 
     return MarkSpec(
       type = type,
@@ -3440,7 +3441,8 @@ public class SpecParser {
       key = obj.fields["key"]?.asString()?.takeIf { it.isNotEmpty() },
       sort = sort,
       transform = markTransforms,
-      encode = parseEncode(obj.fields["encode"], "$path.encode"),
+      encode =
+        parseEncode(obj.fields["encode"], "$path.encode").withDefaults(defaults, styleDefaults),
       marks = parseArray(obj, "marks", path) { child, childPath -> parseMark(child, childPath) },
       projections =
         parseArray(obj, "projections", path) { child, childPath ->
@@ -3462,8 +3464,6 @@ public class SpecParser {
       aria = obj.fields["aria"]?.asBoolean() ?: true,
       description = obj.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
       clip = markClip(obj.fields["clip"]),
-      configBelowDefaults = below.fields,
-      configAboveDefaults = above.fields,
     )
   }
 

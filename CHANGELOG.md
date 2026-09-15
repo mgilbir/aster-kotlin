@@ -82,6 +82,39 @@ section here does not get released.
 
 ### Fixed
 
+- **A mark's config reaches every channel, because it is folded into the encode.** Upstream does not
+  read a mark's defaults channel by channel: `applyDefaults` builds
+  `extend({}, config.mark, config[type])`, drops each key the mark's own encode already mentions,
+  turns the rest into `{value: …}` — or `{signal: …}`, which goes to `update` rather than `enter` —
+  and merges them **beneath** the mark's own blocks. Every channel then finds its default through
+  the one path it already uses for everything else.
+
+  This engine asked a hand-written accessor instead, and a channel whose call site never asked got
+  nothing: **19 of the 57** a mark config can carry — `blend`, `angle`, `interpolate`, `fontWeight`,
+  `xc`, `yc`, `x2`, `tension`, `shape`, `defined`, `scaleX`, `scaleY`, `limit`, `dir`, `lineHeight`,
+  `orient`, `radius` and the two paints. Each worked when the mark stated it and was ignored when a
+  theme did, which is the difference between a chart and the same chart under someone's house style.
+
+  **Two loops, not one.** The mark's own config blocks carry the paint pair's rule — a `fill` or a
+  `stroke` is skipped when the encode mentions *either*, so a mark that states only its stroke does
+  not take the config's fill — and the `style` blocks that follow do not. Merging them into one loop
+  drops a Vega-Lite plotting area from the scene: it is a group styled `cell` whose block fills it
+  transparent and outlines it grey, and a chart that hides the outline with `stroke: null` has not
+  asked for the fill to go too. Caught by `concat-shared-transform` and `trellis-header-label-expr`.
+
+  **A `path` is stroked.** Writing Vega's per-type defaults down as the config blocks they are —
+  rather than as arguments threaded into a colour lookup — is what showed two of them to be wrong:
+  `path: {stroke: defaultColor}` and `shape: {stroke: defaultColor}`, where this engine gave both a
+  fill. Probed: upstream draws `<path … stroke="#4c78a8"/>` for a path mark that paints nothing
+  itself.
+
+  `config-marks` carries four more marks, one per route: a symbol taking its `shape` from the
+  config, a text its `fontWeight` and `angle`, a line its `interpolate`, and a path taking the
+  stroke. **368 of the sweep's differences close with this; 7479 of 7479 charts agree.**
+
+  **API:** `MarkSpec.configBelowDefaults` and `configAboveDefaults` are gone — a mark's defaults are
+  in its encode now, where upstream puts them. `EncodeSpec.withDefaults` is the fold.
+
 - **Centring a trellis requires an alignment, and a falsy `columns` is one row.** Four defects in the
   grid a `layout` lays out, all cited to `vega-view-transforms`' own `gridLayout`.
 

@@ -206,7 +206,17 @@ class PropertySweepTest {
      * case where upstream **measures a shape it will not draw**.
      */
     val KNOWN_DIFFERENCES: Map<String, String> =
-      listOf("encode-path-angle--4", "encode-path-angle-0.5", "encode-path-angle-8")
+      // The same three values by both routes a chart can set an angle: on the mark, and in the
+      // `config.path` block a theme writes. The quirk is upstream's measurement and does not care
+      // which of the two put the angle there.
+      listOf(
+          "encode-path-angle--4",
+          "encode-path-angle-0.5",
+          "encode-path-angle-8",
+          "config-path-angle--4",
+          "config-path-angle-0.5",
+          "config-path-angle-8",
+        )
         .associateWith {
           "a rotated `path` mark is *measured* about the scene origin upstream, not about its own " +
             "anchor: `pathRender(context, cache, x, y, sx, sy)` places the outline and the bound " +

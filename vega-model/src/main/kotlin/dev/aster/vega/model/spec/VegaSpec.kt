@@ -1796,6 +1796,63 @@ public data class EncodeSpec(
    */
   public val effective: EncodeEntry
     get() = if (update.isEmpty()) enter else enter + update
+
+  /**
+   * A mark's `config` defaults, folded **into its encode** the way upstream folds them.
+   *
+   * `applyDefaults` in `vega-parser` does exactly this: it walks the merged config block, drops
+   * each key the mark's own encode already mentions, turns the rest into `{value: …}` — or
+   * `{signal: …}`, which goes to `update` rather than `enter` — and merges them *beneath* the
+   * mark's own blocks. Every channel then reads its default through the one path it already uses
+   * for everything else.
+   *
+   * This engine asked a per-channel accessor instead, and a channel whose call site never asked got
+   * nothing: nineteen of the fifty-seven a mark config can carry — `blend`, `angle`, `interpolate`,
+   * `fontWeight`, `xc`, `yc`, `x2`, `tension`, `shape`, `defined`, `scaleX`, `scaleY`, `limit`,
+   * `dir`, `lineHeight`, `orient`, `radius` and the two paints — were honoured when the mark stated
+   * them and ignored when a theme did.
+   *
+   * **The paint pair.** In the first loop a `fill` or a `stroke` is skipped when the encode
+   * mentions *either* of the two, not merely its own key: a mark that states only its stroke does
+   * not take the config's fill. Upstream's rule, and the reason is visible in any themed chart — a
+   * stroked outline that also picked up the theme's fill would be a filled shape nobody asked for.
+   * The **style** loop does not carry it; see the note where it runs.
+   *
+   * "Mentions" means `enter` or `update` and not `exit` or `hover`, which is what upstream's `has`
+   * looks at.
+   */
+  public fun withDefaults(
+    byType: VegaValue.Obj,
+    byStyle: VegaValue.Obj = VegaValue.Obj(emptyMap()),
+  ): EncodeSpec {
+    if (byType.fields.isEmpty() && byStyle.fields.isEmpty()) return this
+    val stated = { key: String -> enter.containsKey(key) || update.containsKey(key) }
+    val paints = stated("fill") || stated("stroke")
+    val defaulted = LinkedHashMap<String, ChannelValue>()
+    val defaultedUpdate = LinkedHashMap<String, ChannelValue>()
+    fun apply(fields: Map<String, VegaValue>, pairRule: Boolean) {
+      for ((key, value) in fields) {
+        if (stated(key)) continue
+        if (pairRule && (key == "fill" || key == "stroke") && paints) continue
+        val signal = (value as? VegaValue.Obj)?.fields?.get("signal")?.asString()
+        if (signal != null) defaultedUpdate[key] = ChannelValue.Signal(signal)
+        else defaulted[key] = ChannelValue.Constant(value)
+      }
+    }
+    apply(byType.fields, pairRule = true)
+    // The styles second, **without** the pair rule and over what the type's blocks supplied:
+    // upstream's two loops differ in exactly that. A plotting area is a group styled `cell`, whose
+    // block fills it transparent and outlines it grey, and a chart that hides the outline by
+    // encoding `stroke: null` has not thereby asked for the fill to go as well — suppressing both
+    // drops the group from the scene altogether, which is what a Vega-Lite concat and a trellis
+    // header caught the moment this loop carried the rule too.
+    apply(byStyle.fields, pairRule = false)
+    if (defaulted.isEmpty() && defaultedUpdate.isEmpty()) return this
+    return copy(
+      enter = defaulted.apply { putAll(this@EncodeSpec.enter) },
+      update = defaultedUpdate.apply { putAll(this@EncodeSpec.update) },
+    )
+  }
 }
 
 /**
@@ -2010,13 +2067,4 @@ public data class MarkSpec(
    */
   val description: String? = null,
   val clip: MarkClip = MarkClip.None,
-  /**
-   * Appearance defaults from `config`, either side of the engine's own built-in per-type block.
-   *
-   * Two maps rather than one because the built-ins sit between them: `config.mark` loses to a
-   * rect's blue and `config.rect` beats it, which is upstream's ordering and is not what the names
-   * suggest.
-   */
-  val configBelowDefaults: Map<String, VegaValue> = emptyMap(),
-  val configAboveDefaults: Map<String, VegaValue> = emptyMap(),
 )

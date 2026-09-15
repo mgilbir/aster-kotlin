@@ -1111,13 +1111,19 @@ public class SpecCompiler(
         MarkSpec(
           type = MarkType.GROUP,
           name = "root",
-          encode = rootEncode(spec, plot),
           // Two blocks reach the chart's own frame and neither is a mark's. `config.group` is the
           // frame's own paint — upstream's comment says "top-level group marks" and means the root
           // rectangle — and the `config.style` blocks the specification named are what a Vega-Lite
           // chart's plotting area gets its border from. The named styles are the more specific of
-          // the two, so they are applied over it.
-          configAboveDefaults = spec.frameConfig + spec.styleAboveDefaults,
+          // the two, so they are applied over it. Folded into the encode by the same rules a mark's
+          // own defaults are, which is upstream's `applyDefaults` taking `config.group` for a frame
+          // exactly where it takes `config.<marktype>` for a mark.
+          encode =
+            rootEncode(spec, plot)
+              .withDefaults(
+                dev.aster.vega.model.VegaValue.Obj(spec.frameConfig),
+                dev.aster.vega.model.VegaValue.Obj(spec.styleAboveDefaults),
+              ),
         ),
         listOf(VegaValue.EmptyObject),
       ) { _, _, _, _ ->

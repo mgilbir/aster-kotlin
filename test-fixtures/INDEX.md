@@ -54,7 +54,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `colour-ramps` | 57 | rect, rule, text | — | band, linear |
 | `colour-scheme` | 39 | rect, rule, text | — | band, linear, ordinal |
 | `config-group-projection` | 2 | group, shape | geoshape | — |
-| `config-marks` | 31 | rect, rule, symbol, text | — | band, linear |
+| `config-marks` | 34 | line, path, rect, rule, symbol, text | — | band, linear |
 | `config-range` | 20 | rect, symbol, text | — | band, linear, ordinal |
 | `config-theme` | 42 | rect, rule, symbol, text | — | band, linear, ordinal |
 | `connected-scatter` | 146 | line, rule, symbol, text | — | linear, ordinal |

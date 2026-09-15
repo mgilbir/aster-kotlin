@@ -1052,6 +1052,7 @@ EncodeSpec.init(enter:update:exit:hover:named:)
 EncodeSpec.isEqual(_:)
 EncodeSpec.named
 EncodeSpec.update
+EncodeSpec.withDefaults(byType:byStyle:)
 EvaluationContext
 EvaluationContext.dataset(name:)
 EvaluationContext.diagnostics
@@ -1560,7 +1561,7 @@ GuideConfig.block(name:)
 GuideConfig.companion
 GuideConfig.init(blocks:)
 GuideConfig.legendDefaults()
-GuideConfig.markDefaults(type:styles:)
+GuideConfig.markDefaults(type:)
 GuideConfig.projectionDefaults()
 GuideConfig.rangeDefault(name:)
 GuideConfig.styleBlock(name:)
@@ -2808,16 +2809,14 @@ MarkSpec
 MarkSpec.aria
 MarkSpec.axes
 MarkSpec.clip
-MarkSpec.configAboveDefaults
-MarkSpec.configBelowDefaults
 MarkSpec.data
 MarkSpec.description()
 MarkSpec.description_
-MarkSpec.doCopy(type:name:role:from:key:sort:transform:encode:marks:projections:axes:data:signals:scales:legends:layout:title:zindex:interactive:aria:description:clip:configBelowDefaults:configAboveDefaults:)
+MarkSpec.doCopy(type:name:role:from:key:sort:transform:encode:marks:projections:axes:data:signals:scales:legends:layout:title:zindex:interactive:aria:description:clip:)
 MarkSpec.encode
 MarkSpec.from
 MarkSpec.hash()
-MarkSpec.init(type:name:role:from:key:sort:transform:encode:marks:projections:axes:data:signals:scales:legends:layout:title:zindex:interactive:aria:description:clip:configBelowDefaults:configAboveDefaults:)
+MarkSpec.init(type:name:role:from:key:sort:transform:encode:marks:projections:axes:data:signals:scales:legends:layout:title:zindex:interactive:aria:description:clip:)
 MarkSpec.interactive
 MarkSpec.isEqual(_:)
 MarkSpec.key
