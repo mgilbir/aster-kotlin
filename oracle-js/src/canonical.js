@@ -46,7 +46,16 @@ export function canonicalSvg(svg) {
       .replace(/id="[^"]*"/g, 'id="ID"')
       .replace(/url\(#[^)]*\)/g, 'url(#ID)')
       .replace(/>\s+</g, '><')
-      .replace(/\s+/g, ' ')
+      // **Only the whitespace that is formatting.** A run containing a line break is indentation
+      // and collapses; a run of plain spaces is *content* and stays, because the captions and mark
+      // descriptions harvested out of this file are read from these very attributes. Collapsing
+      // every run flattened them: upstream's caption for an axis whose labels are all empty is
+      // `values from  to `, two spaces around a value that formatted to nothing — `domainCaption`
+      // interpolates `values from ${fmt(d[0])} to ${fmt(peek(d))}` and neither end formats — and
+      // this rewrote it to one before the reference was written. The comparison then failed against
+      // an engine that had it right, which is the worst shape a reference can take: a gate that
+      // reports a defect the code does not have.
+      .replace(/[ \t]*[\r\n]+[ \t]*/g, ' ')
       .trim() + '\n'
   );
 }
