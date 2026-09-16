@@ -205,6 +205,23 @@ section here does not get released.
 
 ### Fixed
 
+- **A bandwidth has to come from a band scale.** `defaultSizeRef` is handed the *offset's* scale
+  where there is one — `defaultSizeRef(vgSizeChannel, offsetScaleName || scaleName, offsetScale || scale, …)`
+  — and only reaches for a bandwidth once it has asked what that scale is:
+  `if (scaleType === 'band') { …bandwidth… }`. Everything else drops out of that chain onto the tail
+  a mark with no usable band size takes, which is a step less two.
+
+  This compiler read "there is an offset channel" as "there is a band to measure". That holds for the
+  offset scales a chart usually has and fails the moment one is continuous — a grouped bar offset
+  along a *number* rather than a category. `bandwidth()` of a linear scale is **0** in Vega, so those
+  bars were drawn with no width at all.
+
+  `a-bandwidth-needs-a-band-scale` is new: the same chart offset by a number and by a category, so
+  what decides the answer is the scale's kind rather than the offset channel's presence, and a third
+  row with no offset that takes its own band. **The last 4 of the encoding sweep's differences that
+  this change owns close with it**; 9248 of 9274 agree, and the 2 left are a normalized stack's axis
+  format.
+
 - **A counting aggregate answers with a number, whatever the column it counted was.** `count`,
   `distinct`, `valid` and `missing` reduce a group to a tally, so a `type` the chart stated is about
   the wrong thing — it describes the column going in where what comes out is a count. Upstream

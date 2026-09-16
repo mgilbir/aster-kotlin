@@ -2466,18 +2466,45 @@ internal object Marks {
         // there is on `encoding.size`, the channel definition, and an object is true whatever
         // number it carries.
         (markSize != null && useVlSizeChannel) || markSizeChannel != null -> noBandSize()
+        // **A bandwidth has to come from a band scale.** `defaultSizeRef` is handed the *offset's*
+        // scale where there is one —
+        // `defaultSizeRef(vgSizeChannel, offsetScaleName || scaleName, offsetScale || scale, …)` —
+        // and only reaches for a bandwidth once it has asked what that scale is:
+        //
+        //     if (isRelativeBandSize(bandSize)) {
+        //       if (scale) {
+        //         const scaleType = scale.get('type');
+        //         if (scaleType === 'band') { …bandwidth… }
+        //         else if (bandSize.band !== 1) {
+        // log.warn(cannotUseRelativeBandSizeWithNonBandScale) }
+        //       } else { return {mult: bandSize.band, field: {group: sizeChannel}}; }
+        //     }
+        //     // no valid band size
+        //
+        // Anything else drops out of that chain onto the tail below. This read "there is an offset
+        // channel" as "there is a band to measure", which is true of the offset scales a chart
+        // usually has and false as soon as one is continuous — a grouped bar whose offset is a
+        // *number* rather than a category. `bandwidth()` of a linear scale is **0** in Vega, so the
+        // bars came out with no width at all where upstream gives them a step less two.
+        //
+        // The kind asked is the one the size is measured on, which is the offset's where there is
+        // an offset — not [bandingType], which answers the position's first because that is what
+        // `getBandSize` is given.
         offsetChannel != null || bandingType == "band" -> {
           // The width of one *nested* mark where there is an offset scale, and of the whole band
           // where there is not — times the fraction of it the mark asked for, if it asked.
           val band = offsetChannel ?: channel
-          val fraction = relativeBandSize(view, channel)
-          val bandwidth =
-            if (fraction == 1.0) "bandwidth('${view.scale(band)}')"
-            else "${Fields.expressionNumber(fraction)} * bandwidth('${view.scale(band)}')"
-          signalRef(
-            if (minBandSize != null) "max(${canonicalNumberString(minBandSize)}, $bandwidth)"
-            else bandwidth
-          )
+          if (view.scaleType(band) != "band") noBandSize()
+          else {
+            val fraction = relativeBandSize(view, channel)
+            val bandwidth =
+              if (fraction == 1.0) "bandwidth('${view.scale(band)}')"
+              else "${Fields.expressionNumber(fraction)} * bandwidth('${view.scale(band)}')"
+            signalRef(
+              if (minBandSize != null) "max(${canonicalNumberString(minBandSize)}, $bandwidth)"
+              else bandwidth
+            )
+          }
         }
         // A rect-based mark on a **continuous** scale is `continuousBandSize` wide — five units for
         // a bar — not a step less two. `getBandSize` asks the scale's kind first and only reaches
