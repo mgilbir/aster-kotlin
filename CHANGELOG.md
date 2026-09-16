@@ -153,6 +153,31 @@ section here does not get released.
 
 ### Fixed
 
+- **A domain's rows are chosen by the configuration's `invalid`, never by the mark's.**
+  `assembleDomain` asks `getMarkConfig('invalid', markDef, config)` — `getMarkConfig`, not
+  `getMarkPropOrConfig`. The two differ in exactly one way and it is the one that matters here:
+  `getMarkPropOrConfig` reads `mark[channel]` first and falls through to the configuration, while
+  `getMarkConfig` reads **only** the configuration chain — a style block, `config[marktype]`,
+  `config.mark`. So an `invalid` written on the mark definition never reaches the choice of which
+  rows a domain is measured over, and one written in the configuration does.
+
+  Measured across all four modes and both mark kinds: the same `break-paths-show-domains` gives a
+  point's domains `data_0` from the mark definition and `source_0` from `config.mark`, and the same
+  `break-paths-filter-domains` gives a line's domains `data_0` from the mark definition and a
+  `data_1` of its own from the configuration. The two cells where they differ are exactly the two
+  where upstream's own table has the marks and the scales wanting different rows.
+
+  **Both sides** of that comparison come from the same value, too. This engine tested the mark
+  definition's answer for the marks against the configuration's for the scales, which is not the
+  same test and gets the common case wrong: a point whose mark definition says `invalid: null` has
+  no filter to sit below, and asking for one put a dataset in the specification that upstream does
+  not write. `getScaleDataSourceForHandlingInvalidValues` is ported whole now rather than as two
+  flags that can disagree.
+
+  `invalid-on-the-mark-definition` is new and is the pair of `invalid-break-paths-domains`: the same
+  two modes by the other route, neither needing a second dataset where the configuration's need one
+  apiece. **12 of the Vega-Lite sweep's differences close with this**; 8473 of 8484 agree.
+
 - **`cornerRadiusEnd` is a bar's word and nothing else's.** `initMarkDef` guards the whole rule with
   `if (markDef.type === 'bar' && markDef.orient)`, so an area, a point, a tick or a rule that asks
   for one is compiled as though it had not — upstream emits no corner property at all for them. This

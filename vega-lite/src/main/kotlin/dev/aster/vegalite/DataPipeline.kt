@@ -341,7 +341,7 @@ internal class DataPipeline(
     // The scales measure the rows *before* the filter where they want the invalid ones and the
     // marks do not — a named point above the filter, which is upstream's `preFilterInvalid`.
     val preFilter =
-      if (view.marksExcludeInvalid && !view.scalesExcludeInvalid) {
+      if (view.scaleDataSource == UnitView.ScaleDataSource.PRE_FILTER) {
         OutputNode(view.prefixed("prefilter")).also {
           head.then(it)
           head = it
@@ -378,7 +378,7 @@ internal class DataPipeline(
     // And *below* the filter where the marks want the invalid rows and the scales do not: a path
     // drawn with a break at the gap, over a domain measured without it — `postFilterInvalid`.
     val post =
-      if (!view.marksExcludeInvalid && view.scalesExcludeInvalid) {
+      if (view.scaleDataSource == UnitView.ScaleDataSource.POST_FILTER) {
         filterInvalidNode(force = true)?.let { filter ->
           head = head.then(filter)
           OutputNode(view.prefixed("postfilter")).also { head.then(it) }
