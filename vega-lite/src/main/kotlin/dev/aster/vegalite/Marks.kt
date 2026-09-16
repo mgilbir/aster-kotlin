@@ -2425,8 +2425,15 @@ internal object Marks {
     // exactly as one given a `size` is. Upstream writes `xc` with `band: 0.5` for a `rect` on a
     // nominal scale with `"width": 20`, where a mark left to fill the band gets `x` and a
     // bandwidth.
-    val centred = bandingType != "band" || sizeWasHonoured || markSizeChannel != null
-    val vgChannel = alignedPositionChannel(view, channel, centred)
+    val defaultCentred = bandingType != "band" || sizeWasHonoured || markSizeChannel != null
+    val vgChannel = alignedPositionChannel(view, channel, defaultCentred)
+    // **Centred is what the channel came out as, not what the default was.** Upstream reads
+    // `const center = vgChannel === 'xc' || vgChannel === 'yc'` *after* choosing the channel, so a
+    // mark that states `align: "center"` over a band it would otherwise start at is centred in the
+    // band — `xc` with a `band` of 0.5 — and this read the default instead and wrote `xc` with no
+    // band at all, placing the mark on the band's leading edge under a channel that means its
+    // middle.
+    val centred = vgChannel == "xc" || vgChannel == "yc"
 
     val posRef =
       if (def != null) {
