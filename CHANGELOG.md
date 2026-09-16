@@ -205,6 +205,40 @@ section here does not get released.
 
 ### Fixed
 
+- **A discrete axis with a format specifier uses it.** `tickFormat` in `vega-scale` picks the
+  formatter by asking whether the scale has a `tickFormat` of its own, which only a continuous one
+  does:
+
+  ```js
+  else if (scale.tickFormat) {
+    // if d3 scale has tickFormat, it must be continuous
+    const d = scale.domain();
+    format = locale.formatSpan(d[0], d[d.length - 1], count, specifier);
+  }
+  else if (specifier) {
+    format = locale.format(specifier);
+  }
+  ```
+
+  so a band or point scale falls past the span-resolved branch and uses the specifier **as written**.
+  Only an axis that states no specifier keeps its domain's own values, by the `defaultFormatter`
+  above both arms. This engine read that as "a discrete axis never consults a format", and said so in
+  a comment: a band axis of 1, 2 and 3 asked for `.0%` kept its numbers where upstream reads
+  100%, 200%, 300%.
+
+  Two details it would be easy to get half right. The value is **coerced**, as d3 coerces it, so a
+  band of words asked for `.0%` reads `NaN%` on every tick — which is upstream's answer, and looks
+  like the mistake it is, where quietly printing the words back looks like the axis was never asked.
+  And the specifier is used plainly rather than span-resolved: a discrete domain has no span to
+  resolve a missing precision against, so `s` takes d3's default six significant digits where a
+  continuous axis would derive one.
+
+  The spoken caption had the same gap for the same reason and is fixed with it, so what a listener
+  hears is what the axis shows.
+
+  `axis-format-on-a-discrete-scale` is new and holds all five cases, including the two that must not
+  move. 214 Vega differential fixtures.
+
 - **A bandwidth has to come from a band scale.** `defaultSizeRef` is handed the *offset's* scale
   where there is one — `defaultSizeRef(vgSizeChannel, offsetScaleName || scaleName, offsetScale || scale, …)`
   — and only reaches for a bandwidth once it has asked what that scale is:
