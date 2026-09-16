@@ -28,6 +28,39 @@ import org.junit.jupiter.api.Test
  */
 class VegaLitePropertySweepTest {
 
+  /**
+   * Cases where upstream is **wrong** and this compiler deliberately does not follow it.
+   *
+   * A sweep that only counts differences invites the next reader to close them all, and one of
+   * these must not be closed: matching it would mean emitting a specification that draws nothing.
+   * They are counted apart from the rest so the number left to fix is the number actually left to
+   * fix.
+   *
+   * Keyed by the prefix of a case name, with the reason spelled out. Anything listed here is still
+   * compared — it is reported under its own heading rather than skipped, because the day upstream
+   * fixes one of these the case should start failing loudly rather than sitting in a skip list.
+   */
+  private val accepted =
+    mapOf(
+      "encoding-theta-timeUnit-" to
+        "upstream reads `…_offsetted_rect_start` for a bucketed instant on a polar channel, and " +
+          "writes no formula producing it: `useRectOffsetField = fieldDef.timeUnit && " +
+          "bandPosition !== 0.5` is true when `bandPosition` is *undefined*, which it is for an " +
+          "arc — no `timeUnitBandPosition` is configured for one — while the formulas that would " +
+          "write those columns are guarded by `rectBandPosition !== undefined && !== 0.5`. The " +
+          "reference names a column no transform in it produces, so the angle resolves to nothing " +
+          "and the arc is not drawn. This compiler reads the bucket's own column.",
+      "encoding-radius-timeUnit-" to
+        "the same upstream defect as the theta case above, on the other polar channel: " +
+          "`innerRadius` and `outerRadius` name `…_offsetted_rect_start` and `…_offsetted_rect_end` " +
+          "where the only columns written are the bucket's own and its `_end`.",
+      "encoding-theta-bandPosition-8" to BAND_POSITION_OUT_OF_RANGE,
+      "encoding-theta-bandPosition--4" to BAND_POSITION_OUT_OF_RANGE,
+    )
+
+  private fun acceptedReason(name: String): String? =
+    accepted.entries.firstOrNull { name.startsWith(it.key) }?.value
+
   @Test
   fun `report how far the Vega-Lite property sweep agrees with upstream`() {
     assumeTrue(
@@ -51,6 +84,7 @@ class VegaLitePropertySweepTest {
     var differed = 0
     var oursRefused = 0
     val causes = HashMap<String, MutableSet<String>>()
+    val acceptedCases = LinkedHashMap<String, String>()
     val refusedWhy = LinkedHashMap<String, String>()
     val perCase = LinkedHashMap<String, Triple<String, Int, String>>()
 
@@ -88,6 +122,12 @@ class VegaLitePropertySweepTest {
         perCase[name] = Triple("matched", 0, "")
         continue
       }
+      val reason = acceptedReason(name)
+      if (reason != null) {
+        acceptedCases[name] = reason
+        perCase[name] = Triple("accepted", differences.size, shapeless(differences.first()))
+        continue
+      }
       differed++
       perCase[name] = Triple("differed", differences.size, shapeless(differences.first()))
       // One vote per shape per case, so a specification with fifty differences does not outvote
@@ -117,13 +157,27 @@ class VegaLitePropertySweepTest {
         }
       )
 
-    val compared = matched + differed + oursRefused
+    // The accepted ones count as compared, because they were — and not as matched, because they did
+    // not. The rate is what agrees; the line below it says how much of the remainder is deliberate.
+    val compared = matched + differed + oursRefused + acceptedCases.size
     val rate = if (compared == 0) 0.0 else matched * 100.0 / compared
     println("==== Vega-Lite property sweep ====")
     println("compared          $compared")
     println(String.format(Locale.ROOT, "matched           %d (%.1f%%)", matched, rate))
     println("differed          $differed")
+    println("accepted          ${acceptedCases.size} (upstream is wrong; see below)")
     println("we produced none  $oursRefused")
+    acceptedCases
+      .takeIf { it.isNotEmpty() }
+      ?.let { cases ->
+        println()
+        println("accepted divergences, deliberately not matched:")
+        cases.values.distinct().forEach { why ->
+          val affected = cases.entries.filter { it.value == why }.map { it.key }
+          println("  ${affected.size} case(s): $why")
+          println("         ${affected.take(3)}${if (affected.size > 3) " …" else ""}")
+        }
+      }
     refusedWhy
       .takeIf { it.isNotEmpty() }
       ?.let {
@@ -160,6 +214,28 @@ class VegaLitePropertySweepTest {
   private fun shapeless(difference: Any): String = "$difference"
 
   private companion object {
+    /**
+     * `interpolatedSignalRef` reads the row through `datum[…]` only for a band position strictly
+     * *between* the edges:
+     * ```js
+     * const expr = !isSignalRef(bandPosition) && 0 < bandPosition && bandPosition < 1 ? 'datum' : undefined;
+     * ```
+     *
+     * which is right at exactly 0 and exactly 1, where the name is written as a **field** reference
+     * and a plain column name is what a field reference wants. Outside `[0, 1]` it is neither: the
+     * interpolation branch is taken, so the name lands inside a **signal**, and a plain column name
+     * there is read as a signal of that name. `vega.parse` rejects the result outright —
+     * *Unrecognized signal name: "v_start"* — so the chart does not load at all. This compiler
+     * writes `datum["v_start"]`, which is what the signal branch means everywhere it is reachable.
+     */
+    const val BAND_POSITION_OUT_OF_RANGE =
+      "upstream writes a band position outside [0, 1] into a *signal* using bare column names — " +
+        "`scale(\"theta\", 5 * v_start + -4 * v_end)` — because its `datum` guard is " +
+        "`0 < bandPosition && bandPosition < 1`, which is right at the two edges, where the name " +
+        "is a field reference, and wrong outside them, where it is a signal. `vega.parse` refuses " +
+        "the result: Unrecognized signal name: \"v_start\". Matching it would emit a chart that " +
+        "does not load."
+
     private val repositoryRoot: File = File(System.getProperty("user.dir")).parentFile
     private val sweepDir = File(repositoryRoot, "build/vega-lite-property-sweep")
     private val specDir = File(sweepDir, "specs")
