@@ -18,11 +18,42 @@ internal object Fields {
   /**
    * The Vega field name for a definition.
    *
-   * @param suffix appended after an underscore — `"end"` for the upper edge of a stack
+   * **A bin suffix is not a suffix**, and upstream keeps them as two parameters for a reason. A
+   * plain [suffix] names a column something else wrote beside this one — a stack's `_start` and
+   * `_end` — and it is appended whatever the definition is. A [binSuffix] names one of the columns
+   * *the bin itself* produced, and a definition with no bin of this compiler's making has none of
+   * them to name:
+   * ```js
+   * if (isBinning(bin)) {
+   *   fn = binToString(bin);
+   *   suffix = (opt.binSuffix ?? '') + (opt.suffix ?? '');
+   * } else if (timeUnit && !isBinnedTimeUnit(timeUnit)) {
+   *   fn = timeUnitToString(timeUnit);
+   *   suffix = ((!['range', 'mid'].includes(opt.binSuffix) && opt.binSuffix) || '') + (opt.suffix ?? '');
+   * }
+   * ```
+   *
+   * `isBinning`, so a column that **arrived** bucketed — `bin: "binned"` — falls past both arms and
+   * the bin suffix is dropped: its name is simply its own, because there is no `_end` or `_mid`
+   * column for a transform this chart never ran. Collapsing the two parameters into one made a
+   * pre-binned dimension group by `lo_mid` where upstream groups by `lo`, and that is a stack keyed
+   * on a column that does not exist. A bucketed *instant* keeps the distinction too, in its own
+   * smaller way: its time unit did write an `_end`, so a `binSuffix` of `end` still applies to it,
+   * while `range` and `mid` — which only a real bin produces — do not.
+   *
+   * @param suffix appended after an underscore whatever the definition is — `"end"` for the upper
+   *   edge of a stack
+   * @param binSuffix appended only where the bin that would have produced that column was this
+   *   compiler's to run
    * @param forAs true when the name is a transform's output, where a nested path is flattened
    *   rather than escaped
    */
-  fun vgField(def: ChannelDef, suffix: String? = null, forAs: Boolean = false): String {
+  fun vgField(
+    def: ChannelDef,
+    suffix: String? = null,
+    binSuffix: String? = null,
+    forAs: Boolean = false,
+  ): String {
     var field = def.field
     var effectiveSuffix = suffix
 
@@ -43,13 +74,17 @@ internal object Fields {
       val function =
         when {
           def.bin is Binning.Bin -> {
-            effectiveSuffix = suffix
+            effectiveSuffix = binSuffix.orEmpty() + suffix.orEmpty()
             binToString(def.bin.params)
           }
           def.aggregate != null -> def.aggregate
           // `isBinnedTimeUnit`: a column that arrives already bucketed keeps its own name — there
           // is no transform writing a new one, only a formula computing the bucket's far edge.
-          def.timeUnit != null && !isBinnedTimeUnit(def.timeUnit) -> timeUnitToString(def.timeUnit)
+          def.timeUnit != null && !isBinnedTimeUnit(def.timeUnit) -> {
+            effectiveSuffix =
+              binSuffix.takeUnless { it == "range" || it == "mid" }.orEmpty() + suffix.orEmpty()
+            timeUnitToString(def.timeUnit)
+          }
           else -> null
         }
       if (function != null) {
@@ -57,7 +92,9 @@ internal object Fields {
       }
     }
 
-    if (effectiveSuffix != null) field = "${field}_$effectiveSuffix"
+    // `if (suffix)`: the empty string the two halves add up to when neither applies is *falsy*
+    // upstream, so it appends nothing rather than a trailing underscore.
+    if (!effectiveSuffix.isNullOrEmpty()) field = "${field}_$effectiveSuffix"
     val resolved = field ?: ""
     return if (forAs) removePathFromField(resolved) else replacePathInField(resolved)
   }
@@ -71,8 +108,14 @@ internal object Fields {
   fun datumPath(field: String): String = "datum['${field.replace("'", "\\'")}']"
 
   /** `datum["mean_b"]`, the accessor an emitted expression uses to read the field. */
-  fun datumAccess(def: ChannelDef, suffix: String? = null, datum: String = "datum"): String =
-    "$datum[${quoted(removePathFromField(vgField(def, suffix, forAs = true)))}]" + argAccessor(def)
+  fun datumAccess(
+    def: ChannelDef,
+    suffix: String? = null,
+    binSuffix: String? = null,
+    datum: String = "datum",
+  ): String =
+    "$datum[${quoted(removePathFromField(vgField(def, suffix, binSuffix, forAs = true)))}]" +
+      argAccessor(def)
 
   /** The one path step an `argmin`/`argmax` reads out of the row it answered with. */
   private fun argAccessor(def: ChannelDef): String {

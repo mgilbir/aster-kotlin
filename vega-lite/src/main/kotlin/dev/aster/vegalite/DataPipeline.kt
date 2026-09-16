@@ -1102,7 +1102,10 @@ internal class DataPipeline(
         // fields not being imputable at once.
         when {
           dimension.bin == null -> listOf(Fields.vgField(dimension))
-          stack.impute -> listOf(Fields.vgField(dimension, suffix = "mid"))
+          // A **bin** suffix: the midpoint is a column the binning wrote, so a dimension that
+          // arrived bucketed groups by its own name — it has no `_mid` for a transform this chart
+          // never ran, and grouping by one keyed the stack on a column that does not exist.
+          stack.impute -> listOf(Fields.vgField(dimension, binSuffix = "mid"))
           dimension.bin is Binning.Bin ->
             listOf(Fields.vgField(dimension), Fields.vgField(dimension, suffix = "end"))
           // A column that arrived already binned has no `_end` of its own, and upstream's
@@ -1152,9 +1155,15 @@ internal class DataPipeline(
         else
           stack.groupbyChannels.mapNotNull { channel ->
             val dimension = view.spec.fieldDef(channel) ?: return@mapNotNull null
-            if (dimension.bin !is Binning.Bin) return@mapNotNull null
+            // `for (const dimensionFieldDef of dimensionFieldDefs) { const {bin} = …; if (bin) {`
+            // — **any** bin, including one the data arrived with. The formula that comes out for
+            // one of those is a no-op, `0.5*lo + 0.5*lo` written back over `lo`, because both
+            // edges resolve to the same column; upstream emits it anyway and the impute below is
+            // keyed on the column it names. Read as this compiler's own bin only, the formula was
+            // skipped and the impute keyed on a `_mid` nobody wrote.
+            if (dimension.bin == null) return@mapNotNull null
             val start = Fields.datumAccess(dimension)
-            val end = Fields.datumAccess(dimension, suffix = "end")
+            val end = Fields.datumAccess(dimension, binSuffix = "end")
             val near = dimension.raw.number("bandPosition") ?: 0.5
             obj {
               put("type", "formula")
@@ -1164,7 +1173,7 @@ internal class DataPipeline(
                   "${Fields.expressionNumber(near)}*$start+" +
                   "${Fields.expressionNumber(1 - near)}*$end : $start",
               )
-              put("as", Fields.vgField(dimension, suffix = "mid", forAs = true))
+              put("as", Fields.vgField(dimension, binSuffix = "mid", forAs = true))
             }
           },
       component =
