@@ -417,7 +417,11 @@ internal object Marks {
             view.markDef.raw.fields["tooltip"].isTruthy()
         put("interactive", VegaValue.Bool(own))
       }
-      if (view.markDef.raw.fields["aria"] == VegaValue.Bool(false)) {
+      // `getMarkGroup`: `const aria = getMarkPropOrConfig('aria', markDef, config)` — the **whole**
+      // chain, so a theme that switches the accessibility tree off for every point takes the marks
+      // out of it just as a mark that says so itself does. Read as the definition alone, a chart
+      // themed `config.point.aria: false` kept its points in the tree.
+      if (markPropOrConfig(view, "aria") == VegaValue.Bool(false)) {
         put("aria", VegaValue.Bool(false))
       }
       // A line or an area is drawn in the order its points arrive, so the dimension has to be
@@ -726,7 +730,10 @@ internal object Marks {
     )
 
   private fun markDefProperties(view: UnitView): VegaValue.Obj = obj {
-    view.markDef.raw.fields["cornerRadiusEnd"]?.let { radius ->
+    // `initMarkDef` reads it through `getMarkPropOrConfig('cornerRadiusEnd', markDef, config)`, so
+    // a theme that rounds the top of every bar — `config.bar.cornerRadiusEnd` — rounds them, and
+    // this compiler, reading the definition alone, drew square corners under it.
+    markPropOrConfig(view, "cornerRadiusEnd")?.let { radius ->
       // **A bar, and one with an orientation.** `initMarkDef` guards the whole rule with
       // `if (markDef.type === 'bar' && markDef.orient)`, so every other mark type ignores the
       // property outright — an arc, an area, a circle, a point, a rect, a rule, a text, a tick and
@@ -740,7 +747,11 @@ internal object Marks {
         (orient == "horizontal" && view.spec.encoding["x2"] != null) ||
           (orient == "vertical" && view.spec.encoding["y2"] != null)
       val corners = if (ranged) listOf("cornerRadius") else CORNER_RADIUS_END.getValue(orient)
-      corners.forEach { corner -> put(corner, obj { put("value", radius) }) }
+      // `markDef[newProp] = cornerRadiusEnd` and then `markDefProperties` writes it out with
+      // `signalOrValueRef`, so a radius stated as an expression is a **signal** here as anywhere
+      // else — written out as a value, a bar bound to a slider was drawn with an object for a
+      // corner.
+      corners.forEach { corner -> put(corner, markProperty(radius)) }
     }
     // A mark that links somewhere shows the pointer, there being nothing else about it that looks
     // clickable — `baseEncodeEntry`'s `cursor` rule, which is about the *encoding* and not a style.
@@ -1182,7 +1193,16 @@ internal object Marks {
     val value =
       own
         ?: if (vgChannel != channel || !ignoreVgConfig) {
-          view.config.markConfig(view.spec.mark).fields[vgChannel]
+          // `getMarkConfig`, the whole of it, and not one lookup out of it. The tail of
+          // `getMarkPropOrConfig` is `return getMarkConfig(channel, mark, config, opt)`, which
+          // walks
+          // the style blocks under the **Vega-Lite** name, then `config[marktype]` under Vega's
+          // name
+          // and then under Vega-Lite's, and only then `config.mark` under Vega's. Read as
+          // `config[marktype][vgChannel]` alone, everything the other three arms answer was lost:
+          // `config.text.size` never became a font size, `config.line.size` never became a stroke
+          // width, and a style block that sized a mark sized nothing.
+          markConfigValue(view, channel, vgChannel)
         } else {
           null
         }
@@ -1301,7 +1321,24 @@ internal object Marks {
     // it: no role description and no spoken summary. It is a *mark* property rather than an encode
     // channel, and it is how a composite mark hides its own scaffolding — an error bar's two caps
     // are read as part of the bar, not as three separate objects.
-    if (view.markDef.raw.fields["aria"] == VegaValue.Bool(false)) return@obj
+    //
+    // It is read off the **whole** chain, not the definition alone:
+    //
+    //     const enableAria = getMarkPropOrConfig('aria', markDef, config);
+    //     if (enableAria === false) return {};
+    //     return {...(enableAria ? {aria: enableAria} : {}), ...ariaRoleDescription(model), …};
+    //
+    // so a theme's `config.point.aria: false` silences the encode block exactly as the mark's own
+    // does — and this compiler, asking only the definition, went on to write a role description for
+    // a mark upstream had already taken out of the tree.
+    val enableAria = markPropOrConfig(view, "aria")
+    if (enableAria == VegaValue.Bool(false)) return@obj
+    // And the other way about: `aria: true` is written **into** the encode block, as a bare `true`
+    // rather than as a value ref — it is Vega's own switch and not a graphic property, so there is
+    // no reference to wrap it in. Nothing here wrote it at all, so a chart that asked for the
+    // accessibility tree back on — `config.mark.aria: true` over a `config.aria: false`, or a
+    // single mark saying so — was compiled as though it had not asked.
+    if (enableAria.isTruthy()) put("aria", enableAria!!)
     val mark = view.spec.mark
     // `config.aria: false` says there is no accessibility tree to describe anything *to*, and
     // `ariaRoleDescription` is skipped for the whole chart by it. Upstream tests it separately in
@@ -1309,8 +1346,10 @@ internal object Marks {
     // description the specification **asked for** is still written under it.
     if (view.config.raw.fields["aria"] != VegaValue.Bool(false)) {
       // A mark may say what it *is* rather than what it is drawn with: a box plot's box is a rect,
-      // and calling it a rect to a screen reader is naming the tool instead of the thing.
-      val stated = view.markDef.raw.fields["ariaRoleDescription"]
+      // and calling it a rect to a screen reader is naming the tool instead of the thing. A theme
+      // may say it for every mark of a type at once — `getMarkPropOrConfig` again — which is how a
+      // house style names its bars "column" without touching a single chart.
+      val stated = markPropOrConfig(view, "ariaRoleDescription")?.takeIf { it != VegaValue.Null }
       if (stated != null) put("ariaRoleDescription", obj { put("value", stated) })
       else if (mark !in VG_MARK_NAMES) put("ariaRoleDescription", obj { put("value", mark) })
     }
