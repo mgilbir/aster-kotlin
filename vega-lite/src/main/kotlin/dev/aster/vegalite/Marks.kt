@@ -2,6 +2,7 @@ package dev.aster.vegalite
 
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asBoolean
 import dev.aster.vega.model.canonicalNumberString
 
 /**
@@ -2343,19 +2344,72 @@ internal object Marks {
     // have to thread one, which is a change of its own rather than part of this fix. The drawing is
     // upstream's either way; only the explanation is missing.
 
+    // `defaultSizeRef`'s tail, reached by every mark whose band size came out unusable. It is not
+    // only the "nothing was stated" case: a size stated as zero arrives here too, which is why it
+    // is named for the absent band size rather than for the absent property.
+    fun noBandSize(): VegaValue =
+      // `defaultSizeRef` asks whether the channel has a field **first**. A rect-based mark with
+      // nothing encoded on this channel spans the plot rather than sitting somewhere in it at a
+      // default width, and it keeps back exactly what a band scale's inner padding would have kept
+      // back — so a lone row of ticks is as thick as one row of a trellis of them, and a boxplot of
+      // one column is as thick as one row of boxes.
+      if (def == null) {
+        val padding =
+          view.config.scaleConfig(
+            when (view.spec.mark) {
+              "bar" -> "barBandPaddingInner"
+              "tick" -> "tickBandPaddingInner"
+              else -> "rectBandPaddingInner"
+            }
+          )!!
+        // The *plain* `width` or `height`, not this plot's own name for it: a plot with nothing on
+        // the other channel has no gridline scale, so its group already defines the plain name as
+        // an alias — `assembleAxisSignals` — and upstream writes the expression against that.
+        signalRef("${canonicalNumberString(1 - padding)} * $sizeChannel")
+      } else {
+        // `const defaultStep = getViewConfigDiscreteStep(config.view, sizeChannel)` — the step of
+        // the dimension this mark is being sized along, not whichever `view.step` is.
+        obj { put("value", view.config.discreteStep(sizeChannel!!) - 2) }
+      }
+
     val sizeRef: VegaValue =
       when {
         declaredSize != null && useVlSizeChannel && sizeChannel != null ->
           nonPosition(view, "size", sizeChannel).fields[sizeChannel] ?: VegaValue.EmptyObject
         // A mark's stated size may be an **expression** — `{"size": {"expr": 20}}` — and then it is
         // a signal, as it is everywhere else a value is read.
-        markSize != null && useVlSizeChannel ->
+        markSize?.asBoolean() == true && useVlSizeChannel ->
           literalRef(markSize)?.let { (key, value) -> obj { put(key, value) } }
             ?: VegaValue.EmptyObject
         // The band size proper, which `getBandSize` settles before it looks at the scale at all.
-        markSizeChannel != null ->
+        // Below the one above, and that is upstream's order rather than `getBandSize`'s own: a
+        // truthy `size` on the mark is answered before `getBandSize` is ever called, so a bar
+        // written `{"size": 10, "width": 20}` is ten wide. Once the `size` is falsy and the call
+        // does happen, `getMarkPropOrConfig` reads the **Vega** name first and the same bar written
+        // `{"size": 0, "width": 20}` is twenty.
+        markSizeChannel?.asBoolean() == true ->
           literalRef(markSizeChannel)?.let { (key, value) -> obj { put(key, value) } }
             ?: VegaValue.EmptyObject
+        // **A size stated as zero is not a zero-width mark; it is a mark with no usable size.**
+        // Upstream tests the size it resolved for *truth* rather than for presence, twice on the
+        // way down: `if (encoding.size || markDef.size)` decides whether to build a size at all,
+        // and then `else if (bandSize)` in `defaultSizeRef` decides whether to write the one
+        // `getBandSize` returned. A falsy number fails both, so `{"type": "bar", "size": 0}` falls
+        // past everything below — past the bandwidth its band would have given it, past
+        // `continuousBandSize` on a quantitative axis — and lands on the same tail a mark with no
+        // size of any kind takes, which is a step less two: 18. This engine read the size for
+        // presence and drew the invisible bar the number literally asks for.
+        //
+        // It still counts as a size for the *placement*, though, and that is not an inconsistency
+        // in upstream so much as a second reading of the same word: `defaultBandAlign` asks whether
+        // the band size is **relative**, and zero is a number, so the mark is centred in its band
+        // exactly as a mark 18 wide would be. [sizeWasHonoured] below is left reading presence for
+        // that reason.
+        //
+        // An `encoding` of `{"value": 0}` is a different thing and does draw nothing: the test
+        // there is on `encoding.size`, the channel definition, and an object is true whatever
+        // number it carries.
+        (markSize != null && useVlSizeChannel) || markSizeChannel != null -> noBandSize()
         offsetChannel != null || bandingType == "band" -> {
           // The width of one *nested* mark where there is an offset scale, and of the whole band
           // where there is not — times the fraction of it the mark asked for, if it asked.
@@ -2377,36 +2431,22 @@ internal object Marks {
           !Scales.hasDiscreteDomain(scaleType) &&
           view.spec.mark in RECT_BASED_MARKS &&
           markConfig.number("continuousBandSize") != null ->
-          obj { put("value", markConfig.number("continuousBandSize")) }
-        else -> {
-          val discreteBandSize = markConfig.number("discreteBandSize")
-          when {
-            // `defaultSizeRef` asks whether the channel has a field **first**. A rect-based mark
-            // with nothing encoded on this channel spans the plot rather than sitting somewhere in
-            // it at a default width, and it keeps back exactly what a band scale's inner padding
-            // would have kept back — so a lone row of ticks is as thick as one row of a trellis of
-            // them, and a boxplot of one column is as thick as one row of boxes.
-            def == null -> {
-              val padding =
-                view.config.scaleConfig(
-                  when (view.spec.mark) {
-                    "bar" -> "barBandPaddingInner"
-                    "tick" -> "tickBandPaddingInner"
-                    else -> "rectBandPaddingInner"
-                  }
-                )!!
-              // The *plain* `width` or `height`, not this plot's own name for it: a plot with
-              // nothing on the other channel has no gridline scale, so its group already defines
-              // the plain name as an alias — `assembleAxisSignals` — and upstream writes the
-              // expression against that.
-              signalRef("${canonicalNumberString(1 - padding)} * $sizeChannel")
-            }
-            discreteBandSize != null -> obj { put("value", discreteBandSize) }
-            // `const defaultStep = getViewConfigDiscreteStep(config.view, sizeChannel)` — the step
-            // of the dimension this mark is being sized along, not whichever `view.step` is.
-            else -> obj { put("value", view.config.discreteStep(sizeChannel!!) - 2) }
-          }
-        }
+          // Configured as zero, it is a band size that fails the same truth test as a stated one —
+          // `getBandSize` returns the 0 it found here rather than looking any further, and
+          // `defaultSizeRef` then declines to write it.
+          markConfig
+            .number("continuousBandSize")
+            ?.takeIf { it != 0.0 }
+            ?.let { obj { put("value", it) } } ?: noBandSize()
+        // A configured `discreteBandSize` of zero is the one falsy size that does **not** land on
+        // the tail by way of being ignored: `config[mark.type]?.discreteBandSize || {band: 1}`
+        // substitutes the whole band for it, and a relative band size of one over a scale that is
+        // not a band scale drops out of `defaultSizeRef`'s chain untouched — onto the same tail,
+        // by a different road. The band scales themselves never reach this line; they are answered
+        // by the bandwidth branch above.
+        markConfig.number("discreteBandSize")?.takeIf { it != 0.0 } != null ->
+          obj { put("value", markConfig.number("discreteBandSize")) }
+        else -> noBandSize()
       }
 
     // `defaultBandAlign`: a rect filling a *relative* band starts at the band's leading edge; one

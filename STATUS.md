@@ -27,7 +27,7 @@ end to end — expressions, signals, all 51 of upstream's 51 documented data tra
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-213 Vega differential fixtures and 287 Vega-Lite fixtures pass, every one of them matching upstream
+213 Vega differential fixtures and 288 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -194,7 +194,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 213 Vega differential fixtures and 287 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 213 Vega differential fixtures and 288 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -5817,7 +5817,7 @@ compose instead of one replacing the other. It is the axis's own `withLabelText`
 on both guides, which is why it was worth having one function for it.
 
 `legend-label-expr.vl.json` arms both gates and both of them failed before the fix — the specification
-comparison on the stray property, and the scene comparison on labels drawn at full length. 287
+comparison on the stray property, and the scene comparison on labels drawn at full length. 288
 Vega-Lite fixtures now.
 
 ### The order of a date, which the locale seam could not reach
@@ -5831,7 +5831,7 @@ did not pass it to `TimeUnits.specifier`.
 
 Upstream has no lever for it either — its `timeUnitSpecifier` takes no locale, and `VEGALITE_TIMEFORMAT`
 is a module constant — so this is an addition rather than a port. Both new tables are therefore
-**empty by default** and the emitted specification is byte-for-byte what it was, which is what the 287
+**empty by default** and the emitted specification is byte-for-byte what it was, which is what the 288
 Vega-Lite fixtures compare against.
 
 Two tables, because there are two places a date's shape is decided and they are different tables.
