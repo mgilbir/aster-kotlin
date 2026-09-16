@@ -231,6 +231,27 @@ section here does not get released.
 
 ### Fixed
 
+- **A mark's default position is read from the whole chain too, and a second position reads its own
+  channel.** `pointPositionDefaultRef` asks
+  `getMarkPropOrConfig(channel, markDef, config, {vgChannel})`, which walks the definition under
+  Vega's name for the channel and then Vega-Lite's, and then the configuration the same way. Read as
+  the definition alone, a theme that places every arc at a `radius` or every label at a `theta`
+  placed nothing: the mark fell through to the default it would have taken untouched — an arc to
+  `min(width,height)/2`, a text to no angle at all.
+
+  The second position was worse, and the theme is what exposed it. Upstream's fallback names the
+  **second** channel throughout — `position2orSize(channel, markDef) || … ||
+  {[vgChannel]: pointPositionDefaultRef({model, defaultPos, channel, …})()}`, with `channel` the
+  second one — where this handed it the first. So everything that answered for a radius answered for
+  the hole in the middle of it as well, and a themed pie came out a ring with nothing in it. The
+  mark's own `radius` had leaked the same way for as long as that line existed; it took a theme to
+  make it visible, because a chart that states a radius usually states its hole too.
+
+  `a-position-a-theme-asked-for` is new: an arc whose radius a theme sets, a text whose angle and
+  radius it sets, and a mark stating its own radius over the theme's to keep that order drawn rather
+  than assumed. Three mutants, all killed. **38 of the configuration sweep's differences close with
+  this**; 21129 of 21251 agree. 298 Vega-Lite fixtures.
+
 - **A mark's size is read from the whole chain, not from the definition alone.** `getBandSize` asks
   `getMarkPropOrConfig(useVlSizeChannel ? 'size' : sizeChannel, mark, config, {vgChannel: sizeChannel})`,
   and that walks the definition under Vega's name for the property, then Vega-Lite's, then the style

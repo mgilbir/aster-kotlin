@@ -2134,8 +2134,16 @@ internal object Marks {
     // it passes through, and this wrote only the pass-through.
     //
     // For `x` and `y` the two names are the same and nothing changes.
+    // And then the **configuration**, which is the rest of what `getMarkPropOrConfig` is: the style
+    // blocks, `config[marktype]` under each of the two names in turn, and `config.mark`. Read as
+    // the
+    // definition alone, a theme that places every arc at a `radius` or every label at a `theta`
+    // placed nothing: the mark fell through to the default it would have taken untouched — an arc
+    // to
+    // `min(width,height)/2`, a text to no angle at all — and 50 of the configuration sweep's cases
+    // were that one omission across `config.arc` and `config.text`.
     val vgChannel = vgPositionChannel(channel)
-    (view.markDef.raw.fields[vgChannel] ?: view.markDef.raw.fields[channel])?.let {
+    markPropOrConfig(view, channel, vgChannel = vgChannel)?.let {
       if (it == VegaValue.Str("width")) return obj { put("field", obj { put("group", "width") }) }
       if (it == VegaValue.Str("height")) return obj { put("field", obj { put("group", "height") }) }
       // `signalOrValueRef`, as every other mark property is built: a position written `{"expr": …}`
@@ -2282,7 +2290,21 @@ internal object Marks {
     view.markDef.raw.fields[vgPositionChannel(channel2)]?.let {
       return obj { put("value", it) }
     }
-    return defaultPositionRef(view, channel, defaultPos2)
+    // **The second channel's own default, not the first's.** Upstream's fallback names `channel`
+    // throughout and `channel` there *is* the second one:
+    //
+    //     position2orSize(channel, markDef) || position2orSize(channel, styleConfig) ||
+    //     position2orSize(channel, config[mark]) || position2orSize(channel, config.mark) ||
+    //     {[vgChannel]: pointPositionDefaultRef({model, defaultPos, channel, …})()}
+    //
+    // Handed the first channel instead, everything that answers for a radius answered for the hole
+    // in the middle of it as well: a theme's `config.arc.radius` came back out as the
+    // `innerRadius`,
+    // so a themed pie was drawn as a ring with nothing in it. The mark's own `radius` had leaked
+    // the
+    // same way for as long as this line has existed; it took a theme to make it visible, because a
+    // chart that states a radius usually states the hole too.
+    return defaultPositionRef(view, channel2, defaultPos2)
   }
 
   /**
