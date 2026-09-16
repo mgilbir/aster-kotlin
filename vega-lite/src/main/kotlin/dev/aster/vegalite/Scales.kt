@@ -1127,18 +1127,82 @@ internal object Scales {
       set("nice", bool(true))
     }
 
-    // A **point** offset scale is padded at its ends like any other point scale, and by the same
-    // number: `pointPadding` becomes its outer padding, its marks having no width to pad within.
-    if ((channel == "xOffset" || channel == "yOffset") && type == "point") {
-      set("paddingOuter", num(config.scaleConfig("pointPadding")!!))
+    // An **offset** scale is padded by its own two configuration entries, and by nothing the outer
+    // scale reads. Upstream's `paddingInner`/`paddingOuter` take the offset channels down a second
+    // arm entirely:
+    //
+    //     } else if (isXorYOffset(channel)) {
+    //       if (scaleType === ScaleType.BAND) return scaleConfig.offsetBandPaddingInner;
+    //     }
+    //     ...
+    //     } else if (isXorYOffset(channel)) {
+    //       if (scaleType === ScaleType.POINT) {
+    //         return 0.5; // so the point positions align with centers of band scales.
+    //       } else if (scaleType === ScaleType.BAND) return scaleConfig.offsetBandPaddingOuter;
+    //     }
+    //
+    // The point half is a **constant**, not `pointPadding`: half a step is what puts an offset
+    // point on the centre of the band a bar would have filled, and a theme that narrows every
+    // other point scale must not pull those points off their bands. Reading `pointPadding` here
+    // agreed only because its default happens to be the same 0.5. The band half was not read at
+    // all, so `config.scale.offsetBandPaddingInner` and `offsetBandPaddingOuter` did nothing —
+    // they have no default, which is why the omission stayed invisible until a theme set one.
+    if (channel == "xOffset" || channel == "yOffset") {
+      if (type == "point") {
+        set("paddingOuter", num(0.5))
+      } else if (type == "band") {
+        config.scaleConfig("offsetBandPaddingInner")?.let { set("paddingInner", num(it)) }
+        config.scaleConfig("offsetBandPaddingOuter")?.let { set("paddingOuter", num(it)) }
+      }
     }
     if (channelIsPosition(channel)) {
+      // `padding()`, whole. A position scale's padding is settled before its two halves are, and
+      // the first thing upstream asks is the theme:
+      //
+      //     if (isContinuousToContinuous(scaleType)) {
+      //       if (scaleConfig.continuousPadding !== undefined) {
+      //         return scaleConfig.continuousPadding;
+      //       }
+      //       const {type, orient} = markDef;
+      //       if (type === 'bar' && !(isFieldDef(fieldOrDatumDef) && (…bin || …timeUnit))) {
+      //         if ((orient === 'vertical' && channel === 'x') || …) {
+      //           return barConfig.continuousBandSize;
+      //         }
+      //       }
+      //     }
+      //     if (scaleType === ScaleType.POINT) return scaleConfig.pointPadding;
+      //
+      // `continuousPadding` was never read, so a theme could not pad a continuous position scale
+      // at all, and could not narrow a histogram's bars by the one entry written for it: the bar
+      // width fell through to `config.bar.continuousBandSize` even where the theme had spoken.
+      // Note which types it reaches — every continuous one, a plain line's `x` included, not only
+      // a bar's.
+      val derivedPadding: Double? =
+        if (type in CONTINUOUS_TO_CONTINUOUS) {
+          config.scaleConfig("continuousPadding")
+            ?: if (
+              view.spec.mark == "bar" &&
+                def.bin == null &&
+                def.timeUnit == null &&
+                ((view.markDef.orient == "vertical" && channel == "x") ||
+                  (view.markDef.orient == "horizontal" && channel == "y"))
+            ) {
+              // A bar against a continuous dimension has no band to fill, so its width comes from
+              // here.
+              config.markConfig("bar").number("continuousBandSize")
+            } else null
+        } else if (type == "point") {
+          config.scaleConfig("pointPadding")
+        } else null
+      derivedPadding?.let { set("padding", num(it)) }
+
       // A stated `padding` settles both ends of a band at once and passes through as it stands;
       // the derived inner and outer paddings are for a scale that said nothing, and writing them
-      // beside a stated one gives Vega three numbers where the specification gave it one.
-      if (type == "point") {
-        set("padding", num(config.scaleConfig("pointPadding")!!))
-      } else if (type == "band" && def.scale?.has("padding") != true) {
+      // beside a stated one gives Vega three numbers where the specification gave it one. (Only a
+      // *stated* one can suppress them here: `padding()` returns nothing for a band, which is
+      // neither continuous nor a point, so the resolved padding upstream guards on is the stated
+      // one and nothing else.)
+      if (type == "band" && def.scale?.has("padding") != true) {
         // A **stated** inner padding is the resolved one, and the outer is half of *that*: the two
         // are one decision, and deriving the outer from the configured inner beside a stated one
         // pads the ends against a gap the bands do not have.
@@ -1162,21 +1226,22 @@ internal object Scales {
             }
         set("paddingInner", num(inner))
         // Half the inner padding, so that a band's step stays a whole number of units — except
-        // around a nested group, where upstream pads both sides alike.
+        // around a nested group, where upstream pads both sides alike, and except where the theme
+        // has named an outer padding of its own:
+        //
+        //     if (hasNestedOffsetScale) return bandWithNestedOffsetPaddingOuter;
+        //     if (scaleType === ScaleType.BAND) {
+        //       return getFirstDefined(bandPaddingOuter, paddingInnerValue / 2);
+        //     }
+        //
+        // `bandPaddingOuter` heads that chain and was not read, so a theme asking for wider ends
+        // got the halved inner padding anyway. It stands behind the nested-offset entry, which is
+        // about the gap between groups rather than at the edges of the plot.
         val outer =
           if (view.hasNestedOffset(channel))
             config.scaleConfig("bandWithNestedOffsetPaddingOuter")!!
-          else inner / 2
+          else config.scaleConfig("bandPaddingOuter") ?: inner / 2
         set("paddingOuter", num(outer))
-      } else if (
-        view.spec.mark == "bar" &&
-          def.bin == null &&
-          def.timeUnit == null &&
-          ((view.markDef.orient == "vertical" && channel == "x") ||
-            (view.markDef.orient == "horizontal" && channel == "y"))
-      ) {
-        // A bar against a continuous dimension has no band to fill, so its width comes from here.
-        config.markConfig("bar").number("continuousBandSize")?.let { set("padding", num(it)) }
       }
     }
 
