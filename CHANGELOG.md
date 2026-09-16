@@ -153,6 +153,21 @@ section here does not get released.
 
 ### Fixed
 
+- **A position reads Vega's name for its channel before Vega-Lite's.** `pointPositionDefaultRef`
+  asks `getMarkPropOrConfig(channel, markDef, config, {vgChannel})`, and that reads `mark[vgChannel]`
+  before `mark[channel]`. For a polar channel the two names differ — a radius is Vega's
+  `outerRadius` and an angle its `startAngle` — so a text mark's radius is its `outerRadius` where
+  it states one and its `radius` otherwise, the former winning when both are written.
+
+  `outerRadius` is the documented alias for `radius`, and reading only the Vega-Lite name left the
+  label unplaced: upstream writes a `radius` beside the `outerRadius` it passes through to Vega, and
+  this engine wrote only the pass-through. For `x` and `y` the two names are the same and nothing
+  changes.
+
+  `text-placed-by-an-outer-radius` is new: a pie with its slices labelled by a `radius`, its values
+  labelled by an `outerRadius`, and a third layer stating both so that which one wins is drawn as
+  well as declared. **4 of the Vega-Lite sweep's differences close with this**; 8477 of 8484 agree.
+
 - **A domain's rows are chosen by the configuration's `invalid`, never by the mark's.**
   `assembleDomain` asks `getMarkConfig('invalid', markDef, config)` — `getMarkConfig`, not
   `getMarkPropOrConfig`. The two differ in exactly one way and it is the one that matters here:

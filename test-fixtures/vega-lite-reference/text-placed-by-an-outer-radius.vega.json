@@ -1,0 +1,262 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A text mark placed in polar coordinates by a radius its **mark definition** states rather than its encoding. `pointPositionDefaultRef` asks `getMarkPropOrConfig(channel, markDef, config, {vgChannel})`, and that reads Vega's name for the channel before Vega-Lite's — so a radius is the mark's `outerRadius` where it states one and its `radius` otherwise, the former winning when both are written. `outerRadius` is the documented alias for `radius`, and reading only the Vega-Lite name left the label unplaced: upstream writes a `radius` beside the `outerRadius` it passes through to Vega, and this engine wrote only the pass-through. The three layers state the two names apart and together, so which one wins is drawn as well as declared.",
+  "background": "white",
+  "padding": 5,
+  "width": 160,
+  "height": 160,
+  "style": "view",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "c": "alpha",
+          "v": 30
+        },
+        {
+          "c": "beta",
+          "v": 20
+        },
+        {
+          "c": "gamma",
+          "v": 50
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [],
+          "field": "v",
+          "sort": {
+            "field": [
+              "c"
+            ],
+            "order": [
+              "ascending"
+            ]
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [],
+          "field": "v",
+          "sort": {
+            "field": [
+              "v"
+            ],
+            "order": [
+              "ascending"
+            ]
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_marks",
+      "type": "arc",
+      "style": [
+        "arc"
+      ],
+      "from": {
+        "data": "data_1"
+      },
+      "encode": {
+        "update": {
+          "outerRadius": {
+            "value": 60
+          },
+          "fill": {
+            "scale": "color",
+            "field": "c"
+          },
+          "description": {
+            "signal": "\"v: \" + (format(datum[\"v\"], \"\")) + \"; c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"])"
+          },
+          "x": {
+            "signal": "width",
+            "mult": 0.5
+          },
+          "y": {
+            "signal": "height",
+            "mult": 0.5
+          },
+          "innerRadius": {
+            "value": 0
+          },
+          "startAngle": {
+            "scale": "theta",
+            "field": "v_end"
+          },
+          "endAngle": {
+            "scale": "theta",
+            "field": "v_start"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_marks",
+      "type": "text",
+      "style": [
+        "text"
+      ],
+      "from": {
+        "data": "data_1"
+      },
+      "encode": {
+        "update": {
+          "radius": {
+            "value": 72
+          },
+          "fill": {
+            "value": "black"
+          },
+          "description": {
+            "signal": "\"v: \" + (format(datum[\"v\"], \"\")) + \"; c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"])"
+          },
+          "x": {
+            "signal": "width",
+            "mult": 0.5
+          },
+          "y": {
+            "signal": "height",
+            "mult": 0.5
+          },
+          "text": {
+            "signal": "isValid(datum[\"c\"]) ? datum[\"c\"] : \"\"+datum[\"c\"]"
+          },
+          "align": {
+            "value": "center"
+          },
+          "baseline": {
+            "value": "middle"
+          },
+          "theta": {
+            "signal": "scale(\"theta\", 0.5 * datum[\"v_start\"] + 0.5 * datum[\"v_end\"])"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_2_marks",
+      "type": "text",
+      "style": [
+        "text"
+      ],
+      "from": {
+        "data": "data_2"
+      },
+      "encode": {
+        "update": {
+          "outerRadius": {
+            "value": 40
+          },
+          "radius": {
+            "value": 40
+          },
+          "fontSize": {
+            "value": 8
+          },
+          "fill": {
+            "value": "black"
+          },
+          "description": {
+            "signal": "\"v: \" + (format(datum[\"v\"], \"\"))"
+          },
+          "x": {
+            "signal": "width",
+            "mult": 0.5
+          },
+          "y": {
+            "signal": "height",
+            "mult": 0.5
+          },
+          "text": {
+            "signal": "format(datum[\"v\"], \"\")"
+          },
+          "align": {
+            "value": "center"
+          },
+          "baseline": {
+            "value": "middle"
+          },
+          "theta": {
+            "signal": "scale(\"theta\", 0.5 * datum[\"v_start\"] + 0.5 * datum[\"v_end\"])"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "theta",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "v_start"
+          },
+          {
+            "data": "data_1",
+            "field": "v_end"
+          },
+          {
+            "data": "data_2",
+            "field": "v_start"
+          },
+          {
+            "data": "data_2",
+            "field": "v_end"
+          }
+        ]
+      },
+      "range": [
+        0,
+        6.283185307179586
+      ],
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "data_1",
+        "field": "c",
+        "sort": true
+      },
+      "range": "category"
+    }
+  ]
+}
