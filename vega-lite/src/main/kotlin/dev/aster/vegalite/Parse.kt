@@ -716,8 +716,45 @@ internal class Parse(
 
     val conditions = conditions(channel, value.fields["condition"], "$path.condition")
 
+    // ```js
+    // if (type !== 'quantitative') {
+    //   if (isCountingAggregateOp(aggregate)) {
+    //     log.warn(log.message.invalidFieldTypeForCountAggregate(type, aggregate));
+    //     fieldDef.type = 'quantitative';
+    //   }
+    // }
+    // ```
+    //
+    // **A counting aggregate answers with a number, whatever the column it counted was.** `count`,
+    // `distinct`, `valid` and `missing` all reduce a group to a tally, so a `type` the chart stated
+    // is about the wrong thing: it describes the column going in, and what comes out is a count.
+    // Upstream overrides it and says so.
+    //
+    // Only those four, and only over a stated type that is not already quantitative. A `sum` or a
+    // `mean` leaves the stated type alone — upstream's test is `isCountingAggregateOp`, not "is an
+    // aggregate" — which is the distinction that makes this a rule rather than a coincidence, since
+    // [inferType] below already answers quantitative for *any* aggregate where no type was stated.
+    // That is why this went unnoticed: the two agree everywhere the chart says nothing.
+    //
+    // Left as stated, the channel keeps a band or an ordinal scale where upstream builds a linear
+    // one, and everything hung off the scale follows — the axis flips to the other side, a legend
+    // becomes a gradient rather than a row of symbols, and a bar takes a bandwidth it has no band
+    // for. 32 of the encoding sweep's cases were that, across eight channels.
     val declaredType = MeasureType.from(value.string("type"))
-    val type = declaredType ?: inferType(channel, field, aggregate, timeUnit, bin, value, path)
+    val counted =
+      declaredType != null && declaredType != MeasureType.QUANTITATIVE && aggregate in COUNTING_OPS
+    if (counted) {
+      diagnostics.warn(
+        VegaLiteDiagnostics.INFERRED_TYPE,
+        "`$aggregate` counts rows, so this channel is quantitative; the stated " +
+          "`${declaredType.name.lowercase()}` describes the column going in rather than the " +
+          "tally coming out, and is ignored.",
+        jsonPath = path,
+      )
+    }
+    val type =
+      if (counted) MeasureType.QUANTITATIVE
+      else declaredType ?: inferType(channel, field, aggregate, timeUnit, bin, value, path)
 
     return ChannelDef(
       channel = channel,
