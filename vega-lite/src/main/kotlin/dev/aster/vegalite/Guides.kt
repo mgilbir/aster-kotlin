@@ -545,13 +545,6 @@ internal object Guides {
     // normalized stack is a percentage and shows no dates at all. Written below, this compiler
     // would have agreed on the first of the two cases and not the second.
     //
-    // **No fixture pins that ordering, and a mutant moving this below the time branch survives the
-    // suite.** The sweep case that covers it — `encoding-x-temporal-stack-normalize` — agrees, but
-    // a sweep is a measurement rather than a gate. A fixture cannot hold it yet for a reason that
-    // has nothing to do with this rule: the only chart that reaches the ordering labels dates with
-    // a *number* specifier, and `%` at the end of a time specifier with no directive after it is
-    // dropped by d3 — `timeFormat(".0%")` reads `.0` — where this engine keeps it. Close that and
-    // the temporal row can join `a-normalized-stack-is-a-percentage`, and this comment can go.
     // `&& config.normalizedNumberFormat` is a **truthiness** test, so a theme that sets it to the
     // empty string is asking for no percentage rather than for an empty one, and the axis falls
     // through to whatever it would otherwise have shown.
@@ -563,10 +556,12 @@ internal object Guides {
 
     // Labels for a bucketed instant, and a tick step no finer than the bucket.
     if (def.timeUnit != null) {
-      if (!normalized) {
-        derived("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit, view.config.locale)))
-      }
-      // The tick step is `properties.ts`'s and not `guideFormat`'s, so the return above does not
+      // Below the percentage above, and that ordering is the whole of upstream's `return`:
+      // [AxisComponent.set] keeps the **first** answer for a property, so whichever of these two
+      // runs first is the format. Swap them and a bucketed instant carrying a normalized stack is
+      // labelled with its months.
+      derived("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit, view.config.locale)))
+      // The tick step is `properties.ts`'s and not `guideFormat`'s, so the percentage does not
       // reach it: a bucket is still a bucket wide however its labels are written.
       Fields.timeUnitDuration(def.timeUnit)?.let { derived("tickMinStep", signalRef(it)) }
     }

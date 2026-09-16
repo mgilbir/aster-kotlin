@@ -119,7 +119,7 @@ public object TimeFormat {
     var i = 0
     while (i < pattern.length) {
       val c = pattern[i]
-      if (c != '%' || i == pattern.lastIndex) {
+      if (c != '%') {
         out.append(c)
         i++
         continue
@@ -127,9 +127,24 @@ public object TimeFormat {
       // An optional pad modifier sits between the percent and the directive.
       var cursor = i + 1
       var padWith: Char? = null
-      if (cursor < pattern.lastIndex && pattern[cursor] in "-_0") {
+      if (cursor <= pattern.lastIndex && pattern[cursor] in "-_0") {
         padWith = pattern[cursor]
         cursor++
+      }
+      // **A percent consumes what follows it, and a percent with nothing after it consumes
+      // itself.** d3 reads the character after the percent, looks it up, and pushes whatever the
+      // table gave back — which is the character itself where there is no entry, and the empty
+      // string where the pattern ended first, `charAt` past the end being `""`. So `%~` is `~`,
+      // `%-~` is `~` with the modifier swallowed too, and a dangling percent disappears:
+      // `timeFormat(".0%")` reads `.0` and `timeFormat("%")` reads nothing at all.
+      //
+      // This appended the percent as written in both cases, which is the one shape upstream never
+      // produces. It surfaces wherever a *number* specifier reaches a time scale — a normalized
+      // stack on a temporal axis is asked for `.0%` — and there the whole label differed by the
+      // trailing character.
+      if (cursor > pattern.lastIndex) {
+        i = cursor
+        continue
       }
       val directive = pattern[cursor]
       // Each numeric piece goes through the host's numbering system, if it has one — **after**
@@ -214,12 +229,9 @@ public object TimeFormat {
         'x' -> out.append(render(locale.date, at, millis, zone, locale))
         'X' -> out.append(render(locale.time, at, millis, zone, locale))
         '%' -> out.append('%')
-        else -> {
-          // Unknown directive: emit it as written rather than guessing.
-          out.append('%')
-          if (padWith != null) out.append(padWith)
-          out.append(directive)
-        }
+        // Unknown directive: the character survives and the percent does not, which is what
+        // `formats[c]` being absent leaves `c` as.
+        else -> out.append(directive)
       }
       i = cursor + 1
     }

@@ -255,6 +255,16 @@
   "caption": "X-axis titled 'a log scale, capped but not walked down' for a log scale with values from 1 to 1,000"
  },
  {
+  "fixture": "axis-time-format-oddities",
+  "kind": "axis",
+  "caption": "X-axis for a utc scale with values from ~ to ~"
+ },
+ {
+  "fixture": "axis-time-format-oddities",
+  "kind": "axis",
+  "caption": "X-axis for a utc scale with values from ~ to ~"
+ },
+ {
   "fixture": "axis-values",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 5 values: alpha, bravo, charlie, delta, echo"
