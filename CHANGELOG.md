@@ -153,6 +153,27 @@ section here does not get released.
 
 ### Fixed
 
+- **A bucket that arrived bucketed keeps its far edge in a second column, and a point sits between
+  the two.** `valueRefForFieldOrDatumDef`'s `else if (isBinned(bin))` interpolates between the
+  channel's own field and the *secondary channel's* field — not between a field and an `_end` beside
+  it, which is what a bin this compiler asked for has and a pre-binned column does not. That is the
+  whole reason `bin: "binned"` requires an `x2`.
+
+  The **rect** path has read the pair all along — `rectBinPosition`, which is what makes a
+  histogram's bars span their buckets. The **point** path had no branch for it at all, so it fell to
+  the plain field reference and drew the mark on the bucket's near edge: an area or a line over data
+  that came pre-bucketed was half a bucket to the left of where upstream draws it, all the way along.
+
+  Two things it must not do, and the fixture pins both: a `bandPosition` of 0 asks for the near edge
+  by name and gets the plain column back rather than a signal computing it, and a bucketed column
+  with no second channel has no far edge to interpolate towards, so the mark stays where it was.
+  Upstream warns there; this does not, for the reason already recorded against
+  `cannotApplySizeToNonOrientedMark` — the encoder reaches no diagnostic collector.
+
+  `a-bucket-with-two-columns-of-its-own` is new. Found by a fixture rather than by the schema sweep,
+  which compares emitted specifications one mark type at a time and never paired a pre-binned channel
+  with its secondary.
+
 - **A stated `orient` is an argument to the rule that decides orientation, not a way past it.**
   Upstream's own comment on the call says so — "set orient, which can be overridden by rules as
   sometimes the specified orient is invalid" — and only two of the blocks in `orient()` ask for the

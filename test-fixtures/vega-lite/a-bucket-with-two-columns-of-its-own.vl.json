@@ -1,0 +1,73 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+  "description": "A column that **arrived** bucketed keeps its far edge in a second column rather than in an `_end` of its own, and a mark placed at a *point* is placed between the two: `else if (isBinned(bin)) { if (isFieldDef(channel2Def)) return interpolatedSignalRef({fieldOrDatumDef: channelDef, fieldOrDatumDef2: channel2Def, …}) }`. The rect path already read the pair — that is what makes a histogram's bars span their buckets — but the point path did not, and an area or a line over data that came pre-bucketed was drawn along the buckets' near edges instead of through their middles, half a bucket to the left of where upstream draws it. The first two rows are that area and that line. The last two must not move: a `bandPosition` of 0 asks for the near edge by name and gets the plain column back rather than a signal that computes it, and a bucketed column with no second channel has no far edge to interpolate towards — upstream warns that `x2` is required and leaves the mark where it was. The area's `stack: null` is **not** decoration: an area over a bucketed column stacks by default, and stacking a path mark imputes over the bucket as a key, where this compiler names the imputed column `lo_mid` and orders the transforms differently from upstream — a second defect in the same shape, twenty differences of its own, which is its own fix rather than part of this one. Turning the stack off is what lets this fixture answer about the position alone.",
+  "vconcat": [
+    {
+      "width": 200,
+      "height": 70,
+      "data": {
+        "values": [
+          {"lo": 0, "hi": 10, "v": 28},
+          {"lo": 10, "hi": 20, "v": 55},
+          {"lo": 20, "hi": 30, "v": 43}
+        ]
+      },
+      "mark": "area",
+      "encoding": {
+        "y": {"field": "lo", "bin": "binned", "type": "quantitative"},
+        "y2": {"field": "hi"},
+        "x": {"field": "v", "type": "quantitative", "stack": null}
+      }
+    },
+    {
+      "width": 200,
+      "height": 70,
+      "data": {
+        "values": [
+          {"lo": 0, "hi": 10, "v": 28},
+          {"lo": 10, "hi": 20, "v": 55},
+          {"lo": 20, "hi": 30, "v": 43}
+        ]
+      },
+      "mark": {"type": "line", "point": true},
+      "encoding": {
+        "x": {"field": "lo", "bin": "binned", "type": "quantitative"},
+        "x2": {"field": "hi"},
+        "y": {"field": "v", "type": "quantitative"}
+      }
+    },
+    {
+      "width": 200,
+      "height": 70,
+      "data": {
+        "values": [
+          {"lo": 0, "hi": 10, "v": 28},
+          {"lo": 10, "hi": 20, "v": 55},
+          {"lo": 20, "hi": 30, "v": 43}
+        ]
+      },
+      "mark": "point",
+      "encoding": {
+        "x": {"field": "lo", "bin": "binned", "type": "quantitative", "bandPosition": 0},
+        "x2": {"field": "hi"},
+        "y": {"field": "v", "type": "quantitative"}
+      }
+    },
+    {
+      "width": 200,
+      "height": 70,
+      "data": {
+        "values": [
+          {"lo": 0, "hi": 10, "v": 28},
+          {"lo": 10, "hi": 20, "v": 55},
+          {"lo": 20, "hi": 30, "v": 43}
+        ]
+      },
+      "mark": "point",
+      "encoding": {
+        "x": {"field": "lo", "bin": "binned", "type": "quantitative"},
+        "y": {"field": "v", "type": "quantitative"}
+      }
+    }
+  ]
+}
