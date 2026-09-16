@@ -287,6 +287,8 @@ internal class Config(
    *   became a top-level property, `countTitle` named a field) and the rest mean nothing to Vega.
    * - A per-mark-type block is **redirected into `config.style`**, because Vega-Lite's `bar` and
    *   `rect` are the same Vega mark: left in `config.rect`, a rect theme would repaint every bar.
+   * - A `config.legend` block loses the five words only Vega-Lite knows, the same way `config.mark`
+   *   loses its own.
    * - `config.title` becomes the `group-title` style, with `color` rewritten as `fill`, since a
    *   style block names its properties the way a mark does.
    *
@@ -324,19 +326,23 @@ internal class Config(
     for ((key, value) in user.fields) {
       when {
         key in VEGA_LITE_ONLY -> Unit
-        // A `config.style` block is a mark config under another name, so it loses the same
-        // Vega-Lite-only properties — `point: true` on a line is a *normalizer's* instruction and
-        // means nothing to Vega.
+        // A `config.style` block is passed through **whole**. `stripAndRedirectConfig` deletes
+        // Vega-Lite-only properties from `config.mark` and from each `config[markType]`, and from
+        // nowhere else — a style block is never walked:
+        //
+        //     if (config.mark) { for (const prop of VL_ONLY_MARK_CONFIG_PROPERTIES) delete …; }
+        //     for (const markType of MARK_STYLES) { … redirectConfigToStyleConfig(config,
+        // markType); }
+        //
+        // and the redirection *reads into* `config.style` rather than filtering what is already
+        // there, `{...propConfig, ...config.style[toProp ?? prop]}`. Filtered like a mark config,
+        // a style block lost every word on that list — a theme that said how a named style treats
+        // an unplaceable value, or gave one a colour, arrived at the renderer without it.
         key == "style" ->
           (value as? VegaValue.Obj)?.fields?.forEach { (k, v) ->
-            val kept =
-              (v as? VegaValue.Obj)?.let { block ->
-                VegaValue.Obj(block.fields.filterKeys { it !in VEGA_LITE_ONLY_MARK })
-              } ?: v
             // `mergeConfig` is a deep merge over the derived blocks above, so a style that names
             // one property keeps the seeded font beside it rather than replacing the block.
-            if (kept !is VegaValue.Obj || kept.fields.isNotEmpty())
-              styles[k] = merged(styles[k], kept)
+            if (v !is VegaValue.Obj || v.fields.isNotEmpty()) styles[k] = merged(styles[k], v)
           }
         // `config.mark` survives, minus the properties only Vega-Lite understands — `color` and
         // `filled` are resolved into a mark's own fill and stroke long before Vega sees anything.
@@ -347,6 +353,26 @@ internal class Config(
             }
             ?.takeIf { it.fields.isNotEmpty() }
             ?.let { out["mark"] = it }
+        // ```js
+        // if (config.legend) {
+        //   for (const prop of VL_ONLY_LEGEND_CONFIG) { delete config.legend[prop]; }
+        // }
+        // ```
+        //
+        // The five are *inputs* to this compiler, not instructions to Vega: the four
+        // `gradient*Length` bounds are the clamp a gradient legend's length is worked out from, and
+        // `unselectedOpacity` is what a legend bound to a selection fades its unpicked entries to.
+        // Vega has never heard of any of them, so passing them through put five unknown words in
+        // the block it applies to every legend. A block left holding nothing at all is dropped
+        // rather than emitted empty — upstream's closing sweep, `if (isObject(config[prop]) &&
+        // isEmpty(config[prop])) delete config[prop]`.
+        key == "legend" ->
+          (value as? VegaValue.Obj)
+            ?.let { block ->
+              VegaValue.Obj(block.fields.filterKeys { it !in VEGA_LITE_ONLY_LEGEND })
+            }
+            ?.takeIf { it.fields.isNotEmpty() }
+            ?.let { out["legend"] = it }
         key in MARK_TYPES ->
           (value as? VegaValue.Obj)
             ?.let { block ->
@@ -620,6 +646,29 @@ internal class Config(
         "theta2",
         "timeUnitBandSize",
         "timeUnitBandPosition",
+      )
+
+    /**
+     * `VL_ONLY_LEGEND_CONFIG`: what a `config.legend` block loses on the way to Vega.
+     *
+     * ```ts
+     * export const VL_ONLY_LEGEND_CONFIG: (keyof LegendConfig<any>)[] = [
+     *   'gradientHorizontalMaxLength', 'gradientHorizontalMinLength',
+     *   'gradientVerticalMaxLength', 'gradientVerticalMinLength', 'unselectedOpacity',
+     * ];
+     * ```
+     *
+     * Every one of them is spent before a specification is written: the four bounds by
+     * `defaultGradientLength`, which turns them into a legend's own `gradientLength`, and
+     * `unselectedOpacity` by the encoding a legend binding puts on its unpicked entries.
+     */
+    val VEGA_LITE_ONLY_LEGEND =
+      setOf(
+        "gradientHorizontalMaxLength",
+        "gradientHorizontalMinLength",
+        "gradientVerticalMaxLength",
+        "gradientVerticalMinLength",
+        "unselectedOpacity",
       )
 
     val VEGA_LITE_ONLY =

@@ -1517,10 +1517,10 @@ internal object Guides {
         parts["labels"] = obj { put("update", obj { put("text", it) }) }
       }
       if (gradient) {
-        // A colour ramp is drawn as a bar whose length follows the plot, within Vega's own limits —
-        // and **which** measure of the plot depends on which way the ramp runs. A horizontal one is
-        // as long as the plot is wide and no shorter than a hundred units; a vertical one follows
-        // the height and may be as short as sixty-four.
+        // A colour ramp is drawn as a bar whose length follows the plot, within limits the theme
+        // sets — and **which** measure of the plot depends on which way the ramp runs. A horizontal
+        // one is as long as the plot is wide and by default no shorter than a hundred units; a
+        // vertical one follows the height and by default may be as short as sixty-four.
         // The *view's* own size signal, not the plain name: inside a concatenation the plotting
         // area is `concat_0_childHeight` and `height` is either something else or nothing at all,
         // so a ramp measured against it came out the wrong length or not at all.
@@ -1539,12 +1539,37 @@ internal object Guides {
         // A horizontal ramp beside the plot, or placed by hand with `orient: "none"`, has no width
         // to follow — it is simply the shortest a horizontal ramp may be. A vertical one follows
         // the height wherever it sits, there being a height either way.
+        //
+        // The two numbers in that clamp are the **theme's**, not this compiler's. They are four of
+        // the five words `config.legend` has that Vega has never heard of, so they never leave as
+        // configuration; `defaultGradientLength` destructures them out of the legend config and
+        // spends them here, and `defaultLegendConfig` is where the values below come from:
+        //
+        //     export const defaultLegendConfig: LegendConfig<SignalRef> = {
+        //       gradientHorizontalMaxLength: 200,
+        //       gradientHorizontalMinLength: 100,
+        //       gradientVerticalMaxLength: 200,
+        //       gradientVerticalMinLength: 64, // This is Vega's minimum.
+        //       unselectedOpacity: 0.35,
+        //     };
+        //
+        // Hard-coded, a theme that asked for a shorter ramp was answered with a hundred-unit one:
+        // the numbers reached the renderer as unknown configuration instead of as this legend's
+        // length. `gradientLength` itself is a Vega word and stays in the block, which is why it is
+        // the *theme* that settles the length when it states one — `derived` stands aside.
         val horizontal = legendRuns == "horizontal"
         val alongThePlot = !horizontal || legendOrient == "top" || legendOrient == "bottom"
         val measure = if (horizontal) view.sizeSignal("x") else view.sizeSignal("y")
-        val shortest = if (horizontal) 100 else 64
-        if (alongThePlot) derived("gradientLength", signalRef("clamp($measure, $shortest, 200)"))
-        else derived("gradientLength", num(shortest.toDouble()))
+        val bound = if (horizontal) "gradientHorizontal" else "gradientVertical"
+        val shortest =
+          view.config.raw.obj("legend")?.number("${bound}MinLength")
+            ?: if (horizontal) 100.0 else 64.0
+        val longest = view.config.raw.obj("legend")?.number("${bound}MaxLength") ?: 200.0
+        if (alongThePlot) {
+          val clamp =
+            "clamp($measure, ${canonicalNumberString(shortest)}, ${canonicalNumberString(longest)})"
+          derived("gradientLength", signalRef(clamp))
+        } else derived("gradientLength", num(shortest))
       } else {
         // The type is written only where it *disagrees* with what Vega would pick: a symbol legend
         // over a continuous colour scale has to say so, and everywhere else a symbol is already

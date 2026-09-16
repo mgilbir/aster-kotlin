@@ -717,6 +717,30 @@ internal class LegendBuilder(
         ),
       )
 
+    // `legendEntryLayout`, which runs once the legend's own bounds are settled and sizes **every**
+    // entry group of a symbol legend, not only a clipped one:
+    //
+    // ```js
+    // const widths = entries.reduce((w, g) => {
+    //   w[g.column] = Math.max(g.bounds.x2 - g.x, w[g.column] || 0);
+    //   return w;
+    // }, {});
+    // entries.forEach(g => { g.width = widths[g.column]; g.height = g.bounds.y2 - g.y; });
+    // ```
+    //
+    // A row is therefore as wide as the widest row in its **column** and as tall as what is in it.
+    // Sized only where a `clipHeight` asked for it, an ordinary legend's rows had no rectangle at
+    // all, which is invisible until something reads one: a legend a selection is bound to paints
+    // its rows transparent so that a click anywhere along one is caught, and a row of no size
+    // catches nothing.
+    fun extent(box: RectD, of: (RectD) -> Double) = of(box).takeIf { it.isFinite() } ?: 0.0
+    val columnWidths =
+      ordered.indices
+        .groupBy { it % columns }
+        .mapValues { (_, inColumn) ->
+          inColumn.maxOf { extent(boxes[it]) { box -> box.right } }
+        }
+
     return ordered.indices.map { position ->
       val offset = offsets[position]
       // The `entries` block paints the **row**, which is how a legend a selection is bound to
@@ -729,12 +753,16 @@ internal class LegendBuilder(
         children = clipped(ordered[position], clipHeight, boxes[position].right),
         fill = painted?.let { Fill.of(it) },
         transform = Transform2D.translate(offset.x, offset.y),
-        // With a `clipHeight` the entry has a rectangle of its own — `height: height ? encoder(…)`
-        // — and `g.width = Math.max(g.bounds.x2 - g.x, …)` fills the width in afterwards, so the
-        // row reaches from its **own origin** to whatever is furthest right in it. The row itself
-        // is **not** clipped: only the symbol inside it is, which is why a label longer than the
-        // row is drawn in full while a swatch taller than it is cut.
-        size = clipHeight?.let { SizeD(boxes[position].right, it) },
+        // The row reaches from its **own origin** to whatever is furthest right in its column, and
+        // down to whatever is lowest in it — which with a `clipHeight` is at least the clip, since
+        // that is the one case where the group's own rectangle joins its bounds. The row itself is
+        // **not** clipped: only the symbol inside it is, which is why a label longer than the row
+        // is drawn in full while a swatch taller than it is cut.
+        size =
+          SizeD(
+            columnWidths.getValue(position % columns),
+            extent(boxes[position]) { box -> box.bottom },
+          ),
         // Upstream calls this a "scope" group; naming it for what it is keeps a legend entry
         // distinguishable from a group mark's cell, which shares that role.
         metadata =

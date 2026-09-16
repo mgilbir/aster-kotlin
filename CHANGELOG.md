@@ -231,6 +231,33 @@ section here does not get released.
 
 ### Fixed
 
+- **A gradient legend is as long as the theme asked for, and a style block reaches Vega whole.**
+  `stripAndRedirectConfig` deletes five words from `config.legend` on the way out —
+  `if (config.legend) { for (const prop of VL_ONLY_LEGEND_CONFIG) delete config.legend[prop]; }`,
+  where `VL_ONLY_LEGEND_CONFIG` is the four `gradient*Length` bounds and `unselectedOpacity`. They
+  are Vega-Lite's own vocabulary, spent before anything is emitted: `defaultGradientLength`
+  destructures the bounds out of the legend configuration and returns
+  `gradientLengthSignal(model, 'height', gradientVerticalMinLength, gradientVerticalMaxLength)` for
+  a vertical colour ramp, the same against `'width'` for a horizontal one oriented top or bottom,
+  and the bare `gradientHorizontalMinLength` for a horizontal ramp anywhere else. Passed straight
+  through, they reached the renderer as five words Vega has never heard of in the block it applies
+  to every legend — and the length they were meant to decide was decided by a constant instead, so
+  a theme that asked for a shorter ramp was answered with upstream's default hundred.
+
+  The same function is where a `config.style` block was being filtered as though it were a mark
+  config. It is not one: the Vega-Lite-only mark properties are deleted from `config.mark` and from
+  each `config[markType]`, and from nowhere else, and the redirection that follows only merges a
+  mark-type block *into* a style, `{...propConfig, ...config.style[toProp ?? prop]}`. A named style
+  therefore keeps `color`, `invalid` and the rest, where this dropped them and a theme that styled
+  one arrived at the renderer without them.
+
+  Sizing a legend's rows was wrong underneath both. `legendEntryLayout` runs for every symbol
+  legend — `entries.forEach(g => { g.width = widths[g.column]; g.height = g.bounds.y2 - g.y; })`,
+  the widths being each column's maximum — where this sized a row only when a `clipHeight` asked
+  for one. Invisible until something reads a row's rectangle: a legend a selection is bound to
+  paints its rows transparent so a click anywhere along one is caught, and a row of no size catches
+  nothing.
+
 - **A mark's default position is read from the whole chain too, and a second position reads its own
   channel.** `pointPositionDefaultRef` asks
   `getMarkPropOrConfig(channel, markDef, config, {vgChannel})`, which walks the definition under
