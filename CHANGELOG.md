@@ -40,6 +40,32 @@ section here does not get released.
   Recorded rather than fixed in this change: the sweep is a measurement, and each of those is its own
   defect with its own fix.
 
+- **The sweep reads the configuration, and finds a family of defects.** Eighteen families more, one
+  per configuration block plus one for the fourteen scalars at its top. A configuration is a
+  *different code path* to the same properties: `getMarkConfig` walks the configuration chain and
+  never looks at the mark definition, where `getMarkPropOrConfig` reads the definition first, and the
+  two have already disagreed here over `invalid`. A property the mark families agree on may still be
+  read wrongly out of a theme — which is exactly what this found. The axis block is swept three times
+  over, plain and `axisX` and `axisBand`, because the same table resolved at three scopes is three
+  answers and which one wins is the rule rather than the value.
+
+  **21251 specifications, up from 9274**, every one of which upstream compiles.
+
+  It found **156 differences**, all of them in the new families and none in the old. The largest
+  group is one sentence: **a mark property written in a theme is not read.** A `size`, a
+  `discreteBandSize`, a `radius`, an `outerRadius`, a `theta`, a `startAngle`, a `cornerRadiusEnd`,
+  an `x` or a `y` on `config.bar`, `config.text`, `config.arc`, `config.tick` or `config.rect` leaves
+  the mark at the default it would have taken with no theme at all — a bar keeps its bandwidth where
+  upstream gives it the configured width, an arc keeps `min(width,height)/2` where upstream gives it
+  the configured radius. The rest: `aria` and `ariaRoleDescription` from a theme, the four
+  `gradient*Length` bounds and `unselectedOpacity` on `config.legend` passed through to the output
+  instead of being read, `continuousPadding` and `bandPaddingOuter` on `config.scale`, `titleAngle`
+  on `config.header`, `orient` on the axis blocks, `fieldTitle`, and `invalid` choosing a domain's
+  source.
+
+  Recorded rather than fixed in this change: the sweep is a measurement, and each cause is its own
+  fix.
+
 - **The sweep reads the encoding, and finds four causes.** Nineteen families more, one per
   **encoding channel**, sweeping the properties that channel's field definition declares — the same
   reasoning one level over from the mark: what a property means is the channel's question, and a
