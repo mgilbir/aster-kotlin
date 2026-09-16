@@ -231,6 +231,23 @@ section here does not get released.
 
 ### Fixed
 
+- **What a mark does with a value it cannot place is read from the whole configuration chain.**
+  `assembleDomain` and the mark's own `defined` both ask `getMarkConfig('invalid', markDef, config)`,
+  which is
+  `getFirstDefined(styleConfig, styleConfig, config[mark.type].invalid, config.mark.invalid)`. This
+  compiler read `config.mark.invalid` and nothing else, so a theme saying `config.line.invalid` — or
+  saying it in a style block — was dropped: the chart kept the default for its kind, `filter` for a
+  point and `break-paths-show-domains` for a line, and the data pipeline then built the wrong number
+  of datasets for it.
+
+  `an-invalid-a-theme-asked-for` is new, with the mark's own value over a theme's to keep that order
+  drawn. Four mutants, all killed. **15 of the configuration sweep's differences close with this**;
+  21144 of 21251 agree.
+
+  The **style** arm of that chain is resolved but not drawn, and the fixture says why: a style block
+  written in a configuration is currently stripped from the emitted Vega where upstream passes it
+  through, so a fixture using one would fail on that instead of on this.
+
 - **A mark's default position is read from the whole chain too, and a second position reads its own
   channel.** `pointPositionDefaultRef` asks
   `getMarkPropOrConfig(channel, markDef, config, {vgChannel})`, which walks the definition under

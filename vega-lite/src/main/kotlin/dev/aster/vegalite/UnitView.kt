@@ -49,9 +49,46 @@ internal class UnitView(
    * two consumers are the mark's `defined` and the data flow's filter, and they have to agree:
    * filtering a row the path was going to break at removes the break along with the row.
    */
+  /**
+   * `getMarkConfig('invalid', markDef, config)` — the **whole** configuration chain, not
+   * `config.mark` alone.
+   *
+   * ```js
+   * const cfg = getMarkStyleConfig(channel, mark, config.style);
+   * return getFirstDefined(cfg, cfg, config[mark.type][channel], config.mark[channel]);
+   * ```
+   *
+   * so a theme saying `config.line.invalid` speaks for every line, and one saying
+   * `config.style.annotation.invalid` speaks for every mark that names that style. Read as
+   * `config.mark.invalid` and nothing else, a per-mark-type or styled `invalid` was dropped on the
+   * floor — the chart kept the default for its kind, which is `filter` for a point and
+   * `break-paths-show-domains` for a line, and the data pipeline then built the wrong number of
+   * datasets for it.
+   *
+   * The mark type's block outranks `config.mark`, which is the order [Config.markConfig] already
+   * merges them in; the style blocks outrank both and are asked here, last one winning, because a
+   * mark's styles are its own type followed by whatever its `style` names.
+   */
+  private val themedInvalid: VegaValue?
+    get() {
+      val named =
+        when (val style = markDef.raw.fields["style"]) {
+          is VegaValue.Str -> listOf(style.value)
+          is VegaValue.Arr -> style.values.mapNotNull { (it as? VegaValue.Str)?.value }
+          else -> emptyList()
+        }
+      (listOf(spec.mark) + named)
+        .mapNotNull { config.style(it)?.fields?.get("invalid") }
+        .lastOrNull()
+        ?.let {
+          return it
+        }
+      return config.markConfig(spec.mark).fields["invalid"]
+    }
+
   val invalidDataMode: String
     get() {
-      val stated = markDef.raw.fields["invalid"] ?: config.markInvalid
+      val stated = markDef.raw.fields["invalid"] ?: themedInvalid
       val isPath = spec.mark in PATH_MARKS
       val forPathOrNot = if (isPath) "break-paths-show-domains" else "filter"
       if (stated == null) return forPathOrNot
@@ -143,7 +180,7 @@ internal class UnitView(
     get() {
       val isPath = spec.mark in PATH_MARKS
       val forPathOrNot = if (isPath) "break-paths-show-domains" else "filter"
-      val stated = config.markInvalid ?: return forPathOrNot
+      val stated = themedInvalid ?: return forPathOrNot
       if (stated is VegaValue.Null) return "show"
       return when (val named = (stated as? VegaValue.Str)?.value) {
         null,
