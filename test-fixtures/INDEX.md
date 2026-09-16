@@ -36,7 +36,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `axis-placement` | 54 | rect, rule, text | — | band, linear |
 | `axis-style` | 37 | rect, rule, text | — | band, linear |
 | `axis-tick-min-step` | 97 | rule, text | — | linear, log |
-| `axis-time-format-oddities` | 20 | rule, symbol, text | — | linear, utc |
+| `axis-time-format-oddities` | 30 | rule, symbol, text | — | linear, utc |
 | `axis-values` | 34 | rect, rule, text | — | band, linear |
 | `axis-variants` | 35 | rect, rule, text | — | band, linear |
 | `band-padding` | 22 | rect, rule, symbol, text | — | band, linear, point |

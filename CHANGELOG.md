@@ -205,6 +205,29 @@ section here does not get released.
 
 ### Fixed
 
+- **The oracle harvests captions from an SVG it had already flattened.** `canonicalSvg` replaced
+  every run of whitespace with a single space so the written artefact would diff cleanly — and the
+  guide captions and mark descriptions are read back out of *that* file, from the very attributes it
+  had rewritten. Upstream's caption for an axis whose labels all format to nothing is
+  `values from  to `, two spaces around a value that came out empty: `domainCaption` interpolates
+  `values from ${fmt(d[0])} to ${fmt(peek(d))}` and neither end formats. The reference recorded one
+  space, and the comparison then failed against an engine that had it right.
+
+  Now only runs containing a **line break** collapse — that is the indentation the rule was for — and
+  a run of plain spaces is content and survives. No other fixture's caption or description moves,
+  which is the measure of how narrow the rule had to be.
+
+  **Two entries that were going to be written as defects are withdrawn by this.** An axis whose
+  labels are empty was said to be captioned differently here; it is not. Axes sharing a side, and a
+  left beside a right, were said to be *ordered* differently here; they are not — that reading came
+  from the same flattened reference, and five axes over three sides now agree exactly.
+  `axis-time-format-oddities` goes back to stating its four cases as axes, two of them sharing the
+  bottom, rather than working around a defect that was never in the engine.
+
+  A gate that reports a fault the code does not have is the worst shape a reference can take: it
+  costs more than a missing test, because it sends the next person to fix something that is already
+  right.
+
 - **A stack groups by the dimensions it was given and then by the facet's, concatenated rather than
   merged.** `groupby: [...this.getGroupbyFields(), ...facetby]`. A chart that facets by the column it
   also plots along names that column twice, and upstream writes it twice; this compiler filtered the
