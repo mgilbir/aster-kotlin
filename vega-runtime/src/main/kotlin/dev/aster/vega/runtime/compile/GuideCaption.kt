@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.expression.NumberFormat
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.model.time.TimeFormat
@@ -304,8 +305,11 @@ internal object GuideCaption {
    * One discrete value, as a listener hears it.
    *
    * Upstream expands the abbreviating directives before reading a caption out — `%a` becomes `%A`
-   * and `%b` becomes `%B` — so an axis whose labels say "Sun" is described as "Sunday". Without a
-   * format type there is nothing temporal to expand and the value stands as it is written.
+   * and `%b` becomes `%B` — so an axis whose labels say "Sun" is described as "Sunday".
+   *
+   * With no format type and a **specifier**, the value is formatted by it, which is `tickFormat`'s
+   * last arm and the same rule the labels themselves follow: a caption that read the domain's raw
+   * values described an axis nobody was looking at. With neither, the value stands as written.
    */
   private fun spoken(
     value: String,
@@ -318,7 +322,11 @@ internal object GuideCaption {
       when (formatType) {
         "time" -> timeZone ?: TimeZone.currentSystemDefault()
         "utc" -> TimeZone.UTC
-        else -> return value
+        else ->
+          return if (format == null) value
+          // Coerced, as d3 coerces it: a category that is not a number is read out as `NaN%`,
+          // which is what the axis shows and so what the caption has to say.
+          else NumberFormat.format(value.toDoubleOrNull() ?: Double.NaN, format, locale)
       }
     val instant = value.toDoubleOrNull() ?: return value
     val pattern = format?.replace("%a", "%A")?.replace("%b", "%B") ?: datePattern(locale)

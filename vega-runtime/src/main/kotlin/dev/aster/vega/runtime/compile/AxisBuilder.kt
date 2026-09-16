@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.expression.NumberFormat
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
@@ -1330,10 +1331,36 @@ public class AxisBuilder(
         else TimeFormat.format(instant, format, scale.zone, locale)
       }
     }
-    // An explicit specifier replaces the precision the scale would have chosen, and applies only
-    // where there is a number to format: upstream coerces a discrete domain's own values to strings
-    // and never consults it, so a band axis keeps its labels whatever this says.
-    if (format != null && scale !is BandScale && scale !is PointScale) {
+    // A **discrete** scale with a specifier formats with it too, and plainly — `locale.format`, not
+    // the span-resolved formatter a continuous scale gets. `tickFormat` in `vega-scale` picks by
+    // asking whether the scale *has* a `tickFormat` of its own, which only a continuous one does:
+    //
+    //     else if (scale.tickFormat) {
+    //       // if d3 scale has tickFormat, it must be continuous
+    //       const d = scale.domain();
+    //       format = locale.formatSpan(d[0], d[d.length - 1], count, specifier);
+    //     }
+    //     else if (specifier) {
+    //       format = locale.format(specifier);
+    //     }
+    //
+    // so a band or point scale falls to the second arm and uses the specifier as written. Only an
+    // axis that states **no** specifier keeps its domain's own values, by the `defaultFormatter`
+    // above both arms — and that is the case the comment here used to describe, generalised into a
+    // claim that a discrete axis "never consults" a format at all. It does: a band axis of 1, 2 and
+    // 3 asked for `.0%` reads 100%, 200%, 300%.
+    //
+    // There is no span to resolve the precision against, a discrete domain having no arithmetic in
+    // it, which is why this arm formats the value as it stands.
+    // Applied to whatever the value is, including a category that is not a number at all. d3's
+    // formatter coerces its argument, so a band axis of words asked for `.0%` reads `NaN%` on every
+    // tick — which is upstream's answer and looks like the mistake it is, where quietly printing
+    // the words back looks like the axis was never asked.
+    if (format != null && (scale is BandScale || scale is PointScale)) {
+      return { value -> NumberFormat.format(value.asDouble(), format, locale) }
+    }
+    // An explicit specifier replaces the precision a **continuous** scale would have chosen.
+    if (format != null) {
       // Upstream resolves the specifier against the *span* being labelled, so a specifier that
       // names no precision takes as many decimals as the tick step needs rather than d3's fixed
       // six.
@@ -1342,6 +1369,8 @@ public class AxisBuilder(
           is LinearScale -> scale.domain
           is TransformedScale -> scale.domain
           is TimeScale -> scale.domain
+          // Unreachable: the discrete scales returned above, and this `when` is over the rest.
+          else -> listOf(0.0, 1.0)
         }
       val labeller = Ticks.spanFormatter(format, numeric.first(), numeric.last(), count, locale)
       return { value ->

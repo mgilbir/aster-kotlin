@@ -110,6 +110,31 @@
   "caption": "Y-axis titled 'amount' for a linear scale with values from 0 to 55"
  },
  {
+  "fixture": "axis-format-on-a-discrete-scale",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: 100%, 200%, 300%"
+ },
+ {
+  "fixture": "axis-format-on-a-discrete-scale",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: $1.00, $2.00, $3.00"
+ },
+ {
+  "fixture": "axis-format-on-a-discrete-scale",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 3 values: NaN%, NaN%, NaN%"
+ },
+ {
+  "fixture": "axis-format-on-a-discrete-scale",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 3 values: alpha, bravo, charlie"
+ },
+ {
+  "fixture": "axis-format-on-a-discrete-scale",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: 1.00000, 2.00000, 3.00000"
+ },
+ {
   "fixture": "axis-label-angle",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 4 values: alpha-long-name, bravo-long-name, charlie-long, delta-longer"
