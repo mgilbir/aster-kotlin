@@ -1360,6 +1360,21 @@
   "caption": "Gradient legend titled 'by signal' for fill color with values from 15 January to 16 October"
  },
  {
+  "fixture": "legend-gradient-constant-domain",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'Constant' for fill color with values from 7.000000 to 7.000000"
+ },
+ {
+  "fixture": "legend-gradient-constant-domain",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'Varied' for fill color with values from 1 to 9"
+ },
+ {
+  "fixture": "legend-gradient-constant-domain",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'Sliced' for fill color with values from 7.000000 to 7.000000"
+ },
+ {
   "fixture": "legend-grid-align",
   "kind": "legend",
   "caption": "Symbol legend titled 'each' for size with values from 0 to 2,500"

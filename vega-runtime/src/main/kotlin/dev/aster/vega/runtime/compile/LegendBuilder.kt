@@ -1293,15 +1293,63 @@ internal class LegendBuilder(
   private fun gradientStops(scale: SequentialColorScale): List<GradientStop> {
     val lo = scale.domain.first()
     val hi = scale.domain.last()
+    // ```js
+    // if (!(max - min)) {
+    //   // expand scale if domain has zero span, fix #1479
+    //   scale = (scale.interpolator
+    //     ? get('sequential')().interpolator(scale.interpolator())
+    //     : get('linear')().interpolate(scale.interpolate()).range(scale.range())
+    //   ).domain([min=0, max=1]);
+    // } else {
+    //   fraction = scaleFraction(scale, min, max);
+    // }
+    // ```
+    //
+    // **A domain with no span is drawn as the whole ramp, not as one colour.** Every other reader
+    // of such a scale answers the *middle* — [SequentialColorScale.position] returns 0.5, which is
+    // what a column that turns out constant should paint — but a legend has nothing to say with one
+    // swatch, so upstream throws the domain away and samples the ramp end to end over `[0, 1]`. It
+    // is the fix behind vega's own issue 1479, and it is the only place the domain is replaced
+    // rather than consulted.
+    //
+    // Two things go with the replacement. Upstream leaves `fraction` as `identity` rather than
+    // `scaleFraction`, and over a domain of `[0, 1]` those are the same function — the samples are
+    // already fractions of the ramp — so asking the expanded scale for the fraction is asking for
+    // the value back. And the scale it builds is a plain linear or sequential one, so a
+    // **transformed** colour scale loses its transform here: there is no span for a log or a power
+    // to bend, and bending `[0, 1]` would space the stops by an exponent the data never had.
+    //
+    // Left unexpanded, the ramp collapsed to a single stop — the ends coincide, so the ticks
+    // between them are one value — and a legend that should show the whole scale showed one block
+    // of colour with its label adrift.
+    val degenerate = hi - lo == 0.0
+    val sampled =
+      if (degenerate) {
+        SequentialColorScale(
+          name = scale.name,
+          domain = listOf(0.0, 1.0),
+          colors = scale.colors,
+          space = scale.space,
+          gamma = scale.gamma,
+          clamp = scale.clamp,
+          rampExtent = scale.rampExtent,
+        )
+      } else {
+        scale
+      }
+    val from = sampled.domain.first()
+    val to = sampled.domain.last()
     val values = LinkedHashSet<Double>()
-    values += lo
+    values += from
     values +=
-      scale.ticks(LegendDefaults.GRADIENT_STOP_COUNT).filter { it in minOf(lo, hi)..maxOf(lo, hi) }
-    values += hi
+      sampled.ticks(LegendDefaults.GRADIENT_STOP_COUNT).filter {
+        it in minOf(from, to)..maxOf(from, to)
+      }
+    values += to
     return values
-      .sortedBy { scale.fraction(it) }
+      .sortedBy { sampled.fraction(it) }
       .mapNotNull { value ->
-        scale.colorAt(value)?.let { GradientStop(scale.fraction(value), it) }
+        sampled.colorAt(value)?.let { GradientStop(sampled.fraction(value), it) }
       }
   }
 
