@@ -2340,6 +2340,83 @@ internal object Marks {
    * quarter of a unit would otherwise disappear at the same moment the axis still claims it is
    * there.
    */
+  /**
+   * `getMarkStyleConfig`: the style blocks a mark belongs to, the last one that speaks winning.
+   *
+   * A mark's styles are its own type followed by whatever its `style` names — so `config.style.bar`
+   * reaches every bar, and a chart that names `style: "annotation"` reaches that block too.
+   */
+  private fun styleConfigValue(view: UnitView, channel: String): VegaValue? {
+    val named =
+      when (val style = view.markDef.raw.fields["style"]) {
+        is VegaValue.Str -> listOf(style.value)
+        is VegaValue.Arr -> style.values.mapNotNull { (it as? VegaValue.Str)?.value }
+        else -> emptyList()
+      }
+    return (listOf(view.spec.mark) + named)
+      .mapNotNull { view.config.style(it)?.fields?.get(channel) }
+      .lastOrNull()
+  }
+
+  /**
+   * `getMarkConfig`: the **configuration chain only**, never the mark definition.
+   *
+   * ```js
+   * const cfg = getMarkStyleConfig(channel, mark, config.style);
+   * return getFirstDefined(
+   *   vgChannel ? cfg : undefined,
+   *   cfg,
+   *   vgChannel ? config[mark.type][vgChannel] : undefined,
+   *   config[mark.type][channel],
+   *   vgChannel ? config.mark[vgChannel] : config.mark[channel],
+   * );
+   * ```
+   *
+   * The order is the whole of it, and the last line is the one with a comment upstream: "If there
+   * is vgChannel, skip vl channel. For example, vl size for text is vg fontSize, but
+   * `config.mark.size` is only for point size." So a `size` in `config.mark` is *not* a text mark's
+   * font size, while a `size` in `config.text` is.
+   */
+  private fun markConfigValue(
+    view: UnitView,
+    channel: String,
+    vgChannel: String? = null,
+  ): VegaValue? {
+    styleConfigValue(view, channel)?.let {
+      return it
+    }
+    val (own, shared) = view.config.markBlocks(view.spec.mark)
+    if (vgChannel != null)
+      own.fields[vgChannel]?.let {
+        return it
+      }
+    own.fields[channel]?.let {
+      return it
+    }
+    return shared.fields[vgChannel ?: channel]
+  }
+
+  /**
+   * `getMarkPropOrConfig`: the mark definition first — under Vega's name for the property before
+   * Vega-Lite's — and then the configuration chain.
+   *
+   * The pair of them is how every mark property in Vega-Lite is resolved, and reading only the
+   * definition is why a theme that set a `size`, a `radius` or a `discreteBandSize` was ignored:
+   * the chart drew the default it would have drawn with no theme at all.
+   */
+  private fun markPropOrConfig(
+    view: UnitView,
+    channel: String,
+    vgChannel: String? = null,
+  ): VegaValue? {
+    val raw = view.markDef.raw
+    if (vgChannel != null && raw.fields.containsKey(vgChannel)) return raw.fields[vgChannel]
+    raw.fields[channel]?.let {
+      return it
+    }
+    return markConfigValue(view, channel, vgChannel)
+  }
+
   private fun positionAndSize(
     view: UnitView,
     channel: String,
@@ -2363,6 +2440,8 @@ internal object Marks {
     val minBandSize = markConfig.number("minBandSize")
 
     val declaredSize = view.spec.encoding["size"]
+    // `markDef.size` for the *first* test — `if (encoding.size || markDef.size)` reads the
+    // definition and nothing else, a theme's size never deciding whether a size is built at all.
     val markSize = view.markDef.raw.fields["size"]
 
     // `getBandSize` asks for the size under its **Vega** name before anything else:
@@ -2384,15 +2463,23 @@ internal object Marks {
     // a style is not a size, and upstream leaves a bar styled that way filling its band. Its own
     // comment says why: "if there is vgChannel, skip vl channel. For example, vl size for text is
     // vg fontSize, but config.mark.size is only for point size."
-    val markSizeChannel =
-      sizeChannel
-        ?.let { view.markDef.raw.fields[it] ?: markConfig.fields[it] }
-        ?.takeIf { (it as? VegaValue.Obj)?.fields?.containsKey("band") != true }
-
     val useVlSizeChannel =
       view.spec.mark == "tick" ||
         (view.markDef.orient == "horizontal" && channel == "y") ||
         (view.markDef.orient == "vertical" && channel == "x")
+
+    // `getBandSize` asks `getMarkPropOrConfig(useVlSizeChannel ? 'size' : sizeChannel, mark,
+    // config,
+    // {vgChannel: sizeChannel})` — the **whole** chain, definition then theme, not the definition
+    // alone. Read as the definition plus `config[type][width]`, a theme that set `config.bar.size`
+    // or `config.mark.width` was ignored and the bar kept the bandwidth it would have had with no
+    // theme at all.
+    val markSizeChannel =
+      sizeChannel
+        ?.let {
+          markPropOrConfig(view, if (useVlSizeChannel) "size" else it, vgChannel = it)
+        }
+        ?.takeIf { (it as? VegaValue.Obj)?.fields?.containsKey("band") != true }
 
     // **Not reported, and that is a gap rather than a decision about silence.** Upstream logs
     // `cannotApplySizeToNonOrientedMark` here, and a reader who wrote a `size` that does nothing is
@@ -2428,6 +2515,10 @@ internal object Marks {
         obj { put("value", view.config.discreteStep(sizeChannel!!) - 2) }
       }
 
+    // `isRelativeBandSize(bandSize)` in [defaultCentred]'s own words: only a fraction of a band is
+    // relative, and every other answer below — a stated size, a configured `discreteBandSize`, a
+    // `continuousBandSize`, the tail's step less two — is a number of pixels.
+    var bandSizeRelative = false
     val sizeRef: VegaValue =
       when {
         declaredSize != null && useVlSizeChannel && sizeChannel != null ->
@@ -2491,19 +2582,40 @@ internal object Marks {
         // an offset — not [bandingType], which answers the position's first because that is what
         // `getBandSize` is given.
         offsetChannel != null || bandingType == "band" -> {
-          // The width of one *nested* mark where there is an offset scale, and of the whole band
-          // where there is not — times the fraction of it the mark asked for, if it asked.
-          val band = offsetChannel ?: channel
-          if (view.scaleType(band) != "band") noBandSize()
-          else {
-            val fraction = relativeBandSize(view, channel)
-            val bandwidth =
-              if (fraction == 1.0) "bandwidth('${view.scale(band)}')"
-              else "${Fields.expressionNumber(fraction)} * bandwidth('${view.scale(band)}')"
-            signalRef(
-              if (minBandSize != null) "max(${canonicalNumberString(minBandSize)}, $bandwidth)"
-              else bandwidth
-            )
+          // `config[mark.type]?.discreteBandSize || {band: 1}` — a **configured** band size for a
+          // rect-based mark on a discrete scale is a number of pixels and is taken before the band
+          // is measured at all; only its absence falls through to the whole band. Asked after the
+          // bandwidth instead, as it was, a theme's `discreteBandSize` could never be reached on
+          // the scales it is written for, and the `|| {band: 1}` is why a zero cannot reach it
+          // either.
+          val themed =
+            if (view.spec.mark in RECT_BASED_MARKS)
+              markConfig.number("discreteBandSize")?.takeIf { it != 0.0 }
+            else null
+          if (themed != null) {
+            obj { put("value", themed) }
+          } else {
+            // The one branch whose band size is **relative**: a fraction of a band rather than a
+            // number of pixels. [defaultCentred] below turns on it.
+            bandSizeRelative = true
+            // The width of one *nested* mark where there is an offset scale, and of the whole band
+            // where there is not — times the fraction of it the mark asked for, if it asked.
+            val band = offsetChannel ?: channel
+            if (view.scaleType(band) != "band") noBandSize()
+            else {
+              val fraction = relativeBandSize(view, channel)
+              val bandwidth =
+                if (fraction == 1.0) "bandwidth('${view.scale(band)}')"
+                else "${Fields.expressionNumber(fraction)} * bandwidth('${view.scale(band)}')"
+              signalRef(
+                // `minBandSize ? max(…) : bandWidth` — a **truthy** test, so a theme that sets it
+                // to zero is asking for no floor rather than for a floor of nothing, and upstream
+                // writes the bandwidth alone.
+                if (minBandSize != null && minBandSize != 0.0)
+                  "max(${canonicalNumberString(minBandSize)}, $bandwidth)"
+                else bandwidth
+              )
+            }
           }
         }
         // A rect-based mark on a **continuous** scale is `continuousBandSize` wide — five units for
@@ -2548,7 +2660,17 @@ internal object Marks {
     // exactly as one given a `size` is. Upstream writes `xc` with `band: 0.5` for a `rect` on a
     // nominal scale with `"width": 20`, where a mark left to fill the band gets `x` and a
     // bandwidth.
-    val defaultCentred = bandingType != "band" || sizeWasHonoured || markSizeChannel != null
+    // ```js
+    // const defaultBandAlign =
+    //   (scale || offsetScale)?.get('type') === 'band' && isRelativeBandSize(bandSize)
+    //     && !hasSizeFromMarkOrEncoding ? 'top' : 'middle';
+    // ```
+    //
+    // A mark fills its band from the leading edge only where the band size it took is a **fraction
+    // of that band**; any size in pixels centres it. Read as "a size channel was stated", a band
+    // size a *theme* supplied — `config.bar.discreteBandSize`, which is a number — left the mark at
+    // the edge, so a themed bar sat half its width to the left of where upstream draws it.
+    val defaultCentred = bandingType != "band" || sizeWasHonoured || !bandSizeRelative
     val vgChannel = alignedPositionChannel(view, channel, defaultCentred)
     // **Centred is what the channel came out as, not what the default was.** Upstream reads
     // `const center = vgChannel === 'xc' || vgChannel === 'yc'` *after* choosing the channel, so a

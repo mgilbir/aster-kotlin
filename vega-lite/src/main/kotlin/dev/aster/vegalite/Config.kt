@@ -190,6 +190,32 @@ internal class Config(
     }
   }
 
+  /**
+   * `config[mark.type]` and `config.mark` **unmerged**, in that order.
+   *
+   * [markConfig] flattens the two into one table, which is what most readers want and what most
+   * properties can live with. It cannot answer `getMarkConfig`, though, because that walks the two
+   * blocks looking for a *different key in each*:
+   * ```js
+   * getFirstDefined(cfg, cfg, config[mark.type][vgChannel], config[mark.type][channel],
+   *                 vgChannel ? config.mark[vgChannel] : config.mark[channel])
+   * ```
+   *
+   * so `config.bar.size` outranks `config.mark.width`, and a flattened table would answer with
+   * whichever key happens to be present rather than with the block that owns it.
+   */
+  fun markBlocks(mark: String): List<VegaValue.Obj> =
+    listOf(
+      obj {
+        putAll(MARK_DEFAULTS[mark] ?: VegaValue.EmptyObject)
+        putAll(user.obj(mark))
+      },
+      obj {
+        putAll(DEFAULT_MARK)
+        putAll(user.obj("mark"))
+      },
+    )
+
   fun scaleConfig(name: String): Double? = user.obj("scale").number(name) ?: SCALE_DEFAULTS[name]
 
   /** A `config.scale` entry that is a flag rather than a number, such as `zero`. */

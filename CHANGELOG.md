@@ -231,6 +231,34 @@ section here does not get released.
 
 ### Fixed
 
+- **A mark's size is read from the whole chain, not from the definition alone.** `getBandSize` asks
+  `getMarkPropOrConfig(useVlSizeChannel ? 'size' : sizeChannel, mark, config, {vgChannel: sizeChannel})`,
+  and that walks the definition under Vega's name for the property, then Vega-Lite's, then the style
+  blocks, then `config[marktype]` under each name in turn, then `config.mark`. This compiler read the
+  definition plus `config[marktype][width]` and stopped, so a theme that said `config.bar.size` was
+  ignored and the bar kept the bandwidth it would have had with no theme at all.
+
+  Three rules travel with it, each its own line in upstream and each missing here:
+
+  * a configured `discreteBandSize` is taken **before** the band is measured —
+    `config[mark.type]?.discreteBandSize || {band: 1}` — so the number wins and only its absence
+    falls through to the whole band. Asked after the bandwidth, as it was, a theme's band size could
+    never be reached on the scales it is written for;
+  * a band size that is a *number of pixels* **centres** the mark, where only a fraction of the band
+    leaves it at the leading edge. `defaultBandAlign` tests `isRelativeBandSize(bandSize)`, which
+    this read as "a size channel was stated" — so a themed bar sat half its width to the left;
+  * `minBandSize` is tested for **truth**, so a theme setting it to zero is asking for no floor
+    rather than a floor of nothing, and the bandwidth is written alone.
+
+  `getMarkPropOrConfig` and `getMarkConfig` are now two functions here rather than an inlined
+  approximation of them, which is what the rest of the configuration families will need.
+
+  `a-size-a-theme-asked-for` and `a-size-a-style-asked-for` are new; the second holds the two ends of
+  the chain the first cannot reach, a size found early stopping the walk. Six mutants, all killed —
+  including the one that puts the style block after the mark type's, which upstream puts first.
+  **20 of the configuration sweep's 156 differences close with this**; 21091 of 21251 agree.
+  297 Vega-Lite fixtures.
+
 - **The oracle harvests captions from an SVG it had already flattened.** `canonicalSvg` replaced
   every run of whitespace with a single space so the written artefact would diff cleanly — and the
   guide captions and mark descriptions are read back out of *that* file, from the very attributes it
