@@ -153,6 +153,27 @@ section here does not get released.
 
 ### Fixed
 
+- **A stated `orient` is an argument to the rule that decides orientation, not a way past it.**
+  Upstream's own comment on the call says so — "set orient, which can be overridden by rules as
+  sometimes the specified orient is invalid" — and only two of the blocks in `orient()` ask for the
+  stated value: the ranged bar's, where the direction is genuinely ambiguous, and the line's.
+  Everything else answers from the encoding and then *logs* that it overrode what the chart asked
+  for. This compiler took the stated value first and inferred only in its absence, which is the same
+  answer wherever a stated orientation happens to be reachable and the wrong one everywhere else.
+
+  The blocks are a `switch` whose cases all fall through, so which of them a mark reaches is the
+  whole of the rule: a text mark tries the bar's rules, then the rule's, then the area's, then the
+  line's, and stops at the first that answers. Flattened into one pass, a mark collected the wrong
+  blocks — an area ranged along y was measured by the *bar's* ranged rule, which asks whether the
+  other channel is a number, where upstream asks only whether this one arrived bucketed. A mark that
+  matches no block at all — an arc, a trail, a geoshape — is vertical, by the `return 'vertical'`
+  under the whole switch. A **trail** is not a line here: one that states `horizontal` is vertical
+  anyway.
+
+  `an-orientation-a-mark-cannot-state` is new: the trail, a bar over a bucketed column whose first
+  block settles it before the stated value is read, and a ranged area that cannot choose where a
+  ranged bar can. **The last of the Vega-Lite sweep's differences closes with this; all 8484 agree.**
+
 - **A size stated as zero is not a zero-width mark; it is a mark with no usable size.** Upstream
   tests the size it resolved for *truth* rather than for presence, twice on the way down:
   `if (encoding.size || markDef.size)` decides whether to build a size at all, and
