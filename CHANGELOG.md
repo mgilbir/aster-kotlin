@@ -205,6 +205,31 @@ section here does not get released.
 
 ### Fixed
 
+- **A percent consumes what follows it, and a percent with nothing after it consumes itself.** d3
+  reads the character after the percent — and a pad modifier before it — looks the character up, and
+  pushes whatever the table gave back: the character itself where there is no entry, and the empty
+  string where the pattern ended first, `charAt` past the end being `""`. This engine wrote the
+  percent out instead, which is the one shape upstream never produces:
+
+  | specifier | d3 | before |
+  | --- | --- | --- |
+  | `%b%` | `Jan` | `Jan%` |
+  | `%~` | `~` | `%~` |
+  | `%-~` | `~` | `%-~` |
+  | `%-` | *(empty)* | `-` |
+
+  One rule with four faces, and the last of them is why the pad modifier is now looked for *up to*
+  the last character rather than one short of it: `%-` is a percent, a modifier, and then the end.
+
+  It surfaces wherever a **number** specifier reaches a time scale — a normalized stack on a temporal
+  axis is asked for `.0%` — and there the whole label differed by its final character.
+
+  `axis-time-format-oddities` is new and holds all four, two as axes and two as text marks. The two
+  are text because an axis whose every label is empty is described in a caption that differs here by
+  a space, and axes sharing a side are listed in a different order than upstream — both real, both
+  questions about guides rather than about this, and neither worth hiding this rule behind. 215 Vega
+  differential fixtures.
+
 - **A normalized stack's axis is a percentage, and the channel says so rather than the stack.**
   `guideFormat` asks the definition in front of it:
   `if (isPositionFieldOrDatumDef(fieldOrDatumDef) && fieldOrDatumDef.stack === 'normalize' && config.normalizedNumberFormat) { return numberFormat({type: 'quantitative', config, normalizeStack: true}); }`.

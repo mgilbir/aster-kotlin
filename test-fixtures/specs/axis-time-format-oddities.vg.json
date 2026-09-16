@@ -1,0 +1,128 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A percent consumes what follows it, and a percent with nothing after it consumes itself. d3 reads the character after the percent \u2014 and a pad modifier before it \u2014 looks it up, and pushes whatever the table gave back: the character itself where there is no entry, and the empty string where the pattern ended first, `charAt` past the end being the empty string. The bottom axis asks for `%~`, which is no directive at all, and reads `~` with the percent gone; the top asks for `%-~` and reads the same, the modifier swallowed with it. The other two shapes are drawn as **text** rather than as axes: `%-` is a modifier with nothing to pad and consumes all of itself, so that mark is empty, and `%b%` is a real directive with a dangling percent after it and reads the month alone. They are text because an axis whose every label is empty is described in a caption that differs here by a space, and an axis that shares a side with another is listed in a different order \u2014 both questions about guides rather than about this, and neither worth hiding this rule behind. A malformed specifier is not an error anywhere in it: the specifier is read the way d3 reads it, which is the only answer a chart can be compared against.",
+  "width": 220,
+  "height": 90,
+  "padding": 5,
+  "data": [
+    {
+      "name": "table",
+      "values": [
+        {
+          "t": 1704067200000,
+          "v": 42
+        },
+        {
+          "t": 1709251200000,
+          "v": 88
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "when",
+      "type": "utc",
+      "domain": {
+        "data": "table",
+        "field": "t"
+      },
+      "range": "width"
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "table",
+        "field": "v"
+      },
+      "range": "height"
+    }
+  ],
+  "axes": [
+    {
+      "orient": "bottom",
+      "scale": "when",
+      "format": "%~",
+      "tickCount": 2
+    },
+    {
+      "orient": "top",
+      "scale": "when",
+      "format": "%-~",
+      "tickCount": 2
+    }
+  ],
+  "marks": [
+    {
+      "type": "symbol",
+      "from": {
+        "data": "table"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "when",
+            "field": "t"
+          },
+          "y": {
+            "scale": "y",
+            "field": "v"
+          },
+          "size": {
+            "value": 90
+          },
+          "fill": {
+            "value": "#4c78a8"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {
+        "data": "table"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "when",
+            "field": "t"
+          },
+          "y": {
+            "value": 20
+          },
+          "text": {
+            "signal": "utcFormat(datum.t, '%-')"
+          },
+          "fontSize": {
+            "value": 11
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {
+        "data": "table"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "when",
+            "field": "t"
+          },
+          "y": {
+            "value": 40
+          },
+          "text": {
+            "signal": "utcFormat(datum.t, '%b%')"
+          },
+          "fontSize": {
+            "value": 11
+          }
+        }
+      }
+    }
+  ]
+}
