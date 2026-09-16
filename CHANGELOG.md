@@ -153,6 +153,28 @@ section here does not get released.
 
 ### Fixed
 
+- **A size stated as zero is not a zero-width mark; it is a mark with no usable size.** Upstream
+  tests the size it resolved for *truth* rather than for presence, twice on the way down:
+  `if (encoding.size || markDef.size)` decides whether to build a size at all, and
+  `else if (bandSize)` in `defaultSizeRef` decides whether to write the one `getBandSize` returned.
+  A falsy number fails both.
+
+  So `{"type": "bar", "size": 0}` falls past everything — past the bandwidth its band would have
+  given it, past `continuousBandSize` on a quantitative axis — onto the tail a mark with no size of
+  any kind takes: `getViewConfigDiscreteStep(config.view, sizeChannel) - 2`, which is 18. This
+  compiler read the size for presence and drew the invisible mark the number literally asks for. The
+  same rule governs a `width` or `height` on the mark and a `continuousBandSize` configured as zero.
+
+  Three things it deliberately does not change. An `encoding` of `{"value": 0}` is tested as
+  `encoding.size`, a channel definition, and an object is true whatever number it carries — that bar
+  really is invisible. A falsy `size` beside a truthy `width` comes out the width's, because once
+  the `size` is falsy `getBandSize` does run and it reads the Vega name first. And the mark is still
+  centred in its band, since `defaultBandAlign` asks whether the band size is *relative* and zero is
+  a number.
+
+  `a-size-stated-as-zero` is new and covers all five. **2 of the Vega-Lite sweep's differences close
+  with this**; 8483 of 8484 agree.
+
 - **Centred is what the channel came out as, not what the default was.** Upstream chooses the Vega
   channel first — `left` is `x`, `center` is `xc`, `right` is `x2`, and the same three down the other
   axis — and only then asks whether that channel is a centre:
