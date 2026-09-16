@@ -205,6 +205,25 @@ section here does not get released.
 
 ### Fixed
 
+- **A counting aggregate answers with a number, whatever the column it counted was.** `count`,
+  `distinct`, `valid` and `missing` reduce a group to a tally, so a `type` the chart stated is about
+  the wrong thing — it describes the column going in where what comes out is a count. Upstream
+  overrides it and says so:
+  `if (type !== 'quantitative') { if (isCountingAggregateOp(aggregate)) { log.warn(…); fieldDef.type = 'quantitative'; } }`.
+
+  Left as stated, the channel keeps a band or an ordinal scale where upstream builds a linear one,
+  and everything hung off that scale follows: the axis flips to the other side, a legend becomes a
+  gradient rather than a row of symbols, and a bar takes a bandwidth it has no band for.
+
+  Only those four operations, and only over a stated type that is not already quantitative — a `sum`
+  or a `mean` leaves the stated type alone, upstream's test being `isCountingAggregateOp` rather than
+  "is an aggregate". That is also why it went unnoticed: where no type is stated the inference here
+  already answers quantitative for *any* aggregate, so the two agreed everywhere until a chart said
+  otherwise. The diagnostic upstream logs is emitted too.
+
+  `a-counting-aggregate-is-a-number` is new and draws all three cases, the `mean` included.
+  **28 of the encoding sweep's 34 differences close with this**; 9244 of 9274 agree.
+
 - **A bin suffix is not a suffix.** Upstream's `vgField` keeps them as two parameters and applies
   them by different rules: a plain `suffix` names a column something *else* wrote beside this one —
   a stack's `_start` and `_end` — and is appended whatever the definition is, while a `binSuffix`
