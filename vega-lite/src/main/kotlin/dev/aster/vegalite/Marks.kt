@@ -2023,6 +2023,58 @@ internal object Marks {
           "${Fields.expressionNumber(position)} * $end)"
       )
     }
+
+    // ```js
+    // } else if (isBinned(bin)) {
+    //   if (isFieldDef(channel2Def)) {
+    //     return interpolatedSignalRef({scaleName, fieldOrDatumDef: channelDef,
+    //                                   fieldOrDatumDef2: channel2Def, bandPosition, offset});
+    //   } else {
+    //     log.warn(log.message.channelRequiredForBinned(channel2));
+    //   }
+    // ```
+    //
+    // A column that **arrived** bucketed keeps its far edge in a second column rather than in an
+    // `_end` beside it, which is the whole reason `bin: "binned"` requires an `x2`. A mark placed
+    // at
+    // a *point* is placed between the two, and this branch is the only one that knows how to find
+    // that far edge: the bucketed branch above reads an `_end` that a pre-binned column does not
+    // have, so it is guarded on [Binning.Bin] and never fires here.
+    //
+    // The **rect** path has read the pair all along — `rectBinPosition`, which is what makes a
+    // histogram's bars span their buckets — and the point path had nothing, so it fell to the plain
+    // field reference at the bottom and drew the mark on the bucket's *near edge*. An area or a
+    // line
+    // over data that came pre-bucketed was therefore half a bucket to the left of where upstream
+    // draws it, all the way along.
+    //
+    // Only the **main** channel, and only where the second one is a column: `channel2Def` is the
+    // secondary channel's definition and the guard is `isFieldDef`. Without it there is no far edge
+    // to interpolate towards and upstream leaves the mark where it was — after warning, which this
+    // does not: `UnitView` carries no diagnostic collector, the same gap already recorded for
+    // `cannotApplySizeToNonOrientedMark` in [positionAndSize]. The drawing is upstream's either
+    // way;
+    // only the explanation is missing.
+    val secondaryDef = secondaryChannel(channel)?.let { view.spec.encoding[it] }
+    if (
+      def.datum == null &&
+        channel == mainChannel(channel) &&
+        def.bin == Binning.PreBinned &&
+        secondaryDef?.isFieldDef == true
+    ) {
+      return interpolated(
+        view,
+        mainChannel(channel),
+        Fields.vgField(def),
+        Fields.vgField(secondaryDef),
+        // `bandPosition = 0.5` is `interpolatedSignalRef`'s own default, and it is where the middle
+        // of the bucket comes from: [bandPosition] answers null for a column that arrived bucketed,
+        // having no `bin` of this compiler's own to read a default from.
+        bandPosition(view, def, secondaryDef) ?: 0.5,
+        visualOffset,
+      )
+    }
+
     return obj {
       put("scale", scaleName(view, mainChannel(channel)))
       val datum = def.datum
