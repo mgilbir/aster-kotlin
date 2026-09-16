@@ -519,23 +519,61 @@ internal object Guides {
       derived("labelOverlap", if (greedy) str("greedy") else bool(true))
     }
 
+    // A normalized stack is a proportion, so its axis is a percentage — `normalizedNumberFormat`,
+    // which defaults to `.0%`. Left off, the labels read 0, 0.2, 0.4 for what the chart draws as
+    // fifths of a whole.
+    //
+    // **The channel definition's own `stack`, and not the stack the view resolved.** `guideFormat`
+    // asks the definition in front of it:
+    //
+    //     if (isPositionFieldOrDatumDef(fieldOrDatumDef) && fieldOrDatumDef.stack === 'normalize'
+    //         && config.normalizedNumberFormat) {
+    //       return numberFormat({type: 'quantitative', config, normalizeStack: true});
+    //     }
+    //
+    // so it is written wherever the word appears, on the channel it appears on, whatever the chart
+    // makes of it. The two readings agree on the ordinary normalized bar chart and part company as
+    // soon as the word lands somewhere it cannot act: a `stack` on the *categorical* axis of a bar
+    // chart is not the stack Vega-Lite builds — the emitted transform still says `offset: "zero"` —
+    // and upstream formats that axis `.0%` all the same, band scale, category labels and all.
+    //
+    // Note `type: 'quantitative'`, passed rather than read: the field's own measure does not come
+    // into it, which is what makes the categorical case come out the way it does.
+    //
+    // It is a **return**, above the time branch rather than beside it, so it takes the place of a
+    // bucketed instant's specifier instead of being overwritten by it: a temporal axis carrying a
+    // normalized stack is a percentage and shows no dates at all. Written below, this compiler
+    // would have agreed on the first of the two cases and not the second.
+    //
+    // **No fixture pins that ordering, and a mutant moving this below the time branch survives the
+    // suite.** The sweep case that covers it — `encoding-x-temporal-stack-normalize` — agrees, but
+    // a sweep is a measurement rather than a gate. A fixture cannot hold it yet for a reason that
+    // has nothing to do with this rule: the only chart that reaches the ordering labels dates with
+    // a *number* specifier, and `%` at the end of a time specifier with no directive after it is
+    // dropped by d3 — `timeFormat(".0%")` reads `.0` — where this engine keeps it. Close that and
+    // the temporal row can join `a-normalized-stack-is-a-percentage`, and this comment can go.
+    // `&& config.normalizedNumberFormat` is a **truthiness** test, so a theme that sets it to the
+    // empty string is asking for no percentage rather than for an empty one, and the axis falls
+    // through to whatever it would otherwise have shown.
+    val normalized =
+      def.raw.string("stack") == "normalize" && view.config.normalizedNumberFormat.isNotEmpty()
+    if (normalized) {
+      derived("format", str(view.config.normalizedNumberFormat))
+    }
+
     // Labels for a bucketed instant, and a tick step no finer than the bucket.
     if (def.timeUnit != null) {
-      derived("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit, view.config.locale)))
+      if (!normalized) {
+        derived("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit, view.config.locale)))
+      }
+      // The tick step is `properties.ts`'s and not `guideFormat`'s, so the return above does not
+      // reach it: a bucket is still a bucket wide however its labels are written.
       Fields.timeUnitDuration(def.timeUnit)?.let { derived("tickMinStep", signalRef(it)) }
     }
     // `guideFormatType`: a specifier is a *time* specifier, and Vega has to be told so wherever the
     // scale itself does not already say it. A time or utc scale formats instants by nature; a band
     // scale of month names does not, and without this its labels come out as raw numbers.
     formatType(def, type)?.let { derived("formatType", str(it)) }
-
-    // A normalized stack is a proportion, so its axis is a percentage —
-    // `config.normalizedNumberFormat`,
-    // which defaults to `.0%`. Left off, the labels read 0, 0.2, 0.4 for what the chart draws as
-    // fifths of a whole.
-    if (view.stack?.offset == "normalize" && channel == view.stack.fieldChannel) {
-      derived("format", str(view.config.normalizedNumberFormat))
-    }
 
     tickCount(view, channel, def, type)?.let { derived("tickCount", it) }
 

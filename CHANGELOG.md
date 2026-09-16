@@ -205,6 +205,30 @@ section here does not get released.
 
 ### Fixed
 
+- **A normalized stack's axis is a percentage, and the channel says so rather than the stack.**
+  `guideFormat` asks the definition in front of it:
+  `if (isPositionFieldOrDatumDef(fieldOrDatumDef) && fieldOrDatumDef.stack === 'normalize' && config.normalizedNumberFormat) { return numberFormat({type: 'quantitative', config, normalizeStack: true}); }`.
+  So the format is written wherever the word appears, on the channel it appears on, whatever the
+  chart makes of it — and the `type: 'quantitative'` is *passed* rather than read, so the field's own
+  measure never enters into it.
+
+  This compiler read the resolved stack instead and required the channel to be the one that stacks.
+  The two agree on the ordinary normalized bar chart and part company as soon as the word lands
+  somewhere it cannot act: a `stack` on the categorical axis of a bar chart is not a stack Vega-Lite
+  builds — the emitted transform still says `offset: "zero"` — and upstream formats that axis
+  regardless.
+
+  Two halves of the same rule that are easy to lose. The second test is a **truthiness** one, so a
+  theme setting `normalizedNumberFormat` to the empty string is asking for no percentage rather than
+  an empty one. And it is a `return` **above** the bucketed-instant branch, so a temporal axis
+  carrying a normalized stack shows percentages and no dates.
+
+  `a-normalized-stack-is-a-percentage` and `a-normalized-stack-with-no-percentage` are new. Three of
+  four mutants are killed; the fourth is the ordering, which no fixture can hold yet — the only chart
+  that reaches it labels dates with a number specifier, and a `%` at the end of a time specifier is
+  dropped by d3 where this engine keeps it. The sweep case covers it meanwhile. **The last 2 of the
+  encoding sweep's differences close with this: 9250 of 9274 agree and none differ.**
+
 - **A discrete axis with a format specifier uses it.** `tickFormat` in `vega-scale` picks the
   formatter by asking whether the scale has a `tickFormat` of its own, which only a continuous one
   does:

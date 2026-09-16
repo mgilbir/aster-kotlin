@@ -1,0 +1,397 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A normalized stack is a proportion, so its axis is a percentage — `config.normalizedNumberFormat`, which defaults to `.0%`. `guideFormat` asks the **channel definition's own** `stack` for that, not the stack the view resolved: `if (isPositionFieldOrDatumDef(fieldOrDatumDef) && fieldOrDatumDef.stack === 'normalize' && config.normalizedNumberFormat) { return numberFormat({type: 'quantitative', config, normalizeStack: true}); }`. So the format is written wherever the word appears, on the channel it appears on, whatever the chart makes of it — and note the `type: 'quantitative'` passed rather than read, which means the field's own measure never enters into it. The first row is the ordinary case, where the word is on the stacked channel and both readings agree. The second is where they part: `stack: \"normalize\"` on the *discrete* axis is not a stack Vega-Lite can build — the emitted transform still says `offset: \"zero\"` — and upstream formats that band axis `.0%` regardless, so its 1, 2 and 3 are labelled as whole percentages. Read as the resolved stack, this compiler wrote nothing there at all. The rule also sits **above** the bucketed-instant branch rather than beside it, being a `return`, so a temporal axis carrying a normalized stack shows percentages and no dates; that ordering is not drawn here, because the only chart that exercises it labels dates with a number format and this runtime and upstream disagree about what such a label reads — a renderer question rather than this one.",
+  "background": "white",
+  "padding": 5,
+  "width": 220,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "c": "alpha",
+          "k": "one",
+          "n": 1,
+          "v": 28
+        },
+        {
+          "c": "alpha",
+          "k": "two",
+          "n": 2,
+          "v": 43
+        },
+        {
+          "c": "beta",
+          "k": "one",
+          "n": 1,
+          "v": 55
+        },
+        {
+          "c": "beta",
+          "k": "two",
+          "n": 2,
+          "v": 12
+        },
+        {
+          "c": "gamma",
+          "k": "one",
+          "n": 3,
+          "v": 91
+        },
+        {
+          "c": "gamma",
+          "k": "two",
+          "n": 3,
+          "v": 37
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "c"
+          ],
+          "field": "v",
+          "sort": {
+            "field": [
+              "k"
+            ],
+            "order": [
+              "descending"
+            ]
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "normalize"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "n"
+          ],
+          "field": "v",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "childHeight",
+      "value": 80
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "columns": 1,
+    "bounds": "full",
+    "align": "each"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "concat_0_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_0_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_1"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "scale": "color",
+                "field": "k"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; v: \" + (format(datum[\"v_end\"]-datum[\"v_start\"], \".0%\")) + \"; k: \" + (isValid(datum[\"k\"]) ? isArray(datum[\"k\"]) ? join(datum[\"k\"], ' ') : datum[\"k\"] : \"\"+datum[\"k\"])"
+              },
+              "x": {
+                "scale": "concat_0_x",
+                "field": "c"
+              },
+              "width": {
+                "signal": "max(0.25, bandwidth('concat_0_x'))"
+              },
+              "y": {
+                "scale": "concat_0_y",
+                "field": "v_end"
+              },
+              "y2": {
+                "scale": "concat_0_y",
+                "field": "v_start"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "gridScale": "concat_0_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "c",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "grid": false,
+          "title": "v",
+          "format": ".0%",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_1_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_1_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_2"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"v: \" + (format(datum[\"v\"], \"\")) + \"; n: \" + (isValid(datum[\"n\"]) ? isArray(datum[\"n\"]) ? join(datum[\"n\"], ' ') : datum[\"n\"] : \"\"+datum[\"n\"])"
+              },
+              "x": {
+                "scale": "concat_1_x",
+                "field": "v_end"
+              },
+              "x2": {
+                "scale": "concat_1_x",
+                "field": "v_start"
+              },
+              "y": {
+                "scale": "concat_1_y",
+                "field": "n"
+              },
+              "height": {
+                "signal": "max(0.25, bandwidth('concat_1_y'))"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "gridScale": "concat_1_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "v",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "grid": false,
+          "title": "n",
+          "format": ".0%",
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "data_1",
+        "field": "k",
+        "sort": true
+      },
+      "range": "category"
+    },
+    {
+      "name": "concat_0_x",
+      "type": "band",
+      "domain": {
+        "data": "data_1",
+        "field": "c",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "concat_0_y",
+      "type": "linear",
+      "domain": [
+        0,
+        1
+      ],
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_1_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "fields": [
+          "v_start",
+          "v_end"
+        ]
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_1_y",
+      "type": "band",
+      "domain": {
+        "data": "data_2",
+        "field": "n",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "childHeight"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "symbolType": "square",
+      "title": "k"
+    }
+  ]
+}

@@ -1,0 +1,198 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "The same rule as `a-normalized-stack-is-a-percentage`, from the other side. `guideFormat`'s test is `fieldOrDatumDef.stack === 'normalize' && config.normalizedNumberFormat`, and the second half of it is a **truthiness** test rather than a presence one — so a theme that sets `normalizedNumberFormat` to the empty string is asking for no percentage rather than for an empty one, and the axis falls through to whatever it would otherwise have shown. Upstream writes no `format` on it at all. Read as \"is it set\", the empty string is set, and the axis would be handed a specifier that formats every label as nothing.",
+  "background": "white",
+  "padding": 5,
+  "width": 220,
+  "height": 90,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "c": "alpha",
+          "k": "one",
+          "v": 28
+        },
+        {
+          "c": "alpha",
+          "k": "two",
+          "v": 43
+        },
+        {
+          "c": "beta",
+          "k": "one",
+          "v": 55
+        },
+        {
+          "c": "beta",
+          "k": "two",
+          "v": 12
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "c"
+          ],
+          "field": "v",
+          "sort": {
+            "field": [
+              "k"
+            ],
+            "order": [
+              "descending"
+            ]
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "normalize"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "rect",
+      "style": [
+        "bar"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "scale": "color",
+            "field": "k"
+          },
+          "ariaRoleDescription": {
+            "value": "bar"
+          },
+          "description": {
+            "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; v: \" + (format(datum[\"v_end\"]-datum[\"v_start\"], \"\")) + \"; k: \" + (isValid(datum[\"k\"]) ? isArray(datum[\"k\"]) ? join(datum[\"k\"], ' ') : datum[\"k\"] : \"\"+datum[\"k\"])"
+          },
+          "x": {
+            "scale": "x",
+            "field": "c"
+          },
+          "width": {
+            "signal": "max(0.25, bandwidth('x'))"
+          },
+          "y": {
+            "scale": "y",
+            "field": "v_end"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "v_start"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "data": "data_0",
+        "field": "c",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": [
+        0,
+        1
+      ],
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "data_0",
+        "field": "k",
+        "sort": true
+      },
+      "range": "category"
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "c",
+      "labelAlign": "right",
+      "labelAngle": 270,
+      "labelBaseline": "middle",
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "v",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "symbolType": "square",
+      "title": "k"
+    }
+  ]
+}
