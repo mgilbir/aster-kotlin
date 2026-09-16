@@ -153,6 +153,32 @@ section here does not get released.
 
 ### Fixed
 
+- **A bin suffix is not a suffix.** Upstream's `vgField` keeps them as two parameters and applies
+  them by different rules: a plain `suffix` names a column something *else* wrote beside this one —
+  a stack's `_start` and `_end` — and is appended whatever the definition is, while a `binSuffix`
+  names one of the columns the bin itself produced and is honoured only `if (isBinning(bin))`. A
+  column that **arrived** bucketed is not a binning, so the bin suffix is dropped: its name is
+  simply its own, there being no `_end` or `_mid` for a transform this chart never ran.
+
+  Collapsed into one parameter, those columns were invented. Stacking a path mark imputes over the
+  bucket as a key, and a key has to be a single column, so upstream writes the bucket's midpoint out
+  first — for a pre-binned one that formula is the no-op `0.5*lo + 0.5*lo` written back over `lo`,
+  emitted all the same because the impute is keyed on the column it names. This compiler skipped the
+  formula, having read the rule as applying to its own bins only, then keyed the impute and grouped
+  the stack on a `lo_mid` nobody had written, and drew the path from it too.
+
+  A bucketed **instant** keeps the distinction in its own smaller way: its time unit did write an
+  `_end`, so a bin suffix of `end` still reaches it, while `range` and `mid` — columns only a real
+  bin produces — are excluded by name.
+
+  One call site had already worked the rule out and written it by hand, guarding on `bin != null`
+  because `vgField` would otherwise have invented a `value_mid` for unbinned fields. That guard is
+  now the parameter's job, and it was wrong in the case it was written for: `bin != null` is true of
+  a pre-binned column as well.
+
+  `a-bucket-with-two-columns-of-its-own` grows the two stacked rows this needs, and the `stack: null`
+  that fixture carried to hold this defect out of the previous change is removed.
+
 - **A bucket that arrived bucketed keeps its far edge in a second column, and a point sits between
   the two.** `valueRefForFieldOrDatumDef`'s `else if (isBinned(bin))` interpolates between the
   channel's own field and the *secondary channel's* field — not between a field and an `_end` beside

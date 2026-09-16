@@ -1741,9 +1741,13 @@ internal object Marks {
       if (!Scales.hasContinuousDomain(scaleType)) continue
       if (def.aggregate in COUNTING_OPS) continue
       if (view.config.scaleInvalid(channel) != null) continue
-      // A bin suffix names a *bin's* column, so it only reaches a binned field: `vgField` ignores
-      // it otherwise, and appending it here invented a `value_mid` no transform ever wrote.
-      fields += Fields.datumAccess(def, suffix = if (imputed && def.bin != null) "mid" else null)
+      // A bin suffix names a *bin's* column, so it only reaches a field whose bin this compiler
+      // ran, and that is now [Fields.vgField]'s own rule rather than a guard spelled out here. It
+      // was spelled out here because the rule was missing: a plain suffix applies to anything, so
+      // `value_mid` was being invented for unbinned fields and `lo_mid` for a column that arrived
+      // bucketed — the second of which the hand-written guard did not catch, `bin != null` being
+      // true of both kinds.
+      fields += Fields.datumAccess(def, binSuffix = if (imputed) "mid" else null)
     }
     if (fields.isEmpty()) return null
     return signalRef(fields.joinToString(" && ") { "isValid($it) && isFinite(+$it)" })
