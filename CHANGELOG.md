@@ -153,6 +153,22 @@ section here does not get released.
 
 ### Fixed
 
+- **Centred is what the channel came out as, not what the default was.** Upstream chooses the Vega
+  channel first — `left` is `x`, `center` is `xc`, `right` is `x2`, and the same three down the other
+  axis — and only then asks whether that channel is a centre:
+  `const center = vgChannel === 'xc' || vgChannel === 'yc'`. A centred rect-like mark is placed at
+  its band's middle, `band: 0.5`, where one left to fill the band is placed at the leading edge with
+  no band at all.
+
+  This engine read the *default* alignment instead of the resulting channel, so a bar that asked to
+  be centred was written under `xc` — the channel that means the middle — with its position still at
+  the edge. The two disagree exactly when a mark states an `align` or a `baseline` its band would not
+  have given it.
+
+  `aligned-in-its-own-band` is new: a bar centred, a bar aligned right and a tick with a middle
+  baseline, so the channel and the band are both drawn. **4 of the Vega-Lite sweep's differences
+  close with this**; 8481 of 8484 agree.
+
 - **A position reads Vega's name for its channel before Vega-Lite's.** `pointPositionDefaultRef`
   asks `getMarkPropOrConfig(channel, markDef, config, {vgChannel})`, and that reads `mark[vgChannel]`
   before `mark[channel]`. For a polar channel the two names differ — a radius is Vega's
