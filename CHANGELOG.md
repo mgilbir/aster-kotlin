@@ -40,6 +40,58 @@ section here does not get released.
   Recorded rather than fixed in this change: the sweep is a measurement, and each of those is its own
   defect with its own fix.
 
+- **The sweep reads the encoding, and finds four causes.** Nineteen families more, one per
+  **encoding channel**, sweeping the properties that channel's field definition declares — the same
+  reasoning one level over from the mark: what a property means is the channel's question, and a
+  `stack` belongs to a position where a `legend` belongs to a colour. Several channels appear twice
+  under different measures, because the measure is most of what decides the answer: an `x` over a
+  number and an `x` over a date are different charts, and a rule that reads one correctly can still
+  read the other wrong. **9274 specifications, up from 8484**, every one of which upstream compiles.
+
+  The generator now asks each family what to read rather than knowing: it had `MarkDef` written into
+  its loop, which is why the encoding was never swept.
+
+  It found **58 disagreements**, of which **34 are defects here** in two causes:
+
+  * **a counting aggregate does not re-type its channel** — 32 of the 34, across eight families.
+    `count`, `distinct`, `valid` and `missing` force the type to quantitative whatever the chart
+    stated, and upstream says so out loud: *Invalid field type "nominal" for aggregate: "count",
+    using "quantitative" instead*. Left nominal, the channel keeps a band or ordinal scale where
+    upstream builds a linear one, and the axes, the legend and the mark's extent all follow it;
+  * **`stack: "normalize"`** on a nominal `y` and on a temporal `x`, where upstream formats the
+    axis `.0%` and this does not.
+
+  Recorded rather than fixed in this change: the sweep is a measurement, and each of those is its own
+  defect with its own fix.
+
+  The other **24 are upstream's**, and the sweep now reports those apart rather than counting them
+  against this compiler — a sweep that only counts differences invites the next reader to close them
+  all, and these must not be closed. Both emit a specification that does not work:
+
+  * a bucketed instant on a **polar** channel makes upstream read `…_offsetted_rect_start` and
+    `…_offsetted_rect_end`, columns no formula in the same specification writes.
+    `useRectOffsetField = fieldDef.timeUnit && bandPosition !== 0.5` is true when `bandPosition` is
+    *undefined*, which it is for an arc since no `timeUnitBandPosition` is configured for one, while
+    the formulas that would write those columns are guarded by
+    `rectBandPosition !== undefined && !== 0.5`. The angle resolves to nothing and the arc is not
+    drawn. 22 cases;
+  * a **`bandPosition` outside `[0, 1]`** is written into a *signal* using bare column names —
+    `scale("theta", 5 * v_start + -4 * v_end)` — because the `datum` guard is
+    `0 < bandPosition && bandPosition < 1`. That is right at the two edges, where the name is a
+    field reference, and wrong outside them, where it is a signal. `vega.parse` refuses the result
+    outright: *Unrecognized signal name: "v_start"*. 2 cases.
+
+  Both are **listed, not skipped**: still compared, and reported under their own heading with the
+  reasoning, so the day upstream fixes one the case starts failing rather than sitting unnoticed in a
+  skip list.
+
+  One difference was the instrument's own and is fixed here rather than recorded. The facet families
+  first gave `row` and `column` the same column that was already on `x`; upstream emits
+  `groupby: ["c", "c"]` for that chart and this compiler emits `["c"]`, so all 30 cases in both
+  families reported that one disagreement instead of the property each was there to try. The facet
+  channels now take a different column. The disagreement itself is real and is written down here so
+  that changing the chart does not lose it.
+
 - **The sweep reads `config.range`, and agrees.** The six palettes a theme sets — `category`,
   `ordinal`, `heatmap`, `ramp`, `diverging`, `symbol` — read from `vega-parser`'s own default
   configuration, since the schema declares `config` as an object and says nothing about what goes in

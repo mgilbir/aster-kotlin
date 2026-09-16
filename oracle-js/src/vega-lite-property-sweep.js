@@ -19,6 +19,20 @@
  * the reason the Vega sweep has one per mark type: which properties mean anything is the mark's own
  * question, and `cornerRadiusEnd` belongs to a bar where `interpolate` belongs to a line.
  *
+ * And one family per **encoding channel**, sweeping the properties that channel's field definition
+ * declares — `{"encoding": {"y": {"field": "c", "type": "nominal", …}}}`. The same reasoning one
+ * level over: what a property means is the channel's question, and a `stack` belongs to a position
+ * where a `legend` belongs to a colour. Several channels appear twice under different measures,
+ * because the measure is most of what decides the answer: an `x` over a number and an `x` over a
+ * date are different charts, and a rule that reads one correctly can still read the other wrong.
+ *
+ * A channel's chart gives the swept channel a column of the kind its own properties are about, and
+ * names that channel separately from the encoding — several of these charts need a second channel to
+ * be a chart at all, and a property written on the wrong one would be measuring that instead. The
+ * facet channels take a *different* column from the one on `x` for the same reason: sharing it made
+ * upstream emit `groupby: ["c", "c"]` where this compiler emits `["c"]`, and every case in both
+ * families then reported that one disagreement rather than the property it was there to try.
+ *
  * Values are chosen the way the Vega sweep chooses them, from the schema and nothing else: an enum's
  * words, both booleans, a small fixed set of numbers, one colour. Anything the schema does not say
  * enough about is skipped **and counted**, with its reason, in the manifest.
@@ -94,14 +108,96 @@ function markBaseSpec(type) {
   };
 }
 
-const FAMILIES = Object.fromEntries(
-  Object.keys(MARK_ENCODINGS).map((type) => [
-    `mark-${type}`,
-    (spec, property, value) => {
+/**
+ * The chart each swept **encoding channel** is applied to.
+ *
+ * One per channel rather than one for all of them, for the same reason the mark families have one
+ * per type: a property is only worth comparing where the channel it sits on is doing something. A
+ * `bin` on a nominal column and a `timeUnit` on a number are agreements nobody learns from, so the
+ * column each channel is given is the kind its own properties are about — `w` and `v` are numbers,
+ * `c` is a category and `t` is a date.
+ *
+ * The **swept** channel is named separately from the encoding because several of these charts need a
+ * second channel to be a chart at all, and a property written on the wrong one would be measuring
+ * that instead.
+ */
+const CHANNEL_CHARTS = {
+  x: { mark: 'point', channel: 'x', encoding: { x: { field: 'w', type: 'quantitative' }, y: { field: 'v', type: 'quantitative' } } },
+  y: { mark: 'point', channel: 'y', encoding: { x: { field: 'w', type: 'quantitative' }, y: { field: 'v', type: 'quantitative' } } },
+  'x-temporal': { mark: 'line', channel: 'x', encoding: { x: { field: 't', type: 'temporal' }, y: { field: 'v', type: 'quantitative' } } },
+  'y-nominal': { mark: 'bar', channel: 'y', encoding: { x: { field: 'v', type: 'quantitative' }, y: { field: 'c', type: 'nominal' } } },
+  x2: { mark: 'bar', channel: 'x2', encoding: { x: { field: 'w', type: 'quantitative' }, x2: { field: 'v' }, y: { field: 'c', type: 'nominal' } } },
+  color: { mark: 'bar', channel: 'color', encoding: { x: { field: 'c', type: 'nominal' }, y: { field: 'v', type: 'quantitative' }, color: { field: 'w', type: 'quantitative' } } },
+  'color-nominal': { mark: 'bar', channel: 'color', encoding: { x: { field: 'c', type: 'nominal' }, y: { field: 'v', type: 'quantitative' }, color: { field: 'c', type: 'nominal' } } },
+  size: { mark: 'point', channel: 'size', encoding: { x: { field: 'w', type: 'quantitative' }, y: { field: 'v', type: 'quantitative' }, size: { field: 'v', type: 'quantitative' } } },
+  opacity: { mark: 'point', channel: 'opacity', encoding: { x: { field: 'w', type: 'quantitative' }, y: { field: 'v', type: 'quantitative' }, opacity: { field: 'v', type: 'quantitative' } } },
+  shape: { mark: 'point', channel: 'shape', encoding: { x: { field: 'w', type: 'quantitative' }, y: { field: 'v', type: 'quantitative' }, shape: { field: 'c', type: 'nominal' } } },
+  strokeWidth: { mark: 'point', channel: 'strokeWidth', encoding: { x: { field: 'w', type: 'quantitative' }, y: { field: 'v', type: 'quantitative' }, strokeWidth: { field: 'v', type: 'quantitative' } } },
+  text: { mark: 'text', channel: 'text', encoding: { x: { field: 'c', type: 'nominal' }, y: { field: 'v', type: 'quantitative' }, text: { field: 'v', type: 'quantitative' } } },
+  detail: { mark: 'line', channel: 'detail', encoding: { x: { field: 't', type: 'temporal' }, y: { field: 'v', type: 'quantitative' }, detail: { field: 'c', type: 'nominal' } } },
+  order: { mark: 'line', channel: 'order', encoding: { x: { field: 't', type: 'temporal' }, y: { field: 'v', type: 'quantitative' }, order: { field: 'w', type: 'quantitative' } } },
+  theta: { mark: 'arc', channel: 'theta', encoding: { theta: { field: 'v', type: 'quantitative' }, color: { field: 'c', type: 'nominal' } } },
+  radius: { mark: 'arc', channel: 'radius', encoding: { theta: { field: 'v', type: 'quantitative' }, radius: { field: 'w', type: 'quantitative' } } },
+  xOffset: { mark: 'bar', channel: 'xOffset', encoding: { x: { field: 'c', type: 'nominal' }, y: { field: 'v', type: 'quantitative' }, xOffset: { field: 'c', type: 'nominal' } } },
+  row: { mark: 'bar', channel: 'row', encoding: { x: { field: 'c', type: 'nominal' }, y: { field: 'v', type: 'quantitative' }, row: { field: 't', type: 'ordinal' } } },
+  column: { mark: 'bar', channel: 'column', encoding: { x: { field: 'c', type: 'nominal' }, y: { field: 'v', type: 'quantitative' }, column: { field: 't', type: 'ordinal' } } },
+};
+
+/** The chart a swept encoding property is applied to. */
+function channelBaseSpec(key) {
+  const chart = CHANNEL_CHARTS[key];
+  return {
+    $schema: 'https://vega.github.io/schema/vega-lite/v6.json',
+    width: 200,
+    height: 120,
+    data: { values: ROWS },
+    mark: { type: chart.mark },
+    encoding: structuredClone(chart.encoding),
+  };
+}
+
+/**
+ * The properties a channel definition declares, taken from the branch that names a **field**.
+ *
+ * A channel is an `anyOf` over the several shapes it can take — a field, a literal `datum`, a bare
+ * `value`, and a conditional wrapping each — and merging all of them would sweep `value` onto a
+ * definition that has a `field`, which is not a specification anybody can write. The base charts
+ * above all encode fields, so the field branch is the one whose properties are worth asking about.
+ */
+function fieldDefProperties(channel) {
+  const fragment = schema.definitions.FacetedEncoding?.properties?.[channel];
+  if (!fragment) return null;
+  const branch = branchesOf(fragment).find((it) => it.properties?.field);
+  return branch?.properties ?? null;
+}
+
+/**
+ * A family is a property table, a chart to try each property on, and where on that chart it goes.
+ *
+ * It used to be only the first of those — the sweep read `MarkDef` and nothing else, and the mark
+ * type was the whole of what varied. The encoding is a second surface of the same kind and a larger
+ * one, so the loop below now asks each family what to read rather than knowing.
+ */
+const FAMILIES = [
+  ...Object.keys(MARK_ENCODINGS).map((type) => ({
+    name: `mark-${type}`,
+    properties: () => schema.definitions.MarkDef.properties,
+    baseSpec: () => markBaseSpec(type),
+    apply: (spec, property, value) => {
       spec.mark[property] = value;
     },
-  ]),
-);
+    skip: (property) => SKIP[property],
+  })),
+  ...Object.keys(CHANNEL_CHARTS).map((key) => ({
+    name: `encoding-${key}`,
+    properties: () => fieldDefProperties(CHANNEL_CHARTS[key].channel),
+    baseSpec: () => channelBaseSpec(key),
+    apply: (spec, property, value) => {
+      spec.encoding[CHANNEL_CHARTS[key].channel][property] = value;
+    },
+    skip: (property) => ENCODING_SKIP[property],
+  })),
+];
 
 /**
  * Properties that are not a *setting* on the mark, and why each is left alone.
@@ -144,6 +240,28 @@ const SKIP = {
   timeUnitBandSize: 'a band size in time units, which needs a time-unit encoding to mean anything',
   timeUnitBandPosition:
     'a band position in time units, which needs a time-unit encoding to mean anything',
+};
+
+/**
+ * Properties of a channel definition that are not a *setting* on the channel, and why each is left.
+ *
+ * The three guide blocks are the large omission and they are deliberate: an `axis`, a `legend` and a
+ * `header` are whole tables of properties apiece, so each is a family of its own to write rather
+ * than a value to try here. The Vega sweep covers the axis and legend upstream *emits*; what is not
+ * covered anywhere yet is the Vega-Lite spelling that produces them.
+ */
+const ENCODING_SKIP = {
+  field: 'the column itself, which the chart already fixes',
+  type: 'the measure, which decides what every other property here means',
+  datum: 'a literal standing where the column is, so not a property of this definition',
+  value: 'a literal standing where the column is, so not a property of this definition',
+  condition: 'a definition of its own, tried against a selection this chart does not declare',
+  axis: 'a table of properties, and a family of its own to write',
+  legend: 'a table of properties, and a family of its own to write',
+  header: 'a table of properties, and a family of its own to write',
+  scale: 'a table of properties, and a family of its own to write',
+  impute: 'an imputation, which is a specification rather than a value',
+  bin: 'a bin, whose object form is a table of properties and whose bare form the mark families already draw',
 };
 
 /** The numbers tried for a `number`-typed property, and why these. */
@@ -210,14 +328,18 @@ const referenceDir = join(outDir, 'reference');
 mkdirSync(specDir, { recursive: true });
 mkdirSync(referenceDir, { recursive: true });
 
-const markDef = schema.definitions.MarkDef.properties;
 const cases = [];
 const skipped = [];
 const used = new Map();
 
-for (const [family, apply] of Object.entries(FAMILIES)) {
-  for (const [property, fragment] of Object.entries(markDef)) {
-    const reason = SKIP[property];
+for (const { name: family, properties, baseSpec, apply, skip } of FAMILIES) {
+  const table = properties();
+  if (!table) {
+    skipped.push({ family, property: '*', reason: 'the schema declares no such definition' });
+    continue;
+  }
+  for (const [property, fragment] of Object.entries(table)) {
+    const reason = skip(property);
     if (reason) {
       skipped.push({ family, property, reason });
       continue;
@@ -232,7 +354,7 @@ for (const [family, apply] of Object.entries(FAMILIES)) {
       continue;
     }
     for (const value of candidates.values) {
-      const spec = markBaseSpec(family.slice('mark-'.length));
+      const spec = baseSpec();
       apply(spec, property, value);
       let name = `${family}-${property}-${slug(value)}`;
       if (used.has(name)) name = `${name}-${used.get(name) + 1}`;
