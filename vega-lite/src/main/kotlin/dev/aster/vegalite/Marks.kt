@@ -2067,7 +2067,18 @@ internal object Marks {
    */
   private fun defaultPositionRef(view: UnitView, channel: String, defaultPos: String?): VegaValue? {
     val main = mainChannel(channel)
-    view.markDef.raw.fields[channel]?.let {
+    // **Vega's name for the channel first, then Vega-Lite's.** `pointPositionDefaultRef` asks
+    // `getMarkPropOrConfig(channel, markDef, config, {vgChannel})`, and that reads
+    // `mark[vgChannel]`
+    // before `mark[channel]` — so a text mark's radius is its `outerRadius` where it states one and
+    // its `radius` otherwise, with the former winning when both are written. `outerRadius` is the
+    // documented alias for `radius`, and reading only the Vega-Lite name meant a text placed by a
+    // stated outer radius was not placed at all: upstream writes `radius` beside the `outerRadius`
+    // it passes through, and this wrote only the pass-through.
+    //
+    // For `x` and `y` the two names are the same and nothing changes.
+    val vgChannel = vgPositionChannel(channel)
+    (view.markDef.raw.fields[vgChannel] ?: view.markDef.raw.fields[channel])?.let {
       if (it == VegaValue.Str("width")) return obj { put("field", obj { put("group", "width") }) }
       if (it == VegaValue.Str("height")) return obj { put("field", obj { put("group", "height") }) }
       // `signalOrValueRef`, as every other mark property is built: a position written `{"expr": …}`
