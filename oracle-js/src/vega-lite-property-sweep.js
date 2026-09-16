@@ -33,6 +33,14 @@
  * upstream emit `groupby: ["c", "c"]` where this compiler emits `["c"]`, and every case in both
  * families then reported that one disagreement rather than the property it was there to try.
  *
+ * And one family per **configuration** block, sweeping the table that block declares —
+ * `{"config": {"axis": {…}}}`. A configuration is a *different code path* to the same properties:
+ * `getMarkConfig` walks the configuration chain and never looks at the mark definition, where
+ * `getMarkPropOrConfig` reads the definition first, and the two have already disagreed here over
+ * `invalid`. A property the mark families agree on may still be read wrongly out of a theme. The
+ * axis block is swept three times over — plain, `axisX` and `axisBand` — because the same table
+ * resolved at three scopes is three answers, and which one wins is the rule rather than the value.
+ *
  * Values are chosen the way the Vega sweep chooses them, from the schema and nothing else: an enum's
  * words, both booleans, a small fixed set of numbers, one colour. Anything the schema does not say
  * enough about is skipped **and counted**, with its reason, in the manifest.
@@ -172,6 +180,89 @@ function fieldDefProperties(channel) {
 }
 
 /**
+ * The chart each swept **configuration** block is applied to, and the definition it reads.
+ *
+ * A configuration is the third surface, and the one whose defaults are most of what Vega-Lite is
+ * for. It is swept apart from the mark and the encoding because it is a *different code path* to
+ * the same properties: `getMarkConfig` walks the configuration chain and never looks at the mark
+ * definition, where `getMarkPropOrConfig` reads the definition first, and the two have already
+ * disagreed here over `invalid`. A property that the mark families agree on may still be read
+ * wrongly out of a theme.
+ *
+ * The axis block appears three times over — plain, `axisX`, and `axisBand` — because the same table
+ * resolved at three scopes is three answers, and which one wins is the rule rather than the value.
+ */
+const CONFIG_CHARTS = {
+  '': { definition: 'Config', chart: 'legendy' },
+  axis: { definition: 'AxisConfig', chart: 'plain' },
+  axisX: { definition: 'AxisConfig', chart: 'plain' },
+  axisBand: { definition: 'AxisConfig', chart: 'plain' },
+  legend: { definition: 'LegendConfig', chart: 'legendy' },
+  header: { definition: 'HeaderConfig', chart: 'faceted' },
+  title: { definition: 'TitleConfig', chart: 'titled' },
+  view: { definition: 'ViewConfig', chart: 'plain' },
+  scale: { definition: 'ScaleConfig', chart: 'legendy' },
+  mark: { definition: 'MarkConfig', chart: 'plain' },
+  bar: { definition: 'BarConfig', chart: 'plain' },
+  line: { definition: 'LineConfig', chart: 'temporal' },
+  area: { definition: 'AreaConfig', chart: 'temporal' },
+  point: { definition: 'MarkConfig', chart: 'pointy' },
+  text: { definition: 'MarkConfig', chart: 'texty' },
+  tick: { definition: 'TickConfig', chart: 'ticky' },
+  rect: { definition: 'RectConfig', chart: 'recty' },
+  arc: { definition: 'RectConfig', chart: 'arcy' },
+};
+
+/** The charts the configuration families are tried on, one per shape a block needs. */
+const CONFIG_BASE = {
+  plain: { mark: 'bar', encoding: { x: { field: 'c', type: 'nominal' }, y: { field: 'v', type: 'quantitative' } } },
+  legendy: { mark: 'bar', encoding: { x: { field: 'c', type: 'nominal' }, y: { field: 'v', type: 'quantitative' }, color: { field: 'c', type: 'nominal' } } },
+  faceted: { mark: 'bar', encoding: { x: { field: 'c', type: 'nominal' }, y: { field: 'v', type: 'quantitative' }, column: { field: 't', type: 'ordinal' } } },
+  titled: { mark: 'bar', encoding: { x: { field: 'c', type: 'nominal' }, y: { field: 'v', type: 'quantitative' } }, title: 'A chart with a caption' },
+  temporal: { mark: 'line', encoding: { x: { field: 't', type: 'temporal' }, y: { field: 'v', type: 'quantitative' } } },
+  pointy: { mark: 'point', encoding: { x: { field: 'w', type: 'quantitative' }, y: { field: 'v', type: 'quantitative' } } },
+  texty: { mark: 'text', encoding: { x: { field: 'c', type: 'nominal' }, y: { field: 'v', type: 'quantitative' }, text: { field: 'v', type: 'quantitative' } } },
+  ticky: { mark: 'tick', encoding: { x: { field: 'v', type: 'quantitative' }, y: { field: 'c', type: 'nominal' } } },
+  recty: { mark: 'rect', encoding: { x: { field: 'c', type: 'nominal' }, y: { field: 't', type: 'ordinal' }, color: { field: 'v', type: 'quantitative' } } },
+  arcy: { mark: 'arc', encoding: { theta: { field: 'v', type: 'quantitative' }, color: { field: 'c', type: 'nominal' } } },
+};
+
+/** The chart a swept configuration property is applied to. */
+function configBaseSpec(key) {
+  const base = CONFIG_BASE[CONFIG_CHARTS[key].chart];
+  return {
+    $schema: 'https://vega.github.io/schema/vega-lite/v6.json',
+    width: 200,
+    height: 120,
+    data: { values: ROWS },
+    ...structuredClone(base),
+  };
+}
+
+/**
+ * Properties of a configuration block that are not a *setting*, and why each is left alone.
+ *
+ * The nested blocks are the omission that matters: a `style` inside a mark configuration is another
+ * table of tables, and the composite marks are whole specifications. Both are families of their own
+ * rather than values to try here.
+ */
+const CONFIG_SKIP = {
+  style: 'a table of tables, keyed by names this chart does not use',
+  selection: 'selection defaults, which need a selection to mean anything',
+  params: 'parameters, which are a specification rather than a value',
+  locale: 'a locale, which is a table of its own and is swept by the locale tests',
+  range: 'the scheme tables, which the Vega sweep reads at the layer that resolves them',
+  boxplot: 'a composite mark, which is a specification rather than a value',
+  errorbar: 'a composite mark, which is a specification rather than a value',
+  errorband: 'a composite mark, which is a specification rather than a value',
+  tooltipFormat: 'a format table read only where a tooltip is drawn',
+  numberFormatType: 'names a function the page registers, and there is no page here',
+  timeFormatType: 'names a function the page registers, and there is no page here',
+  customFormatTypes: 'a switch for the two above',
+  font: 'a font family, resolved by whatever engine measures the text',
+};
+
+/**
  * A family is a property table, a chart to try each property on, and where on that chart it goes.
  *
  * It used to be only the first of those — the sweep read `MarkDef` and nothing else, and the mark
@@ -196,6 +287,21 @@ const FAMILIES = [
       spec.encoding[CHANNEL_CHARTS[key].channel][property] = value;
     },
     skip: (property) => ENCODING_SKIP[property],
+  })),
+  ...Object.keys(CONFIG_CHARTS).map((key) => ({
+    name: key ? `config-${key}` : 'config',
+    properties: () => schema.definitions[CONFIG_CHARTS[key].definition]?.properties ?? null,
+    baseSpec: () => configBaseSpec(key),
+    apply: (spec, property, value) => {
+      spec.config ??= {};
+      if (key) {
+        spec.config[key] ??= {};
+        spec.config[key][property] = value;
+      } else {
+        spec.config[property] = value;
+      }
+    },
+    skip: (property) => CONFIG_SKIP[property],
   })),
 ];
 
