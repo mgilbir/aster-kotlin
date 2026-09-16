@@ -205,6 +205,38 @@ section here does not get released.
 
 ### Fixed
 
+- **A gradient legend over a constant column shows the whole ramp, not the one colour.** A domain
+  with no span is the one place upstream throws the domain away rather than consulting it:
+
+  ```js
+  if (!(max - min)) {
+    // expand scale if domain has zero span, fix #1479
+    scale = (scale.interpolator ? get('sequential')().interpolator(scale.interpolator())
+                                : get('linear')().interpolate(scale.interpolate()).range(scale.range())
+            ).domain([min = 0, max = 1]);
+  }
+  ```
+
+  so the ramp is sampled end to end over `[0, 1]` — `ticks(15)` there being twenty-one values — and
+  the single label sits beside its **middle**, which is what d3's `normalize` answers for coinciding
+  ends: `constant(0.5)`.
+
+  Unexpanded, the ticks between two ends that coincide are one value, so the legend collapsed to a
+  single stop: a block of colour where the scale should be, with its label adrift at the start. The
+  class had both readings in it — `position` already answered the middle and cited that rule, while
+  `fraction` answered 0 — and only the first was upstream's.
+
+  The replacement carries the scheme's **extent slice** and its interpolation space, because upstream
+  copies the scale's resolved `range()` and an extent is already resolved into it; it does not carry
+  a `log` or `pow` transform, there being no span left for one to bend.
+
+  `legend-gradient-constant-domain` is new: the constant scale, the same scale with a span to say
+  that only the degenerate case moves, and a constant one taking a slice of `viridis`. Four mutants,
+  all killed. 216 Vega differential fixtures.
+
+  Found by a Vega-Lite fixture — a `distinct` aggregate grouped so finely that every group held one
+  row — whose compiled specification already matched upstream exactly.
+
 - **A percent consumes what follows it, and a percent with nothing after it consumes itself.** d3
   reads the character after the percent — and a pad modifier before it — looks the character up, and
   pushes whatever the table gave back: the character itself where there is no entry, and the empty

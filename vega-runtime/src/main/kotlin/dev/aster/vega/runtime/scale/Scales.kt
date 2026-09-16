@@ -1396,7 +1396,17 @@ public class SequentialColorScale(
     // the labels by the diverging position too would bend them a second time.
     val lo = domain.first()
     val hi = domain.last()
-    if (lo == hi) return 0.0
+    // **The middle, for the same reason [position] answers the middle.** `scaleFraction` places
+    // labels with a plain linear scale over `[first, last]`, and d3's `normalize` answers
+    // `constant(0.5)` when the ends coincide:
+    //
+    //     return (b -= (a = +a)) ? function(x) { return (x - a) / b; } : constant(isNaN(b) ? NaN :
+    // 0.5);
+    //
+    // This answered 0 and put the one label a constant column earns at the *start* of the ramp
+    // rather than beside its middle — two readings of the same degenerate domain in one class, of
+    // which only [position] was upstream's.
+    if (lo == hi) return 0.5
     return ((x - lo) / (hi - lo)).coerceIn(0.0, 1.0)
   }
 
