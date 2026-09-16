@@ -1116,7 +1116,14 @@ internal class DataPipeline(
     return StackNode(
       field = Fields.vgField(def),
       // The facet's own fields group every accumulation, so a stack stays inside its cell.
-      groupby = dimensions + facetting.filterNot { it in dimensions },
+      //
+      // `groupby: [...this.getGroupbyFields(), ...facetby]` — **concatenated, not merged**, which
+      // is the same rule already written below for the imputation's own groupby and was applied to
+      // only one of the two. A chart that facets by the column it also plots along names that
+      // column twice, and upstream emits it twice: grouping by `c` and then by `c` again is the
+      // same partition either way, so this is a difference in what is written rather than in what
+      // is drawn — and what is written is what this corpus compares.
+      groupby = dimensions + facetting,
       // `if (!s.field.includes(field))` — the stack's sort names each field **once**. Two channels
       // over one column is one thing to sort by, and repeating it in the pair of parallel lists is
       // a comparator that reads the same column twice.

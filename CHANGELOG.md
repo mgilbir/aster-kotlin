@@ -205,6 +205,23 @@ section here does not get released.
 
 ### Fixed
 
+- **A stack groups by the dimensions it was given and then by the facet's, concatenated rather than
+  merged.** `groupby: [...this.getGroupbyFields(), ...facetby]`. A chart that facets by the column it
+  also plots along names that column twice, and upstream writes it twice; this compiler filtered the
+  second out.
+
+  Grouping by `c` and then by `c` again is the same partition either way, so this is a difference in
+  what is *emitted* rather than in what is drawn — which is the kind the specification comparison
+  exists to catch and a picture cannot. The same rule was already written a few lines below for the
+  imputation's own groupby, and applied to only one of the two.
+
+  `a-stack-groups-by-what-it-was-given` is new, with the ordinary case beside it — faceting by a
+  different column, where the two lists have nothing in common and concatenating and merging agree.
+  Three mutants, all killed. 295 Vega-Lite fixtures.
+
+  Found by the encoding sweep's facet families, which had been reporting this one disagreement for
+  all 30 of their cases instead of the property each was there to try.
+
 - **A gradient legend over a constant column shows the whole ramp, not the one colour.** A domain
   with no span is the one place upstream throws the domain away rather than consulting it:
 
