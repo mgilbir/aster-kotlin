@@ -231,6 +231,26 @@ section here does not get released.
 
 ### Fixed
 
+- **`config.view` is one of the mark blocks, and an object-valued `config.mark.tooltip` is spent
+  rather than passed on.** Two things a configuration must not hand Vega.
+
+  `MARK_STYLES = new Set(['view', ...PRIMITIVE_MARKS])`, and the loop over it deletes the generic
+  `VL_ONLY_MARK_CONFIG_PROPERTIES` from every member *and then* whatever that member has in the
+  mark-specific table — where `view`'s entry is its five sizes. This compiler dropped the sizes and
+  kept the rest, so `config.view.invalid`, a word Vega has never heard, was renamed into the `cell`
+  style and shipped. The two lists are now applied to `view` by the same rule as to `bar` and `rect`,
+  which is what upstream's single loop does.
+
+  `if (config.mark.tooltip && isObject(config.mark.tooltip)) delete config.mark.tooltip`: a tooltip
+  written as an object says *which* fields to show, a question only Vega-Lite can answer, and it is
+  spent while compiling into the `tooltip` channel on the marks. A bare `true` is Vega's own switch
+  and travels through untouched.
+
+  `a-config-block-that-keeps-only-vegas` and `a-config-tooltip-vega-understands` are new — two charts
+  because a configuration is chart-level and the two tooltip forms contradict. Four mutants, all
+  killed, including the one that drops *every* tooltip rather than only the object form.
+
+
 - **A guide's default caption comes from one of three formatters, and `config.fieldTitle` picks
   which.** `defaultTitleFormatter` switches on it — `plain` is the bare field, `functional` spells
   the derivation as a call, and everything else is the verbal one. Only the verbal one was

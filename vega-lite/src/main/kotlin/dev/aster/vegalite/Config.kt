@@ -2,6 +2,7 @@ package dev.aster.vegalite
 
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asBoolean
 import dev.aster.vega.model.locale.VegaLocale
 
 /**
@@ -362,7 +363,22 @@ internal class Config(
         key == "mark" ->
           (value as? VegaValue.Obj)
             ?.let { block ->
-              VegaValue.Obj(block.fields.filterKeys { it !in VEGA_LITE_ONLY_MARK })
+              // ```js
+              // if (config.mark.tooltip && isObject(config.mark.tooltip)) {
+              //   delete config.mark.tooltip;
+              // }
+              // ```
+              //
+              // A tooltip written as an **object** — `{"content": "data"}` — says *which* fields to
+              // show, which is a question only Vega-Lite can answer: it is spent while compiling,
+              // turning into the `tooltip` channel on the marks themselves. A bare `true` is
+              // Vega's own switch and travels through. Passed on as written, Vega was handed a
+              // table where it expects a flag.
+              val tooltip = block.fields["tooltip"]
+              val dropped =
+                if (tooltip is VegaValue.Obj && tooltip.asBoolean()) VEGA_LITE_ONLY_MARK + "tooltip"
+                else VEGA_LITE_ONLY_MARK
+              VegaValue.Obj(block.fields.filterKeys { it !in dropped })
             }
             ?.let { out["mark"] = it }
         // ```js
@@ -540,23 +556,28 @@ internal class Config(
   /** Only the view's own paint reaches Vega; its sizes are Vega-Lite's own arithmetic. */
   private fun viewStyle(value: VegaValue): VegaValue.Obj? {
     val block = value as? VegaValue.Obj ?: return null
-    val fields = LinkedHashMap<String, VegaValue>()
-    for ((key, property) in block.fields) {
-      if (
-        key in
-          setOf(
-            "continuousWidth",
-            "continuousHeight",
-            "discreteWidth",
-            "discreteHeight",
-            "step",
-          )
-      ) {
-        continue
-      }
-      fields[key] = property
-    }
-    return if (fields.isEmpty()) null else VegaValue.Obj(fields)
+    // ```js
+    // const MARK_STYLES = new Set(['view', ...PRIMITIVE_MARKS]);
+    // …
+    // for (const markType of MARK_STYLES) {
+    //   for (const prop of VL_ONLY_MARK_CONFIG_PROPERTIES) { delete config[markType][prop]; }
+    //   const vlOnlyMarkSpecificConfigs =
+    // VL_ONLY_ALL_MARK_SPECIFIC_CONFIG_PROPERTY_INDEX[markType];
+    //   if (vlOnlyMarkSpecificConfigs) {
+    //     for (const prop of vlOnlyMarkSpecificConfigs) { delete config[markType][prop]; }
+    //   }
+    //   redirectConfigToStyleConfig(config, markType);
+    // }
+    // ```
+    //
+    // **`view` is one of the mark blocks**, not a shape of its own: it is the first member of
+    // `MARK_STYLES`, so it loses the generic Vega-Lite-only mark properties *as well as* the five
+    // sizes that are its own entry in the mark-specific table. This dropped the sizes and kept the
+    // rest, so `config.view.invalid` — meaningless to Vega, which has never heard of it — was
+    // written into the `cell` style and shipped.
+    val drop = VEGA_LITE_ONLY_MARK + MARK_SPECIFIC_VEGA_LITE_ONLY["view"].orEmpty()
+    val fields = block.fields.filterKeys { it !in drop }
+    return if (fields.isEmpty()) null else VegaValue.Obj(LinkedHashMap(fields))
   }
 
   private companion object {
@@ -667,6 +688,12 @@ internal class Config(
 
     val MARK_SPECIFIC_VEGA_LITE_ONLY: Map<String, Set<String>> =
       mapOf(
+        // `VL_ONLY_ALL_MARK_SPECIFIC_CONFIG_PROPERTY_INDEX` opens with `view`, whose five sizes are
+        // how a chart states its own default extent and mean nothing to Vega. It sits in the same
+        // table as the marks' own because `view` is one of `MARK_STYLES` — the sizes are its entry
+        // there, and the generic mark properties reach it by the same loop.
+        "view" to
+          setOf("continuousWidth", "continuousHeight", "discreteWidth", "discreteHeight", "step"),
         "area" to setOf("line", "point"),
         "line" to setOf("point"),
         "bar" to RECT_VEGA_LITE_ONLY,
