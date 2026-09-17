@@ -1661,7 +1661,18 @@ internal object Guides {
     // **month** or a **day**, which are continuous in the data and a short list to the reader. Four
     // quarters are four swatches, not a bar with a gradient along it.
     val namedUnits = def.timeUnit in setOf("quarter", "month", "day")
-    val gradient = channel in setOf("color", "fill", "stroke") && continuous && !namedUnits
+    // `getLegendType` is `getFirstDefined(legend.type, defaultType(params))`, so a channel that
+    // **states** its legend's kind gets it: a continuous colour told `type: "symbol"` is a row of
+    // swatches, and a size told `type: "gradient"` is a ramp. Read as the inferred kind alone, a
+    // stated one was ignored and every rule keyed off the kind — which properties survive, whether
+    // a `gradientLength` is written, which encode block is built — followed the wrong one.
+    val inferredGradient = channel in setOf("color", "fill", "stroke") && continuous && !namedUnits
+    val gradient =
+      when (def.legend?.string("type")) {
+        "gradient" -> true
+        "symbol" -> false
+        else -> inferredGradient
+      }
 
     // `if (explicit || config.legend[property] === undefined)`: a property the **theme** states is
     // not written onto the component at all. It is already in the Vega `config.legend` block that
@@ -1815,6 +1826,26 @@ internal object Guides {
       // it too.
       def.legend?.fields?.forEach { (key, value) ->
         if (key !in LEGEND_PROPERTIES) return@forEach
+        // ```js
+        // type: ({legendType, scaleType, channel}) => {
+        //   if (isColorChannel(channel) && isContinuousToContinuous(scaleType)) {
+        //     if (legendType === 'gradient') { return undefined; }
+        //   } else if (legendType === 'symbol') { return undefined; }
+        //   return legendType;
+        // },
+        // ```
+        //
+        // **A legend that is the kind it would have been anyway does not say so.** A continuous
+        // colour is a ramp and a size is a row of swatches, so writing `type` for either is writing
+        // Vega's own default back at it. Only the kind that had to be *asked* for is written — a
+        // colour told to be symbols, a size told to be a ramp. This wrote whatever the chart
+        // stated,
+        // so the redundant half came out too.
+        if (key == "type") {
+          val redundant =
+            if (channel in setOf("color", "fill", "stroke") && continuous) gradient else !gradient
+          if (redundant) return@forEach
+        }
         // ```js
         // for (const property of LEGEND_COMPONENT_PROPERTIES) {
         //   if (
@@ -2112,7 +2143,25 @@ internal object Guides {
     // opacity is tested for **truth**, so a mark drawn at zero has no swatch opacity written at all
     // rather than a swatch drawn at nothing. `point: "transparent"` on a line is exactly that: the
     // overlay is `{opacity: 0}`, and its legend is the line's own key.
-    if (channel != "opacity") {
+    // ```js
+    // const symbolOpacity = legendCmpt.get('symbolOpacity') ?? config.legend.symbolOpacity;
+    // const opacity = symbolOpacity === undefined
+    //   ? (getMaxValue(encoding.opacity) ?? markDef.opacity)
+    //   : undefined;
+    // ```
+    //
+    // **A legend that names its swatches' opacity has said all there is to say.** `symbolOpacity`
+    // is a property of the legend and lands on the swatch through Vega's own legend handling, so
+    // upstream stops deriving one from the mark — `opacity` is `undefined` and nothing is written
+    // into the encode block. Derived anyway, as this did, the mark's opacity was written *over* the
+    // legend's: a chart asking for swatches at a tenth got them at the marks' seven tenths.
+    //
+    // Tested for **presence**, not for truth: a legend asking for zero has still said what it
+    // wants, and the derived value is suppressed all the same.
+    val statedSymbolOpacity =
+      view.spec.encoding[channel]?.legend?.fields?.get("symbolOpacity")
+        ?: view.config.raw.obj("legend")?.fields?.get("symbolOpacity")
+    if (channel != "opacity" && statedSymbolOpacity == null) {
       symbolOpacityValue(view)
         ?.takeIf { it.isTruthy() }
         ?.let { fields["opacity"] = obj { put("value", it) } }
