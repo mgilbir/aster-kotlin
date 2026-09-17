@@ -231,6 +231,25 @@ section here does not get released.
 
 ### Fixed
 
+- **A legend's swatches are painted the way the marks they stand for are painted, and a style block
+  is part of that.** `symbols` in `legend/encode.ts` opens with
+  `applyMarkConfig({}, model, FILL_STROKE_CONFIG)`, which asks `getMarkConfig` for each of the nine
+  stroke and fill properties — and `getMarkConfig` reads a **style block first**, then
+  `config[marktype]`, then `config.mark`. This compiler asked the flattened table of the last two,
+  which has no styles in it at all.
+
+  So a chart whose marks name a style that outlines them left its swatches unoutlined; and where the
+  style was the only thing painting them, the legend came out with **no `encode` block whatsoever**
+  rather than with the wrong one — which is how it was found, by two separate changes whose fixtures
+  tripped over it and which both stopped rather than reaching into this file.
+
+  `a-legend-symbol-wears-the-marks-stroke` and `a-legend-symbol-wears-a-styles-stroke` are new. They
+  are two charts rather than two rows of one because **two size legends over the same field are
+  hoisted into a single legend**: the first draft put them side by side, and the second row's style
+  never reached a legend at all. Both mutants — the flattened table, and an expression written as a
+  value rather than passed through `signalOrValueRef` — are killed only once they are apart.
+
+
 - **An axis is drawn on the side the theme asked for, and a trellis heading faces the way it was
   turned.** Four rules, all of them a guide reading something a theme wrote and none of them read
   before. The side an axis is on is settled from three places rather than one — `const orient =

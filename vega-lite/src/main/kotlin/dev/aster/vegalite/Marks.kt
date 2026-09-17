@@ -894,7 +894,7 @@ internal object Marks {
    * theme's own expressions are already signals by the time they are read — `initConfig` makes them
    * so — and wrapped in a value they reached the renderer as an object where a colour was wanted.
    */
-  private fun markProperty(value: VegaValue): VegaValue {
+  fun markProperty(value: VegaValue): VegaValue {
     val stated = value as? VegaValue.Obj
     if (stated?.fields?.keys == setOf("signal")) return stated
     val expression = stated?.takeIf { it.fields.keys == setOf("expr") }
@@ -2498,7 +2498,7 @@ internal object Marks {
    * `config.mark.size` is only for point size." So a `size` in `config.mark` is *not* a text mark's
    * font size, while a `size` in `config.text` is.
    */
-  private fun markConfigValue(
+  fun markConfigValue(
     view: UnitView,
     channel: String,
     vgChannel: String? = null,
