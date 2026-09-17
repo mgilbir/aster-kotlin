@@ -231,6 +231,37 @@ section here does not get released.
 
 ### Fixed
 
+- **A legend keeps only the words its own kind understands.** The test is the property name's
+  **prefix**, not a list:
+  `if ((legendType === 'gradient' && property.startsWith('symbol')) || (legendType === 'symbol' && property.startsWith('gradient'))) { continue; }`.
+  A ramp has no symbols to colour and a row of swatches has no ramp, so the settings of the other
+  kind are dropped where they are *read* rather than ignored where they are drawn. Written through,
+  as this compiler wrote them, Vega is handed a legend carrying instructions for the kind it is not.
+
+  `a-legend-keeps-its-own-kinds-words` is new: a gradient legend and a symbol legend given the same
+  six properties, so each row carries its own must-not-change half. `titleColor` and `labelColor`
+  survive on both, because the rule is a prefix test and a property that merely *contains* the other
+  kind's name is untouched. Five mutants, all killed, including the whole-name test in place of the
+  prefix.
+
+  **444 of the guide sweep's 516 differences close with this** — one rule, appearing once per CSS
+  colour name the schema declares, times three properties. 27196 of 27251 agree.
+
+### Changed
+
+- **The sweep reads a channel's own guides.** Eight families more, one per (guide, channel) pair —
+  `{"encoding": {"x": {"axis": {…}}}}` and its kin — over the four tables the encoding families had
+  been skipping with "a family of its own to write": `Axis` at 78 properties, `Legend` at 66,
+  `Header` at 32, `Scale` at 24.
+
+  A channel's own block is a **different code path** from a theme's, which is why both are swept: the
+  stated one is explicit where the configured one is derived, and upstream resolves them with
+  different functions. **27251 specifications, up from 21251**, every one of which upstream compiles.
+
+  All three `guide-axis-*` families came back clean, which is a result rather than an absence: a
+  channel's own axis block was already faithful.
+
+
 - **An assembled axis writes everything the chart stated, then everything derived.** Two rules
   compose to give that order. `parseAxis` fills the component by walking `AXIS_COMPONENT_PROPERTIES`
   rather than in whatever order its rules fire, and `Split.combine` puts the halves in a stated

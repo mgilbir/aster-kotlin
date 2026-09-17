@@ -263,6 +263,64 @@ const CONFIG_SKIP = {
 };
 
 /**
+ * The guide blocks a **channel** carries, swept per channel rather than per theme.
+ *
+ * `{"encoding": {"x": {"axis": {…}}}}` is a different code path from `{"config": {"axis": {…}}}`,
+ * and the difference is the whole reason both are swept: a channel's own block is *explicit* where
+ * a theme's is derived, and the two are resolved by different functions — `parseAxis` reads the
+ * stated one before it reads any configuration, and upstream's own `isExplicit` decides which of
+ * them wins on a merge. A property both agree on says nothing; one they disagree about is a rule.
+ *
+ * Which channel carries which guide is not a choice: an axis belongs to a position, a legend to a
+ * colour or a size, a header to a facet, and a scale to anything scaled. They are named here rather
+ * than derived so that a guide is only ever swept where it is actually drawn.
+ */
+const GUIDE_CHARTS = {
+  'axis-x': { definition: 'Axis', guide: 'axis', channel: 'x', chart: 'plain' },
+  'axis-y': { definition: 'Axis', guide: 'axis', channel: 'y', chart: 'plain' },
+  'axis-x-temporal': { definition: 'Axis', guide: 'axis', channel: 'x', chart: 'temporal' },
+  'legend-color': { definition: 'Legend', guide: 'legend', channel: 'color', chart: 'coloured' },
+  'legend-size': { definition: 'Legend', guide: 'legend', channel: 'size', chart: 'sized' },
+  'header-column': { definition: 'Header', guide: 'header', channel: 'column', chart: 'faceted' },
+  'scale-x': { definition: 'Scale', guide: 'scale', channel: 'x', chart: 'plain' },
+  'scale-color': { definition: 'Scale', guide: 'scale', channel: 'color', chart: 'coloured' },
+};
+
+/** The charts the guide families are tried on, one per guide a channel can carry. */
+const GUIDE_BASE = {
+  plain: { mark: 'bar', encoding: { x: { field: 'c', type: 'nominal' }, y: { field: 'v', type: 'quantitative' } } },
+  temporal: { mark: 'line', encoding: { x: { field: 't', type: 'temporal' }, y: { field: 'v', type: 'quantitative' } } },
+  coloured: { mark: 'bar', encoding: { x: { field: 'c', type: 'nominal' }, y: { field: 'v', type: 'quantitative' }, color: { field: 'w', type: 'quantitative' } } },
+  sized: { mark: 'point', encoding: { x: { field: 'w', type: 'quantitative' }, y: { field: 'v', type: 'quantitative' }, size: { field: 'v', type: 'quantitative' } } },
+  faceted: { mark: 'bar', encoding: { x: { field: 'c', type: 'nominal' }, y: { field: 'v', type: 'quantitative' }, column: { field: 't', type: 'ordinal' } } },
+};
+
+/** The chart a swept guide property is applied to. */
+function guideBaseSpec(key) {
+  const chart = GUIDE_CHARTS[key];
+  return {
+    $schema: 'https://vega.github.io/schema/vega-lite/v6.json',
+    width: 200,
+    height: 120,
+    data: { values: ROWS },
+    ...structuredClone(GUIDE_BASE[chart.chart]),
+  };
+}
+
+/**
+ * Properties of a guide that are not a *setting* on it, and why each is left alone.
+ *
+ * Narrower than the other skip tables, because a guide block is almost all settings — which is the
+ * point of sweeping it. `encoding` and `style` are the two that are tables of their own, and
+ * `condition` needs a selection this chart does not declare.
+ */
+const GUIDE_SKIP = {
+  encoding: 'a table of encode blocks, which is a specification rather than a value',
+  style: 'names config blocks the base chart does not declare',
+  condition: 'a rule against a selection this chart does not declare',
+};
+
+/**
  * A family is a property table, a chart to try each property on, and where on that chart it goes.
  *
  * It used to be only the first of those — the sweep read `MarkDef` and nothing else, and the mark
@@ -287,6 +345,17 @@ const FAMILIES = [
       spec.encoding[CHANNEL_CHARTS[key].channel][property] = value;
     },
     skip: (property) => ENCODING_SKIP[property],
+  })),
+  ...Object.keys(GUIDE_CHARTS).map((key) => ({
+    name: `guide-${key}`,
+    properties: () => schema.definitions[GUIDE_CHARTS[key].definition]?.properties ?? null,
+    baseSpec: () => guideBaseSpec(key),
+    apply: (spec, property, value) => {
+      const { guide, channel } = GUIDE_CHARTS[key];
+      spec.encoding[channel][guide] ??= {};
+      spec.encoding[channel][guide][property] = value;
+    },
+    skip: (property) => GUIDE_SKIP[property],
   })),
   ...Object.keys(CONFIG_CHARTS).map((key) => ({
     name: key ? `config-${key}` : 'config',
