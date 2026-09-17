@@ -231,6 +231,32 @@ section here does not get released.
 
 ### Fixed
 
+- **A legend told which kind to be, and one told its swatches' opacity.** `getLegendType` is
+  `getFirstDefined(legend.type, defaultType(params))`, so a channel that states its legend's kind
+  gets it — and every rule keyed off the kind follows: which properties survive the prefix filter,
+  whether a `gradientLength` is written, which encode block is built. Read as the inferred kind
+  alone, a stated one was ignored.
+
+  A legend that is the kind it would have been anyway **does not say so**:
+  `if (isColorChannel(channel) && isContinuousToContinuous(scaleType)) { if (legendType === 'gradient') return undefined; } else if (legendType === 'symbol') return undefined;`.
+  Only the kind that had to be asked for is written; this wrote whatever the chart stated, so the
+  redundant half came out too.
+
+  And a legend naming a `symbolOpacity` has said all there is to say — it reaches the swatch through
+  Vega's own legend handling, so upstream stops deriving one from the mark and writes nothing into
+  the encode block. Derived anyway, the mark's opacity was written *over* the legend's: a chart
+  asking for swatches at a tenth got them at the marks' seven tenths. The test is for **presence**,
+  not truth, so a legend asking for zero suppresses the derived value too.
+
+  `a-legend-told-which-kind-to-be` is new, five rows. Six mutants, all killed — but only after the
+  fixture was rebuilt twice: a concatenation **shares its scales by default**, so four rows over four
+  distinct fields still collapsed into two legends that tested none of them. It now resolves its
+  scales independently, and says so.
+
+  **The last 8 of the guide sweep's differences close with this: 27227 of 27251, and nothing
+  differs.**
+
+
 - **A scale property its channel does not understand is not honoured.** Two of them, each with its
   own test.
 
