@@ -272,6 +272,109 @@ section here does not get released.
   one.
 
   The Vega-Lite schema sweep drops from 30 differing cases to 12.
+- **A stack whose rounded end came from a theme is rounded once, not segment by segment.**
+  `parseMarkGroups` decides whether a bar is drawn inside a group of its own from
+  `const hasCornerRadius = VG_CORNERRADIUS_CHANNELS.some((prop) => getMarkPropOrConfig(prop, model.markDef, model.config))`,
+  and then `if (model.stack && !model.fieldDef('size') && hasCornerRadius)`. Which mark definition is
+  being asked is the whole of it: `initMarkdef` has already run, and it is what turns
+  `cornerRadiusEnd` — a word those five Vega channels do not include — into two of them, by way of
+  `for (const newProp of newProps) { markDef[newProp] = cornerRadiusEnd }`. This asked the mark as it
+  had been *written* rather than as it had been rewritten, so it saw a radius only when the chart put
+  one on the mark itself. A theme that rounds every bar in a report — `config.bar.cornerRadiusEnd`,
+  whose point is that no chart has to mention it, and equally `config.mark` or a style block — opened
+  no group at all, and each segment of each stack was rounded separately, joins and all, where
+  upstream rounds the stack once at its two ends.
+
+  `markDef[newProp] = cornerRadiusEnd` is an assignment and not a default, and was applied here as
+  one: the rewrite ran first and the mark's own properties were written over the top, so a bar asking
+  for a rounded end *and* a square top-left was drawn with the square. Upstream draws the rounded
+  end, and only the corners that word does not claim survive.
+
+  Two things inside the grouping were wrong underneath. The group's radii and its stroke are looked
+  up with `getMarkConfig(key, model.markDef, model.config)`, which consults the **style blocks
+  first**; this read a single flattened table of `config.mark` and `config.bar`, which has no style
+  blocks in it, so a style that rounded and outlined a bar left the group with neither — and left the
+  segments holding a radius they were supposed to have surrendered. And the two branches of
+  `getGroupsForStackedBarWithCornerRadius` are not mirror images: only the horizontal one names the
+  corner channels in its `pick`, so a stack lying on its side writes them before its extent and its
+  clip rather than after. Neither the fixture gate nor the sweep can see that last one, object key
+  order being ignored by both on purpose, so it is pinned by a test of its own.
+- **Sixteen keys of a theme reached the wrong side of the compiler, and an emptied block reached
+  Vega at all.** What survives `stripAndRedirectConfig` is decided by a list upstream wrote out by
+  hand, `VL_ONLY_CONFIG_PROPERTIES`, and by a sweep at the end of it that asks about every property
+  rather than about a named few. This compiler derived the list from the idea behind it — whatever
+  only Vega-Lite understands is struck out — and the idea gives the wrong answer in both
+  directions.
+
+  Five keys are Vega-Lite's own and are nevertheless handed to Vega, which has no use for them.
+  `fieldTitle` names the formatter a guide's default title is written by, `switch (config.fieldTitle)
+  { case 'plain': return fieldDef.field; }` in `channeldef.ts`, and it is not on the list; neither is
+  `timeFormatType`; neither are `headerRow`, `headerColumn` and `headerFacet`, though the `header`
+  block beside them is struck out. Dropped here, a theme arrived at the renderer without them.
+  Eleven go the other way and are struck out although Vega-Lite alone appears to read them: the ten
+  per-direction type-based axis blocks, `axisXBand` and its kin — while `axisBand`, which this
+  compiler resolves through exactly the same chain, is *not* on the list and stays. Passed through,
+  each was a word Vega has never heard of in the configuration it applies to every axis.
+
+  The closing sweep is the part that is not about a particular key: `for (const prop in config) { if
+  (isObject(config[prop]) && isEmpty(config[prop])) delete config[prop]; }`. A block may arrive empty
+  because the specification wrote it so, `{"config": {"axis": {}}}`, or because everything in it was
+  Vega-Lite's own and has just been taken out, which is how `{"config": {"legend":
+  {"unselectedOpacity": 0.3}}}` ends. Every block this compiler knew by name dropped its own, so the
+  ones it passes through untouched — an axis, a projection, a range, a header, an empty parameter
+  list — reached Vega as empty objects nobody had asked for, in a configuration upstream does not
+  emit at all.
+
+  The sweep goes no deeper than the configuration's own properties, which is the other half of the
+  rule: `config.style` is what it asks about, not `config.style.named`. A named style written empty
+  is therefore emitted exactly as written, where this dropped it and a theme that declares its styles
+  up front and fills some of them in later arrived one style short.
+
+- **A scale flag a theme asked for: a clamp, a rounding, an axis turned round.**
+  `parseUnitScaleProperty` walks every scale property by name and, for each one the specification
+  did not state, asks `const value = util.hasProperty(scaleRules, property) ? scaleRules[property]
+  ({…}) : config.scale[property];` — eight properties work themselves out and every other one is
+  whatever the theme named. That `else` arm was missing entirely, so `config.scale.clamp` and
+  `config.scale.round`, the two flags `ScaleConfig` declares and no rule claims, did nothing at all:
+  a theme could not clamp its continuous scales, and could not ask a whole document for
+  pixel-aligned positions. Neither has a default, which is why the omission stayed invisible until
+  somebody wrote one. It is written as the general rule rather than as two reads, because that is
+  what it is — the arm takes whatever the theme names that the rules leave alone, so
+  `config.scale.base` reaches a log scale and `config.scale.align` a band through it — and which
+  scales each value reaches is the ordinary `scaleTypeSupportProperty` gate applied to a themed
+  value exactly as to a stated one: a `clamp` needs a continuous scale to be the ends of, a `round`
+  also suits a band or a point, and an ordinal colour scale takes neither. A property that *has* a
+  rule never consults the theme here even where its rule answers nothing, which is what keeps
+  `config.scale.zero: false` from reaching a bar's measure axis.
+
+  `config.scale.xReverse` is the other half, and it is the entry a document written right to left
+  sets once to turn every `x` scale round. It heads the chain that settles `reverse`: `if (channel
+  === 'x' && scaleConfig.xReverse !== undefined) { if (hasContinuousDomain(scaleType) && sort ===
+  'descending') { if (isSignalRef(scaleConfig.xReverse)) { return {signal:
+  `!${scaleConfig.xReverse.signal}`}; } else { return !scaleConfig.xReverse; } } return
+  scaleConfig.xReverse; }`. Only the tail of that was here — the part that reverses a continuous
+  range because Vega cannot sort a continuous domain and a `sort: "descending"` has to be honoured
+  some other way — so the theme's entry was never read and such a document came out left to right,
+  every chart of it. It reaches every type of `x` scale, a band of categories included, since
+  `scaleTypeSupportProperty` answers `true` for `reverse` whatever the scale is. The descending case
+  **inverts** it rather than losing to it, which is what keeps a descending axis descending in a
+  document read the other way, and an `xReverse` written as an expression is negated as an
+  expression rather than dropped. The flag reaches past the scale as well: `getBinSpacing` multiplies
+  the half-spacing that pulls each bucket's edge inward by `(reverse ? -1 : 1)`, so a histogram's
+  rects move with the range.
+
+  `a-scale-flag-a-theme-asked-for`, `a-scale-flag-an-x-axis-turned-round` and
+  `a-scale-flag-an-x-axis-turned-round-by-an-expression` are new, three because the themes they need
+  contradict each other. Between them: a band taking `round` and `align` and neither `clamp` nor
+  `base`, a linear measure taking `round` and `clamp`, a log scale whose stated `clamp: false`
+  outranks the theme while its `base` comes from it, an ordinal colour scale that takes none of the
+  four, a quantitative colour scale that takes both flags, a band of categories turned round by
+  `xReverse` while the `xOffset` scale beside it is not, a `y` that reverses from its own sort while
+  the `x` reverses from the theme, a continuous `x` sorted descending where the theme's `true` comes
+  out as `false`, a stated `reverse: true` that survives that, a binned rect whose spacing changes
+  sign, and the same chain again with the flag written as a parameter. Seven mutants, all killed.
+
+  6 of the configuration sweep's differences close with this; 21203 of 21251 agree.
 - **A gradient legend is as long as the theme asked for, and a style block reaches Vega whole.**
   `stripAndRedirectConfig` deletes five words from `config.legend` on the way out —
   `if (config.legend) { for (const prop of VL_ONLY_LEGEND_CONFIG) delete config.legend[prop]; }`,

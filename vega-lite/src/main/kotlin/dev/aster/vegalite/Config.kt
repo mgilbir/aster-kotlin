@@ -291,6 +291,8 @@ internal class Config(
    *   loses its own.
    * - `config.title` becomes the `group-title` style, with `color` rewritten as `fill`, since a
    *   style block names its properties the way a mark does.
+   * - Every property left holding an empty block is deleted, whatever its name, which is the last
+   *   thing upstream does and the only step here that is not about a particular key.
    *
    * Anything not recognised passes through untouched rather than being dropped: Vega has guide
    * configuration this compiler never reads, and a theme that sets it should still reach the
@@ -342,7 +344,13 @@ internal class Config(
           (value as? VegaValue.Obj)?.fields?.forEach { (k, v) ->
             // `mergeConfig` is a deep merge over the derived blocks above, so a style that names
             // one property keeps the seeded font beside it rather than replacing the block.
-            if (v !is VegaValue.Obj || v.fields.isNotEmpty()) styles[k] = merged(styles[k], v)
+            //
+            // A block that names *nothing* is still written. The closing sweep below is over the
+            // configuration's own properties and goes no deeper — `config.style` is what it asks
+            // about, not `config.style.named` — so a named style written empty survives, and
+            // `{"style": {"named": {}}}` is what upstream emits for it. Dropped here, a theme that
+            // declares its styles up front and fills some of them in later arrived one style short.
+            styles[k] = merged(styles[k], v)
           }
         // `config.mark` survives, minus the properties only Vega-Lite understands — `color` and
         // `filled` are resolved into a mark's own fill and stroke long before Vega sees anything.
@@ -351,7 +359,6 @@ internal class Config(
             ?.let { block ->
               VegaValue.Obj(block.fields.filterKeys { it !in VEGA_LITE_ONLY_MARK })
             }
-            ?.takeIf { it.fields.isNotEmpty() }
             ?.let { out["mark"] = it }
         // ```js
         // if (config.legend) {
@@ -363,15 +370,13 @@ internal class Config(
         // `gradient*Length` bounds are the clamp a gradient legend's length is worked out from, and
         // `unselectedOpacity` is what a legend bound to a selection fades its unpicked entries to.
         // Vega has never heard of any of them, so passing them through put five unknown words in
-        // the block it applies to every legend. A block left holding nothing at all is dropped
-        // rather than emitted empty — upstream's closing sweep, `if (isObject(config[prop]) &&
-        // isEmpty(config[prop])) delete config[prop]`.
+        // the block it applies to every legend. A block left holding nothing at all is dropped by
+        // the closing sweep below, as every other emptied block is.
         key == "legend" ->
           (value as? VegaValue.Obj)
             ?.let { block ->
               VegaValue.Obj(block.fields.filterKeys { it !in VEGA_LITE_ONLY_LEGEND })
             }
-            ?.takeIf { it.fields.isNotEmpty() }
             ?.let { out["legend"] = it }
         key in MARK_TYPES ->
           (value as? VegaValue.Obj)
@@ -420,8 +425,38 @@ internal class Config(
         out.remove("params")
         out["signals"] = arr((out["signals"] as? VegaValue.Arr)?.values.orEmpty() + declared)
       }
+    // ```js
+    // // Remove empty config objects.
+    // for (const prop in config) {
+    //   if (isObject(config[prop]) && isEmpty(config[prop])) { delete config[prop]; }
+    // }
+    // ```
+    //
+    // The last thing `stripAndRedirectConfig` does, and it asks about **every** property rather
+    // than about a named few. A block may arrive empty because the specification wrote it so —
+    // `{"config": {"axis": {}}}` — or because everything in it was Vega-Lite's own and has just
+    // been taken out, which is how `{"config": {"legend": {"unselectedOpacity": 0.3}}}` ends. Each
+    // block this compiler knows by name was dropping its own, so the ones it passes through
+    // untouched — an axis, a projection, a range, a header — reached Vega as empty objects nobody
+    // had asked for, in a configuration upstream does not emit at all.
+    //
+    // `isObject` is Vega's, so an **array** answers to it too, and one property of a configuration
+    // is a list: `{"params": []}` is as empty as `{"axis": {}}` and goes the same way. Upstream
+    // reaches it by another road — `if (config.params)` is true of an empty list, so the block
+    // above turns it into `config.signals = []` and this sweep deletes that instead — but the
+    // configuration it emits is the same one, and neither word is in it. A `null` does not answer:
+    // `isObject` is `_ != null && typeof _ === 'object'`, so a property stated as null survives.
+    out.values.removeAll { it.isEmptyBlock() }
     return if (out.isEmpty()) null else VegaValue.Obj(out)
   }
+
+  /** `isObject(value) && isEmpty(value)`: a block, or a list, holding nothing. */
+  private fun VegaValue.isEmptyBlock(): Boolean =
+    when (this) {
+      is VegaValue.Obj -> fields.isEmpty()
+      is VegaValue.Arr -> values.isEmpty()
+      else -> false
+    }
 
   /**
    * The `subtitle` half of `extractTitleConfig`: the seven properties that stay in `config.title`.
@@ -615,7 +650,6 @@ internal class Config(
       }
     }
 
-    /** Keys Vega has no use for: this compiler has already applied them, or they mean nothing. */
     /**
      * `VL_ONLY_MARK_SPECIFIC_CONFIG_PROPERTY_INDEX`: what each *kind* of mark loses on top.
      *
@@ -671,11 +705,33 @@ internal class Config(
         "unselectedOpacity",
       )
 
+    /**
+     * `VL_ONLY_CONFIG_PROPERTIES`, **as upstream lists it** — and it is a list, not a rule.
+     *
+     * The temptation is to read it as "whatever only Vega-Lite understands", and every key here
+     * does fit that reading, but the converse does not hold and the emitted configuration is
+     * decided by the list rather than by the idea behind it. `fieldTitle` names the formatter a
+     * guide's default title is written by — `switch (config.fieldTitle) { case 'plain': …}` in
+     * `channeldef.ts`, which is as Vega-Lite a property as there is — and it is **not** on the
+     * list, so it travels to Vega, which has no use for it. `timeFormatType` is the same, and so
+     * are `headerRow`, `headerColumn` and `headerFacet` while `header` beside them is struck out.
+     * Going the other way, the ten per-direction type-based axis blocks — `axisXBand` and its kin,
+     * which this compiler reads itself in [axisConfigFamilies] — *are* on the list, where
+     * `axisBand` is not and survives.
+     *
+     * Derived rather than copied, this dropped each of those five and passed each of those eleven
+     * through, which is what a theme reaching the renderer with the wrong words in it looks like.
+     *
+     * Two keys are struck here that upstream strikes elsewhere, and they are not on this list
+     * upstream:
+     * - `font`, which `initConfig` destructures out of the configuration before any of this runs
+     *   and turns into the derived style blocks seeded in [forVega].
+     * - the three composite marks, deleted by the loop after this one, `for (const m of
+     *   getAllCompositeMarks()) delete config[m]`.
+     */
     val VEGA_LITE_ONLY =
       setOf(
-        "scale",
         "color",
-        "font",
         "fontSize",
         "background",
         "padding",
@@ -686,18 +742,27 @@ internal class Config(
         "normalizedNumberFormat",
         "normalizedNumberFormatType",
         "timeFormat",
-        "timeFormatType",
         "countTitle",
-        "fieldTitle",
         "header",
-        "headerRow",
-        "headerColumn",
-        "headerFacet",
-        "selection",
         "axisQuantitative",
         "axisTemporal",
         "axisDiscrete",
         "axisPoint",
+        "axisXBand",
+        "axisXPoint",
+        "axisXDiscrete",
+        "axisXQuantitative",
+        "axisXTemporal",
+        "axisYBand",
+        "axisYPoint",
+        "axisYDiscrete",
+        "axisYQuantitative",
+        "axisYTemporal",
+        "scale",
+        "selection",
+        "overlay",
+        // Struck by `initConfig` and by the composite-mark loop rather than by the list above.
+        "font",
         "boxplot",
         "errorbar",
         "errorband",

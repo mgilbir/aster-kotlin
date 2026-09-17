@@ -6,7 +6,7 @@ Generated from the corpus by `FixtureIndexTest`, which fails when this file has 
 ./gradlew :vega-runtime:jvmTest -PupdateGoldens=true --rerun-tasks
 ```
 
-216 Vega differential fixtures and 304 Vega-Lite fixtures.
+216 Vega differential fixtures and 316 Vega-Lite fixtures.
 
 Every column is read off disk. A Vega fixture's mark count and mark types come from its
 **upstream** reference, so they are upstream's answer rather than this port's opinion of it.
@@ -238,12 +238,20 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | --- | --- | --- | --- |
 | `a-bandwidth-needs-a-band-scale` | vconcat | bar | — |
 | `a-bucket-with-two-columns-of-its-own` | vconcat | area, line, point | — |
+| `a-chart-out-of-the-accessibility-tree` | single view | bar | — |
+| `a-config-that-reaches-the-output` | single view | bar | — |
 | `a-counting-aggregate-is-a-number` | vconcat | bar | — |
+| `a-heading-a-theme-asked-for` | single view | bar | — |
+| `a-heading-turned-the-other-way` | single view | bar | — |
 | `a-legend-a-theme-asked-for` | vconcat | point | — |
 | `a-mark-property-a-theme-asked-for` | vconcat | bar, line, point, text | — |
 | `a-normalized-stack-is-a-percentage` | vconcat | bar, line | — |
 | `a-normalized-stack-with-no-percentage` | single view | bar | — |
 | `a-position-a-theme-asked-for` | vconcat | arc, text | — |
+| `a-rounded-end-overwrites-the-corner-it-covers` | hconcat | bar | — |
+| `a-scale-flag-a-theme-asked-for` | hconcat | bar, point | — |
+| `a-scale-flag-an-x-axis-turned-round-by-an-expression` | hconcat | bar, point | — |
+| `a-scale-flag-an-x-axis-turned-round` | hconcat | bar, point | — |
 | `a-scale-padding-a-theme-asked-for` | vconcat | bar, line, point | — |
 | `a-scale-padding-an-offset-scale-asked-for` | vconcat | bar, point | — |
 | `a-size-a-style-asked-for` | vconcat | bar, rect | — |
@@ -251,9 +259,13 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `a-size-stated-as-zero` | vconcat | bar, tick | — |
 | `a-stack-groups-by-what-it-was-given` | vconcat | bar | — |
 | `a-style-block-a-theme-asked-for` | vconcat | bar, line | — |
+| `a-themed-rounded-end-rounds-the-whole-stack` | hconcat | bar | — |
+| `a-wrapped-grid-heading-anchored` | facet | bar | — |
 | `aggregate-bar` | single view | bar | — |
 | `aggregate-ops` | layer | point, rule, text | — |
 | `aligned-in-its-own-band` | vconcat | bar, tick | — |
+| `an-axis-a-theme-asked-for-by-scale` | vconcat | bar | — |
+| `an-axis-a-theme-asked-for` | vconcat | bar | — |
 | `an-invalid-a-theme-asked-for` | vconcat | line, point | — |
 | `an-orientation-a-mark-cannot-state` | vconcat | area, bar, trail | — |
 | `animated-frames` | single view | point | — |
