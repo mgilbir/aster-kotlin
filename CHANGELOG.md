@@ -231,6 +231,51 @@ section here does not get released.
 
 ### Fixed
 
+- **A scale flag a theme asked for: a clamp, a rounding, an axis turned round.**
+  `parseUnitScaleProperty` walks every scale property by name and, for each one the specification
+  did not state, asks `const value = util.hasProperty(scaleRules, property) ? scaleRules[property]
+  ({…}) : config.scale[property];` — eight properties work themselves out and every other one is
+  whatever the theme named. That `else` arm was missing entirely, so `config.scale.clamp` and
+  `config.scale.round`, the two flags `ScaleConfig` declares and no rule claims, did nothing at all:
+  a theme could not clamp its continuous scales, and could not ask a whole document for
+  pixel-aligned positions. Neither has a default, which is why the omission stayed invisible until
+  somebody wrote one. It is written as the general rule rather than as two reads, because that is
+  what it is — the arm takes whatever the theme names that the rules leave alone, so
+  `config.scale.base` reaches a log scale and `config.scale.align` a band through it — and which
+  scales each value reaches is the ordinary `scaleTypeSupportProperty` gate applied to a themed
+  value exactly as to a stated one: a `clamp` needs a continuous scale to be the ends of, a `round`
+  also suits a band or a point, and an ordinal colour scale takes neither. A property that *has* a
+  rule never consults the theme here even where its rule answers nothing, which is what keeps
+  `config.scale.zero: false` from reaching a bar's measure axis.
+
+  `config.scale.xReverse` is the other half, and it is the entry a document written right to left
+  sets once to turn every `x` scale round. It heads the chain that settles `reverse`: `if (channel
+  === 'x' && scaleConfig.xReverse !== undefined) { if (hasContinuousDomain(scaleType) && sort ===
+  'descending') { if (isSignalRef(scaleConfig.xReverse)) { return {signal:
+  `!${scaleConfig.xReverse.signal}`}; } else { return !scaleConfig.xReverse; } } return
+  scaleConfig.xReverse; }`. Only the tail of that was here — the part that reverses a continuous
+  range because Vega cannot sort a continuous domain and a `sort: "descending"` has to be honoured
+  some other way — so the theme's entry was never read and such a document came out left to right,
+  every chart of it. It reaches every type of `x` scale, a band of categories included, since
+  `scaleTypeSupportProperty` answers `true` for `reverse` whatever the scale is. The descending case
+  **inverts** it rather than losing to it, which is what keeps a descending axis descending in a
+  document read the other way, and an `xReverse` written as an expression is negated as an
+  expression rather than dropped. The flag reaches past the scale as well: `getBinSpacing` multiplies
+  the half-spacing that pulls each bucket's edge inward by `(reverse ? -1 : 1)`, so a histogram's
+  rects move with the range.
+
+  `a-scale-flag-a-theme-asked-for`, `a-scale-flag-an-x-axis-turned-round` and
+  `a-scale-flag-an-x-axis-turned-round-by-an-expression` are new, three because the themes they need
+  contradict each other. Between them: a band taking `round` and `align` and neither `clamp` nor
+  `base`, a linear measure taking `round` and `clamp`, a log scale whose stated `clamp: false`
+  outranks the theme while its `base` comes from it, an ordinal colour scale that takes none of the
+  four, a quantitative colour scale that takes both flags, a band of categories turned round by
+  `xReverse` while the `xOffset` scale beside it is not, a `y` that reverses from its own sort while
+  the `x` reverses from the theme, a continuous `x` sorted descending where the theme's `true` comes
+  out as `false`, a stated `reverse: true` that survives that, a binned rect whose spacing changes
+  sign, and the same chain again with the flag written as a parameter. Seven mutants, all killed.
+
+  6 of the configuration sweep's differences close with this; 21203 of 21251 agree.
 - **A gradient legend is as long as the theme asked for, and a style block reaches Vega whole.**
   `stripAndRedirectConfig` deletes five words from `config.legend` on the way out —
   `if (config.legend) { for (const prop of VL_ONLY_LEGEND_CONFIG) delete config.legend[prop]; }`,
