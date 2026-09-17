@@ -75,6 +75,11 @@ internal class Config(
 
   val countTitle: String = user.string("countTitle") ?: "Count of Records"
 
+  /**
+   * `config.fieldTitle`: which of the three title formatters a guide's default caption comes from.
+   */
+  val fieldTitle: String? = user.string("fieldTitle")
+
   val normalizedNumberFormat: String = user.string("normalizedNumberFormat") ?: ".0%"
 
   val numberFormat: String? = user.string("numberFormat")
