@@ -1815,6 +1815,24 @@ internal object Guides {
       // it too.
       def.legend?.fields?.forEach { (key, value) ->
         if (key !in LEGEND_PROPERTIES) return@forEach
+        // ```js
+        // for (const property of LEGEND_COMPONENT_PROPERTIES) {
+        //   if (
+        //     (legendType === 'gradient' && property.startsWith('symbol')) ||
+        //     (legendType === 'symbol' && property.startsWith('gradient'))
+        //   ) {
+        //     continue;
+        //   }
+        // ```
+        //
+        // **A legend keeps only the words its own kind understands**, and the test is the property
+        // name's *prefix*. A ramp has no symbols to colour and a row of swatches has no ramp, so a
+        // `symbolFillColor` on a gradient legend and a `gradientStrokeColor` on a symbol one are
+        // dropped where they are read rather than ignored where they are drawn. Written through,
+        // Vega was handed a legend carrying the settings of the kind it is not — 444 of the guide
+        // sweep's cases, which is every colour name the schema declares times three properties.
+        if (gradient && key.startsWith("symbol")) return@forEach
+        if (!gradient && key.startsWith("gradient")) return@forEach
         if (key == "values" && value is VegaValue.Arr) put(key, valueArray(def, value))
         else put(key, asSignal(value))
       }
