@@ -1638,7 +1638,13 @@ internal object Marks {
             is VegaValue.Str -> title.value
             is VegaValue.Arr ->
               title.values.mapNotNull { (it as? VegaValue.Str)?.value }.joinToString(", ")
-            else -> continue
+            // **A field with no title is still announced, under an empty name.** The template is
+            // `"${title}: " + …` and an undefined title interpolates to nothing, so upstream writes
+            // `": " + (format(datum["__count"], ""))` and the reader hears the number with no
+            // label.
+            // Reachable only since `config.fieldTitle: "plain"` began to be honoured: `plain` is
+            // `fieldDef.field`, and a count has no field, where every other formatter names one.
+            else -> ""
           }
         if (out.containsKey(key)) continue
         // A **normalized** stack is announced as the share it takes, not the number behind it: the

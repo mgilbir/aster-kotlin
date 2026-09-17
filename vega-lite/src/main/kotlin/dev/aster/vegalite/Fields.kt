@@ -140,7 +140,62 @@ internal object Fields {
    * `mean_b`, and a count reads `Count of Records` — the one title that comes from configuration
    * rather than from the field, because there is no field to name.
    */
+  /**
+   * `functionalTitleFormatter`: the derivation spelled as a call — `MEAN(v)`, `MONTH(t)`, `BIN(v)`.
+   *
+   * ```js
+   * const fn = aggregate || timeUnitParams?.unit || (timeUnitParams?.maxbins && 'timeunit')
+   *            || (isBinning(bin) && 'bin');
+   * return fn ? `${fn.toUpperCase()}(${field})` : field;
+   * ```
+   *
+   * The two extremes come first and keep their words, spelled as the call rather than as prose: `v
+   * for argmax(c)` where the verbal formatter writes `v for max c`.
+   *
+   * A **count** has no field, and upstream does not guard it: `COUNT(undefined)` is what it writes,
+   * because `field` is `undefined` and the template stringifies it. That is reproduced rather than
+   * tidied — a title nobody would choose, but the one a chart asking for `functional` gets.
+   */
+  private fun functionalTitle(def: ChannelDef): String? {
+    if (def.argumentField != null) {
+      val extreme = if (def.aggregate == "argmax") "argmax" else "argmin"
+      return "${def.field} for $extreme(${def.argumentField})"
+    }
+    // A column that arrived already bucketed has no unit to announce, the same exclusion the verbal
+    // formatter makes: `timeUnit && !isBinnedTimeUnit(timeUnit)`.
+    val unit =
+      def.timeUnit?.takeIf { !isBinnedTimeUnit(it) }?.let { timeUnitParts(it).firstOrNull() }
+    val fn =
+      def.aggregate
+        ?: unit
+        ?: "timeunit".takeIf { def.timeUnit != null && unit == null }
+        ?: "bin".takeIf { def.bin is Binning.Bin }
+    // `${field}` where the field is **undefined** is the string "undefined", JavaScript's own
+    // stringification, and Kotlin's null would be "null". A count has no field and nothing here
+    // guards it, so `COUNT(undefined)` is the caption — upstream's, reproduced rather than tidied.
+    return if (fn != null) "${fn.uppercase()}(${def.field ?: "undefined"})" else def.field
+  }
+
   fun defaultTitle(def: ChannelDef, config: Config): String? {
+    // ```js
+    // export const defaultTitleFormatter = (fieldDef, config) => {
+    //   switch (config.fieldTitle) {
+    //     case 'plain': return fieldDef.field;
+    //     case 'functional': return functionalTitleFormatter(fieldDef);
+    //     default: return verbalTitleFormatter(fieldDef, config);
+    //   }
+    // };
+    // ```
+    //
+    // **Three formatters, and only the last was implemented here.** A theme asking for `plain` or
+    // `functional` got the verbal one regardless, so `Mean of v` stood where the chart had asked
+    // for `v` or for `MEAN(v)`. The key itself reaches the emitted configuration either way — Vega
+    // has no use for it, and upstream passes it through all the same — which is why this was
+    // invisible to a sweep that only checks what is emitted.
+    when (config.fieldTitle) {
+      "plain" -> return def.field
+      "functional" -> return functionalTitle(def)
+    }
     if (def.aggregate == "count") return config.countTitle
     if (def.bin is Binning.Bin) return "${def.field} (binned)"
     // A column that arrived already bucketed is titled by its own name: nothing here bucketed it,

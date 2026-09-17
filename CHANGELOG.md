@@ -231,6 +231,26 @@ section here does not get released.
 
 ### Fixed
 
+- **A guide's default caption comes from one of three formatters, and `config.fieldTitle` picks
+  which.** `defaultTitleFormatter` switches on it — `plain` is the bare field, `functional` spells
+  the derivation as a call, and everything else is the verbal one. Only the verbal one was
+  implemented here, so a theme asking for either of the others was answered with prose it had not
+  asked for: `Mean of v` where the chart wanted `v` or `MEAN(v)`.
+
+  The key itself reaches the emitted configuration either way — Vega has no use for it and upstream
+  passes it through regardless — which is why a sweep over what is *emitted* could not see this, and
+  why it was recorded as debt when the key's pass-through was fixed.
+
+  Two edges are upstream's own and are reproduced rather than tidied. A **count** has no field, so
+  `functional` writes the literal `COUNT(undefined)` — JavaScript's stringification of an absent
+  value, where Kotlin's would be `null`. And under `plain` that same count has no title at all, so
+  its field is announced in the spoken description under an **empty name**: `": " + format(…)`,
+  the number read out with no label. That branch was unreachable until `plain` began to be honoured.
+
+  `a-field-title-spelled-plain` and `a-field-title-spelled-functional` are new, five panels each —
+  a mean, a bucketed month, a bin, an argmax and a count. Seven mutants, all killed.
+
+
 - **A legend's swatches are painted the way the marks they stand for are painted, and a style block
   is part of that.** `symbols` in `legend/encode.ts` opens with
   `applyMarkConfig({}, model, FILL_STROKE_CONFIG)`, which asks `getMarkConfig` for each of the nine
