@@ -1024,6 +1024,27 @@ internal class LegendBuilder(
     scale: VegaScale,
     scaleName: String,
   ): List<SceneNode>? {
+    // **A deliberate divergence, and the only one in this file.** Upstream draws this legend.
+    // `scale_gradient` does not ask what kind of scale it has — it samples it and stores whatever
+    // comes back as the stop's colour:
+    //
+    // ```js
+    // stops.forEach(_ => gradient.stop(fraction(_), scale(_)));
+    // ```
+    //
+    // so a `size` scale ranged `[4, 361]` yields
+    // `{"gradient": "linear", "stops": [{"color": 4, "offset": 0}, {"color": 27.8, …}]}` — a
+    // gradient whose stops are **numbers**. Vega emits it and no renderer can paint it; it is a
+    // scale's outputs written into a field that means a colour.
+    //
+    // Matching that would mean widening [GradientStop.color] from `SceneColor` to something that
+    // can hold a number, through every renderer that consumes it — the Android canvas, the SVG
+    // writer, and the Swift surface, where it is a published type and moves the foreign API
+    // snapshot. The return is a legend that still cannot be drawn. So this reports instead, which
+    // tells the reader what upstream leaves them to discover from a blank space.
+    //
+    // Reachable from Vega-Lite by `{"legend": {"type": "gradient"}}` on a size or shape channel,
+    // which is why it is a diagnostic rather than a silent skip.
     if (scale !is SequentialColorScale) {
       diagnostics.error(
         DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
