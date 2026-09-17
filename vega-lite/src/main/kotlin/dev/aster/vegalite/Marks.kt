@@ -807,9 +807,25 @@ internal object Marks {
     endCorners?.let { (corners, radius) ->
       corners.forEach { corner -> put(corner, markProperty(radius)) }
     }
+    // ```js
+    // const specifiedCursor = getMarkPropOrConfig('cursor', markDef, config);
+    // if (specifiedCursor === undefined) { markDef.cursor = cursor(markDef, encoding, config); }
+    // …
+    // function cursor(markDef, encoding, config) {
+    //   if (encoding.href || markDef.href || getMarkPropOrConfig('href', markDef, config)) {
+    //     return 'pointer';
+    //   }
+    //   return markDef.cursor;
+    // }
+    // ```
+    //
     // A mark that links somewhere shows the pointer, there being nothing else about it that looks
-    // clickable — `baseEncodeEntry`'s `cursor` rule, which is about the *encoding* and not a style.
-    if (view.spec.encoding["href"] != null && view.markDef.raw.fields["cursor"] == null) {
+    // clickable. **Three places say it links**, and this read only the first: the `href` channel,
+    // the mark's own `href`, and an `href` anywhere in the configuration chain — a theme that gives
+    // every bar the same link. Both guards run through the chain too: a `cursor` the theme settles
+    // suppresses the pointer exactly as one on the mark does.
+    val linked = view.spec.encoding["href"] != null || markPropOrConfig(view, "href") != null
+    if (linked && markPropOrConfig(view, "cursor") == null) {
       put("cursor", obj { put("value", "pointer") })
     }
     if (view.spec.mark == "area" && view.markDef.orient != null) {

@@ -463,7 +463,37 @@ function branchesOf(fragment, depth = 0) {
 }
 
 /** Collects the candidate values a schema fragment declares, or null where there are none. */
-function declaredValues(fragment) {
+/**
+ * The value tried for a **free string**, by property name.
+ *
+ * A string the schema does not constrain still has a shape the compiler expects: `format` is a d3
+ * specifier, `symbolType` is one of Vega's shape names, `lineBreak` is what a caption is split on.
+ * Given prose instead, most of these compile and compare fine — and the one or two that do not
+ * would be reported as a difference in a chart nobody could draw, which is a worse use of a reader's
+ * time than a value chosen to mean something.
+ */
+const STRINGS = {
+  format: '.2f',
+  formatType: 'number',
+  symbolType: 'cross',
+  lineBreak: '/',
+  ellipsis: '…',
+  labelExpr: "datum.label + '!'",
+  href: 'https://example.invalid/',
+  url: 'https://example.invalid/image.png',
+  labelFont: 'Courier',
+  titleFont: 'Courier',
+  fontStyle: 'italic',
+  labelFontStyle: 'italic',
+  titleFontStyle: 'italic',
+  ariaRole: 'graphics-symbol',
+  ariaRoleDescription: 'a thing',
+  text: 'Aa',
+  title: 'Aa',
+  description: 'Aa',
+};
+
+function declaredValues(fragment, name) {
   const branches = branchesOf(fragment);
   for (const branch of branches) {
     if (branch.enum) {
@@ -482,6 +512,20 @@ function declaredValues(fragment) {
   for (const branch of branches) {
     if (branch.type === 'array' && (!branch.items || branch.items.type === 'number')) {
       return { kind: 'array', values: [[4, 2]] };
+    }
+  }
+  // A **free string**, which the schema constrains no further and which was therefore skipped
+  // wholesale: 77 properties across the families, the largest omission the manifest records and a
+  // limitation of this generator rather than a decision about what is worth trying.
+  //
+  // One value each, and it has to be a value the property can actually take — a format specifier
+  // where a format is wanted, a symbol name where a shape is. A nonsense string would still compile
+  // and still be compared, but it would compare a chart nobody could draw, and a difference found
+  // that way costs more to read than it is worth. Where nothing meaningful distinguishes one string
+  // from another the value is plain prose, which is exactly what those properties carry.
+  for (const branch of branches) {
+    if (branch.type === 'string') {
+      return { kind: 'string', values: [STRINGS[name] ?? 'Aa'] };
     }
   }
   return null;
@@ -519,7 +563,7 @@ for (const { name: family, properties, baseSpec, apply, skip } of FAMILIES) {
       skipped.push({ family, property, reason });
       continue;
     }
-    const candidates = declaredValues(fragment);
+    const candidates = declaredValues(fragment, property);
     if (!candidates) {
       skipped.push({
         family,
