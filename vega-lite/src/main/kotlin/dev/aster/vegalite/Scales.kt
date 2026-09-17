@@ -710,29 +710,56 @@ internal object Scales {
     // `parseScheme`: a named colour scheme is a **range**, not a property beside one. Written as a
     // property it sat next to the `"category"` range this would otherwise default to, and Vega read
     // the range — so a chart that asked for `category20` got the ten-colour scheme.
-    def.scale?.fields?.get("scheme")?.let { scheme ->
-      return when (scheme) {
-        is VegaValue.Obj ->
-          obj {
-            put("scheme", scheme.fields["name"])
-            scheme.fields.forEach { (key, value) -> if (key != "name") put(key, value) }
-          }
-        else -> obj { put("scheme", scheme) }
+    // ```js
+    // case 'interpolate': case 'scheme': case 'domainMid':
+    //   if (!isColorChannel(channel)) {
+    //     return log.message.cannotUseScalePropertyWithNonColor(propName);
+    //   }
+    // ```
+    //
+    // **A scheme is a colour channel's word.** `channelScalePropertyIncompatability` refuses it
+    // anywhere else and `parseRangeForChannel` then falls through to the range the channel would
+    // have taken — so a position given `scheme: "category10"` is still `[0, width]`, and a chart
+    // that wrote one there is warned rather than obeyed. Written through, this handed Vega a
+    // horizontal axis whose range was a palette, and the marks were placed at colours.
+    if (channel in COLOR_CHANNELS)
+      def.scale?.fields?.get("scheme")?.let { scheme ->
+        return when (scheme) {
+          is VegaValue.Obj ->
+            obj {
+              put("scheme", scheme.fields["name"])
+              scheme.fields.forEach { (key, value) -> if (key != "name") put(key, value) }
+            }
+          else -> obj { put("scheme", scheme) }
+        }
       }
-    }
     val config = view.config
     // `rangeMin`/`rangeMax` **replace the ends** of whatever range the channel would take, rather
     // than being properties of their own: they are how a radial chart says "start the rings at
     // twenty" without writing out the expression for the other end.
     val ends = listOf(def.scale?.fields?.get("rangeMin"), def.scale?.fields?.get("rangeMax"))
     if (ends.any { it != null }) {
+      // ```js
+      // if (
+      //   (rangeMin !== undefined || rangeMax !== undefined) &&
+      //   scaleTypeSupportProperty(scaleType, 'rangeMin') &&
+      //   isArray(d) && d.length === 2
+      // ) {
+      //   return makeExplicit([rangeMin ?? d[0], rangeMax ?? d[1]]);
+      // }
+      // return makeImplicit(d);
+      // ```
+      //
+      // **Only where the range they are replacing an end of is a pair of numbers.** A colour
+      // scale's default range is the word `"ramp"`, a scheme's name rather than two values, and
+      // there is no end of it to replace — so upstream leaves the ramp alone and the two properties
+      // do nothing. This filled the missing end with a zero instead, turning `"ramp"` into
+      // `[-4, 0]`: a colour scale ranging between two numbers, which paints nothing.
       val derived = defaultRange(view, channel, def, type) as? VegaValue.Arr
-      return arr(
-        listOf(
-          ends[0] ?: derived?.values?.firstOrNull() ?: num(0),
-          ends[1] ?: derived?.values?.lastOrNull() ?: num(0),
-        )
-      )
+      if (derived != null && derived.values.size == 2) {
+        return arr(listOf(ends[0] ?: derived.values.first(), ends[1] ?: derived.values.last()))
+      }
+      return derived ?: defaultRange(view, channel, def, type)
     }
     return defaultRange(view, channel, def, type)
   }
