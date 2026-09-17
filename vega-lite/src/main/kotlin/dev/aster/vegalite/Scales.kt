@@ -1035,6 +1035,26 @@ internal object Scales {
       "paddingOuter",
     )
 
+  /**
+   * `scaleRules`: the properties a scale works out for itself, which is the list by exception.
+   *
+   * Upstream's fallback is `config.scale[property]` for everything *not* keyed here, so what this
+   * set is for is saying which properties are not the theme's to settle. A rule that answers
+   * nothing still answers — `padding` declines on an ordinal scale, and no `config.scale.padding`
+   * is consulted behind it.
+   */
+  private val RULED_PROPERTIES =
+    setOf(
+      "bins",
+      "interpolate",
+      "nice",
+      "padding",
+      "paddingInner",
+      "paddingOuter",
+      "reverse",
+      "zero",
+    )
+
   private fun supportsProperty(type: String, property: String): Boolean {
     val continuous = type in setOf("linear", "log", "pow", "sqrt", "symlog", "time", "utc")
     return when (property) {
@@ -1245,13 +1265,71 @@ internal object Scales {
       }
     }
 
-    // A **continuous** domain cannot be sorted — Vega has no such thing — so a `sort: "descending"`
-    // on one reverses the *range* instead. A discrete domain sorts itself and needs none of this.
-    if (hasContinuousDomain(type) && (def.sort as? VegaValue.Str)?.value == "descending") {
-      set("reverse", bool(true))
-    }
+    // `reverse()`, whole. A **continuous** domain cannot be sorted — Vega has no such thing — so a
+    // `sort: "descending"` on one reverses the *range* instead, and a discrete domain sorts itself
+    // and needs none of that. But the chain does not start there:
+    //
+    //     if (channel === 'x' && scaleConfig.xReverse !== undefined) {
+    //       if (hasContinuousDomain(scaleType) && sort === 'descending') {
+    //         if (isSignalRef(scaleConfig.xReverse)) {
+    //           return {signal: `!${scaleConfig.xReverse.signal}`};
+    //         } else {
+    //           return !scaleConfig.xReverse;
+    //         }
+    //       }
+    //       return scaleConfig.xReverse;
+    //     }
+    //
+    // `config.scale.xReverse` is how a document written right to left turns every `x` scale round
+    // at once, and it was not read at all, so such a theme drew every chart left to right. It has
+    // no default, which is why the omission was invisible until somebody set one. Note that it
+    // reaches *every* type of `x` scale — `scaleTypeSupportProperty` answers `true` for `reverse`
+    // whatever the scale is — so a band of categories turns round with the rest.
+    //
+    // The descending case **inverts** it rather than winning over it, and that is the point: the
+    // sort already reversed the range once, so a chart whose axis runs the other way to begin with
+    // has to reverse it back. `xReverse: true` with `sort: "descending"` is `reverse: false`, not
+    // `true`, and a `reverse` written as an expression is negated as an expression.
+    val descendingContinuous =
+      hasContinuousDomain(type) && (def.sort as? VegaValue.Str)?.value == "descending"
+    val xReverse = if (channel == "x") config.raw.obj("scale")?.fields?.get("xReverse") else null
+    val reverse: VegaValue? =
+      when {
+        xReverse == null -> if (descendingContinuous) bool(true) else null
+        !descendingContinuous -> xReverse
+        xReverse is VegaValue.Bool -> bool(!xReverse.value)
+        // An expression reached here as `{"signal": …}` already: `initConfig` turns every
+        // `{"expr": …}` in `config.scale` into one before a scale ever asks.
+        else -> xReverse.string("signal")?.let { signalRef("!$it") } ?: xReverse
+      }
+    reverse?.let { set("reverse", it) }
 
     zero(view, channel, def, type, specifiedDomain)?.let { set("zero", bool(it)) }
+
+    // Every property the rules above do **not** settle is read straight from the theme, by name:
+    //
+    //     const value = util.hasProperty(scaleRules, property)
+    //       ? scaleRules[property]({…})
+    //       : config.scale[property];
+    //     if (value !== undefined) {
+    //       localScaleCmpt.set(property, value as any, false);
+    //     }
+    //
+    // That `else` arm was missing entirely, so `config.scale.clamp` and `config.scale.round` — the
+    // two flags `ScaleConfig` declares and no rule claims — did nothing: a theme could not clamp
+    // its continuous scales, and could not ask for pixel-aligned positions across a whole
+    // document. The gate that decides which scales each reaches is the ordinary one, already in
+    // `set`: a `clamp` needs a continuous scale to be the ends of, while a `round` also suits a
+    // band or a point, and neither goes near an ordinal colour scale.
+    //
+    // Written as the general rule rather than as two reads, because that is what it is — the arm
+    // takes *whatever* the theme names that the rules leave alone, so `config.scale.base` reaches
+    // a log scale and `config.scale.align` a band. A property with a rule never consults the theme
+    // here, even where the rule answers nothing: a `nice` the rule declines is left unwritten.
+    NON_TYPE_DOMAIN_RANGE_PROPERTIES.forEach { key ->
+      if (key in RULED_PROPERTIES) return@forEach
+      config.raw.obj("scale")?.fields?.get(key)?.let { set(key, it) }
+    }
 
     // The rest of what the specification stated on the scale, **asked for by name**:
     //

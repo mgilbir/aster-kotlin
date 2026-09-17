@@ -1,0 +1,524 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "The same `config.scale.xReverse` again, written as an expression rather than as a flag, because the branch that inverts it has to invert an expression as an expression: `if (hasContinuousDomain(scaleType) && sort === 'descending') { if (isSignalRef(scaleConfig.xReverse)) { return {signal: `!${scaleConfig.xReverse.signal}`}; } else { return !scaleConfig.xReverse; } }`. A separate chart from the one that states the flag, since a document has one theme and this one names a parameter as its reading direction — which is the point of writing it this way, a control the reader can flip rather than a decision the author made. It arrives here already spelled Vega's way: `initConfig` runs `replaceExprRef` over `config.scale` as it reads it, so `{\"expr\": \"rtl\"}` is `{\"signal\": \"rtl\"}` long before a scale asks for it, and the negation is a string operation on the signal it carries. The first chart takes the parameter as it stands and its `x` reverses with it. The second sorts its `x` descending, so the sort has already turned that range round and the theme's answer is negated — `!rtl`, not `rtl`, which is a different chart the moment the parameter is false. The third is a band over categories, where the expression reaches a scale with no continuous domain at all and passes through unnegated, since the negation is about undoing a sort and a band's sort is done in its domain. The `y` scales are the rows that must not change: the chain is keyed on the channel named `x`, so nothing about a vertical axis depends on how the document is read.",
+  "background": "white",
+  "padding": 5,
+  "height": 110,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "c": "alpha",
+          "v": 28,
+          "w": 3
+        },
+        {
+          "c": "beta",
+          "v": 55,
+          "w": 7
+        },
+        {
+          "c": "gamma",
+          "v": 43,
+          "w": 5
+        },
+        {
+          "c": "delta",
+          "v": 91,
+          "w": 9
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"w\"]) && isFinite(+datum[\"w\"]) && isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"w\"]) && isFinite(+datum[\"w\"]) && isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_3",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "c"
+          ],
+          "field": "v",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "childWidth",
+      "value": 140
+    },
+    {
+      "name": "rtl",
+      "value": true
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "bounds": "full",
+    "align": "each"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "concat_0_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_0_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "from": {
+            "data": "data_1"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"w: \" + (format(datum[\"w\"], \"\")) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_0_x",
+                "field": "w"
+              },
+              "y": {
+                "scale": "concat_0_y",
+                "field": "v"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_0_x",
+          "orient": "bottom",
+          "gridScale": "concat_0_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "gridScale": "concat_0_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "w",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "grid": false,
+          "title": "v",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_1_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_1_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "from": {
+            "data": "data_2"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"w: \" + (format(datum[\"w\"], \"\")) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_1_x",
+                "field": "w"
+              },
+              "y": {
+                "scale": "concat_1_y",
+                "field": "v"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "gridScale": "concat_1_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "gridScale": "concat_1_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "w",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "grid": false,
+          "title": "v",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_2_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_2_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_3"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_2_x",
+                "field": "c"
+              },
+              "width": {
+                "signal": "max(0.25, bandwidth('concat_2_x'))"
+              },
+              "y": {
+                "scale": "concat_2_y",
+                "field": "v_end"
+              },
+              "y2": {
+                "scale": "concat_2_y",
+                "field": "v_start"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_2_y",
+          "orient": "left",
+          "gridScale": "concat_2_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_2_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "c",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        },
+        {
+          "scale": "concat_2_y",
+          "orient": "left",
+          "grid": false,
+          "title": "v",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "concat_0_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "field": "w"
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "reverse": {
+        "signal": "rtl"
+      },
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_0_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "field": "v"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_1_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "w"
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "reverse": {
+        "signal": "!rtl"
+      },
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_1_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "v"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_2_x",
+      "type": "band",
+      "domain": {
+        "data": "data_3",
+        "field": "c",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "reverse": {
+        "signal": "rtl"
+      },
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "concat_2_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_3",
+        "fields": [
+          "v_start",
+          "v_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ]
+}

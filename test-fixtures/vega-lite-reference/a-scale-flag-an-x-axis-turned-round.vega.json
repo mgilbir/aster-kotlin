@@ -1,0 +1,892 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "`config.scale.xReverse` turns every `x` scale in a document round at once, which is how a chart is drawn for a right-to-left reader, and it heads the chain that settles `reverse`: `if (channel === 'x' && scaleConfig.xReverse !== undefined) { if (hasContinuousDomain(scaleType) && sort === 'descending') { if (isSignalRef(scaleConfig.xReverse)) { return {signal: `!${scaleConfig.xReverse.signal}`}; } else { return !scaleConfig.xReverse; } } return scaleConfig.xReverse; } if (hasContinuousDomain(scaleType) && sort === 'descending') { return true; } return undefined;`. Only the second half of that was here — the half that reverses a continuous range because Vega cannot sort a continuous domain and a `sort: \"descending\"` has to be honoured some other way — so the theme's entry was never read and a document asking for right-to-left came out left-to-right, every chart of it. The entry has no default, which is why nothing noticed. The first chart is a bar over categories: its `x` is a band, and a band turns round with the rest because `scaleTypeSupportProperty` answers `true` for `reverse` whatever the scale type is, so this is not a rule about continuous scales even though the second half of it is. Its `xOffset` scale is the row that must not change: the chain asks for the channel named `x` exactly, and an offset scale is a different channel, so the bars within each group keep their own order while the groups themselves are laid out backwards. The second chart sorts its `y` descending and leaves its `x` alone, which shows the two halves apart — the `y` takes its `reverse` from the sort, as it always did, and the `x` takes its `reverse` from the theme. The third is the interesting one: its `x` is continuous and sorted descending, and the sort has already turned that range round once, so the theme's `true` comes out as `reverse: false` rather than as `true`. Inverting rather than overriding is what keeps a descending axis descending in a document read the other way. The fourth sorts descending in the same way but states `reverse: true` on the scale itself, and a stated value settles a property before any rule is consulted, so it stays `true` where the rule would have said `false`. The fifth bins its `x`, and shows how far the flag reaches past the scale: `getBinSpacing` multiplies the half-spacing that pulls each bucket's edge inward by `(reverse ? -1 : 1)`, so the offsets on the rect change sign along with the range.",
+  "background": "white",
+  "padding": 5,
+  "height": 110,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "c": "alpha",
+          "g": "one",
+          "v": 28,
+          "w": 3
+        },
+        {
+          "c": "beta",
+          "g": "two",
+          "v": 55,
+          "w": 7
+        },
+        {
+          "c": "gamma",
+          "g": "one",
+          "v": 43,
+          "w": 5
+        },
+        {
+          "c": "delta",
+          "g": "two",
+          "v": 91,
+          "w": 9
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "c",
+            "g"
+          ],
+          "field": "v",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"w\"]) && isFinite(+datum[\"w\"]) && isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_3",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"w\"]) && isFinite(+datum[\"w\"]) && isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_4",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"w\"]) && isFinite(+datum[\"w\"]) && isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_5",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "extent",
+          "field": "w",
+          "signal": "concat_4_bin_maxbins_10_w_extent"
+        },
+        {
+          "type": "bin",
+          "field": "w",
+          "as": [
+            "bin_maxbins_10_w",
+            "bin_maxbins_10_w_end"
+          ],
+          "signal": "concat_4_bin_maxbins_10_w_bins",
+          "extent": {
+            "signal": "concat_4_bin_maxbins_10_w_extent"
+          },
+          "maxbins": 10
+        },
+        {
+          "type": "aggregate",
+          "groupby": [
+            "bin_maxbins_10_w",
+            "bin_maxbins_10_w_end"
+          ],
+          "ops": [
+            "count"
+          ],
+          "fields": [
+            null
+          ],
+          "as": [
+            "__count"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"bin_maxbins_10_w\"]) && isFinite(+datum[\"bin_maxbins_10_w\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "childWidth",
+      "value": 140
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "bounds": "full",
+    "align": "each"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "concat_0_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_0_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_1"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "scale": "color",
+                "field": "g"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; v: \" + (format(datum[\"v\"], \"\")) + \"; g: \" + (isValid(datum[\"g\"]) ? isArray(datum[\"g\"]) ? join(datum[\"g\"], ' ') : datum[\"g\"] : \"\"+datum[\"g\"])"
+              },
+              "x": {
+                "scale": "concat_0_x",
+                "field": "c",
+                "offset": {
+                  "scale": "xOffset",
+                  "field": "g"
+                }
+              },
+              "width": {
+                "signal": "max(0.25, bandwidth('xOffset'))"
+              },
+              "y": {
+                "scale": "concat_0_y",
+                "field": "v_end"
+              },
+              "y2": {
+                "scale": "concat_0_y",
+                "field": "v_start"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "gridScale": "concat_0_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "c",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "grid": false,
+          "title": "v",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_1_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_1_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "from": {
+            "data": "data_2"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"w: \" + (format(datum[\"w\"], \"\")) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_1_x",
+                "field": "w"
+              },
+              "y": {
+                "scale": "concat_1_y",
+                "field": "v"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "gridScale": "concat_1_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "gridScale": "concat_1_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "w",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "grid": false,
+          "title": "v",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_2_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_2_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "from": {
+            "data": "data_3"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"w: \" + (format(datum[\"w\"], \"\")) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_2_x",
+                "field": "w"
+              },
+              "y": {
+                "scale": "concat_2_y",
+                "field": "v"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_2_x",
+          "orient": "bottom",
+          "gridScale": "concat_2_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_2_y",
+          "orient": "left",
+          "gridScale": "concat_2_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_2_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "w",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "concat_2_y",
+          "orient": "left",
+          "grid": false,
+          "title": "v",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_3_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_3_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "from": {
+            "data": "data_4"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"w: \" + (format(datum[\"w\"], \"\")) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_3_x",
+                "field": "w"
+              },
+              "y": {
+                "scale": "concat_3_y",
+                "field": "v"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_3_x",
+          "orient": "bottom",
+          "gridScale": "concat_3_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_3_y",
+          "orient": "left",
+          "gridScale": "concat_3_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_3_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "w",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "concat_3_y",
+          "orient": "left",
+          "grid": false,
+          "title": "v",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_4_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_4_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_5"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"w (binned): \" + (!isValid(datum[\"bin_maxbins_10_w\"]) || !isFinite(+datum[\"bin_maxbins_10_w\"]) ? \"null\" : format(datum[\"bin_maxbins_10_w\"], \"\") + \" – \" + format(datum[\"bin_maxbins_10_w_end\"], \"\")) + \"; Count of Records: \" + (format(datum[\"__count\"], \"\"))"
+              },
+              "x2": {
+                "scale": "concat_4_x",
+                "field": "bin_maxbins_10_w",
+                "offset": {
+                  "signal": "0.5 + (true ? -1 : 1) * (abs(scale(\"concat_4_x\", datum[\"bin_maxbins_10_w_end\"]) - scale(\"concat_4_x\", datum[\"bin_maxbins_10_w\"])) < 0.25 ? -0.5 * (0.25 - (abs(scale(\"concat_4_x\", datum[\"bin_maxbins_10_w_end\"]) - scale(\"concat_4_x\", datum[\"bin_maxbins_10_w\"])))) : 1)"
+                }
+              },
+              "x": {
+                "scale": "concat_4_x",
+                "field": "bin_maxbins_10_w_end",
+                "offset": {
+                  "signal": "0.5 + (true ? -1 : 1) * (abs(scale(\"concat_4_x\", datum[\"bin_maxbins_10_w_end\"]) - scale(\"concat_4_x\", datum[\"bin_maxbins_10_w\"])) < 0.25 ? 0.5 * (0.25 - (abs(scale(\"concat_4_x\", datum[\"bin_maxbins_10_w_end\"]) - scale(\"concat_4_x\", datum[\"bin_maxbins_10_w\"])))) : -1)"
+                }
+              },
+              "y": {
+                "scale": "concat_4_y",
+                "field": "__count"
+              },
+              "y2": {
+                "scale": "concat_4_y",
+                "value": 0
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_4_y",
+          "orient": "left",
+          "gridScale": "concat_4_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_4_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "w (binned)",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/10)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "concat_4_y",
+          "orient": "left",
+          "grid": false,
+          "title": "Count of Records",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "xOffset",
+      "type": "band",
+      "domain": {
+        "data": "data_1",
+        "field": "g",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "bandwidth('concat_0_x')"
+        }
+      ]
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "data_1",
+        "field": "g",
+        "sort": true
+      },
+      "range": "category"
+    },
+    {
+      "name": "concat_0_x",
+      "type": "band",
+      "domain": {
+        "data": "data_1",
+        "field": "c",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "reverse": true,
+      "paddingInner": 0.2,
+      "paddingOuter": 0.2
+    },
+    {
+      "name": "concat_0_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "fields": [
+          "v_start",
+          "v_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_1_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "w"
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "reverse": true,
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_1_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "v"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "reverse": true,
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_2_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_3",
+        "field": "w"
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "reverse": false,
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_2_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_3",
+        "field": "v"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_3_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_4",
+        "field": "w"
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "reverse": true,
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_3_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_4",
+        "field": "v"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_4_x",
+      "type": "linear",
+      "domain": {
+        "signal": "[concat_4_bin_maxbins_10_w_bins.start, concat_4_bin_maxbins_10_w_bins.stop]"
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "reverse": true,
+      "bins": {
+        "signal": "concat_4_bin_maxbins_10_w_bins"
+      },
+      "zero": false
+    },
+    {
+      "name": "concat_4_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_5",
+        "field": "__count"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "symbolType": "square",
+      "title": "g"
+    }
+  ]
+}
