@@ -231,6 +231,39 @@ section here does not get released.
 
 ### Fixed
 
+- **A scale's padding is read from the theme too, and an offset scale from its own two entries.**
+  Upstream settles the whole `padding` before either half of it, and the first thing it asks is the
+  configuration: `if (isContinuousToContinuous(scaleType)) { if (scaleConfig.continuousPadding !==
+  undefined) { return scaleConfig.continuousPadding; } … return barConfig.continuousBandSize; } if
+  (scaleType === ScaleType.POINT) { return scaleConfig.pointPadding; }`. Then the outer half of a
+  band, the same shape: `if (scaleType === ScaleType.BAND) { return getFirstDefined(bandPaddingOuter,
+  paddingInnerValue / 2); }`. This compiler began each of those chains one link late. It went
+  straight to `config.bar.continuousBandSize`, so `config.scale.continuousPadding` did nothing at
+  all — a theme could not pad a continuous position scale, and could not narrow a histogram's bars
+  by the one entry written for that; and it always halved the inner padding, so
+  `config.scale.bandPaddingOuter` did nothing either and a theme asking for wider ends got the
+  built-in number. Note how far `continuousPadding` reaches: every continuous position scale on
+  either axis, a plain line's `x` included, not only a bar's.
+
+  The offset scales were a second arm of the same two rules, and this had neither:
+  `} else if (isXorYOffset(channel)) { if (scaleType === ScaleType.BAND) { return
+  scaleConfig.offsetBandPaddingInner; } }`, and for the outer `if (scaleType === ScaleType.POINT) {
+  return 0.5; } else if (scaleType === ScaleType.BAND) { return scaleConfig.offsetBandPaddingOuter;
+  }`. `offsetBandPaddingInner` and `offsetBandPaddingOuter` were never read, and since neither has a
+  default the omission was invisible until a theme wrote one. The point case read `pointPadding`,
+  which agreed only by the accident that its default is the same `0.5` — but that number is a
+  constant with a reason of its own, the half step that puts an offset point on the centre of the
+  band a bar would have filled, so a theme narrowing every other point scale used to pull those
+  points off their bands.
+
+  `a-scale-padding-a-theme-asked-for` is new: a band whose ends a theme widens, the same band with a
+  stated `padding` that outranks it, a point scale `continuousPadding` never reaches, a plain line
+  that it does, a bar where it outranks `config.bar.continuousBandSize`, and a stated `paddingOuter`
+  over the theme's. `a-scale-padding-an-offset-scale-asked-for` is the second, because a conflicting
+  theme needs a second chart: a grouped bar taking the configured offset paddings, offset points
+  keeping the constant `0.5` against a theme that says `0.2`, and a plain point scale where that
+  `0.2` does apply. Five mutants, all killed. **8 of the configuration sweep's differences close with
+  this**; 21137 of 21251 agree. 300 Vega-Lite fixtures.
 - **A mark property a theme asked for: `aria`, a role description, a rounded end, an aliased size.**
   Four more of the places upstream calls `getMarkPropOrConfig` read the mark definition and nothing
   else here, so a theme that spoke about them was not heard. `aria()` opens
