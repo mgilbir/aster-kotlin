@@ -231,6 +231,50 @@ section here does not get released.
 
 ### Fixed
 
+- **A mark property a theme asked for: `aria`, a role description, a rounded end, an aliased size.**
+  Four more of the places upstream calls `getMarkPropOrConfig` read the mark definition and nothing
+  else here, so a theme that spoke about them was not heard. `aria()` opens
+  `const enableAria = getMarkPropOrConfig('aria', markDef, config)` and returns `{}` when it is
+  false, so `config.point.aria: false` silences the encode block exactly as the mark's own does —
+  and this compiler, asking only the definition, went on writing a role description for a mark
+  upstream had already taken out of the accessibility tree. It also writes the switch *back*:
+  `...(enableAria ? {aria: enableAria} : {})`, a bare `true` rather than a value ref, since it is
+  Vega's own flag and not a graphic property. Nothing here wrote it at all. `getMarkGroup` asks the
+  same question for the mark itself — `...(aria === false ? {aria} : {})` — and `initMarkDef` asks
+  it for `cornerRadiusEnd` before resolving that into two of Vega's four corners, so a house style
+  that rounds the top of every bar rounded none of them.
+
+  The fourth is the tail all of them end in. `getMarkConfig` walks the style blocks under
+  Vega-Lite's name for a property, then `config[marktype]` under Vega's name and then under
+  Vega-Lite's, and only then `config.mark` under Vega's:
+
+  ```js
+  getFirstDefined(cfg, cfg, config[mark.type][vgChannel], config[mark.type][channel],
+                  vgChannel ? config.mark[vgChannel] : config.mark[channel]);
+  ```
+
+  This compiler had one lookup of the five — `config[marktype]` under Vega's name — which is enough
+  for a property Vega and Vega-Lite spell alike and nothing at all for the aliased pairs. A text
+  mark's `size` is Vega's `fontSize` and a path mark's is its `strokeWidth`, so `config.text.size`
+  sized no label and `config.line.size` thickened no line: the arm that would have answered was the
+  one under Vega-Lite's own name, never asked. A `cornerRadiusEnd` bound to a parameter was written
+  out as a value besides, where `markDefProperties` passes it through `signalOrValueRef` — a bar
+  tied to a slider was drawn with an object for a corner.
+
+  `a-mark-property-a-theme-asked-for` is new: a bar the theme rounds and names, one stating its own
+  radius and name over the theme's, a point the theme takes out of the tree, a text mark sized by
+  the theme and one stating its own, a line the theme thickens, and a bar whose radius is a
+  parameter. Seven mutants, all killed. **25 of the configuration sweep's differences close with
+  this**; 21154 of 21251 agree. 299 Vega-Lite fixtures.
+
+  What the theme's `cornerRadiusEnd` uncovers behind it is *not* fixed here, and it is why the
+  `config-bar-cornerRadiusEnd` cases still differ: a **stacked** bar with any corner radius is
+  wrapped in two groups upstream, `getGroupsForStackedBarWithCornerRadius` moving the radius and the
+  stroke onto the outer one so that the stack is rounded as a whole rather than each segment of it.
+  That path is unimplemented here and always was; until now nothing reached it from a theme, so the
+  sweep reported the missing corners instead of the missing groups. It is its own defect with its
+  own fix.
+
 - **A mark's default position is read from the whole chain too, and a second position reads its own
   channel.** `pointPositionDefaultRef` asks
   `getMarkPropOrConfig(channel, markDef, config, {vgChannel})`, which walks the definition under
