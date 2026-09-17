@@ -4524,12 +4524,39 @@ private class Compilation(
     }
   }
 
+  /**
+   * `assembleScalesForModel`, whose **key order is written out** rather than left to insertion:
+   * ```js
+   * const {name, type, selectionExtent, domains: _d, range: _r, reverse, ...otherScaleProps} = scale;
+   * scales.push({
+   *   name, type,
+   *   ...(domain ? {domain} : {}),
+   *   ...(domainRaw ? {domainRaw} : {}),
+   *   range,
+   *   ...(reverse !== undefined ? {reverse} : {}),
+   *   ...otherScaleProps,
+   * });
+   * ```
+   *
+   * Six names ahead of the rest, and `domainRaw` and `reverse` are the two this compiler left to
+   * fall in wherever they happened to be set — a selection's raw domain after the range, a reverse
+   * anywhere at all.
+   *
+   * **No gate here can see it**: `SpecDiff` ignores object key order by design, so the fixtures,
+   * the scene comparison and the schema sweep all agree either way. It is still a difference from
+   * the bytes upstream writes, and a reader diffing the two by eye sees it, so it is pinned by
+   * [ScaleKeyOrderTest] on the precedent of `JavaScriptKeyOrderTest`.
+   */
   private fun assembleScale(component: ScaleComponent): VegaValue = obj {
     put("name", component.name())
     put("type", component.type)
     put("domain", domainValue(component))
+    put("domainRaw", component.properties["domainRaw"])
     put("range", component.properties["range"])
-    component.properties.forEach { (key, value) -> if (key != "range") put(key, value) }
+    put("reverse", component.properties["reverse"])
+    component.properties.forEach { (key, value) ->
+      if (key !in HOISTED_SCALE_PROPERTIES) put(key, value)
+    }
   }
 
   /**
@@ -5089,6 +5116,14 @@ private class Compilation(
     }
 
   private companion object {
+    /**
+     * The scale keys `assembleScalesForModel` writes by name, and so must not be written twice.
+     *
+     * `domain` and `range` are computed rather than copied and were already excluded; `domainRaw`
+     * and `reverse` are named in upstream's literal too and are hoisted with them.
+     */
+    val HOISTED_SCALE_PROPERTIES = setOf("domain", "domainRaw", "range", "reverse")
+
     /** The properties `mergeIfNoConflict` compares — see [sharesProjectionProperties]. */
     val PROJECTION_PROPERTIES =
       listOf(
