@@ -1893,13 +1893,17 @@ internal object Guides {
     // every mark of this type settles the swatch too, so a bar outlined two units thick has a
     // swatch outlined two units thick. Only the properties Vega names, and only from the
     // configuration — the mark's own are already in the colour encoding below.
-    val markConfig = view.config.markConfig(view.spec.mark)
     for (property in FILL_STROKE_CONFIG) {
       // The two colours are dropped again where *this* legend is the one explaining them: a swatch
       // cannot show a scale it is itself the key to. Upstream deletes them from the same block.
       if (property == "fill" && (channel == "fill" || (filled && channel == "color"))) continue
       if (property == "stroke" && (channel == "stroke" || (!filled && channel == "color"))) continue
-      markConfig.fields[property]?.let { fields[property] = obj { put("value", it) } }
+      // **`getMarkConfig`, and so the style blocks too.** `applyMarkConfig` walks the whole chain —
+      // a style block first, then `config[marktype]`, then `config.mark` — and this asked the
+      // flattened table of the last two, which has no styles in it at all. So a chart whose marks
+      // name a style that outlines them left the legend's swatches unoutlined, and where the style
+      // was the *only* thing painting them the legend got no `encode` block whatsoever.
+      Marks.markConfigValue(view, property)?.let { fields[property] = Marks.markProperty(it) }
     }
     // ```js
     // } else if (hasProperty(out.fill, 'field')) {

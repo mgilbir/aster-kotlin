@@ -1,0 +1,431 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A legend's swatches are painted the way the marks they stand for are painted, and the whole configuration chain decides that. `symbols` in `legend/encode.ts` opens with `applyMarkConfig({}, model, FILL_STROKE_CONFIG)`, which asks `getMarkConfig` for each of the nine stroke and fill properties — and `getMarkConfig` reads a **style block first**, then `config[marktype]`, then `config.mark`. This compiler asked the flattened table of the last two, which has no styles in it at all, so a chart whose marks name a style that outlines them left its swatches unoutlined; and where the style was the only thing painting them, the legend came out with no `encode` block whatsoever rather than with the wrong one. The first row is that case: a bar outlined by `config.style.bar`, whose size legend must carry the same outline. The second is the case that must not move — the legend explaining the **colour** itself, where the mark's own fill is taken off the swatch because a swatch cannot show a scale it is itself the key to. Note what it still keeps: the outline is not the colour, so the stroke stays while the fill goes. A row naming a style of its own is drawn in `a-legend-symbol-wears-a-styles-stroke` rather than here, because two size legends over the same field are hoisted into one and the second row's style would never reach a legend at all.",
+  "background": "white",
+  "padding": 5,
+  "width": 200,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "c": "alpha",
+          "v": 28
+        },
+        {
+          "c": "beta",
+          "v": 55
+        },
+        {
+          "c": "gamma",
+          "v": 43
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "c"
+          ],
+          "field": "v",
+          "sort": {
+            "field": [
+              "v"
+            ],
+            "order": [
+              "descending"
+            ]
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "c"
+          ],
+          "field": "v",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "childHeight",
+      "value": 70
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "columns": 1,
+    "bounds": "full",
+    "align": "each"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "concat_0_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_0_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_1"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+              },
+              "xc": {
+                "scale": "concat_0_x",
+                "field": "c",
+                "band": 0.5
+              },
+              "width": {
+                "scale": "size",
+                "field": "v"
+              },
+              "y": {
+                "scale": "concat_0_y",
+                "field": "v_end"
+              },
+              "y2": {
+                "scale": "concat_0_y",
+                "field": "v_start"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "gridScale": "concat_0_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "c",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "grid": false,
+          "title": "v",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_1_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_1_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_2"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "scale": "color",
+                "field": "c"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_1_x",
+                "field": "c"
+              },
+              "width": {
+                "signal": "max(0.25, bandwidth('concat_1_x'))"
+              },
+              "y": {
+                "scale": "concat_1_y",
+                "field": "v_end"
+              },
+              "y2": {
+                "scale": "concat_1_y",
+                "field": "v_start"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "gridScale": "concat_1_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "c",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "grid": false,
+          "title": "v",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "size",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "field": "v"
+      },
+      "range": [
+        2,
+        19
+      ],
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "data_2",
+        "field": "c",
+        "sort": true
+      },
+      "range": "category"
+    },
+    {
+      "name": "concat_0_x",
+      "type": "band",
+      "domain": {
+        "data": "data_1",
+        "field": "c",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "concat_0_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "fields": [
+          "v_start",
+          "v_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_1_x",
+      "type": "band",
+      "domain": {
+        "data": "data_2",
+        "field": "c",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "concat_1_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "fields": [
+          "v_start",
+          "v_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "legends": [
+    {
+      "size": "size",
+      "symbolType": "square",
+      "title": "v",
+      "encode": {
+        "symbols": {
+          "update": {
+            "stroke": {
+              "value": "black"
+            },
+            "strokeWidth": {
+              "value": 3
+            },
+            "fill": {
+              "value": "#4c78a8"
+            }
+          }
+        }
+      }
+    },
+    {
+      "fill": "color",
+      "symbolType": "square",
+      "title": "c",
+      "encode": {
+        "symbols": {
+          "update": {
+            "stroke": {
+              "value": "black"
+            },
+            "strokeWidth": {
+              "value": 3
+            }
+          }
+        }
+      }
+    }
+  ],
+  "config": {
+    "style": {
+      "bar": {
+        "stroke": "black",
+        "strokeWidth": 3
+      }
+    }
+  }
+}
