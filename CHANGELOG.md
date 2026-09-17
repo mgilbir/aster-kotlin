@@ -231,6 +231,30 @@ section here does not get released.
 
 ### Fixed
 
+- **A scale property its channel does not understand is not honoured.** Two of them, each with its
+  own test.
+
+  A **scheme** is a colour channel's word:
+  `case 'interpolate': case 'scheme': case 'domainMid': if (!isColorChannel(channel)) { return log.message.cannotUseScalePropertyWithNonColor(propName); }`,
+  and `parseRangeForChannel` then falls through to the range the channel would have taken anyway. A
+  position given `category10` is still `[0, width]`. Written through, Vega was handed a horizontal
+  axis whose range was a palette, and the marks were placed at colours.
+
+  **`rangeMin`/`rangeMax`** replace the ends of a range only where there are two ends to replace:
+  `isArray(d) && d.length === 2`. A colour scale's default range is the word `"ramp"`, so the two
+  properties do nothing there; filling the missing end with a zero turned it into a range between
+  two numbers, which paints nothing. The length test is a length test and not a null check because
+  of `strokeDash`, whose default range is an array of **five** dash patterns — no single end to
+  replace, and upstream leaves all five alone.
+
+  `a-scale-property-its-channel-understands` is new, four rows, two of which must not move: a
+  `rangeMin` on a size, where the default range is a genuine pair and it does what it says, and the
+  `strokeDash` case. Four mutants, all killed — the last only after the `strokeDash` row was added,
+  which is what made the length test reachable at all.
+
+  **23 of the guide sweep's differences close with this**; 27219 of 27251 agree.
+
+
 - **A legend keeps only the words its own kind understands.** The test is the property name's
   **prefix**, not a list:
   `if ((legendType === 'gradient' && property.startsWith('symbol')) || (legendType === 'symbol' && property.startsWith('gradient'))) { continue; }`.
