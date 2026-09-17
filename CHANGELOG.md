@@ -231,6 +231,22 @@ section here does not get released.
 
 ### Fixed
 
+- **An assembled scale writes its keys in upstream's order.** `assembleScalesForModel` builds the
+  object from a literal rather than by accumulating into one, so the order is stated rather than
+  incidental: `{name, type, ...domain, ...domainRaw, range, ...reverse, ...otherScaleProps}`.
+  `domainRaw` and `reverse` are the two this compiler left to fall in wherever they happened to be
+  set — a selection's raw domain arriving after the range, a reverse anywhere at all.
+
+  **No gate here can see it.** `SpecDiff` ignores object key order, by design and for good reason:
+  two specifications differing only in key order are the same specification to Vega, and to every
+  reader that is not a human diffing bytes. So the fixtures, the scene comparison and the
+  21251-case sweep all agree either way. `ScaleKeyOrderTest` is new and holds it instead, on the
+  precedent of `JavaScriptKeyOrderTest` and `RoundedStackGroupOrderTest`.
+
+  Both order-only mutants — `reverse` before `range`, `domainRaw` after it — are killed by that test
+  while the fixture gate stays green, which is the demonstration that it earns its place.
+
+
 - **`config.view` is one of the mark blocks, and an object-valued `config.mark.tooltip` is spent
   rather than passed on.** Two things a configuration must not hand Vega.
 
