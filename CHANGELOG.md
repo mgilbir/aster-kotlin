@@ -257,6 +257,98 @@ section here does not get released.
   for one. Invisible until something reads a row's rectangle: a legend a selection is bound to
   paints its rows transparent so a click anywhere along one is caught, and a row of no size catches
   nothing.
+- **A scale's padding is read from the theme too, and an offset scale from its own two entries.**
+  Upstream settles the whole `padding` before either half of it, and the first thing it asks is the
+  configuration: `if (isContinuousToContinuous(scaleType)) { if (scaleConfig.continuousPadding !==
+  undefined) { return scaleConfig.continuousPadding; } … return barConfig.continuousBandSize; } if
+  (scaleType === ScaleType.POINT) { return scaleConfig.pointPadding; }`. Then the outer half of a
+  band, the same shape: `if (scaleType === ScaleType.BAND) { return getFirstDefined(bandPaddingOuter,
+  paddingInnerValue / 2); }`. This compiler began each of those chains one link late. It went
+  straight to `config.bar.continuousBandSize`, so `config.scale.continuousPadding` did nothing at
+  all — a theme could not pad a continuous position scale, and could not narrow a histogram's bars
+  by the one entry written for that; and it always halved the inner padding, so
+  `config.scale.bandPaddingOuter` did nothing either and a theme asking for wider ends got the
+  built-in number. Note how far `continuousPadding` reaches: every continuous position scale on
+  either axis, a plain line's `x` included, not only a bar's.
+
+  The offset scales were a second arm of the same two rules, and this had neither:
+  `} else if (isXorYOffset(channel)) { if (scaleType === ScaleType.BAND) { return
+  scaleConfig.offsetBandPaddingInner; } }`, and for the outer `if (scaleType === ScaleType.POINT) {
+  return 0.5; } else if (scaleType === ScaleType.BAND) { return scaleConfig.offsetBandPaddingOuter;
+  }`. `offsetBandPaddingInner` and `offsetBandPaddingOuter` were never read, and since neither has a
+  default the omission was invisible until a theme wrote one. The point case read `pointPadding`,
+  which agreed only by the accident that its default is the same `0.5` — but that number is a
+  constant with a reason of its own, the half step that puts an offset point on the centre of the
+  band a bar would have filled, so a theme narrowing every other point scale used to pull those
+  points off their bands.
+
+  `a-scale-padding-a-theme-asked-for` is new: a band whose ends a theme widens, the same band with a
+  stated `padding` that outranks it, a point scale `continuousPadding` never reaches, a plain line
+  that it does, a bar where it outranks `config.bar.continuousBandSize`, and a stated `paddingOuter`
+  over the theme's. `a-scale-padding-an-offset-scale-asked-for` is the second, because a conflicting
+  theme needs a second chart: a grouped bar taking the configured offset paddings, offset points
+  keeping the constant `0.5` against a theme that says `0.2`, and a plain point scale where that
+  `0.2` does apply. Five mutants, all killed. **8 of the configuration sweep's differences close with
+  this**; 21137 of 21251 agree. 300 Vega-Lite fixtures.
+- **A mark property a theme asked for: `aria`, a role description, a rounded end, an aliased size.**
+  Four more of the places upstream calls `getMarkPropOrConfig` read the mark definition and nothing
+  else here, so a theme that spoke about them was not heard. `aria()` opens
+  `const enableAria = getMarkPropOrConfig('aria', markDef, config)` and returns `{}` when it is
+  false, so `config.point.aria: false` silences the encode block exactly as the mark's own does —
+  and this compiler, asking only the definition, went on writing a role description for a mark
+  upstream had already taken out of the accessibility tree. It also writes the switch *back*:
+  `...(enableAria ? {aria: enableAria} : {})`, a bare `true` rather than a value ref, since it is
+  Vega's own flag and not a graphic property. Nothing here wrote it at all. `getMarkGroup` asks the
+  same question for the mark itself — `...(aria === false ? {aria} : {})` — and `initMarkDef` asks
+  it for `cornerRadiusEnd` before resolving that into two of Vega's four corners, so a house style
+  that rounds the top of every bar rounded none of them.
+
+  The fourth is the tail all of them end in. `getMarkConfig` walks the style blocks under
+  Vega-Lite's name for a property, then `config[marktype]` under Vega's name and then under
+  Vega-Lite's, and only then `config.mark` under Vega's:
+
+  ```js
+  getFirstDefined(cfg, cfg, config[mark.type][vgChannel], config[mark.type][channel],
+                  vgChannel ? config.mark[vgChannel] : config.mark[channel]);
+  ```
+
+  This compiler had one lookup of the five — `config[marktype]` under Vega's name — which is enough
+  for a property Vega and Vega-Lite spell alike and nothing at all for the aliased pairs. A text
+  mark's `size` is Vega's `fontSize` and a path mark's is its `strokeWidth`, so `config.text.size`
+  sized no label and `config.line.size` thickened no line: the arm that would have answered was the
+  one under Vega-Lite's own name, never asked. A `cornerRadiusEnd` bound to a parameter was written
+  out as a value besides, where `markDefProperties` passes it through `signalOrValueRef` — a bar
+  tied to a slider was drawn with an object for a corner.
+
+  `a-mark-property-a-theme-asked-for` is new: a bar the theme rounds and names, one stating its own
+  radius and name over the theme's, a point the theme takes out of the tree, a text mark sized by
+  the theme and one stating its own, a line the theme thickens, and a bar whose radius is a
+  parameter. Seven mutants, all killed. **25 of the configuration sweep's differences close with
+  this**; 21154 of 21251 agree. 299 Vega-Lite fixtures.
+
+  What the theme's `cornerRadiusEnd` uncovers behind it is *not* fixed here, and it is why the
+  `config-bar-cornerRadiusEnd` cases still differ: a **stacked** bar with any corner radius is
+  wrapped in two groups upstream, `getGroupsForStackedBarWithCornerRadius` moving the radius and the
+  stroke onto the outer one so that the stack is rounded as a whole rather than each segment of it.
+  That path is unimplemented here and always was; until now nothing reached it from a theme, so the
+  sweep reported the missing corners instead of the missing groups. It is its own defect with its
+  own fix.
+- **What a mark does with a value it cannot place is read from the whole configuration chain.**
+  `assembleDomain` and the mark's own `defined` both ask `getMarkConfig('invalid', markDef, config)`,
+  which is
+  `getFirstDefined(styleConfig, styleConfig, config[mark.type].invalid, config.mark.invalid)`. This
+  compiler read `config.mark.invalid` and nothing else, so a theme saying `config.line.invalid` — or
+  saying it in a style block — was dropped: the chart kept the default for its kind, `filter` for a
+  point and `break-paths-show-domains` for a line, and the data pipeline then built the wrong number
+  of datasets for it.
+
+  `an-invalid-a-theme-asked-for` is new, with the mark's own value over a theme's to keep that order
+  drawn. Four mutants, all killed. **15 of the configuration sweep's differences close with this**;
+  21144 of 21251 agree.
+
+  The **style** arm of that chain is resolved but not drawn, and the fixture says why: a style block
+  written in a configuration is currently stripped from the emitted Vega where upstream passes it
+  through, so a fixture using one would fail on that instead of on this.
 
 - **A mark's default position is read from the whole chain too, and a second position reads its own
   channel.** `pointPositionDefaultRef` asks
