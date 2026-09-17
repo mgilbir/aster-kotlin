@@ -229,6 +229,27 @@ section here does not get released.
   Recorded rather than fixed in this change: the sweep is a measurement, and each of those is its own
   defect with its own fix.
 
+### Changed
+
+- **A gradient legend over a scale that carries no colours is reported rather than matched.** This is
+  a deliberate divergence, recorded with its evidence rather than left to be rediscovered.
+
+  Upstream draws the legend. `scale_gradient` does not ask what kind of scale it has — it samples it
+  and stores whatever comes back as the stop's colour, `stops.forEach(_ => gradient.stop(fraction(_), scale(_)))`
+  — so a `size` scale ranged `[4, 361]` yields
+  `{"gradient": "linear", "stops": [{"color": 4, "offset": 0}, {"color": 27.8, …}]}`: a gradient whose
+  stops are **numbers**. Vega emits it and no renderer can paint it.
+
+  Matching it would mean widening `GradientStop.color` from `SceneColor` to something that can hold a
+  number, through every renderer that consumes it — the Android canvas, the SVG writer, and the Swift
+  surface, where it is a published type and moves the foreign API snapshot. The return is a legend
+  that still cannot be drawn. So this reports instead, which tells the reader what upstream leaves
+  them to discover from a blank space.
+
+  Reachable from Vega-Lite by `{"legend": {"type": "gradient"}}` on a size or shape channel, which is
+  why it is a diagnostic rather than a silent skip. Found when the Vega-Lite compiler began honouring
+  a stated legend type and its fixture could not draw the half it now emitted correctly.
+
 ### Fixed
 
 - **A legend told which kind to be, and one told its swatches' opacity.** `getLegendType` is
