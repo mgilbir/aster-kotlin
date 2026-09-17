@@ -231,6 +231,33 @@ section here does not get released.
 
 ### Fixed
 
+- **A stack whose rounded end came from a theme is rounded once, not segment by segment.**
+  `parseMarkGroups` decides whether a bar is drawn inside a group of its own from
+  `const hasCornerRadius = VG_CORNERRADIUS_CHANNELS.some((prop) => getMarkPropOrConfig(prop, model.markDef, model.config))`,
+  and then `if (model.stack && !model.fieldDef('size') && hasCornerRadius)`. Which mark definition is
+  being asked is the whole of it: `initMarkdef` has already run, and it is what turns
+  `cornerRadiusEnd` — a word those five Vega channels do not include — into two of them, by way of
+  `for (const newProp of newProps) { markDef[newProp] = cornerRadiusEnd }`. This asked the mark as it
+  had been *written* rather than as it had been rewritten, so it saw a radius only when the chart put
+  one on the mark itself. A theme that rounds every bar in a report — `config.bar.cornerRadiusEnd`,
+  whose point is that no chart has to mention it, and equally `config.mark` or a style block — opened
+  no group at all, and each segment of each stack was rounded separately, joins and all, where
+  upstream rounds the stack once at its two ends.
+
+  `markDef[newProp] = cornerRadiusEnd` is an assignment and not a default, and was applied here as
+  one: the rewrite ran first and the mark's own properties were written over the top, so a bar asking
+  for a rounded end *and* a square top-left was drawn with the square. Upstream draws the rounded
+  end, and only the corners that word does not claim survive.
+
+  Two things inside the grouping were wrong underneath. The group's radii and its stroke are looked
+  up with `getMarkConfig(key, model.markDef, model.config)`, which consults the **style blocks
+  first**; this read a single flattened table of `config.mark` and `config.bar`, which has no style
+  blocks in it, so a style that rounded and outlined a bar left the group with neither — and left the
+  segments holding a radius they were supposed to have surrendered. And the two branches of
+  `getGroupsForStackedBarWithCornerRadius` are not mirror images: only the horizontal one names the
+  corner channels in its `pick`, so a stack lying on its side writes them before its extent and its
+  clip rather than after. Neither the fixture gate nor the sweep can see that last one, object key
+  order being ignored by both on purpose, so it is pinned by a test of its own.
 - **Sixteen keys of a theme reached the wrong side of the compiler, and an emptied block reached
   Vega at all.** What survives `stripAndRedirectConfig` is decided by a list upstream wrote out by
   hand, `VL_ONLY_CONFIG_PROPERTIES`, and by a sweep at the end of it that asks about every property

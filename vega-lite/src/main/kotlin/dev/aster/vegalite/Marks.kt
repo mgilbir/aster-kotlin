@@ -175,9 +175,14 @@ internal object Marks {
         value != VegaValue.Null &&
         value != VegaValue.Bool(false) &&
         (value as? VegaValue.Num)?.value != 0.0
-    val hasRadius =
-      VG_CORNER_RADIUS.any { rounded(styled(view, it)) } ||
-        rounded(view.markDef.raw.fields["cornerRadiusEnd"])
+    // Asked of the mark definition `initMarkDef` has already rewritten — which is the whole of the
+    // difference between a rounded stack and a square one, because `cornerRadiusEnd` is not one of
+    // the five channels this asks about and only reaches them through that rewrite. Reading the
+    // *written* definition instead, as this did, saw a radius only when the chart stated one on the
+    // mark itself: a theme that rounds every bar — `config.bar.cornerRadiusEnd`, `config.mark`, or
+    // a
+    // style block — rounded each segment of a stack separately, joins and all.
+    val hasRadius = VG_CORNER_RADIUS.any { rounded(cornerRadius(view, it)) }
     if (!hasRadius) return null
 
     val channel = stack.fieldChannel
@@ -198,7 +203,19 @@ internal object Marks {
     val groupUpdate = LinkedHashMap<String, VegaValue>()
     // Everything that places the stack *across* its own direction belongs to the group; everything
     // along it is the group's own measured extent.
-    for (key in listOf(other, "${other}c", "${other}2", thickness)) {
+    //
+    // The two branches are not mirror images, and upstream's asymmetry is load-bearing for the
+    // order the group's properties come out in:
+    //
+    //     pick(mark.encode.update, ['y', 'yc', 'y2', 'height', ...VG_CORNERRADIUS_CHANNELS])   // x
+    //     pick(mark.encode.update, ['x', 'xc', 'x2', 'width'])                                // y
+    //
+    // A stack along **x** picks the corner radii up here, so they are written before the extent and
+    // the clip; a stack along **y** leaves them to the loop below, which appends them after. The
+    // loop assigns into a key that already exists without moving it, so naming them here is what
+    // puts them in front.
+    val across = listOf(other, "${other}c", "${other}2", thickness)
+    for (key in if (channel == "x") across + VG_CORNER_RADIUS else across) {
       update[key]?.let { groupUpdate[key] = it }
     }
     groupUpdate[channel] = signalRef(extent("min"))
@@ -226,11 +243,16 @@ internal object Marks {
     }
     markUpdate[thickness] = obj { put("field", obj { put("group", thickness) }) }
 
+    // `getMarkConfig(key, model.markDef, model.config)` for both loops — the **style blocks** first
+    // and then the two configuration blocks, not the flattened mark table. A `config.style.bar`
+    // that rounded or outlined every bar was invisible to a stack read through the flat table: the
+    // group was built with neither the radius nor the stroke, and the segments kept a radius they
+    // were supposed to have surrendered.
     for (key in VG_CORNER_RADIUS) {
-      val configured = view.config.markConfig("bar").fields[key]
+      val configured = markConfigValue(view, key)
       val own = markUpdate.remove(key)
       if (own != null) groupUpdate[key] = own
-      else if (configured != null) groupUpdate[key] = obj { put("value", configured) }
+      else if (configured != null) groupUpdate[key] = markProperty(configured)
       // A radius the *configuration* put on every bar has already been moved up, so the segments
       // have to say they have none — Vega would otherwise apply the style block underneath.
       if (configured != null) markUpdate[key] = obj { put("value", 0) }
@@ -238,10 +260,7 @@ internal object Marks {
     for (key in STROKE_PROPERTIES) {
       val own = markUpdate[key]
       if (own != null) groupUpdate[key] = own
-      else
-        view.config.markConfig("bar").fields[key]?.let {
-          groupUpdate[key] = obj { put("value", it) }
-        }
+      else markConfigValue(view, key)?.let { groupUpdate[key] = markProperty(it) }
     }
     if (groupUpdate.containsKey("stroke")) {
       groupUpdate["strokeForeground"] = obj { put("value", true) }
@@ -729,28 +748,63 @@ internal object Marks {
       "horizontal" to listOf("cornerRadiusTopRight", "cornerRadiusBottomRight"),
     )
 
+  /**
+   * `initMarkDef`'s `cornerRadiusEnd` rewrite: the corners it claims, and the radius it puts there.
+   *
+   * ```js
+   * const cornerRadiusEnd = getMarkPropOrConfig('cornerRadiusEnd', markDef, config);
+   * if (cornerRadiusEnd !== undefined) {
+   *   const newProps = ... ? (['cornerRadius'] as const) : BAR_CORNER_RADIUS_END_INDEX[markDef.orient];
+   *   for (const newProp of newProps) {
+   *     markDef[newProp] = cornerRadiusEnd;
+   *   }
+   * ```
+   *
+   * Separate from the writing of it because two rules need the answer: the encode block below, and
+   * the test that decides whether a stacked bar is drawn in a group of its own. That test asks the
+   * *rewritten* definition for its corners, so it has to be able to see this rewrite rather than
+   * only its output.
+   *
+   * It is read through `getMarkPropOrConfig`, so a theme that rounds the top of every bar —
+   * `config.bar.cornerRadiusEnd` — rounds them, and this compiler, reading the definition alone,
+   * drew square corners under it.
+   */
+  private fun cornerRadiusEnd(view: UnitView): Pair<List<String>, VegaValue>? {
+    val radius = markPropOrConfig(view, "cornerRadiusEnd") ?: return null
+    // **A bar, and one with an orientation.** `initMarkDef` guards the whole rule with
+    // `if (markDef.type === 'bar' && markDef.orient)`, so every other mark type ignores the
+    // property outright — an arc, an area, a circle, a point, a rect, a rule, a text, a tick and
+    // a trail all compiled to two rounded corners here and to nothing at all upstream.
+    if (view.spec.mark != "bar") return null
+    val orient = view.markDef.orient ?: return null
+    // A **ranged** bar rounds all four corners rather than two. One whose far end is an `x2` or a
+    // `y2` has two ends of its own and no *far* one to single out, so upstream writes the plain
+    // `cornerRadius` instead of the pair.
+    val ranged =
+      (orient == "horizontal" && view.spec.encoding["x2"] != null) ||
+        (orient == "vertical" && view.spec.encoding["y2"] != null)
+    return (if (ranged) listOf("cornerRadius") else CORNER_RADIUS_END.getValue(orient)) to radius
+  }
+
+  /**
+   * `getMarkPropOrConfig(corner, markDef, config)` asked of the **rewritten** mark definition.
+   *
+   * `markDef[newProp] = cornerRadiusEnd` is an assignment and not a default, so a bar that states
+   * both a `cornerRadiusEnd` and one of the corners that word resolves into comes out with the
+   * *end* radius on it: `{"cornerRadiusEnd": 6, "cornerRadiusTopLeft": 2}` is two sixes upstream.
+   */
+  private fun cornerRadius(view: UnitView, corner: String): VegaValue? {
+    cornerRadiusEnd(view)?.let { (corners, radius) -> if (corner in corners) return radius }
+    return markPropOrConfig(view, corner)
+  }
+
   private fun markDefProperties(view: UnitView): VegaValue.Obj = obj {
-    // `initMarkDef` reads it through `getMarkPropOrConfig('cornerRadiusEnd', markDef, config)`, so
-    // a theme that rounds the top of every bar — `config.bar.cornerRadiusEnd` — rounds them, and
-    // this compiler, reading the definition alone, drew square corners under it.
-    markPropOrConfig(view, "cornerRadiusEnd")?.let { radius ->
-      // **A bar, and one with an orientation.** `initMarkDef` guards the whole rule with
-      // `if (markDef.type === 'bar' && markDef.orient)`, so every other mark type ignores the
-      // property outright — an arc, an area, a circle, a point, a rect, a rule, a text, a tick and
-      // a trail all compiled to two rounded corners here and to nothing at all upstream.
-      if (view.spec.mark != "bar") return@let
-      val orient = view.markDef.orient ?: return@let
-      // A **ranged** bar rounds all four corners rather than two. One whose far end is an `x2` or a
-      // `y2` has two ends of its own and no *far* one to single out, so upstream writes the plain
-      // `cornerRadius` instead of the pair.
-      val ranged =
-        (orient == "horizontal" && view.spec.encoding["x2"] != null) ||
-          (orient == "vertical" && view.spec.encoding["y2"] != null)
-      val corners = if (ranged) listOf("cornerRadius") else CORNER_RADIUS_END.getValue(orient)
-      // `markDef[newProp] = cornerRadiusEnd` and then `markDefProperties` writes it out with
-      // `signalOrValueRef`, so a radius stated as an expression is a **signal** here as anywhere
-      // else — written out as a value, a bar bound to a slider was drawn with an object for a
-      // corner.
+    val endCorners = cornerRadiusEnd(view)
+    // `markDef[newProp] = cornerRadiusEnd` and then `markDefProperties` writes it out with
+    // `signalOrValueRef`, so a radius stated as an expression is a **signal** here as anywhere
+    // else — written out as a value, a bar bound to a slider was drawn with an object for a
+    // corner.
+    endCorners?.let { (corners, radius) ->
       corners.forEach { corner -> put(corner, markProperty(radius)) }
     }
     // A mark that links somewhere shows the pointer, there being nothing else about it that looks
@@ -806,6 +860,12 @@ internal object Marks {
       // no mark at all, so [VG_MARK_PROPERTIES] never lets them through. `radius` is a Vega
       // property on every mark and goes out under its own name.
       if (key in TEXT_ONLY_MARK_PROPERTIES && view.spec.mark != "text") continue
+      // A corner `cornerRadiusEnd` has already claimed is **not** written again from the mark's own
+      // words. `initMarkDef` assigns over it — `markDef[newProp] = cornerRadiusEnd` — so by the
+      // time
+      // anything reads the definition the stated corner is gone. Written in this order the stated
+      // one won instead, and a bar asking for a rounded top and a square top-left got the square.
+      if (endCorners != null && key in endCorners.first) continue
       put(key, markProperty(value))
     }
   }
