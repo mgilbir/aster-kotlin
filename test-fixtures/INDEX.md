@@ -6,7 +6,7 @@ Generated from the corpus by `FixtureIndexTest`, which fails when this file has 
 ./gradlew :vega-runtime:jvmTest -PupdateGoldens=true --rerun-tasks
 ```
 
-216 Vega differential fixtures and 325 Vega-Lite fixtures.
+216 Vega differential fixtures and 328 Vega-Lite fixtures.
 
 Every column is read off disk. A Vega fixture's mark count and mark types come from its
 **upstream** reference, so they are upstream's answer rather than this port's opinion of it.
@@ -243,6 +243,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `a-config-that-reaches-the-output` | single view | bar | — |
 | `a-config-tooltip-vega-understands` | single view | bar | — |
 | `a-counting-aggregate-is-a-number` | vconcat | bar | — |
+| `a-cursor-a-theme-settled` | single view | bar | — |
 | `a-field-title-spelled-functional` | hconcat | point | — |
 | `a-field-title-spelled-plain` | hconcat | point | — |
 | `a-heading-a-theme-asked-for` | single view | bar | — |
@@ -252,6 +253,8 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `a-legend-symbol-wears-a-styles-stroke` | single view | bar | — |
 | `a-legend-symbol-wears-the-marks-stroke` | vconcat | bar | — |
 | `a-legend-told-which-kind-to-be` | vconcat | bar, point | — |
+| `a-link-a-theme-gave-every-mark` | vconcat | bar | — |
+| `a-link-no-one-gave-a-mark` | single view | bar | — |
 | `a-mark-property-a-theme-asked-for` | vconcat | bar, line, point, text | — |
 | `a-normalized-stack-is-a-percentage` | vconcat | bar, line | — |
 | `a-normalized-stack-with-no-percentage` | single view | bar | — |

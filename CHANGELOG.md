@@ -252,6 +252,35 @@ section here does not get released.
 
 ### Fixed
 
+- **Three places can say a mark links somewhere, and this read one.**
+  `cursor(markDef, encoding, config)` asks
+  `encoding.href || markDef.href || getMarkPropOrConfig('href', markDef, config)`, so a theme giving
+  every bar the same link makes every bar clickable. This read only the channel, so a themed link
+  drew no pointer and the reader had nothing to tell them the mark could be followed.
+
+  Both guards run through the chain too —
+  `const specifiedCursor = getMarkPropOrConfig('cursor', markDef, config); if (specifiedCursor === undefined) { … }`
+  — so a `cursor` a *theme* settles suppresses the pointer exactly as one on the mark does.
+
+  Three fixtures, because a configuration is chart-level and the cases contradict: a themed link, a
+  chart with no link at all that must have no cursor, and a theme that settles both. Four mutants,
+  all killed; two of them needed the third fixture, a mark-stated cursor being unable to tell a
+  chain-wide guard from a mark-only one.
+
+### Changed
+
+- **The sweep reads a stated string.** `declaredValues` handled enums, booleans, numbers, colours and
+  number arrays, and skipped every property whose schema says only "string" — 77 of them across the
+  families, the largest omission the manifest recorded and a limitation of the generator rather than
+  a decision about what is worth trying. **27513 specifications, up from 27251**, and the skip count
+  falls from 782 to 520.
+
+  One value each, chosen to be a value the property can actually take: a d3 specifier where a format
+  is wanted, a Vega shape name where a symbol is, prose where nothing distinguishes one string from
+  another. A nonsense string would still compile and still be compared, but it would compare a chart
+  nobody could draw, and a difference found that way costs more to read than it is worth.
+
+
 - **A legend told which kind to be, and one told its swatches' opacity.** `getLegendType` is
   `getFirstDefined(legend.type, defaultType(params))`, so a channel that states its legend's kind
   gets it — and every rule keyed off the kind follows: which properties survive the prefix filter,
