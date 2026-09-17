@@ -306,6 +306,15 @@ internal class Facet(
   /** Which band this part of the header is in — [headerChannel] through the stated side. */
   fun headerChannel(part: String): String = headerChannel(channel, statedOrient(part))
 
+  /** The band and the edge this channel's heading is laid out against — [layoutTitleBand]. */
+  fun titleBand(): Pair<String, Double>? {
+    val anchor =
+      (headerProperty(def.raw.obj("header"), config, channel, "titleAnchor") as? VegaValue.Str)
+        ?.value
+    val band = headerChannel("title")
+    return layoutTitleBand(anchor, band)?.let { band to it }
+  }
+
   /**
    * Whether a caption on this channel is drawn at all.
    *
@@ -350,7 +359,7 @@ internal class Facet(
     // A caption in the trailing band hangs off the other side of its cell.
     headerOrient("label").takeIf { it != "top" }?.let { put("orient", it) }
     put("frame", "group")
-    captionFacing(def.raw.obj("header"), config, channel, headerChannel("label"))
+    headerFacing(def.raw.obj("header"), config, channel, headerChannel("label"), "label")
     val properties = headerProperties("label")
     properties.forEach { (key, value) -> put(key, value) }
     // `config.header.labelPadding: 10`, which this compiler carries as a fallback rather than in a
@@ -554,6 +563,7 @@ internal class Facet(
         put("offset", num(offset))
         // A header moved to the other side of the grid takes its heading with it.
         headerOrient("title").takeIf { it != "top" }?.let { put("orient", it) }
+        headerFacing(def.raw.obj("header"), config, channel, headerChannel("title"), "title")
         headerProperties("title").forEach { (key, value) -> put(key, value) }
       },
     )
@@ -816,20 +826,38 @@ internal interface FacetLayout {
  * Both are asked through the **band's** own axis, not the caption's own side: a row's captions run
  * down the side of the grid and are read as a `y` axis's labels are, a column's along the top and
  * read as an `x` axis's.
+ *
+ * The same pair faces the **heading** over the grid, off `titleAngle` and `titleAnchor` —
+ * `assembleTitleGroup` calls them exactly as `assembleLabelTitle` does. Neither was asked for a
+ * heading at all, so a trellis that turned its heading on its side, or anchored it to one end of
+ * the grid, was drawn with the heading flat and centred; and since the two properties are read from
+ * the theme as well, `config.header.titleAngle` turned every heading in a document and none of them
+ * was anchored to suit.
+ *
+ * @param part `"label"` for the caption on each cell, `"title"` for the heading over the grid.
  */
-private fun ObjectBuilder.captionFacing(
+private fun ObjectBuilder.headerFacing(
   header: VegaValue.Obj?,
   config: Config?,
   channel: String,
   band: String,
+  part: String,
 ) {
-  val angle = (headerProperty(header, config, channel, "labelAngle") as? VegaValue.Num)?.value
+  val stated = (headerProperty(header, config, channel, "${part}Angle") as? VegaValue.Num)?.value
+  // `const titleAngle = normalizeAngle(ta);` in `assembleTitleGroup`, and **no such line** in
+  // `assembleLabelTitle`, which hands `labelAngle` to the same two rules as it was written. The
+  // asymmetry is upstream's and it shows, both rules being a chain of comparisons against a number
+  // between zero and three hundred and sixty: a heading turned to `-100` down a row band is `260`,
+  // which falls past `angle <= 45 || 315 <= angle || (135 <= angle && angle <= 225)` into
+  // `(45 <= angle && angle <= 135) === (orient === 'left')` and is baselined `bottom`, while the
+  // same number handed over as written is caught by `angle <= 45` and baselined `middle`.
+  val angle = if (part == "title") stated?.let { ((it % 360) + 360) % 360 } else stated
   val axis = if (band == "row") "y" else "x"
   val side = if (band == "row") "left" else "top"
   if (angle != null) {
     Guides.labelBaseline(angle, axis, side, alwaysIncludeMiddle = true)?.let { put("baseline", it) }
   }
-  when ((headerProperty(header, config, channel, "labelAnchor") as? VegaValue.Str)?.value) {
+  when ((headerProperty(header, config, channel, "${part}Anchor") as? VegaValue.Str)?.value) {
     "start" -> put("align", "left")
     "end" -> put("align", "right")
     else -> if (angle != null) Guides.labelAlign(angle, axis, side)?.let { put("align", it) }
@@ -837,6 +865,34 @@ private fun ObjectBuilder.captionFacing(
   // The **angle** itself is not written here: `assembleHeaderProperties` carries `labelAngle` over
   // as `angle`, so writing it twice only moves it ahead of the anchor it is written after.
 }
+
+/**
+ * `getLayoutTitleBand`: which band of the grid a heading is laid out in, where it is anchored.
+ *
+ * ```js
+ * const LAYOUT_TITLE_BAND = {
+ *   column: {start: 0, end: 1},
+ *   row: {start: 1, end: 0},
+ * };
+ * ```
+ *
+ * The anchor says *which end of the grid* the heading belongs to and this says *which edge of the
+ * band* it is measured from, and the two are the same statement read twice: a column heading
+ * anchored at the start is laid out against the first column, and a row's against the last, the two
+ * bands being numbered from opposite corners. An anchor of `middle`, or none at all, has no entry
+ * in either row of the table and so writes nothing.
+ *
+ * Read off the **band** the heading is in rather than the channel it captions, and written for
+ * every faceted channel whether or not a heading is actually drawn: `assembleLayoutTitleBand` asks
+ * only that the channel has a field behind it, so a header that anchors a heading it also takes off
+ * still moves the band.
+ */
+private fun layoutTitleBand(anchor: String?, band: String): Double? =
+  when (anchor) {
+    "start" -> if (band == "column") 0.0 else 1.0
+    "end" -> if (band == "column") 1.0 else 0.0
+    else -> null
+  }
 
 internal class FacetGrid(
   val row: Facet?,
@@ -969,6 +1025,13 @@ internal class FacetGrid(
     // and a `center` — which has no default — landing after them.
     for (key in listOf("bounds", "align", "center")) {
       declared.fields[key]?.let { put(key, it) }
+    }
+    // `...(titleBand ? {titleBand} : {})`, last of all and *after* what the specification stated —
+    // `assembleLayout` spreads it past the declared layout, so a grid cannot state its own. Asked
+    // of both channels whether or not either is titled: see [layoutTitleBand].
+    val bands = listOfNotNull(row, column).mapNotNull { it.titleBand() }
+    if (bands.isNotEmpty()) {
+      put("titleBand", obj { bands.forEach { (band, edge) -> put(band, num(edge)) } })
     }
   }
 
@@ -1324,7 +1387,16 @@ internal class FacetWrap(
    * A wrapped facet captions its cells above them, so its heading is a column's unless the header
    * moves it to a side, where it becomes a row's and is laid out down the grid instead.
    */
-  private fun titleBand(): String = headerChannel("facet", statedTitleOrient())
+  private fun headingBand(): String = headerChannel("facet", statedTitleOrient())
+
+  /** The band and the edge this grid's heading is laid out against — [layoutTitleBand]. */
+  private fun titleBand(): Pair<String, Double>? {
+    val anchor =
+      (headerProperty(def.raw.obj("header"), config, "facet", "titleAnchor") as? VegaValue.Str)
+        ?.value
+    val band = headingBand()
+    return layoutTitleBand(anchor, band)?.let { band to it }
+  }
 
   /**
    * Which band a **caption** is read as belonging to — `getHeaderChannel('facet', labelOrient)`.
@@ -1432,7 +1504,7 @@ internal class FacetWrap(
     // A heading moved to a trailing side is anchored at the end of the grid, keyed by the band it
     // is now in — `assembleLayoutTitleBand` runs over every facet channel, this one included.
     if (statedTitleOrient() in setOf("right", "bottom")) {
-      put("titleAnchor", obj { put(titleBand(), "end") })
+      put("titleAnchor", obj { put(headingBand(), "end") })
     }
     put("bounds", "full")
     // `assembleDefaultLayout` with neither a row nor a column: a wrapped facet has no direction
@@ -1451,6 +1523,9 @@ internal class FacetWrap(
     // Last of all, and only where the specification said so: `columns` is spread in after the rest
     // — with none, the whole facet is one row and the layout has no number to write down.
     columns?.let { put("columns", num(it.toDouble())) }
+    // `assembleLayoutTitleBand` runs over every facet channel, a wrapped one included — see
+    // [layoutTitleBand].
+    titleBand()?.let { (band, edge) -> put("titleBand", obj { put(band, num(edge)) }) }
   }
 
   override fun headings(config: Config): Map<String, String> = emptyMap()
@@ -1476,12 +1551,13 @@ internal class FacetWrap(
         obj {
           put("name", "facet-title")
           put("type", "group")
-          put("role", "${titleBand()}-title")
+          put("role", "${headingBand()}-title")
           put(
             "title",
             obj {
               put("text", title)
               put("style", "guide-title")
+              headerFacing(def.raw.obj("header"), config, "facet", headingBand(), "title")
               // `assembleHeaderProperties(config, facetFieldDef, channel,
               // HEADER_TITLE_PROPERTIES,
               // …)`: the heading is styled by the header's `title…` properties exactly as each
@@ -1652,10 +1728,10 @@ internal class FacetWrap(
         put("style", "guide-label")
         put("frame", "group")
         // `assembleLabelTitle` is the **same** function wherever the caption is drawn, so a wrapped
-        // grid's cell caption faces the way a band's does: see [captionFacing]. Left out here, a
+        // grid's cell caption faces the way a band's does: see [headerFacing]. Left out here, a
         // wrapped trellis that anchored its names to one end of each cell drew them centred, and
         // one that turned them read them off their own baseline.
-        captionFacing(def.raw.obj("header"), config, "facet", labelBand())
+        headerFacing(def.raw.obj("header"), config, "facet", labelBand(), "label")
         // A wrapped facet captions its **cells**, so the header's *label* properties belong on the
         // cell's own title — a grid captions its bands with them instead.
         val properties = labelProperties()

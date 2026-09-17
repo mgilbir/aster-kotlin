@@ -231,6 +231,47 @@ section here does not get released.
 
 ### Fixed
 
+- **An axis is drawn on the side the theme asked for, and a trellis heading faces the way it was
+  turned.** Four rules, all of them a guide reading something a theme wrote and none of them read
+  before. The side an axis is on is settled from three places rather than one — `const orient =
+  axis?.orient || config[channel === 'x' ? 'axisX' : 'axisY']?.orient || config.axis?.orient ||
+  defaultOrient(channel);` — and this compiler asked only the first, so a document that puts every
+  vertical scale on the right of every chart was answered with Vega-Lite's own default. The side
+  matters twice over: it is written onto the axis, `orient` being one of
+  `propsToAlwaysIncludeConfig` because Vega has no `config.axis.orient` to apply it from, and it is
+  what every label is turned to face, `defaultLabelAlign` and `defaultLabelBaseline` flipping their
+  answer where an axis has been moved off its main orientation. A block named after a *kind of
+  scale* is a third case again: `config.axisBand.orient` wins the side, `getAxisConfig` asking
+  `vlOnlyAxisConfig` before `vgAxisConfig`, while the labels stay turned for the side the chain
+  above resolved — upstream's own two-tier reading, reproduced rather than repaired. The chain is
+  `||` and not `??`, so an axis writing `"orient": null` steps past its own falsy word into the
+  theme's side.
+
+  Beside it, the one axis property a theme is never asked about: `isAxisProperty(property) &&
+  property !== 'values'` excludes it by name, because the ticks an axis shows are values of its own
+  column and a list written once in `config.axisQuantitative` would be forced onto every measured
+  axis in the document. This compiler wrote it out from every Vega-Lite-only block.
+
+  `config.aria: false` takes a whole drawing out of the accessibility tree, and each guide has to
+  carry that on itself — `...(config.aria === false ? {aria: false} : {})`, spread *after* the
+  axis's own properties, so it overrules an `"aria": true` the axis states. Nothing was written, so
+  every axis in such a document announced itself to a screen reader.
+
+  And the heading over a trellis faces the way its captions do, by the same two rules:
+  `assembleTitleGroup` spreads `defaultHeaderGuideBaseline(titleAngle, headerChannel)` and
+  `defaultHeaderGuideAlign(headerChannel, titleAngle, titleAnchor)` into the title it builds,
+  exactly as `assembleLabelTitle` does off `labelAngle` and `labelAnchor`. Neither was called for a
+  heading, so a trellis that turned its heading drew it turned and still anchored as though it were
+  flat, and one that anchored its heading to one end of the grid drew it centred — as did every
+  trellis in a document whose theme wrote `config.header.titleAngle` once. The anchor is read before
+  the angle, so an unturned heading is still pushed to its end; the angle is normalised for a
+  heading and not for a caption, which is upstream's asymmetry and decides which arm of each rule a
+  negative turn lands in. The anchor is also the whole of `layout.titleBand` —
+  `LAYOUT_TITLE_BAND = {column: {start: 0, end: 1}, row: {start: 1, end: 0}}`, the two bands
+  numbered from opposite corners — which was not emitted at all, for a crossed grid or a wrapped
+  one.
+
+  The Vega-Lite schema sweep drops from 30 differing cases to 12.
 - **A gradient legend is as long as the theme asked for, and a style block reaches Vega whole.**
   `stripAndRedirectConfig` deletes five words from `config.legend` on the way out —
   `if (config.legend) { for (const prop of VL_ONLY_LEGEND_CONFIG) delete config.legend[prop]; }`,

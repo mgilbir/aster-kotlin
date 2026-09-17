@@ -4752,10 +4752,10 @@ private class Compilation(
     // the `x` the layer above it brought, and the two came out the other way round.
     fun each(channel: String) = components.values.filter { it.first == channel }.map { it.second }
     val (xs, ys) = each("x") to each("y")
-    return xs.mapNotNull { Guides.assembleAxis(it, "grid") } +
-      ys.mapNotNull { Guides.assembleAxis(it, "grid") } +
-      xs.mapNotNull { Guides.assembleAxis(it, "main") } +
-      ys.mapNotNull { Guides.assembleAxis(it, "main") }
+    return xs.mapNotNull { Guides.assembleAxis(it, "grid", config) } +
+      ys.mapNotNull { Guides.assembleAxis(it, "grid", config) } +
+      xs.mapNotNull { Guides.assembleAxis(it, "main", config) } +
+      ys.mapNotNull { Guides.assembleAxis(it, "main", config) }
   }
 
   /**

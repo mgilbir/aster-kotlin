@@ -1,0 +1,377 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "The heading over a trellis faces the way its captions do, and by the same two rules: `assembleTitleGroup` spreads `...defaultHeaderGuideBaseline(titleAngle, headerChannel)` and `...defaultHeaderGuideAlign(headerChannel, titleAngle, titleAnchor)` into the title it builds, exactly as `assembleLabelTitle` spreads them off `labelAngle` and `labelAnchor` into each cell's caption. This compiler called neither for a heading — only for a caption — so a trellis that anchored its heading to one end of the grid drew it centred, and one that turned it on its side drew it turned and still anchored as though it were flat. Both properties are read through `getHeaderProperty`, which asks the header's own block, then `config.headerRow`/`config.headerColumn`, then `config.header`, so the anchor written once in the theme here reaches both of this chart's headings and the turn written on the column's own header reaches one. The rules are asked through the **band** the heading is in rather than the channel it captions: a column heading runs across the top of the grid and is faced as an `x` axis's labels are, a row heading down the side as a `y` axis's, and both ask `defaultLabelBaseline` for `alwaysIncludeMiddle`, which an axis does not — a heading turned a quarter turn has its own length running across the band, so it is centred on the band rather than pushed to one edge of it, which is why the column heading is baselined `middle`. The row heading is turned by nothing at all and is still aligned, `right`, because `defaultHeaderGuideAlign` switches on the anchor before it reaches the angle and the two `case` arms answer outright: a heading pushed to one end of the grid is pushed there whether or not anything turned it, and reading the anchor only inside a test for an angle would leave every unturned, anchored heading centred. The baseline is the angle's alone — `defaultLabelBaseline` answers nothing without one — so that row heading has none. The anchor is also the whole of `layout.titleBand`: `LAYOUT_TITLE_BAND = {column: {start: 0, end: 1}, row: {start: 1, end: 0}}`, the two bands being numbered from opposite corners, so one anchor written once puts the column heading against band 1 and the row heading against band 0 — and this compiler wrote no `titleBand` at all. The captions on the cells must not change. They are the header's `label…` properties and neither the theme nor either header states one of them, so they stay flat, unanchored and unbaselined beside headings that are none of those things: the words that face a heading are not an instruction to the names underneath it.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "c": "alpha",
+          "v": 28,
+          "k": "one",
+          "g": "north"
+        },
+        {
+          "c": "beta",
+          "v": 55,
+          "k": "one",
+          "g": "south"
+        },
+        {
+          "c": "gamma",
+          "v": 43,
+          "k": "two",
+          "g": "north"
+        },
+        {
+          "c": "delta",
+          "v": 91,
+          "k": "two",
+          "g": "south"
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "c",
+            "g",
+            "k"
+          ],
+          "field": "v",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    },
+    {
+      "name": "column_domain",
+      "source": "data_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "k"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "row_domain",
+      "source": "data_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "g"
+          ]
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "child_width",
+      "value": 120
+    },
+    {
+      "name": "child_height",
+      "value": 80
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "offset": {
+      "rowTitle": 10,
+      "columnTitle": 10
+    },
+    "columns": {
+      "signal": "length(data('column_domain'))"
+    },
+    "bounds": "full",
+    "align": "all",
+    "titleBand": {
+      "row": 0,
+      "column": 1
+    }
+  },
+  "marks": [
+    {
+      "name": "row-title",
+      "type": "group",
+      "role": "row-title",
+      "title": {
+        "text": "g",
+        "orient": "left",
+        "style": "guide-title",
+        "align": "right",
+        "anchor": "end",
+        "offset": 10
+      }
+    },
+    {
+      "name": "column-title",
+      "type": "group",
+      "role": "column-title",
+      "title": {
+        "text": "k",
+        "style": "guide-title",
+        "baseline": "middle",
+        "align": "right",
+        "anchor": "end",
+        "angle": 90,
+        "offset": 10
+      }
+    },
+    {
+      "name": "row_header",
+      "type": "group",
+      "role": "row-header",
+      "from": {
+        "data": "row_domain"
+      },
+      "sort": {
+        "field": "datum[\"g\"]",
+        "order": "ascending"
+      },
+      "title": {
+        "text": {
+          "signal": "isValid(parent[\"g\"]) ? parent[\"g\"] : \"\"+parent[\"g\"]"
+        },
+        "orient": "left",
+        "style": "guide-label",
+        "frame": "group",
+        "offset": 10
+      },
+      "encode": {
+        "update": {
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      },
+      "axes": [
+        {
+          "scale": "y",
+          "orient": "left",
+          "grid": false,
+          "title": "v",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(child_height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "name": "column_header",
+      "type": "group",
+      "role": "column-header",
+      "from": {
+        "data": "column_domain"
+      },
+      "sort": {
+        "field": "datum[\"k\"]",
+        "order": "ascending"
+      },
+      "title": {
+        "text": {
+          "signal": "isValid(parent[\"k\"]) ? parent[\"k\"] : \"\"+parent[\"k\"]"
+        },
+        "style": "guide-label",
+        "frame": "group",
+        "offset": 10
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "child_width"
+          }
+        }
+      }
+    },
+    {
+      "name": "column_footer",
+      "type": "group",
+      "role": "column-footer",
+      "from": {
+        "data": "column_domain"
+      },
+      "sort": {
+        "field": "datum[\"k\"]",
+        "order": "ascending"
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "child_width"
+          }
+        }
+      },
+      "axes": [
+        {
+          "scale": "x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "c",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "name": "cell",
+      "type": "group",
+      "style": "cell",
+      "from": {
+        "facet": {
+          "name": "facet",
+          "data": "data_0",
+          "groupby": [
+            "g",
+            "k"
+          ],
+          "aggregate": {
+            "cross": true
+          }
+        }
+      },
+      "sort": {
+        "field": [
+          "datum[\"g\"]",
+          "datum[\"k\"]"
+        ],
+        "order": [
+          "ascending",
+          "ascending"
+        ]
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "child_width"
+          },
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "facet"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+              },
+              "x": {
+                "scale": "x",
+                "field": "c"
+              },
+              "width": {
+                "signal": "max(0.25, bandwidth('x'))"
+              },
+              "y": {
+                "scale": "y",
+                "field": "v_end"
+              },
+              "y2": {
+                "scale": "y",
+                "field": "v_start"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "y",
+          "orient": "left",
+          "gridScale": "x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(child_height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "data": "data_0",
+        "field": "c",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "child_width"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "v_start",
+          "v_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "child_height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ]
+}
