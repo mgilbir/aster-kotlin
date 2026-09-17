@@ -231,6 +231,37 @@ section here does not get released.
 
 ### Fixed
 
+- **Sixteen keys of a theme reached the wrong side of the compiler, and an emptied block reached
+  Vega at all.** What survives `stripAndRedirectConfig` is decided by a list upstream wrote out by
+  hand, `VL_ONLY_CONFIG_PROPERTIES`, and by a sweep at the end of it that asks about every property
+  rather than about a named few. This compiler derived the list from the idea behind it — whatever
+  only Vega-Lite understands is struck out — and the idea gives the wrong answer in both
+  directions.
+
+  Five keys are Vega-Lite's own and are nevertheless handed to Vega, which has no use for them.
+  `fieldTitle` names the formatter a guide's default title is written by, `switch (config.fieldTitle)
+  { case 'plain': return fieldDef.field; }` in `channeldef.ts`, and it is not on the list; neither is
+  `timeFormatType`; neither are `headerRow`, `headerColumn` and `headerFacet`, though the `header`
+  block beside them is struck out. Dropped here, a theme arrived at the renderer without them.
+  Eleven go the other way and are struck out although Vega-Lite alone appears to read them: the ten
+  per-direction type-based axis blocks, `axisXBand` and its kin — while `axisBand`, which this
+  compiler resolves through exactly the same chain, is *not* on the list and stays. Passed through,
+  each was a word Vega has never heard of in the configuration it applies to every axis.
+
+  The closing sweep is the part that is not about a particular key: `for (const prop in config) { if
+  (isObject(config[prop]) && isEmpty(config[prop])) delete config[prop]; }`. A block may arrive empty
+  because the specification wrote it so, `{"config": {"axis": {}}}`, or because everything in it was
+  Vega-Lite's own and has just been taken out, which is how `{"config": {"legend":
+  {"unselectedOpacity": 0.3}}}` ends. Every block this compiler knew by name dropped its own, so the
+  ones it passes through untouched — an axis, a projection, a range, a header, an empty parameter
+  list — reached Vega as empty objects nobody had asked for, in a configuration upstream does not
+  emit at all.
+
+  The sweep goes no deeper than the configuration's own properties, which is the other half of the
+  rule: `config.style` is what it asks about, not `config.style.named`. A named style written empty
+  is therefore emitted exactly as written, where this dropped it and a theme that declares its styles
+  up front and fills some of them in later arrived one style short.
+
 - **A scale flag a theme asked for: a clamp, a rounding, an axis turned round.**
   `parseUnitScaleProperty` walks every scale property by name and, for each one the specification
   did not state, asks `const value = util.hasProperty(scaleRules, property) ? scaleRules[property]
