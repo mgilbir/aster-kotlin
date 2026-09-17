@@ -231,6 +231,29 @@ section here does not get released.
 
 ### Fixed
 
+- **An assembled axis writes everything the chart stated, then everything derived.** Two rules
+  compose to give that order. `parseAxis` fills the component by walking `AXIS_COMPONENT_PROPERTIES`
+  rather than in whatever order its rules fire, and `Split.combine` puts the halves in a stated
+  order with a comment saying so: `{...this.explicit, // Explicit properties comes first
+  ...this.implicit}`.
+
+  This compiler walked its own insertion order, which agrees wherever the two coincide and not
+  otherwise. The clearest case is an axis stating a `labelAngle`: the angle was written before the
+  `labelAlign` it *derives*, where upstream writes every stated property first and the derived
+  alignment later, among the implicit ones.
+
+  The document's own `aria: false` moves with it. Upstream spreads it after `...axis`, which in
+  JavaScript overwrites an existing key **in place** and appends only a new one — and its component
+  already carries an `aria`, so the value lands at the property's own position rather than at the
+  end. It is now written into the component for the same reason, still overruling an axis that
+  states `aria: true`.
+
+  **No gate here can see any of this**: `SpecDiff` ignores object key order by design.
+  `AxisKeyOrderTest` is new and holds it, with upstream's own output for the same chart pasted whole
+  rather than summarised. Three order-only mutants are killed by it while the fixture gate stays
+  green, which is what says it earns its place.
+
+
 - **An assembled scale writes its keys in upstream's order.** `assembleScalesForModel` builds the
   object from a literal rather than by accumulating into one, so the order is stated rather than
   incidental: `{name, type, ...domain, ...domainRaw, range, ...reverse, ...otherScaleProps}`.

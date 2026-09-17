@@ -38,6 +38,99 @@ internal object Guides {
    * marks and carries no labels or domain, while the axis is painted in front. Each property knows
    * which half it belongs to.
    */
+  /**
+   * `AXIS_COMPONENT_PROPERTIES`, which is what `parseAxis` walks when it fills a component and
+   * therefore the order every axis property is written in.
+   *
+   * `[disable, gridScale, scale, ...COMMON_AXIS_PROPERTIES_INDEX, labelExpr, encode]`, with the
+   * common block alphabetical from `orient` to `zindex`. Read off upstream rather than guessed, and
+   * checked against a compiled axis carrying every one of them.
+   */
+  val AXIS_PROPERTY_ORDER: List<String> =
+    listOf(
+      "disable",
+      "gridScale",
+      "scale",
+      "orient",
+      "aria",
+      "bandPosition",
+      "description",
+      "domain",
+      "domainCap",
+      "domainColor",
+      "domainDash",
+      "domainDashOffset",
+      "domainOpacity",
+      "domainWidth",
+      "format",
+      "formatType",
+      "grid",
+      "gridCap",
+      "gridColor",
+      "gridDash",
+      "gridDashOffset",
+      "gridOpacity",
+      "gridWidth",
+      "labelAlign",
+      "labelAngle",
+      "labelBaseline",
+      "labelBound",
+      "labelColor",
+      "labelFlush",
+      "labelFlushOffset",
+      "labelFont",
+      "labelFontSize",
+      "labelFontStyle",
+      "labelFontWeight",
+      "labelLimit",
+      "labelLineHeight",
+      "labelOffset",
+      "labelOpacity",
+      "labelOverlap",
+      "labelPadding",
+      "labels",
+      "labelSeparation",
+      "maxExtent",
+      "minExtent",
+      "offset",
+      "position",
+      "tickBand",
+      "tickCap",
+      "tickColor",
+      "tickCount",
+      "tickDash",
+      "tickDashOffset",
+      "tickExtra",
+      "tickMinStep",
+      "tickOffset",
+      "tickOpacity",
+      "tickRound",
+      "ticks",
+      "tickSize",
+      "tickWidth",
+      "title",
+      "titleAlign",
+      "titleAnchor",
+      "titleAngle",
+      "titleBaseline",
+      "titleColor",
+      "titleFont",
+      "titleFontSize",
+      "titleFontStyle",
+      "titleFontWeight",
+      "titleLimit",
+      "titleLineHeight",
+      "titleOpacity",
+      "titlePadding",
+      "titleX",
+      "titleY",
+      "translate",
+      "values",
+      "zindex",
+      "labelExpr",
+      "encode",
+    )
+
   private val MAIN_ONLY =
     setOf(
       "aria",
@@ -197,6 +290,38 @@ internal object Guides {
      * decision.
      */
     val explicitProperties: MutableSet<String> = mutableSetOf()
+
+    /**
+     * The properties in the order upstream writes them: **everything explicit, then everything
+     * implicit**, each in `AXIS_COMPONENT_PROPERTIES` order.
+     *
+     * ```js
+     * public combine(): Partial<T> {
+     *   return {
+     *     ...this.explicit, // Explicit properties comes first
+     *     ...this.implicit,
+     *   };
+     * }
+     * ```
+     *
+     * and each half is in that order because `parseAxis` fills the component by walking
+     * `AXIS_COMPONENT_PROPERTIES` — `for (const property of AXIS_COMPONENT_PROPERTIES) { … }` —
+     * rather than in whatever order the rules happen to fire.
+     *
+     * This walked its own insertion order instead, which agrees wherever the two coincide and not
+     * otherwise: an axis stating a `labelAngle` wrote it before the `labelAlign` that the angle
+     * *derives*, where upstream writes the stated one after every implicit one it does not share a
+     * name with. **No gate here can see it** — `SpecDiff` ignores object key order by design — so
+     * it is pinned by `AxisKeyOrderTest` rather than by a fixture.
+     */
+    fun orderedProperties(): List<Map.Entry<String, VegaValue>> {
+      val rank = AXIS_PROPERTY_ORDER.withIndex().associate { (index, name) -> name to index }
+      // A name upstream does not list sorts after everything it does, keeping its own relative
+      // order — the same place a spread of unknown keys would put it.
+      fun position(name: String) = rank[name] ?: (AXIS_PROPERTY_ORDER.size + 1)
+      val (explicit, implicit) = properties.entries.partition { it.key in explicitProperties }
+      return explicit.sortedBy { position(it.key) } + implicit.sortedBy { position(it.key) }
+    }
 
     fun set(name: String, value: VegaValue?) {
       if (value != null && !properties.containsKey(name)) properties[name] = value
@@ -1282,12 +1407,21 @@ internal object Guides {
     if (kind == "grid" && !grid) return null
     val labelExpr = (axis.properties["labelExpr"] as? VegaValue.Str)?.value
 
+    // The document's own `aria: false` is **written into the component**, not appended to the
+    // finished axis. Upstream spreads it after `...axis`, which in JavaScript overwrites an
+    // existing
+    // key *in place* and appends only a new one — and its component already carries an `aria`, so
+    // the value lands at the property's own position rather than at the end. Appending it here put
+    // it after every label and tick property instead. Overwriting rather than defaulting is still
+    // the rule: an axis that states `aria: true` is overruled, because a document that is not in
+    // the accessibility tree has no axes in it either.
+    if (config.raw.fields["aria"] == VegaValue.Bool(false)) axis.override("aria", bool(false))
     return obj {
       put("scale", axis.properties["scale"])
       put("orient", axis.properties["orient"])
       val zindex = axis.properties["zindex"] ?: num(0)
       if (kind == "grid") {
-        axis.properties.forEach { (key, value) ->
+        axis.orderedProperties().forEach { (key, value) ->
           if (key == "encode") encodeFor(value, kind)?.let { put(key, it) }
           else if (
             key !in setOf("scale", "orient", "zindex", "labelExpr") &&
@@ -1324,7 +1458,7 @@ internal object Guides {
             .takeIf { it.isNotEmpty() }
             ?.let { put("title", str(it.joinToString(", "))) }
         var wroteEncode = false
-        axis.properties.forEach { (key, value) ->
+        axis.orderedProperties().forEach { (key, value) ->
           if (key == "encode") {
             val own = encodeFor(value, kind)
             val withText = if (labelExpr == null) own else withLabelText(own, labelExpr)
@@ -1353,7 +1487,6 @@ internal object Guides {
         // axis cannot opt back into a tree the chart is not in. The gridlines need no such rule —
         // they are `aria: false` whatever the theme says, being a repetition of the axis beside
         // them. The legend's twin is guarded by `legend.aria == undefined` and this one is not.
-        if (config.raw.fields["aria"] == VegaValue.Bool(false)) put("aria", false)
         put("zindex", zindex)
       }
     }
