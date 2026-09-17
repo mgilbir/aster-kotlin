@@ -1,0 +1,322 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A wrapped facet is a third channel beside `row` and `column`, and every rule that faces a heading runs over it too: `assembleLayoutTitleBand` loops `for (const channel of FACET_CHANNELS)`, which is all three, and `getHeaderChannel` answers `column` for a wrapped one because its cells are captioned above them. So a wrapped grid whose header anchors its heading at the end is anchored in the *column* band — `LAYOUT_TITLE_BAND.column.end` is 1 — and the heading itself is aligned `right`. That alignment is the anchor's and not the turn's, which is what this chart is arranged to show: `defaultHeaderGuideAlign` switches on the anchor first and returns from the `case` arm without ever reaching `defaultLabelAlign`, and two hundred degrees on a column band would have answered `left` had it been reached, `(0 < angle && angle < 180) === (orient === 'bottom')` being false against false. The turn still reaches the baseline, which the anchor has nothing to say about: two hundred degrees is caught by neither of the two middle bands, so `(angle <= 45 || 315 <= angle) === (orient === 'top')` reads false against true and the heading is baselined `top`. This compiler wrote the heading's `angle` and its `anchor` — those are `assembleHeaderProperties` carrying `titleAngle` and `titleAnchor` across under their Vega names — and neither the baseline nor the alignment nor the band the two of them imply, so a wrapped trellis anchored its heading by naming the anchor to Vega and then laid it out from the middle of the grid anyway. The captions on the cells must not change. A wrapped facet captions the **cell** rather than a band, `assembleLabelTitle` being the same function wherever its result is drawn, and the header states no `labelAngle` or `labelAnchor` here — so the names stay flat and unanchored while the heading above them is neither, which is what says the two are read from two different pairs of words.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "c": "alpha",
+          "v": 28,
+          "k": "one"
+        },
+        {
+          "c": "beta",
+          "v": 55,
+          "k": "two"
+        },
+        {
+          "c": "gamma",
+          "v": 43,
+          "k": "three"
+        },
+        {
+          "c": "delta",
+          "v": 91,
+          "k": "four"
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "c",
+            "k"
+          ],
+          "field": "v",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    },
+    {
+      "name": "facet_domain",
+      "source": "data_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "k"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "facet_domain_row",
+      "transform": [
+        {
+          "type": "sequence",
+          "start": 0,
+          "stop": {
+            "signal": "ceil(length(data(\"facet_domain\")) / 2)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "facet_domain_column",
+      "transform": [
+        {
+          "type": "sequence",
+          "start": 0,
+          "stop": {
+            "signal": "min(length(data(\"facet_domain\")), 2)"
+          }
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "child_width",
+      "value": 120
+    },
+    {
+      "name": "child_height",
+      "value": 80
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "bounds": "full",
+    "align": "all",
+    "columns": 2,
+    "titleBand": {
+      "column": 1
+    }
+  },
+  "marks": [
+    {
+      "name": "facet-title",
+      "type": "group",
+      "role": "column-title",
+      "title": {
+        "text": "k",
+        "style": "guide-title",
+        "baseline": "top",
+        "align": "right",
+        "anchor": "end",
+        "angle": 200,
+        "offset": 10
+      }
+    },
+    {
+      "name": "row_header",
+      "type": "group",
+      "role": "row-header",
+      "from": {
+        "data": "facet_domain_row"
+      },
+      "encode": {
+        "update": {
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      },
+      "axes": [
+        {
+          "scale": "y",
+          "orient": "left",
+          "grid": false,
+          "title": "v",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(child_height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "name": "column_footer",
+      "type": "group",
+      "role": "column-footer",
+      "from": {
+        "data": "facet_domain_column"
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "child_width"
+          }
+        }
+      },
+      "axes": [
+        {
+          "scale": "x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "c",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "name": "cell",
+      "type": "group",
+      "title": {
+        "text": {
+          "signal": "isValid(parent[\"k\"]) ? parent[\"k\"] : \"\"+parent[\"k\"]"
+        },
+        "style": "guide-label",
+        "frame": "group",
+        "offset": 10
+      },
+      "style": "cell",
+      "from": {
+        "facet": {
+          "name": "facet",
+          "data": "data_0",
+          "groupby": [
+            "k"
+          ]
+        }
+      },
+      "sort": {
+        "field": [
+          "datum[\"k\"]"
+        ],
+        "order": [
+          "ascending"
+        ]
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "child_width"
+          },
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "facet"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+              },
+              "x": {
+                "scale": "x",
+                "field": "c"
+              },
+              "width": {
+                "signal": "max(0.25, bandwidth('x'))"
+              },
+              "y": {
+                "scale": "y",
+                "field": "v_end"
+              },
+              "y2": {
+                "scale": "y",
+                "field": "v_start"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "y",
+          "orient": "left",
+          "gridScale": "x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(child_height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "data": "data_0",
+        "field": "c",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "child_width"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "v_start",
+          "v_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "child_height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ]
+}

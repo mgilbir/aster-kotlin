@@ -250,13 +250,44 @@ internal object Guides {
     // scale, and returning nothing at all here let the other layers put it back.
     if (def.axisDisabled) return AxisComponent(channel).also { it.disabled = true }
     val user = def.axis
+    // ```js
+    // const orient =
+    //   axis?.orient ||
+    //   config[channel === 'x' ? 'axisX' : 'axisY']?.orient ||
+    //   config.axis?.orient ||
+    //   defaultOrient(channel);
+    // ```
+    //
+    // The side an axis is on is settled **before** the theme's blocks are gathered, because it
+    // chooses one of them — `axis${titleCase(orient)}` — and because every label on the axis is
+    // turned to face it. Only three places are asked, and which three is the whole of the split
+    // below: the axis's own statement, the theme's block for this direction, and the theme's block
+    // for every axis at once. A theme writing its side in a block named after a **scale** —
+    // `config.axisBand`, `config.axisQuantitative` — is not asked here, so such an axis is drawn
+    // on the side the block names while its labels are turned as though it had stayed where it was.
+    // Reading only the axis's own statement left a theme that moves every axis to the top unread.
+    //
+    // `||` and not `??`, so the chain steps past a side the axis wrote down **falsily** as much as
+    // past one it did not write at all: an axis carrying `"orient": null` — which is how a
+    // generated specification says "no opinion" — takes the theme's side, and one carrying
+    // `"orient": ""` does too.
+    val statedOrient = user?.fields?.get("orient")?.takeIf { it.isTruthy() }
+    val themedOrient =
+      if (statedOrient != null) null
+      else
+        view.config.raw.obj(if (channel == "x") "axisX" else "axisY")?.string("orient")
+          ?: view.config.raw.obj("axis")?.string("orient")
+    // `defaultOrient`: the bottom for a horizontal axis, the left for a vertical one.
+    val side =
+      (statedOrient as? VegaValue.Str)?.value
+        ?: themedOrient
+        ?: if (channel == "x") "bottom" else "left"
     // The blocks a theme may write this axis in, most specific first — `config.axisX` as much as
-    // `config.axis`. `getAxisConfig` asks the same chain for **every** axis property, not only the
-    // ones Vega has never heard of, so a theme that turns its horizontal labels upright or takes
-    // every caption off is read here and not just where a conditional value is.
-    val configuredSide = user?.string("orient") ?: if (channel == "x") "bottom" else "left"
-    val (vegaLiteOnlyConfigs, vegaConfigs) =
-      view.config.axisConfigFamilies(channel, type, configuredSide)
+    // `config.axis`, and `axis${titleCase(side)}` for the edge it has just been settled on.
+    // `getAxisConfig` asks the same chain for **every** axis property, not only the ones Vega has
+    // never heard of, so a theme that turns its horizontal labels upright or takes every caption
+    // off is read here and not just where a conditional value is.
+    val (vegaLiteOnlyConfigs, vegaConfigs) = view.config.axisConfigFamilies(channel, type, side)
     // `getStyleConfig(property, axis.style, config.style)`: an axis may **name style blocks**, and
     // they outrank every configuration family. That is how a document keeps its axis styling in one
     // place and points an axis at it by name, and it is the only way to reach the properties a
@@ -322,8 +353,15 @@ internal object Guides {
     }
 
     axis.set("scale", str(view.scale(channel)))
-    axis.explicitOrient = user?.fields?.get("orient") != null
-    axis.set("orient", str(if (channel == "x") "bottom" else "left"))
+    axis.explicitOrient = statedOrient != null
+    // `orient` is one of `propsToAlwaysIncludeConfig`, which is why a themed side is written onto
+    // the axis rather than left in the configuration for Vega to apply: Vega has no `config.axis
+    // .orient` of its own to read it from. The side a block named after a **scale** states is
+    // written out too, and beats the one the chain above resolved — `getAxisConfig` asks
+    // `vlOnlyAxisConfig` before `vgAxisConfig` — so `config.axisBand.orient` moves the axis while
+    // `config.axisX.orient` is still what its labels were turned for.
+    if (statedOrient != null) axis.set("orient", asSignal(statedOrient))
+    else derived("orient", str(side))
 
     // The gridlines belong to *this* scale but are drawn across the other one's extent. Whether
     // there are any is a *default* — a continuous field-driven axis has them — and a theme saying
@@ -449,7 +487,6 @@ internal object Guides {
         ?: themeAngle
         ?: if (channel == "x" && def.type?.isDiscrete == true && def.timeUnit == null) 270.0
         else null
-    val side = user?.string("orient") ?: if (channel == "x") "bottom" else "left"
     // An angle a *signal* supplies cannot be compared here, so the comparison is written out and
     // handed to Vega: `defaultLabelAlign`'s signal branch. The two answers then have to live on the
     // labels' own `encode`, an axis property taking a constant rather than a rule.
@@ -591,6 +628,12 @@ internal object Guides {
     // exclude is every word nobody has written yet.
     for (key in AXIS_PROPERTIES) {
       val value = user?.fields?.get(key) ?: continue
+      // `orient` is settled above and not here. It is one of the properties `axisRules` answers
+      // for, and its rule — `orient: ({orient}) => orient` — reads the side the chain resolved
+      // rather than `axis.orient`, so what the axis wrote down reaches the output only through
+      // that chain. Copied across raw, an axis saying `"orient": null` said it to Vega instead of
+      // stepping past its own falsy word into the theme's side.
+      if (key == "orient") continue
       // ```js
       // export function numberFormat({type, specifiedFormat, config, normalizeStack}) {
       //   // Specified format in axis/legend has higher precedence than fieldDef.format
@@ -655,6 +698,18 @@ internal object Guides {
     // beside it would settle the property for this axis alone and beat the theme with a default.
     for (property in AXIS_PROPERTIES) {
       if (axis.properties.containsKey(property)) continue
+      // ```js
+      // isAxisProperty(property) && property !== 'values'
+      //   ? getAxisConfig(property, config.style, axis.style, axisConfigs)
+      //   : {};
+      // ```
+      //
+      // The theme is never asked about `values`, and it is the only property excluded by name. The
+      // ticks an axis shows are the values of *its* column, and a theme cannot know them: a list
+      // written once in `config.axisQuantitative` would be forced onto every measured axis in the
+      // document, whatever each of them is measuring. `defaultTickCount` reads `axis.values` for
+      // the same reason — only what the specification stated suppresses the count.
+      if (property == "values") continue
       val themed = configured(property) ?: continue
       // A themed **signal** or conditional is written out from any block: Vega can read neither
       // from its own configuration, and a conditional is not a Vega property at all. So is one of
@@ -1222,7 +1277,7 @@ internal object Guides {
   /** `labelAlign`/`labelBaseline` of null are decisions the axis keeps and Vega is not shown. */
   private val NULLABLE_LABEL_PROPERTIES = setOf("labelAlign", "labelBaseline")
 
-  fun assembleAxis(axis: AxisComponent, kind: String): VegaValue? {
+  fun assembleAxis(axis: AxisComponent, kind: String, config: Config): VegaValue? {
     val grid = (axis.properties["grid"] as? VegaValue.Bool)?.value == true
     if (kind == "grid" && !grid) return null
     val labelExpr = (axis.properties["labelExpr"] as? VegaValue.Str)?.value
@@ -1286,6 +1341,19 @@ internal object Guides {
           }
         }
         if (labelExpr != null && !wroteEncode) put("encode", withLabelText(null, labelExpr))
+        // ```js
+        // ...axis,
+        // ...(config.aria === false ? {aria: false} : {}),
+        // ```
+        //
+        // `config.aria: false` takes the whole drawing out of the accessibility tree, and a guide
+        // has to say so on itself — there is nothing for a reader to be told about an axis that is
+        // not being described. Written **after** the axis's own properties, so it overrules an
+        // `"aria": true` the axis states: the document's decision is about the document, and an
+        // axis cannot opt back into a tree the chart is not in. The gridlines need no such rule —
+        // they are `aria: false` whatever the theme says, being a repetition of the axis beside
+        // them. The legend's twin is guarded by `legend.aria == undefined` and this one is not.
+        if (config.raw.fields["aria"] == VegaValue.Bool(false)) put("aria", false)
         put("zindex", zindex)
       }
     }
