@@ -1,5 +1,7 @@
 package dev.aster.vega.runtime.differential
 
+import dev.aster.vega.model.DEFAULT_DECIMAL_PRECISION
+import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
@@ -1700,13 +1702,47 @@ public object Differential {
    * }
    * ```
    *
-   * — a number or a date as its canonical digits, everything else as `String(value)`. [asString] is
-   * that rule already: it sends `Num` and `Timestamp` through `canonicalNumberString` and spells a
-   * null `null`. So this exists to say *why* the comparison is text when the domain is not, which
-   * is that the **recording** is text: a null entry and the word for one are the same row in the
-   * reference, and it is a fixture's labels that tell those two apart.
+   * — a number or a date as its **canonical digits**, everything else as `String(value)`, and those
+   * are not the same function. `canonicalNumber` rounds to the harvest precision and never writes
+   * the exponent form, so the reference records `1e-7` as `0`; `String(x)` writes `1e-7`.
+   *
+   * This used to call [asString] for both halves, which worked only while `asString` went through
+   * `canonicalNumberString` too. The moment that became `String(x)` — which is what a *label* is —
+   * a domain holding `1e-7` compared `1e-7` against a reference saying `0`, and the gate objected.
+   * Correctly: a comparison has to speak the recording's language, not the engine's.
+   *
+   * The note this used to carry still holds. The recording is text, so a null entry and the word
+   * for one are the same row in the reference, and it is a fixture's labels that tell those apart.
    */
-  private fun harvested(domain: List<VegaValue>): List<String> = domain.map { it.asString() }
+  private fun harvested(domain: List<VegaValue>): List<String> = domain.map {
+    when (it) {
+      is VegaValue.Num -> harvestedNumber(it.value)
+      is VegaValue.Timestamp -> harvestedNumber(it.epochMillis)
+      else -> it.asString()
+    }
+  }
+
+  /**
+   * A number as the recording holds it, which is **rounded and then written by JSON**.
+   *
+   * `canonicalNumber` answers a *number*, not text — `Number(value.toFixed(precision))` — and
+   * `JSON.stringify` then writes it, which is `String(x)`. Two steps, and each contributes a case
+   * this got wrong in turn: the rounding takes `1e-7` and `5e-324` to **0**, and the writing takes
+   * `1e21` to **`1e+21`**, `toFixed` giving up at that magnitude and handing back the exponent form
+   * for `Number` to read straight back.
+   *
+   * So it is neither of the engine's two functions. `canonicalNumberString` rounds the same way and
+   * then deliberately *never* writes an exponent, which is right for an SVG attribute and wrong
+   * here; `asString` writes the exponent and does not round. The recording does one of each.
+   */
+  private fun harvestedNumber(value: Double): String {
+    if (!value.isFinite()) return Decimals.jsString(value)
+    // Above 10^21 `toFixed` hands back the exponent form unchanged, so the round trip is identity.
+    val rounded =
+      if (kotlin.math.abs(value) >= 1e21) value
+      else Decimals.trimmed(value, DEFAULT_DECIMAL_PRECISION).toDouble()
+    return Decimals.jsString(if (rounded == 0.0) 0.0 else rounded)
+  }
 
   private fun compareNumberList(
     where: String,

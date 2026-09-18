@@ -3,7 +3,12 @@ package dev.aster.vega.model
 import dev.aster.vega.model.locale.VegaLocale
 
 /**
- * Canonical numeric formatting shared by snapshot serialization, SVG output and label text.
+ * Canonical numeric formatting for snapshot serialization and SVG output — **a coordinate, not a
+ * label**.
+ *
+ * Not `String(x)`, and deliberately: the two rules below that make it good for an attribute make it
+ * wrong for text a reader sees. `VegaValue.asString` used to come through here and a text mark over
+ * `1e-7` read `0`; it goes through [Decimals.jsString] now, which is `String(x)` exactly.
  *
  * Rules (ADR 0009 and 18.2):
  * - negative zero normalizes to `0`

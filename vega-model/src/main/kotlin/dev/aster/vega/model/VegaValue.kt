@@ -188,14 +188,27 @@ public fun VegaValue.asDouble(): Double =
   }
 
 /**
- * Vega's coercion to string. Numbers use [canonicalNumberString] so that the same value always
- * produces the same text in labels, SVG output and snapshots.
+ * **`String(x)`**, which is a different thing from the way a coordinate is written down.
+ *
+ * Numbers go through [Decimals.jsString], the shortest decimal that reads back as the same double,
+ * with JavaScript's own notation thresholds: below 10^-6 and at or above 10^21 it is the exponent
+ * form, and in between it is not.
+ *
+ * It used to go through [canonicalNumberString], and that is a **coordinate** formatter with its
+ * own stated rules — six decimal places, and never the exponent form, because an SVG attribute
+ * parser and a golden diff both read a plain decimal more reliably. Right for an `x`, wrong for a
+ * *label*: the two part company exactly at those thresholds, so a text mark over `1e-7` read `0`
+ * and one over `1e21` read `1000000000000000000000` where upstream writes `1e-7` and `1e+21`.
+ *
+ * Both are still here because both jobs are real, and the pair is the same shape as [asDouble]
+ * beside `JsSemantics.toNumber`: a *reading* and a *coercion* that agree on everything a chart
+ * usually holds. Found by the value sweep, which is the corpus that holds the unusual ones.
  */
 public fun VegaValue.asString(): String =
   when (this) {
     is VegaValue.Str -> value
-    is VegaValue.Num -> canonicalNumberString(value)
-    is VegaValue.Timestamp -> canonicalNumberString(epochMillis)
+    is VegaValue.Num -> Decimals.jsString(value)
+    is VegaValue.Timestamp -> Decimals.jsString(epochMillis)
     is VegaValue.Bool -> value.toString()
     is VegaValue.Null -> "null"
     is VegaValue.Undefined -> "undefined"
