@@ -1,5 +1,10 @@
 [
  {
+  "fixture": "a-scale-coerces-what-it-is-given",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 20"
+ },
+ {
   "fixture": "aggregate-ops-rest",
   "kind": "axis",
   "caption": "X-axis titled 'variance' for a linear scale with values from 0 to 14"

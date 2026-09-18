@@ -42,6 +42,7 @@ import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.runtime.scale.TimeTicks
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.runtime.scale.internKey
+import dev.aster.vega.runtime.scale.scaleNumber
 import dev.aster.vega.scene.ColorSpaces
 import dev.aster.vega.scene.SceneColor
 import kotlin.math.abs
@@ -1117,7 +1118,11 @@ public class ScaleResolver(
           return null
         }
       }
-    val numbers = values.map { it.asDouble() }.filterNot { it.isNaN() }
+    // `d != null && !isNaN(d = +d)`, which is d3's own filter for a quantile scale's samples and
+    // the same line every scale reads a value with — so an empty cell is a **sample at zero** and
+    // not a row that was never there. [scaleNumber] is that line; `asDouble` parses a string where
+    // `Number` coerces one, and dropped every empty cell in the column.
+    val numbers = values.map { scaleNumber(it) }.filterNot { it.isNaN() }
     if (numbers.isEmpty()) {
       diagnostics.error(
         DiagnosticCodes.SCALE_INVALID_DOMAIN,

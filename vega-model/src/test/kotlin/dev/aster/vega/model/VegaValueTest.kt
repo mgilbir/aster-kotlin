@@ -117,7 +117,14 @@ class VegaValueTest {
   }
 
   @Test
-  fun `numeric coercion follows vega rules`() {
+  fun `reading a number out of a value is not Number(x), and the difference is load-bearing`() {
+    // `Number(null)`, `Number("")` and `Number([])` are all **0**; all three read `NaN` here, and
+    // that is what lets an aggregate skip a row that has no number in it. d3 draws the same line in
+    // `extent` — `value != null && value >= value` — and answers nothing for a column of nulls
+    // where a coercion would answer `[0, 0]`. Probed by making this faithful to `Number` and
+    // running the corpus: two tests moved, and that was one of them.
+    //
+    // A scale is the place upstream really does coerce; see `scaleNumber` in the runtime.
     assertEquals(1.0, VegaValue.Bool(true).asDouble())
     assertEquals(0.0, VegaValue.Bool(false).asDouble())
     assertEquals(42.0, VegaValue.Str(" 42 ").asDouble())

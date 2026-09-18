@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.scale
 
+import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
@@ -123,8 +124,8 @@ public class IdentityScale(
   }
 
   override fun scale(value: VegaValue): VegaValue {
-    val number = value.asDouble()
-    return if (number.isNaN()) VegaValue.Null else VegaValue.Num(number)
+    val number = scaleNumber(value)
+    return if (number.isNaN()) VegaValue.Undefined else VegaValue.Num(number)
   }
 }
 
@@ -171,7 +172,7 @@ public class LinearScale(
   override val bandwidth: Double
     get() = 0.0
 
-  override fun position(value: VegaValue): Double = apply(value.asDouble())
+  override fun position(value: VegaValue): Double = apply(scaleNumber(value))
 
   /**
    * A continuous scale of something that is not a number is **not a number**, not nothing.
@@ -182,7 +183,16 @@ public class LinearScale(
    * expression to decide whether a bar is too thin to see, and a pre-binned column has no `_end` to
    * give it — so a bar came out a quarter of a unit narrow and shifted along.
    */
-  override fun scale(value: VegaValue): VegaValue = VegaValue.Num(position(value))
+  override fun scale(value: VegaValue): VegaValue {
+    // **The guard is on the input, not on the answer.** d3 tests `x == null || isNaN(x = +x)` and
+    // then does the arithmetic whatever it comes to — so a log scale asked for `-5` answers `NaN`,
+    // a perfectly good number having no logarithm, while the same scale asked for a *word* answers
+    // `undefined`. Reading the answer instead conflates the two and reports nothing for both.
+    //
+    // `""` separates them: it coerces to `0`, passes the guard, and its logarithm is `NaN`. Probed.
+    val x = scaleNumber(value)
+    return if (x.isNaN()) VegaValue.Undefined else VegaValue.Num(apply(x))
+  }
 
   public fun apply(x: Double): Double = if (round) roundHalfUp(unrounded(x)) else unrounded(x)
 
@@ -342,6 +352,37 @@ public class LinearScale(
     }
   }
 }
+
+/**
+ * What a scale reads a value as, which is **one line of d3** and two rules in it:
+ * ```js
+ * function scale(x) {
+ *   return x == null || isNaN(x = +x) ? unknown : …;
+ * }
+ * ```
+ *
+ * Nothing is caught **before** the coercion — `x == null` is the loose test, so a null and an
+ * undefined never reach `+` at all and answer `unknown` — and everything else goes **through** `+`,
+ * which is `Number(x)` and not a parse. So the empty string is `0`, an empty array is `0`, a flag
+ * is `1`, and only something that genuinely has no number in it reaches `NaN`.
+ *
+ * The empty cell is the one that matters, a column read from a CSV being full of them: upstream
+ * places it at zero. This engine read strings with `toDoubleOrNull`, a *parse*, which rejects the
+ * empty string — so the row was dropped from the chart instead.
+ *
+ * Returns `NaN` for the cases d3 answers `unknown` for, which the callers turn back into nothing.
+ *
+ * **`quantize` and `threshold` do not share this line**: theirs is `x != null && x <= x ? … :
+ * unknown`, which never coerces at all and bisects with whatever it was handed. That is a different
+ * rule and it is recorded as its own question rather than assumed to be this one.
+ */
+internal fun scaleNumber(value: VegaValue): Double =
+  when (value) {
+    // `x == null` is loose, so it is both of these and nothing else.
+    is VegaValue.Null,
+    is VegaValue.Undefined -> Double.NaN
+    else -> JsSemantics.toNumber(value)
+  }
 
 /**
  * How a discrete scale's index keys a domain value, which is d3's `InternMap` and not equality.
@@ -565,7 +606,7 @@ public abstract class TransformedScale(
   override val bandwidth: Double
     get() = 0.0
 
-  override fun position(value: VegaValue): Double = apply(value.asDouble())
+  override fun position(value: VegaValue): Double = apply(scaleNumber(value))
 
   /**
    * A continuous scale of something that is not a number is **not a number**, not nothing.
@@ -576,7 +617,16 @@ public abstract class TransformedScale(
    * expression to decide whether a bar is too thin to see, and a pre-binned column has no `_end` to
    * give it — so a bar came out a quarter of a unit narrow and shifted along.
    */
-  override fun scale(value: VegaValue): VegaValue = VegaValue.Num(position(value))
+  override fun scale(value: VegaValue): VegaValue {
+    // **The guard is on the input, not on the answer.** d3 tests `x == null || isNaN(x = +x)` and
+    // then does the arithmetic whatever it comes to — so a log scale asked for `-5` answers `NaN`,
+    // a perfectly good number having no logarithm, while the same scale asked for a *word* answers
+    // `undefined`. Reading the answer instead conflates the two and reports nothing for both.
+    //
+    // `""` separates them: it coerces to `0`, passes the guard, and its logarithm is `NaN`. Probed.
+    val x = scaleNumber(value)
+    return if (x.isNaN()) VegaValue.Undefined else VegaValue.Num(apply(x))
+  }
 
   public fun apply(x: Double): Double = if (round) roundHalfUp(unrounded(x)) else unrounded(x)
 
@@ -905,12 +955,17 @@ public class OrdinalScale(
     domain.withIndex().associateTo(LinkedHashMap()) { (index, value) -> internKey(value) to index }
 
   override fun scale(value: VegaValue): VegaValue {
-    if (rangeValues.isEmpty()) return unknown ?: VegaValue.Null
+    // `unknown`, which is **`undefined`** when the specification names none — the same answer every
+    // other scale family gives for a value it cannot place. An ordinal scale is the clearest
+    // statement of it, having no coercion at all: its index is keyed by the value, so a miss is a
+    // miss and no arithmetic stands in the way. This answered a null, which a mark encoding writes
+    // where an undefined leaves the property absent.
+    if (rangeValues.isEmpty()) return unknown ?: VegaValue.Undefined
     val key = internKey(value)
     val index =
       indices[key]
         ?: if (implicit) indices.size.also { indices[key] = it }
-        else return unknown ?: VegaValue.Null
+        else return unknown ?: VegaValue.Undefined
     return rangeValues[index % rangeValues.size]
   }
 
@@ -1093,11 +1148,30 @@ public class QuantizeScale(
     return extentAt(index, domain.firstOrNull() ?: 0.0, domain.lastOrNull() ?: 1.0)
   }
 
+  /**
+   * `quantize` and `threshold` read a value **without coercing it**, which is a different line from
+   * every other scale's:
+   * ```js
+   * function scale(x) {
+   *   return x != null && x <= x ? range[bisect(domain, x, 0, n)] : unknown;
+   * }
+   * ```
+   *
+   * `x <= x` is a NaN test that works on any type, and it lets a **word** through: `"abc" <= "abc"`
+   * is true, string comparison being perfectly happy. So a word reaches the bisect, where every
+   * comparison against a number is false — `"abc" < 10` is a NaN comparison — and the search lands
+   * on the **first** range entry rather than answering `unknown`. Probed: `scale("abc")` is `lo`
+   * where a linear scale over the same value answers nothing at all.
+   *
+   * Everything with a number in it behaves as though it had been coerced, because JavaScript's `<`
+   * coerces: `"" < 10` is `0 < 10`. So the only case that separates this from [scaleNumber] is the
+   * one that has no number in it, and that case is the reason this is written out.
+   */
   override fun scale(value: VegaValue): VegaValue {
-    if (rangeValues.isEmpty()) return VegaValue.Null
-    val x = value.asDouble()
-    if (x.isNaN()) return VegaValue.Null
-    return rangeValues[bisectRight(thresholds, x)]
+    if (rangeValues.isEmpty()) return VegaValue.Undefined
+    if (value is VegaValue.Null || value is VegaValue.Undefined) return VegaValue.Undefined
+    val x = JsSemantics.toNumber(value)
+    return rangeValues[if (x.isNaN()) 0 else bisectRight(thresholds, x)]
   }
 }
 
@@ -1142,9 +1216,9 @@ public class QuantileScale(
   }
 
   override fun scale(value: VegaValue): VegaValue {
-    if (rangeValues.isEmpty()) return VegaValue.Null
-    val x = value.asDouble()
-    if (x.isNaN()) return VegaValue.Null
+    if (rangeValues.isEmpty()) return VegaValue.Undefined
+    val x = scaleNumber(value)
+    if (x.isNaN()) return VegaValue.Undefined
     return rangeValues[bisectRight(thresholds, x)]
   }
 
@@ -1196,14 +1270,15 @@ public class ThresholdScale(
       return (lo - adjust) to (hi + adjust)
     }
 
+  /** Read without coercing, as `quantize` is; see the note on [QuantizeScale.scale]. */
   override fun scale(value: VegaValue): VegaValue {
-    if (rangeValues.isEmpty()) return VegaValue.Null
-    val x = value.asDouble()
-    if (x.isNaN()) return VegaValue.Null
+    if (rangeValues.isEmpty()) return VegaValue.Undefined
+    if (value is VegaValue.Null || value is VegaValue.Undefined) return VegaValue.Undefined
+    val x = JsSemantics.toNumber(value)
     // d3 clamps the search to one fewer than the range length, so extra domain values past the end
     // of the range are ignored rather than indexing off it.
     val limit = minOf(thresholds.size, rangeValues.size - 1)
-    return rangeValues[bisectRight(thresholds, x, high = limit)]
+    return rangeValues[if (x.isNaN()) 0 else bisectRight(thresholds, x, high = limit)]
   }
 }
 
@@ -1410,7 +1485,7 @@ public class SequentialColorScale(
   }
 
   override fun scale(value: VegaValue): VegaValue {
-    val colour = colorAt(value.asDouble()) ?: return VegaValue.Null
+    val colour = colorAt(scaleNumber(value)) ?: return VegaValue.Undefined
     return VegaValue.Str(colour.toCssHex())
   }
 
