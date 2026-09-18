@@ -103,6 +103,7 @@ class UpstreamVectorShapeTest {
         "d3-format.json",
         "d3-geo.json",
         "d3-interpolate.json",
+        "d3-invalid-date.json",
         "d3-scale.json",
         "d3-time-format.json",
         "d3-time.json",

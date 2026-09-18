@@ -1008,8 +1008,39 @@ public object Functions {
       VegaValue.Timestamp(construct(args, localZone()))
     }
     map["utc"] = ExpressionFunction { args -> VegaValue.Num(construct(args, TimeZone.UTC)) }
+    /**
+     * `toDate`, whose answer for a value it cannot read is **not** nothing.
+     *
+     * ```js
+     * const defaultParser = _ => isNumber(_) ? _ : isDate(_) ? _ : Date.parse(_);
+     * export default function toDate(_, parser) {
+     *   parser = parser || defaultParser;
+     *   return _ == null || _ === '' ? null : parser(_);
+     * }
+     * ```
+     *
+     * Two answers, and only the first two inputs get the empty one: nothing, and the empty string.
+     * Everything else goes to `Date.parse`, which answers **`NaN`** rather than nothing when it
+     * cannot read what it was given — a number, not an absence. [DateValues.parse] is a parser and
+     * rightly says `null` when a string is not a date; turning that into `VegaValue.Null` here made
+     * an unreadable date *vanish* where upstream keeps it as a NaN instant.
+     *
+     * That is not a cosmetic difference, because it decides whether the row is in the chart at all.
+     * A `formatType: "time"` on a category is enough to reach it — Vega-Lite writes
+     * `toDate(datum["c"])` over a column of words — and then a null and a NaN part company at every
+     * step after: `isValid` is true of a NaN and false of a null, so a filter keeps one row and
+     * drops the other; a scale's domain gains an entry or does not; and a band over the result is
+     * one band wide or empty.
+     */
     map["toDate"] = ExpressionFunction { args ->
-      DateValues.parse(args.at(0), localZone()) ?: VegaValue.Null
+      val value = args.at(0)
+      when {
+        value is VegaValue.Null -> VegaValue.Null
+        value is VegaValue.Str && value.value.isEmpty() -> VegaValue.Null
+        // `Date.parse` coerces whatever it is handed to a string and answers NaN for a string that
+        // is not a date. A number and a date are handed back before it is reached.
+        else -> DateValues.parse(value, localZone()) ?: VegaValue.Num(Double.NaN)
+      }
     }
     map["time"] = ExpressionFunction { args ->
       VegaValue.Num(instantOf(args.at(0), localZone()))

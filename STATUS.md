@@ -27,7 +27,7 @@ end to end — expressions, signals, all 51 of upstream's 51 documented data tra
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-216 Vega differential fixtures and 330 Vega-Lite fixtures pass, every one of them matching upstream
+216 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -194,7 +194,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 216 Vega differential fixtures and 330 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 216 Vega differential fixtures and 332 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -5817,7 +5817,7 @@ compose instead of one replacing the other. It is the axis's own `withLabelText`
 on both guides, which is why it was worth having one function for it.
 
 `legend-label-expr.vl.json` arms both gates and both of them failed before the fix — the specification
-comparison on the stray property, and the scene comparison on labels drawn at full length. 330
+comparison on the stray property, and the scene comparison on labels drawn at full length. 332
 Vega-Lite fixtures now.
 
 ### The order of a date, which the locale seam could not reach
@@ -5831,7 +5831,7 @@ did not pass it to `TimeUnits.specifier`.
 
 Upstream has no lever for it either — its `timeUnitSpecifier` takes no locale, and `VEGALITE_TIMEFORMAT`
 is a module constant — so this is an addition rather than a port. Both new tables are therefore
-**empty by default** and the emitted specification is byte-for-byte what it was, which is what the 330
+**empty by default** and the emitted specification is byte-for-byte what it was, which is what the 332
 Vega-Lite fixtures compare against.
 
 Two tables, because there are two places a date's shape is decided and they are different tables.
@@ -7902,4 +7902,72 @@ get past it; this is the finding it left behind, recorded in the pull request th
 on a different one to pin the interleaving that was already right. Its two same-column panels differ
 only in how they caption their cells, which keeps the fixture about the order of the datasets rather
 than their contents. Three mutants die on it: the old `at + 1`, a skip that steps past *everything*
-rather than only the domains, and an append to the end of the chart's data. 330 Vega-Lite fixtures.
+rather than only the domains, and an append to the end of the chart's data. 332 Vega-Lite fixtures.
+
+### A date that is not a date, and the eight pixels it explains
+
+Two fixtures' worth of labels differed by one character, and the difference was recorded as an
+unexplained eight pixels of chart height. It is one character because the labels are **turned on
+their side**, where a label's width is the chart's height; and it is a label because a column of
+words told to read as dates reaches a formatter that had nothing to say about it.
+
+`formatType: "time"` decides the grammar before the scale gets a say, and it reaches further than
+the labels — `isFieldOrDatumDefForTimeFormat` is `formatType === 'time' || (!formatType &&
+isTemporalFieldDef(...))`, so the column is *parsed* as well. Four separate things were wrong along
+that chain, and each was a rule read off upstream rather than arithmetic:
+
+1. **`toDate` answered nothing for what it could not read.** Upstream's is
+   `_ == null || _ === '' ? null : parser(_)` with `defaultParser` ending in `Date.parse(_)`, and
+   `Date.parse('one')` is **`NaN`** — a number, not an absence. `DateValues.parse` is a parser and
+   rightly says no by answering null; turning that into a null *value* made an unreadable date
+   vanish where upstream keeps it. `ToDateTest` pins all three answers.
+2. **`TimeFormat` had no answer for an instant that is not a number**, and `at(NaN, zone)` truncated
+   to zero — so a label read **1970**. Every getter of an Invalid Date answers `NaN`, and d3 formats
+   those through the *same* padding as any other field: `%Y` pads three characters to four and
+   writes `0NaN`, `%d` is two wide and leaves `NaN` alone, `%-Y` drops the padding. Carried by
+   making the date fields nullable rather than by a second directive table, so the whole of it falls
+   out of the one `pad` — including the three answers that are accidents of JavaScript, `%I` being
+   `12` because `NaN` is falsy, `%p` being `AM` because `NaN >= 12` is false, and `%q` being `1`
+   because `~~NaN` is `0`.
+3. **The multi-format asked the negated question.** `!(floor(millis) >= millis)` and
+   `floor(millis) < millis` are the same of every real number and opposite of `NaN`, so where d3
+   falls through six tests to the **year** this cascade said yes at the first and labelled a
+   millisecond. That is the `0NaN` against `NaN`, and the eight pixels.
+4. **Both guides bailed out before the formatter.** Upstream's `tickFormat` chooses by format type
+   and then hands the formatter every tick, coercing with `new Date(+value)`; answering the value's
+   own text instead is a label of a different width.
+
+Two more came out of the vectors rather than out of the chart: `%f` is the **milliseconds with
+`"000"` appended** and not a six-wide field — the same for every real instant, `NaN000` against
+`000NaN` for one that is not — and `%Z` is the one directive upstream implements twice, the UTC form
+being `function formatUTCZone() { return "+0000"; }` and reading no date at all. The **pad modifier
+did not reach the year** either: `%-Y` of the year 24 is `24` upstream and was `0024` here, because
+`%Y`, `%y`, `%G` and `%g` went through a second padding function that never consulted it.
+
+`oracle-js/src/record-invalid-date-formats.mjs` records d3's own answer for every directive crossed
+with every modifier, both zones, and the multi-format — 280 vectors, replayed by
+`InvalidDateFormatTest`. Like `record-number-strings.mjs` it replays no upstream *test*, because
+there is none: d3's suite formats dates and an Invalid Date is not one. Nothing in this repository
+states what any of these should be.
+
+`a-date-that-is-not-a-date.vl.json` arms both gates. Its fourth panel is what makes the *parse*
+visible rather than only its labels — a nominal text channel writes `isValid(datum["a"]) ?
+datum["a"] : "" + datum["a"]`, and `isValid` is false of a NaN exactly as it is of a null, so the
+second arm runs either way and prints the two apart. Without it every mutant of `toDate` survived.
+332 Vega-Lite fixtures.
+
+**And the reason a sibling was a test rather than a fixture is gone.** `GuideFormatTypeTest` pinned
+the format-type rules with unit assertions and said why: every chart they need is degenerate, and
+upstream's rendering of them was eight pixels taller for a reason nobody had explained. This was
+that reason. `a-format-type-decides-the-parse.vl.json` now carries them as a drawing as well — a
+category spoken as a joined list beside one spoken plainly, and a temporal field whose axis says
+`number` and is therefore never parsed beside the same field parsed as usual. The test stays,
+because it names which rule broke where a fixture only says that something did; its false
+justification does not.
+
+**What this found and did not fix.** A row whose word is the empty string puts a genuine null into
+the chart, and upstream keys a stack's groups by `JSON.stringify(groupby.map(get))` — under which
+`[NaN]` and `[null]` are the same string, so a NaN stacks with the nulls and every value JSON cannot
+represent does too. This engine keys them apart. That is a different cause with a wider reach than
+dates, it is next on the list below, and the empty-string rule is pinned by `ToDateTest` in the
+meantime rather than by a fixture that would fail for the wrong reason.

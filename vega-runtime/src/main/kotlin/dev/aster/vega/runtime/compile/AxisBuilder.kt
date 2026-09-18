@@ -1314,10 +1314,13 @@ public class AxisBuilder(
     // band of instants, since there is no temporal scale anywhere to infer it from.
     // `formatType` decides the grammar and the shared formatter knows how; see [GuideFormat].
     GuideFormat.timeLabeller(format, formatType, locale, timeZone)?.let { write ->
-      return { value ->
-        val instant = value.asDouble()
-        if (instant.isNaN()) value.asString() else write(instant)
-      }
+      // Whatever the tick is, coerced — which is what upstream does and *not* what falling back to
+      // the value's own text does. `tickFormat` chooses the formatter from the format type and then
+      // hands it every tick; d3 coerces with `new Date(+value)`, so a band of words reads `0NaN`
+      // rather than reading the words. A chart gets here by naming `formatType: "time"` over a
+      // column that is not dates, which Vega-Lite also parses with `toDate` — so the words are
+      // already gone by the time the axis sees them.
+      return { value -> write(value.asDouble()) }
     }
     // A **time** scale reads its specifier as a time specifier, without needing a `formatType` to
     // say so: upstream's `tickFormat` asks the scale, and a temporal scale's own formatter is d3's
@@ -1325,11 +1328,8 @@ public class AxisBuilder(
     // which printed the epoch milliseconds unchanged — a chart labelled `1580515200000` where
     // upstream labelled it `Feb 01`.
     if (format != null && scale is TimeScale) {
-      return { value ->
-        val instant = value.asDouble()
-        if (instant.isNaN()) value.asString()
-        else TimeFormat.format(instant, format, scale.zone, locale)
-      }
+      // Coerced, not fallen back on — see the note on the format-type branch above.
+      return { value -> TimeFormat.format(value.asDouble(), format, scale.zone, locale) }
     }
     // A **discrete** scale with a specifier formats with it too, and plainly — `locale.format`, not
     // the span-resolved formatter a continuous scale gets. `tickFormat` in `vega-scale` picks by
@@ -1631,10 +1631,8 @@ public class AxisBuilder(
     formatType: String?,
   ): (VegaValue) -> String {
     GuideFormat.timeLabeller(specifier, formatType, locale, timeZone)?.let { write ->
-      return { value ->
-        val instant = value.asDouble()
-        if (instant.isNaN()) value.asString() else write(instant)
-      }
+      // Coerced, not fallen back on — see the note on [labeller]'s format-type branch.
+      return { value -> write(value.asDouble()) }
     }
     if (specifier != null) {
       val labeller = Ticks.spanFormatter(specifier, low, high, count, locale)
