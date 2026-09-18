@@ -8156,3 +8156,61 @@ coercion, with an answer for everything and zero as the answer for nothing; `asD
 where `NaN` means there was nothing to read. Both are now documented as such, on the function and in
 the test that pins it, so the next person to notice the difference does not "fix" it. The scales are
 the place upstream really does coerce, and they are the ones that changed.
+
+### A value sweep: hold the specification still and vary the column
+
+Every corpus here varies the **specification**. The fixtures, the gallery, the 1981 wild
+specifications and the Deneb templates are charts somebody drew; the schema sweep is one chart with
+one property changed; the Vega-Lite sweep is one encoding changed. All of them hold the *data*
+still, and the data in all of them is tidy — numbers where numbers go, words where words go.
+
+Real data is not tidy, and that is where every difference of the last day came from:
+
+- `toDate` of a word is `NaN` and not nothing;
+- a stack's groups are keyed by `JSON.stringify`, so a NaN stacks with the nulls;
+- a discrete domain holds values, so `+null` is `0` and `+"null"` is `NaN`;
+- a scale reads `""` as **zero** and a null as nothing;
+- `quantize` does not coerce at all, so a word lands in the first bucket;
+- an axis joins its ticks by value, so two entries with one text draw one tick.
+
+Not one was reachable by changing a property, because none of them is about a property. So this
+sweep holds the specification still and varies the **column**: sixteen columns, each chosen because
+JavaScript treats it differently from the obvious reading, across twelve charts chosen for the
+journeys a value takes — a scale of each family, a stack, an aggregate, a discrete domain, a legend
+that enumerates it, and a text mark that simply writes it out. **192 cases**, all of which upstream
+renders.
+
+`scripts/value-sweep.sh` runs it and `ValueSweepTest` is the comparison, **report-only** as the
+other sweeps are. It earned its place before it was committed: it found a defect in the change
+directly beneath it in this stack — a scale guarded on its answer rather than on its input, so a log
+scale of `-5` reported nothing where upstream reports `NaN`. That is fixed, and the fixture that
+pins it names the log scale for that reason.
+
+**169 of 192 agree.** What the other 23 are, ranked by where they cluster rather than by what they
+say, because the shapes repeat:
+
+- **the time-scale chart, 13 cases** — a time scale over an odd column, *including the control
+  column of 1, 2, 3, 4*, which is a sub-second domain and therefore about tick granularity rather
+  than about odd values;
+- **the log-scale chart, 3** — its labels at the notation thresholds, `1e21` and `1e-7`;
+- **the pie chart, 2** — a column holding a null or an empty cell;
+- **four charts, one case each** — a legend label, a quantile domain, a written-out value and a
+  band label, all at the notation thresholds or past exact integers;
+- **one refusal** — this engine draws nothing where upstream draws the chart with an empty axis: a
+  time scale over `1e21` milliseconds ends in a `FATAL` `VEGA_COMPILE_FAILED`,
+  `DateTimeException: Invalid value for Year`, caught inside the compiler.
+
+(Written as a list and not a table on purpose: `DocumentedNumbersTest` reads a row of the shape
+`| \`name\` | count |` as a claim about a **fixture** that must exist on disk, and these are the
+sweep's chart names. The gate was right to object.)
+
+The last of those is the one that is not cosmetic. The exception does **not** escape `compileJson`;
+the compiler catches it and reports a fatal diagnostic, which is the policy working. What is wrong
+is that there is anything to catch: ECMA-262 clips a time value to ±8.64e15 milliseconds and calls
+anything outside it an *Invalid Date*, so upstream's domain here is `[0, NaN]` and its axis draws no
+labels at all. `TimeClip` is already written down in this repository — and it is private to the
+expression module, so the scales and the ticks never see it. It is the next thing to fix.
+
+Recorded rather than fixed here, which is what a sweep is for: the measurement comes first, and each
+row above is its own change.
+
