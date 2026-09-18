@@ -8195,12 +8195,16 @@ say, because the shapes repeat:
 | `log-symbol` | 3 | a log scale's labels at the notation thresholds, `1e21` and `1e-7` |
 | `arc-theta` | 2 | a pie whose column holds a null or an empty cell |
 | four charts | 4 | one case each: a legend label, a quantile domain, a written-out value, a band label — all at the notation thresholds or past exact integers |
-| refused | 1 | **this engine throws**: a time scale over `1e21` milliseconds raises
-  `DateTimeException: Invalid value for Year` out of a public compile, where upstream draws a chart |
+| refused | 1 | **this engine draws nothing**: a time scale over `1e21` milliseconds ends in a
+  `FATAL` `VEGA_COMPILE_FAILED` — `DateTimeException: Invalid value for Year` caught inside the
+  compiler — where upstream draws the chart with an empty axis |
 
-The last of those is the one that is not a cosmetic difference: an exception escaping
-`compileJson` is a defect whatever the specification says, and a year past what the calendar can
-hold is reachable from any column of large numbers. It is the next thing to fix.
+The last of those is the one that is not cosmetic. The exception does **not** escape `compileJson`;
+the compiler catches it and reports a fatal diagnostic, which is the policy working. What is wrong
+is that there is anything to catch: ECMA-262 clips a time value to ±8.64e15 milliseconds and calls
+anything outside it an *Invalid Date*, so upstream's domain here is `[0, NaN]` and its axis draws no
+labels at all. `TimeClip` is already written down in this repository — and it is private to the
+expression module, so the scales and the ticks never see it. It is the next thing to fix.
 
 Recorded rather than fixed here, which is what a sweep is for: the measurement comes first, and each
 row above is its own change.
