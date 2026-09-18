@@ -1,0 +1,163 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "What a continuous scale does with a value that is not a number, which is one line of d3 and two rules: `return x == null || isNaN(x = +x) ? unknown : \u2026`. **Nothing is caught before the coercion** \u2014 a null and an undefined answer `unknown`, which is `undefined` unless the scale was given one \u2014 and **everything else goes through `+`**, which is `Number(x)` and not a parse: the empty string is `0`, an empty array is `0`, a flag is `1`, and only a word that is not a number reaches `NaN` and so `unknown` as well. The rows below are those five cases and a plain number to hold the axis. The empty cell is the one that matters in practice, a column read from a CSV being full of them: upstream places it at zero and this engine dropped it, because its coercion read a string with `toDoubleOrNull` \u2014 a *parse*, which rejects the empty string where `Number` accepts it. The symbols are drawn at the value's own position and labelled with what the scale answered, so a row that is placed and a row that is not are told apart by the text rather than by an absence.",
+  "width": 220,
+  "height": 120,
+  "padding": 5,
+  "data": [
+    {
+      "name": "raw",
+      "values": [
+        {
+          "v": 20,
+          "what": "a number",
+          "n": 0
+        },
+        {
+          "v": null,
+          "what": "nothing",
+          "n": 1
+        },
+        {
+          "v": "",
+          "what": "an empty cell",
+          "n": 2
+        },
+        {
+          "v": [],
+          "what": "an empty list",
+          "n": 3
+        },
+        {
+          "v": true,
+          "what": "a flag",
+          "n": 4
+        },
+        {
+          "v": "abc",
+          "what": "a word",
+          "n": 5
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": [
+        0,
+        20
+      ],
+      "range": "height"
+    },
+    {
+      "name": "b",
+      "type": "band",
+      "domain": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "range": "width"
+    },
+    {
+      "name": "q",
+      "type": "quantize",
+      "domain": [
+        0,
+        20
+      ],
+      "range": [
+        "lo",
+        "mid",
+        "hi"
+      ]
+    },
+    {
+      "name": "th",
+      "type": "threshold",
+      "domain": [
+        10
+      ],
+      "range": [
+        "under",
+        "over"
+      ]
+    },
+    {
+      "name": "qt",
+      "type": "quantile",
+      "domain": {
+        "data": "raw",
+        "field": "v"
+      },
+      "range": [
+        "p0",
+        "p1",
+        "p2"
+      ]
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left"
+    }
+  ],
+  "marks": [
+    {
+      "type": "symbol",
+      "from": {
+        "data": "raw"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "b",
+            "field": "n",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "field": "v"
+          },
+          "size": {
+            "value": 60
+          },
+          "fill": {
+            "value": "steelblue"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {
+        "data": "raw"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "value": 0
+          },
+          "y": {
+            "signal": "14 * datum.n + 7"
+          },
+          "text": {
+            "signal": "datum.what + ' -> ' + scale('y', datum.v) + ' | q ' + scale('q', datum.v) + ' | th ' + scale('th', datum.v) + ' | qt ' + scale('qt', datum.v)"
+          },
+          "fontSize": {
+            "value": 8
+          },
+          "baseline": {
+            "value": "top"
+          }
+        }
+      }
+    }
+  ]
+}

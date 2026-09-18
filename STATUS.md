@@ -27,7 +27,7 @@ end to end — expressions, signals, all 51 of upstream's 51 documented data tra
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-219 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
+220 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -194,7 +194,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 219 Vega differential fixtures and 332 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 220 Vega differential fixtures and 332 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -226,7 +226,7 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests, and every renderer now exposes the tree: the Android View, the Swift one and Compose Multiplatform. Not verified on physical hardware or with a real user |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 219 Vega differential fixtures |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 220 Vega differential fixtures |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -8001,7 +8001,7 @@ group value at once: two words that must stay apart, a NaN, an infinity and a nu
 one group, and a zero beside a negative zero that must become another. Written as `0/0` and `1/0`,
 because `NaN` and `Infinity` are not names Vega's expression language knows — `Unrecognized signal
 name: "Infinity"`. Three mutants die on it: the raw-value key, an `aggregate`-style text key, and a
-JSON writer that prints a non-finite number as itself. 219 Vega fixtures.
+JSON writer that prints a non-finite number as itself. 220 Vega fixtures.
 
 **And a third cause in the same chain**, which is the next entry: a discrete scale's domain held
 text, so a null entry became the word `null` and coerced to `NaN` where upstream's `+null` is `0`.
@@ -8045,7 +8045,7 @@ through the locale.
 directly for each value rather than reading an axis, because **an axis joins its label items by the
 value's text**: two bands both reading `1001` collapse into one label at the later band, so an axis
 shows three where the domain has six. That is a rule of its own and it is the open question below.
-Seven mutants die on the fixture. 219 Vega fixtures.
+Seven mutants die on the fixture. 220 Vega fixtures.
 
 **Found here, and the next entry closes it.** An axis over a discrete scale draws one item per
 distinct *value* rather than one per band. It is visible only where two domain entries share a text,
@@ -8078,8 +8078,64 @@ Applied in `ticksFor`, which is the one place every axis mark reads its ticks fr
 the eight branches that build them. Four mutants die on it: no join, the *first* of a repeated key
 winning instead of the last, joining by the value rather than by its text, and joining by the
 **label** rather than the value — that last one is not hypothetical, because a format can give two
-distinct values one label and the corpus has such axes. 219 Vega fixtures.
+distinct values one label and the corpus has such axes. 220 Vega fixtures.
 
 The note on the entry above said "one label per distinct label text", which was the right shape and
 the wrong field; it is the value's text, and the mutant that joins by the label is what said so.
+
+### What a scale does with a value that is not a number, which is one line of d3
+
+```js
+function scale(x) {
+  return x == null || isNaN(x = +x) ? unknown : …;
+}
+```
+
+Two rules in it, and this engine had neither quite right.
+
+**Nothing is caught before the coercion.** `x == null` is the loose test, so a null and an undefined
+never reach `+` at all. That is what separates a null from an **empty cell**, and the separation is
+the whole practical point of this change: a column read from a CSV is full of empty cells, and
+upstream places them at **zero** while a null is placed nowhere.
+
+**Everything else goes through `+`, which is `Number(x)` and not a parse.** This engine read a
+string with `toDoubleOrNull` — a parse, which rejects `""` — so every empty cell was dropped from
+the chart instead of landing at zero. An empty array is `0` too, and a flag is `1`.
+
+And the answer for the cases it does refuse is `unknown`, which is **`undefined`** and not a null or
+a NaN. The note that used to sit on `LinearScale.scale` argued for `Num(NaN)` over a null, and its
+reasoning was right and its conclusion one step short: Vega-Lite decides whether a bar is too thin
+to see with `abs(scale(x, a) - scale(x, b))`, and answering *zero* there says the bar has no width.
+An undefined does not — `undefined - 5` is `NaN` exactly as a NaN would be — so the arithmetic that
+note cared about is unchanged, and everything that can tell the two apart now agrees: `'' + scale(…)`
+reads `undefined`, and a mark encoding leaves the property absent rather than writing one.
+
+**`quantize` and `threshold` do not share the line**, which is the part that could only be found by
+asking:
+
+```js
+return x != null && x <= x ? range[bisect(domain, x, 0, n)] : unknown;
+```
+
+`x <= x` is a NaN test that works on any type, and it lets a **word** through — `"abc" <= "abc"` is
+true, string comparison being perfectly happy. So a word reaches the bisect, where every comparison
+against a number is false, and the search lands on the **first** range entry. Probed:
+`scale("abc")` is `lo` where a linear scale over the same value answers nothing at all. Everything
+with a number in it behaves as though coerced, because JavaScript's `<` coerces.
+
+A quantile scale's *samples* are filtered with the same line as its lookup — `d != null && !isNaN(d
+= +d)` — so an empty cell is a sample at zero rather than a row that was never there. That one
+showed as a domain of two where upstream had four.
+
+`a-scale-coerces-what-it-is-given.vg.json` asks all four scale families the same six questions — a
+number, nothing, an empty cell, an empty list, a flag and a word — and draws both the symbol each
+answer places and the answer itself as text, so a value that is placed and one that is not are told
+apart by characters rather than by an absence. Five mutants die on it. 220 Vega fixtures.
+
+**Still open, and now named.** `asDouble` is documented as "Vega's coercion to number" and is not
+`Number()`: it answers `NaN` for a null, an empty string and an empty array where JavaScript answers
+`0`. `JsSemantics.toNumber` is the faithful one, and the two exist because `asDouble` lives in
+`vega-model` and cannot see `vega-expression`. The scales now read through the faithful one; the
+other **148** call sites have not been examined, and whether any of them is a `+x` site upstream is
+a question rather than a claim.
 

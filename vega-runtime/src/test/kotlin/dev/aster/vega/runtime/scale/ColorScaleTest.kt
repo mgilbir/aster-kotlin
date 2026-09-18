@@ -104,7 +104,10 @@ class ColorScaleTest {
   @Test
   fun `a non-numeric input has no colour`() {
     val scale = SequentialColorScale("s", listOf(0.0, 1.0), listOf(hex("red"), hex("blue")))
-    assertEquals(VegaValue.Null, scale.scale(VegaValue.Str("not a number")))
+    // d3's `unknown`, which is `undefined`; a sequential scale reads its input with the same line
+    // every continuous scale does.
+    assertEquals(VegaValue.Undefined, scale.scale(VegaValue.Str("not a number")))
+    assertEquals(VegaValue.Undefined, scale.scale(VegaValue.Null))
   }
 
   @Test

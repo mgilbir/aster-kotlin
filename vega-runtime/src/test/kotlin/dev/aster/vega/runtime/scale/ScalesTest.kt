@@ -43,8 +43,12 @@ class ScalesTest {
     assertEquals(VegaValue.Num(-3.5), scale.scale(VegaValue.Num(-3.5)))
     // A numeric string coerces, exactly as `+value` coerces it.
     assertEquals(VegaValue.Num(7.0), scale.scale(VegaValue.Str("7")))
-    assertEquals(VegaValue.Null, scale.scale(VegaValue.Str("not a number")))
-    assertEquals(VegaValue.Null, scale.scale(VegaValue.Null))
+    // `unknown`, which is `undefined`, for the two cases d3's one line answers it for: a value with
+    // no number in it, and a null — the latter caught **before** the coercion, so it is not zero.
+    assertEquals(VegaValue.Undefined, scale.scale(VegaValue.Str("not a number")))
+    assertEquals(VegaValue.Undefined, scale.scale(VegaValue.Null))
+    // And the empty cell, which is the case the two rules separate: `Number("")` is 0.
+    assertEquals(VegaValue.Num(0.0), scale.scale(VegaValue.Str("")))
     assertEquals(listOf(0.0, 1.0), scale.domain)
     assertEquals(listOf(0.0, 1.0), scale.range)
   }
@@ -88,15 +92,21 @@ class ScalesTest {
   }
 
   @Test
-  fun `a value that is not a number scales to one that is not either`() {
-    // Not to *nothing*: JavaScript reads a null as zero in arithmetic and propagates a NaN, and
-    // Vega-Lite decides whether a bar is too thin to see with `abs(scale(x, a) - scale(x, b))`.
-    // Answering zero there says the bar has no width; answering NaN says the question does not
-    // apply, which is what upstream answers.
+  fun `a value that is not a number scales to nothing, and behaves as a NaN in arithmetic`() {
+    // d3's `unknown`, which is `undefined` — and it has to satisfy the reason this test was
+    // written: Vega-Lite decides whether a bar is too thin to see with
+    // `abs(scale(x, a) - scale(x, b))`, and answering **zero** there says the bar has no width.
+    // An undefined does not: `undefined - 5` is `NaN`, exactly as a NaN would be, so the arithmetic
+    // is unchanged. What changes is everything that can tell the two apart — `'' + scale(...)`
+    // reads `undefined` and not `NaN`, and a mark encoding leaves the property absent rather than
+    // writing one.
     val scale = LinearScale("s", listOf(0.0, 1.0), listOf(0.0, 1.0))
     assertTrue(scale.apply(Double.NaN).isNaN())
-    val scaled = scale.scale(VegaValue.Str("not a number"))
-    assertTrue(scaled is VegaValue.Num && scaled.value.isNaN(), scaled.toString())
+    assertEquals(VegaValue.Undefined, scale.scale(VegaValue.Str("not a number")))
+    // A null never reaches the coercion at all: `x == null` is tested first, which is why an empty
+    // cell and a null part company — the one is zero and the other is nothing.
+    assertEquals(VegaValue.Undefined, scale.scale(VegaValue.Null))
+    assertEquals(VegaValue.Num(0.0), scale.scale(VegaValue.Str("")))
   }
 
   @Test
