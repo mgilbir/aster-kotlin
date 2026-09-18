@@ -120,6 +120,22 @@
   "hidden": false
  },
  {
+  "fixture": "an-axis-joins-its-ticks-by-value",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "an-axis-joins-its-ticks-by-value",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "arc-padding",
   "kind": "group",
   "role": "graphics-object",
