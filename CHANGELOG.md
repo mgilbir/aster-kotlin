@@ -252,6 +252,36 @@ section here does not get released.
 
 ### Fixed
 
+- **A guide's `formatType` reaches further than its own labels, and a header's `labelExpr` comes
+  from the theme too.** `getFormatMixins` reads the *guide's* pair for anything that is not a plain
+  string definition — `getGuide(fieldDef)` — so an `axis` block settles two rules for the whole
+  channel.
+
+  `addLineBreaksToTooltip` uses the array-aware form only for a discrete field with no time unit and
+  `!getFormatMixins(channelDef).format && !getFormatMixins(channelDef).formatType`. This checked the
+  format and not the type, and read a category out as a joined list where upstream reads a word.
+
+  `isFieldOrDatumDefForTimeFormat` is
+  `formatType === 'time' || (!formatType && isTemporalFieldDef(fieldOrDatumDef))`, and it decides
+  **both** whether a column is parsed into dates and whether it is spoken as one. A temporal field
+  whose axis says `number` is therefore not parsed at all: upstream emits the source rows untouched,
+  with no formula and no dataset derived from one, and leaves a time scale standing over raw strings.
+  The same predicate now governs both sites here, where each had its own half of it.
+
+  And `assembleLabelTitle` asks `getHeaderProperties([…, 'labelExpr'], facetFieldDef.header, config, channel)`
+  — the header block and then the theme. Read from the header alone, a `config.header.labelExpr` was
+  dropped and a theme that captions every cell of every trellis captioned none of them.
+
+  `a-heading-a-theme-wrote-itself` is new. The format-type rules are held by `GuideFormatTypeTest`
+  rather than by a fixture, and deliberately: every chart they need is degenerate — a number format
+  over a category, a time scale over unparsed text — and upstream's rendering of those lays out eight
+  pixels differently from this runtime's. That difference is real, unexplained, and **not** what these
+  rules are about; a fixture carrying it would fail the scene comparison for an unrelated reason. Four
+  mutants, all killed.
+
+  **This closes the string sweep: 27489 of 27513, and nothing differs.**
+
+
 - **Three places can say a mark links somewhere, and this read one.**
   `cursor(markDef, encoding, config)` asks
   `encoding.href || markDef.href || getMarkPropOrConfig('href', markDef, config)`, so a theme giving

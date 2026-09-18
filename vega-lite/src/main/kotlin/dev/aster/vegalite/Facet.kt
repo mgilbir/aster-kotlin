@@ -20,7 +20,14 @@ import dev.aster.vega.model.locale.VegaLocale
  */
 private fun headerLabel(def: ChannelDef, field: String, config: Config? = null): String {
   val derived = headerText(def, field, config)
-  val stated = def.raw.obj("header")?.string("labelExpr") ?: return derived
+  // `getHeaderProperties(['format', 'formatType', 'labelAngle', 'labelAnchor', 'labelOrient',
+  // 'labelExpr'], facetFieldDef.header, config, channel)` — **all six through the same chain**, the
+  // header block and then the theme. Read from the header alone, a `config.header.labelExpr` was
+  // dropped: a theme that captions every cell of every trellis the same way captioned none of them.
+  // [headerText] beside this already walks that chain for `format` and `formatType`.
+  val stated =
+    (headerProperty(def.raw.obj("header"), config, def.channel, "labelExpr") as? VegaValue.Str)
+      ?.value ?: return derived
   return stated.replace("datum.label", derived).replace("datum.value", "parent[${quoted(field)}]")
 }
 

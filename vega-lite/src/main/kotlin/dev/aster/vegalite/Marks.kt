@@ -1778,7 +1778,13 @@ internal object Marks {
         val plain = "datum[${quoted(def.field.orEmpty())}]"
         "isValid($plain) ? isArray($plain) ? join($plain, '$separator') : $plain : \"\"+$plain"
       }
-      def.type == MeasureType.TEMPORAL || def.timeUnit != null -> {
+      // The same `isFieldOrDatumDefForTimeFormat` the implicit parse turns on, and for the same
+      // reason: `formatType === 'time' || (!formatType && isTemporalFieldDef(def))`. A stated
+      // format type that is **not** `time` takes an instant out of the time branch entirely, so a
+      // date whose axis names `formatType: "number"` is spoken as the plain column it arrives as —
+      // which is consistent, since upstream does not parse it into a date either.
+      def.formatType == "time" ||
+        (def.formatType == null && (def.type == MeasureType.TEMPORAL || def.timeUnit != null)) -> {
         val timeUnit = def.timeUnit
         // `normalizeTimeUnit` reads the `utc` out of the unit's name wherever it sits, so
         // `binnedutcyearmonth` is universal time as much as `utcmonth` is.
@@ -1814,7 +1820,22 @@ internal object Marks {
       // this one alone".
       def.type == MeasureType.QUANTITATIVE || !stated.isNullOrEmpty() ->
         "format($accessor, \"$number\")"
-      !arrays -> "isValid($accessor) ? $accessor : \"\"+$accessor"
+      // ```js
+      // if (
+      //   isFieldDef(channelDef) && isDiscrete(channelDef.type) && !channelDef.timeUnit &&
+      //   !getFormatMixins(channelDef).format && !getFormatMixins(channelDef).formatType
+      // ) {
+      //   return {signal: `isValid(f) ? isArray(f) ? join(f, '\n') : f : ""+f`};
+      // }
+      // return textRef(channelDef, config, expr);
+      // ```
+      //
+      // **A stated `formatType` takes the array form away**, as a stated `format` already did here.
+      // `getFormatMixins` reads the *guide's* pair for anything that is not a plain string
+      // definition — `getGuide(fieldDef)` — so an `axis: {"formatType": "number"}` is what settles
+      // it, not something on the channel itself. Checking only the format, a category whose axis
+      // named a format type was still spoken as a joined list where upstream speaks it plainly.
+      !arrays || def.formatType != null -> "isValid($accessor) ? $accessor : \"\"+$accessor"
       else -> {
         // `addLineBreaksToTooltip` builds this one from the **column's own name** rather than from
         // what the aggregate wrote: `datum["<field>"]`, spelled out. It tells on an `argmin`, whose
