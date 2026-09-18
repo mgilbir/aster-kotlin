@@ -5,7 +5,6 @@ import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.model.time.TimeInterval
 import dev.aster.vega.model.time.TimeStepper
 import kotlin.math.abs
-import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 
 /**
@@ -129,7 +128,6 @@ public object TimeTicks {
     zone: TimeZone,
     locale: VegaLocale = VegaLocale.EnglishUS,
   ): String {
-    val at = localAt(millis, zone)
     // Each step's pattern, which a host may replace through `VegaLocale.timeTickFormats`. Keyed by
     // d3's own names for the cascade, because these *are* d3's steps and the default is d3's
     // exactly — a fixture compares these labels against upstream's. The lever exists because the
@@ -144,26 +142,35 @@ public object TimeTicks {
     // the clock forward at 00:00, so the first instant of that day is 01:00. There, an axis's day
     // tick had `hour == 1` and was labelled as an *hour* rather than a day, once a year, in the one
     // place a reader most needs the date back.
-    fun onBoundary(interval: TimeInterval): Boolean =
-      TimeStepper(interval, zone = zone).floor(millis) >= millis
+    // **`floor(millis) < millis`, and not the negation of `floor(millis) >= millis`.** The two are
+    // the same question of every real number and opposite questions of `NaN`, which is not a
+    // pedantic distinction here: a value that is not an instant reaches this cascade — a
+    // `formatType: "time"` over a column of words is enough — and the negated form said *yes* at
+    // the very first test, labelling it as a millisecond. d3 asks `second(date) < date`, gets false
+    // at every step, and falls all the way through to the **year**, which is why an unreadable date
+    // is labelled `0NaN` upstream rather than `NaN`. One character, and the label is turned on its
+    // side, so it was eight pixels of chart height.
+    fun below(interval: TimeInterval): Boolean =
+      TimeStepper(interval, zone = zone).floor(millis) < millis
 
     return when {
-      !onBoundary(TimeInterval.SECOND) ->
-        TimeFormat.format(at, pattern("millisecond", ".%L"), locale)
-      !onBoundary(TimeInterval.MINUTE) -> TimeFormat.format(at, pattern("second", ":%S"), locale)
-      !onBoundary(TimeInterval.HOUR) -> TimeFormat.format(at, pattern("minute", "%I:%M"), locale)
-      !onBoundary(TimeInterval.DAY) -> TimeFormat.format(at, pattern("hour", "%I %p"), locale)
-      !onBoundary(TimeInterval.MONTH) ->
+      below(TimeInterval.SECOND) ->
+        TimeFormat.format(millis, pattern("millisecond", ".%L"), zone, locale)
+      below(TimeInterval.MINUTE) ->
+        TimeFormat.format(millis, pattern("second", ":%S"), zone, locale)
+      below(TimeInterval.HOUR) ->
+        TimeFormat.format(millis, pattern("minute", "%I:%M"), zone, locale)
+      below(TimeInterval.DAY) -> TimeFormat.format(millis, pattern("hour", "%I %p"), zone, locale)
+      below(TimeInterval.MONTH) ->
         // A week boundary gets the month back; any other day only needs its name. d3's default
         // week is `timeSunday`, which is what `TimeInterval.WEEK` floors to.
-        if (onBoundary(TimeInterval.WEEK)) TimeFormat.format(at, pattern("week", "%b %d"), locale)
-        else TimeFormat.format(at, pattern("day", "%a %d"), locale)
-      !onBoundary(TimeInterval.YEAR) -> TimeFormat.format(at, pattern("month", "%B"), locale)
-      else -> TimeFormat.format(at, pattern("year", "%Y"), locale)
+        if (below(TimeInterval.WEEK))
+          TimeFormat.format(millis, pattern("day", "%a %d"), zone, locale)
+        else TimeFormat.format(millis, pattern("week", "%b %d"), zone, locale)
+      below(TimeInterval.YEAR) -> TimeFormat.format(millis, pattern("month", "%B"), zone, locale)
+      else -> TimeFormat.format(millis, pattern("year", "%Y"), zone, locale)
     }
   }
-
-  private fun localAt(millis: Double, zone: TimeZone): LocalDateTime = TimeFormat.at(millis, zone)
 
   /** Convenience for callers that already know the pattern they want. */
   public fun format(

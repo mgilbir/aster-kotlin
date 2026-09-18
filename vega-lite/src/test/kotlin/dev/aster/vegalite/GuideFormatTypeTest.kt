@@ -24,13 +24,18 @@ import org.junit.jupiter.api.Test
  * **not** parsed: upstream emits the source rows untouched, with no formula and no dataset derived
  * from one, and leaves a time scale standing over the raw strings.
  *
- * **Checked here rather than by a fixture, and the reason is worth stating.** Every chart these
+ * **The reason this was a test and not a fixture is gone, and both now exist.** Every chart these
  * rules need is degenerate — a number format over a category, a time format over a category, a time
- * scale over unparsed text — and upstream's own rendering of them lays out eight pixels differently
- * from this runtime's. That difference is real and unexplained; it is **not** what these rules are
- * about, and a fixture carrying it would fail the scene comparison for a reason that has nothing to
- * do with them. The rules are about the specification that is emitted, so that is what is asserted.
- * The scene difference is recorded in the changelog as its own open question.
+ * scale over unparsed text — and upstream's rendering of them was eight pixels taller than this
+ * runtime's for a reason recorded as unexplained. The reason was a **label over a value that is not
+ * an instant**: `formatType: "time"` has the column parsed with `toDate`, `Date.parse` of a word is
+ * `NaN` rather than nothing, and d3 prints `0NaN` for it where this engine printed one character
+ * fewer — which on labels turned on their side is the height of the chart. With that fixed the
+ * shapes are comparable as drawings, and `a-format-type-decides-the-parse.vl.json` and
+ * `a-date-that-is-not-a-date.vl.json` arm both gates on them.
+ *
+ * This stays because it says which rule broke rather than that something did: the assertions below
+ * name the description signal and the absent dataset, where a fixture compares a whole chart.
  *
  * Every expectation below was read off upstream rather than reasoned about.
  */

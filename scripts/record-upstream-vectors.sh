@@ -145,6 +145,11 @@ done
 # prints. Every number a chart writes as text goes through it.
 node oracle-js/src/record-number-strings.mjs
 
+# Also not an upstream test, and for the same shape of reason: d3's suite formats *dates*, and what
+# it prints for a value that is **not** an instant is observable, reachable from a specification and
+# load-bearing — it decides the width of a label and so the height of a chart. Only d3 can say it.
+node oracle-js/src/record-invalid-date-formats.mjs
+
 total="$(node -e '
   const fs = require("fs");
   const dir = "test-fixtures/upstream-vectors";
