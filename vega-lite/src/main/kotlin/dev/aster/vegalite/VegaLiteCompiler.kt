@@ -1057,8 +1057,21 @@ private class Compilation(
         )
       // Beside the table it reads, not at the end of the chart's: a plot's own data is assembled
       // when that plot is, so a grid's values stand between its table and the next plot's.
+      //
+      // **After anything already put there**, which matters as soon as two plots read the *same*
+      // table: each is assembled in turn and each would otherwise insert at the same index, so the
+      // second landed in front of the first and the two grids' values came out back to front. A
+      // concatenation whose members facet on one column is exactly that shape. Upstream assembles
+      // in order and appends, so the fix is to skip past the values already standing there rather
+      // than to insert among them.
       val at = data.indexOfFirst { it.string("name") == reads }
-      if (at >= 0) data.addAll(at + 1, domains) else data += domains
+      if (at >= 0) {
+        var after = at + 1
+        while (after < data.size && data[after].string("name")?.endsWith("_domain") == true) {
+          after++
+        }
+        data.addAll(after, domains)
+      } else data += domains
     }
     // A grid **wrapping a concatenation** writes its own values beside the chart's table too: the
     // cells' values are the whole table's, whatever the cell turns out to hold.
