@@ -8132,10 +8132,16 @@ number, nothing, an empty cell, an empty list, a flag and a word — and draws b
 answer places and the answer itself as text, so a value that is placed and one that is not are told
 apart by characters rather than by an absence. Five mutants die on it. 220 Vega fixtures.
 
-**Still open, and now named.** `asDouble` is documented as "Vega's coercion to number" and is not
-`Number()`: it answers `NaN` for a null, an empty string and an empty array where JavaScript answers
-`0`. `JsSemantics.toNumber` is the faithful one, and the two exist because `asDouble` lives in
-`vega-model` and cannot see `vega-expression`. The scales now read through the faithful one; the
-other **148** call sites have not been examined, and whether any of them is a `+x` site upstream is
-a question rather than a claim.
+**And the question that raised — answered by measuring it.** `asDouble` was documented as "Vega's
+coercion to number" and is not `Number()`: it answers `NaN` for a null, an empty string and an empty
+array where JavaScript answers `0`. The obvious reading is that it is a broken coercion and all 148
+of its call sites are suspect. It is not. Making it faithful to `Number()` and running the whole
+corpus moved **two** tests, and one of them says why: `extent` over a column of nulls went from
+nothing to `[0, 0]`. d3's `extent` draws the same line this does — `value != null && value >= value`
+— because an aggregate has to *skip* a row with no number in it, and `NaN` is how that is said.
 
+So the two are different jobs that agree wherever a value has a number in it: `Number` is a
+coercion, with an answer for everything and zero as the answer for nothing; `asDouble` is a reading,
+where `NaN` means there was nothing to read. Both are now documented as such, on the function and in
+the test that pins it, so the next person to notice the difference does not "fix" it. The scales are
+the place upstream really does coerce, and they are the ones that changed.

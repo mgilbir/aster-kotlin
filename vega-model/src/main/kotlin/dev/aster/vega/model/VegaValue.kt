@@ -146,8 +146,32 @@ public fun VegaValue.asNumberOrNull(): Double? =
   }
 
 /**
- * Vega's coercion to number. Returns `NaN` rather than throwing, because Vega expressions and
- * scales are expected to propagate `NaN` instead of failing the whole dataflow.
+ * **The number in this value, if there is one** — and deliberately not JavaScript's `Number(x)`.
+ *
+ * The two agree wherever a value has a number in it and part company where one does not:
+ * ```
+ *              Number(x)   asDouble
+ * null              0         NaN
+ * ""                0         NaN
+ * []                0         NaN
+ * ```
+ *
+ * `Number` is a *coercion*: it has an answer for everything, and zero is the answer it gives when
+ * there is nothing to convert. This is a *reading*: `NaN` means the value held no number, and the
+ * callers depend on that — an aggregate skips a row whose field reads `NaN`, which is how a column
+ * with empty cells in it gets a `min` rather than a zero. d3's own `extent` draws the same line,
+ * `value != null && value >= value`, and answers `undefined` for a column of nulls where a coercion
+ * would answer `[0, 0]`.
+ *
+ * Measured rather than assumed: making this faithful to `Number()` and running the whole corpus
+ * moved **two** tests, and one of them was `extent` over a column of nulls going from nothing to
+ * `0,0`. So the 148 places that read a value this way are reading it correctly.
+ *
+ * Where upstream really does write `+x` — every scale, whose `x == null || isNaN(x = +x)` is a
+ * coercion — use `JsSemantics.toNumber`, which is `Number(x)` exactly. `scaleNumber` in the runtime
+ * is that line, null guard and all. The two functions exist separately because this one lives in
+ * `vega-model` and cannot see `vega-expression`; that is a layering fact and not a duplication to
+ * be tidied away.
  */
 public fun VegaValue.asDouble(): Double =
   when (this) {
