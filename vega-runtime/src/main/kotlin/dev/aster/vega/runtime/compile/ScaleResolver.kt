@@ -20,6 +20,7 @@ import dev.aster.vega.model.spec.RangeSpec
 import dev.aster.vega.model.spec.ScaleSpec
 import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.model.spec.SchemeRef
+import dev.aster.vega.model.time.JsDate
 import dev.aster.vega.model.time.TimeInterval
 import dev.aster.vega.model.time.TimeStepper
 import dev.aster.vega.runtime.scale.BandScale
@@ -798,8 +799,19 @@ public class ScaleResolver(
     // `!scale.bins && (linear || pow || sqrt)` — a time scale never zeroes unless a specification
     // asks it to, and an explicit `zero: true` still applies.
     val domain =
-      continuousDomain(spec, zeroDefault = false, fallback = emptyList())?.takeIf { it.size >= 2 }
-        ?: return null
+      continuousDomain(spec, zeroDefault = false, fallback = emptyList())
+        // **Clipped, because a time scale's domain is a list of dates and not of numbers.** Vega
+        // hands each value to `new Date(x)`, and ECMA-262's `TimeClip` calls anything past
+        // ±8.64e15 milliseconds an *Invalid Date* whose time value is `NaN`. So a column reaching
+        // `1e21` gives upstream a domain of `[0, NaN]` and an axis with no labels at all — where
+        // this engine carried the number through, saturated it on the way to a `Long`, and asked
+        // for the year 292278994. `LocalDate` will not build one, and the compile ended in a fatal
+        // `DateTimeException` with no chart rather than in the empty axis upstream draws.
+        //
+        // [JsDate.clip] is that rule, and it was already written down here — in `vega-model`, where
+        // a scale can see it. Only the expression functions were using it.
+        ?.map { JsDate.clip(it) }
+        ?.takeIf { it.size >= 2 } ?: return null
     val padded = padded(domain, range, spec)
     val niced =
       if (spec.nice && !rawApplies(spec)) {
