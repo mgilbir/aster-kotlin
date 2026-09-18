@@ -368,12 +368,24 @@
       "x": 201.666667
     },
     {
+      "fill": "steelblue",
+      "role": "mark",
+      "shapeHeight": 7.745967,
+      "shapeLeft": -3.872983,
+      "shapeTop": 146.127017,
+      "shapeWidth": 7.745967,
+      "size": 60,
+      "type": "symbol",
+      "x": "NaN",
+      "y": 150
+    },
+    {
       "baseline": "top",
       "fill": "#000",
       "font": "sans-serif",
       "fontSize": 8,
       "role": "mark",
-      "text": "a number -> 0 | q hi | th over | qt p2 | o undefined | e undefined",
+      "text": "a number -> 0 | q hi | th over | qt p2 | o undefined | e undefined | lg 65.05149978319905",
       "type": "text",
       "x": 0,
       "y": 7
@@ -384,7 +396,7 @@
       "font": "sans-serif",
       "fontSize": 8,
       "role": "mark",
-      "text": "nothing -> undefined | q undefined | th undefined | qt undefined | o undefined | e undefined",
+      "text": "nothing -> undefined | q undefined | th undefined | qt undefined | o undefined | e undefined | lg undefined",
       "type": "text",
       "x": 0,
       "y": 21
@@ -395,7 +407,7 @@
       "font": "sans-serif",
       "fontSize": 8,
       "role": "mark",
-      "text": "an empty cell -> 120 | q lo | th under | qt p1 | o undefined | e undefined",
+      "text": "an empty cell -> 120 | q lo | th under | qt p1 | o undefined | e undefined | lg NaN",
       "type": "text",
       "x": 0,
       "y": 35
@@ -406,7 +418,7 @@
       "font": "sans-serif",
       "fontSize": 8,
       "role": "mark",
-      "text": "an empty list -> 120 | q lo | th under | qt p1 | o undefined | e undefined",
+      "text": "an empty list -> 120 | q lo | th under | qt p1 | o undefined | e undefined | lg NaN",
       "type": "text",
       "x": 0,
       "y": 49
@@ -417,7 +429,7 @@
       "font": "sans-serif",
       "fontSize": 8,
       "role": "mark",
-      "text": "a flag -> 114 | q lo | th under | qt p2 | o undefined | e undefined",
+      "text": "a flag -> 114 | q lo | th under | qt p2 | o undefined | e undefined | lg 0",
       "type": "text",
       "x": 0,
       "y": 63
@@ -428,10 +440,21 @@
       "font": "sans-serif",
       "fontSize": 8,
       "role": "mark",
-      "text": "a word -> undefined | q lo | th under | qt undefined | o undefined | e undefined",
+      "text": "a word -> undefined | q lo | th under | qt undefined | o undefined | e undefined | lg undefined",
       "type": "text",
       "x": 0,
       "y": 77
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "a negative -> 150 | q lo | th under | qt p0 | o undefined | e undefined | lg NaN",
+      "type": "text",
+      "x": 0,
+      "y": 91
     }
   ],
   "scales": {
@@ -456,6 +479,37 @@
         "a"
       ],
       "range": []
+    },
+    "lg": {
+      "domain": [
+        1,
+        100
+      ],
+      "range": [
+        0,
+        100
+      ],
+      "ticks": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        20,
+        30,
+        40,
+        50,
+        60,
+        70,
+        80,
+        90,
+        100
+      ]
     },
     "o": {
       "domain": [
@@ -493,6 +547,7 @@
     },
     "qt": {
       "domain": [
+        -5,
         0,
         0,
         1,
@@ -538,8 +593,8 @@
     }
   },
   "size": {
-    "height": 140,
-    "width": 621
+    "height": 168.872983,
+    "width": 717
   },
   "spec": "a-scale-coerces-what-it-is-given.vg.json",
   "vegaVersion": "6.3.1"

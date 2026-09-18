@@ -8127,6 +8127,12 @@ A quantile scale's *samples* are filtered with the same line as its lookup — `
 = +d)` — so an empty cell is a sample at zero rather than a row that was never there. That one
 showed as a domain of two where upstream had four.
 
+**The guard is on the input, not on the answer**, and getting that backwards was a defect this
+change introduced before the value sweep below caught it. d3 tests `x == null || isNaN(x = +x)` and
+then does the arithmetic whatever it comes to — so a **log** scale asked for `-5` answers `NaN`, a
+perfectly good number having no logarithm, while the same scale asked for a *word* answers nothing.
+The empty cell separates them: it coerces to `0`, passes the guard, and its logarithm is `NaN` too.
+
 An **ordinal** scale has no coercion at all — its index is keyed by the value — so it is the
 clearest statement of what `unknown` is, and it was answering a null too. So was a scale with an
 **empty range**, which is legal and answers `unknown` for every value including the ones its domain

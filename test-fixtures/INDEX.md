@@ -15,7 +15,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 
 | Fixture | Marks | Mark types | Transforms | Scales |
 | --- | --- | --- | --- | --- |
-| `a-scale-coerces-what-it-is-given` | 35 | rule, symbol, text | — | band, linear, ordinal, quantile, quantize, threshold |
+| `a-scale-coerces-what-it-is-given` | 37 | rule, symbol, text | — | band, linear, log, ordinal, quantile, quantize, threshold |
 | `aggregate-ops-rest` | 14 | rect, rule, text | aggregate | band, linear |
 | `aggregate-ops-tail` | 43 | rect, rule, symbol, text | aggregate, fold | band, linear, ordinal |
 | `airport-connections` | 650 | path, symbol, text | aggregate, collect, filter, geopath, geopoint, linkpath, lookup, voronoi | linear |

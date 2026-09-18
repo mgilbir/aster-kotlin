@@ -183,8 +183,16 @@ public class LinearScale(
    * expression to decide whether a bar is too thin to see, and a pre-binned column has no `_end` to
    * give it — so a bar came out a quarter of a unit narrow and shifted along.
    */
-  override fun scale(value: VegaValue): VegaValue =
-    position(value).let { if (it.isNaN()) VegaValue.Undefined else VegaValue.Num(it) }
+  override fun scale(value: VegaValue): VegaValue {
+    // **The guard is on the input, not on the answer.** d3 tests `x == null || isNaN(x = +x)` and
+    // then does the arithmetic whatever it comes to — so a log scale asked for `-5` answers `NaN`,
+    // a perfectly good number having no logarithm, while the same scale asked for a *word* answers
+    // `undefined`. Reading the answer instead conflates the two and reports nothing for both.
+    //
+    // `""` separates them: it coerces to `0`, passes the guard, and its logarithm is `NaN`. Probed.
+    val x = scaleNumber(value)
+    return if (x.isNaN()) VegaValue.Undefined else VegaValue.Num(apply(x))
+  }
 
   public fun apply(x: Double): Double = if (round) roundHalfUp(unrounded(x)) else unrounded(x)
 
@@ -609,8 +617,16 @@ public abstract class TransformedScale(
    * expression to decide whether a bar is too thin to see, and a pre-binned column has no `_end` to
    * give it — so a bar came out a quarter of a unit narrow and shifted along.
    */
-  override fun scale(value: VegaValue): VegaValue =
-    position(value).let { if (it.isNaN()) VegaValue.Undefined else VegaValue.Num(it) }
+  override fun scale(value: VegaValue): VegaValue {
+    // **The guard is on the input, not on the answer.** d3 tests `x == null || isNaN(x = +x)` and
+    // then does the arithmetic whatever it comes to — so a log scale asked for `-5` answers `NaN`,
+    // a perfectly good number having no logarithm, while the same scale asked for a *word* answers
+    // `undefined`. Reading the answer instead conflates the two and reports nothing for both.
+    //
+    // `""` separates them: it coerces to `0`, passes the guard, and its logarithm is `NaN`. Probed.
+    val x = scaleNumber(value)
+    return if (x.isNaN()) VegaValue.Undefined else VegaValue.Num(apply(x))
+  }
 
   public fun apply(x: Double): Double = if (round) roundHalfUp(unrounded(x)) else unrounded(x)
 
