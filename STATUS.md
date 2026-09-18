@@ -8189,15 +8189,20 @@ pins it names the log scale for that reason.
 **169 of 192 agree.** What the other 23 are, ranked by where they cluster rather than by what they
 say, because the shapes repeat:
 
-| where | cases | what |
-| --- | --- | --- |
-| `time-line` | 13 | a time scale over an odd column — **including the control column of 1, 2, 3, 4**, which is a sub-second domain and therefore about tick granularity rather than about odd values |
-| `log-symbol` | 3 | a log scale's labels at the notation thresholds, `1e21` and `1e-7` |
-| `arc-theta` | 2 | a pie whose column holds a null or an empty cell |
-| four charts | 4 | one case each: a legend label, a quantile domain, a written-out value, a band label — all at the notation thresholds or past exact integers |
-| refused | 1 | **this engine draws nothing**: a time scale over `1e21` milliseconds ends in a
-  `FATAL` `VEGA_COMPILE_FAILED` — `DateTimeException: Invalid value for Year` caught inside the
-  compiler — where upstream draws the chart with an empty axis |
+- **the time-scale chart, 13 cases** — a time scale over an odd column, *including the control
+  column of 1, 2, 3, 4*, which is a sub-second domain and therefore about tick granularity rather
+  than about odd values;
+- **the log-scale chart, 3** — its labels at the notation thresholds, `1e21` and `1e-7`;
+- **the pie chart, 2** — a column holding a null or an empty cell;
+- **four charts, one case each** — a legend label, a quantile domain, a written-out value and a
+  band label, all at the notation thresholds or past exact integers;
+- **one refusal** — this engine draws nothing where upstream draws the chart with an empty axis: a
+  time scale over `1e21` milliseconds ends in a `FATAL` `VEGA_COMPILE_FAILED`,
+  `DateTimeException: Invalid value for Year`, caught inside the compiler.
+
+(Written as a list and not a table on purpose: `DocumentedNumbersTest` reads a row of the shape
+`| \`name\` | count |` as a claim about a **fixture** that must exist on disk, and these are the
+sweep's chart names. The gate was right to object.)
 
 The last of those is the one that is not cosmetic. The exception does **not** escape `compileJson`;
 the compiler catches it and reports a fatal diagnostic, which is the policy working. What is wrong
