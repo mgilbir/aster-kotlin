@@ -1,6 +1,7 @@
 package dev.aster.vega.dataflow.transform
 
 import dev.aster.vega.expression.JsSemantics
+import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.field
 import dev.aster.vega.model.isMissing
@@ -38,13 +39,30 @@ public object StackTransform : Transform {
 
     // Group positions, not tuples, so duplicates stay distinct.
     //
-    // And on the **raw** values, not on `GroupKey`'s coerced ones: upstream's `Stack` partitions
-    // with `JSON.stringify(groupby.map(get))` rather than through the object-backed `fastmap` that
-    // `aggregate` and `window` group with, so the number `1001` and the string `"1001"` are two
-    // groups here and one there. Probed both ways round; the difference is visible in `y1`.
-    val groups = LinkedHashMap<List<VegaValue>, MutableList<Int>>()
+    // And keyed by **the JSON of the group values**, which is upstream's key verbatim:
+    //
+    //     k = JSON.stringify(groupby.map(get));
+    //
+    // rather than through the object-backed `fastmap` that `aggregate` and `window` group with. The
+    // distinction that motivated writing it out was that `'' + 1001` and `'' + "1001"` are the same
+    // string and `[1001]` and `["1001"]` are not, so the number and the word are two groups here
+    // and one there. Keying on the raw values kept that and missed the other half: `JSON.stringify`
+    // also **merges**, because JSON cannot write every double.
+    //
+    // A non-finite number is written `null`, so a NaN, an infinity and an actual null all key to
+    // `[null]` and stack as one group — and a NaN is not exotic here, `toDate` of a word being one
+    // and a `formatType: "time"` over a column of words being enough to ask for it. A negative zero
+    // is written `0`, so it joins the zeroes, where a `Double`'s own `equals` holds `-0.0` apart
+    // from `0.0`. Both were three groups where upstream had one, and a stack's totals are its
+    // scale's domain, so the whole chart was a different height.
+    //
+    // [VegaJson.write] already implements `JSON.stringify`'s number rules — non-finite to `null`,
+    // everything else through `Decimals.jsString` — so this is that function and not a second
+    // transcription of it.
+    val groups = LinkedHashMap<String, MutableList<Int>>()
     input.forEachIndexed { index, datum ->
-      groups.getOrPut(groupBy.map { datum.field(it) }) { mutableListOf() }.add(index)
+      val key = VegaJson.write(VegaValue.Arr(groupBy.map { datum.field(it) }))
+      groups.getOrPut(key) { mutableListOf() }.add(index)
     }
 
     val comparator = sortComparator(params.fields["sort"])

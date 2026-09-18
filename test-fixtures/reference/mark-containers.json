@@ -16896,6 +16896,30 @@
   "hidden": false
  },
  {
+  "fixture": "stack-groups-by-json",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "stack-groups-by-json",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "stack-groups-by-json",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "stack-offsets",
   "kind": "group",
   "role": "graphics-object",

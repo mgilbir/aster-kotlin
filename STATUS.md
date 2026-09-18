@@ -27,7 +27,7 @@ end to end — expressions, signals, all 51 of upstream's 51 documented data tra
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-216 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
+217 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -194,7 +194,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 216 Vega differential fixtures and 332 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 217 Vega differential fixtures and 332 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -226,7 +226,7 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests, and every renderer now exposes the tree: the Android View, the Swift one and Compose Multiplatform. Not verified on physical hardware or with a real user |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 216 Vega differential fixtures |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 217 Vega differential fixtures |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -7966,8 +7966,49 @@ because it names which rule broke where a fixture only says that something did; 
 justification does not.
 
 **What this found and did not fix.** A row whose word is the empty string puts a genuine null into
-the chart, and upstream keys a stack's groups by `JSON.stringify(groupby.map(get))` — under which
-`[NaN]` and `[null]` are the same string, so a NaN stacks with the nulls and every value JSON cannot
-represent does too. This engine keys them apart. That is a different cause with a wider reach than
-dates, it is next on the list below, and the empty-string rule is pinned by `ToDateTest` in the
-meantime rather than by a fixture that would fail for the wrong reason.
+the chart, and two further rules turn on it — the first is the next entry below, and the second is
+still open. The empty-string rule is pinned by `ToDateTest` in the meantime rather than by a fixture
+that would fail for a reason that is not about dates.
+
+### A stack's groups are keyed by JSON, and JSON cannot write every double
+
+`Stack` partitions with one line, and the line is the whole finding:
+
+```js
+k = JSON.stringify(groupby.map(get));
+```
+
+Not the object-backed `fastmap` that `aggregate` and `window` group through — which is a difference
+this engine already knew about and had written down, because `'' + 1001` and `'' + "1001"` are the
+same string while `[1001]` and `["1001"]` are not, so the number and the word are two groups in a
+stack and one in an aggregate. Keying on the raw values kept that half and missed the other:
+**`JSON.stringify` also merges.**
+
+A non-finite number is written `null`, so a NaN, an infinity and an actual null all key to `[null]`
+and stack as one group. A negative zero is written `0`, so it joins the zeroes — where a `Double`'s
+own `equals` holds `-0.0` apart from `0.0`. Both were three groups here where upstream had one, and
+a stack's totals are its scale's domain, so the whole chart came out a different height: the fixture
+below had upstream's y axis reaching 13 and this engine's reaching 7.
+
+None of it is exotic. `toDate` of a word is a NaN, and a `formatType: "time"` over a column of words
+is enough to ask for one — which is how this was found, from the row that could not go into
+`a-date-that-is-not-a-date.vl.json`.
+
+The fix is upstream's line: key by `VegaJson.write` of the group values, which already implements
+`JSON.stringify`'s number rules — non-finite to `null`, everything else through `Decimals.jsString`
+— rather than transcribing them a second time. `stack-groups-by-json.vg.json` carries five kinds of
+group value at once: two words that must stay apart, a NaN, an infinity and a null that must become
+one group, and a zero beside a negative zero that must become another. Written as `0/0` and `1/0`,
+because `NaN` and `Infinity` are not names Vega's expression language knows — `Unrecognized signal
+name: "Infinity"`. Three mutants die on it: the raw-value key, an `aggregate`-style text key, and a
+JSON writer that prints a non-finite number as itself. 217 Vega fixtures.
+
+**And a third cause in the same chain, still open.** With the stack keyed right, the empty-string row
+gets one difference further and stops on this: a discrete scale's domain here is a `List<String>`, so
+a null entry becomes the text `"null"` and coerces to `NaN`, where upstream's domain holds the value
+and `+null` is **0**. Upstream labels that band `01 AM` — epoch zero in the pinned zone, through the
+multi-format — and this engine labels it `0NaN`. The text of a value is not the value for a null, a
+boolean or a date, and only a discrete domain throws the value away. `BandScale.domain` and
+`PointScale.domain` would have to carry `VegaValue`, which is 56 call sites across the scales, the
+axes, the legends and the hit index, so it is its own change rather than a rider on this one.
+

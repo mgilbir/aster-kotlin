@@ -2100,6 +2100,16 @@
   "caption": "Symbol legend titled 'Series' for fill color with 3 values: gain, loss, other"
  },
  {
+  "fixture": "stack-groups-by-json",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 7 values: p, q, nan, inf, null, zero, negzero"
+ },
+ {
+  "fixture": "stack-groups-by-json",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 13"
+ },
+ {
   "fixture": "stack-offsets",
   "kind": "axis",
   "caption": "X-axis for a linear scale with values from 1.0 to 4.0"
