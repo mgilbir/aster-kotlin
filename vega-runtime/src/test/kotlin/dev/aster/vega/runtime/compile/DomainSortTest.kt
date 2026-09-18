@@ -2,6 +2,7 @@ package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticSeverity
+import dev.aster.vega.model.asString
 import dev.aster.vega.runtime.scale.BandScale
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -52,8 +53,10 @@ class DomainSortTest {
           .trimIndent()
       )
 
+  // A domain is a list of values; every domain in this file is words, and the tests below read
+  // better comparing text than comparing wrappers.
   private fun domainOf(domain: String, values: String = rows): List<String> =
-    (compile(domain, values).scales["s"] as BandScale).domain
+    (compile(domain, values).scales["s"] as BandScale).domain.map { it.asString() }
 
   private fun codes(domain: String, values: String = rows) =
     compile(domain, values).diagnostics.map { it.code }

@@ -78,6 +78,19 @@ class UpstreamD3ScaleVectorsTest {
   private class Config {
     var domainNumbers: List<Double>? = null
     var domainStrings: List<String>? = null
+
+    /**
+     * The same domain as a scale holds it, which is a list of **values**.
+     *
+     * Wrapped as text on both sides — here and at the `scale(...)` call the vector replays — so the
+     * key the index is built with is the key it is asked with. d3's own vectors read the domain and
+     * the argument out of the same JSON, so text-to-text replays the *geometry* these vectors are
+     * about exactly; which of a number and its word a domain holds is a different rule, and it is
+     * `discrete-domain-keeps-its-values.vg.json` that checks it.
+     */
+    val domainWords: List<VegaValue>?
+      get() = domainStrings?.map { VegaValue.Str(it) }
+
     var domainQuoted = false
     var rangeNumbers: List<Double>? = null
     var rangeValues: List<VegaValue>? = null
@@ -231,7 +244,7 @@ class UpstreamD3ScaleVectorsTest {
     return when (kind) {
       "scaleBand",
       "scalePoint" -> {
-        val values = config.domainStrings ?: return null
+        val values = config.domainWords ?: return null
         if (method != "(call)" || range.size < 2) return null
         val at = (args.getOrNull(0) as? JsonPrimitive)?.content ?: return null
         val scale =
@@ -278,7 +291,7 @@ class UpstreamD3ScaleVectorsTest {
         }
       }
       "scaleOrdinal" -> {
-        val values = config.domainStrings ?: return null
+        val values = config.domainWords ?: return null
         val outputs = config.rangeValues ?: return null
         if (method != "(call)") return null
         val at = (args.getOrNull(0) as? JsonPrimitive)?.content ?: return null

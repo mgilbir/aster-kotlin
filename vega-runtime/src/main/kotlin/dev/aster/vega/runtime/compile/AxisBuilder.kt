@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.expression.NumberFormat
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
@@ -1320,7 +1321,13 @@ public class AxisBuilder(
       // rather than reading the words. A chart gets here by naming `formatType: "time"` over a
       // column that is not dates, which Vega-Lite also parses with `toDate` — so the words are
       // already gone by the time the axis sees them.
-      return { value -> write(value.asDouble()) }
+      //
+      // **`Number(value)` and not `asDouble`**, which are the same for a number and a word and
+      // differ for everything else a discrete domain can hold: `+null` is `0` and `+true` is `1`,
+      // where `asDouble` answers `NaN` for both. A null band is labelled `01 AM` upstream — epoch
+      // zero — and was labelled `0NaN` here for as long as the domain held text, which could not
+      // tell a null from the word for one.
+      return { value -> write(JsSemantics.toNumber(value)) }
     }
     // A **time** scale reads its specifier as a time specifier, without needing a `formatType` to
     // say so: upstream's `tickFormat` asks the scale, and a temporal scale's own formatter is d3's
@@ -1412,24 +1419,13 @@ public class AxisBuilder(
         val alongTick = bandOffset(scale, spec)
         val alongLabel = labelOffsetAlong(scale, spec)
         scale.domain.map { value ->
-          val start = scale.position(VegaValue.Str(value))
-          Tick(
-            label(VegaValue.Str(value)),
-            start + alongTick,
-            VegaValue.Str(value),
-            labelPosition = start + alongLabel,
-          )
+          val start = scale.position(value)
+          Tick(label(value), start + alongTick, value, labelPosition = start + alongLabel)
         }
       }
       is PointScale -> {
         val label = labeller(scale, scale.domain.size, specifier, spec.formatType)
-        scale.domain.map { value ->
-          Tick(
-            label(VegaValue.Str(value)),
-            scale.position(VegaValue.Str(value)),
-            VegaValue.Str(value),
-          )
-        }
+        scale.domain.map { value -> Tick(label(value), scale.position(value), value) }
       }
       // An **ordinal** scale's ticks are its domain, each placed wherever the scale sends it. It is
       // the discrete case the band and point branches already cover, and it had no branch at all —
@@ -1442,11 +1438,11 @@ public class AxisBuilder(
       // same NaN onto the item and draws nothing.
       is OrdinalScale ->
         scale.domain.map { value ->
-          val at = scale.scale(VegaValue.Str(value)).asNumberOrNull() ?: Double.NaN
+          val at = scale.scale(value).asNumberOrNull() ?: Double.NaN
           // A discrete domain's values *are* its labels, which is the rule the binned scales follow
           // too: upstream asks the scale for a `tickFormat`, an ordinal scale has none, and the
           // fallback is plain string coercion.
-          Tick(value, at, VegaValue.Str(value))
+          Tick(value.asString(), at, value)
         }
       // An **identity** scale is `linearish` in d3, so its ticks are a linear scale's over its own
       // domain — and its position is the value itself, the scale being the identity. Upstream

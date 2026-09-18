@@ -905,6 +905,21 @@
   "caption": "Y-axis for a linear scale with values from 0.00 to 0.16"
  },
  {
+  "fixture": "discrete-domain-keeps-its-values",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: Thursday, 01 January 1970, 1:00:01 AM, Thursday, 01 January 1970, 1:00:00 AM, Thursday, 01 January 1970, 1:00:00 AM"
+ },
+ {
+  "fixture": "discrete-domain-keeps-its-values",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: 1001, null, true"
+ },
+ {
+  "fixture": "discrete-domain-keeps-its-values",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 9"
+ },
+ {
   "fixture": "diverging-colour",
   "kind": "axis",
   "caption": "Y-axis for a discrete scale with 6 values: -10, -5, 0, 5, 10, 20"

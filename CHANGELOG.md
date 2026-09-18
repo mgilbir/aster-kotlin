@@ -8,6 +8,23 @@ section here does not get released.
 
 ### Changed
 
+- **A discrete scale's domain holds values, not their text.** `BandScale.domain`,
+  `PointScale.domain` and `OrdinalScale.domain` are `List<VegaValue>` where they were
+  `List<String>`, and `BandScale.invert` and `invertRange` answer values for the same reason. It is
+  a source-incompatible change to those five signatures, and it is what upstream's own shape is: d3
+  builds a discrete scale's index on an `InternMap`, keyed by **value**, so `scale("1001")` finds
+  nothing where `scale(1001)` finds a band, and `+null` is `0` where `+"null"` is `NaN` — a
+  time-formatted axis reads `01 AM` for a null band and read `0NaN` here.
+
+  Three rules come with it, each upstream's and none derivable from the others: a *data-driven*
+  domain dedups by the group key `'' + value` and keeps the group's first raw value; a *literal*
+  domain dedups through the `InternMap` by value, so `[1001, "1001"]` stays two entries; and a band
+  scale answers **`undefined`** rather than a null for a value it does not hold. Two further
+  transcriptions fell out: the guides now coerce with `Number(value)` rather than a looser reading,
+  and a caption's long date form uses the locale's own `%X` instead of a second spelling of the
+  American clock that had drifted to a padded hour — `1:00:01 AM` upstream against `01:00:01 AM`
+  here, visible only before ten in the morning.
+
 - **A schema sweep for Vega-Lite, comparing the Vega it compiles into.** The sister of the Vega
   property sweep, one layer up. That one sweeps what Vega declares and compares the *scene*; this
   sweeps what **Vega-Lite** declares and compares the **specification it emits**, because that is

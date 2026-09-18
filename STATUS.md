@@ -27,7 +27,7 @@ end to end — expressions, signals, all 51 of upstream's 51 documented data tra
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-217 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
+218 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -194,7 +194,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 217 Vega differential fixtures and 332 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 218 Vega differential fixtures and 332 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -226,7 +226,7 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests, and every renderer now exposes the tree: the Android View, the Swift one and Compose Multiplatform. Not verified on physical hardware or with a real user |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 217 Vega differential fixtures |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 218 Vega differential fixtures |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -8001,14 +8001,53 @@ group value at once: two words that must stay apart, a NaN, an infinity and a nu
 one group, and a zero beside a negative zero that must become another. Written as `0/0` and `1/0`,
 because `NaN` and `Infinity` are not names Vega's expression language knows — `Unrecognized signal
 name: "Infinity"`. Three mutants die on it: the raw-value key, an `aggregate`-style text key, and a
-JSON writer that prints a non-finite number as itself. 217 Vega fixtures.
+JSON writer that prints a non-finite number as itself. 218 Vega fixtures.
 
-**And a third cause in the same chain, still open.** With the stack keyed right, the empty-string row
-gets one difference further and stops on this: a discrete scale's domain here is a `List<String>`, so
-a null entry becomes the text `"null"` and coerces to `NaN`, where upstream's domain holds the value
-and `+null` is **0**. Upstream labels that band `01 AM` — epoch zero in the pinned zone, through the
-multi-format — and this engine labels it `0NaN`. The text of a value is not the value for a null, a
-boolean or a date, and only a discrete domain throws the value away. `BandScale.domain` and
-`PointScale.domain` would have to carry `VegaValue`, which is 56 call sites across the scales, the
-axes, the legends and the hit index, so it is its own change rather than a rider on this one.
+**And a third cause in the same chain**, which is the next entry: a discrete scale's domain held
+text, so a null entry became the word `null` and coerced to `NaN` where upstream's `+null` is `0`.
+
+### A discrete scale's domain holds values, not their text
+
+`BandScale.domain` was a `List<String>`, and the word for a value is not the value. `+null` is `0`
+and `+"null"` is `NaN`; `+true` is `1` and `+"true"` is `NaN`; and `1001` is a number that a `Map`
+does not find under the key `"1001"`. Upstream keeps the values, so all three differences were ours.
+
+The one place they were thrown away was the last line of `discreteDomain`, `values.map {
+it.asString() }.distinct()` — and replacing it took **three** rules apart that had been one, none of
+them derivable from the others:
+
+- A **data-driven** domain is built by *grouping* the dataset, and a group's key is `'' + value`, so
+  `1001` and `"1001"` fall in one group. What the group keeps is that group's **first raw value** —
+  the number, not the word. `orderedDomain` already did this, with the values intact.
+- A **literal** domain never meets a grouping. It is handed to the scale, and d3 dedups it through
+  the `InternMap` its index is built on — by *value*, so `[1001, "1001"]` stays **two** entries
+  upstream where a text dedup makes it one. Nothing in the corpus reached this: the first draft of
+  the fix deduped by text at both ends, every gate passed, and what said otherwise was a **mutant of
+  that line surviving**.
+- The index itself is that `InternMap`: `keyof` interns an object by its `valueOf`, so a date and
+  the milliseconds it stands for are one key, and a `Map` keys by SameValueZero, so `0` and `-0` are
+  one key where a `Double`'s own `equals` holds them apart.
+
+A fourth rule came with them, in the same `Map`: a band scale answers **`undefined`** for a value it
+does not hold, not a null. `index.get(d)` and nothing more. An expression prints that as the word
+`undefined` and a mark encoding leaves the property absent, where a null writes both.
+
+Two transcriptions fell out on the way. The guides coerced with `asDouble`, which answers `NaN` for
+a null and a flag where d3's `new Date(+value)` answers `0` and `1` — `JsSemantics.toNumber` is the
+one that is `Number(x)`. And a caption's long date form named the American clock in a constant,
+`%I:%M:%S %p`, when `VegaLocale.time` already carried d3's `%-I:%M:%S %p`: a second transcription of
+a table that existed, drifted by one character, so upstream read `1:00:01 AM` where this read
+`01:00:01 AM`. Only before ten in the morning, and only in a caption — which is why nothing caught
+it until a band over a **null** put epoch zero on an axis. The constant is gone; `%X` expands
+through the locale.
+
+`discrete-domain-keeps-its-values.vg.json` carries both ways a domain arrives and asks the scale
+directly for each value rather than reading an axis, because **an axis joins its label items by the
+value's text**: two bands both reading `1001` collapse into one label at the later band, so an axis
+shows three where the domain has six. That is a rule of its own and it is the open question below.
+Seven mutants die on the fixture. 218 Vega fixtures.
+
+**Open, found here.** An axis over a discrete scale draws one label per *distinct label text* rather
+than one per band — upstream's own behaviour, and not reproduced here yet. It is visible only where
+two domain entries share a text, which before this change could not happen.
 

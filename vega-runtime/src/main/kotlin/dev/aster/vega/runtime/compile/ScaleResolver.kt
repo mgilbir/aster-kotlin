@@ -41,6 +41,7 @@ import dev.aster.vega.runtime.scale.Ticks
 import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.runtime.scale.TimeTicks
 import dev.aster.vega.runtime.scale.VegaScale
+import dev.aster.vega.runtime.scale.internKey
 import dev.aster.vega.scene.ColorSpaces
 import dev.aster.vega.scene.SceneColor
 import kotlin.math.abs
@@ -1270,7 +1271,7 @@ public class ScaleResolver(
     return numbers.min()..numbers.max()
   }
 
-  private fun discreteDomain(domain: DomainSpec, scaleName: String): List<String>? {
+  private fun discreteDomain(domain: DomainSpec, scaleName: String): List<VegaValue>? {
     val values =
       when (domain) {
         // An explicit domain is never sorted, whatever `sort` says: upstream reads the array
@@ -1295,8 +1296,23 @@ public class ScaleResolver(
           return null
         }
       }
-    // Vega's discrete domains keep first-seen order and drop duplicates.
-    return values.map { it.asString() }.distinct()
+    // Vega's discrete domains keep first-seen order and drop duplicates, **by value** — and the
+    // text dedup that reads like the same rule has already happened somewhere else, for one of the
+    // two ways a domain arrives.
+    //
+    // A *data-driven* domain is built by grouping the dataset, and a group's key is `'' + value`,
+    // so `1001` and `"1001"` fall in one group and the entry kept is that group's **first raw
+    // value** — the number, not the word. [orderedDomain] does that, with the values intact.
+    //
+    // A *literal* domain never meets a grouping. It is handed to the scale, and d3 dedups it
+    // through the `InternMap` its index is built on — by value, so `[1001, "1001"]` stays **two**
+    // entries upstream. Deduping by text here collapsed it to one, which no fixture caught until a
+    // mutant of this very line survived: the data-driven path had already done the text dedup, so
+    // the two rules agreed everywhere the corpus looked.
+    //
+    // [internKey] is the `InternMap` rule, so this is that map's key and not a second reading of
+    // it — a date and the milliseconds it stands for are one entry, and so are `0` and `-0`.
+    return values.distinctBy { internKey(it) }
   }
 
   /**

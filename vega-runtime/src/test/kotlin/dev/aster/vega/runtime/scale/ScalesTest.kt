@@ -13,6 +13,15 @@ import org.junit.jupiter.api.assertThrows
  */
 class ScalesTest {
 
+  /**
+   * A discrete domain written the way a test reads best, wrapped the way a scale holds it.
+   *
+   * A domain is a list of **values** rather than of text — see the note on [BandScale] — and every
+   * domain in this file happens to be words, so this keeps the literals short without pretending
+   * the type is `String`.
+   */
+  private fun words(vararg values: String): List<VegaValue> = values.map { VegaValue.Str(it) }
+
   private val tolerance = 1e-12
 
   // ---- identity -------------------------------------------------------------
@@ -166,7 +175,7 @@ class ScalesTest {
     val scale =
       BandScale(
         name = "xscale",
-        domain = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"),
+        domain = words("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"),
         range = listOf(0.0, 344.0),
         paddingInner = 0.05,
         paddingOuter = 0.05,
@@ -179,7 +188,7 @@ class ScalesTest {
 
   @Test
   fun `band scale without padding fills the range exactly`() {
-    val scale = BandScale("s", listOf("a", "b", "c", "d"), listOf(0.0, 100.0))
+    val scale = BandScale("s", words("a", "b", "c", "d"), listOf(0.0, 100.0))
     assertEquals(25.0, scale.step, tolerance)
     assertEquals(25.0, scale.bandwidth, tolerance)
     assertEquals(0.0, scale.position(VegaValue.Str("a")), tolerance)
@@ -188,30 +197,33 @@ class ScalesTest {
 
   @Test
   fun `band scale reverses when the range is descending`() {
-    val scale = BandScale("s", listOf("a", "b"), listOf(100.0, 0.0))
+    val scale = BandScale("s", words("a", "b"), listOf(100.0, 0.0))
     assertEquals(50.0, scale.position(VegaValue.Str("a")), tolerance)
     assertEquals(0.0, scale.position(VegaValue.Str("b")), tolerance)
   }
 
   @Test
   fun `band align moves the leftover space`() {
-    val left = BandScale("s", listOf("a"), listOf(0.0, 100.0), paddingOuter = 0.5, align = 0.0)
-    val right = BandScale("s", listOf("a"), listOf(0.0, 100.0), paddingOuter = 0.5, align = 1.0)
+    val left = BandScale("s", words("a"), listOf(0.0, 100.0), paddingOuter = 0.5, align = 0.0)
+    val right = BandScale("s", words("a"), listOf(0.0, 100.0), paddingOuter = 0.5, align = 1.0)
     assertTrue(left.position(VegaValue.Str("a")) < right.position(VegaValue.Str("a")))
   }
 
   @Test
   fun `band round snaps step and bandwidth to whole pixels`() {
-    val scale = BandScale("s", listOf("a", "b", "c"), listOf(0.0, 100.0), round = true)
+    val scale = BandScale("s", words("a", "b", "c"), listOf(0.0, 100.0), round = true)
     assertEquals(33.0, scale.step, tolerance)
     assertEquals(33.0, scale.bandwidth, tolerance)
   }
 
   @Test
   fun `band scale returns NaN outside its domain`() {
-    val scale = BandScale("s", listOf("a"), listOf(0.0, 10.0))
+    val scale = BandScale("s", words("a"), listOf(0.0, 10.0))
     assertTrue(scale.position(VegaValue.Str("zzz")).isNaN())
-    assertEquals(VegaValue.Null, scale.scale(VegaValue.Str("zzz")))
+    // **Nothing, not a null.** d3's band scale is a `Map` lookup, and a miss on a `Map` is
+    // `undefined` — which an expression prints as the word `undefined` and a mark encoding leaves
+    // absent, where a null would write both.
+    assertEquals(VegaValue.Undefined, scale.scale(VegaValue.Str("zzz")))
   }
 
   @Test
@@ -224,14 +236,14 @@ class ScalesTest {
   @Test
   fun `duplicate band categories collapse to the last position`() {
     // Vega's band scale is a map from value to position, so a repeated category is not a new slot.
-    val scale = BandScale("s", listOf("a", "a", "b"), listOf(0.0, 30.0))
+    val scale = BandScale("s", words("a", "a", "b"), listOf(0.0, 30.0))
     assertEquals(10.0, scale.position(VegaValue.Str("a")), tolerance)
     assertEquals(20.0, scale.position(VegaValue.Str("b")), tolerance)
   }
 
   @Test
   fun `band centers sit half a bandwidth past each position`() {
-    val scale = BandScale("s", listOf("a", "b"), listOf(0.0, 100.0))
+    val scale = BandScale("s", words("a", "b"), listOf(0.0, 100.0))
     assertEquals(listOf(25.0, 75.0), scale.centers())
   }
 
@@ -239,7 +251,7 @@ class ScalesTest {
 
   @Test
   fun `point scale has zero bandwidth and lands on boundaries`() {
-    val scale = PointScale("s", listOf("a", "b", "c"), listOf(0.0, 100.0))
+    val scale = PointScale("s", words("a", "b", "c"), listOf(0.0, 100.0))
     assertEquals(0.0, scale.bandwidth)
     assertEquals(0.0, scale.position(VegaValue.Str("a")), tolerance)
     assertEquals(50.0, scale.position(VegaValue.Str("b")), tolerance)
@@ -248,7 +260,7 @@ class ScalesTest {
 
   @Test
   fun `point padding insets the first and last point`() {
-    val scale = PointScale("s", listOf("a", "b"), listOf(0.0, 100.0), padding = 0.5)
+    val scale = PointScale("s", words("a", "b"), listOf(0.0, 100.0), padding = 0.5)
     assertEquals(25.0, scale.position(VegaValue.Str("a")), tolerance)
     assertEquals(75.0, scale.position(VegaValue.Str("b")), tolerance)
   }
@@ -260,7 +272,7 @@ class ScalesTest {
     val scale =
       OrdinalScale(
         "colour",
-        listOf("a", "b", "c"),
+        words("a", "b", "c"),
         listOf(VegaValue.Str("red"), VegaValue.Str("green")),
       )
     assertEquals(VegaValue.Str("red"), scale.scale(VegaValue.Str("a")))
@@ -271,10 +283,10 @@ class ScalesTest {
   @Test
   fun `ordinal scale returns the unknown value outside its domain`() {
     val scale =
-      OrdinalScale("c", listOf("a"), listOf(VegaValue.Str("red")), unknown = VegaValue.Str("#ccc"))
+      OrdinalScale("c", words("a"), listOf(VegaValue.Str("red")), unknown = VegaValue.Str("#ccc"))
     assertEquals(VegaValue.Str("#ccc"), scale.scale(VegaValue.Str("zzz")))
 
-    val withoutUnknown = OrdinalScale("c", listOf("a"), listOf(VegaValue.Str("red")))
+    val withoutUnknown = OrdinalScale("c", words("a"), listOf(VegaValue.Str("red")))
     assertEquals(VegaValue.Null, withoutUnknown.scale(VegaValue.Str("zzz")))
   }
 
@@ -282,7 +294,7 @@ class ScalesTest {
   fun `ordinal scale with an empty range yields null`() {
     assertEquals(
       VegaValue.Null,
-      OrdinalScale("c", listOf("a"), emptyList()).scale(VegaValue.Str("a")),
+      OrdinalScale("c", words("a"), emptyList()).scale(VegaValue.Str("a")),
     )
   }
 
@@ -320,8 +332,8 @@ class ScalesTest {
       },
     )
     assertEquals(
-      listOf("-5", "12", "-1200"),
-      BandScale("s", listOf("-5", "12", "-1200"), listOf(0.0, 200.0)).domain,
+      words("-5", "12", "-1200"),
+      BandScale("s", words("-5", "12", "-1200"), listOf(0.0, 200.0)).domain,
     )
   }
 
