@@ -27,7 +27,7 @@ end to end — expressions, signals, all 51 of upstream's 51 documented data tra
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-222 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
+223 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -194,7 +194,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 222 Vega differential fixtures and 332 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 223 Vega differential fixtures and 332 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -226,7 +226,7 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests, and every renderer now exposes the tree: the Android View, the Swift one and Compose Multiplatform. Not verified on physical hardware or with a real user |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 222 Vega differential fixtures |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 223 Vega differential fixtures |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -7872,7 +7872,7 @@ hit index and `Scene.walk` all apply it. What was wrong is subtler and worth mor
   in this channel, which is why the corpus had no fixture for it after all this time.
 
 The build-time sort is gone. `paintOrder` was always the single place this belongs, and now it is
-the only one. 222 Vega fixtures pass.
+the only one. 223 Vega fixtures pass.
 
 ### Two grids over one table, in the order they were built
 
@@ -8001,7 +8001,7 @@ group value at once: two words that must stay apart, a NaN, an infinity and a nu
 one group, and a zero beside a negative zero that must become another. Written as `0/0` and `1/0`,
 because `NaN` and `Infinity` are not names Vega's expression language knows — `Unrecognized signal
 name: "Infinity"`. Three mutants die on it: the raw-value key, an `aggregate`-style text key, and a
-JSON writer that prints a non-finite number as itself. 222 Vega fixtures.
+JSON writer that prints a non-finite number as itself. 223 Vega fixtures.
 
 **And a third cause in the same chain**, which is the next entry: a discrete scale's domain held
 text, so a null entry became the word `null` and coerced to `NaN` where upstream's `+null` is `0`.
@@ -8045,7 +8045,7 @@ through the locale.
 directly for each value rather than reading an axis, because **an axis joins its label items by the
 value's text**: two bands both reading `1001` collapse into one label at the later band, so an axis
 shows three where the domain has six. That is a rule of its own and it is the open question below.
-Seven mutants die on the fixture. 222 Vega fixtures.
+Seven mutants die on the fixture. 223 Vega fixtures.
 
 **Found here, and the next entry closes it.** An axis over a discrete scale draws one item per
 distinct *value* rather than one per band. It is visible only where two domain entries share a text,
@@ -8078,7 +8078,7 @@ Applied in `ticksFor`, which is the one place every axis mark reads its ticks fr
 the eight branches that build them. Four mutants die on it: no join, the *first* of a repeated key
 winning instead of the last, joining by the value rather than by its text, and joining by the
 **label** rather than the value — that last one is not hypothetical, because a format can give two
-distinct values one label and the corpus has such axes. 222 Vega fixtures.
+distinct values one label and the corpus has such axes. 223 Vega fixtures.
 
 The note on the entry above said "one label per distinct label text", which was the right shape and
 the wrong field; it is the value's text, and the mutant that joins by the label is what said so.
@@ -8141,7 +8141,7 @@ holds, `range[index % 0]` being `range[NaN]`.
 `a-scale-coerces-what-it-is-given.vg.json` asks all five scale families the same six questions — a
 number, nothing, an empty cell, an empty list, a flag and a word — and draws both the symbol each
 answer places and the answer itself as text, so a value that is placed and one that is not are told
-apart by characters rather than by an absence. Seven mutants die on it. 222 Vega fixtures.
+apart by characters rather than by an absence. Seven mutants die on it. 223 Vega fixtures.
 
 **And the question that raised — answered by measuring it.** `asDouble` was documented as "Vega's
 coercion to number" and is not `Number()`: it answers `NaN` for a null, an empty string and an empty
@@ -8237,7 +8237,7 @@ JSON cannot spell one. Beside them the same column read as a **linear** scale, w
 bound and places every value — so the fixture says the clipping belongs to the date and not to the
 number. Three mutants die: no clip, a clip a day too wide, and a clip that tests only the magnitude.
 
-Found by the value sweep on the day it was written. 222 Vega fixtures.
+Found by the value sweep on the day it was written. 223 Vega fixtures.
 
 ### An axis keys a date by its second, because that is what a date's text is
 
@@ -8264,3 +8264,31 @@ second and third are there so the fixture says the collapse is the *key* and not
 
 Found by the value sweep, where it was the largest cluster: thirteen cases, including the control
 column of 1, 2, 3, 4 — a sub-second domain being what that chart has whatever the column holds.
+
+### `String(x)` for a number is not how a coordinate is written down
+
+JavaScript writes the shortest decimal that reads back as the same double, and switches to the
+exponent form at two thresholds: **below 10^-6** and **at or above 10^21**. Between them it never
+does, so `1e20` is written out in full and `1e21` is `1e+21`, one step later.
+
+`VegaValue.asString` went through `canonicalNumberString`, which is a **coordinate** formatter with
+its own stated rules — six decimal places, and never the exponent form, because an SVG attribute
+parser and a golden diff both read a plain decimal more reliably. Right for an `x`, wrong for a
+label: a text mark over `1e-7` read `0`, having rounded away, and one over `1e21` read
+`1000000000000000000000`.
+
+Both functions stay, because both jobs are real. It is the same pair as [asDouble] beside
+`JsSemantics.toNumber` — a reading and a coercion that agree on everything a chart usually holds —
+and the same lesson twice in one day: a second transcription of a language rule drifts, and the
+place it drifts is the place nothing normal reaches.
+
+Two tests moved with it, and they are worth naming. `TransformReferenceTest` compared a list of bin
+positions as one comma-joined string built with `asString`, which worked only because `asString`
+rounded to six decimals on the way: a bin at `9.399999999999999` read `9.4`. That was a tolerance
+wearing a formatter's clothes, and it is an explicit one now — 1e-9, tighter than the six decimals
+were.
+
+`a-number-written-as-text.vg.json` puts both thresholds and the values either side of each through
+the three routes that share the coercion: a text mark whose content is the column, an ordinal legend
+that enumerates it, and a band axis whose domain entries are its labels.
+
