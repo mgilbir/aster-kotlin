@@ -27,7 +27,7 @@ end to end — expressions, signals, all 51 of upstream's 51 documented data tra
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-216 Vega differential fixtures and 329 Vega-Lite fixtures pass, every one of them matching upstream
+216 Vega differential fixtures and 330 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -194,7 +194,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 216 Vega differential fixtures and 329 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 216 Vega differential fixtures and 330 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -5817,7 +5817,7 @@ compose instead of one replacing the other. It is the axis's own `withLabelText`
 on both guides, which is why it was worth having one function for it.
 
 `legend-label-expr.vl.json` arms both gates and both of them failed before the fix — the specification
-comparison on the stray property, and the scene comparison on labels drawn at full length. 329
+comparison on the stray property, and the scene comparison on labels drawn at full length. 330
 Vega-Lite fixtures now.
 
 ### The order of a date, which the locale seam could not reach
@@ -5831,7 +5831,7 @@ did not pass it to `TimeUnits.specifier`.
 
 Upstream has no lever for it either — its `timeUnitSpecifier` takes no locale, and `VEGALITE_TIMEFORMAT`
 is a module constant — so this is an addition rather than a port. Both new tables are therefore
-**empty by default** and the emitted specification is byte-for-byte what it was, which is what the 329
+**empty by default** and the emitted specification is byte-for-byte what it was, which is what the 330
 Vega-Lite fixtures compare against.
 
 Two tables, because there are two places a date's shape is decided and they are different tables.
@@ -7873,3 +7873,33 @@ hit index and `Scene.walk` all apply it. What was wrong is subtler and worth mor
 
 The build-time sort is gone. `paintOrder` was always the single place this belongs, and now it is
 the only one. 195 Vega fixtures pass.
+
+### Two grids over one table, in the order they were built
+
+A trellis writes the distinct values it splits on into a dataset of its own, and that dataset stands
+**beside the table it reads** rather than at the end of the chart's data — a plot's own data is
+assembled when that plot is, so one grid's values come between its table and the next plot's. This
+compiler placed it at the index just after that table:
+
+```kotlin
+val at = data.indexOfFirst { it.string("name") == reads }
+if (at >= 0) data.addAll(at + 1, domains) else data += domains
+```
+
+Which is right for one plot and wrong for two, as soon as the two read the *same* table. Each is
+assembled in turn, each finds the same `at`, and each inserts at `at + 1` — so the second landed in
+**front** of the first and the two grids' values came out back to front: `concat_1_column_domain`
+before `concat_0_column_domain`. Upstream assembles in order and appends, so the fix is to skip past
+the values already standing there rather than to insert among them.
+
+The shape that shows it is a concatenation whose members facet on **one** column, which is also why
+it went unseen for so long: members faceting on *different* columns get a table each, so each domain
+is interleaved with its own table and the bug cannot arise. `a-heading-a-theme-wrote-itself` was
+originally that `hconcat` and had to be rewritten to facet on `row` and `column` in a single chart to
+get past it; this is the finding it left behind, recorded in the pull request that changed it.
+
+`two-grids-over-one-table.vl.json` carries both halves — two panels on the same column, then a third
+on a different one to pin the interleaving that was already right. Its two same-column panels differ
+only in how they caption their cells, which keeps the fixture about the order of the datasets rather
+than their contents. Three mutants die on it: the old `at + 1`, a skip that steps past *everything*
+rather than only the domains, and an append to the end of the chart's data. 330 Vega-Lite fixtures.
