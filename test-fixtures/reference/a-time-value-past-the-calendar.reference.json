@@ -1,0 +1,196 @@
+{
+  "marks": [
+    {
+      "opacity": 1,
+      "role": "axis-domain",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": 0.5,
+      "y": 100.5,
+      "y2": 0.5
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 6.324555,
+      "shapeLeft": 36.837722,
+      "shapeTop": -3.162278,
+      "shapeWidth": 6.324555,
+      "size": 40,
+      "type": "symbol",
+      "x": 40,
+      "y": "NaN"
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 6.324555,
+      "shapeLeft": 76.837722,
+      "shapeTop": -3.162278,
+      "shapeWidth": 6.324555,
+      "size": 40,
+      "type": "symbol",
+      "x": 80,
+      "y": "NaN"
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 6.324555,
+      "shapeLeft": 116.837722,
+      "shapeTop": -3.162278,
+      "shapeWidth": 6.324555,
+      "size": 40,
+      "type": "symbol",
+      "x": 120,
+      "y": "NaN"
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 6.324555,
+      "shapeLeft": 156.837722,
+      "shapeTop": -3.162278,
+      "shapeWidth": 6.324555,
+      "size": 40,
+      "type": "symbol",
+      "x": 160,
+      "y": "NaN"
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "time NaN | linear 5.9999999999999995e-27 | at 6.9444444444444445e-22 | past NaN | inf NaN",
+      "type": "text",
+      "x": 0,
+      "y": 7
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "time NaN | linear 6.000000000000001e-14 | at 6.944444444444444e-9 | past NaN | inf NaN",
+      "type": "text",
+      "x": 0,
+      "y": 21
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "time NaN | linear 6 | at 694444.4444444445 | past NaN | inf NaN",
+      "type": "text",
+      "x": 0,
+      "y": 35
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "time NaN | linear 60 | at 6944444.444444445 | past NaN | inf NaN",
+      "type": "text",
+      "x": 0,
+      "y": 49
+    }
+  ],
+  "scales": {
+    "atBound": {
+      "domain": [
+        0,
+        8640000000000000
+      ],
+      "range": [
+        0,
+        60
+      ],
+      "ticks": [
+        568971817200000,
+        1200110857200000,
+        1831249897200000,
+        2462388937200000,
+        3093527977200000,
+        3724667017200000,
+        4355806057200000,
+        4986945097200000,
+        5618084137200000,
+        6249223177200000,
+        6880362217200000,
+        7511501257200000,
+        8142640297200000
+      ]
+    },
+    "infinite": {
+      "domain": [
+        "NaN",
+        "NaN"
+      ],
+      "range": [
+        0,
+        60
+      ],
+      "ticks": []
+    },
+    "lin": {
+      "domain": [
+        0,
+        1e+21
+      ],
+      "range": [
+        0,
+        60
+      ],
+      "ticks": [
+        0,
+        100000000000000000000,
+        200000000000000000000,
+        300000000000000000000,
+        400000000000000000000,
+        500000000000000000000,
+        600000000000000000000,
+        700000000000000000000,
+        800000000000000000000,
+        900000000000000000000,
+        1e+21
+      ]
+    },
+    "pastBound": {
+      "domain": [
+        0,
+        "NaN"
+      ],
+      "range": [
+        0,
+        60
+      ],
+      "ticks": []
+    },
+    "y": {
+      "domain": [
+        0,
+        "NaN"
+      ],
+      "range": [
+        100,
+        0
+      ],
+      "ticks": []
+    }
+  },
+  "size": {
+    "height": 113.162278,
+    "width": 579
+  },
+  "spec": "a-time-value-past-the-calendar.vg.json",
+  "vegaVersion": "6.3.1"
+}
