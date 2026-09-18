@@ -261,11 +261,11 @@ public class SignalScope(
     // range a step at a time and asking which value each step lands on.
     if (scale is BandScale) {
       val position = value.asDouble()
-      return scale.invert(position)?.let { VegaValue.Str(it) } ?: VegaValue.Null
+      return scale.invert(position) ?: VegaValue.Null
     }
     if (scale is PointScale) {
       val position = value.asDouble()
-      return scale.invert(position)?.let { VegaValue.Str(it) } ?: VegaValue.Null
+      return scale.invert(position) ?: VegaValue.Null
     }
     // A scale with **buckets** runs backwards to a stretch of domain rather than to a point, which
     // is upstream's `invertExtent` — `invert()` falls to it when there is no continuous inverse.
@@ -317,8 +317,7 @@ public class SignalScope(
           is BandScale -> scale.invertRange(from, to)
           is PointScale -> scale.invertRange(from, to)
         }
-      return covered?.let { VegaValue.Arr(it.map { entry -> VegaValue.Str(entry) }) }
-        ?: VegaValue.Undefined
+      return covered?.let { VegaValue.Arr(it) } ?: VegaValue.Undefined
     }
     if (scale !is InvertibleScale) {
       diagnostics?.error(
@@ -351,9 +350,11 @@ public class SignalScope(
         is TransformedScale -> scale.domain.map { VegaValue.Num(it) }
         is TimeScale -> scale.domain.map { VegaValue.Num(it) }
         is SequentialColorScale -> scale.domain.map { VegaValue.Num(it) }
-        is BandScale -> scale.domain.map { VegaValue.Str(it) }
-        is PointScale -> scale.domain.map { VegaValue.Str(it) }
-        is OrdinalScale -> scale.domain.map { VegaValue.Str(it) }
+        // Already values: a discrete domain holds what it was built from, so `domain('x')` in an
+        // expression answers a null as a null rather than as the word for one.
+        is BandScale -> scale.domain
+        is PointScale -> scale.domain
+        is OrdinalScale -> scale.domain
         is BinnedScale -> scale.thresholds.map { VegaValue.Num(it) }
       }
     )

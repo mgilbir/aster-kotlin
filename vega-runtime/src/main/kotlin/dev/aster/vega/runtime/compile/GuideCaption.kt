@@ -1,6 +1,9 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.expression.NumberFormat
+import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asString
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.model.time.TimeFormat
@@ -43,20 +46,17 @@ internal object GuideCaption {
   /**
    * A long-form date, because a screen reader should not have to expand `01/05`.
    *
-   * Upstream's `%A, %d %B %Y, %X`; `%X` is a locale time, which here is the 12-hour clock d3's
-   * en-US default produces.
-   */
-  private const val DATE_PATTERN = "%A, %d %B %Y, %I:%M:%S %p"
-
-  /**
-   * The same long form, with the locale's own time of day in it.
+   * `%X` is **the locale's own time**, and that is the whole of it: en-US spells it `%-I:%M:%S %p`
+   * on [VegaLocale.time], a locale writing a 24-hour clock says so there, and neither needs naming
+   * here.
    *
-   * Upstream's `%X` is the locale's time, which for d3's en-US default is the twelve-hour clock the
-   * constant above spells out. A locale that writes a 24-hour clock says so in `VegaLocale.time`,
-   * and a caption reading a whole timestamp out should use it rather than the American one.
+   * It used to name one anyway — a constant spelling the American form out as `%I:%M:%S %p`, used
+   * whenever the locale *was* en-US. A second transcription of a table that already existed, and it
+   * had drifted by one character: d3's is `%-I`, unpadded, so upstream reads `1:00:01 AM` where
+   * this read `01:00:01 AM`. Only visible before ten in the morning, and only in a caption, which
+   * is why nothing caught it until a band scale over a **null** put epoch zero on an axis.
    */
-  private fun datePattern(locale: VegaLocale): String =
-    if (locale == VegaLocale.EnglishUS) DATE_PATTERN else "%A, %d %B %Y, %X"
+  private fun datePattern(locale: VegaLocale): String = "%A, %d %B %Y, %X"
 
   /**
    * @param declaredType the scale's `type` as written, not its runtime class.
@@ -312,23 +312,28 @@ internal object GuideCaption {
    * values described an axis nobody was looking at. With neither, the value stands as written.
    */
   private fun spoken(
-    value: String,
+    value: VegaValue,
     format: String?,
     formatType: String?,
     locale: VegaLocale,
     timeZone: TimeZone?,
   ): String {
+    // **`Number(value)`, not the text's own reading of itself.** A discrete domain holds values, so
+    // what reaches here for a null band is a null and not the word `null` — and `+null` is `0`
+    // where `"null".toDoubleOrNull()` is nothing. Same for a flag: `+true` is `1`. This is the
+    // coercion d3 applies on the way into `new Date(+value)`.
+    val number = JsSemantics.toNumber(value)
     val zone =
       when (formatType) {
         "time" -> timeZone ?: TimeZone.currentSystemDefault()
         "utc" -> TimeZone.UTC
         else ->
-          return if (format == null) value
+          return if (format == null) value.asString()
           // Coerced, as d3 coerces it: a category that is not a number is read out as `NaN%`,
           // which is what the axis shows and so what the caption has to say.
-          else NumberFormat.format(value.toDoubleOrNull() ?: Double.NaN, format, locale)
+          else NumberFormat.format(number, format, locale)
       }
-    val instant = value.toDoubleOrNull() ?: return value
+    val instant = number
     val pattern = format?.replace("%a", "%A")?.replace("%b", "%B") ?: datePattern(locale)
     return TimeFormat.format(instant, pattern, zone, locale)
   }

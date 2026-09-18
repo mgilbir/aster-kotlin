@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
@@ -1481,7 +1482,7 @@ internal class LegendBuilder(
    * `TimeTicks.label` is the no-specifier case, the same multi-format an axis falls back to: it
    * chooses its own granularity per value rather than writing them all alike.
    */
-  private fun discreteDateLabeller(spec: LegendSpec, scaleName: String): ((String) -> String)? {
+  private fun discreteDateLabeller(spec: LegendSpec, scaleName: String): ((VegaValue) -> String)? {
     val zone =
       when (spec.formatType) {
         "time" -> timeZone ?: TimeZone.currentSystemDefault()
@@ -1490,9 +1491,10 @@ internal class LegendBuilder(
       }
     val specifier = spec.format ?: spec.formatExpression?.let { numbers.resolveText(it, scaleName) }
     return { value ->
-      val instant = value.toDoubleOrNull()
+      // `Number(value)`, which is what d3 coerces with — so a null entry is epoch zero and not a
+      // word that fails to parse. See the note in [GuideCaption.spoken].
+      val instant = JsSemantics.toNumber(value)
       when {
-        instant == null -> value
         specifier == null -> TimeTicks.label(instant, zone, locale)
         else -> TimeFormat.format(instant, specifier, zone, locale)
       }
@@ -1599,9 +1601,9 @@ internal class LegendBuilder(
       // no
       // entries rather than a made-up set of them.
       is IdentityScale -> emptyList()
-      is OrdinalScale -> scale.domain.map { Entry(VegaValue.Str(it), dates?.invoke(it) ?: it) }
-      is BandScale -> scale.domain.map { Entry(VegaValue.Str(it), dates?.invoke(it) ?: it) }
-      is PointScale -> scale.domain.map { Entry(VegaValue.Str(it), dates?.invoke(it) ?: it) }
+      is OrdinalScale -> scale.domain.map { Entry(it, dates?.invoke(it) ?: it.asString()) }
+      is BandScale -> scale.domain.map { Entry(it, dates?.invoke(it) ?: it.asString()) }
+      is PointScale -> scale.domain.map { Entry(it, dates?.invoke(it) ?: it.asString()) }
       // A legend's own `format` wins over the scale's tick labels, exactly as an axis's does: a
       // rate scale labelled `.1%` reads "10.0%" and not "0.1".
       is LinearScale -> numeric(spec, scale.ticks(count), scale.tickLabels(count, locale), count)

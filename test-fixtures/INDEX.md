@@ -6,7 +6,7 @@ Generated from the corpus by `FixtureIndexTest`, which fails when this file has 
 ./gradlew :vega-runtime:jvmTest -PupdateGoldens=true --rerun-tasks
 ```
 
-217 Vega differential fixtures and 332 Vega-Lite fixtures.
+218 Vega differential fixtures and 332 Vega-Lite fixtures.
 
 Every column is read off disk. A Vega fixture's mark count and mark types come from its
 **upstream** reference, so they are upstream's answer rather than this port's opinion of it.
@@ -72,6 +72,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `density-heatmaps` | 76 | image, rect, rule, text | filter, heatmap, kde2d | linear |
 | `density-options` | 37 | area, line, rule, symbol, text | kde, loess | linear, ordinal |
 | `density-plot` | 40 | area, line, rule, symbol, text | density, dotbin, kde, stack | linear |
+| `discrete-domain-keeps-its-values` | 54 | rect, rule, text | — | band, linear |
 | `diverging-colour` | 31 | rect, rule, text | — | band, linear |
 | `domain-limits` | 37 | rect, rule, symbol, text | — | band, linear, symlog |
 | `domain-sort-order` | 32 | rect, rule, text | — | band, linear |

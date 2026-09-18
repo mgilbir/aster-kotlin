@@ -1495,9 +1495,13 @@ public object Differential {
             differences,
           )
         is BandScale -> {
-          if (reference.domain != scale.domain) {
+          if (reference.domain != harvested(scale.domain)) {
             differences.add(
-              Difference("scale $name domain", reference.domain.toString(), scale.domain.toString())
+              Difference(
+                "scale $name domain",
+                reference.domain.toString(),
+                harvested(scale.domain).toString(),
+              )
             )
           }
           compareNumberList(
@@ -1519,9 +1523,13 @@ public object Differential {
           }
         }
         is PointScale -> {
-          if (reference.domain != scale.domain) {
+          if (reference.domain != harvested(scale.domain)) {
             differences.add(
-              Difference("scale $name domain", reference.domain.toString(), scale.domain.toString())
+              Difference(
+                "scale $name domain",
+                reference.domain.toString(),
+                harvested(scale.domain).toString(),
+              )
             )
           }
           compareNumberList(
@@ -1544,12 +1552,12 @@ public object Differential {
           // `[alpha, beta, gamma, delta]` against `[alpha, beta]` on `scale-domain-implicit`, which
           // is the comparison looking at the wrong property rather than the engine losing values:
           // the marks in that fixture have always matched.
-          if (reference.domain != scale.effectiveDomain) {
+          if (reference.domain != harvested(scale.effectiveDomain)) {
             differences.add(
               Difference(
                 "scale $name domain",
                 reference.domain.toString(),
-                scale.effectiveDomain.toString(),
+                harvested(scale.effectiveDomain).toString(),
               )
             )
           }
@@ -1680,6 +1688,25 @@ public object Differential {
     }
     return differences
   }
+
+  /**
+   * A discrete domain as the **oracle** records one, for comparison with what it recorded.
+   *
+   * `normalize.js` writes each entry through `scaleValue`:
+   * ```js
+   * function scaleValue(value, precision) {
+   *   if (value instanceof Date) return canonicalNumber(+value, precision);
+   *   return typeof value === 'number' ? canonicalNumber(value, precision) : String(value);
+   * }
+   * ```
+   *
+   * — a number or a date as its canonical digits, everything else as `String(value)`. [asString] is
+   * that rule already: it sends `Num` and `Timestamp` through `canonicalNumberString` and spells a
+   * null `null`. So this exists to say *why* the comparison is text when the domain is not, which
+   * is that the **recording** is text: a null entry and the word for one are the same row in the
+   * reference, and it is a fixture's labels that tell those two apart.
+   */
+  private fun harvested(domain: List<VegaValue>): List<String> = domain.map { it.asString() }
 
   private fun compareNumberList(
     where: String,

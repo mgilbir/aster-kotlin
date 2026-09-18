@@ -888,14 +888,14 @@ final class dev.aster.vega.runtime.load/LoadDeniedException : kotlin/Exception {
 }
 
 final class dev.aster.vega.runtime.scale/BandScale : dev.aster.vega.runtime.scale/PositionScale { // dev.aster.vega.runtime.scale/BandScale|null[0]
-    constructor <init>(kotlin/String, kotlin.collections/List<kotlin/String>, kotlin.collections/List<kotlin/Double>, kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Boolean = ...) // dev.aster.vega.runtime.scale/BandScale.<init>|<init>(kotlin.String;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.Double>;kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>, kotlin.collections/List<kotlin/Double>, kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Boolean = ...) // dev.aster.vega.runtime.scale/BandScale.<init>|<init>(kotlin.String;kotlin.collections.List<dev.aster.vega.model.VegaValue>;kotlin.collections.List<kotlin.Double>;kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Boolean){}[0]
 
     final val align // dev.aster.vega.runtime.scale/BandScale.align|{}align[0]
         final fun <get-align>(): kotlin/Double // dev.aster.vega.runtime.scale/BandScale.align.<get-align>|<get-align>(){}[0]
     final val bandwidth // dev.aster.vega.runtime.scale/BandScale.bandwidth|{}bandwidth[0]
         final fun <get-bandwidth>(): kotlin/Double // dev.aster.vega.runtime.scale/BandScale.bandwidth.<get-bandwidth>|<get-bandwidth>(){}[0]
     final val domain // dev.aster.vega.runtime.scale/BandScale.domain|{}domain[0]
-        final fun <get-domain>(): kotlin.collections/List<kotlin/String> // dev.aster.vega.runtime.scale/BandScale.domain.<get-domain>|<get-domain>(){}[0]
+        final fun <get-domain>(): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.runtime.scale/BandScale.domain.<get-domain>|<get-domain>(){}[0]
     final val name // dev.aster.vega.runtime.scale/BandScale.name|{}name[0]
         final fun <get-name>(): kotlin/String // dev.aster.vega.runtime.scale/BandScale.name.<get-name>|<get-name>(){}[0]
     final val paddingInner // dev.aster.vega.runtime.scale/BandScale.paddingInner|{}paddingInner[0]
@@ -912,11 +912,11 @@ final class dev.aster.vega.runtime.scale/BandScale : dev.aster.vega.runtime.scal
         final fun <get-step>(): kotlin/Double // dev.aster.vega.runtime.scale/BandScale.step.<get-step>|<get-step>(){}[0]
 
     final fun centers(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/BandScale.centers|centers(){}[0]
-    final fun invert(kotlin/Double): kotlin/String? // dev.aster.vega.runtime.scale/BandScale.invert|invert(kotlin.Double){}[0]
-    final fun invertRange(kotlin/Double, kotlin/Double): kotlin.collections/List<kotlin/String>? // dev.aster.vega.runtime.scale/BandScale.invertRange|invertRange(kotlin.Double;kotlin.Double){}[0]
+    final fun invert(kotlin/Double): dev.aster.vega.model/VegaValue? // dev.aster.vega.runtime.scale/BandScale.invert|invert(kotlin.Double){}[0]
+    final fun invertRange(kotlin/Double, kotlin/Double): kotlin.collections/List<dev.aster.vega.model/VegaValue>? // dev.aster.vega.runtime.scale/BandScale.invertRange|invertRange(kotlin.Double;kotlin.Double){}[0]
     final fun position(dev.aster.vega.model/VegaValue): kotlin/Double // dev.aster.vega.runtime.scale/BandScale.position|position(dev.aster.vega.model.VegaValue){}[0]
     final fun scale(dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.runtime.scale/BandScale.scale|scale(dev.aster.vega.model.VegaValue){}[0]
-    final fun ticks(): kotlin.collections/List<kotlin/String> // dev.aster.vega.runtime.scale/BandScale.ticks|ticks(){}[0]
+    final fun ticks(): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.runtime.scale/BandScale.ticks|ticks(){}[0]
 }
 
 final class dev.aster.vega.runtime.scale/BinOrdinalScale : dev.aster.vega.runtime.scale/BinnedScale { // dev.aster.vega.runtime.scale/BinOrdinalScale|null[0]
@@ -1007,12 +1007,12 @@ final class dev.aster.vega.runtime.scale/LogScale : dev.aster.vega.runtime.scale
 }
 
 final class dev.aster.vega.runtime.scale/OrdinalScale : dev.aster.vega.runtime.scale/VegaScale { // dev.aster.vega.runtime.scale/OrdinalScale|null[0]
-    constructor <init>(kotlin/String, kotlin.collections/List<kotlin/String>, kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue? = ..., kotlin/Boolean = ...) // dev.aster.vega.runtime.scale/OrdinalScale.<init>|<init>(kotlin.String;kotlin.collections.List<kotlin.String>;kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue?;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>, kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue? = ..., kotlin/Boolean = ...) // dev.aster.vega.runtime.scale/OrdinalScale.<init>|<init>(kotlin.String;kotlin.collections.List<dev.aster.vega.model.VegaValue>;kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue?;kotlin.Boolean){}[0]
 
     final val domain // dev.aster.vega.runtime.scale/OrdinalScale.domain|{}domain[0]
-        final fun <get-domain>(): kotlin.collections/List<kotlin/String> // dev.aster.vega.runtime.scale/OrdinalScale.domain.<get-domain>|<get-domain>(){}[0]
+        final fun <get-domain>(): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.runtime.scale/OrdinalScale.domain.<get-domain>|<get-domain>(){}[0]
     final val effectiveDomain // dev.aster.vega.runtime.scale/OrdinalScale.effectiveDomain|{}effectiveDomain[0]
-        final fun <get-effectiveDomain>(): kotlin.collections/List<kotlin/String> // dev.aster.vega.runtime.scale/OrdinalScale.effectiveDomain.<get-effectiveDomain>|<get-effectiveDomain>(){}[0]
+        final fun <get-effectiveDomain>(): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.runtime.scale/OrdinalScale.effectiveDomain.<get-effectiveDomain>|<get-effectiveDomain>(){}[0]
     final val name // dev.aster.vega.runtime.scale/OrdinalScale.name|{}name[0]
         final fun <get-name>(): kotlin/String // dev.aster.vega.runtime.scale/OrdinalScale.name.<get-name>|<get-name>(){}[0]
     final val rangeValues // dev.aster.vega.runtime.scale/OrdinalScale.rangeValues|{}rangeValues[0]
@@ -1024,14 +1024,14 @@ final class dev.aster.vega.runtime.scale/OrdinalScale : dev.aster.vega.runtime.s
 }
 
 final class dev.aster.vega.runtime.scale/PointScale : dev.aster.vega.runtime.scale/PositionScale { // dev.aster.vega.runtime.scale/PointScale|null[0]
-    constructor <init>(kotlin/String, kotlin.collections/List<kotlin/String>, kotlin.collections/List<kotlin/Double>, kotlin/Double = ..., kotlin/Double = ..., kotlin/Boolean = ...) // dev.aster.vega.runtime.scale/PointScale.<init>|<init>(kotlin.String;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.Double>;kotlin.Double;kotlin.Double;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>, kotlin.collections/List<kotlin/Double>, kotlin/Double = ..., kotlin/Double = ..., kotlin/Boolean = ...) // dev.aster.vega.runtime.scale/PointScale.<init>|<init>(kotlin.String;kotlin.collections.List<dev.aster.vega.model.VegaValue>;kotlin.collections.List<kotlin.Double>;kotlin.Double;kotlin.Double;kotlin.Boolean){}[0]
 
     final val align // dev.aster.vega.runtime.scale/PointScale.align|{}align[0]
         final fun <get-align>(): kotlin/Double // dev.aster.vega.runtime.scale/PointScale.align.<get-align>|<get-align>(){}[0]
     final val bandwidth // dev.aster.vega.runtime.scale/PointScale.bandwidth|{}bandwidth[0]
         final fun <get-bandwidth>(): kotlin/Double // dev.aster.vega.runtime.scale/PointScale.bandwidth.<get-bandwidth>|<get-bandwidth>(){}[0]
     final val domain // dev.aster.vega.runtime.scale/PointScale.domain|{}domain[0]
-        final fun <get-domain>(): kotlin.collections/List<kotlin/String> // dev.aster.vega.runtime.scale/PointScale.domain.<get-domain>|<get-domain>(){}[0]
+        final fun <get-domain>(): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.runtime.scale/PointScale.domain.<get-domain>|<get-domain>(){}[0]
     final val name // dev.aster.vega.runtime.scale/PointScale.name|{}name[0]
         final fun <get-name>(): kotlin/String // dev.aster.vega.runtime.scale/PointScale.name.<get-name>|<get-name>(){}[0]
     final val padding // dev.aster.vega.runtime.scale/PointScale.padding|{}padding[0]
@@ -1043,11 +1043,11 @@ final class dev.aster.vega.runtime.scale/PointScale : dev.aster.vega.runtime.sca
     final val step // dev.aster.vega.runtime.scale/PointScale.step|{}step[0]
         final fun <get-step>(): kotlin/Double // dev.aster.vega.runtime.scale/PointScale.step.<get-step>|<get-step>(){}[0]
 
-    final fun invert(kotlin/Double): kotlin/String? // dev.aster.vega.runtime.scale/PointScale.invert|invert(kotlin.Double){}[0]
-    final fun invertRange(kotlin/Double, kotlin/Double): kotlin.collections/List<kotlin/String>? // dev.aster.vega.runtime.scale/PointScale.invertRange|invertRange(kotlin.Double;kotlin.Double){}[0]
+    final fun invert(kotlin/Double): dev.aster.vega.model/VegaValue? // dev.aster.vega.runtime.scale/PointScale.invert|invert(kotlin.Double){}[0]
+    final fun invertRange(kotlin/Double, kotlin/Double): kotlin.collections/List<dev.aster.vega.model/VegaValue>? // dev.aster.vega.runtime.scale/PointScale.invertRange|invertRange(kotlin.Double;kotlin.Double){}[0]
     final fun position(dev.aster.vega.model/VegaValue): kotlin/Double // dev.aster.vega.runtime.scale/PointScale.position|position(dev.aster.vega.model.VegaValue){}[0]
     final fun scale(dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.runtime.scale/PointScale.scale|scale(dev.aster.vega.model.VegaValue){}[0]
-    final fun ticks(): kotlin.collections/List<kotlin/String> // dev.aster.vega.runtime.scale/PointScale.ticks|ticks(){}[0]
+    final fun ticks(): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.runtime.scale/PointScale.ticks|ticks(){}[0]
 }
 
 final class dev.aster.vega.runtime.scale/PowScale : dev.aster.vega.runtime.scale/TransformedScale { // dev.aster.vega.runtime.scale/PowScale|null[0]

@@ -3,7 +3,6 @@ package dev.aster.vega.runtime.scale
 import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
-import dev.aster.vega.model.asString
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.withTypographicMinus
@@ -345,6 +344,33 @@ public class LinearScale(
 }
 
 /**
+ * How a discrete scale's index keys a domain value, which is d3's `InternMap` and not equality.
+ *
+ * ```js
+ * function keyof(value) {
+ *   return value !== null && typeof value === "object" ? value.valueOf() : value;
+ * }
+ * ```
+ *
+ * A `Map` then holds those keys, so the rule is **SameValueZero**: two `NaN`s are one key, and `+0`
+ * and `-0` are one key — where a `Double`'s own `equals` agrees about the first and disagrees about
+ * the second. `keyof` is the other half: an object is interned by its `valueOf`, so a date and the
+ * number of milliseconds it stands for are the *same* key and a scale looked up with either finds
+ * the same band.
+ *
+ * This is deliberately not `asString`. A domain of text is what this engine used to hold, and it
+ * answers a different question: `scale("1001")` finds the band of the **number** `1001` under a
+ * text key and finds nothing upstream, because the index holds the number and the word is not it.
+ */
+internal fun internKey(value: VegaValue): VegaValue =
+  when (value) {
+    is VegaValue.Timestamp -> VegaValue.Num(value.epochMillis)
+    // `+0` and `-0` are one key in a `Map`, and two in Kotlin: `(-0.0).equals(0.0)` is false.
+    is VegaValue.Num -> if (value.value == 0.0) VegaValue.Num(0.0) else value
+    else -> value
+  }
+
+/**
  * Band scale: a discrete domain mapped to contiguous, equal-width bands.
  *
  * The step and padding arithmetic follows d3-scaleBand exactly, including `align` controlling where
@@ -352,7 +378,7 @@ public class LinearScale(
  */
 public class BandScale(
   override val name: String,
-  public val domain: List<String>,
+  public val domain: List<VegaValue>,
   override val range: List<Double>,
   public val paddingInner: Double = 0.0,
   public val paddingOuter: Double = 0.0,
@@ -364,7 +390,7 @@ public class BandScale(
     require(range.size >= 2) { "A band scale needs a two-value range, got $range" }
   }
 
-  private val positions: Map<String, Double>
+  private val positions: Map<VegaValue, Double>
   override val bandwidth: Double
   public val step: Double
   /** Range start after outer padding and alignment, i.e. the first band's position. */
@@ -393,18 +419,23 @@ public class BandScale(
     bandwidth = computedBand
 
     val ordered = if (reverse) domain.indices.reversed().toList() else domain.indices.toList()
-    val map = LinkedHashMap<String, Double>(n)
+    val map = LinkedHashMap<VegaValue, Double>(n)
     ordered.forEachIndexed { slot, domainIndex ->
-      map[domain[domainIndex]] = computedStart + computedStep * slot
+      map[internKey(domain[domainIndex])] = computedStart + computedStep * slot
     }
     positions = map
   }
 
-  override fun position(value: VegaValue): Double = positions[value.asString()] ?: Double.NaN
+  override fun position(value: VegaValue): Double = positions[internKey(value)] ?: Double.NaN
 
   override fun scale(value: VegaValue): VegaValue {
     val result = position(value)
-    return if (result.isNaN()) VegaValue.Null else VegaValue.Num(result)
+    // **Nothing, and not a null**, for a value the index does not hold. d3's band scale is a `Map`
+    // lookup and nothing more — `index.get(d)` — so a miss answers `undefined`, which is what an
+    // expression asking `'' + scale('x', v)` prints and what a mark encoding a property from it
+    // leaves absent. A null reads as the word `null` in the first case and as a written property in
+    // the second, and neither is what upstream draws.
+    return if (result.isNaN()) VegaValue.Undefined else VegaValue.Num(result)
   }
 
   /**
@@ -414,7 +445,7 @@ public class BandScale(
    * bands the given pixels fall in. A position in the **gap** between two bands belongs to neither,
    * which is what the bandwidth check drops, and a stretch outside the range answers with nothing.
    */
-  public fun invertRange(from: Double, to: Double): List<String>? {
+  public fun invertRange(from: Double, to: Double): List<VegaValue>? {
     if (from.isNaN() || to.isNaN() || domain.isEmpty()) return null
     val reverse = range.last() < range.first()
     val starts = domain.map { positions[it] ?: Double.NaN }
@@ -437,7 +468,7 @@ public class BandScale(
   }
 
   /** The one band a position falls in, or null where it falls in a gap or outside the range. */
-  public fun invert(position: Double): String? = invertRange(position, position)?.firstOrNull()
+  public fun invert(position: Double): VegaValue? = invertRange(position, position)?.firstOrNull()
 
   private fun bisectRight(values: List<Double>, at: Double): Int {
     var low = 0
@@ -451,10 +482,10 @@ public class BandScale(
 
   /** Band centres, the positions axis ticks and labels use. */
   public fun centers(): List<Double> = domain.map {
-    (positions[it] ?: Double.NaN) + bandwidth / 2.0
+    (positions[internKey(it)] ?: Double.NaN) + bandwidth / 2.0
   }
 
-  public fun ticks(): List<String> = domain
+  public fun ticks(): List<VegaValue> = domain
 }
 
 /**
@@ -464,7 +495,7 @@ public class BandScale(
  */
 public class PointScale(
   override val name: String,
-  public val domain: List<String>,
+  public val domain: List<VegaValue>,
   override val range: List<Double>,
   public val padding: Double = 0.0,
   public val align: Double = 0.5,
@@ -493,12 +524,12 @@ public class PointScale(
   override fun scale(value: VegaValue): VegaValue = band.scale(value)
 
   /** The one point a position falls nearest, through the band this scale is built on. */
-  public fun invert(position: Double): String? = band.invert(position)
+  public fun invert(position: Double): VegaValue? = band.invert(position)
 
   /** Which points a stretch of the range covers — see [BandScale.invertRange]. */
-  public fun invertRange(from: Double, to: Double): List<String>? = band.invertRange(from, to)
+  public fun invertRange(from: Double, to: Double): List<VegaValue>? = band.invertRange(from, to)
 
-  public fun ticks(): List<String> = domain
+  public fun ticks(): List<VegaValue> = domain
 }
 
 /**
@@ -854,7 +885,7 @@ public class TimeScale(
  */
 public class OrdinalScale(
   override val name: String,
-  public val domain: List<String>,
+  public val domain: List<VegaValue>,
   public val rangeValues: List<VegaValue>,
   /** Returned for a value outside the domain; `null` means [VegaValue.Null]. */
   public val unknown: VegaValue? = null,
@@ -870,12 +901,12 @@ public class OrdinalScale(
   private val implicit: Boolean = false,
 ) : VegaScale {
 
-  private val indices: MutableMap<String, Int> =
-    domain.withIndex().associateTo(LinkedHashMap()) { (index, value) -> value to index }
+  private val indices: MutableMap<VegaValue, Int> =
+    domain.withIndex().associateTo(LinkedHashMap()) { (index, value) -> internKey(value) to index }
 
   override fun scale(value: VegaValue): VegaValue {
     if (rangeValues.isEmpty()) return unknown ?: VegaValue.Null
-    val key = value.asString()
+    val key = internKey(value)
     val index =
       indices[key]
         ?: if (implicit) indices.size.also { indices[key] = it }
@@ -884,7 +915,7 @@ public class OrdinalScale(
   }
 
   /** The domain as it now stands, which [implicit] may have grown past what was declared. */
-  public val effectiveDomain: List<String>
+  public val effectiveDomain: List<VegaValue>
     get() = indices.keys.toList()
 }
 
