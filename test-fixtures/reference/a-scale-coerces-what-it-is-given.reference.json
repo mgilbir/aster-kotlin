@@ -373,7 +373,7 @@
       "font": "sans-serif",
       "fontSize": 8,
       "role": "mark",
-      "text": "a number -> 0 | q hi | th over | qt p2",
+      "text": "a number -> 0 | q hi | th over | qt p2 | o undefined | e undefined",
       "type": "text",
       "x": 0,
       "y": 7
@@ -384,7 +384,7 @@
       "font": "sans-serif",
       "fontSize": 8,
       "role": "mark",
-      "text": "nothing -> undefined | q undefined | th undefined | qt undefined",
+      "text": "nothing -> undefined | q undefined | th undefined | qt undefined | o undefined | e undefined",
       "type": "text",
       "x": 0,
       "y": 21
@@ -395,7 +395,7 @@
       "font": "sans-serif",
       "fontSize": 8,
       "role": "mark",
-      "text": "an empty cell -> 120 | q lo | th under | qt p1",
+      "text": "an empty cell -> 120 | q lo | th under | qt p1 | o undefined | e undefined",
       "type": "text",
       "x": 0,
       "y": 35
@@ -406,7 +406,7 @@
       "font": "sans-serif",
       "fontSize": 8,
       "role": "mark",
-      "text": "an empty list -> 120 | q lo | th under | qt p1",
+      "text": "an empty list -> 120 | q lo | th under | qt p1 | o undefined | e undefined",
       "type": "text",
       "x": 0,
       "y": 49
@@ -417,7 +417,7 @@
       "font": "sans-serif",
       "fontSize": 8,
       "role": "mark",
-      "text": "a flag -> 114 | q lo | th under | qt p2",
+      "text": "a flag -> 114 | q lo | th under | qt p2 | o undefined | e undefined",
       "type": "text",
       "x": 0,
       "y": 63
@@ -428,7 +428,7 @@
       "font": "sans-serif",
       "fontSize": 8,
       "role": "mark",
-      "text": "a word -> undefined | q lo | th under | qt undefined",
+      "text": "a word -> undefined | q lo | th under | qt undefined | o undefined | e undefined",
       "type": "text",
       "x": 0,
       "y": 77
@@ -450,6 +450,22 @@
         220
       ],
       "step": 36.666667
+    },
+    "e": {
+      "domain": [
+        "a"
+      ],
+      "range": []
+    },
+    "o": {
+      "domain": [
+        "a",
+        "b"
+      ],
+      "range": [
+        "red",
+        "blue"
+      ]
     },
     "q": {
       "domain": [
@@ -523,7 +539,7 @@
   },
   "size": {
     "height": 140,
-    "width": 442
+    "width": 621
   },
   "spec": "a-scale-coerces-what-it-is-given.vg.json",
   "vegaVersion": "6.3.1"

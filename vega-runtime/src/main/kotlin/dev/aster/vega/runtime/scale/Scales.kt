@@ -939,12 +939,17 @@ public class OrdinalScale(
     domain.withIndex().associateTo(LinkedHashMap()) { (index, value) -> internKey(value) to index }
 
   override fun scale(value: VegaValue): VegaValue {
-    if (rangeValues.isEmpty()) return unknown ?: VegaValue.Null
+    // `unknown`, which is **`undefined`** when the specification names none — the same answer every
+    // other scale family gives for a value it cannot place. An ordinal scale is the clearest
+    // statement of it, having no coercion at all: its index is keyed by the value, so a miss is a
+    // miss and no arithmetic stands in the way. This answered a null, which a mark encoding writes
+    // where an undefined leaves the property absent.
+    if (rangeValues.isEmpty()) return unknown ?: VegaValue.Undefined
     val key = internKey(value)
     val index =
       indices[key]
         ?: if (implicit) indices.size.also { indices[key] = it }
-        else return unknown ?: VegaValue.Null
+        else return unknown ?: VegaValue.Undefined
     return rangeValues[index % rangeValues.size]
   }
 

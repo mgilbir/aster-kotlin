@@ -296,14 +296,16 @@ class ScalesTest {
       OrdinalScale("c", words("a"), listOf(VegaValue.Str("red")), unknown = VegaValue.Str("#ccc"))
     assertEquals(VegaValue.Str("#ccc"), scale.scale(VegaValue.Str("zzz")))
 
+    // With no `unknown` named, d3's own default: `undefined`. A mark encoding leaves the
+    // property absent for that, where a null writes one.
     val withoutUnknown = OrdinalScale("c", words("a"), listOf(VegaValue.Str("red")))
-    assertEquals(VegaValue.Null, withoutUnknown.scale(VegaValue.Str("zzz")))
+    assertEquals(VegaValue.Undefined, withoutUnknown.scale(VegaValue.Str("zzz")))
   }
 
   @Test
-  fun `ordinal scale with an empty range yields null`() {
+  fun `ordinal scale with an empty range yields nothing`() {
     assertEquals(
-      VegaValue.Null,
+      VegaValue.Undefined,
       OrdinalScale("c", words("a"), emptyList()).scale(VegaValue.Str("a")),
     )
   }
