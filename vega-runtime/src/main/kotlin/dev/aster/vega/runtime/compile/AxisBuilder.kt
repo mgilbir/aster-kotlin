@@ -943,12 +943,45 @@ public class AxisBuilder(
       // tick [withExtraTick] appends is built from a raw scale position afterwards and adds the
       // offset itself, which is why it is not shifted twice.
       val offset = (scale as? PositionScale)?.let { tickOffset(it, spec) } ?: 0.0
-      if (offset == 0.0) ticks
-      else
-        ticks.map {
-          it.copy(position = it.position + offset, labelPosition = it.labelPosition?.plus(offset))
-        }
+      val shifted =
+        if (offset == 0.0) ticks
+        else
+          ticks.map {
+            it.copy(position = it.position + offset, labelPosition = it.labelPosition?.plus(offset))
+          }
+      joinedByValue(shifted)
     }
+
+  /**
+   * One item per **distinct tick value as text**, keeping the last.
+   *
+   * An axis's three value-driven marks are data joins with a key, all three spelled the same way:
+   * ```js
+   * {type: RuleMark, role: AxisGridRole, key: Value, from: dataRef, encode, ...}
+   * ```
+   *
+   * — `Value` being the string `'value'`, so the join is on `datum.value`. A keyed join holds one
+   * tuple per key and a later arrival **overwrites** an earlier one, so two ticks whose values key
+   * alike leave a single item, at the later one's position. The key is an object property, which
+   * makes it the value's *text*: `1001` and `"1001"` are one key, and so are a null and the word
+   * for one.
+   *
+   * It takes a domain holding two values with one text to see this at all, which is why nothing did
+   * until a discrete domain started holding values rather than their text. Five entries draw three
+   * grid lines, three ticks and three labels.
+   *
+   * A **legend** does not do this, and not because the rule is different — its entry marks carry
+   * the same `key: Value`. A legend builds a *group per entry*, so the key is unique inside each
+   * one and there is nothing to collapse. Five swatches beside three ticks over the same five
+   * values, which is what the fixture draws.
+   */
+  private fun joinedByValue(ticks: List<Tick>): List<Tick> {
+    if (ticks.size < 2) return ticks
+    val seen = HashSet<String>(ticks.size)
+    // Backwards, because the **last** of a repeated key is the one that survives; reversed again so
+    // the survivors keep the order they appear in.
+    return ticks.reversed().filter { seen.add(it.value.asString()) }.reversed()
+  }
 
   private fun rawTicks(scale: VegaScale, spec: AxisSpec, specifier: String?): List<Tick>? {
     // A scale with `bins` has its tick values already decided: upstream's `tickValues` returns the
