@@ -465,7 +465,26 @@ internal class DataPipeline(
       // an ordinal scale is bucketed from a date exactly as a temporal one is.
       // No exception for an aggregate: a `mean` over a date column still needs the column read as
       // dates first, or it averages the strings' character codes.
-      if (def.type == MeasureType.TEMPORAL || def.timeUnit != null) {
+      // ```js
+      // export function isFieldOrDatumDefForTimeFormat(fieldOrDatumDef): boolean {
+      //   const {formatType} = getFormatMixins(fieldOrDatumDef);
+      //   return formatType === 'time' || (!formatType && isTemporalFieldDef(fieldOrDatumDef));
+      // }
+      // ```
+      //
+      // **A stated `formatType` decides it, and the answer is not always yes.** A column read as a
+      // date is one whose guide formats it as *time*, or one typed temporal that says nothing about
+      // its format at all. So a temporal field whose axis names `formatType: "number"` is **not**
+      // parsed: upstream emits the source rows untouched, with no formula and no dataset derived
+      // from one, and leaves a time scale standing over the raw strings. That is upstream's answer
+      // and not a good chart, but it is the one a specification written that way is given.
+      //
+      // `getFormatMixins` reads the guide's pair for anything that is not a plain string
+      // definition, so it is the `axis` block that settles this rather than the channel itself.
+      val timeFormatted =
+        def.formatType == "time" ||
+          (def.formatType == null && (def.type == MeasureType.TEMPORAL || def.timeUnit != null))
+      if (timeFormatted) {
         parse[field] = "date"
       } else if (def.type == MeasureType.QUANTITATIVE && def.aggregate in MIN_MAX_OPS) {
         // Upstream's own comment: "we need to parse numbers to support correct min and max". Every
