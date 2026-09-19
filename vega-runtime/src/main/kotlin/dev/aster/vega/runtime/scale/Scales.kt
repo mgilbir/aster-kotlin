@@ -1078,7 +1078,16 @@ internal fun bisectRight(
   var hi = high
   while (lo < hi) {
     val mid = (lo + hi) ushr 1
-    if (x < values[mid]) hi = mid else lo = mid + 1
+    // **`compare(a[mid], x) <= 0`, which is d3's own direction and not its negation.** The two
+    // agree on every pair of numbers and differ when the *pivot* is `NaN`: `ascending` answers
+    // `NaN` then, `NaN <= 0` is false, and the search moves **left**. Asking `x < values[mid]`
+    // instead sends it right, because a comparison against a NaN is false whichever way round it
+    // is written.
+    //
+    // A pivot is `NaN` when a quantile scale has no samples to cut on — its thresholds are the
+    // quantiles of an empty column — and upstream then answers the **first** range entry for every
+    // value. This walked to the last one.
+    if (values[mid] <= x) lo = mid + 1 else hi = mid
   }
   return lo
 }

@@ -1053,7 +1053,13 @@ public class ScaleResolver(
   private fun buildQuantile(spec: ScaleSpec): QuantileScale? {
     val range = binnedRange(spec, buckets = null) ?: return null
     // Every value, not the extent: a quantile scale cuts by count, so it needs the whole column.
-    val domain = fullNumericDomain(spec) ?: return null
+    //
+    // **A column with no number in it is still a scale**, and upstream builds one: probed, a
+    // quantile over four date *strings* has `domain: []` and `quantiles: [null, null]`, and it
+    // answers the **first** range entry for any number — a null threshold makes d3's `ascending`
+    // return `NaN`, and a bisect whose comparison is NaN settles at the low end. Dropping the scale
+    // instead left the chart with a colour channel that named a scale which was not there.
+    val domain = fullNumericDomain(spec, allowEmpty = true) ?: return null
     return QuantileScale(spec.name, domain, range)
   }
 
@@ -1112,7 +1118,7 @@ public class ScaleResolver(
    * Duplicates are kept, which matters: `quantile` cuts by count, so dropping a repeated value
    * would move every quartile.
    */
-  private fun fullNumericDomain(spec: ScaleSpec): List<Double>? {
+  private fun fullNumericDomain(spec: ScaleSpec, allowEmpty: Boolean = false): List<Double>? {
     val values =
       when (val domain = spec.domain) {
         is DomainSpec.Literal -> literalDomain(domain.values, spec.name)
@@ -1135,7 +1141,11 @@ public class ScaleResolver(
     // not a row that was never there. [scaleNumber] is that line; `asDouble` parses a string where
     // `Number` coerces one, and dropped every empty cell in the column.
     val numbers = values.map { scaleNumber(it) }.filterNot { it.isNaN() }
-    if (numbers.isEmpty()) {
+    // [allowEmpty] is the quantile case, where upstream keeps the scale and its empty domain; see
+    // the note there. `threshold` and `bin-ordinal` also keep theirs — probed, both report a domain
+    // of `[null, null]` over the same column — and neither is reproduced here yet, there being no
+    // case in any corpus that reaches them. Recorded rather than guessed at.
+    if (numbers.isEmpty() && !allowEmpty) {
       diagnostics.error(
         DiagnosticCodes.SCALE_INVALID_DOMAIN,
         "Scale '${spec.name}' has no numeric values in its domain",
