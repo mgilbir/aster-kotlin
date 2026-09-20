@@ -4,7 +4,6 @@ import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.field
-import dev.aster.vega.model.isMissing
 import kotlin.math.abs
 
 /**
@@ -143,12 +142,29 @@ public object StackTransform : Transform {
     }
   }
 
-  /** A missing or non-finite value contributes nothing; a stack with no field counts tuples. */
+  /**
+   * `+field(t)`, and **nothing is substituted for what that comes to**.
+   *
+   * Upstream reads the column with a plain coercion and then adds it to a running cursor:
+   * ```js
+   * v = +field(t);
+   * if (v < 0) { t[y0] = lastNeg; t[y1] = lastNeg += v; }
+   * else       { t[y0] = lastPos; t[y1] = lastPos += v; }
+   * ```
+   *
+   * A `NaN` is not less than zero, so it takes the positive branch and **poisons the cursor**: that
+   * row gets a `y0` and no `y1`, and every row after it in the group gets neither. The totals do
+   * the same, `partition` summing `Math.abs(field(g[i]))` with no guard of its own.
+   *
+   * This answered `0` for a value it could not read, which is a different chart rather than a
+   * missing piece of one: a column of unreadable dates stacked to a flat zero, so the axis came out
+   * `[0, 0]` where upstream's is `[NaN, NaN]` and draws no ticks at all. The same distinction as
+   * the pie — see `Pie.valueAt` — and for the same reason, that a cursor accumulates.
+   *
+   * A stack with no field counts tuples, which is upstream's `field = one`.
+   */
   private fun valueAt(input: List<VegaValue>, index: Int, path: String?): Double {
     if (path == null) return 1.0
-    val value = input[index].field(path)
-    if (value.isMissing) return 0.0
-    val number = JsSemantics.toNumber(value)
-    return if (number.isFinite()) number else 0.0
+    return JsSemantics.toNumber(input[index].field(path))
   }
 }

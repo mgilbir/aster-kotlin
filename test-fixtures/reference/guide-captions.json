@@ -30,6 +30,16 @@
   "caption": "Y-axis for a linear scale with values from 0 to 20"
  },
  {
+  "fixture": "a-stack-propagates-what-it-cannot-add",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 8"
+ },
+ {
+  "fixture": "a-stack-propagates-what-it-cannot-add",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from NaN to NaN"
+ },
+ {
   "fixture": "a-time-value-past-the-calendar",
   "kind": "axis",
   "caption": "Y-axis for a time scale with values from Thursday, 01 January 1970, 1:00:00 AM to , NaN  0NaN, 12:NaN:NaN AM"

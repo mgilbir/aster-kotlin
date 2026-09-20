@@ -112,6 +112,30 @@
   "hidden": false
  },
  {
+  "fixture": "a-stack-propagates-what-it-cannot-add",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-stack-propagates-what-it-cannot-add",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-stack-propagates-what-it-cannot-add",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "a-time-value-past-the-calendar",
   "kind": "group",
   "role": "graphics-object",
