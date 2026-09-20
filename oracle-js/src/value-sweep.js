@@ -27,16 +27,20 @@
  * A set of columns, each a list of values chosen because JavaScript treats it differently from the
  * obvious reading: a null against the word `null`, an empty cell against a zero, a number against
  * the same number written as text, a flag, a negative zero, a value past the precision where
- * integers stop being exact, and the notation thresholds where `String(x)` changes shape.
+ * integers stop being exact, the notation thresholds where `String(x)` changes shape, hexadecimal
+ * and exponent text, the word `Infinity`, a list inside a cell, letters outside the Latin block, and
+ * a label far wider than its neighbours.
  *
  * ### What it is varied in
  *
- * One chart per **scale family and mark type**, because a value's journey is the scale it goes
- * through and the mark it lands in: a band, a linear, a log, a time, an ordinal, a quantize, a
- * quantile and a threshold; a rect, a line, an area, a symbol, an arc and a text. The swept column
- * is the one the chart's *position* reads, so a value that is placed differently moves a mark, and
- * the chart draws an axis and a legend over the same column so the same value is also formatted,
- * captioned and enumerated.
+ * One chart per **journey**, because a value's journey is the scale it goes through, the guide that
+ * captions it and the transform that accumulates it. A scale of each family — band, point, linear,
+ * log, pow, symlog, time, ordinal, quantize, quantile, threshold — under a rect, a line, a symbol,
+ * an arc or a text; a discrete legend that enumerates the column and a gradient legend that ramps
+ * over it; and the transforms that do something to a value rather than place it: a stack, a window,
+ * a pie, an aggregate, a bin, a sort and the number formatters. The swept column is the one the
+ * chart's *position* reads, so a value that is placed differently moves a mark, and the chart draws
+ * an axis over the same column so the same value is also formatted and captioned.
  *
  * ### Refusals
  *
@@ -100,6 +104,51 @@ const COLUMNS = [
   { name: 'all-dates', note: 'a column of ISO dates, for the scales that parse them', values: ['2024-01-07', '2024-03-19', '2024-06-02', '2024-11-30'] },
   { name: 'one-value', note: 'a degenerate domain, where every span is zero', values: [7, 7, 7, 7] },
   { name: 'with-a-huge-gap', note: 'a domain wide enough to change a tick step', values: [1, 1000000, 2, 3] },
+  {
+    name: 'with-infinity-written-out',
+    note: 'the word Infinity, which Number reads as a number no arithmetic recovers from',
+    values: ['Infinity', '-Infinity', 1, 2],
+  },
+  {
+    name: 'with-a-hex-number',
+    note: 'hexadecimal text, where Number says 16 and parseFloat says 0 — the two readings disagree',
+    values: ['0x10', 16, 1, 2],
+  },
+  {
+    name: 'with-an-exponent-written-out',
+    note: 'exponent notation as text, in both cases, which Number reads and a digit scan does not',
+    values: ['1e3', '1E-3', 1, 2],
+  },
+  {
+    name: 'with-a-sign-written-out',
+    note: 'a leading sign, which Number accepts and a stricter parse rejects',
+    values: ['+5', '-5', 1, 2],
+  },
+  {
+    name: 'with-a-list-in-a-cell',
+    note: 'a cell holding a list: Number([3]) is 3, Number([1,2]) is NaN, String([1,2]) is "1,2"',
+    values: [[1, 2], [3], 4, 5],
+  },
+  {
+    name: 'with-an-epoch-number',
+    note: 'a number that is also a plausible instant, which a time scale reads as a date and a linear one does not',
+    values: [1704585600000, 1709424000000, 1, 2],
+  },
+  {
+    name: 'beyond-ascii',
+    note: 'letters outside the Latin block, whose widths come from a different part of the font table',
+    values: ['café', '日本語', 'Ωμέγα', 'x'],
+  },
+  {
+    name: 'with-a-long-word',
+    note: 'a label far wider than its neighbours, which decides a legend’s width and an axis’ overlap',
+    values: ['antidisestablishmentarianism', 'a', 'bb', 'ccc'],
+  },
+  {
+    name: 'near-a-rounding-boundary',
+    note: 'the values either side of 0.1 + 0.2, where the shortest decimal and the exact one differ',
+    values: [0.1, 0.2, 0.30000000000000004, 0.3],
+  },
 ];
 
 /** A chart per scale family and mark type; `field` names the column the sweep replaces. */
@@ -308,6 +357,179 @@ function CHARTS() {
                 startAngle: { field: 'startAngle' },
                 endAngle: { field: 'endAngle' },
                 outerRadius: { value: 50 },
+              },
+            },
+          },
+        ],
+      }),
+    },
+    {
+      name: 'pow-symbol',
+      note: 'a pow scale, which raises what it is given and keeps the sign it came with',
+      spec: withAxes(
+        { name: 'y', type: 'pow', exponent: 0.5, domain: { data: 't', field: 'v' }, range: 'height' },
+        'symbol',
+        { size: { value: 50 } },
+      ),
+    },
+    {
+      name: 'symlog-symbol',
+      note: 'a symlog scale, the one continuous family that spans zero, with a constant of its own',
+      spec: withAxes(
+        { name: 'y', type: 'symlog', constant: 1, domain: { data: 't', field: 'v' }, range: 'height' },
+        'symbol',
+        { size: { value: 50 } },
+      ),
+    },
+    {
+      name: 'point-over-the-values',
+      note: 'a point scale over the column, band’s sibling with a step of its own and no width',
+      spec: base({
+        scales: [{ name: 'x', type: 'point', domain: { data: 't', field: 'v' }, range: 'width', padding: 0.5 }],
+        axes: [{ orient: 'bottom', scale: 'x', labelOverlap: false }],
+        marks: [
+          {
+            type: 'symbol',
+            from: { data: 't' },
+            encode: {
+              enter: {
+                x: { scale: 'x', field: 'v' },
+                y: { value: 60 },
+                size: { value: 50 },
+              },
+            },
+          },
+        ],
+      }),
+    },
+    {
+      name: 'gradient-legend',
+      note: 'a **continuous** legend over the column, which is a ramp with its own ticks and captions',
+      spec: base({
+        scales: [
+          { name: 'x', type: 'band', domain: { data: 't', field: 'k' }, range: 'width', padding: 0.1 },
+          { name: 'colour', type: 'linear', domain: { data: 't', field: 'v' }, range: { scheme: 'blues' } },
+        ],
+        legends: [{ fill: 'colour', type: 'gradient' }],
+        marks: [
+          {
+            type: 'rect',
+            from: { data: 't' },
+            encode: {
+              enter: {
+                x: { scale: 'x', field: 'k' },
+                width: { scale: 'x', band: 1 },
+                y: { value: 0 },
+                y2: { value: 60 },
+                fill: { scale: 'colour', field: 'v' },
+              },
+            },
+          },
+        ],
+      }),
+    },
+    {
+      name: 'binned',
+      note: 'a bin, which asks the column for an extent and then chooses a step inside it',
+      spec: base({
+        data: [
+          {
+            name: 't',
+            values: [],
+            transform: [
+              { type: 'extent', field: 'v', signal: 'ext' },
+              { type: 'bin', field: 'v', extent: { signal: 'ext' }, maxbins: 4 },
+            ],
+          },
+        ],
+        marks: [
+          {
+            type: 'text',
+            from: { data: 't' },
+            encode: {
+              enter: {
+                x: { value: 5 },
+                y: { signal: '14 * datum.n - 7' },
+                text: { signal: "datum.n + ': ' + datum.bin0 + ' to ' + datum.bin1" },
+                fontSize: { value: 9 },
+                baseline: { value: 'top' },
+              },
+            },
+          },
+        ],
+      }),
+    },
+    {
+      name: 'sorted',
+      note: 'the column put in order, which is a comparator’s reading of values of mixed type',
+      spec: base({
+        data: [
+          { name: 't', values: [] },
+          { name: 'ordered', source: 't', transform: [{ type: 'collect', sort: { field: 'v' } }] },
+        ],
+        marks: [
+          {
+            type: 'text',
+            from: { data: 'ordered' },
+            encode: {
+              enter: {
+                x: { value: 5 },
+                y: { signal: '14 * datum.n - 7' },
+                text: { signal: "'' + datum.v" },
+                fontSize: { value: 9 },
+                baseline: { value: 'top' },
+              },
+            },
+          },
+        ],
+      }),
+    },
+    {
+      name: 'running-total',
+      note: 'a window, an accumulator like the stack, where one unreadable row poisons every later one',
+      spec: base({
+        data: [
+          { name: 't', values: [] },
+          {
+            name: 'running',
+            source: 't',
+            transform: [{ type: 'window', ops: ['sum', 'rank'], fields: ['v', null], as: ['total', 'place'] }],
+          },
+        ],
+        marks: [
+          {
+            type: 'text',
+            from: { data: 'running' },
+            encode: {
+              enter: {
+                x: { value: 5 },
+                y: { signal: '14 * datum.place - 7' },
+                text: { signal: "datum.place + ': ' + datum.total" },
+                fontSize: { value: 9 },
+                baseline: { value: 'top' },
+              },
+            },
+          },
+        ],
+      }),
+    },
+    {
+      name: 'formatted',
+      note: 'the column through the number formatters, where a fixed count, an SI prefix and a percentage each read it',
+      spec: base({
+        marks: [
+          {
+            type: 'text',
+            from: { data: 't' },
+            encode: {
+              enter: {
+                x: { value: 5 },
+                y: { signal: '14 * datum.n - 7' },
+                text: {
+                  signal: "format(datum.v, ',.2f') + ' | ' + format(datum.v, '.3s') + ' | ' + format(datum.v, '.1%')",
+                },
+                fontSize: { value: 9 },
+                baseline: { value: 'top' },
               },
             },
           },

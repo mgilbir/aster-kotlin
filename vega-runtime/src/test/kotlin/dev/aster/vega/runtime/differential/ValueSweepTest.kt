@@ -26,10 +26,10 @@ import org.junit.jupiter.api.Test
  * the same number written as text. Not one was reachable by changing a property, because none of
  * them is about a property.
  *
- * So this sweep holds the specification still and varies the **column**: sixteen columns, each
- * chosen because JavaScript treats it differently from the obvious reading, across twelve charts
- * chosen to cover the journeys a value takes — a scale of each family, a stack, an aggregate, a
- * discrete domain, a legend that enumerates it, and a text mark that simply writes it out.
+ * So this sweep holds the specification still and varies the **column**: twenty-five columns, each
+ * chosen because JavaScript treats it differently from the obvious reading, across twenty charts
+ * chosen to cover the journeys a value takes — a scale of each family, a guide of each kind, and a
+ * transform that accumulates or orders or formats one.
  *
  * **The claim is agreement, not success**, as in every sweep here: a specification upstream refuses
  * is recorded as a refusal in the manifest rather than dropped.
@@ -100,6 +100,14 @@ class ValueSweepTest {
       }
       differed++
       perCase[name] = Triple("differed", differences.size, differences.first().toString())
+      // **Every difference for the cases asked about, unmasked.** The tally above ranks *shapes*
+      // with the numbers taken out, which is the right thing for deciding what to fix and the wrong
+      // thing for fixing it: by then the question is what this one chart actually drew, and the
+      // report keeps only the first line of it. `-DvalueSweepCase=<substring>` prints the rest.
+      if (focus.any { name.contains(it) }) {
+        println("---- $name ----")
+        differences.forEach { println("  ${it.where}: expected ${it.expected}, got ${it.actual}") }
+      }
       differences
         .map { shape("${it.where}: ${it.expected} vs ${it.actual}") }
         .distinct()
@@ -176,6 +184,21 @@ class ValueSweepTest {
       .take(140)
 
   private companion object {
+    /**
+     * `-DvalueSweepCase=<substring>[,<substring>…]`: which cases print every difference they found.
+     *
+     * A list rather than one, because a sweep is slow enough that looking at two clusters means
+     * looking at them in the same run.
+     */
+    val focus: List<String> =
+      System.getProperty("valueSweepCase")
+        .orEmpty()
+        .split(',')
+        .map { it.trim() }
+        .filter {
+          it.isNotEmpty()
+        }
+
     val repositoryRoot: File = File(System.getProperty("user.dir")).parentFile
     val sweepDir = File(repositoryRoot, "build/value-sweep")
     val specDir = File(sweepDir, "specs")

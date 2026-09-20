@@ -1,26 +1,28 @@
 #!/usr/bin/env bash
-# The **schema** sweep: one chart per property value Vega's own schema declares.
+# The **value** sweep: one chart per (chart, column) pair, varying what the data holds.
 #
-# Every other corpus here is a collection of charts somebody drew — the 200 fixtures under
-# `test-fixtures/specs`, Vega-Lite's 627 examples (`scripts/vega-lite-gallery.sh`), 1981
-# specifications from GitHub (`scripts/vega-lite-wild.sh`), 63 Deneb templates (`scripts/deneb.sh`).
-# All four agree with upstream on everything they cover, which is the point at which a corpus of
-# *used* features stops being able to find anything. What none of them reaches is a property nobody
-# happened to set, or a value of it nobody happened to choose: `tickBand: "extent"`,
-# `labelOverlap: "greedy"`, `align: "all"`, `bandPosition: 0`.
+# Every other corpus here varies the **specification** and holds the data still: the fixtures under
+# `test-fixtures/specs` are charts somebody drew, the schema sweep (`scripts/property-sweep.sh`) is
+# one chart with one property changed, the Vega-Lite sweep is one encoding changed, and the gallery
+# and wild corpora are charts from the world. The data in all of them is tidy — numbers where numbers
+# go and words where words go — so none of them reaches a value nobody meant to put there.
 #
-# `vega/build/vega-schema.json` is the list of those, and it is machine-readable. This walks it and
-# writes one small bar chart per (property, value) pair — the same chart every time with one property
-# changed, so a difference names its own cause — renders each with upstream, and compares.
+# Real data is not tidy, and that is where the differences have been: `+""` is 0 where `+"null"` is
+# NaN, `quantize` does not coerce at all, a stack's groups are keyed by `JSON.stringify`, an axis
+# joins its ticks by value. Not one of those was reachable by changing a property.
 #
-# The families are `axis`, `legend`, `title`, one per **scale type**, one per **projection type**, the
-# **view** itself, the **layout** of a group of groups, the `config` block behind each guide and each
-# mark type and each range name, a mark's own properties, and one per **mark type** for the encode
-# channels every item carries — the widest declared surface there is. A property is swept where the schema says enough to choose values
-# honestly (an enum, a boolean, a number, a colour), or where upstream fixes a vocabulary its schema
-# leaves open; anything else is skipped **and counted**, with the reason, in the manifest. A scale
-# type and a projection type each bring their own base chart, because which properties mean anything
-# is the type's own question. See `oracle-js/src/value-sweep.js`.
+# So this holds the specification still and varies the **column**. The columns are reasons rather
+# than a random spread — a null beside the word for it, an empty cell, a flag, a number beside its
+# own text, a negative zero, a value past where integers stop being exact, the notation thresholds,
+# hexadecimal and exponent text, a list inside a cell, letters outside the Latin block, a word far
+# wider than its neighbours. The charts are **journeys** rather than a gallery: one per scale family
+# (band, point, linear, log, pow, symlog, time, ordinal, quantize, quantile, threshold), one per
+# guide that reads a value (a discrete legend, a gradient legend, an axis), and one per transform
+# that accumulates or orders or formats one (stack, window, pie, aggregate, bin, collect, format).
+# See `oracle-js/src/value-sweep.js`.
+#
+# A specification upstream refuses to render is recorded as a refusal rather than dropped: "upstream
+# will not draw this either" is an agreement.
 #
 # **A measurement, not a gate**, the same course the gallery and Deneb sweeps took: a sweep of a
 # surface nobody has finished porting would paint every branch red for reasons unconnected to it.

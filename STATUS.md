@@ -8471,3 +8471,46 @@ every integer exponent probed. They differ only for a **fractional** one, where 
 `NaN` and `Math.pow` answers a real number, which a log axis reaches only when its exponent ticks
 are fractional. No case in any corpus produces one, so it is written down rather than guessed at.
 
+
+### The value sweep reaches further: 25 columns, 20 charts, 500 cases
+
+A sweep that agrees with upstream everywhere has stopped being an instrument. The value sweep
+reached 192 of 192 in the change above, which is the point at which the useful thing to do with it
+is not to retire it but to widen it — the same course the schema sweep took.
+
+Widened along both axes it has, because the two find different things.
+
+**Nine more columns**, each a reason rather than a spread: the word `Infinity`, which `Number` reads
+as a number no arithmetic recovers from; hexadecimal text, where `Number` says 16 and `parseFloat`
+says 0; exponent notation written out in both cases; a leading sign; **a list inside a cell**, where
+`Number([3])` is 3, `Number([1,2])` is `NaN` and `String([1,2])` is `1,2`; a number that is also a
+plausible instant; letters outside the Latin block, whose widths come from a different part of the
+font table; a label far wider than its neighbours; and the values either side of `0.1 + 0.2`.
+
+**Eight more charts**, each a *journey* rather than a picture — a `pow` scale and a `symlog` scale,
+the two continuous families the sweep had no chart for; a `point` scale, band's sibling with a step
+of its own; a **gradient** legend, which is the only continuous guide and the sweep drew none; a
+`bin`, which asks the column for an extent before choosing a step; a `collect` sort, which is a
+comparator over values of mixed type; a `window` running total, an accumulator of the same family as
+the stack; and the number formatters, which read the column three ways.
+
+**500 cases. Upstream refuses one** — a gradient legend over a domain that reaches infinity throws
+`I[i] is not a function` inside upstream itself, which is recorded as a refusal and is an agreement.
+
+**481 of 499 agree.** The 18 that do not are five causes, not eighteen:
+
+- **an infinite extent, 9 cases.** `Extent.js` ends `if (!Number.isFinite(min) || !Number.isFinite(max)) { warn; min = max = undefined; }` — an extent that is not finite is **no extent at all**, and that covers a column of `Infinity` and a column with no number in it alike. Upstream's domain is then `[undefined, undefined]`, its scale answers `NaN` for every value and its axis draws no ticks; this engine computes a domain from the finite values and draws five.
+- **a list inside a cell, 4 cases.** A text mark whose `text` is an array is **multi-line text, one line per element** — `[1,2]` is two lines and 24 pixels tall, `["a",null,"c"]` is three and 37. Probed. This engine writes `1,2` on one line, which is `String([1,2])` and the wrong rule, and every legend entry below it sits 12 pixels too high.
+- **a colour ramp that clamps, 1 case.** A continuous colour scale does not clamp: upstream's blues ramp evaluated below its domain extrapolates to `rgb(255, 255, 255)`, and this engine answers the colour at the domain's own minimum.
+- **`min` and `max` over values that do not coerce, 1 case.** `AggregateOps.js` initialises both to `undefined` and adds with `if (v > m.max || m.max === undefined)` — the **JavaScript relational operator** on the raw value, which compares two strings as strings. Upstream's max over `[[1,2],[3],4,5]` is 5; this engine's is `1,2`.
+- **`symlog`, 1 case.** One label differs in its last two digits. d3's transform is
+  `Math.sign(x) * Math.log1p(Math.abs(x / c))`; this engine's scale writes `ln(1 + |x| / c)`, which
+  is the same rule transcribed twice — and the expression module's `symlog` already has it right.
+
+Recorded rather than fixed here, which is what a sweep is for. Each of the five is its own change.
+`-PvalueSweepCase=<substring>[,…]` prints every difference for the cases that match, because the
+tally ranks *shapes* with the numbers taken out and by the time you are fixing one you need the
+numbers back.
+
+(A list and not a table, for the reason the first value-sweep entry gives: `DocumentedNumbersTest`
+reads `| \`name\` | count |` as a claim about a fixture on disk, and these are chart names.)
