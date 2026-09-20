@@ -1,5 +1,13 @@
 [
  {
+  "fixture": "a-log-axis-labels-with-twelve-digits",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "a-number-written-as-text",
   "kind": "group",
   "role": "graphics-object",

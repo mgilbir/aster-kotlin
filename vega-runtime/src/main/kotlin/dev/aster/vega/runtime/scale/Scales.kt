@@ -1,6 +1,7 @@
 package dev.aster.vega.runtime.scale
 
 import dev.aster.vega.expression.JsSemantics
+import dev.aster.vega.expression.NumberFormat
 import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
@@ -794,8 +795,23 @@ public class LogScale(
     Ticks.logTicks(domain.first(), domain.last(), base, count)
 
   override fun formatTick(value: Double, count: Int, locale: VegaLocale): String =
-    // Log ticks are powers and their small multiples, so a fixed decimal count does not apply.
-    formatTickLabel(value, if (value == floor(value)) 0 else 2, locale)
+    // **`formatFloat`, which is `,` at twelve significant digits.** A log axis is the one family
+    // `tickFormat` sends down its own branch:
+    //
+    // ```js
+    // else if (isLogarithmic(type)) {
+    //   const varfmt = locale.formatFloat(specifier);
+    //   …
+    // }
+    // ```
+    //
+    // and `formatFloat` fills in `precision = 12` when the specifier names none. Twelve is where
+    // the exponent form begins, so `10,000,000,000` is written out and `1e+12` is not — which is
+    // the whole visible difference, and it changes the *width* of the axis and so of the chart.
+    //
+    // A fixed decimal count cannot express that: it says how many places follow the point, not how
+    // many digits are worth showing, so every power past a million came out in full.
+    NumberFormat.format(value, ",.12", locale)
 
   /**
    * Log tick labels, with the crowded ones blanked as d3 and Vega do.
