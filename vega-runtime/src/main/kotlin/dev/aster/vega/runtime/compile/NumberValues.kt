@@ -133,12 +133,8 @@ public class NumberResolver(
    * as the lines and collapses a one-element array to its element. Stringifying it instead joins
    * the lines with a comma and draws them on one, which is a different chart and a wider legend.
    */
-  public fun resolveLines(expression: String, owner: String): String? {
-    val value = resolveValue(expression, owner) ?: return null
-    if (value !is VegaValue.Arr) return JsSemantics.toStringValue(value)
-    if (value.values.size == 1) return JsSemantics.toStringValue(value.values.first())
-    return value.values.joinToString("\n") { JsSemantics.toStringValue(it) }
-  }
+  public fun resolveLines(expression: String, owner: String): String? =
+    resolveValue(expression, owner)?.let { asLines(it) }
 
   /** The raw value of a signal, for a property whose shape depends on what the signal holds. */
   public fun resolveValue(expression: String, owner: String): VegaValue? =
@@ -182,3 +178,37 @@ public class NumberResolver(
         }
     }
 }
+
+/**
+ * Upstream's `lineArray`, as one string with the lines separated by newlines.
+ *
+ * `vega-scenegraph`'s `util/text.js` is three lines and decides every multi-line label there is:
+ * ```js
+ * function lineArray(_) {
+ *   return isArray(_) ? _.length > 1 ? _ : _[0] : _;
+ * }
+ * ```
+ *
+ * An array of more than one element **is** the list of lines; an array of exactly one is that one
+ * element; an empty array is `undefined`, which `textValue` writes as the empty string. So a cell
+ * holding `[1, 2]` is a label two lines tall, and `String([1,2])` — `1,2` on one line — is the
+ * wrong rule everywhere a label is drawn.
+ *
+ * Newline-joined rather than carried as a list because that is what this engine's text layout
+ * reads: [dev.aster.vega.scene.TextRun.displayLines] splits on newlines when no explicit line list
+ * is given. A **mark's** text channel is the exception and passes the list itself, because a mark
+ * can carry a `lineBreak` that upstream ignores for an array and would otherwise re-split these.
+ *
+ * Written three times before this: for a guide title, for a mark's text channel, and nowhere at all
+ * for an axis or legend label — which is how a band axis over a column of lists drew `1,2` on one
+ * line where upstream draws two, and put every legend entry below it twelve pixels too high.
+ *
+ * **Upstream's three cases collapse to two here**, which is worth saying rather than spelling out a
+ * `when` that looks like the original: joining a one-element list gives that element, and joining
+ * an empty one gives the empty string, so no input can tell those two branches from the general
+ * case. They were written out first, and two mutants that deleted them survived every fixture —
+ * which is what a redundant branch looks like from the outside.
+ */
+internal fun asLines(value: VegaValue): String =
+  if (value !is VegaValue.Arr) JsSemantics.toStringValue(value)
+  else value.values.joinToString("\n") { JsSemantics.toStringValue(it) }

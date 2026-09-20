@@ -1436,7 +1436,7 @@ public class AxisBuilder(
       val labeller = Ticks.spanFormatter(format, numeric.first(), numeric.last(), count, locale)
       return { value ->
         val number = value.asDouble()
-        if (number.isNaN()) value.asString() else labeller(number)
+        if (number.isNaN()) asLines(value) else labeller(number)
       }
     }
     return when (scale) {
@@ -1452,7 +1452,7 @@ public class AxisBuilder(
         TimeTicks.label(value.asDouble(), scale.zone, locale)
       }
       else -> { value ->
-        value.asString()
+        asLines(value)
       }
     }
   }
@@ -1496,7 +1496,7 @@ public class AxisBuilder(
           // A discrete domain's values *are* its labels, which is the rule the binned scales follow
           // too: upstream asks the scale for a `tickFormat`, an ordinal scale has none, and the
           // fallback is plain string coercion.
-          Tick(value.asString(), at, value)
+          Tick(asLines(value), at, value)
         }
       // An **identity** scale is `linearish` in d3, so its ticks are a linear scale's over its own
       // domain — and its position is the value itself, the scale being the identity. Upstream
@@ -1665,7 +1665,7 @@ public class AxisBuilder(
         formatType,
       )
     }
-    return { value -> value.asString() }
+    return { value -> asLines(value) }
   }
 
   /**

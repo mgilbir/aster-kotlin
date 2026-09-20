@@ -1,5 +1,15 @@
 [
  {
+  "fixture": "a-label-that-is-a-list-of-lines",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: 1,2, 3, plain, a,b,c"
+ },
+ {
+  "fixture": "a-label-that-is-a-list-of-lines",
+  "kind": "legend",
+  "caption": "Symbol legend for fill color with 4 values: 1,2, 3, plain, a,b,c"
+ },
+ {
   "fixture": "a-log-axis-labels-with-twelve-digits",
   "kind": "axis",
   "caption": "Y-axis for a log scale with values from 1 to 1e+15"

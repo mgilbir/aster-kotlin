@@ -1313,7 +1313,7 @@ internal class LegendBuilder(
     scaleName: String,
   ): (Int, Double) -> String {
     spec.values?.let { explicit ->
-      return { index, _ -> explicit.getOrNull(index)?.asString() ?: "" }
+      return { index, _ -> explicit.getOrNull(index)?.let { asLines(it) } ?: "" }
     }
     val reference = if (scale is QuantileScale) scale.thresholds else scale.legendExtent.toList()
     val step =
@@ -1424,7 +1424,7 @@ internal class LegendBuilder(
           operator = scaleName,
         )
       }
-      if (readable.isNotEmpty()) return readable.map { Entry(it, it.asString()) }
+      if (readable.isNotEmpty()) return readable.map { Entry(it, asLines(it)) }
     }
     val length = numbers.resolve(spec.gradientLength, scaleName) ?: LegendDefaults.GRADIENT_LENGTH
     // Upstream scales the label count to the ramp's length rather than using a fixed five, so a
@@ -1573,7 +1573,7 @@ internal class LegendBuilder(
    */
   private fun entryValues(spec: LegendSpec, scale: VegaScale, scaleName: String): List<Entry> {
     spec.values?.let { explicit ->
-      return explicit.map { Entry(it, it.asString()) }
+      return explicit.map { Entry(it, asLines(it)) }
     }
     val count =
       numbers.resolveTickCount(spec.tickCount, scaleName) ?: LegendDefaults.SYMBOL_TICK_COUNT
@@ -1601,9 +1601,9 @@ internal class LegendBuilder(
       // no
       // entries rather than a made-up set of them.
       is IdentityScale -> emptyList()
-      is OrdinalScale -> scale.domain.map { Entry(it, dates?.invoke(it) ?: it.asString()) }
-      is BandScale -> scale.domain.map { Entry(it, dates?.invoke(it) ?: it.asString()) }
-      is PointScale -> scale.domain.map { Entry(it, dates?.invoke(it) ?: it.asString()) }
+      is OrdinalScale -> scale.domain.map { Entry(it, dates?.invoke(it) ?: asLines(it)) }
+      is BandScale -> scale.domain.map { Entry(it, dates?.invoke(it) ?: asLines(it)) }
+      is PointScale -> scale.domain.map { Entry(it, dates?.invoke(it) ?: asLines(it)) }
       // A legend's own `format` wins over the scale's tick labels, exactly as an axis's does: a
       // rate scale labelled `.1%` reads "10.0%" and not "0.1".
       is LinearScale -> numeric(spec, scale.ticks(count), scale.tickLabels(count, locale), count)
