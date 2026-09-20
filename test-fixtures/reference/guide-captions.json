@@ -105,6 +105,16 @@
   "caption": "Y-axis for a linear scale with values from 0 to 4"
  },
  {
+  "fixture": "an-infinite-extent-is-no-extent",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from NaN to NaN"
+ },
+ {
+  "fixture": "an-infinite-extent-is-no-extent",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 4"
+ },
+ {
   "fixture": "area-gaps",
   "kind": "axis",
   "caption": "X-axis for a linear scale with values from 0 to 4"

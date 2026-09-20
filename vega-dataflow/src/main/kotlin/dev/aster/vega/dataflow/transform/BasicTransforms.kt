@@ -207,6 +207,47 @@ public object ExtentTransform : Transform {
   /** `[min, max]`, which is what upstream's extent operator holds. */
   override val publishesSignal: Boolean = true
 
+  /**
+   * Upstream's `Extent.js`, over values already plucked from their field.
+   *
+   * **`null` means there is no extent**, which is a different answer from an empty one. The last
+   * four lines of the operator are
+   *
+   * ```js
+   * if (!Number.isFinite(min) || !Number.isFinite(max)) {
+   *   pulse.dataflow.warn(`Infinite extent${name}: [${min}, ${max}]`);
+   *   min = max = undefined;
+   * }
+   * ```
+   *
+   * so a column of `Infinity`, a column with no number anywhere in it, and a column with no rows
+   * all reach the same place: a scale with `[undefined, undefined]` for a domain, which answers
+   * `NaN` for every value and whose axis draws nothing. The infinity is not filtered out on the way
+   * in — `Number.isFinite` is asked of the *result*, which is why a single `Infinity` in an
+   * otherwise ordinary column takes the whole extent with it.
+   *
+   * Public and shared because it was transcribed twice. The scale resolver had a second copy that
+   * dropped every non-finite value before comparing, and so reported the finite extent of a column
+   * upstream reports no extent for at all — which drew five axis labels where upstream draws none.
+   */
+  public fun extentOf(values: Iterable<VegaValue>): ClosedFloatingPointRange<Double>? {
+    var low = Double.POSITIVE_INFINITY
+    var high = Double.NEGATIVE_INFINITY
+    for (value in values) {
+      // `toNumber(_) { return _ == null || _ === '' ? null : +_; }` from `vega-util`, then
+      // `if (v != null)`. The empty string is the one coercion upstream declines to make here, and
+      // it is not the same as skipping it: `+""` is 0, and a column of empty cells would otherwise
+      // report an extent of `[0, 0]`.
+      if (value.isNullish || (value is VegaValue.Str && value.value.isEmpty())) continue
+      // `if (v < min) min = v; if (v > max) max = v`, with upstream's own comment on why there is
+      // no NaN test: "NaNs will fail all comparisons!". An **infinity** does not fail them.
+      val number = JsSemantics.toNumber(value)
+      if (number < low) low = number
+      if (number > high) high = number
+    }
+    return if (low.isFinite() && high.isFinite()) low..high else null
+  }
+
   override fun apply(
     input: List<VegaValue>,
     params: VegaValue.Obj,
@@ -221,40 +262,27 @@ public object ExtentTransform : Transform {
       )
       return input
     }
-    // `toNumber(field(t))` first — null, undefined and the empty string are skipped — then
-    // `if (v < min) min = v; if (v > max) max = v`, with a comment upstream that says why:
-    // "NaNs will fail all comparisons!". An **infinity** does not fail them, so it takes the
-    // extreme; filtering it out here reported the finite extent of a column that upstream refuses
-    // to report an extent for at all.
-    var low = Double.POSITIVE_INFINITY
-    var high = Double.NEGATIVE_INFINITY
-    for (datum in input) {
-      val value = datum.field(path)
-      if (value.isNullish || (value is VegaValue.Str && value.value.isEmpty())) continue
-      val number = JsSemantics.toNumber(value)
-      if (number < low) low = number
-      if (number > high) high = number
-    }
+    val extent = extentOf(input.map { it.field(path) })
     // "Infinite extent": upstream warns and answers `[undefined, undefined]`, which is what an
     // empty column gives too — a scale over it has no domain rather than a domain of infinities.
-    val infinite = !low.isFinite() || !high.isFinite()
-    if (infinite && input.isNotEmpty()) {
+    if (extent == null && input.isNotEmpty()) {
       context.diagnostics.warn(
         DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
-        "Infinite extent for field '$path': [$low, $high]; the signal is left with no extent",
+        "Infinite extent for field '$path'; the signal is left with no extent",
         operator = type,
       )
     }
 
     val signal = params.string("signal")
     if (signal != null) {
-      val extent =
-        if (infinite) {
+      context.setSignal(
+        signal,
+        if (extent == null) {
           VegaValue.Arr(listOf(VegaValue.Null, VegaValue.Null))
         } else {
-          VegaValue.Arr(listOf(VegaValue.Num(low), VegaValue.Num(high)))
-        }
-      context.setSignal(signal, extent)
+          VegaValue.Arr(listOf(VegaValue.Num(extent.start), VegaValue.Num(extent.endInclusive)))
+        },
+      )
     }
     return input
   }

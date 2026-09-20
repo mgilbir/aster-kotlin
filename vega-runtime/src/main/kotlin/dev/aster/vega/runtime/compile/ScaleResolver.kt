@@ -1,6 +1,7 @@
 package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.dataflow.transform.AggregateOp
+import dev.aster.vega.dataflow.transform.ExtentTransform
 import dev.aster.vega.dataflow.transform.aggregateOver
 import dev.aster.vega.dataflow.transform.compareFieldValues
 import dev.aster.vega.expression.JsSemantics
@@ -1285,17 +1286,21 @@ public class ScaleResolver(
           return null
         }
       }
-    val numbers = values.map { it.asDouble() }.filter { it.isFinite() }
-    if (numbers.isEmpty()) {
-      // **Not** a fallback to `[0, 1]`. Upstream's extent of nothing is `[undefined, undefined]`,
-      // and its own arithmetic turns that into `[NaN, NaN]` — a scale that generates no ticks and
-      // positions nothing, so the axis over it draws nothing at all. That is the whole point in a
-      // chart that switches between two views by emptying one of the datasets: substituting a
-      // usable domain draws the axis of the view nobody asked for. `domainMin` and `domainMax`
-      // still replace their end, which is how such a scale keeps one real bound.
-      return Double.NaN..Double.NaN
-    }
-    return numbers.min()..numbers.max()
+    // **Not** a fallback to `[0, 1]` when there is no extent. Upstream's extent of nothing is
+    // `[undefined, undefined]`, and its own arithmetic turns that into `[NaN, NaN]` — a scale that
+    // generates no ticks and positions nothing, so the axis over it draws nothing at all. That is
+    // the whole point in a chart that switches between two views by emptying one of the datasets:
+    // substituting a usable domain draws the axis of the view nobody asked for. `domainMin` and
+    // `domainMax` still replace their end, which is how such a scale keeps one real bound.
+    //
+    // [ExtentTransform.extentOf] and not a second reading of the same rule: this used to say
+    // `values.map { it.asDouble() }.filter { it.isFinite() }`, which is wrong twice over.
+    // `asDouble`
+    // is a *reading* and not `Number()`, and the filter **drops** a non-finite value where upstream
+    // lets it take the extreme and then discards the extent entirely — so a column holding the word
+    // `Infinity` reported the extent of the two ordinary numbers beside it, and drew an axis
+    // upstream leaves blank.
+    return ExtentTransform.extentOf(values) ?: (Double.NaN..Double.NaN)
   }
 
   private fun discreteDomain(domain: DomainSpec, scaleName: String): List<VegaValue>? {
