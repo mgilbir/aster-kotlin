@@ -15,6 +15,21 @@
   "caption": "Y-axis for a log scale with values from 10,000,000,000 to 1e+12"
  },
  {
+  "fixture": "a-logarithm-has-a-base",
+  "kind": "axis",
+  "caption": "Y-axis for a log scale with values from 1 to 1,000,000"
+ },
+ {
+  "fixture": "a-logarithm-has-a-base",
+  "kind": "axis",
+  "caption": "Y-axis for a log scale with values from 1 to 1,024"
+ },
+ {
+  "fixture": "a-logarithm-has-a-base",
+  "kind": "axis",
+  "caption": "Y-axis for a log scale with values from 1 to 19,683"
+ },
+ {
   "fixture": "a-number-written-as-text",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 6 values: 1e-7, 0.000001, 100000000000000000000, 1e+21, 0.1, 5e-324"

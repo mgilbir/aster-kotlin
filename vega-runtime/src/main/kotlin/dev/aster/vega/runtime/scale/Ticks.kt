@@ -8,6 +8,7 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.math.log10
+import kotlin.math.log2
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -370,7 +371,32 @@ public object Ticks {
     return result
   }
 
-  private fun log(value: Double, base: Double): Double = ln(value) / ln(base)
+  /**
+   * The logarithm d3 **chooses** rather than the one it divides for.
+   *
+   * ```js
+   * function logp(base) {
+   *   return base === Math.E ? Math.log
+   *       : base === 10 && Math.log10
+   *       || base === 2 && Math.log2
+   *       || (base = Math.log(base), x => Math.log(x) / base);
+   * }
+   * ```
+   *
+   * Three bases get the host's own function and everything else gets the division, and the
+   * difference is not cosmetic: `Math.log10(1e6)` is **exactly 6** where `ln(1e6) / ln(10)` is
+   * `5.999999999999999`. A log axis from 1 to a million then asks for ticks over `[0, 5.999…]`
+   * rather than `[0, 6]`, and the last power falls outside the range — so the axis drew **1, 100,
+   * 10,000** and upstream drew those and **1,000,000**. One tick, at the top, on the commonest log
+   * axis there is.
+   */
+  private fun log(value: Double, base: Double): Double =
+    when (base) {
+      kotlin.math.E -> ln(value)
+      10.0 -> log10(value)
+      2.0 -> log2(value)
+      else -> ln(value) / ln(base)
+    }
 
   /**
    * How many times `nice` will widen a domain before giving up and returning it unchanged.
