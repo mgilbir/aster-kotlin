@@ -27,7 +27,7 @@ end to end — expressions, signals, all 51 of upstream's 51 documented data tra
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-233 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
+234 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -194,7 +194,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 233 Vega differential fixtures and 332 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 234 Vega differential fixtures and 332 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -226,7 +226,7 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests, and every renderer now exposes the tree: the Android View, the Swift one and Compose Multiplatform. Not verified on physical hardware or with a real user |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 233 Vega differential fixtures |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 234 Vega differential fixtures |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -8599,7 +8599,7 @@ joining an empty one gives the empty string, so no input can tell the branches a
 are one newline-joined string. They are gone, and the reason is written where they were, because the
 next reader will want to put them back.
 
-Found by the widened value sweep: four cases, second-largest cluster. 233 Vega differential
+Found by the widened value sweep: four cases, second-largest cluster. 234 Vega differential
 fixtures.
 
 ### A maximum compares as JavaScript does, not as arithmetic does
@@ -8643,7 +8643,7 @@ numbers, and an ordinary one — and writes `argmin`/`argmax` beside `min`/`max`
 their answer by a different route and genuinely disagree: the maximum of the nested column is `5`
 while the arg-maximum is the row holding `[3]`.
 
-Found by the widened value sweep. 233 Vega differential fixtures.
+Found by the widened value sweep. 234 Vega differential fixtures.
 
 ### A symlog is log1p of x over c
 
@@ -8695,7 +8695,7 @@ see it and there is none, so the arm is pinned by a unit test on the transform r
 unclaimed. The same test carries the two observable decisions as reference values read off `node`,
 which is what makes it a transcription check and not a restatement.
 
-Found by the widened value sweep. 233 Vega differential fixtures.
+Found by the widened value sweep. 234 Vega differential fixtures.
 
 ### A colour ramp does not clamp
 
@@ -8748,4 +8748,47 @@ it because the normalizer canonicalizes a mark's fill, and it shows only when an
 scale's answer into a label. It is a different question from clamping — how a colour is written,
 not which colour it is — and it is the next change.
 
-233 Vega differential fixtures.
+234 Vega differential fixtures.
+
+### A null line is an empty line
+
+`textValue` is the last thing upstream does to a line before drawing it:
+
+```js
+const text = line == null ? '' : (line + '').trim();
+```
+
+**A null line is an empty line**, not the four letters that spell it. This engine wrote `null`
+there, so a text mark over a cell holding `["a", null, "c"]` had a word in the middle where upstream
+leaves a gap.
+
+Two more ways to the same wrong answer sat beside it. A list of **one** element was handed back to
+the ordinary single-string path rather than kept as a line list, so `[null]` came out as the word by
+a different route — and, more quietly, a `lineBreak` on such a mark was honoured where upstream
+ignores it, because `textLines` asks `!isArray(item.text)` of the *original* and an array of one is
+still an array. And an **empty** list produced no text at all, where `lineArray` collapses `[]` to
+`undefined` and `textValue` writes that as the empty string: one empty line, a line's height tall.
+
+`a-null-line-is-an-empty-line` pins the first two; a third mutant, which drops the empty-list guard,
+**survives**. An empty line and no line at all differ in this engine's own text metrics, but the
+item is empty either way and the comparison cannot see it. The guard is the faithful reading and it
+stays; saying so is better than deleting a line that is right because nothing catches it.
+
+No scale reads that column on purpose, and that is the interesting part.
+
+**Observed and not reproduced: a discrete domain over a column of lists.** Upstream keys such a
+domain by the value's **string** form, and `String([null])` is `""` — so `[null]` and `[]` are one
+entry and a band axis over the five rows here draws four ticks. This engine keys by the value and
+draws five. The fix is one line — `Array.prototype.join` writes an empty string for a null element,
+which `JsSemantics.toStringValue` has always known and `VegaValue.asString` does not — and it was
+written, and then taken out again, because it is not one line.
+
+The reason is the **caption**, which disagrees with the domain about the same list. Upstream's aria
+text for that axis is `a,null,c, null, 1,null, only` — with the word — because a caption is built
+from the *formatted labels*, and a label has been through `String` **per element** by then.
+The domain key is `String` of the **whole array**, where a null joins as nothing. So `a,,c` and
+`a,null,c` are both correct, for different questions, and making `asString` right for the first
+broke the second — a gate caught it immediately. Two transcriptions that genuinely differ is the
+opposite of the shape this week has been full of, and it is the next change rather than this one.
+
+234 Vega differential fixtures.

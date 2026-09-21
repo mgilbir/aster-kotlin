@@ -6,7 +6,6 @@ import dev.aster.vega.scene.MetricTextEngine
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.TextNode
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -60,13 +59,16 @@ class ArrayTextTest {
   }
 
   @Test
-  fun `an array of one element is a plain label`() {
-    // Upstream's `lineArray` collapses it, so this is a single-line label rather than a one-line
-    // multi-line one — and `lines` stays null, which is what says so.
+  fun `an array of one element is one line, and still an array`() {
+    // `lineArray` collapses it to that element, so it is **one** line. What it does not do is stop
+    // being an array: `textLines` asks `!isArray(item.text)` of the *original*, so a `lineBreak` is
+    // ignored here exactly as it is for a longer list. This used to hand a one-element array back
+    // to
+    // the plain single-string path, where a `lineBreak` would have split it — and where a `[null]`
+    // came out as the word `null` instead of an empty line.
     val node = textNodes(spec("""["only"]""")).single()
 
-    assertNull(node.layout.run.lines)
-    assertEquals("only", node.layout.run.text)
+    assertEquals(listOf("only"), node.layout.run.lines)
     assertEquals(1, node.layout.metrics.lineCount)
   }
 

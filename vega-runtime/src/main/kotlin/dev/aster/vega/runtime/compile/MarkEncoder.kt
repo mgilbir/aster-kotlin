@@ -1576,9 +1576,33 @@ public class MarkEncoder(
    */
   private fun arrayLines(channel: ChannelValue?, datum: VegaValue): List<String>? {
     val array = value(channel, datum) as? VegaValue.Arr ?: return null
-    if (array.values.size <= 1) return null
-    return array.values.map { it.asString().trim() }
+    // **Every array, including an empty one and one of a single element.** `lineArray` collapses
+    // those two to `_[0]` — the element, or `undefined` — but `textLines` asks
+    // `!isArray(item.text)`
+    // of the **original**, so a `lineBreak` is ignored for all three alike and the collapse is only
+    // about how many lines there are. Returning null here for the short ones handed them back to
+    // the
+    // `lineBreak` path, and `[]` came out as no text rather than one empty line.
+    if (array.values.isEmpty()) return listOf("")
+    return array.values.map { lineText(it) }
   }
+
+  /**
+   * One line of a mark's text, as upstream's `textValue` writes it.
+   *
+   * ```js
+   * const text = line == null ? '' : (line + '').trim();
+   * ```
+   *
+   * **A null line is an empty line**, not the four letters that spell it — and that is the one
+   * place in this engine where a guide and a mark genuinely disagree about the same value. A
+   * guide's label has already been through its formatter by the time it is lines, and the default
+   * formatter is `String`, so an axis over a cell holding `["a", null, "c"]` really does write
+   * `null` on its middle line while the text mark beside it writes nothing there. Probed both, in
+   * one view, before believing it.
+   */
+  private fun lineText(value: VegaValue): String =
+    if (value.isNullish) "" else value.asString().trim()
 
   /**
    * A channel as text, or null when it holds nothing.
