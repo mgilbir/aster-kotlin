@@ -22,7 +22,12 @@ cd "$(dirname "$0")/../swift/AsterVegaRender"
 
 MODE="${1:-check}"
 SNAPSHOT="swift-api.txt"
-GRAPHS=".build/symbolgraph"
+# **Absolute**, because the compiler resolves `-emit-symbol-graph-dir` against its own working
+# directory rather than the package's, and Swift 6.4 changed which that is. A relative path used to
+# land the graph beside the package and now lands it nowhere: the build still succeeds, emits no
+# file, and the guard below is the only thing that notices. The scratch path stays relative — that
+# one SwiftPM resolves itself.
+GRAPHS="$PWD/.build/symbolgraph"
 SCRATCH=".build/symbolgraph-build"
 
 # **Its own scratch path, and the graph deleted first.** A symbol graph is emitted by the *compile*,
