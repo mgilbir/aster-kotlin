@@ -1443,7 +1443,14 @@ public class SequentialColorScale(
   public val space: ColorSpaces.Interpolation = ColorSpaces.Interpolation.RGB,
   /** `interpolate: {"type": "rgb", "gamma": y}` — only the RGB space has one. */
   public val gamma: Double = 1.0,
-  public val clamp: Boolean = true,
+  /**
+   * Whether a position outside `0..1` is pinned to the ramp's ends. **False**, as d3's is.
+   *
+   * See [colorAt]: this defaulted to true, so every continuous colour scale in this engine painted
+   * an out-of-domain value with the ramp's own first or last colour instead of extrapolating past
+   * it.
+   */
+  public val clamp: Boolean = false,
   /**
    * The space the ramp is walked in, for a colour scale built on a **transformed** scale type.
    *
@@ -1523,9 +1530,23 @@ public class SequentialColorScale(
   public fun colorAt(x: Double): SceneColor? {
     if (x.isNaN()) return null
     val raw = position(x)
-    // Sequential scales clamp by default, since a colour past the end of a ramp has no meaning.
-    if (!clamp && (raw < 0.0 || raw > 1.0)) return null
-    val along = raw.coerceIn(0.0, 1.0)
+    if (raw.isNaN()) return null
+    // **Only when the specification asks for it.** d3's continuous scale is
+    //
+    //     clamp ? Math.max(0, Math.min(1, x * k10)) : x * k10
+    //
+    // with `clamp` false until someone sets it, and a colour range does not change that. A value
+    // below the domain therefore takes a position below zero, the ramp's first segment is
+    // *extrapolated* through it, and the channels saturate — upstream's blues ramp one third of a
+    // domain below its start is `rgb(255, 255, 255)`, which is no colour in the scheme.
+    //
+    // This class defaulted to clamping and, worse, answered **nothing at all** when told not to: a
+    // value outside the domain of a `clamp: false` scale came back with no colour, where upstream
+    // has a colour for every finite number. Both halves were wrong in the same direction, which is
+    // why it looked consistent. Probed across six scale shapes; a range written out as two colours
+    // behaves the same way and only *looks* clamped, because extrapolating past pure black or pure
+    // white saturates back to itself.
+    val along = if (clamp) raw.coerceIn(0.0, 1.0) else raw
     val from = rampExtent.firstOrNull() ?: 0.0
     val to = rampExtent.getOrNull(1) ?: 1.0
     return ColorSpaces.sample(colors, from + along * (to - from), space, gamma)

@@ -340,6 +340,10 @@ public class ScaleResolver(
       colors = if (reversed(spec) && !ramp) colors.reversed() else colors,
       space = space,
       gamma = spec.interpolateGamma ?: 1.0,
+      // **Read from the specification**, which it was not: the scale's own default of `true` was
+      // taken every time, so `"clamp": true` and saying nothing drew the same chart and the
+      // difference upstream draws — an extrapolated ramp against a pinned one — was unreachable.
+      clamp = spec.clamp,
       transform = transform,
       rampExtent =
         if (!ramp) listOf(0.0, 1.0)

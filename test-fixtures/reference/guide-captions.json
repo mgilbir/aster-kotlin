@@ -1,5 +1,10 @@
 [
  {
+  "fixture": "a-colour-ramp-does-not-clamp",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 5 values: 1, 2.5, 4, 0, 100"
+ },
+ {
   "fixture": "a-label-that-is-a-list-of-lines",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 4 values: 1,2, 3, plain, a,b,c"
