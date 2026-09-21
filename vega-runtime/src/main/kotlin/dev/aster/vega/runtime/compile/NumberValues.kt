@@ -7,6 +7,7 @@ import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asString
 import dev.aster.vega.model.spec.ChannelValue
 import dev.aster.vega.model.spec.NumberValue
 
@@ -212,3 +213,33 @@ public class NumberResolver(
 internal fun asLines(value: VegaValue): String =
   if (value !is VegaValue.Arr) JsSemantics.toStringValue(value)
   else value.values.joinToString("\n") { JsSemantics.toStringValue(it) }
+
+/**
+ * The key a **guide mark** joins on, which is `String(datum.value)`.
+ *
+ * Every value-driven guide mark upstream builds is a keyed data join, and all of them are spelled
+ * the same way — `{type: RuleMark, role: AxisGridRole, key: Value, from: dataRef, …}`. `Value` is
+ * the string `'value'`, so the key is `datum.value` read as an object property, which makes it the
+ * value's *text*: `1001` and `"1001"` are one key, and so are a null and the word for one. A keyed
+ * join holds one tuple per key and a later arrival overwrites an earlier one, so two entries whose
+ * values key alike leave a single item.
+ *
+ * Shared because **six** marks carry it: an axis's grid, ticks and labels, and a legend's gradient
+ * labels, discrete gradient and symbol groups. A symbol legend is the one where it never fires — it
+ * builds a *group per entry*, so the key is unique inside each group — and reading that as "a
+ * legend does not join" is what left the **gradient** legend, whose labels are one mark over every
+ * entry, joining nothing. Two entries reading `NaN` drew two labels where upstream draws one.
+ *
+ * **A date's text has no milliseconds in it.** `Date.prototype.toString` writes down to the second,
+ * so every tick of a time scale inside one second keys alike and a domain a few milliseconds wide
+ * draws one tick where it generated four. Probed: `timeTicks(new Date(1), new Date(4), 4)` answers
+ * four dates with one distinct string between them. Written as the second rather than as that
+ * sentence, which would have to reproduce a zone's display name out of the host's own tables to
+ * compare two instants that are always in the same zone anyway — the equivalence is exact, two
+ * instants sharing a `toString` exactly when they share a second.
+ */
+internal fun guideJoinKey(value: VegaValue): String =
+  when (value) {
+    is VegaValue.Timestamp -> "date:${kotlin.math.floor(value.epochMillis / 1000.0)}"
+    else -> value.asString()
+  }

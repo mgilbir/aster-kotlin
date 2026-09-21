@@ -5,6 +5,16 @@
   "caption": "X-axis for a discrete scale with 5 values: 1, 2.5, 4, 0, 100"
  },
  {
+  "fixture": "a-gradient-over-a-column-with-no-number",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'no number' for fill color with values from NaN to NaN"
+ },
+ {
+  "fixture": "a-gradient-over-a-column-with-no-number",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'numbers' for fill color with values from 3 to 20"
+ },
+ {
   "fixture": "a-label-that-is-a-list-of-lines",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 4 values: 1,2, 3, plain, a,b,c"

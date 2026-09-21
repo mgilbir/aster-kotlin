@@ -1117,7 +1117,7 @@ internal class LegendBuilder(
     val labelLimit = numbers.resolve(spec.labelLimit, scaleName) ?: LegendDefaults.LABEL_LIMIT
     val labels = mutableListOf<TextNode>()
 
-    for ((index, entry) in gradientLabels(spec, scale, scaleName).withIndex()) {
+    for ((index, entry) in joinedByValue(gradientLabels(spec, scale, scaleName)).withIndex()) {
       val fraction = scale.fraction(entry.value.asNumberOrNull() ?: 0.0)
       // The end labels hang inside the swatch rather than past it, so a ramp's extremes stay
       // legible
@@ -1372,7 +1372,14 @@ internal class LegendBuilder(
     // Left unexpanded, the ramp collapsed to a single stop — the ends coincide, so the ticks
     // between them are one value — and a legend that should show the whole scale showed one block
     // of colour with its label adrift.
-    val degenerate = hi - lo == 0.0
+    // `if (!(max - min))` is **falsiness**, not a comparison with zero, so it catches a span of
+    // `NaN` as well as one of zero — and a domain of `[NaN, NaN]` is exactly what a colour scale
+    // over a column with no number in it has, since an extent that is not finite is discarded. So
+    // that legend draws the whole ramp too. Written as `hi - lo == 0.0`, this asked the one
+    // question
+    // JavaScript was not asking and left such a legend with no gradient at all.
+    val span = hi - lo
+    val degenerate = span == 0.0 || span.isNaN()
     val sampled =
       if (degenerate) {
         SequentialColorScale(
@@ -1450,6 +1457,24 @@ internal class LegendBuilder(
       }
     }
     return values.indices.map { Entry(VegaValue.Num(values[it]), labels[it]) }
+  }
+
+  /**
+   * One label per **distinct entry value**, keeping the last — upstream's `key: Value` join.
+   *
+   * A gradient legend's labels are one text mark over every entry, so the keyed join actually fires
+   * here, unlike a symbol legend's, where each entry is a group of its own and the key is unique
+   * inside it. It takes two entries whose values key alike to see it, which a ramp over an ordinary
+   * domain never produces — but a domain of `[NaN, NaN]`, which is what a colour scale over a
+   * column with no number in it has, is two entries reading `NaN` and upstream draws one label. See
+   * [guideJoinKey].
+   */
+  private fun joinedByValue(entries: List<Entry>): List<Entry> {
+    if (entries.size < 2) return entries
+    val seen = HashSet<String>(entries.size)
+    // Backwards, because the **last** of a repeated key survives; reversed again so the survivors
+    // keep the order they arrived in.
+    return entries.reversed().filter { seen.add(guideJoinKey(it.value)) }.reversed()
   }
 
   /**

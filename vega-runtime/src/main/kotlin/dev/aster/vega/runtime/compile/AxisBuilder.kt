@@ -7,7 +7,6 @@ import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asNumberOrNull
-import dev.aster.vega.model.asString
 import dev.aster.vega.model.isNullish
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.spec.Anchor
@@ -980,29 +979,8 @@ public class AxisBuilder(
     val seen = HashSet<String>(ticks.size)
     // Backwards, because the **last** of a repeated key is the one that survives; reversed again so
     // the survivors keep the order they appear in.
-    return ticks.reversed().filter { seen.add(joinKey(it.value)) }.reversed()
+    return ticks.reversed().filter { seen.add(guideJoinKey(it.value)) }.reversed()
   }
-
-  /**
-   * The key a tick joins on, which is `String(datum.value)` — and **a date's text has no
-   * milliseconds in it**.
-   *
-   * `Date.prototype.toString` writes down to the second: `Thu Jan 01 1970 01:00:00 GMT+0100
-   * (Central European Standard Time)`. So every tick of a time scale inside one second keys alike,
-   * and a domain a few milliseconds wide draws **one** tick where it generated four. Probed:
-   * `timeTicks(new Date(1), new Date(4), 4)` answers four dates with one distinct string between
-   * them.
-   *
-   * Written as the second rather than as that sentence, which would have to reproduce a zone's
-   * display name out of the host's own tables in order to compare two ticks that are always in the
-   * same zone anyway. The equivalence is exact either way: two instants share a `toString` exactly
-   * when they share a second, a zone's offset never changing anywhere but on a second boundary.
-   */
-  private fun joinKey(value: VegaValue): String =
-    when (value) {
-      is VegaValue.Timestamp -> "date:${kotlin.math.floor(value.epochMillis / 1000.0)}"
-      else -> value.asString()
-    }
 
   private fun rawTicks(scale: VegaScale, spec: AxisSpec, specifier: String?): List<Tick>? {
     // A scale with `bins` has its tick values already decided: upstream's `tickValues` returns the

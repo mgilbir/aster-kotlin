@@ -27,7 +27,7 @@ end to end — expressions, signals, all 51 of upstream's 51 documented data tra
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-235 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
+236 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -194,7 +194,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 235 Vega differential fixtures and 332 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 236 Vega differential fixtures and 332 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -226,7 +226,7 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests, and every renderer now exposes the tree: the Android View, the Swift one and Compose Multiplatform. Not verified on physical hardware or with a real user |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 235 Vega differential fixtures |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 236 Vega differential fixtures |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -8599,7 +8599,7 @@ joining an empty one gives the empty string, so no input can tell the branches a
 are one newline-joined string. They are gone, and the reason is written where they were, because the
 next reader will want to put them back.
 
-Found by the widened value sweep: four cases, second-largest cluster. 235 Vega differential
+Found by the widened value sweep: four cases, second-largest cluster. 236 Vega differential
 fixtures.
 
 ### A maximum compares as JavaScript does, not as arithmetic does
@@ -8643,7 +8643,7 @@ numbers, and an ordinary one — and writes `argmin`/`argmax` beside `min`/`max`
 their answer by a different route and genuinely disagree: the maximum of the nested column is `5`
 while the arg-maximum is the row holding `[3]`.
 
-Found by the widened value sweep. 235 Vega differential fixtures.
+Found by the widened value sweep. 236 Vega differential fixtures.
 
 ### A symlog is log1p of x over c
 
@@ -8695,7 +8695,7 @@ see it and there is none, so the arm is pinned by a unit test on the transform r
 unclaimed. The same test carries the two observable decisions as reference values read off `node`,
 which is what makes it a transcription check and not a restatement.
 
-Found by the widened value sweep. 235 Vega differential fixtures.
+Found by the widened value sweep. 236 Vega differential fixtures.
 
 ### A colour ramp does not clamp
 
@@ -8748,7 +8748,7 @@ it because the normalizer canonicalizes a mark's fill, and it shows only when an
 scale's answer into a label. It is a different question from clamping — how a colour is written,
 not which colour it is — and it is the next change.
 
-235 Vega differential fixtures.
+236 Vega differential fixtures.
 
 ### A null line is an empty line
 
@@ -8791,7 +8791,7 @@ The domain key is `String` of the **whole array**, where a null joins as nothing
 broke the second — a gate caught it immediately. Two transcriptions that genuinely differ is the
 opposite of the shape this week has been full of, and it is the next change rather than this one.
 
-235 Vega differential fixtures.
+236 Vega differential fixtures.
 
 ### A quantile cut that lands on a sample
 
@@ -8827,5 +8827,44 @@ so the fixture says what this costs an ordinary chart, which is nothing.
 algebra and not in floating point — but the only case that observes the difference here has `w = 0`
 and an infinite `value1`, where both forms reach NaN. d3's form is kept because it is d3's form.
 
-Found by the widened value sweep, which went 481 to 495 of 499 across this stack. 235 Vega
+Found by the widened value sweep, which went 481 to 495 of 499 across this stack. 236 Vega
 differential fixtures.
+
+### A gradient over a column with no number, and the sweep reaches 100%
+
+The last three cases of the widened value sweep were one chart: a gradient legend over a colour
+scale whose column holds no number at all. The extent is discarded, so the domain is `[NaN, NaN]`,
+and two separate rules decide what gets drawn.
+
+**The degenerate test is falsiness, not a comparison with zero.** Upstream's is
+
+```js
+if (!(max - min)) { /* expand the scale to [0, 1] and sample the whole ramp */ }
+```
+
+and `!(NaN)` is true. So a NaN span is degenerate exactly as a zero span is — the domain is thrown
+away and the ramp is sampled end to end, 21 stops. Written here as `hi - lo == 0.0`, which asks the
+one question JavaScript is not asking, the swatch came out with no gradient at all. The zero-span
+half of that rule was already right and already fixed once; this is the arm beside it.
+
+**A gradient legend's labels join by value, and this engine's did not.** Automatic label generation
+produces nothing over a NaN domain, so upstream falls back to the domain's two ends — `NaN !== NaN`
+is true, so it takes that branch — and makes **two** entries, which the label mark's `key: Value`
+join then collapses to **one**, both keying as the text `NaN`.
+
+That is the other half of a finding already in this file. Six guide marks upstream carry
+`key: Value`: an axis's grid, ticks and labels, and a legend's gradient labels, discrete gradient
+and symbol groups. The earlier note read the symbol legend correctly — it builds a *group per
+entry*, so the key is unique inside each group and the join never fires — and then generalised it
+to "a legend does not", which is what left the gradient legend, whose labels are one mark over
+every entry, joining nothing. The rule now lives once as `guideJoinKey` and both callers use it; a
+mutant that keys a date by its whole instant rather than by its second dies on the axis fixture
+that found that rule in the first place.
+
+`a-gradient-over-a-column-with-no-number` pins both, beside an ordinary column that says what they
+cost a chart with numbers in it, which is nothing. Three mutants die. A fourth — keeping the
+**first** of a repeated key rather than the last — survives, and is equivalent here: the two
+entries it chooses between are both `NaN`, with the same label and the same position.
+
+**The widened sweep is now 499 of 499.** It opened at 481 and cost nine changes, of which five were
+a rule transcribed twice and one was a rule transcribed three times. 236 Vega differential fixtures.

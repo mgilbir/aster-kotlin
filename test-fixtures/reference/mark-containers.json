@@ -40,6 +40,22 @@
   "hidden": false
  },
  {
+  "fixture": "a-gradient-over-a-column-with-no-number",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-gradient-over-a-column-with-no-number",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "a-label-that-is-a-list-of-lines",
   "kind": "group",
   "role": "graphics-object",
