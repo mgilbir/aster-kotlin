@@ -1,0 +1,192 @@
+{
+  "marks": [
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "Infinity -> #999  #333  #333",
+      "type": "text",
+      "x": 2,
+      "y": 2
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "-Infinity -> #eee  #eee  #eee",
+      "type": "text",
+      "x": 2,
+      "y": 16
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "1 -> #999  #999  #bbb",
+      "type": "text",
+      "x": 2,
+      "y": 30
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "2 -> #999  #333  #777",
+      "type": "text",
+      "x": 2,
+      "y": 44
+    },
+    {
+      "fill": "#999",
+      "role": "mark",
+      "shapeHeight": 8.3666,
+      "shapeLeft": 221.8167,
+      "shapeTop": 9.8167,
+      "shapeWidth": 8.3666,
+      "size": 70,
+      "type": "symbol",
+      "x": 226,
+      "y": 14
+    },
+    {
+      "fill": "#eee",
+      "role": "mark",
+      "shapeHeight": 8.3666,
+      "shapeLeft": 235.8167,
+      "shapeTop": 9.8167,
+      "shapeWidth": 8.3666,
+      "size": 70,
+      "type": "symbol",
+      "x": 240,
+      "y": 14
+    },
+    {
+      "fill": "#999",
+      "role": "mark",
+      "shapeHeight": 8.3666,
+      "shapeLeft": 249.8167,
+      "shapeTop": 9.8167,
+      "shapeWidth": 8.3666,
+      "size": 70,
+      "type": "symbol",
+      "x": 254,
+      "y": 14
+    },
+    {
+      "fill": "#999",
+      "role": "mark",
+      "shapeHeight": 8.3666,
+      "shapeLeft": 263.8167,
+      "shapeTop": 9.8167,
+      "shapeWidth": 8.3666,
+      "size": 70,
+      "type": "symbol",
+      "x": 268,
+      "y": 14
+    },
+    {
+      "fill": "#333",
+      "role": "mark",
+      "shapeHeight": 8.3666,
+      "shapeLeft": 221.8167,
+      "shapeTop": 35.8167,
+      "shapeWidth": 8.3666,
+      "size": 70,
+      "type": "symbol",
+      "x": 226,
+      "y": 40
+    },
+    {
+      "fill": "#eee",
+      "role": "mark",
+      "shapeHeight": 8.3666,
+      "shapeLeft": 235.8167,
+      "shapeTop": 35.8167,
+      "shapeWidth": 8.3666,
+      "size": 70,
+      "type": "symbol",
+      "x": 240,
+      "y": 40
+    },
+    {
+      "fill": "#bbb",
+      "role": "mark",
+      "shapeHeight": 8.3666,
+      "shapeLeft": 249.8167,
+      "shapeTop": 35.8167,
+      "shapeWidth": 8.3666,
+      "size": 70,
+      "type": "symbol",
+      "x": 254,
+      "y": 40
+    },
+    {
+      "fill": "#777",
+      "role": "mark",
+      "shapeHeight": 8.3666,
+      "shapeLeft": 263.8167,
+      "shapeTop": 35.8167,
+      "shapeWidth": 8.3666,
+      "size": 70,
+      "type": "symbol",
+      "x": 268,
+      "y": 40
+    }
+  ],
+  "scales": {
+    "between": {
+      "domain": [
+        -8,
+        1,
+        2,
+        4
+      ],
+      "range": [
+        "#eee",
+        "#bbb",
+        "#777",
+        "#333"
+      ]
+    },
+    "tame": {
+      "domain": [
+        -8,
+        1,
+        2,
+        4
+      ],
+      "range": [
+        "#eee",
+        "#999",
+        "#333"
+      ]
+    },
+    "wild": {
+      "domain": [
+        "-Infinity",
+        1,
+        2,
+        "Infinity"
+      ],
+      "range": [
+        "#eee",
+        "#999",
+        "#333"
+      ]
+    }
+  },
+  "size": {
+    "height": 90,
+    "width": 282.1833
+  },
+  "spec": "a-quantile-cut-that-lands-on-a-sample.vg.json",
+  "vegaVersion": "6.3.1"
+}

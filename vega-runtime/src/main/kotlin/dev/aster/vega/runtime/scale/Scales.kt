@@ -1270,15 +1270,42 @@ public class QuantileScale(
     return rangeValues[bisectRight(thresholds, x)]
   }
 
+  /**
+   * d3-array's `quantileSorted`, transcribed rather than rearranged.
+   *
+   * ```js
+   * if (!(n = values.length) || isNaN(p = +p)) return;
+   * if (p <= 0 || n < 2) return +values[0];
+   * if (p >= 1) return +values[n - 1];
+   * var i = (n - 1) * p, i0 = Math.floor(i),
+   *     value0 = +values[i0], value1 = +values[i0 + 1];
+   * return value0 + (value1 - value0) * (i - i0);
+   * ```
+   *
+   * Three things here were written more sensibly and were therefore wrong.
+   *
+   * **No short circuit when the position lands on a sample.** `return values[lower]` looks like an
+   * obvious saving, and for finite numbers it is exact — but d3 still evaluates `(value1 -
+   * value0) * 0`, and when the next sample is an infinity that product is `NaN`, not zero. A
+   * quantile scale over a column holding `Infinity` has `[1, NaN]` for its thresholds upstream and
+   * had `[1, 2]` here, which moved two of four marks into the wrong colour bucket.
+   *
+   * **The second sample is `values[i0 + 1]`, not `values[ceil(i)]`.** They differ exactly when the
+   * position is a whole number, which is the case the short circuit used to hide: `ceil` names the
+   * same sample twice and d3 names the one after it.
+   *
+   * **`value0 + (value1 - value0) * w`, not `value0 * (1 - w) + value1 * w`.** The same line in
+   * algebra and not in floating point.
+   */
   private fun quantileSorted(values: List<Double>, p: Double): Double {
-    if (values.isEmpty()) return Double.NaN
-    if (values.size == 1) return values[0]
+    if (values.isEmpty() || p.isNaN()) return Double.NaN
+    if (p <= 0.0 || values.size < 2) return values[0]
+    if (p >= 1.0) return values[values.size - 1]
     val position = (values.size - 1) * p
     val lower = kotlin.math.floor(position).toInt()
-    val upper = kotlin.math.ceil(position).toInt()
-    if (lower == upper) return values[lower]
-    val weight = position - lower
-    return values[lower] * (1.0 - weight) + values[upper] * weight
+    val value0 = values[lower]
+    val value1 = values[lower + 1]
+    return value0 + (value1 - value0) * (position - lower)
   }
 }
 
