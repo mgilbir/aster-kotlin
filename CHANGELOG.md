@@ -8,6 +8,21 @@ section here does not get released.
 
 ### Changed
 
+- **An extent that is not finite is no extent at all**, and `ExtentTransform.extentOf` is now public
+  so that one function answers it. `Extent.js` ends
+  `if (!Number.isFinite(min) || !Number.isFinite(max)) { warn; min = max = undefined; }`, and the
+  infinity is not filtered on the way in — `Number.isFinite` is asked of the *result*, so one
+  infinite value takes the whole extent with it and the scale over that column gets
+  `[undefined, undefined]`, answers `NaN` for everything and draws no axis at all. A column of
+  infinities, a column with no number anywhere in it and a column with no rows all reach the same
+  place.
+
+  The rule was transcribed twice and only the `extent` transform had it right; the scale resolver's
+  copy filtered non-finite values out and then reported the extent of what was left. Sharing it
+  means `ExtentTransform.extentOf` crosses to foreign hosts, which is **one new exported symbol**
+  (`ExtentTransform.extentOf(values:)`, 4924 in total) and one new line in each of
+  `vega-dataflow`'s two ABI dumps. Additive: nothing that compiled before stops compiling.
+
 - **A discrete scale's domain holds values, not their text.** `BandScale.domain`,
   `PointScale.domain` and `OrdinalScale.domain` are `List<VegaValue>` where they were
   `List<String>`, and `BandScale.invert` and `invertRange` answer values for the same reason. It is

@@ -414,6 +414,7 @@ final object dev.aster.vega.dataflow.transform/ExtentTransform : dev.aster.vega.
         final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/ExtentTransform.type.<get-type>|<get-type>(){}[0]
 
     final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/ExtentTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+    final fun extentOf(kotlin.collections/Iterable<dev.aster.vega.model/VegaValue>): kotlin.ranges/ClosedFloatingPointRange<kotlin/Double>? // dev.aster.vega.dataflow.transform/ExtentTransform.extentOf|extentOf(kotlin.collections.Iterable<dev.aster.vega.model.VegaValue>){}[0]
 }
 
 final object dev.aster.vega.dataflow.transform/FilterTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/FilterTransform|null[0]
