@@ -1,0 +1,929 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Five of `config.legend`'s words are Vega-Lite's alone and are spent before anything is emitted: `VL_ONLY_LEGEND_CONFIG = ['gradientHorizontalMaxLength', 'gradientHorizontalMinLength', 'gradientVerticalMaxLength', 'gradientVerticalMinLength', 'unselectedOpacity']`, which `stripAndRedirectConfig` deletes from the block on the way out — `if (config.legend) { for (const prop of VL_ONLY_LEGEND_CONFIG) delete config.legend[prop]; }`. Passed straight through, they reached the renderer as five words Vega has never heard of in the block it applies to every legend, and the thing they were meant to decide was decided by a constant instead. What they decide is a colour ramp's length: `defaultGradientLength` destructures the four bounds out of the legend configuration and returns `gradientLengthSignal(model, 'height', gradientVerticalMinLength, gradientVerticalMaxLength)` for a vertical ramp, the same against `'width'` for a horizontal one oriented top or bottom, and the bare `gradientHorizontalMinLength` for a horizontal ramp anywhere else, `gradientLengthSignal` writing `clamp(size, min, max)`. The first row is a ramp down the side of the plot, so its length is the height clamped between the vertical bounds this theme asked for rather than between upstream's default sixty-four and two hundred. The second is a ramp along the top, clamped between the horizontal bounds against the width. The third is a horizontal ramp beside the plot, which has no width to follow and is simply as short as a horizontal ramp is allowed to be, proving the minimum is read on its own and not only as half of a clamp. The fourth is a discrete scale whose legend a selection picks through, drawn at `unselectedOpacity` where it is not picked, and it also shows that a symbol legend takes no length at all from the four bounds. The last row must not change: `labelFontSize` is a word Vega does know, so it survives in `config.legend` and keeps the block from disappearing, which is what distinguishes deleting five named keys from dropping the block whole.",
+  "background": "white",
+  "padding": 5,
+  "width": 180,
+  "data": [
+    {
+      "name": "picked_store"
+    },
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "a": 1,
+          "b": 2,
+          "v": 3,
+          "k": "alpha"
+        },
+        {
+          "a": 4,
+          "b": 5,
+          "v": 60,
+          "k": "beta"
+        },
+        {
+          "a": 7,
+          "b": 1,
+          "v": 25,
+          "k": "gamma"
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"a\"]) && isFinite(+datum[\"a\"]) && isValid(datum[\"b\"]) && isFinite(+datum[\"b\"]) && isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"a\"]) && isFinite(+datum[\"a\"]) && isValid(datum[\"b\"]) && isFinite(+datum[\"b\"]) && isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_3",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"a\"]) && isFinite(+datum[\"a\"]) && isValid(datum[\"b\"]) && isFinite(+datum[\"b\"]) && isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_4",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"a\"]) && isFinite(+datum[\"a\"]) && isValid(datum[\"b\"]) && isFinite(+datum[\"b\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "childHeight",
+      "value": 150
+    },
+    {
+      "name": "unit",
+      "value": {},
+      "on": [
+        {
+          "events": "pointermove",
+          "update": "isTuple(group()) ? group() : unit"
+        }
+      ]
+    },
+    {
+      "name": "picked_k_legend",
+      "value": null,
+      "on": [
+        {
+          "events": [
+            {
+              "source": "view",
+              "type": "click",
+              "markname": "k_legend_symbols"
+            },
+            {
+              "source": "view",
+              "type": "click",
+              "markname": "k_legend_labels"
+            },
+            {
+              "source": "view",
+              "type": "click",
+              "markname": "k_legend_entries"
+            }
+          ],
+          "update": "isDefined(datum.value) ? datum.value : item().items[0].items[0].datum.value",
+          "force": true
+        },
+        {
+          "events": [
+            {
+              "source": "view",
+              "type": "click"
+            }
+          ],
+          "update": "!event.item || !datum ? null : picked_k_legend",
+          "force": true
+        }
+      ]
+    },
+    {
+      "name": "picked",
+      "update": "vlSelectionResolve(\"picked_store\", \"union\", true, true)"
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "columns": 1,
+    "bounds": "full",
+    "align": "each"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "concat_0_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_0_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "interactive": false,
+          "from": {
+            "data": "data_1"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "scale": "concat_0_color",
+                "field": "v"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"a: \" + (format(datum[\"a\"], \"\")) + \"; b: \" + (format(datum[\"b\"], \"\")) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_0_x",
+                "field": "a"
+              },
+              "y": {
+                "scale": "concat_0_y",
+                "field": "b"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_0_x",
+          "orient": "bottom",
+          "gridScale": "concat_0_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "gridScale": "concat_0_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "a",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "grid": false,
+          "title": "b",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ],
+      "legends": [
+        {
+          "stroke": "concat_0_color",
+          "gradientLength": {
+            "signal": "clamp(childHeight, 24, 96)"
+          },
+          "title": "v",
+          "encode": {
+            "gradient": {
+              "update": {
+                "opacity": {
+                  "value": 0.7
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_1_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_1_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "interactive": false,
+          "from": {
+            "data": "data_2"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "scale": "concat_1_color",
+                "field": "v"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"a: \" + (format(datum[\"a\"], \"\")) + \"; b: \" + (format(datum[\"b\"], \"\")) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_1_x",
+                "field": "a"
+              },
+              "y": {
+                "scale": "concat_1_y",
+                "field": "b"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "gridScale": "concat_1_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "gridScale": "concat_1_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "a",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "grid": false,
+          "title": "b",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ],
+      "legends": [
+        {
+          "orient": "top",
+          "stroke": "concat_1_color",
+          "direction": "horizontal",
+          "gradientLength": {
+            "signal": "clamp(width, 36, 72)"
+          },
+          "title": "v",
+          "encode": {
+            "gradient": {
+              "update": {
+                "opacity": {
+                  "value": 0.7
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_2_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_2_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "interactive": false,
+          "from": {
+            "data": "data_3"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "scale": "concat_2_color",
+                "field": "v"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"a: \" + (format(datum[\"a\"], \"\")) + \"; b: \" + (format(datum[\"b\"], \"\")) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_2_x",
+                "field": "a"
+              },
+              "y": {
+                "scale": "concat_2_y",
+                "field": "b"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_2_x",
+          "orient": "bottom",
+          "gridScale": "concat_2_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_2_y",
+          "orient": "left",
+          "gridScale": "concat_2_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_2_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "a",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "concat_2_y",
+          "orient": "left",
+          "grid": false,
+          "title": "b",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ],
+      "legends": [
+        {
+          "direction": "horizontal",
+          "orient": "right",
+          "stroke": "concat_2_color",
+          "gradientLength": 36,
+          "title": "v",
+          "encode": {
+            "gradient": {
+              "update": {
+                "opacity": {
+                  "value": 0.7
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_3_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "signals": [
+        {
+          "name": "picked_tuple",
+          "update": "picked_k_legend !== null ? {fields: picked_tuple_fields, values: [picked_k_legend]} : null"
+        },
+        {
+          "name": "picked_tuple_fields",
+          "value": [
+            {
+              "type": "E",
+              "field": "k"
+            }
+          ]
+        },
+        {
+          "name": "picked_toggle",
+          "value": false,
+          "on": [
+            {
+              "events": {
+                "merge": [
+                  {
+                    "source": "view",
+                    "type": "click"
+                  }
+                ]
+              },
+              "update": "event.shiftKey"
+            }
+          ]
+        },
+        {
+          "name": "picked_modify",
+          "on": [
+            {
+              "events": {
+                "signal": "picked_tuple"
+              },
+              "update": "modify(\"picked_store\", picked_toggle ? null : picked_tuple, picked_toggle ? null : true, picked_toggle ? picked_tuple : null)"
+            }
+          ]
+        }
+      ],
+      "marks": [
+        {
+          "name": "concat_3_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "interactive": true,
+          "from": {
+            "data": "data_4"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "scale": "concat_3_color",
+                "field": "k"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"a: \" + (format(datum[\"a\"], \"\")) + \"; b: \" + (format(datum[\"b\"], \"\")) + \"; k: \" + (isValid(datum[\"k\"]) ? isArray(datum[\"k\"]) ? join(datum[\"k\"], ' ') : datum[\"k\"] : \"\"+datum[\"k\"])"
+              },
+              "x": {
+                "scale": "concat_3_x",
+                "field": "a"
+              },
+              "y": {
+                "scale": "concat_3_y",
+                "field": "b"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_3_x",
+          "orient": "bottom",
+          "gridScale": "concat_3_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_3_y",
+          "orient": "left",
+          "gridScale": "concat_3_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_3_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "a",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "concat_3_y",
+          "orient": "left",
+          "grid": false,
+          "title": "b",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ],
+      "legends": [
+        {
+          "stroke": "concat_3_color",
+          "symbolType": "circle",
+          "title": "k",
+          "encode": {
+            "labels": {
+              "name": "k_legend_labels",
+              "interactive": true,
+              "update": {
+                "opacity": [
+                  {
+                    "test": "(!length(data(\"picked_store\")) || (picked[\"k\"] && indexof(picked[\"k\"], datum.value) >= 0))",
+                    "value": 1
+                  },
+                  {
+                    "value": 0.15
+                  }
+                ],
+                "cursor": {
+                  "value": "pointer"
+                }
+              }
+            },
+            "symbols": {
+              "name": "k_legend_symbols",
+              "interactive": true,
+              "update": {
+                "fill": {
+                  "value": "transparent"
+                },
+                "opacity": [
+                  {
+                    "test": "(!length(data(\"picked_store\")) || (picked[\"k\"] && indexof(picked[\"k\"], datum.value) >= 0))",
+                    "value": 0.7
+                  },
+                  {
+                    "value": 0.15
+                  }
+                ],
+                "cursor": {
+                  "value": "pointer"
+                }
+              }
+            },
+            "entries": {
+              "name": "k_legend_entries",
+              "interactive": true,
+              "update": {
+                "fill": {
+                  "value": "transparent"
+                },
+                "cursor": {
+                  "value": "pointer"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "concat_0_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "field": "a"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_0_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "field": "b"
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_0_color",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "field": "v"
+      },
+      "range": "ramp",
+      "interpolate": "hcl",
+      "zero": false
+    },
+    {
+      "name": "concat_1_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "a"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_1_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "b"
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_1_color",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "v"
+      },
+      "range": "ramp",
+      "interpolate": "hcl",
+      "zero": false
+    },
+    {
+      "name": "concat_2_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_3",
+        "field": "a"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_2_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_3",
+        "field": "b"
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_2_color",
+      "type": "linear",
+      "domain": {
+        "data": "data_3",
+        "field": "v"
+      },
+      "range": "ramp",
+      "interpolate": "hcl",
+      "zero": false
+    },
+    {
+      "name": "concat_3_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_4",
+        "field": "a"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_3_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_4",
+        "field": "b"
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_3_color",
+      "type": "ordinal",
+      "domain": {
+        "data": "data_4",
+        "field": "k",
+        "sort": true
+      },
+      "range": "category"
+    }
+  ],
+  "config": {
+    "legend": {
+      "labelFontSize": 9
+    }
+  }
+}

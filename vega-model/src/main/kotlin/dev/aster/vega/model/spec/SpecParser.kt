@@ -855,7 +855,6 @@ private val PROJECTION_CONSUMED =
     "translate",
     "center",
     "rotate",
-    "angle",
     "precision",
     "clipAngle",
     "clipExtent",
@@ -866,6 +865,22 @@ private val PROJECTION_CONSUMED =
     "fit",
     "extent",
     "size",
+  )
+
+/**
+ * Projection properties this engine deliberately does not apply, and what a reader should know.
+ *
+ * `angle` is d3's — a rotation of the *plane* after the projection, which every `d3-geo` projection
+ * has a setter for — and upstream never reaches it. `vega-geo`'s projection transform forwards the
+ * nineteen names in `vega-projection`'s `projectionProperties` and no others, and `angle` is not
+ * among them; probed, a projection given an `angle` of 30 places every point exactly where it did
+ * without one. This engine applied it, so a map upstream draws upright came out turned.
+ */
+private val PROJECTION_EXPLAINED =
+  mapOf(
+    "angle" to
+      "Upstream never applies a projection's 'angle': it is not one of the properties " +
+        "vega-geo forwards to the projection, so a map is drawn the same with it and without it"
   )
 
 /** Layout properties this engine reads; the rest are named in [SpecParser.parseLayout]. */
@@ -1873,7 +1888,7 @@ public class SpecParser {
     }
     val typeValue = obj.fields["type"]
     val typeSignal = (typeValue as? VegaValue.Obj)?.fields?.get("signal")?.asString()
-    obj.reportUnhandled("Projection", path, PROJECTION_CONSUMED)
+    obj.reportUnhandled("Projection", path, PROJECTION_CONSUMED, PROJECTION_EXPLAINED)
     return ProjectionSpec(
       name = name,
       type = if (typeSignal == null) typeValue?.asString()?.takeIf { it.isNotEmpty() } else null,
@@ -1882,7 +1897,6 @@ public class SpecParser {
       translate = numberList(obj.fields["translate"], "$path.translate"),
       center = numberList(obj.fields["center"], "$path.center"),
       rotate = numberList(obj.fields["rotate"], "$path.rotate"),
-      angle = obj.numberOrSignal("angle", "$path.angle"),
       precision = obj.numberOrSignal("precision", "$path.precision"),
       clipAngle = obj.numberOrSignal("clipAngle", "$path.clipAngle"),
       clipExtent = numberPairs(obj.fields["clipExtent"], "$path.clipExtent"),
@@ -2439,7 +2453,14 @@ public class SpecParser {
         },
       aria = obj.fields["aria"]?.asBoolean() ?: true,
       description = obj.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
-      position = obj.numberOrSignal("position", "$path.position"),
+      // **The axis's own**, not the merged defaults. Every other entry in upstream's
+      // `buildAxisEncode` is read through `lookup(spec, config)`, which answers `spec[p] ??
+      // config[p]`
+      // — and `position` alone is written `value(spec.position, 0)`, straight off the specification
+      // with a literal zero behind it. So a `config.axis.position` is ignored there and was
+      // honoured
+      // here, which moved every axis in a chart that set a theme.
+      position = own.numberOrSignal("position", "$path.position"),
       translate = obj.numberOrSignal("translate", "$path.translate"),
       tickRound = obj.fields["tickRound"]?.asBoolean(),
       gridScale = obj.fields["gridScale"]?.takeIf { it is VegaValue.Str }?.asString(),
@@ -3409,7 +3430,8 @@ public class SpecParser {
 
     obj.reportUnhandled("Mark", path, MARK_CONSUMED)
 
-    val (below, above) = config.markDefaults(typeName.lowercase(), markStyles(obj))
+    val defaults = config.markDefaults(typeName.lowercase())
+    val styleDefaults = config.styleDefaults(markStyles(obj))
 
     return MarkSpec(
       type = type,
@@ -3419,7 +3441,8 @@ public class SpecParser {
       key = obj.fields["key"]?.asString()?.takeIf { it.isNotEmpty() },
       sort = sort,
       transform = markTransforms,
-      encode = parseEncode(obj.fields["encode"], "$path.encode"),
+      encode =
+        parseEncode(obj.fields["encode"], "$path.encode").withDefaults(defaults, styleDefaults),
       marks = parseArray(obj, "marks", path) { child, childPath -> parseMark(child, childPath) },
       projections =
         parseArray(obj, "projections", path) { child, childPath ->
@@ -3441,8 +3464,6 @@ public class SpecParser {
       aria = obj.fields["aria"]?.asBoolean() ?: true,
       description = obj.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
       clip = markClip(obj.fields["clip"]),
-      configBelowDefaults = below.fields,
-      configAboveDefaults = above.fields,
     )
   }
 

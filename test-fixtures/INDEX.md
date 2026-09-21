@@ -6,7 +6,7 @@ Generated from the corpus by `FixtureIndexTest`, which fails when this file has 
 ./gradlew :vega-runtime:jvmTest -PupdateGoldens=true --rerun-tasks
 ```
 
-209 Vega differential fixtures and 283 Vega-Lite fixtures.
+236 Vega differential fixtures and 332 Vega-Lite fixtures.
 
 Every column is read off disk. A Vega fixture's mark count and mark types come from its
 **upstream** reference, so they are upstream's answer rather than this port's opinion of it.
@@ -15,9 +15,27 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 
 | Fixture | Marks | Mark types | Transforms | Scales |
 | --- | --- | --- | --- | --- |
+| `a-colour-ramp-does-not-clamp` | 31 | rect, rule, text | — | linear, point |
+| `a-gradient-over-a-column-with-no-number` | 13 | rect, text | — | band, linear |
+| `a-label-that-is-a-list-of-lines` | 25 | rect, rule, symbol, text | — | band, ordinal |
+| `a-log-axis-labels-with-twelve-digits` | 113 | rule, text | — | log |
+| `a-logarithm-has-a-base` | 33 | rule, text | — | log |
+| `a-maximum-compares-as-javascript-does` | 6 | text | aggregate, collect | — |
+| `a-null-line-is-an-empty-line` | 21 | rect, rule, text | — | band |
+| `a-number-written-as-text` | 31 | rule, symbol, text | — | band, ordinal |
+| `a-pie-multiplies-what-it-was-given` | 15 | arc, text | pie | — |
+| `a-quantile-cut-that-lands-on-a-sample` | 12 | symbol, text | — | quantile |
+| `a-quantile-with-no-samples` | 8 | rect, text | — | quantile |
+| `a-scale-coerces-what-it-is-given` | 37 | rule, symbol, text | — | band, linear, log, ordinal, quantile, quantize, threshold |
+| `a-stack-propagates-what-it-cannot-add` | 26 | rect, rule, text | stack | band, linear |
+| `a-symlog-is-log1p-of-x-over-c` | 12 | symbol, text | — | symlog |
+| `a-time-value-past-the-calendar` | 9 | rule, symbol, text | formula | linear, time |
 | `aggregate-ops-rest` | 14 | rect, rule, text | aggregate | band, linear |
 | `aggregate-ops-tail` | 43 | rect, rule, symbol, text | aggregate, fold | band, linear, ordinal |
 | `airport-connections` | 650 | path, symbol, text | aggregate, collect, filter, geopath, geopoint, linkpath, lookup, voronoi | linear |
+| `an-axis-joins-its-ticks-by-value` | 20 | rule, symbol, text | — | band, ordinal |
+| `an-axis-keys-a-date-by-its-second` | 26 | rule, text | — | linear, time |
+| `an-infinite-extent-is-no-extent` | 21 | rule, symbol, text | extent, formula | linear |
 | `arc-padding` | 10 | arc | pie | ordinal |
 | `arc-radii-inverted` | 5 | arc | — | ordinal |
 | `area-gaps` | 22 | area, line, rule, text | — | linear |
@@ -28,6 +46,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `autosize-none` | 19 | rect, rule, text | — | band, linear |
 | `axis-discretizing` | 89 | rect, rule, symbol, text | bin | bin-ordinal, quantile, quantize, threshold |
 | `axis-extent-crossed` | 25 | rect, rule, text | — | band, linear |
+| `axis-format-on-a-discrete-scale` | 38 | rect, rule, text | — | band, point |
 | `axis-label-angle` | 33 | rect, rule, text | — | band, linear |
 | `axis-label-bound` | 30 | rect, rule, text | — | band, linear |
 | `axis-label-flush` | 85 | line, rule, text | — | linear |
@@ -35,6 +54,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `axis-placement` | 54 | rect, rule, text | — | band, linear |
 | `axis-style` | 37 | rect, rule, text | — | band, linear |
 | `axis-tick-min-step` | 97 | rule, text | — | linear, log |
+| `axis-time-format-oddities` | 30 | rule, symbol, text | — | linear, utc |
 | `axis-values` | 34 | rect, rule, text | — | band, linear |
 | `axis-variants` | 35 | rect, rule, text | — | band, linear |
 | `band-padding` | 22 | rect, rule, symbol, text | — | band, linear, point |
@@ -44,7 +64,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `beeswarm` | 100 | rule, symbol, text | force | band, ordinal |
 | `bin-settings` | 36 | rect, rule, text | aggregate, bin, filter | linear |
 | `bin-to-ordinal` | 36 | rect, rule, text | aggregate, bin | bin-ordinal, linear |
-| `binned-scales` | 69 | rect, rule, text | — | bin-ordinal, linear, quantile, quantize, threshold |
+| `binned-scales` | 151 | rect, rule, symbol, text | — | bin-ordinal, linear, quantile, quantize, threshold |
 | `box-plot` | 32 | rect, rule, text | aggregate | band, linear |
 | `budget-forecasts` | 77 | line, rule, symbol, text | aggregate, filter, formula, lookup | band, linear |
 | `calendar-view` | 6311 | rect, text | aggregate, filter, formula, sequence, timeunit, window | band, linear |
@@ -53,8 +73,8 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `colour-interpolation` | 180 | rect, text | — | linear |
 | `colour-ramps` | 57 | rect, rule, text | — | band, linear |
 | `colour-scheme` | 39 | rect, rule, text | — | band, linear, ordinal |
-| `config-group-projection` | 2 | group, path | geoshape | — |
-| `config-marks` | 31 | rect, rule, symbol, text | — | band, linear |
+| `config-group-projection` | 2 | group, shape | geoshape | — |
+| `config-marks` | 34 | line, path, rect, rule, symbol, text | — | band, linear |
 | `config-range` | 20 | rect, symbol, text | — | band, linear, ordinal |
 | `config-theme` | 42 | rect, rule, symbol, text | — | band, linear, ordinal |
 | `connected-scatter` | 146 | line, rule, symbol, text | — | linear, ordinal |
@@ -70,6 +90,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `density-heatmaps` | 76 | image, rect, rule, text | filter, heatmap, kde2d | linear |
 | `density-options` | 37 | area, line, rule, symbol, text | kde, loess | linear, ordinal |
 | `density-plot` | 40 | area, line, rule, symbol, text | density, dotbin, kde, stack | linear |
+| `discrete-domain-keeps-its-values` | 54 | rect, rule, text | — | band, linear |
 | `diverging-colour` | 31 | rect, rule, text | — | band, linear |
 | `domain-limits` | 37 | rect, rule, symbol, text | — | band, linear, symlog |
 | `domain-sort-order` | 32 | rect, rule, text | — | band, linear |
@@ -105,7 +126,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `histogram` | 33 | rect, rule, text | aggregate, bin | linear |
 | `href-links` | 17 | rect, rule, symbol, text | — | band, linear, ordinal |
 | `hypothetical-outcome-plots` | 60 | rect, rule, text | formula, sequence | band, linear |
-| `identity-projection` | 7 | path, symbol, text | geopoint, geoshape | — |
+| `identity-projection` | 11 | shape, symbol, text | geopoint, geoshape | — |
 | `identity-scale` | 4 | symbol, text | — | identity, ordinal |
 | `image-marks` | 18 | image, symbol | — | — |
 | `impute-pivot` | 41 | rect, rule, symbol, text | impute, pivot, stack | band, linear, ordinal |
@@ -115,12 +136,13 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `item-zindex` | 5 | rect, rule, text | — | — |
 | `label-limit` | 33 | rect, rule, symbol, text | — | band, linear, ordinal |
 | `label-overlap` | 90 | rect, rule, text | — | band, linear |
-| `layout-center` | 12 | rect, text | — | ordinal |
+| `layout-center` | 48 | rect, text | — | ordinal |
 | `legend-background` | 19 | group, rect, symbol, text | — | band, linear, ordinal |
 | `legend-clip-height` | 52 | rect, rule, symbol, text | — | band, linear, ordinal |
 | `legend-columns` | 21 | symbol, text | — | ordinal |
 | `legend-discretizing` | 66 | rect, rule, symbol, text | — | linear, quantile, quantize, threshold |
 | `legend-format-type` | 29 | rect, rule, symbol, text | — | linear, utc |
+| `legend-gradient-constant-domain` | 19 | rect, symbol, text | — | linear |
 | `legend-grid-align` | 45 | rect, symbol, text | — | band, linear |
 | `legend-grid-anchor` | 48 | rect, rule, symbol, text | — | band, linear, ordinal |
 | `legend-left-of-axis` | 30 | rect, rule, symbol, text | — | band, linear, ordinal |
@@ -134,7 +156,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `link-paths` | 77 | path, symbol, text | formula, linkpath, stratify, tree, treelinks | ordinal |
 | `local-time-dst` | 35 | line, rule, symbol, text | — | linear, time, utc |
 | `log-axis-labels` | 154 | rule, text | — | log |
-| `log-scale` | 75 | rule, symbol, text | — | log, sqrt |
+| `log-scale` | 99 | rule, symbol, text | — | log, sqrt |
 | `luminance-contrast` | 24 | rect, text | — | band |
 | `map-with-tooltip` | 3623 | group, rect, shape, text | filter, formula, geoshape, lookup | quantize |
 | `mark-clip-shape` | 8 | rect, symbol | — | — |
@@ -160,10 +182,13 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `platformer` | 7517 | image, rect | formula | linear |
 | `polylinear-scales` | 7 | text | formula | band, linear, log, pow, symlog |
 | `probability-density` | 533 | area, line, rect, rule, symbol, text | aggregate, density | linear, ordinal |
+| `projection-angle` | 7 | shape, symbol | geopoint, geoshape | — |
+| `projection-degenerate` | 6 | shape | geoshape | — |
 | `projection-families` | 84 | group, path, symbol, text | geopath, geopoint, graticule | — |
 | `projection-fit-composite` | 3 | symbol | geojson, geopoint | — |
 | `projection-fit-two-publishers` | 4 | symbol | geojson, geopoint | — |
 | `projection-fit` | 13 | shape | formula, geoshape | — |
+| `projection-precision` | 12 | shape | geoshape | — |
 | `published-signals` | 16 | rect, rule, text | extent | linear |
 | `qq-plot` | 332 | rule, symbol, text | formula, quantile | linear |
 | `radar` | 31 | line, rule, text | aggregate | linear, ordinal, point |
@@ -175,7 +200,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `scale-domain-implicit` | 13 | rect, rule, text | — | band, ordinal |
 | `scale-domain-raw` | 73 | rule, symbol, text | — | linear |
 | `scale-nice-intervals` | 47 | rule, symbol, text | — | linear, utc |
-| `scale-variants` | 43 | rule, symbol, text | — | point, pow, symlog |
+| `scale-variants` | 77 | rule, symbol, text | — | identity, ordinal, point, pow, quantize, symlog |
 | `scheme-forms` | 31 | rect, rule, text | — | band, linear, ordinal |
 | `scope-shadowing` | 11 | rect, rule, text | — | linear |
 | `sequence-lookup` | 27 | line, rect, rule, text | formula, lookup, sequence | band, linear |
@@ -188,6 +213,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `spatial-resolution` | 25 | area, rect, symbol, text | — | point |
 | `spherical-measures` | 19 | rule, text | formula | band |
 | `stack-diverging` | 45 | rect, rule, symbol, text | stack | band, linear, ordinal |
+| `stack-groups-by-json` | 58 | rect, rule, text | formula, stack | band, linear |
 | `stack-offsets` | 32 | area, rule, symbol, text | stack | linear, ordinal |
 | `stacked-bar` | 42 | rect, rule, text | aggregate, stack | band, linear |
 | `statistics` | 28 | line, rule, symbol, text | quantile, regression | linear |
@@ -218,6 +244,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `trend-lines` | 33 | line, rule, symbol, text | loess, regression | linear |
 | `u-district-cuisine` | 252 | area, rule, symbol, text | density | band, linear, ordinal |
 | `unicode-identifiers` | 1 | text | formula | — |
+| `view-size-degenerate` | 18 | rect, rule, text | — | band, linear |
 | `volcano-contours` | 21 | path | geopath, isocontour | linear |
 | `watch` | 90 | arc, rule, text | formula, sequence | linear |
 | `window-ops` | 18 | rect, text | window | band, linear |
@@ -229,8 +256,53 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 
 | Fixture | Composition | Marks | Transforms |
 | --- | --- | --- | --- |
+| `a-bandwidth-needs-a-band-scale` | vconcat | bar | — |
+| `a-bucket-with-two-columns-of-its-own` | vconcat | area, line, point | — |
+| `a-chart-out-of-the-accessibility-tree` | single view | bar | — |
+| `a-config-block-that-keeps-only-vegas` | single view | bar | — |
+| `a-config-that-reaches-the-output` | single view | bar | — |
+| `a-config-tooltip-vega-understands` | single view | bar | — |
+| `a-counting-aggregate-is-a-number` | vconcat | bar | — |
+| `a-cursor-a-theme-settled` | single view | bar | — |
+| `a-date-that-is-not-a-date` | hconcat | bar, text | — |
+| `a-field-title-spelled-functional` | hconcat | point | — |
+| `a-field-title-spelled-plain` | hconcat | point | — |
+| `a-format-type-decides-the-parse` | hconcat | bar, line | — |
+| `a-heading-a-theme-asked-for` | single view | bar | — |
+| `a-heading-a-theme-wrote-itself` | single view | bar | — |
+| `a-heading-turned-the-other-way` | single view | bar | — |
+| `a-legend-a-theme-asked-for` | vconcat | point | — |
+| `a-legend-keeps-its-own-kinds-words` | vconcat | bar, point | — |
+| `a-legend-symbol-wears-a-styles-stroke` | single view | bar | — |
+| `a-legend-symbol-wears-the-marks-stroke` | vconcat | bar | — |
+| `a-legend-told-which-kind-to-be` | vconcat | bar, point | — |
+| `a-link-a-theme-gave-every-mark` | vconcat | bar | — |
+| `a-link-no-one-gave-a-mark` | single view | bar | — |
+| `a-mark-property-a-theme-asked-for` | vconcat | bar, line, point, text | — |
+| `a-normalized-stack-is-a-percentage` | vconcat | bar, line | — |
+| `a-normalized-stack-with-no-percentage` | single view | bar | — |
+| `a-position-a-theme-asked-for` | vconcat | arc, text | — |
+| `a-rounded-end-overwrites-the-corner-it-covers` | hconcat | bar | — |
+| `a-scale-flag-a-theme-asked-for` | hconcat | bar, point | — |
+| `a-scale-flag-an-x-axis-turned-round-by-an-expression` | hconcat | bar, point | — |
+| `a-scale-flag-an-x-axis-turned-round` | hconcat | bar, point | — |
+| `a-scale-padding-a-theme-asked-for` | vconcat | bar, line, point | — |
+| `a-scale-padding-an-offset-scale-asked-for` | vconcat | bar, point | — |
+| `a-scale-property-its-channel-understands` | vconcat | bar, line, point | — |
+| `a-size-a-style-asked-for` | vconcat | bar, rect | — |
+| `a-size-a-theme-asked-for` | vconcat | bar, rect, tick | — |
+| `a-size-stated-as-zero` | vconcat | bar, tick | — |
+| `a-stack-groups-by-what-it-was-given` | vconcat | bar | — |
+| `a-style-block-a-theme-asked-for` | vconcat | bar, line | — |
+| `a-themed-rounded-end-rounds-the-whole-stack` | hconcat | bar | — |
+| `a-wrapped-grid-heading-anchored` | facet | bar | — |
 | `aggregate-bar` | single view | bar | — |
 | `aggregate-ops` | layer | point, rule, text | — |
+| `aligned-in-its-own-band` | vconcat | bar, tick | — |
+| `an-axis-a-theme-asked-for-by-scale` | vconcat | bar | — |
+| `an-axis-a-theme-asked-for` | vconcat | bar | — |
+| `an-invalid-a-theme-asked-for` | vconcat | line, point | — |
+| `an-orientation-a-mark-cannot-state` | vconcat | area, bar, trail | — |
 | `animated-frames` | single view | point | — |
 | `arc-labelled` | layer | arc, text | — |
 | `arc-mark-polar-bounds` | hconcat | arc | — |
@@ -287,6 +359,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `config-number-format-type` | facet | point | — |
 | `config-tooltip-format` | single view | line | — |
 | `connected-scatter` | single view | line | — |
+| `corner-radius-end-only-a-bar` | layer | area, bar, point, tick | — |
 | `crossfilter-binned` | layer, repeat | bar | — |
 | `dash-legend` | single view | line | — |
 | `date-predicates` | single view | line | — |
@@ -363,6 +436,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `inferred-types` | single view | bar | — |
 | `invalid-break-paths-domains` | single view | point | — |
 | `invalid-modes` | layer | line, point | — |
+| `invalid-on-the-mark-definition` | hconcat | line, point | — |
 | `invalid-shown` | single view | point | — |
 | `label-expression` | single view | bar | — |
 | `labelled-bar` | layer | bar, text | — |
@@ -486,6 +560,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `temporal-units` | single view | point | — |
 | `text-format` | layer | bar, text | — |
 | `text-heatmap` | single view | rect | — |
+| `text-placed-by-an-outer-radius` | layer | arc, text | — |
 | `theme-axis-and-tick` | layer | text, tick | — |
 | `themed` | single view | bar | — |
 | `tick-at-a-constant` | single view | tick | — |
@@ -509,6 +584,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `trellis-selections` | single view | circle | — |
 | `trellis-sort-array` | single view | bar | — |
 | `trellis-timeunit` | single view | line | — |
+| `two-grids-over-one-table` | hconcat | bar | — |
 | `usermeta` | single view | line | — |
 | `vconcat` | vconcat | line, tick | — |
 | `view-cursor` | single view | line | — |

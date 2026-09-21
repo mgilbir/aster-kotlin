@@ -309,10 +309,15 @@ internal class Parse(
       // whatever its `style` names, the last one that says anything winning. A parallel-coordinate
       // plot turning its ticks on their side in `config.style.tick` is where it tells.
       orient =
-        raw.string("orient")
-          ?: styleOrient(config, type, raw)
-          ?: markConfig.string("orient")
-          ?: defaultOrient(type, encoding),
+        defaultOrient(
+          type,
+          encoding,
+          // `const specifiedOrient = getMarkPropOrConfig('orient', markDef, config)`: what the
+          // chart *asked* for, from the definition or the configuration chain. Whether it gets it
+          // is [defaultOrient]'s to say.
+          specified =
+            raw.string("orient") ?: styleOrient(config, type, raw) ?: markConfig.string("orient"),
+        ),
     )
   }
 
@@ -711,8 +716,45 @@ internal class Parse(
 
     val conditions = conditions(channel, value.fields["condition"], "$path.condition")
 
+    // ```js
+    // if (type !== 'quantitative') {
+    //   if (isCountingAggregateOp(aggregate)) {
+    //     log.warn(log.message.invalidFieldTypeForCountAggregate(type, aggregate));
+    //     fieldDef.type = 'quantitative';
+    //   }
+    // }
+    // ```
+    //
+    // **A counting aggregate answers with a number, whatever the column it counted was.** `count`,
+    // `distinct`, `valid` and `missing` all reduce a group to a tally, so a `type` the chart stated
+    // is about the wrong thing: it describes the column going in, and what comes out is a count.
+    // Upstream overrides it and says so.
+    //
+    // Only those four, and only over a stated type that is not already quantitative. A `sum` or a
+    // `mean` leaves the stated type alone — upstream's test is `isCountingAggregateOp`, not "is an
+    // aggregate" — which is the distinction that makes this a rule rather than a coincidence, since
+    // [inferType] below already answers quantitative for *any* aggregate where no type was stated.
+    // That is why this went unnoticed: the two agree everywhere the chart says nothing.
+    //
+    // Left as stated, the channel keeps a band or an ordinal scale where upstream builds a linear
+    // one, and everything hung off the scale follows — the axis flips to the other side, a legend
+    // becomes a gradient rather than a row of symbols, and a bar takes a bandwidth it has no band
+    // for. 32 of the encoding sweep's cases were that, across eight channels.
     val declaredType = MeasureType.from(value.string("type"))
-    val type = declaredType ?: inferType(channel, field, aggregate, timeUnit, bin, value, path)
+    val counted =
+      declaredType != null && declaredType != MeasureType.QUANTITATIVE && aggregate in COUNTING_OPS
+    if (counted) {
+      diagnostics.warn(
+        VegaLiteDiagnostics.INFERRED_TYPE,
+        "`$aggregate` counts rows, so this channel is quantitative; the stated " +
+          "`${declaredType.name.lowercase()}` describes the column going in rather than the " +
+          "tally coming out, and is ignored.",
+        jsonPath = path,
+      )
+    }
+    val type =
+      if (counted) MeasureType.QUANTITATIVE
+      else declaredType ?: inferType(channel, field, aggregate, timeUnit, bin, value, path)
 
     return ChannelDef(
       channel = channel,
@@ -946,18 +988,57 @@ internal class Parse(
     }
 
   /**
-   * `orient` from `compile/mark/init.ts`, reduced to the marks this compiler emits.
+   * `orient` from `compile/mark/init.ts`.
    *
    * It decides which way a bar grows and which axis a rule spans, and it is derived from the
    * encoding rather than declared: a quantitative y against a discrete x is a vertical bar, and the
    * same pair on a tick is a *horizontal* one, because a tick marks the position it measures.
+   *
+   * **The stated orientation is an argument to this, not a shortcut past it** — upstream's own
+   * comment on the call is "set orient, which can be overridden by rules as sometimes the specified
+   * orient is invalid". Two of the blocks below ask for it and the rest ignore it, so a bar over a
+   * bucketed column grows the only way it can whatever its definition says, while a ranged one,
+   * which genuinely has no obvious direction, is given the direction it asked for. This compiler
+   * used to take the stated value first and infer only in its absence, which is the same answer
+   * wherever a stated orientation happens to be reachable and the wrong one everywhere else.
+   *
+   * The blocks are upstream's `switch`, and every one of them **falls through** to the next: a text
+   * mark tries the bar rules, then the rule's, then the area's, then the line's, and stops at the
+   * first that answers. That is why they are written here as a chain of `if`s over the set of marks
+   * that reach each one rather than as a `when` over the mark. Flattened into a single pass, a mark
+   * collected the wrong blocks: an area ranged along y was measured by the *bar*'s ranged rule,
+   * which asks whether the other channel is a number, where upstream asks only whether this one
+   * arrived bucketed.
+   *
+   * A mark that matches no block at all — an arc, a trail, a geoshape — is **vertical**, by the
+   * `return 'vertical'` under the whole switch. A trail is not a line here, and that is the whole
+   * of the difference the schema sweep found: a trail that states `horizontal` is vertical anyway,
+   * and upstream logs that it overrode it.
+   *
+   * That last value is written because it is upstream's, and **no test can currently tell it from
+   * `null`**: the three marks that reach it read their orientation in exactly one place, the path
+   * sort's `if (orient == 'horizontal') Y else X`, which answers the same either way — upstream's
+   * `sortPathBy` collapses the two identically. A mutant returning `null` here survives the whole
+   * suite, and that is worth knowing rather than hiding. It is still the value to hold, because the
+   * next rule to read a trail's orientation should read the one upstream would have.
    */
-  private fun defaultOrient(mark: String, encoding: Map<String, ChannelDef>): String? {
-    if (mark in setOf("point", "circle", "square", "rect", "image", "arc", "text")) return null
+  private fun defaultOrient(
+    mark: String,
+    encoding: Map<String, ChannelDef>,
+    specified: String?,
+  ): String? {
+    // "orient is meaningless for these marks" — and meaningless is `undefined`, not vertical, so
+    // they are the one group that leaves before the fallthrough can reach them.
+    if (mark in setOf("point", "circle", "square", "rect", "image")) return null
     val x = encoding["x"]
     val y = encoding["y"]
+    val x2 = encoding["x2"]
+    val y2 = encoding["y2"]
+    val xIsMeasure = x?.isUnbinnedQuantitative == true || x?.datum is VegaValue.Num
+    val yIsMeasure = y?.isUnbinnedQuantitative == true || y?.datum is VegaValue.Num
 
-    if (mark == "bar") {
+    // `case TEXT: case BAR:`
+    if (mark == "text" || mark == "bar") {
       // ```js
       // if (isFieldDef(x) && (isBinned(x.bin) || (isFieldDef(y) && y.aggregate && !x.aggregate))) {
       //   return 'vertical';
@@ -973,52 +1054,82 @@ internal class Parse(
       // reached the ranged rule: it was called vertical, so the *stack* became its y, its y scale
       // took a zero it should not have had, and the bar was drawn as a column rather than as the
       // five-unit marker upstream draws across each bucket.
-      if (x?.isFieldDef == true && x.bin == Binning.PreBinned) return "vertical"
-      if (y?.isFieldDef == true && y.bin == Binning.PreBinned) return "horizontal"
-      if (x?.isFieldDef == true && y?.aggregate != null && x.aggregate == null) return "vertical"
-      if (y?.isFieldDef == true && x?.aggregate != null && y.aggregate == null) return "horizontal"
-    }
-
-    val x2 = encoding["x2"]
-    val y2 = encoding["y2"]
-
-    // The *second position* decides before anything else does — but only where **one** of the two
-    // is ranged. A mark ranged along both axes has no orientation at all: it runs from one point to
-    // another and neither axis is the one it measures along, which is as true of a bar drawn as a
-    // lane between four coordinates as it is of a line segment. Upstream falls the ranged bar
-    // through to the rule's own rule for exactly that.
-    if (mark == "rule" || mark == "area" || mark == "bar") {
+      //
+      // Both halves of x's question are asked before either half of y's, which is not the order the
+      // four tests fall in when they are split apart one per line: a bucketed y under an aggregated
+      // x is x's answer, vertical, and splitting them made it y's.
+      if (
+        x?.isFieldDef == true &&
+          (x.bin == Binning.PreBinned ||
+            (y?.isFieldDef == true && y.aggregate != null && x.aggregate == null))
+      ) {
+        return "vertical"
+      }
+      if (
+        y?.isFieldDef == true &&
+          (y.bin == Binning.PreBinned ||
+            (x?.isFieldDef == true && x.aggregate != null && y.aggregate == null))
+      ) {
+        return "horizontal"
+      }
       if (y2 != null || x2 != null) {
+        // "Ranged bar does not always have clear orientation, so we allow overriding" — the first
+        // of the two places the stated value is read.
+        if (specified != null) return specified
         if (x2 == null) {
           // A *pre-binned* first position turns the answer around: the pair of edges the data
           // arrived with is the extent of the bar's own band, not the direction it grows in.
-          val xIsNumber = x?.isUnbinnedQuantitative == true || x?.datum is VegaValue.Num
-          return if (xIsNumber && y?.bin == Binning.PreBinned) "horizontal" else "vertical"
+          if (xIsMeasure && y?.bin == Binning.PreBinned) return "horizontal"
+          return "vertical"
         }
         if (y2 == null) {
-          val yIsNumber = y?.isUnbinnedQuantitative == true || y?.datum is VegaValue.Num
-          return if (yIsNumber && x?.bin == Binning.PreBinned) "vertical" else "horizontal"
+          if (yIsMeasure && x?.bin == Binning.PreBinned) return "vertical"
+          return "horizontal"
         }
       }
+    }
+
+    // `case RULE:` — "return undefined for line segment rule and bar with both axis ranged".
+    // A mark ranged along both axes has no orientation at all: it runs from one point to another
+    // and neither axis is the one it measures along, which is as true of a bar drawn as a lane
+    // between four coordinates as it is of a line segment.
+    if (mark == "text" || mark == "bar" || mark == "rule") {
       if (x2 != null && x?.bin != Binning.PreBinned && y2 != null && y?.bin != Binning.PreBinned) {
         return null
       }
+    }
+
+    // `case AREA:` — "if there are range for both x and y, y (vertical) has higher precedence".
+    if (mark == "text" || mark == "bar" || mark == "rule" || mark == "area") {
+      if (y2 != null) return if (y?.bin == Binning.PreBinned) "horizontal" else "vertical"
+      if (x2 != null) return if (x?.bin == Binning.PreBinned) "vertical" else "horizontal"
       if (mark == "rule") {
         if (x != null && y == null) return "vertical"
         if (y != null && x == null) return "horizontal"
       }
     }
 
-    val xIsMeasure = x?.isUnbinnedQuantitative == true || x?.datum is VegaValue.Num
-    val yIsMeasure = y?.isUnbinnedQuantitative == true || y?.datum is VegaValue.Num
-    return when {
-      xIsMeasure && !yIsMeasure -> if (mark != "tick") "horizontal" else "vertical"
-      !xIsMeasure && yIsMeasure -> if (mark != "tick") "vertical" else "horizontal"
-      xIsMeasure && yIsMeasure -> "vertical"
-      x?.type == MeasureType.TEMPORAL && y?.type != MeasureType.TEMPORAL -> "vertical"
-      x?.type != MeasureType.TEMPORAL && y?.type == MeasureType.TEMPORAL -> "horizontal"
-      else -> null
+    // `case LINE: case TICK:` — the second and last place the stated value is read.
+    if (
+      mark == "text" ||
+        mark == "bar" ||
+        mark == "rule" ||
+        mark == "area" ||
+        mark == "line" ||
+        mark == "tick"
+    ) {
+      if (specified != null) return specified
+      return when {
+        xIsMeasure && !yIsMeasure -> if (mark != "tick") "horizontal" else "vertical"
+        !xIsMeasure && yIsMeasure -> if (mark != "tick") "vertical" else "horizontal"
+        xIsMeasure && yIsMeasure -> "vertical"
+        x?.type == MeasureType.TEMPORAL && y?.type != MeasureType.TEMPORAL -> "vertical"
+        x?.type != MeasureType.TEMPORAL && y?.type == MeasureType.TEMPORAL -> "horizontal"
+        else -> null
+      }
     }
+
+    return "vertical"
   }
 
   companion object {

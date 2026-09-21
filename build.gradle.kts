@@ -431,6 +431,9 @@ subprojects {
       "vega.updateGoldens",
       providers.gradleProperty("updateGoldens").getOrElse("false"),
     )
+    // `-PvalueSweepCase=<substring>`: which value-sweep cases print every difference they found
+    // rather than the first. Empty by default, which prints none of them.
+    systemProperty("valueSweepCase", providers.gradleProperty("valueSweepCase").getOrElse(""))
     testLogging { showStandardStreams = false }
   }
 

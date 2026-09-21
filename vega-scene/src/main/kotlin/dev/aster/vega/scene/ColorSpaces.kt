@@ -118,7 +118,10 @@ public object ColorSpaces {
      */
     gamma: Double = 1.0,
   ): SceneColor {
-    val amount = t.coerceIn(0.0, 1.0)
+    // **`t` is not clamped.** d3's interpolators are plain functions of `t` and extrapolate
+    // outside `0..1`; a colour scale that does not clamp its position relies on that, and the
+    // channels saturate on the way out rather than the parameter being pinned on the way in.
+    val amount = t
     fun channel(a: Double, b: Double): Double {
       val start = a * 255.0
       val end = b * 255.0
@@ -142,7 +145,10 @@ public object ColorSpaces {
    * Interpolates in CIE Lab, which keeps the midpoint of two saturated colours from going muddy.
    */
   public fun interpolateLab(from: SceneColor, to: SceneColor, t: Double): SceneColor {
-    val amount = t.coerceIn(0.0, 1.0)
+    // **`t` is not clamped.** d3's interpolators are plain functions of `t` and extrapolate
+    // outside `0..1`; a colour scale that does not clamp its position relies on that, and the
+    // channels saturate on the way out rather than the parameter being pinned on the way in.
+    val amount = t
     val a = toLab(from)
     val b = toLab(to)
     return fromLab(
@@ -234,7 +240,10 @@ public object ColorSpaces {
     t: Double,
     long: Boolean = false,
   ): SceneColor {
-    val amount = t.coerceIn(0.0, 1.0)
+    // **`t` is not clamped.** d3's interpolators are plain functions of `t` and extrapolate
+    // outside `0..1`; a colour scale that does not clamp its position relies on that, and the
+    // channels saturate on the way out rather than the parameter being pinned on the way in.
+    val amount = t
     val a = toHcl(from)
     val b = toHcl(to)
     return fromHcl(
@@ -310,7 +319,10 @@ public object ColorSpaces {
     t: Double,
     long: Boolean = false,
   ): SceneColor {
-    val amount = t.coerceIn(0.0, 1.0)
+    // **`t` is not clamped.** d3's interpolators are plain functions of `t` and extrapolate
+    // outside `0..1`; a colour scale that does not clamp its position relies on that, and the
+    // channels saturate on the way out rather than the parameter being pinned on the way in.
+    val amount = t
     val a = toHsl(from)
     val b = toHsl(to)
     return fromHsl(
@@ -377,7 +389,10 @@ public object ColorSpaces {
     t: Double,
     long: Boolean = false,
   ): SceneColor {
-    val amount = t.coerceIn(0.0, 1.0)
+    // **`t` is not clamped.** d3's interpolators are plain functions of `t` and extrapolate
+    // outside `0..1`; a colour scale that does not clamp its position relies on that, and the
+    // channels saturate on the way out rather than the parameter being pinned on the way in.
+    val amount = t
     val a = toCubehelix(from)
     val b = toCubehelix(to)
     return fromCubehelix(
@@ -391,9 +406,31 @@ public object ColorSpaces {
   }
 
   /**
-   * Samples a multi-stop colour ramp at [t] in `0..1`.
+   * Samples a multi-stop colour ramp at [t], which is usually but not always in `0..1`.
    *
    * Stops are evenly spaced, as `d3.interpolateRgbBasis`-style ramps and Vega's colour ranges are.
+   *
+   * d3's `piecewise` whole:
+   * ```js
+   * function(t) {
+   *   var i = Math.max(0, Math.min(n - 1, Math.floor(t *= n)));
+   *   return I[i](t - i);
+   * }
+   * ```
+   *
+   * **The clamp is on the segment index, not on `t`.** That one placement is the whole of how a
+   * ramp behaves outside its own extent: the first or last segment is picked and then
+   * *extrapolated* — at `t = -1/3` over a sixteen-stop scheme, segment 0 is evaluated at `-5` — and
+   * the channels saturate at the end rather than the parameter being pinned at the start.
+   * Upstream's blues ramp below its domain is `rgb(255, 255, 255)`, which is no colour in the
+   * scheme at all. Clamping `t` here instead answered the ramp's own first colour, and a scale that
+   * does not clamp could not be written.
+   *
+   * It also subsumes the endpoints: at `t = 1` the index clamps to the last segment and that
+   * segment is evaluated at 1, which is why an endpoint still goes through the interpolator rather
+   * than being looked up. For an ordinary colour that is exact, and for one carrying no colour of
+   * its own it is the difference between `range: ["red", "transparent"]` ending at transparent
+   * *red* and ending at transparent *black*.
    */
   public fun sample(
     colors: List<SceneColor>,
@@ -402,24 +439,15 @@ public object ColorSpaces {
     gamma: Double = 1.0,
   ): SceneColor {
     if (colors.isEmpty()) return SceneColor.Black
+    // `piecewise` over one colour builds no segments at all and would read past its own array.
     if (colors.size == 1) return colors[0]
-    val amount = t.coerceIn(0.0, 1.0)
-    val position = amount * (colors.size - 1)
-    val lower = kotlin.math.floor(position).toInt().coerceIn(0, colors.size - 1)
-    val upper = (lower + 1).coerceAtMost(colors.size - 1)
-    // **An endpoint still goes through the interpolator**, which is what d3 does: its ramp is a
-    // function evaluated at `t`, not a lookup, so at `t = 1` the substitution above still applies.
-    // For an ordinary colour this is exact — interpolating to a stop at 1 returns that stop — and
-    // for one carrying no colour of its own it is the difference between `range: ["red",
-    // "transparent"]` ending at transparent *red* and ending at transparent *black*.
-    if (lower == upper) {
-      return when {
-        colors.size == 1 -> colors[0]
-        lower == 0 -> interpolate(colors[0], colors[1], 0.0, space, gamma)
-        else -> interpolate(colors[lower - 1], colors[lower], 1.0, space, gamma)
-      }
-    }
-    return interpolate(colors[lower], colors[upper], position - lower, space, gamma)
+    val segments = colors.size - 1
+    val position = t * segments
+    // `Math.floor` of a NaN is a NaN and upstream indexes with it, reading `undefined`; Kotlin's
+    // `toInt` answers 0 for a NaN, which is the first segment. Callers screen a NaN before they get
+    // here, and this keeps the array in range either way.
+    val index = kotlin.math.floor(position).toInt().coerceIn(0, segments - 1)
+    return interpolate(colors[index], colors[index + 1], position - index, space, gamma)
   }
 
   // ---- CIE Lab ---------------------------------------------------------------

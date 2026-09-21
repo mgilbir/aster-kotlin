@@ -59,31 +59,50 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
     add(block("axis"))
     add(block(if (orient.isVertical) "axisY" else "axisX"))
     add(block("axis" + orient.name.lowercase().replaceFirstChar { it.uppercase() }))
-    if (band) add(block("axisBand"))
+    if (band) add(bandBlock())
   }
 
   /**
-   * A mark's defaults, split either side of the engine's own built-in per-type block.
+   * `config.axisBand`, over the correction Vega's own default configuration already puts there.
    *
-   * Upstream resolves them as `extend({}, config.mark, config[type])` and then the mark's `style`
-   * names in order — but its *default* configuration already fills `config[type]` in, with a rect's
-   * blue and a symbol's size of 64. So `config.mark` sits **below** those built-ins and everything
-   * else sits above, which is why setting `config.mark.fill` does not recolour a rect and setting
-   * `config.rect.fill` does.
+   * Upstream's default config is literally `axisBand: {tickOffset: -0.5}` — "correction for
+   * centering bias", the half pixel the axis group's own translation adds — and `axisBand` is the
+   * **last** block `extend({}, axis, xy, or, band)` merges. So it beats `config.axis.tickOffset`
+   * rather than losing to it, and a band axis in a theme that sets one keeps the -0.5.
    *
-   * @return the block that loses to the built-ins, then the one that beats them.
+   * It was a fallback *below* the whole chain here, reached only when nothing else set a
+   * `tickOffset` — which is the same answer for an axis that sets its own, and the wrong one for a
+   * config that does. A specification's own `config.axisBand` still wins over the correction,
+   * property by property, as it does over any built-in.
    */
-  public fun markDefaults(type: String, styles: List<String>): Pair<VegaValue.Obj, VegaValue.Obj> {
-    val above = LinkedHashMap<String, VegaValue>()
+  private fun bandBlock(): VegaValue.Obj {
+    val declared = blocks["axisBand"]?.fields.orEmpty()
+    return VegaValue.Obj(LinkedHashMap(BUILT_IN_AXIS_BAND).apply { putAll(declared) })
+  }
+
+  /**
+   * A mark's defaults from the `config` blocks that apply to its **type**, weakest first.
+   *
+   * `extend({}, config.mark, config[type])`, where `config[type]` is Vega's own block for the type
+   * with a theme's over it — which is why setting `config.mark.fill` does not recolour a rect and
+   * setting `config.rect.fill` does: the type's block already carries the blue.
+   *
+   * The `style` blocks a mark names are **not** here. Upstream applies them in a second loop under
+   * a weaker rule, and [EncodeSpec.withDefaults] takes both, because what separates the two loops
+   * is a rule about paint rather than a difference in precedence.
+   */
+  public fun markDefaults(type: String): VegaValue.Obj {
+    val fields = LinkedHashMap<String, VegaValue>()
+    fields.putAll(block("mark").fields)
     // `group` is the one type whose block is **not** a mark default: `config.group` paints the
-    // view's
-    // own frame and leaves group marks alone. Probed — with it set, upstream's root item carries
-    // the
-    // fill and an inner group mark does not — and reading it here as well put a tinted rectangle
-    // behind every group a specification wrote.
-    if (type != "group") above.putAll(block(type).fields)
-    for (name in styles) above.putAll(styleBlock(name).fields)
-    return block("mark") to VegaValue.Obj(above)
+    // view's own frame and leaves group marks alone. Probed — with it set, upstream's root item
+    // carries the fill and an inner group mark does not — and reading it here as well put a tinted
+    // rectangle behind every group a specification wrote.
+    if (type != "group") {
+      fields.putAll(BUILT_IN_MARK_BLOCKS[type].orEmpty())
+      fields.putAll(block(type).fields)
+    }
+    return VegaValue.Obj(fields)
   }
 
   /** A named `config.style` block, which a mark opts into through its own `style` property. */
@@ -183,6 +202,50 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
      * does exactly that, and a trellis header drawn at a heading's thirteen points instead of a
      * label's ten is both the wrong size and, being measured, the wrong amount of chart.
      */
+    /**
+     * `config.<marktype>` as Vega's own default configuration states it.
+     *
+     * These are not "the engine's built-ins" and never were: upstream keeps them in exactly the
+     * place a theme would, so `extend({}, config.mark, config[type])` puts them *above*
+     * `config.mark` and a theme's own `config.rect` above them again, with no third mechanism in
+     * between. Writing them here is what makes that ordering fall out of the merge rather than out
+     * of an argument passed to a colour lookup — and it is what caught two of them being wrong: a
+     * `path` and a `shape` default to a **stroke** upstream, where this engine gave them a fill.
+     *
+     * `image` and `group` have no block, and `mark` is the shared one every type sits above.
+     */
+    private val BUILT_IN_MARK_BLOCKS: Map<String, Map<String, VegaValue>> =
+      mapOf(
+        "arc" to mapOf("fill" to VegaValue.Str(DEFAULT_MARK_COLOUR)),
+        "area" to mapOf("fill" to VegaValue.Str(DEFAULT_MARK_COLOUR)),
+        "line" to
+          mapOf(
+            "stroke" to VegaValue.Str(DEFAULT_MARK_COLOUR),
+            "strokeWidth" to VegaValue.Num(2.0),
+          ),
+        "path" to mapOf("stroke" to VegaValue.Str(DEFAULT_MARK_COLOUR)),
+        "rect" to mapOf("fill" to VegaValue.Str(DEFAULT_MARK_COLOUR)),
+        "rule" to mapOf("stroke" to VegaValue.Str(BLACK)),
+        "shape" to mapOf("stroke" to VegaValue.Str(DEFAULT_MARK_COLOUR)),
+        "symbol" to
+          mapOf("fill" to VegaValue.Str(DEFAULT_MARK_COLOUR), "size" to VegaValue.Num(64.0)),
+        "text" to
+          mapOf(
+            "fill" to VegaValue.Str(BLACK),
+            "font" to VegaValue.Str("sans-serif"),
+            "fontSize" to VegaValue.Num(11.0),
+          ),
+        "trail" to
+          mapOf("fill" to VegaValue.Str(DEFAULT_MARK_COLOUR), "size" to VegaValue.Num(2.0)),
+      )
+
+    private const val DEFAULT_MARK_COLOUR = "#4c78a8"
+    private const val BLACK = "#000"
+
+    /** `config.axisBand` as Vega's own default configuration states it; see [bandBlock]. */
+    private val BUILT_IN_AXIS_BAND: Map<String, VegaValue> =
+      linkedMapOf("tickOffset" to VegaValue.Num(-0.5))
+
     private val BUILT_IN_STYLES: Map<String, VegaValue.Obj> =
       mapOf(
         // axis and legend labels

@@ -1,8 +1,8 @@
 package dev.aster.vega.dataflow.transform
 
+import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asBoolean
-import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.field
 import kotlin.math.PI
 
@@ -37,7 +37,21 @@ public object PieTransform : Transform {
   ): List<VegaValue> {
     if (input.isEmpty()) return input
     val path = (params.fields["field"] as? VegaValue.Str)?.value
-    val values = input.map { datum -> if (path == null) 1.0 else datum.field(path).asDouble() }
+    // **`Number(x)`, because the slice is a multiplication.** Upstream never coerces the column at
+    // all: it keeps the raw values, divides by d3's `sum` of them, and then writes `a += v * k` —
+    // and JavaScript's `*` does the coercion, so `null * k` is `0` and `"" * k` is `0`. Each leaves
+    // a slice of no width and the next one exactly where it was.
+    //
+    // `asDouble` is a *parser* and answers NaN for both, which is a different thing entirely here:
+    // the angle **accumulates**, so a NaN does not draw nothing, it draws nothing from that slice
+    // onwards. A single empty cell emptied the rest of the pie.
+    //
+    // A word is the case that must stay NaN — `"abc" * k` is NaN upstream too — and it poisons the
+    // running angle there for the same reason. That is upstream's own behaviour and the fixture
+    // pins it beside the others, the three of them answering differently.
+    val values = input.map { datum ->
+      if (path == null) 1.0 else JsSemantics.toNumber(datum.field(path))
+    }
     // d3's `sum`, which is what upstream divides by: `if (value = +value) sum += value` skips a
     // NaN because it is falsey, and keeps an infinity because it is not.
     val total = values.sumOf { if (it.isNaN()) 0.0 else it }

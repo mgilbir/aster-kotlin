@@ -18,11 +18,42 @@ internal object Fields {
   /**
    * The Vega field name for a definition.
    *
-   * @param suffix appended after an underscore — `"end"` for the upper edge of a stack
+   * **A bin suffix is not a suffix**, and upstream keeps them as two parameters for a reason. A
+   * plain [suffix] names a column something else wrote beside this one — a stack's `_start` and
+   * `_end` — and it is appended whatever the definition is. A [binSuffix] names one of the columns
+   * *the bin itself* produced, and a definition with no bin of this compiler's making has none of
+   * them to name:
+   * ```js
+   * if (isBinning(bin)) {
+   *   fn = binToString(bin);
+   *   suffix = (opt.binSuffix ?? '') + (opt.suffix ?? '');
+   * } else if (timeUnit && !isBinnedTimeUnit(timeUnit)) {
+   *   fn = timeUnitToString(timeUnit);
+   *   suffix = ((!['range', 'mid'].includes(opt.binSuffix) && opt.binSuffix) || '') + (opt.suffix ?? '');
+   * }
+   * ```
+   *
+   * `isBinning`, so a column that **arrived** bucketed — `bin: "binned"` — falls past both arms and
+   * the bin suffix is dropped: its name is simply its own, because there is no `_end` or `_mid`
+   * column for a transform this chart never ran. Collapsing the two parameters into one made a
+   * pre-binned dimension group by `lo_mid` where upstream groups by `lo`, and that is a stack keyed
+   * on a column that does not exist. A bucketed *instant* keeps the distinction too, in its own
+   * smaller way: its time unit did write an `_end`, so a `binSuffix` of `end` still applies to it,
+   * while `range` and `mid` — which only a real bin produces — do not.
+   *
+   * @param suffix appended after an underscore whatever the definition is — `"end"` for the upper
+   *   edge of a stack
+   * @param binSuffix appended only where the bin that would have produced that column was this
+   *   compiler's to run
    * @param forAs true when the name is a transform's output, where a nested path is flattened
    *   rather than escaped
    */
-  fun vgField(def: ChannelDef, suffix: String? = null, forAs: Boolean = false): String {
+  fun vgField(
+    def: ChannelDef,
+    suffix: String? = null,
+    binSuffix: String? = null,
+    forAs: Boolean = false,
+  ): String {
     var field = def.field
     var effectiveSuffix = suffix
 
@@ -43,13 +74,17 @@ internal object Fields {
       val function =
         when {
           def.bin is Binning.Bin -> {
-            effectiveSuffix = suffix
+            effectiveSuffix = binSuffix.orEmpty() + suffix.orEmpty()
             binToString(def.bin.params)
           }
           def.aggregate != null -> def.aggregate
           // `isBinnedTimeUnit`: a column that arrives already bucketed keeps its own name — there
           // is no transform writing a new one, only a formula computing the bucket's far edge.
-          def.timeUnit != null && !isBinnedTimeUnit(def.timeUnit) -> timeUnitToString(def.timeUnit)
+          def.timeUnit != null && !isBinnedTimeUnit(def.timeUnit) -> {
+            effectiveSuffix =
+              binSuffix.takeUnless { it == "range" || it == "mid" }.orEmpty() + suffix.orEmpty()
+            timeUnitToString(def.timeUnit)
+          }
           else -> null
         }
       if (function != null) {
@@ -57,7 +92,9 @@ internal object Fields {
       }
     }
 
-    if (effectiveSuffix != null) field = "${field}_$effectiveSuffix"
+    // `if (suffix)`: the empty string the two halves add up to when neither applies is *falsy*
+    // upstream, so it appends nothing rather than a trailing underscore.
+    if (!effectiveSuffix.isNullOrEmpty()) field = "${field}_$effectiveSuffix"
     val resolved = field ?: ""
     return if (forAs) removePathFromField(resolved) else replacePathInField(resolved)
   }
@@ -71,8 +108,14 @@ internal object Fields {
   fun datumPath(field: String): String = "datum['${field.replace("'", "\\'")}']"
 
   /** `datum["mean_b"]`, the accessor an emitted expression uses to read the field. */
-  fun datumAccess(def: ChannelDef, suffix: String? = null, datum: String = "datum"): String =
-    "$datum[${quoted(removePathFromField(vgField(def, suffix, forAs = true)))}]" + argAccessor(def)
+  fun datumAccess(
+    def: ChannelDef,
+    suffix: String? = null,
+    binSuffix: String? = null,
+    datum: String = "datum",
+  ): String =
+    "$datum[${quoted(removePathFromField(vgField(def, suffix, binSuffix, forAs = true)))}]" +
+      argAccessor(def)
 
   /** The one path step an `argmin`/`argmax` reads out of the row it answered with. */
   private fun argAccessor(def: ChannelDef): String {
@@ -97,7 +140,62 @@ internal object Fields {
    * `mean_b`, and a count reads `Count of Records` — the one title that comes from configuration
    * rather than from the field, because there is no field to name.
    */
+  /**
+   * `functionalTitleFormatter`: the derivation spelled as a call — `MEAN(v)`, `MONTH(t)`, `BIN(v)`.
+   *
+   * ```js
+   * const fn = aggregate || timeUnitParams?.unit || (timeUnitParams?.maxbins && 'timeunit')
+   *            || (isBinning(bin) && 'bin');
+   * return fn ? `${fn.toUpperCase()}(${field})` : field;
+   * ```
+   *
+   * The two extremes come first and keep their words, spelled as the call rather than as prose: `v
+   * for argmax(c)` where the verbal formatter writes `v for max c`.
+   *
+   * A **count** has no field, and upstream does not guard it: `COUNT(undefined)` is what it writes,
+   * because `field` is `undefined` and the template stringifies it. That is reproduced rather than
+   * tidied — a title nobody would choose, but the one a chart asking for `functional` gets.
+   */
+  private fun functionalTitle(def: ChannelDef): String? {
+    if (def.argumentField != null) {
+      val extreme = if (def.aggregate == "argmax") "argmax" else "argmin"
+      return "${def.field} for $extreme(${def.argumentField})"
+    }
+    // A column that arrived already bucketed has no unit to announce, the same exclusion the verbal
+    // formatter makes: `timeUnit && !isBinnedTimeUnit(timeUnit)`.
+    val unit =
+      def.timeUnit?.takeIf { !isBinnedTimeUnit(it) }?.let { timeUnitParts(it).firstOrNull() }
+    val fn =
+      def.aggregate
+        ?: unit
+        ?: "timeunit".takeIf { def.timeUnit != null && unit == null }
+        ?: "bin".takeIf { def.bin is Binning.Bin }
+    // `${field}` where the field is **undefined** is the string "undefined", JavaScript's own
+    // stringification, and Kotlin's null would be "null". A count has no field and nothing here
+    // guards it, so `COUNT(undefined)` is the caption — upstream's, reproduced rather than tidied.
+    return if (fn != null) "${fn.uppercase()}(${def.field ?: "undefined"})" else def.field
+  }
+
   fun defaultTitle(def: ChannelDef, config: Config): String? {
+    // ```js
+    // export const defaultTitleFormatter = (fieldDef, config) => {
+    //   switch (config.fieldTitle) {
+    //     case 'plain': return fieldDef.field;
+    //     case 'functional': return functionalTitleFormatter(fieldDef);
+    //     default: return verbalTitleFormatter(fieldDef, config);
+    //   }
+    // };
+    // ```
+    //
+    // **Three formatters, and only the last was implemented here.** A theme asking for `plain` or
+    // `functional` got the verbal one regardless, so `Mean of v` stood where the chart had asked
+    // for `v` or for `MEAN(v)`. The key itself reaches the emitted configuration either way — Vega
+    // has no use for it, and upstream passes it through all the same — which is why this was
+    // invisible to a sweep that only checks what is emitted.
+    when (config.fieldTitle) {
+      "plain" -> return def.field
+      "functional" -> return functionalTitle(def)
+    }
     if (def.aggregate == "count") return config.countTitle
     if (def.bin is Binning.Bin) return "${def.field} (binned)"
     // A column that arrived already bucketed is titled by its own name: nothing here bucketed it,

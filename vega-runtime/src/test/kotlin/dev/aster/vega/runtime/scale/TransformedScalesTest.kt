@@ -196,3 +196,49 @@ class TransformedScalesTest {
     assertEquals(0.0, scale.apply(100.0), tolerance)
   }
 }
+
+/**
+ * `symlogForward` and `symlogBackward` on their own, below the scale that uses them.
+ *
+ * Two of d3's three decisions in that one line are observable through a chart and pinned by
+ * `a-symlog-is-log1p-of-x-over-c`: `log1p` rather than `ln(1 + t)`, which moves the last two
+ * digits, and `abs(x / c)` rather than `abs(x) / c`, which decides a negative constant. The third —
+ * `Math.sign`, which is **zero at zero** and so carries the sign of a negative zero through — is
+ * not. A scale normalizes the transform's answer against its domain immediately, and that
+ * arithmetic absorbs a `-0` before anything can look at it, so a mutant that branches on the sign
+ * instead of multiplying by it survives every fixture. Searched for a chart that could see it and
+ * there is none, which makes this the honest place to pin it rather than a gap to leave open.
+ */
+class SymlogTransformTest {
+
+  @Test
+  fun `the sign is multiplied in, so a negative zero keeps its sign`() {
+    // `Math.sign(-0) * Math.log1p(0)` is `-0 * 0`, which is `-0`. A branch on `value < 0` answers
+    // `+0`, because `-0 < 0` is false.
+    assertTrue(1.0 / symlogForward(-0.0, 1.0) < 0.0, "symlog(-0) should be -0")
+    assertTrue(1.0 / symlogForward(0.0, 1.0) > 0.0, "symlog(0) should be +0")
+    assertTrue(1.0 / symlogBackward(-0.0, 1.0) < 0.0, "symexp(-0) should be -0")
+  }
+
+  @Test
+  fun `log1p and not ln of one plus`() {
+    // The two differ in the last bits for a small argument, which is the whole of the defect this
+    // replaced. Read off `node`: `Math.sign(0.2) * Math.log1p(Math.abs(0.2 / 1))`.
+    assertEquals(0.18232155679395462, symlogForward(0.2, 1.0))
+    assertEquals(0.09531017980432487, symlogForward(0.1, 1.0))
+  }
+
+  @Test
+  fun `the constant divides before the absolute, so a negative one still has a logarithm`() {
+    // `Math.sign(8) * Math.log1p(Math.abs(8 / -2))` is `log1p(4)`; `ln1p(abs(8) / -2)` is NaN.
+    assertEquals(kotlin.math.ln(5.0), symlogForward(8.0, -2.0), 1e-12)
+    assertEquals(-kotlin.math.ln(5.0), symlogForward(-8.0, -2.0), 1e-12)
+  }
+
+  @Test
+  fun `the inverse undoes the transform`() {
+    for (x in listOf(-40.0, -1.0, 0.0, 0.25, 3.0, 1e6)) {
+      assertEquals(x, symlogBackward(symlogForward(x, 7.5), 7.5), 1e-9)
+    }
+  }
+}

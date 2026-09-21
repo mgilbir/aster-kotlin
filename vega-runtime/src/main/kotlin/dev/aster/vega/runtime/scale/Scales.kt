@@ -1,9 +1,10 @@
 package dev.aster.vega.runtime.scale
 
+import dev.aster.vega.expression.JsSemantics
+import dev.aster.vega.expression.NumberFormat
 import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
-import dev.aster.vega.model.asString
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.withTypographicMinus
@@ -11,10 +12,13 @@ import dev.aster.vega.scene.ColorSpaces
 import dev.aster.vega.scene.SceneColor
 import kotlin.math.abs
 import kotlin.math.exp
+import kotlin.math.expm1
 import kotlin.math.floor
 import kotlin.math.ln
+import kotlin.math.ln1p
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlin.math.sign
 
 /**
  * Scale implementations, ported from d3-scale, which is what upstream Vega uses.
@@ -84,14 +88,48 @@ public sealed interface PositionScale : VegaScale {
  * that is not a number maps to **nothing** rather than to `NaN` — d3's `unknown`, which for a mark
  * means a channel left unset and a mark that does not draw.
  */
-public class IdentityScale(override val name: String) : VegaScale {
-  public val range: List<Double> = listOf(0.0, 1.0)
+public class IdentityScale(
+  override val name: String,
+  /**
+   * The declared domain, which an identity scale **does** have and which is also its range.
+   *
+   * ```js
+   * scale.domain = scale.range = function(_) { … };
+   * …
+   * return linearish(scale);
+   * ```
+   *
+   * d3 gives the two the same array and then makes the scale `linearish`, so an identity scale
+   * generates ticks over its domain exactly as a linear one does — and an axis drawn against one is
+   * ticked and labelled like any other. This carried `[0, 1]` whatever the specification said,
+   * which was harmless while nothing asked and wrong the moment an axis did: no domain, no ticks,
+   * no labels, an empty guide beside a chart upstream draws fourteen labels on.
+   */
+  public val domain: List<Double> = listOf(0.0, 1.0),
+) : VegaScale {
+  /** The same numbers as [domain]: d3 assigns the one accessor to both names. */
+  public val range: List<Double>
+    get() = domain
 
-  public val domain: List<Double> = listOf(0.0, 1.0)
+  /**
+   * A tick's label, by the same rule a linear scale uses, because `linearish` is what d3 makes it.
+   *
+   * The precision comes from the step between ticks rather than from the values, so a domain walked
+   * in fives is labelled in whole numbers.
+   */
+  public fun formatTick(
+    value: Double,
+    count: Int = LinearScale.DEFAULT_TICK_COUNT,
+    locale: VegaLocale = VegaLocale.EnglishUS,
+  ): String {
+    val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
+    val precision = if (step.isFinite()) Ticks.precisionForStep(step) else 0
+    return formatTickLabel(value, precision, locale)
+  }
 
   override fun scale(value: VegaValue): VegaValue {
-    val number = value.asDouble()
-    return if (number.isNaN()) VegaValue.Null else VegaValue.Num(number)
+    val number = scaleNumber(value)
+    return if (number.isNaN()) VegaValue.Undefined else VegaValue.Num(number)
   }
 }
 
@@ -138,7 +176,7 @@ public class LinearScale(
   override val bandwidth: Double
     get() = 0.0
 
-  override fun position(value: VegaValue): Double = apply(value.asDouble())
+  override fun position(value: VegaValue): Double = apply(scaleNumber(value))
 
   /**
    * A continuous scale of something that is not a number is **not a number**, not nothing.
@@ -149,7 +187,16 @@ public class LinearScale(
    * expression to decide whether a bar is too thin to see, and a pre-binned column has no `_end` to
    * give it — so a bar came out a quarter of a unit narrow and shifted along.
    */
-  override fun scale(value: VegaValue): VegaValue = VegaValue.Num(position(value))
+  override fun scale(value: VegaValue): VegaValue {
+    // **The guard is on the input, not on the answer.** d3 tests `x == null || isNaN(x = +x)` and
+    // then does the arithmetic whatever it comes to — so a log scale asked for `-5` answers `NaN`,
+    // a perfectly good number having no logarithm, while the same scale asked for a *word* answers
+    // `undefined`. Reading the answer instead conflates the two and reports nothing for both.
+    //
+    // `""` separates them: it coerces to `0`, passes the guard, and its logarithm is `NaN`. Probed.
+    val x = scaleNumber(value)
+    return if (x.isNaN()) VegaValue.Undefined else VegaValue.Num(apply(x))
+  }
 
   public fun apply(x: Double): Double = if (round) roundHalfUp(unrounded(x)) else unrounded(x)
 
@@ -311,6 +358,64 @@ public class LinearScale(
 }
 
 /**
+ * What a scale reads a value as, which is **one line of d3** and two rules in it:
+ * ```js
+ * function scale(x) {
+ *   return x == null || isNaN(x = +x) ? unknown : …;
+ * }
+ * ```
+ *
+ * Nothing is caught **before** the coercion — `x == null` is the loose test, so a null and an
+ * undefined never reach `+` at all and answer `unknown` — and everything else goes **through** `+`,
+ * which is `Number(x)` and not a parse. So the empty string is `0`, an empty array is `0`, a flag
+ * is `1`, and only something that genuinely has no number in it reaches `NaN`.
+ *
+ * The empty cell is the one that matters, a column read from a CSV being full of them: upstream
+ * places it at zero. This engine read strings with `toDoubleOrNull`, a *parse*, which rejects the
+ * empty string — so the row was dropped from the chart instead.
+ *
+ * Returns `NaN` for the cases d3 answers `unknown` for, which the callers turn back into nothing.
+ *
+ * **`quantize` and `threshold` do not share this line**: theirs is `x != null && x <= x ? … :
+ * unknown`, which never coerces at all and bisects with whatever it was handed. That is a different
+ * rule and it is recorded as its own question rather than assumed to be this one.
+ */
+internal fun scaleNumber(value: VegaValue): Double =
+  when (value) {
+    // `x == null` is loose, so it is both of these and nothing else.
+    is VegaValue.Null,
+    is VegaValue.Undefined -> Double.NaN
+    else -> JsSemantics.toNumber(value)
+  }
+
+/**
+ * How a discrete scale's index keys a domain value, which is d3's `InternMap` and not equality.
+ *
+ * ```js
+ * function keyof(value) {
+ *   return value !== null && typeof value === "object" ? value.valueOf() : value;
+ * }
+ * ```
+ *
+ * A `Map` then holds those keys, so the rule is **SameValueZero**: two `NaN`s are one key, and `+0`
+ * and `-0` are one key — where a `Double`'s own `equals` agrees about the first and disagrees about
+ * the second. `keyof` is the other half: an object is interned by its `valueOf`, so a date and the
+ * number of milliseconds it stands for are the *same* key and a scale looked up with either finds
+ * the same band.
+ *
+ * This is deliberately not `asString`. A domain of text is what this engine used to hold, and it
+ * answers a different question: `scale("1001")` finds the band of the **number** `1001` under a
+ * text key and finds nothing upstream, because the index holds the number and the word is not it.
+ */
+internal fun internKey(value: VegaValue): VegaValue =
+  when (value) {
+    is VegaValue.Timestamp -> VegaValue.Num(value.epochMillis)
+    // `+0` and `-0` are one key in a `Map`, and two in Kotlin: `(-0.0).equals(0.0)` is false.
+    is VegaValue.Num -> if (value.value == 0.0) VegaValue.Num(0.0) else value
+    else -> value
+  }
+
+/**
  * Band scale: a discrete domain mapped to contiguous, equal-width bands.
  *
  * The step and padding arithmetic follows d3-scaleBand exactly, including `align` controlling where
@@ -318,7 +423,7 @@ public class LinearScale(
  */
 public class BandScale(
   override val name: String,
-  public val domain: List<String>,
+  public val domain: List<VegaValue>,
   override val range: List<Double>,
   public val paddingInner: Double = 0.0,
   public val paddingOuter: Double = 0.0,
@@ -330,7 +435,7 @@ public class BandScale(
     require(range.size >= 2) { "A band scale needs a two-value range, got $range" }
   }
 
-  private val positions: Map<String, Double>
+  private val positions: Map<VegaValue, Double>
   override val bandwidth: Double
   public val step: Double
   /** Range start after outer padding and alignment, i.e. the first band's position. */
@@ -359,18 +464,23 @@ public class BandScale(
     bandwidth = computedBand
 
     val ordered = if (reverse) domain.indices.reversed().toList() else domain.indices.toList()
-    val map = LinkedHashMap<String, Double>(n)
+    val map = LinkedHashMap<VegaValue, Double>(n)
     ordered.forEachIndexed { slot, domainIndex ->
-      map[domain[domainIndex]] = computedStart + computedStep * slot
+      map[internKey(domain[domainIndex])] = computedStart + computedStep * slot
     }
     positions = map
   }
 
-  override fun position(value: VegaValue): Double = positions[value.asString()] ?: Double.NaN
+  override fun position(value: VegaValue): Double = positions[internKey(value)] ?: Double.NaN
 
   override fun scale(value: VegaValue): VegaValue {
     val result = position(value)
-    return if (result.isNaN()) VegaValue.Null else VegaValue.Num(result)
+    // **Nothing, and not a null**, for a value the index does not hold. d3's band scale is a `Map`
+    // lookup and nothing more — `index.get(d)` — so a miss answers `undefined`, which is what an
+    // expression asking `'' + scale('x', v)` prints and what a mark encoding a property from it
+    // leaves absent. A null reads as the word `null` in the first case and as a written property in
+    // the second, and neither is what upstream draws.
+    return if (result.isNaN()) VegaValue.Undefined else VegaValue.Num(result)
   }
 
   /**
@@ -380,7 +490,7 @@ public class BandScale(
    * bands the given pixels fall in. A position in the **gap** between two bands belongs to neither,
    * which is what the bandwidth check drops, and a stretch outside the range answers with nothing.
    */
-  public fun invertRange(from: Double, to: Double): List<String>? {
+  public fun invertRange(from: Double, to: Double): List<VegaValue>? {
     if (from.isNaN() || to.isNaN() || domain.isEmpty()) return null
     val reverse = range.last() < range.first()
     val starts = domain.map { positions[it] ?: Double.NaN }
@@ -403,7 +513,7 @@ public class BandScale(
   }
 
   /** The one band a position falls in, or null where it falls in a gap or outside the range. */
-  public fun invert(position: Double): String? = invertRange(position, position)?.firstOrNull()
+  public fun invert(position: Double): VegaValue? = invertRange(position, position)?.firstOrNull()
 
   private fun bisectRight(values: List<Double>, at: Double): Int {
     var low = 0
@@ -417,10 +527,10 @@ public class BandScale(
 
   /** Band centres, the positions axis ticks and labels use. */
   public fun centers(): List<Double> = domain.map {
-    (positions[it] ?: Double.NaN) + bandwidth / 2.0
+    (positions[internKey(it)] ?: Double.NaN) + bandwidth / 2.0
   }
 
-  public fun ticks(): List<String> = domain
+  public fun ticks(): List<VegaValue> = domain
 }
 
 /**
@@ -430,7 +540,7 @@ public class BandScale(
  */
 public class PointScale(
   override val name: String,
-  public val domain: List<String>,
+  public val domain: List<VegaValue>,
   override val range: List<Double>,
   public val padding: Double = 0.0,
   public val align: Double = 0.5,
@@ -459,12 +569,12 @@ public class PointScale(
   override fun scale(value: VegaValue): VegaValue = band.scale(value)
 
   /** The one point a position falls nearest, through the band this scale is built on. */
-  public fun invert(position: Double): String? = band.invert(position)
+  public fun invert(position: Double): VegaValue? = band.invert(position)
 
   /** Which points a stretch of the range covers — see [BandScale.invertRange]. */
-  public fun invertRange(from: Double, to: Double): List<String>? = band.invertRange(from, to)
+  public fun invertRange(from: Double, to: Double): List<VegaValue>? = band.invertRange(from, to)
 
-  public fun ticks(): List<String> = domain
+  public fun ticks(): List<VegaValue> = domain
 }
 
 /**
@@ -500,7 +610,7 @@ public abstract class TransformedScale(
   override val bandwidth: Double
     get() = 0.0
 
-  override fun position(value: VegaValue): Double = apply(value.asDouble())
+  override fun position(value: VegaValue): Double = apply(scaleNumber(value))
 
   /**
    * A continuous scale of something that is not a number is **not a number**, not nothing.
@@ -511,7 +621,16 @@ public abstract class TransformedScale(
    * expression to decide whether a bar is too thin to see, and a pre-binned column has no `_end` to
    * give it — so a bar came out a quarter of a unit narrow and shifted along.
    */
-  override fun scale(value: VegaValue): VegaValue = VegaValue.Num(position(value))
+  override fun scale(value: VegaValue): VegaValue {
+    // **The guard is on the input, not on the answer.** d3 tests `x == null || isNaN(x = +x)` and
+    // then does the arithmetic whatever it comes to — so a log scale asked for `-5` answers `NaN`,
+    // a perfectly good number having no logarithm, while the same scale asked for a *word* answers
+    // `undefined`. Reading the answer instead conflates the two and reports nothing for both.
+    //
+    // `""` separates them: it coerces to `0`, passes the guard, and its logarithm is `NaN`. Probed.
+    val x = scaleNumber(value)
+    return if (x.isNaN()) VegaValue.Undefined else VegaValue.Num(apply(x))
+  }
 
   public fun apply(x: Double): Double = if (round) roundHalfUp(unrounded(x)) else unrounded(x)
 
@@ -635,34 +754,67 @@ public class LogScale(
   round: Boolean = false,
 ) : TransformedScale(name, domain, range, clamp, round) {
 
-  private val logBase = ln(base)
-
-  /** True when the domain lies entirely on one side of zero, i.e. the scale is usable. */
+  /**
+   * True when the domain lies entirely on one side of zero, i.e. the scale is usable.
+   *
+   * The **base has no say in this**. A log scale's transform is the natural log whatever base was
+   * asked for, so a base of 0, 1, a half or a negative number leaves the geometry perfectly well
+   * defined and changes only which ticks are generated — probed against upstream, which places the
+   * same marks for all of them. Requiring `base > 1` here turned every position into a NaN and took
+   * the marks, the axis and the chart's own size with it.
+   *
+   * A domain touching or straddling zero is a different matter, and upstream agrees: `zero: true`
+   * on a log scale gives a domain of `[0, 900]`, and every `scale(x)` on it answers null.
+   */
   public val isValid: Boolean =
-    base > 1.0 &&
-      domain.first() != 0.0 &&
-      domain.last() != 0.0 &&
-      (domain.first() > 0.0) == (domain.last() > 0.0)
+    domain.first() != 0.0 && domain.last() != 0.0 && (domain.first() > 0.0) == (domain.last() > 0.0)
 
+  /**
+   * The **natural** log, whatever the base is.
+   *
+   * d3's transform is `Math.log` and its inverse `Math.exp`; `base` reaches only the ticks, the
+   * labels and `nice`. That is not an approximation of dividing by `ln(base)` — it is the same
+   * answer, because a continuous scale normalises between the transformed ends and a constant
+   * divisor cancels. It stops being the same answer exactly where the constant stops being one: a
+   * base of 0 makes `ln(base)` negative infinity and every position `-0`, a base of 1 makes it zero
+   * and every position infinite, a negative base makes it NaN. Dividing here therefore threw away
+   * the whole geometry of a chart upstream draws perfectly well — probed, upstream maps 3 to 120
+   * and 900 to 0 for bases 10, 0, 0.5, -4 and 1 alike, and only the *ticks* differ between them.
+   */
   override fun forward(value: Double): Double {
     if (!isValid) return Double.NaN
     // A negative domain reflects: the log of the magnitude, negated, so ordering is preserved.
     return if (domain.first() < 0.0) {
-      if (value >= 0.0) Double.NaN else -ln(-value) / logBase
+      if (value >= 0.0) Double.NaN else -ln(-value)
     } else {
-      if (value <= 0.0) Double.NaN else ln(value) / logBase
+      if (value <= 0.0) Double.NaN else ln(value)
     }
   }
 
   override fun backward(value: Double): Double =
-    if (domain.first() < 0.0) -base.pow(-value) else base.pow(value)
+    if (domain.first() < 0.0) -exp(-value) else exp(value)
 
   override fun ticks(count: Int): List<Double> =
     Ticks.logTicks(domain.first(), domain.last(), base, count)
 
   override fun formatTick(value: Double, count: Int, locale: VegaLocale): String =
-    // Log ticks are powers and their small multiples, so a fixed decimal count does not apply.
-    formatTickLabel(value, if (value == floor(value)) 0 else 2, locale)
+    // **`formatFloat`, which is `,` at twelve significant digits.** A log axis is the one family
+    // `tickFormat` sends down its own branch:
+    //
+    // ```js
+    // else if (isLogarithmic(type)) {
+    //   const varfmt = locale.formatFloat(specifier);
+    //   …
+    // }
+    // ```
+    //
+    // and `formatFloat` fills in `precision = 12` when the specifier names none. Twelve is where
+    // the exponent form begins, so `10,000,000,000` is written out and `1e+12` is not — which is
+    // the whole visible difference, and it changes the *width* of the axis and so of the chart.
+    //
+    // A fixed decimal count cannot express that: it says how many places follow the point, not how
+    // many digits are worth showing, so every power past a million came out in full.
+    NumberFormat.format(value, ",.12", locale)
 
   /**
    * Log tick labels, with the crowded ones blanked as d3 and Vega do.
@@ -687,8 +839,13 @@ public class LogScale(
     }
   }
 
-  /** The log of the magnitude, which is what the mantissa is measured against. */
-  private fun logMagnitude(value: Double): Double = ln(kotlin.math.abs(value)) / logBase
+  /**
+   * The log of the magnitude, which is what the mantissa is measured against.
+   *
+   * **In the scale's own base**, unlike the transform: which labels are blank is a question about
+   * powers of the base, and this is the one place in the scale where that matters.
+   */
+  private fun logMagnitude(value: Double): Double = ln(kotlin.math.abs(value)) / ln(base)
 
   private companion object {
     /** d3 compares the mantissa against a fractional threshold; tolerate representation error. */
@@ -736,14 +893,34 @@ public class SymlogScale(
   round: Boolean = false,
 ) : TransformedScale(name, domain, range, clamp, round) {
 
-  override fun forward(value: Double): Double {
-    val scaled = value / constant
-    return if (scaled < 0.0) -ln(1.0 - scaled) else ln(1.0 + scaled)
-  }
+  override fun forward(value: Double): Double = symlogForward(value, constant)
 
-  override fun backward(value: Double): Double =
-    if (value < 0.0) -constant * (exp(-value) - 1.0) else constant * (exp(value) - 1.0)
+  override fun backward(value: Double): Double = symlogBackward(value, constant)
 }
+
+/**
+ * d3's `transformSymlog`: `Math.sign(x) * Math.log1p(Math.abs(x / c))`.
+ *
+ * Every part of that one line is load-bearing, and this engine had written it out three times with
+ * three different readings.
+ *
+ * **`log1p`, not `ln(1 + t)`.** They are the same function and not the same arithmetic: adding one
+ * to a small number throws away the low bits before the logarithm ever sees them. A symlog scale
+ * over `[0.1, 0.30000000000000004]` placed a value at `…4051715` where upstream has `…4051665` —
+ * the last two digits, which is exactly as much as this costs and exactly enough to fail a
+ * comparison.
+ *
+ * **`Math.abs(x / c)`, and not `abs(x) / c`.** They agree for a positive constant and differ for a
+ * negative one, where the first is still a logarithm of something positive and the second is `NaN`.
+ *
+ * **`Math.sign(x)`, which is zero at zero**, so `symlog(-0)` is `-0` rather than `0`.
+ */
+internal fun symlogForward(value: Double, constant: Double): Double =
+  sign(value) * ln1p(abs(value / constant))
+
+/** Its inverse, d3's `transformSymexp`: `Math.sign(x) * Math.expm1(Math.abs(x)) * c`. */
+internal fun symlogBackward(value: Double, constant: Double): Double =
+  sign(value) * expm1(abs(value)) * constant
 
 /**
  * A continuous scale over instants, in epoch milliseconds.
@@ -797,7 +974,7 @@ public class TimeScale(
  */
 public class OrdinalScale(
   override val name: String,
-  public val domain: List<String>,
+  public val domain: List<VegaValue>,
   public val rangeValues: List<VegaValue>,
   /** Returned for a value outside the domain; `null` means [VegaValue.Null]. */
   public val unknown: VegaValue? = null,
@@ -813,21 +990,26 @@ public class OrdinalScale(
   private val implicit: Boolean = false,
 ) : VegaScale {
 
-  private val indices: MutableMap<String, Int> =
-    domain.withIndex().associateTo(LinkedHashMap()) { (index, value) -> value to index }
+  private val indices: MutableMap<VegaValue, Int> =
+    domain.withIndex().associateTo(LinkedHashMap()) { (index, value) -> internKey(value) to index }
 
   override fun scale(value: VegaValue): VegaValue {
-    if (rangeValues.isEmpty()) return unknown ?: VegaValue.Null
-    val key = value.asString()
+    // `unknown`, which is **`undefined`** when the specification names none — the same answer every
+    // other scale family gives for a value it cannot place. An ordinal scale is the clearest
+    // statement of it, having no coercion at all: its index is keyed by the value, so a miss is a
+    // miss and no arithmetic stands in the way. This answered a null, which a mark encoding writes
+    // where an undefined leaves the property absent.
+    if (rangeValues.isEmpty()) return unknown ?: VegaValue.Undefined
+    val key = internKey(value)
     val index =
       indices[key]
         ?: if (implicit) indices.size.also { indices[key] = it }
-        else return unknown ?: VegaValue.Null
+        else return unknown ?: VegaValue.Undefined
     return rangeValues[index % rangeValues.size]
   }
 
   /** The domain as it now stands, which [implicit] may have grown past what was declared. */
-  public val effectiveDomain: List<String>
+  public val effectiveDomain: List<VegaValue>
     get() = indices.keys.toList()
 }
 
@@ -935,7 +1117,16 @@ internal fun bisectRight(
   var hi = high
   while (lo < hi) {
     val mid = (lo + hi) ushr 1
-    if (x < values[mid]) hi = mid else lo = mid + 1
+    // **`compare(a[mid], x) <= 0`, which is d3's own direction and not its negation.** The two
+    // agree on every pair of numbers and differ when the *pivot* is `NaN`: `ascending` answers
+    // `NaN` then, `NaN <= 0` is false, and the search moves **left**. Asking `x < values[mid]`
+    // instead sends it right, because a comparison against a NaN is false whichever way round it
+    // is written.
+    //
+    // A pivot is `NaN` when a quantile scale has no samples to cut on — its thresholds are the
+    // quantiles of an empty column — and upstream then answers the **first** range entry for every
+    // value. This walked to the last one.
+    if (values[mid] <= x) lo = mid + 1 else hi = mid
   }
   return lo
 }
@@ -1005,11 +1196,30 @@ public class QuantizeScale(
     return extentAt(index, domain.firstOrNull() ?: 0.0, domain.lastOrNull() ?: 1.0)
   }
 
+  /**
+   * `quantize` and `threshold` read a value **without coercing it**, which is a different line from
+   * every other scale's:
+   * ```js
+   * function scale(x) {
+   *   return x != null && x <= x ? range[bisect(domain, x, 0, n)] : unknown;
+   * }
+   * ```
+   *
+   * `x <= x` is a NaN test that works on any type, and it lets a **word** through: `"abc" <= "abc"`
+   * is true, string comparison being perfectly happy. So a word reaches the bisect, where every
+   * comparison against a number is false — `"abc" < 10` is a NaN comparison — and the search lands
+   * on the **first** range entry rather than answering `unknown`. Probed: `scale("abc")` is `lo`
+   * where a linear scale over the same value answers nothing at all.
+   *
+   * Everything with a number in it behaves as though it had been coerced, because JavaScript's `<`
+   * coerces: `"" < 10` is `0 < 10`. So the only case that separates this from [scaleNumber] is the
+   * one that has no number in it, and that case is the reason this is written out.
+   */
   override fun scale(value: VegaValue): VegaValue {
-    if (rangeValues.isEmpty()) return VegaValue.Null
-    val x = value.asDouble()
-    if (x.isNaN()) return VegaValue.Null
-    return rangeValues[bisectRight(thresholds, x)]
+    if (rangeValues.isEmpty()) return VegaValue.Undefined
+    if (value is VegaValue.Null || value is VegaValue.Undefined) return VegaValue.Undefined
+    val x = JsSemantics.toNumber(value)
+    return rangeValues[if (x.isNaN()) 0 else bisectRight(thresholds, x)]
   }
 }
 
@@ -1054,21 +1264,48 @@ public class QuantileScale(
   }
 
   override fun scale(value: VegaValue): VegaValue {
-    if (rangeValues.isEmpty()) return VegaValue.Null
-    val x = value.asDouble()
-    if (x.isNaN()) return VegaValue.Null
+    if (rangeValues.isEmpty()) return VegaValue.Undefined
+    val x = scaleNumber(value)
+    if (x.isNaN()) return VegaValue.Undefined
     return rangeValues[bisectRight(thresholds, x)]
   }
 
+  /**
+   * d3-array's `quantileSorted`, transcribed rather than rearranged.
+   *
+   * ```js
+   * if (!(n = values.length) || isNaN(p = +p)) return;
+   * if (p <= 0 || n < 2) return +values[0];
+   * if (p >= 1) return +values[n - 1];
+   * var i = (n - 1) * p, i0 = Math.floor(i),
+   *     value0 = +values[i0], value1 = +values[i0 + 1];
+   * return value0 + (value1 - value0) * (i - i0);
+   * ```
+   *
+   * Three things here were written more sensibly and were therefore wrong.
+   *
+   * **No short circuit when the position lands on a sample.** `return values[lower]` looks like an
+   * obvious saving, and for finite numbers it is exact — but d3 still evaluates `(value1 -
+   * value0) * 0`, and when the next sample is an infinity that product is `NaN`, not zero. A
+   * quantile scale over a column holding `Infinity` has `[1, NaN]` for its thresholds upstream and
+   * had `[1, 2]` here, which moved two of four marks into the wrong colour bucket.
+   *
+   * **The second sample is `values[i0 + 1]`, not `values[ceil(i)]`.** They differ exactly when the
+   * position is a whole number, which is the case the short circuit used to hide: `ceil` names the
+   * same sample twice and d3 names the one after it.
+   *
+   * **`value0 + (value1 - value0) * w`, not `value0 * (1 - w) + value1 * w`.** The same line in
+   * algebra and not in floating point.
+   */
   private fun quantileSorted(values: List<Double>, p: Double): Double {
-    if (values.isEmpty()) return Double.NaN
-    if (values.size == 1) return values[0]
+    if (values.isEmpty() || p.isNaN()) return Double.NaN
+    if (p <= 0.0 || values.size < 2) return values[0]
+    if (p >= 1.0) return values[values.size - 1]
     val position = (values.size - 1) * p
     val lower = kotlin.math.floor(position).toInt()
-    val upper = kotlin.math.ceil(position).toInt()
-    if (lower == upper) return values[lower]
-    val weight = position - lower
-    return values[lower] * (1.0 - weight) + values[upper] * weight
+    val value0 = values[lower]
+    val value1 = values[lower + 1]
+    return value0 + (value1 - value0) * (position - lower)
   }
 }
 
@@ -1108,14 +1345,15 @@ public class ThresholdScale(
       return (lo - adjust) to (hi + adjust)
     }
 
+  /** Read without coercing, as `quantize` is; see the note on [QuantizeScale.scale]. */
   override fun scale(value: VegaValue): VegaValue {
-    if (rangeValues.isEmpty()) return VegaValue.Null
-    val x = value.asDouble()
-    if (x.isNaN()) return VegaValue.Null
+    if (rangeValues.isEmpty()) return VegaValue.Undefined
+    if (value is VegaValue.Null || value is VegaValue.Undefined) return VegaValue.Undefined
+    val x = JsSemantics.toNumber(value)
     // d3 clamps the search to one fewer than the range length, so extra domain values past the end
     // of the range are ignored rather than indexing off it.
     val limit = minOf(thresholds.size, rangeValues.size - 1)
-    return rangeValues[bisectRight(thresholds, x, high = limit)]
+    return rangeValues[if (x.isNaN()) 0 else bisectRight(thresholds, x, high = limit)]
   }
 }
 
@@ -1211,10 +1449,9 @@ public sealed interface ScaleTransform {
     override fun forward(value: Double): Double = ln(abs(value)) / logBase
   }
 
-  /** `symlog`, which does handle zero and both signs: `sign(x) * ln(1 + |x| / constant)`. */
+  /** `symlog`, which does handle zero and both signs. See [symlogForward]. */
   public data class Symlog(public val constant: Double = 1.0) : ScaleTransform {
-    override fun forward(value: Double): Double =
-      if (value < 0.0) -ln(1.0 + abs(value) / constant) else ln(1.0 + value / constant)
+    override fun forward(value: Double): Double = symlogForward(value, constant)
   }
 }
 
@@ -1233,7 +1470,14 @@ public class SequentialColorScale(
   public val space: ColorSpaces.Interpolation = ColorSpaces.Interpolation.RGB,
   /** `interpolate: {"type": "rgb", "gamma": y}` — only the RGB space has one. */
   public val gamma: Double = 1.0,
-  public val clamp: Boolean = true,
+  /**
+   * Whether a position outside `0..1` is pinned to the ramp's ends. **False**, as d3's is.
+   *
+   * See [colorAt]: this defaulted to true, so every continuous colour scale in this engine painted
+   * an out-of-domain value with the ramp's own first or last colour instead of extrapolating past
+   * it.
+   */
+  public val clamp: Boolean = false,
   /**
    * The space the ramp is walked in, for a colour scale built on a **transformed** scale type.
    *
@@ -1313,16 +1557,30 @@ public class SequentialColorScale(
   public fun colorAt(x: Double): SceneColor? {
     if (x.isNaN()) return null
     val raw = position(x)
-    // Sequential scales clamp by default, since a colour past the end of a ramp has no meaning.
-    if (!clamp && (raw < 0.0 || raw > 1.0)) return null
-    val along = raw.coerceIn(0.0, 1.0)
+    if (raw.isNaN()) return null
+    // **Only when the specification asks for it.** d3's continuous scale is
+    //
+    //     clamp ? Math.max(0, Math.min(1, x * k10)) : x * k10
+    //
+    // with `clamp` false until someone sets it, and a colour range does not change that. A value
+    // below the domain therefore takes a position below zero, the ramp's first segment is
+    // *extrapolated* through it, and the channels saturate — upstream's blues ramp one third of a
+    // domain below its start is `rgb(255, 255, 255)`, which is no colour in the scheme.
+    //
+    // This class defaulted to clamping and, worse, answered **nothing at all** when told not to: a
+    // value outside the domain of a `clamp: false` scale came back with no colour, where upstream
+    // has a colour for every finite number. Both halves were wrong in the same direction, which is
+    // why it looked consistent. Probed across six scale shapes; a range written out as two colours
+    // behaves the same way and only *looks* clamped, because extrapolating past pure black or pure
+    // white saturates back to itself.
+    val along = if (clamp) raw.coerceIn(0.0, 1.0) else raw
     val from = rampExtent.firstOrNull() ?: 0.0
     val to = rampExtent.getOrNull(1) ?: 1.0
     return ColorSpaces.sample(colors, from + along * (to - from), space, gamma)
   }
 
   override fun scale(value: VegaValue): VegaValue {
-    val colour = colorAt(value.asDouble()) ?: return VegaValue.Null
+    val colour = colorAt(scaleNumber(value)) ?: return VegaValue.Undefined
     return VegaValue.Str(colour.toCssHex())
   }
 
@@ -1339,7 +1597,17 @@ public class SequentialColorScale(
     // the labels by the diverging position too would bend them a second time.
     val lo = domain.first()
     val hi = domain.last()
-    if (lo == hi) return 0.0
+    // **The middle, for the same reason [position] answers the middle.** `scaleFraction` places
+    // labels with a plain linear scale over `[first, last]`, and d3's `normalize` answers
+    // `constant(0.5)` when the ends coincide:
+    //
+    //     return (b -= (a = +a)) ? function(x) { return (x - a) / b; } : constant(isNaN(b) ? NaN :
+    // 0.5);
+    //
+    // This answered 0 and put the one label a constant column earns at the *start* of the ramp
+    // rather than beside its middle — two readings of the same degenerate domain in one class, of
+    // which only [position] was upstream's.
+    if (lo == hi) return 0.5
     return ((x - lo) / (hi - lo)).coerceIn(0.0, 1.0)
   }
 

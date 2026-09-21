@@ -1,5 +1,7 @@
 package dev.aster.vega.runtime.differential
 
+import dev.aster.vega.model.DEFAULT_DECIMAL_PRECISION
+import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
@@ -514,8 +516,16 @@ public object Differential {
    * Deliberately short. A channel added here stops being compared where upstream states the default
    * and this omits it, which is right for a cap and would be wrong for anything whose absence means
    * "nothing was drawn".
+   *
+   * `dir` is the third, and it is the same shape: `textMetrics` asks `item.dir === 'rtl'`, so
+   * left-to-right is what every other answer means and `dir: "ltr"` is the default written down.
+   * Probed — a text mark drawn with `dir: "ltr"`, with `"rtl"` and with no `dir` at all emits the
+   * identical `<text>` element and the identical bounds; only a *limit* makes the direction
+   * visible, by truncating from the other end. This side records the direction only when it is
+   * `rtl`, which is the one case that changes what is drawn.
    */
-  private val IMPLIED_BY_ABSENCE = mapOf("strokeCap" to "butt", "strokeJoin" to "miter")
+  private val IMPLIED_BY_ABSENCE =
+    mapOf("strokeCap" to "butt", "strokeJoin" to "miter", "dir" to "ltr")
 
   private fun strokeDetails(stroke: Stroke, into: MutableMap<String, String>) {
     if (stroke.cap != StrokeCap.BUTT) into["strokeCap"] = stroke.cap.name.lowercase()
@@ -1487,9 +1497,13 @@ public object Differential {
             differences,
           )
         is BandScale -> {
-          if (reference.domain != scale.domain) {
+          if (reference.domain != harvested(scale.domain)) {
             differences.add(
-              Difference("scale $name domain", reference.domain.toString(), scale.domain.toString())
+              Difference(
+                "scale $name domain",
+                reference.domain.toString(),
+                harvested(scale.domain).toString(),
+              )
             )
           }
           compareNumberList(
@@ -1511,9 +1525,13 @@ public object Differential {
           }
         }
         is PointScale -> {
-          if (reference.domain != scale.domain) {
+          if (reference.domain != harvested(scale.domain)) {
             differences.add(
-              Difference("scale $name domain", reference.domain.toString(), scale.domain.toString())
+              Difference(
+                "scale $name domain",
+                reference.domain.toString(),
+                harvested(scale.domain).toString(),
+              )
             )
           }
           compareNumberList(
@@ -1536,12 +1554,12 @@ public object Differential {
           // `[alpha, beta, gamma, delta]` against `[alpha, beta]` on `scale-domain-implicit`, which
           // is the comparison looking at the wrong property rather than the engine losing values:
           // the marks in that fixture have always matched.
-          if (reference.domain != scale.effectiveDomain) {
+          if (reference.domain != harvested(scale.effectiveDomain)) {
             differences.add(
               Difference(
                 "scale $name domain",
                 reference.domain.toString(),
-                scale.effectiveDomain.toString(),
+                harvested(scale.effectiveDomain).toString(),
               )
             )
           }
@@ -1671,6 +1689,59 @@ public object Differential {
       }
     }
     return differences
+  }
+
+  /**
+   * A discrete domain as the **oracle** records one, for comparison with what it recorded.
+   *
+   * `normalize.js` writes each entry through `scaleValue`:
+   * ```js
+   * function scaleValue(value, precision) {
+   *   if (value instanceof Date) return canonicalNumber(+value, precision);
+   *   return typeof value === 'number' ? canonicalNumber(value, precision) : String(value);
+   * }
+   * ```
+   *
+   * — a number or a date as its **canonical digits**, everything else as `String(value)`, and those
+   * are not the same function. `canonicalNumber` rounds to the harvest precision and never writes
+   * the exponent form, so the reference records `1e-7` as `0`; `String(x)` writes `1e-7`.
+   *
+   * This used to call [asString] for both halves, which worked only while `asString` went through
+   * `canonicalNumberString` too. The moment that became `String(x)` — which is what a *label* is —
+   * a domain holding `1e-7` compared `1e-7` against a reference saying `0`, and the gate objected.
+   * Correctly: a comparison has to speak the recording's language, not the engine's.
+   *
+   * The note this used to carry still holds. The recording is text, so a null entry and the word
+   * for one are the same row in the reference, and it is a fixture's labels that tell those apart.
+   */
+  private fun harvested(domain: List<VegaValue>): List<String> = domain.map {
+    when (it) {
+      is VegaValue.Num -> harvestedNumber(it.value)
+      is VegaValue.Timestamp -> harvestedNumber(it.epochMillis)
+      else -> it.asString()
+    }
+  }
+
+  /**
+   * A number as the recording holds it, which is **rounded and then written by JSON**.
+   *
+   * `canonicalNumber` answers a *number*, not text — `Number(value.toFixed(precision))` — and
+   * `JSON.stringify` then writes it, which is `String(x)`. Two steps, and each contributes a case
+   * this got wrong in turn: the rounding takes `1e-7` and `5e-324` to **0**, and the writing takes
+   * `1e21` to **`1e+21`**, `toFixed` giving up at that magnitude and handing back the exponent form
+   * for `Number` to read straight back.
+   *
+   * So it is neither of the engine's two functions. `canonicalNumberString` rounds the same way and
+   * then deliberately *never* writes an exponent, which is right for an SVG attribute and wrong
+   * here; `asString` writes the exponent and does not round. The recording does one of each.
+   */
+  private fun harvestedNumber(value: Double): String {
+    if (!value.isFinite()) return Decimals.jsString(value)
+    // Above 10^21 `toFixed` hands back the exponent form unchanged, so the round trip is identity.
+    val rounded =
+      if (kotlin.math.abs(value) >= 1e21) value
+      else Decimals.trimmed(value, DEFAULT_DECIMAL_PRECISION).toDouble()
+    return Decimals.jsString(if (rounded == 0.0) 0.0 else rounded)
   }
 
   private fun compareNumberList(

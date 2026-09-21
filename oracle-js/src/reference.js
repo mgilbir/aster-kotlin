@@ -15,7 +15,12 @@ import { fileLoader, rootsFor } from './file-loader.js';
 import * as vega from 'vega';
 import { pinDeterminism } from './determinism.js';
 import { canonicalJson, canonicalNumber } from './canonical.js';
-import { normalizeNestedScales, normalizeScales, normalizeScene } from './normalize.js';
+import {
+  normalizeNestedScales,
+  normalizeScales,
+  normalizeScene,
+  surfaceSize,
+} from './normalize.js';
 
 const [specPath, outputPath] = process.argv.slice(2);
 
@@ -56,7 +61,7 @@ const reference = {
   spec: specPath.split('/').pop(),
   // The rendered surface size, which under Vega's default `autosize: pad` is the content bounds plus
   // padding — not width/height plus padding, because axis labels hang outside the plotting area.
-  size: surfaceSize(view),
+  size: surfaceSize(view, spec),
   scales: normalizeScales(view, scaleNames),
   // Only when there is something to record, so the 199 committed references do not all gain an
   // empty key. Most charts declare no scale inside a group.
@@ -72,31 +77,5 @@ writeFileSync(outputPath, canonicalJson(reference));
 
 await view.finalize();
 
-function surfaceSize(view) {
-  const padding = view.padding() || {};
-  const left = padding.left || 0;
-  const top = padding.top || 0;
-  const right = padding.right || 0;
-  const bottom = padding.bottom || 0;
-
-  // `autosize: none` uses the declared size verbatim and lets the content overflow, so the frame
-  // bounds say nothing about how large the surface is. Reading them anyway made a chart whose labels
-  // overhang look bigger than it renders.
-  const autosize = spec.autosize;
-  const type = typeof autosize === 'string' ? autosize : autosize && autosize.type;
-  if (type === 'none') {
-    return { width: view.width() + left + right, height: view.height() + top + bottom };
-  }
-
-  const frame = view.scenegraph().root.items[0];
-  const bounds = frame && frame.bounds;
-  if (!bounds) {
-    return { width: view.width() + left + right, height: view.height() + top + bottom };
-  }
-  return {
-    width: canonicalNumber(bounds.x2 - bounds.x1 + left + right),
-    height: canonicalNumber(bounds.y2 - bounds.y1 + top + bottom),
-  };
-}
 
 console.log(`Wrote ${outputPath} (${reference.marks.length} marks)`);

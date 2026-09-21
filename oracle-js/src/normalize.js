@@ -150,6 +150,42 @@ function dashOf(item) {
  * @param root the value of `view.scenegraph().root`
  * @returns {{marks: Array<object>}} marks in paint order, absolute coordinates
  */
+/**
+ * The rendered surface: the frame's own bounds plus the view's padding.
+ *
+ * **One definition, two callers.** `reference.js` harvests the fixture corpus and
+ * `property-sweep.js` harvests the schema sweep, and each had its own copy — which is how the
+ * sweep came to be measuring `autosize: none` by a rule the references do not use, and reporting
+ * an engine defect that was its own. A measurement worth making twice is worth defining once.
+ *
+ * `autosize: none` takes the declared size verbatim and lets the content overflow, so the frame's
+ * bounds say nothing about how large the surface is: a chart whose labels hang off the left renders
+ * at the size it asked for and is clipped. Every other mode grows to hold what it drew.
+ */
+export function surfaceSize(view, spec, precision = DEFAULT_PRECISION) {
+  const padding = view.padding() || {};
+  const left = padding.left || 0;
+  const top = padding.top || 0;
+  const right = padding.right || 0;
+  const bottom = padding.bottom || 0;
+  const declared = () => ({
+    width: view.width() + left + right,
+    height: view.height() + top + bottom,
+  });
+
+  const autosize = spec && spec.autosize;
+  const type = typeof autosize === 'string' ? autosize : autosize && autosize.type;
+  if (type === 'none') return declared();
+
+  const frame = view.scenegraph().root.items[0];
+  const bounds = frame && frame.bounds;
+  if (!bounds) return declared();
+  return {
+    width: canonicalNumber(bounds.x2 - bounds.x1 + left + right, precision),
+    height: canonicalNumber(bounds.y2 - bounds.y1 + top + bottom, precision),
+  };
+}
+
 export function normalizeScene(root, precision = DEFAULT_PRECISION) {
   const marks = [];
   walkMarktype(root, 0, 0, marks, precision);

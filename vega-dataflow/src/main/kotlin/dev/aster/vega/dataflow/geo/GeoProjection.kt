@@ -284,7 +284,7 @@ internal class ResampleStream(
 internal class NoResampleStream(
   target: GeoStream,
   private val project: (Double, Double) -> DoubleArray,
-) : DelegatingStream(target) {
+) : TransformingStream(target) {
   override fun point(x: Double, y: Double) {
     val p = project(x, y)
     sink.point(p[0], p[1])
@@ -336,13 +336,35 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
    *
    * Everything else — the scale, the translation, the reflections, the plane rotation, `clipExtent`
    * and `fitExtent` — is shared, which is why this is a flag rather than a second class.
+   *
+   * What the flag has to carry with it is everything `geoIdentity` **does not have**. Upstream's is
+   * `transform(postclip(stream))` and nothing else, with five setters — `scale`, `translate`,
+   * `reflectX`, `reflectY` and `clipExtent` — where this one is the spherical projection and has
+   * every setter there is. `vega-geo` applies a projection property only where the projection has a
+   * setter of that name (`set` is `if (isFunction(proj[key])) proj[key](value)`), so a `clipAngle`,
+   * a `center`, a `rotate` and a `precision` are all silently dropped on an identity projection
+   * upstream and were all honoured here. [clipAngle], [center], [rotate] and [precision] answer
+   * that by doing nothing on a planar projection, which is the same silence from the other side.
    */
   var planar: Boolean = false
     set(value) {
       field = value
-      if (value) preclip = { it }
+      if (value) {
+        preclip = { it }
+        // **No resampler**, which is not a property anybody set and so could not be dropped like
+        // one: upstream's identity pipeline has no resampling stage at all, and this one defaults
+        // to a threshold of 0.5. Left on, it subdivides against a *great-circle* midpoint of
+        // coordinates that are already on the page — a straight edge from `[-100, 20]` to
+        // `[-60, 20]` came out 1.7 pixels taller than the two points it joins, and a polygon across
+        // the antimeridian 40 wider than its own corners.
+        delta2 = 0.0
+      }
       recenter()
     }
+
+  /** Whether the spherical setters mean anything here; see [planar]. */
+  private val spherical: Boolean
+    get() = !planar
 
   private var preclip: (GeoStream) -> GeoStream = ClipAntimeridian::stream
   private var postclip: ((GeoStream) -> GeoStream)? = null
@@ -390,6 +412,7 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
   var swapsAxes: Boolean = false
 
   fun center(lambda: Double, phi: Double): Projection {
+    if (!spherical) return this
     val x = if (swapsAxes) -phi else lambda
     val y = if (swapsAxes) lambda else phi
     centreLambda = x % 360 * RADIANS
@@ -398,6 +421,7 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
   }
 
   fun rotate(values: DoubleArray): Projection {
+    if (!spherical) return this
     deltaLambda = values.getOrElse(0) { 0.0 } % 360 * RADIANS
     deltaPhi = values.getOrElse(1) { 0.0 } % 360 * RADIANS
     val gamma = if (values.size > 2) values[2] else 0.0
@@ -438,6 +462,7 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
    * instead.
    */
   fun clipAngle(value: Double): Projection {
+    if (!spherical) return this
     preclip =
       if (value != 0.0) {
         val circle = ClipCircle(value * RADIANS)
@@ -449,6 +474,7 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
   }
 
   fun precision(value: Double): Projection {
+    if (!spherical) return this
     delta2 = value * value
     return this
   }
@@ -636,7 +662,7 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
 
   /** Degrees in, radians out, rotated: the first stage of the pipeline. */
   private class RotateStream(target: GeoStream, private val rotation: Rotation) :
-    DelegatingStream(target) {
+    TransformingStream(target) {
     override fun point(x: Double, y: Double) {
       val r = rotation.forward(x * RADIANS, y * RADIANS)
       sink.point(r[0], r[1])

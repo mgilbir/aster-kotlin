@@ -39,12 +39,15 @@ internal object GuideFormat {
         "utc" -> TimeZone.UTC
         else -> return null
       }
+    // **No guard on a value that is not an instant**, because upstream has none: `tickFormat` hands
+    // the formatter whatever the tick is and d3 coerces it — `new Date(+value)` — so a column of
+    // words under a `formatType: "time"` is labelled with d3's arithmetic on an Invalid Date rather
+    // than with nothing. Answering the empty string here was a label narrower than upstream's, and
+    // on an axis whose labels are turned on their side that is the height of the whole chart.
+    // [TimeFormat.format] carries it; `InvalidDateFormatTest` holds d3's answers.
     return { instant ->
-      when {
-        instant.isNaN() -> ""
-        format == null -> TimeTicks.label(instant, zone, locale)
-        else -> TimeFormat.format(instant, format, zone, locale)
-      }
+      if (format == null) TimeTicks.label(instant, zone, locale)
+      else TimeFormat.format(instant, format, zone, locale)
     }
   }
 

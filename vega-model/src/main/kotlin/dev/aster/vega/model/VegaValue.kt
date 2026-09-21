@@ -146,8 +146,32 @@ public fun VegaValue.asNumberOrNull(): Double? =
   }
 
 /**
- * Vega's coercion to number. Returns `NaN` rather than throwing, because Vega expressions and
- * scales are expected to propagate `NaN` instead of failing the whole dataflow.
+ * **The number in this value, if there is one** — and deliberately not JavaScript's `Number(x)`.
+ *
+ * The two agree wherever a value has a number in it and part company where one does not:
+ * ```
+ *              Number(x)   asDouble
+ * null              0         NaN
+ * ""                0         NaN
+ * []                0         NaN
+ * ```
+ *
+ * `Number` is a *coercion*: it has an answer for everything, and zero is the answer it gives when
+ * there is nothing to convert. This is a *reading*: `NaN` means the value held no number, and the
+ * callers depend on that — an aggregate skips a row whose field reads `NaN`, which is how a column
+ * with empty cells in it gets a `min` rather than a zero. d3's own `extent` draws the same line,
+ * `value != null && value >= value`, and answers `undefined` for a column of nulls where a coercion
+ * would answer `[0, 0]`.
+ *
+ * Measured rather than assumed: making this faithful to `Number()` and running the whole corpus
+ * moved **two** tests, and one of them was `extent` over a column of nulls going from nothing to
+ * `0,0`. So the 148 places that read a value this way are reading it correctly.
+ *
+ * Where upstream really does write `+x` — every scale, whose `x == null || isNaN(x = +x)` is a
+ * coercion — use `JsSemantics.toNumber`, which is `Number(x)` exactly. `scaleNumber` in the runtime
+ * is that line, null guard and all. The two functions exist separately because this one lives in
+ * `vega-model` and cannot see `vega-expression`; that is a layering fact and not a duplication to
+ * be tidied away.
  */
 public fun VegaValue.asDouble(): Double =
   when (this) {
@@ -164,14 +188,27 @@ public fun VegaValue.asDouble(): Double =
   }
 
 /**
- * Vega's coercion to string. Numbers use [canonicalNumberString] so that the same value always
- * produces the same text in labels, SVG output and snapshots.
+ * **`String(x)`**, which is a different thing from the way a coordinate is written down.
+ *
+ * Numbers go through [Decimals.jsString], the shortest decimal that reads back as the same double,
+ * with JavaScript's own notation thresholds: below 10^-6 and at or above 10^21 it is the exponent
+ * form, and in between it is not.
+ *
+ * It used to go through [canonicalNumberString], and that is a **coordinate** formatter with its
+ * own stated rules — six decimal places, and never the exponent form, because an SVG attribute
+ * parser and a golden diff both read a plain decimal more reliably. Right for an `x`, wrong for a
+ * *label*: the two part company exactly at those thresholds, so a text mark over `1e-7` read `0`
+ * and one over `1e21` read `1000000000000000000000` where upstream writes `1e-7` and `1e+21`.
+ *
+ * Both are still here because both jobs are real, and the pair is the same shape as [asDouble]
+ * beside `JsSemantics.toNumber`: a *reading* and a *coercion* that agree on everything a chart
+ * usually holds. Found by the value sweep, which is the corpus that holds the unusual ones.
  */
 public fun VegaValue.asString(): String =
   when (this) {
     is VegaValue.Str -> value
-    is VegaValue.Num -> canonicalNumberString(value)
-    is VegaValue.Timestamp -> canonicalNumberString(epochMillis)
+    is VegaValue.Num -> Decimals.jsString(value)
+    is VegaValue.Timestamp -> Decimals.jsString(epochMillis)
     is VegaValue.Bool -> value.toString()
     is VegaValue.Null -> "null"
     is VegaValue.Undefined -> "undefined"

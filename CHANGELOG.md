@@ -6,7 +6,1559 @@ section here does not get released.
 
 ## Unreleased
 
+### Changed
+
+- **A discrete scale's domain holds values, not their text.** `BandScale.domain`,
+  `PointScale.domain` and `OrdinalScale.domain` are `List<VegaValue>` where they were
+  `List<String>`, and `BandScale.invert` and `invertRange` answer values for the same reason. It is
+  a source-incompatible change to those five signatures, and it is what upstream's own shape is: d3
+  builds a discrete scale's index on an `InternMap`, keyed by **value**, so `scale("1001")` finds
+  nothing where `scale(1001)` finds a band, and `+null` is `0` where `+"null"` is `NaN` — a
+  time-formatted axis reads `01 AM` for a null band and read `0NaN` here.
+
+  Three rules come with it, each upstream's and none derivable from the others: a *data-driven*
+  domain dedups by the group key `'' + value` and keeps the group's first raw value; a *literal*
+  domain dedups through the `InternMap` by value, so `[1001, "1001"]` stays two entries; and a band
+  scale answers **`undefined`** rather than a null for a value it does not hold. Two further
+  transcriptions fell out: the guides now coerce with `Number(value)` rather than a looser reading,
+  and a caption's long date form uses the locale's own `%X` instead of a second spelling of the
+  American clock that had drifted to a padded hour — `1:00:01 AM` upstream against `01:00:01 AM`
+  here, visible only before ten in the morning.
+
+- **A schema sweep for Vega-Lite, comparing the Vega it compiles into.** The sister of the Vega
+  property sweep, one layer up. That one sweeps what Vega declares and compares the *scene*; this
+  sweeps what **Vega-Lite** declares and compares the **specification it emits**, because that is
+  where a Vega-Lite defect lives. Vega-Lite's whole value is the defaults it supplies — a scale type,
+  a stack transform, a tick count, a label angle, a band size — and every one of them is a property
+  of the Vega it produces. Comparing the emitted specification names the rule that drifted; comparing
+  the picture would say "some marks moved".
+
+  The surface is much larger than Vega's: 458 definitions, a `MarkDef` of 88 properties, an
+  `Encoding` of 38 channels, a `Config` of 72. The 283 fixtures cover what people draw; this covers
+  what the schema says can be written. One family per **mark type**, twelve of them, sweeping the
+  `MarkDef` table against a chart that suits the type — an arc gets a `theta`, a line an ordered `x`,
+  a text something to write. **8484 specifications, every one of which upstream compiles.**
+
+  `scripts/vega-lite-property-sweep.sh` runs it; `VegaLitePropertySweepTest` is the comparison, and
+  it is **a measurement rather than a gate**, the same course the other sweeps took.
+
+  It found **67 differences**, in five causes:
+
+  * **`cornerRadiusEnd` on a mark that is not a bar** — 44 of the 67. Upstream emits nothing for it
+    on an arc, an area, a circle or a point; this compiler writes `cornerRadiusTopLeft` and
+    `cornerRadiusTopRight` onto all of them;
+  * **`invalid`** — `break-paths-show` and `break-paths-filter` build a different data pipeline here:
+    a filter that upstream does not add, a source a scale's domain names differently, and one data
+    entry too many or too few;
+  * **`outerRadius` on a text mark** — upstream emits a `radius` and this does not;
+  * **`baseline` on a rect or a tick** — a `yc.band` missing from the emitted encoding;
+  * **`align`, `size` and `orient`** on one mark type each.
+
+  Recorded rather than fixed in this change: the sweep is a measurement, and each of those is its own
+  defect with its own fix.
+
+- **The sweep reads the configuration, and finds a family of defects.** Eighteen families more, one
+  per configuration block plus one for the fourteen scalars at its top. A configuration is a
+  *different code path* to the same properties: `getMarkConfig` walks the configuration chain and
+  never looks at the mark definition, where `getMarkPropOrConfig` reads the definition first, and the
+  two have already disagreed here over `invalid`. A property the mark families agree on may still be
+  read wrongly out of a theme — which is exactly what this found. The axis block is swept three times
+  over, plain and `axisX` and `axisBand`, because the same table resolved at three scopes is three
+  answers and which one wins is the rule rather than the value.
+
+  **21251 specifications, up from 9274**, every one of which upstream compiles.
+
+  It found **156 differences**, all of them in the new families and none in the old. The largest
+  group is one sentence: **a mark property written in a theme is not read.** A `size`, a
+  `discreteBandSize`, a `radius`, an `outerRadius`, a `theta`, a `startAngle`, a `cornerRadiusEnd`,
+  an `x` or a `y` on `config.bar`, `config.text`, `config.arc`, `config.tick` or `config.rect` leaves
+  the mark at the default it would have taken with no theme at all — a bar keeps its bandwidth where
+  upstream gives it the configured width, an arc keeps `min(width,height)/2` where upstream gives it
+  the configured radius. The rest: `aria` and `ariaRoleDescription` from a theme, the four
+  `gradient*Length` bounds and `unselectedOpacity` on `config.legend` passed through to the output
+  instead of being read, `continuousPadding` and `bandPaddingOuter` on `config.scale`, `titleAngle`
+  on `config.header`, `orient` on the axis blocks, `fieldTitle`, and `invalid` choosing a domain's
+  source.
+
+  Recorded rather than fixed in this change: the sweep is a measurement, and each cause is its own
+  fix.
+
+- **The sweep reads the encoding, and finds four causes.** Nineteen families more, one per
+  **encoding channel**, sweeping the properties that channel's field definition declares — the same
+  reasoning one level over from the mark: what a property means is the channel's question, and a
+  `stack` belongs to a position where a `legend` belongs to a colour. Several channels appear twice
+  under different measures, because the measure is most of what decides the answer: an `x` over a
+  number and an `x` over a date are different charts, and a rule that reads one correctly can still
+  read the other wrong. **9274 specifications, up from 8484**, every one of which upstream compiles.
+
+  The generator now asks each family what to read rather than knowing: it had `MarkDef` written into
+  its loop, which is why the encoding was never swept.
+
+  It found **58 disagreements**, of which **34 are defects here** in two causes:
+
+  * **a counting aggregate does not re-type its channel** — 32 of the 34, across eight families.
+    `count`, `distinct`, `valid` and `missing` force the type to quantitative whatever the chart
+    stated, and upstream says so out loud: *Invalid field type "nominal" for aggregate: "count",
+    using "quantitative" instead*. Left nominal, the channel keeps a band or ordinal scale where
+    upstream builds a linear one, and the axes, the legend and the mark's extent all follow it;
+  * **`stack: "normalize"`** on a nominal `y` and on a temporal `x`, where upstream formats the
+    axis `.0%` and this does not.
+
+  Recorded rather than fixed in this change: the sweep is a measurement, and each of those is its own
+  defect with its own fix.
+
+  The other **24 are upstream's**, and the sweep now reports those apart rather than counting them
+  against this compiler — a sweep that only counts differences invites the next reader to close them
+  all, and these must not be closed. Both emit a specification that does not work:
+
+  * a bucketed instant on a **polar** channel makes upstream read `…_offsetted_rect_start` and
+    `…_offsetted_rect_end`, columns no formula in the same specification writes.
+    `useRectOffsetField = fieldDef.timeUnit && bandPosition !== 0.5` is true when `bandPosition` is
+    *undefined*, which it is for an arc since no `timeUnitBandPosition` is configured for one, while
+    the formulas that would write those columns are guarded by
+    `rectBandPosition !== undefined && !== 0.5`. The angle resolves to nothing and the arc is not
+    drawn. 22 cases;
+  * a **`bandPosition` outside `[0, 1]`** is written into a *signal* using bare column names —
+    `scale("theta", 5 * v_start + -4 * v_end)` — because the `datum` guard is
+    `0 < bandPosition && bandPosition < 1`. That is right at the two edges, where the name is a
+    field reference, and wrong outside them, where it is a signal. `vega.parse` refuses the result
+    outright: *Unrecognized signal name: "v_start"*. 2 cases.
+
+  Both are **listed, not skipped**: still compared, and reported under their own heading with the
+  reasoning, so the day upstream fixes one the case starts failing rather than sitting unnoticed in a
+  skip list.
+
+  One difference was the instrument's own and is fixed here rather than recorded. The facet families
+  first gave `row` and `column` the same column that was already on `x`; upstream emits
+  `groupby: ["c", "c"]` for that chart and this compiler emits `["c"]`, so all 30 cases in both
+  families reported that one disagreement instead of the property each was there to try. The facet
+  channels now take a different column. The disagreement itself is real and is written down here so
+  that changing the chart does not lose it.
+
+- **The sweep reads `config.range`, and agrees.** The six palettes a theme sets — `category`,
+  `ordinal`, `heatmap`, `ramp`, `diverging`, `symbol` — read from `vega-parser`'s own default
+  configuration, since the schema declares `config` as an object and says nothing about what goes in
+  it. A chart that says `"range": "category"` is saying "whatever the theme thinks a category looks
+  like", which is how every Vega-Lite chart gets its colours. Its own base chart, with one scale per
+  name so each entry has something to land on. **7510 charts, up from 7499.**
+
+  **No differences.** Recorded because a measurement that found nothing is still a measurement, and
+  the families stay as a net: all three forms a range is written in — a scheme by name, the colours
+  written out, and a scheme with an `extent` that reverses it — agree entry for entry.
+
+  Each case was checked to *change the drawing* before the agreement was believed. Two did not at
+  first: a diverging range given `extent: [0, 1]` draws what a plain one draws, because an override
+  replaces the default entry rather than merging into it and the default's `[1, 0]` goes with it;
+  and a cross, a diamond and a square all measure the same box, so a row of them says nothing about
+  which was drawn. A case that cannot fail is not evidence.
+
+- **The sweep reads the view itself, and both harvesters measure the surface with one function.**
+  `width`, `height`, `padding`, `autosize` and `background`: the five properties a specification
+  writes beside its marks, which decide how big the drawing is rather than what is in it. Every case
+  the sweep compares already checks the surface, so this is the one family whose whole subject is the
+  number every other family checks in passing. **7499 charts, up from 7482.**
+
+  `autosize` and `padding` are each declared as *either* a word or an object, and the generic rules
+  pick the word: sweeping only that leaves `contains` and `resize` unreached, and
+  `contains: "padding"` moves every mark in the chart. Both forms are swept now.
+
+  The first difference it reported was its own. `reference.js` and `property-sweep.js` each had a
+  copy of `surfaceSize`, and only one of them knew that `autosize: none` takes the declared size
+  verbatim and lets the content overflow — so the sweep measured the reference by one rule and this
+  engine by another, and called the gap a defect. There is one definition now, in `normalize.js`,
+  and both harvesters import it. **A measurement worth making twice is worth defining once.**
+
+- **The sweep reads the mark config blocks, which reach every encode channel.** `config.rect.blend`
+  and a rect's own `blend` are the same channel and a different piece of code. Eleven families — one
+  per mark type, plus `config.mark` and `config.style.<name>` — each writing the channel table the
+  matching `encode-<type>` family writes, into `config` rather than onto the mark. **7482 charts, up
+  from 4733**, and 368 differences in 19 of the 57 channels a mark config can carry. Fixed below.
+
+- **The sweep reads a group's `layout`, which is a subsystem no other family reaches.** Every other
+  chart the sweep writes has one group or none, and every one of the ten layout properties is a
+  relationship *between* cells: how they line up, how far apart they sit, whether a cell narrower
+  than its column hugs the left of it or floats in the middle. So the family brings a trellis of its
+  own — six cells of six widths and two heights in a grid of three, each with a title for
+  `titleBand` to band and an axis for `bounds: "full"` to measure, because the differences between
+  the cells are the only thing any of these properties can act on. **4733 charts, up from 4702.**
+
+  Four differences, all real and all fixed in this release. Writing the base chart found a fifth
+  thing worth knowing: a facet group's datum is its grouping key and nothing else, so a cell that
+  reads `{"field": "w"}` off a facet grouped by `c` alone finds no width at all — which is how the
+  `bounds: "flush"` case came to be measuring sizeless cells, and how the missing fallback surfaced.
+
+- **The sweep reads the `config` block, which is the same property table reached by different code.**
+  `config.axis.labelAngle` and an axis's own `labelAngle` are one property and two pieces of code:
+  upstream reads every axis property through `lookup(spec, config)`, which answers
+  `spec[p] ?? config[p]`, so a property this engine reads off the specification alone is honoured
+  there and ignored here — silently, and for every chart that sets a theme rather than an axis. The
+  schema has nothing to say about `config`: it declares it as `{"type": "object"}`, so the properties
+  come from the guide's own table and the *route* is what is being swept. **4702 charts, up from
+  4104.**
+
+  A config family also reaches **both** axes where the `axis` family reaches only `axes[0]`, which is
+  how the widening found a defect that has nothing to do with config at all. Three differences, all
+  real, and all now fixed in this release: `tickOffset` applied only to a band axis, `position` read
+  from the config, and the band correction sitting below `config.axis` instead of above it.
+
+- **The sweep reads every projection, which nothing else here reaches by property.** A projection is
+  the one part of a specification whose correctness is invisible until it is drawn: a formula, a
+  clipping rule and a resampler, and the whole of it lands in a path string. The corpora cover the
+  handful of maps people draw; `GeoProjectionTypesTest` pins each type's default constants against
+  `d3-geo`'s own path strings. Neither reaches a *property* — a `clipAngle` on a stereographic, a
+  `fit` on an `albersUsa`, a `precision` of zero.
+
+  One family per registered type, seventeen of them, read from `vega-projection`'s own registry
+  table rather than written down. Each draws the same small geography, chosen to be awkward: a
+  polygon at the pole, one across the antimeridian that has to be cut in two and stitched to the
+  seam, a line with no area and a bare point, which is drawn by `pointRadius` rather than by the
+  projection at all. Two comparisons rather than one — `geoshape` for the path string, where the
+  clipping and the resampling live, and `geopoint` for an x and a y, which is the formula with
+  nothing to hide behind. **4127 charts, up from 2999.**
+
+  Properties come from the schema *and* from `projectionProperties`, the nineteen names upstream
+  forwards in code: `reflectX` and `reflectY` are missing from the schema, and so are the nine that
+  belong to projection families `vega-projection` does not register. Their shape is read off a live
+  projection rather than written here. Two mechanisms were needed and both are general: a family may
+  now state values for a property whose schema declaration is a *container* rather than a value —
+  `fit` is "an object or an array", and the array rule was offering a projection `[4, 2]` to fit
+  itself to — and a family may now state that a property is **swept here** against a shared skip,
+  which `scale` needed: it names a scale everywhere in a specification except on a projection, where
+  it is the zoom, and the shared skip had quietly taken the most consequential number a map has.
+
+  The widening found **68 differences in five causes**, all real:
+
+  * the **identity** projection honours four things `d3-geo`'s does not have. Its identity is an
+    affine transform — `transform(postclip(stream))`, with setters for `scale`, `translate`,
+    `reflectX`, `reflectY` and `clipExtent` and nothing else — where this engine builds it out of
+    the spherical projection with a flag, so a clip angle clips it to a circle, a centre and a
+    rotation turn it, and the adaptive **resampler** runs on coordinates that are already on the
+    page: a straight edge from `[-100, 20]` to `[-60, 20]` bulges by 1.7 pixels, because the
+    midpoint it tests for is a great-circle midpoint. 63 of the 68;
+  * `precision: 0` on a gnomonic or an orthographic projection resamples differently;
+  * `scale: 0` on a mercator or a transverse mercator leaves this engine measuring `-Infinity` where
+    upstream draws a two-unit shape;
+  * `clipAngle: 0` on a stereographic projection clips to something different here;
+  * a projection's **`angle`** is applied here and ignored upstream — found by reading rather than by
+    the sweep, since the schema does not declare it. It is not in `projectionProperties`, so
+    `vega-geo` never forwards it, and probed: an `angle` of 30 moves nothing upstream.
+
+  Recorded rather than fixed in this change: the sweep is a measurement, and each of those is its own
+  defect with its own fix.
+
+### Changed
+
+- **A gradient legend over a scale that carries no colours is reported rather than matched.** This is
+  a deliberate divergence, recorded with its evidence rather than left to be rediscovered.
+
+  Upstream draws the legend. `scale_gradient` does not ask what kind of scale it has — it samples it
+  and stores whatever comes back as the stop's colour, `stops.forEach(_ => gradient.stop(fraction(_), scale(_)))`
+  — so a `size` scale ranged `[4, 361]` yields
+  `{"gradient": "linear", "stops": [{"color": 4, "offset": 0}, {"color": 27.8, …}]}`: a gradient whose
+  stops are **numbers**. Vega emits it and no renderer can paint it.
+
+  Matching it would mean widening `GradientStop.color` from `SceneColor` to something that can hold a
+  number, through every renderer that consumes it — the Android canvas, the SVG writer, and the Swift
+  surface, where it is a published type and moves the foreign API snapshot. The return is a legend
+  that still cannot be drawn. So this reports instead, which tells the reader what upstream leaves
+  them to discover from a blank space.
+
+  Reachable from Vega-Lite by `{"legend": {"type": "gradient"}}` on a size or shape channel, which is
+  why it is a diagnostic rather than a silent skip. Found when the Vega-Lite compiler began honouring
+  a stated legend type and its fixture could not draw the half it now emitted correctly.
+
 ### Fixed
+
+- **A guide's `formatType` reaches further than its own labels, and a header's `labelExpr` comes
+  from the theme too.** `getFormatMixins` reads the *guide's* pair for anything that is not a plain
+  string definition — `getGuide(fieldDef)` — so an `axis` block settles two rules for the whole
+  channel.
+
+  `addLineBreaksToTooltip` uses the array-aware form only for a discrete field with no time unit and
+  `!getFormatMixins(channelDef).format && !getFormatMixins(channelDef).formatType`. This checked the
+  format and not the type, and read a category out as a joined list where upstream reads a word.
+
+  `isFieldOrDatumDefForTimeFormat` is
+  `formatType === 'time' || (!formatType && isTemporalFieldDef(fieldOrDatumDef))`, and it decides
+  **both** whether a column is parsed into dates and whether it is spoken as one. A temporal field
+  whose axis says `number` is therefore not parsed at all: upstream emits the source rows untouched,
+  with no formula and no dataset derived from one, and leaves a time scale standing over raw strings.
+  The same predicate now governs both sites here, where each had its own half of it.
+
+  And `assembleLabelTitle` asks `getHeaderProperties([…, 'labelExpr'], facetFieldDef.header, config, channel)`
+  — the header block and then the theme. Read from the header alone, a `config.header.labelExpr` was
+  dropped and a theme that captions every cell of every trellis captioned none of them.
+
+  `a-heading-a-theme-wrote-itself` is new. The format-type rules are held by `GuideFormatTypeTest`
+  rather than by a fixture, and deliberately: every chart they need is degenerate — a number format
+  over a category, a time scale over unparsed text — and upstream's rendering of those lays out eight
+  pixels differently from this runtime's. That difference is real, unexplained, and **not** what these
+  rules are about; a fixture carrying it would fail the scene comparison for an unrelated reason. Four
+  mutants, all killed.
+
+  **This closes the string sweep: 27489 of 27513, and nothing differs.**
+
+
+- **Three places can say a mark links somewhere, and this read one.**
+  `cursor(markDef, encoding, config)` asks
+  `encoding.href || markDef.href || getMarkPropOrConfig('href', markDef, config)`, so a theme giving
+  every bar the same link makes every bar clickable. This read only the channel, so a themed link
+  drew no pointer and the reader had nothing to tell them the mark could be followed.
+
+  Both guards run through the chain too —
+  `const specifiedCursor = getMarkPropOrConfig('cursor', markDef, config); if (specifiedCursor === undefined) { … }`
+  — so a `cursor` a *theme* settles suppresses the pointer exactly as one on the mark does.
+
+  Three fixtures, because a configuration is chart-level and the cases contradict: a themed link, a
+  chart with no link at all that must have no cursor, and a theme that settles both. Four mutants,
+  all killed; two of them needed the third fixture, a mark-stated cursor being unable to tell a
+  chain-wide guard from a mark-only one.
+
+### Changed
+
+- **The sweep reads a stated string.** `declaredValues` handled enums, booleans, numbers, colours and
+  number arrays, and skipped every property whose schema says only "string" — 77 of them across the
+  families, the largest omission the manifest recorded and a limitation of the generator rather than
+  a decision about what is worth trying. **27513 specifications, up from 27251**, and the skip count
+  falls from 782 to 520.
+
+  One value each, chosen to be a value the property can actually take: a d3 specifier where a format
+  is wanted, a Vega shape name where a symbol is, prose where nothing distinguishes one string from
+  another. A nonsense string would still compile and still be compared, but it would compare a chart
+  nobody could draw, and a difference found that way costs more to read than it is worth.
+
+
+- **A legend told which kind to be, and one told its swatches' opacity.** `getLegendType` is
+  `getFirstDefined(legend.type, defaultType(params))`, so a channel that states its legend's kind
+  gets it — and every rule keyed off the kind follows: which properties survive the prefix filter,
+  whether a `gradientLength` is written, which encode block is built. Read as the inferred kind
+  alone, a stated one was ignored.
+
+  A legend that is the kind it would have been anyway **does not say so**:
+  `if (isColorChannel(channel) && isContinuousToContinuous(scaleType)) { if (legendType === 'gradient') return undefined; } else if (legendType === 'symbol') return undefined;`.
+  Only the kind that had to be asked for is written; this wrote whatever the chart stated, so the
+  redundant half came out too.
+
+  And a legend naming a `symbolOpacity` has said all there is to say — it reaches the swatch through
+  Vega's own legend handling, so upstream stops deriving one from the mark and writes nothing into
+  the encode block. Derived anyway, the mark's opacity was written *over* the legend's: a chart
+  asking for swatches at a tenth got them at the marks' seven tenths. The test is for **presence**,
+  not truth, so a legend asking for zero suppresses the derived value too.
+
+  `a-legend-told-which-kind-to-be` is new, five rows. Six mutants, all killed — but only after the
+  fixture was rebuilt twice: a concatenation **shares its scales by default**, so four rows over four
+  distinct fields still collapsed into two legends that tested none of them. It now resolves its
+  scales independently, and says so.
+
+  **The last 8 of the guide sweep's differences close with this: 27227 of 27251, and nothing
+  differs.**
+
+
+- **A scale property its channel does not understand is not honoured.** Two of them, each with its
+  own test.
+
+  A **scheme** is a colour channel's word:
+  `case 'interpolate': case 'scheme': case 'domainMid': if (!isColorChannel(channel)) { return log.message.cannotUseScalePropertyWithNonColor(propName); }`,
+  and `parseRangeForChannel` then falls through to the range the channel would have taken anyway. A
+  position given `category10` is still `[0, width]`. Written through, Vega was handed a horizontal
+  axis whose range was a palette, and the marks were placed at colours.
+
+  **`rangeMin`/`rangeMax`** replace the ends of a range only where there are two ends to replace:
+  `isArray(d) && d.length === 2`. A colour scale's default range is the word `"ramp"`, so the two
+  properties do nothing there; filling the missing end with a zero turned it into a range between
+  two numbers, which paints nothing. The length test is a length test and not a null check because
+  of `strokeDash`, whose default range is an array of **five** dash patterns — no single end to
+  replace, and upstream leaves all five alone.
+
+  `a-scale-property-its-channel-understands` is new, four rows, two of which must not move: a
+  `rangeMin` on a size, where the default range is a genuine pair and it does what it says, and the
+  `strokeDash` case. Four mutants, all killed — the last only after the `strokeDash` row was added,
+  which is what made the length test reachable at all.
+
+  **23 of the guide sweep's differences close with this**; 27219 of 27251 agree.
+
+
+- **A legend keeps only the words its own kind understands.** The test is the property name's
+  **prefix**, not a list:
+  `if ((legendType === 'gradient' && property.startsWith('symbol')) || (legendType === 'symbol' && property.startsWith('gradient'))) { continue; }`.
+  A ramp has no symbols to colour and a row of swatches has no ramp, so the settings of the other
+  kind are dropped where they are *read* rather than ignored where they are drawn. Written through,
+  as this compiler wrote them, Vega is handed a legend carrying instructions for the kind it is not.
+
+  `a-legend-keeps-its-own-kinds-words` is new: a gradient legend and a symbol legend given the same
+  six properties, so each row carries its own must-not-change half. `titleColor` and `labelColor`
+  survive on both, because the rule is a prefix test and a property that merely *contains* the other
+  kind's name is untouched. Five mutants, all killed, including the whole-name test in place of the
+  prefix.
+
+  **444 of the guide sweep's 516 differences close with this** — one rule, appearing once per CSS
+  colour name the schema declares, times three properties. 27196 of 27251 agree.
+
+### Changed
+
+- **The sweep reads a channel's own guides.** Eight families more, one per (guide, channel) pair —
+  `{"encoding": {"x": {"axis": {…}}}}` and its kin — over the four tables the encoding families had
+  been skipping with "a family of its own to write": `Axis` at 78 properties, `Legend` at 66,
+  `Header` at 32, `Scale` at 24.
+
+  A channel's own block is a **different code path** from a theme's, which is why both are swept: the
+  stated one is explicit where the configured one is derived, and upstream resolves them with
+  different functions. **27251 specifications, up from 21251**, every one of which upstream compiles.
+
+  All three `guide-axis-*` families came back clean, which is a result rather than an absence: a
+  channel's own axis block was already faithful.
+
+
+- **An assembled axis writes everything the chart stated, then everything derived.** Two rules
+  compose to give that order. `parseAxis` fills the component by walking `AXIS_COMPONENT_PROPERTIES`
+  rather than in whatever order its rules fire, and `Split.combine` puts the halves in a stated
+  order with a comment saying so: `{...this.explicit, // Explicit properties comes first
+  ...this.implicit}`.
+
+  This compiler walked its own insertion order, which agrees wherever the two coincide and not
+  otherwise. The clearest case is an axis stating a `labelAngle`: the angle was written before the
+  `labelAlign` it *derives*, where upstream writes every stated property first and the derived
+  alignment later, among the implicit ones.
+
+  The document's own `aria: false` moves with it. Upstream spreads it after `...axis`, which in
+  JavaScript overwrites an existing key **in place** and appends only a new one — and its component
+  already carries an `aria`, so the value lands at the property's own position rather than at the
+  end. It is now written into the component for the same reason, still overruling an axis that
+  states `aria: true`.
+
+  **No gate here can see any of this**: `SpecDiff` ignores object key order by design.
+  `AxisKeyOrderTest` is new and holds it, with upstream's own output for the same chart pasted whole
+  rather than summarised. Three order-only mutants are killed by it while the fixture gate stays
+  green, which is what says it earns its place.
+
+
+- **An assembled scale writes its keys in upstream's order.** `assembleScalesForModel` builds the
+  object from a literal rather than by accumulating into one, so the order is stated rather than
+  incidental: `{name, type, ...domain, ...domainRaw, range, ...reverse, ...otherScaleProps}`.
+  `domainRaw` and `reverse` are the two this compiler left to fall in wherever they happened to be
+  set — a selection's raw domain arriving after the range, a reverse anywhere at all.
+
+  **No gate here can see it.** `SpecDiff` ignores object key order, by design and for good reason:
+  two specifications differing only in key order are the same specification to Vega, and to every
+  reader that is not a human diffing bytes. So the fixtures, the scene comparison and the
+  21251-case sweep all agree either way. `ScaleKeyOrderTest` is new and holds it instead, on the
+  precedent of `JavaScriptKeyOrderTest` and `RoundedStackGroupOrderTest`.
+
+  Both order-only mutants — `reverse` before `range`, `domainRaw` after it — are killed by that test
+  while the fixture gate stays green, which is the demonstration that it earns its place.
+
+
+- **`config.view` is one of the mark blocks, and an object-valued `config.mark.tooltip` is spent
+  rather than passed on.** Two things a configuration must not hand Vega.
+
+  `MARK_STYLES = new Set(['view', ...PRIMITIVE_MARKS])`, and the loop over it deletes the generic
+  `VL_ONLY_MARK_CONFIG_PROPERTIES` from every member *and then* whatever that member has in the
+  mark-specific table — where `view`'s entry is its five sizes. This compiler dropped the sizes and
+  kept the rest, so `config.view.invalid`, a word Vega has never heard, was renamed into the `cell`
+  style and shipped. The two lists are now applied to `view` by the same rule as to `bar` and `rect`,
+  which is what upstream's single loop does.
+
+  `if (config.mark.tooltip && isObject(config.mark.tooltip)) delete config.mark.tooltip`: a tooltip
+  written as an object says *which* fields to show, a question only Vega-Lite can answer, and it is
+  spent while compiling into the `tooltip` channel on the marks. A bare `true` is Vega's own switch
+  and travels through untouched.
+
+  `a-config-block-that-keeps-only-vegas` and `a-config-tooltip-vega-understands` are new — two charts
+  because a configuration is chart-level and the two tooltip forms contradict. Four mutants, all
+  killed, including the one that drops *every* tooltip rather than only the object form.
+
+
+- **A guide's default caption comes from one of three formatters, and `config.fieldTitle` picks
+  which.** `defaultTitleFormatter` switches on it — `plain` is the bare field, `functional` spells
+  the derivation as a call, and everything else is the verbal one. Only the verbal one was
+  implemented here, so a theme asking for either of the others was answered with prose it had not
+  asked for: `Mean of v` where the chart wanted `v` or `MEAN(v)`.
+
+  The key itself reaches the emitted configuration either way — Vega has no use for it and upstream
+  passes it through regardless — which is why a sweep over what is *emitted* could not see this, and
+  why it was recorded as debt when the key's pass-through was fixed.
+
+  Two edges are upstream's own and are reproduced rather than tidied. A **count** has no field, so
+  `functional` writes the literal `COUNT(undefined)` — JavaScript's stringification of an absent
+  value, where Kotlin's would be `null`. And under `plain` that same count has no title at all, so
+  its field is announced in the spoken description under an **empty name**: `": " + format(…)`,
+  the number read out with no label. That branch was unreachable until `plain` began to be honoured.
+
+  `a-field-title-spelled-plain` and `a-field-title-spelled-functional` are new, five panels each —
+  a mean, a bucketed month, a bin, an argmax and a count. Seven mutants, all killed.
+
+
+- **A legend's swatches are painted the way the marks they stand for are painted, and a style block
+  is part of that.** `symbols` in `legend/encode.ts` opens with
+  `applyMarkConfig({}, model, FILL_STROKE_CONFIG)`, which asks `getMarkConfig` for each of the nine
+  stroke and fill properties — and `getMarkConfig` reads a **style block first**, then
+  `config[marktype]`, then `config.mark`. This compiler asked the flattened table of the last two,
+  which has no styles in it at all.
+
+  So a chart whose marks name a style that outlines them left its swatches unoutlined; and where the
+  style was the only thing painting them, the legend came out with **no `encode` block whatsoever**
+  rather than with the wrong one — which is how it was found, by two separate changes whose fixtures
+  tripped over it and which both stopped rather than reaching into this file.
+
+  `a-legend-symbol-wears-the-marks-stroke` and `a-legend-symbol-wears-a-styles-stroke` are new. They
+  are two charts rather than two rows of one because **two size legends over the same field are
+  hoisted into a single legend**: the first draft put them side by side, and the second row's style
+  never reached a legend at all. Both mutants — the flattened table, and an expression written as a
+  value rather than passed through `signalOrValueRef` — are killed only once they are apart.
+
+
+- **An axis is drawn on the side the theme asked for, and a trellis heading faces the way it was
+  turned.** Four rules, all of them a guide reading something a theme wrote and none of them read
+  before. The side an axis is on is settled from three places rather than one — `const orient =
+  axis?.orient || config[channel === 'x' ? 'axisX' : 'axisY']?.orient || config.axis?.orient ||
+  defaultOrient(channel);` — and this compiler asked only the first, so a document that puts every
+  vertical scale on the right of every chart was answered with Vega-Lite's own default. The side
+  matters twice over: it is written onto the axis, `orient` being one of
+  `propsToAlwaysIncludeConfig` because Vega has no `config.axis.orient` to apply it from, and it is
+  what every label is turned to face, `defaultLabelAlign` and `defaultLabelBaseline` flipping their
+  answer where an axis has been moved off its main orientation. A block named after a *kind of
+  scale* is a third case again: `config.axisBand.orient` wins the side, `getAxisConfig` asking
+  `vlOnlyAxisConfig` before `vgAxisConfig`, while the labels stay turned for the side the chain
+  above resolved — upstream's own two-tier reading, reproduced rather than repaired. The chain is
+  `||` and not `??`, so an axis writing `"orient": null` steps past its own falsy word into the
+  theme's side.
+
+  Beside it, the one axis property a theme is never asked about: `isAxisProperty(property) &&
+  property !== 'values'` excludes it by name, because the ticks an axis shows are values of its own
+  column and a list written once in `config.axisQuantitative` would be forced onto every measured
+  axis in the document. This compiler wrote it out from every Vega-Lite-only block.
+
+  `config.aria: false` takes a whole drawing out of the accessibility tree, and each guide has to
+  carry that on itself — `...(config.aria === false ? {aria: false} : {})`, spread *after* the
+  axis's own properties, so it overrules an `"aria": true` the axis states. Nothing was written, so
+  every axis in such a document announced itself to a screen reader.
+
+  And the heading over a trellis faces the way its captions do, by the same two rules:
+  `assembleTitleGroup` spreads `defaultHeaderGuideBaseline(titleAngle, headerChannel)` and
+  `defaultHeaderGuideAlign(headerChannel, titleAngle, titleAnchor)` into the title it builds,
+  exactly as `assembleLabelTitle` does off `labelAngle` and `labelAnchor`. Neither was called for a
+  heading, so a trellis that turned its heading drew it turned and still anchored as though it were
+  flat, and one that anchored its heading to one end of the grid drew it centred — as did every
+  trellis in a document whose theme wrote `config.header.titleAngle` once. The anchor is read before
+  the angle, so an unturned heading is still pushed to its end; the angle is normalised for a
+  heading and not for a caption, which is upstream's asymmetry and decides which arm of each rule a
+  negative turn lands in. The anchor is also the whole of `layout.titleBand` —
+  `LAYOUT_TITLE_BAND = {column: {start: 0, end: 1}, row: {start: 1, end: 0}}`, the two bands
+  numbered from opposite corners — which was not emitted at all, for a crossed grid or a wrapped
+  one.
+
+  The Vega-Lite schema sweep drops from 30 differing cases to 12.
+- **A stack whose rounded end came from a theme is rounded once, not segment by segment.**
+  `parseMarkGroups` decides whether a bar is drawn inside a group of its own from
+  `const hasCornerRadius = VG_CORNERRADIUS_CHANNELS.some((prop) => getMarkPropOrConfig(prop, model.markDef, model.config))`,
+  and then `if (model.stack && !model.fieldDef('size') && hasCornerRadius)`. Which mark definition is
+  being asked is the whole of it: `initMarkdef` has already run, and it is what turns
+  `cornerRadiusEnd` — a word those five Vega channels do not include — into two of them, by way of
+  `for (const newProp of newProps) { markDef[newProp] = cornerRadiusEnd }`. This asked the mark as it
+  had been *written* rather than as it had been rewritten, so it saw a radius only when the chart put
+  one on the mark itself. A theme that rounds every bar in a report — `config.bar.cornerRadiusEnd`,
+  whose point is that no chart has to mention it, and equally `config.mark` or a style block — opened
+  no group at all, and each segment of each stack was rounded separately, joins and all, where
+  upstream rounds the stack once at its two ends.
+
+  `markDef[newProp] = cornerRadiusEnd` is an assignment and not a default, and was applied here as
+  one: the rewrite ran first and the mark's own properties were written over the top, so a bar asking
+  for a rounded end *and* a square top-left was drawn with the square. Upstream draws the rounded
+  end, and only the corners that word does not claim survive.
+
+  Two things inside the grouping were wrong underneath. The group's radii and its stroke are looked
+  up with `getMarkConfig(key, model.markDef, model.config)`, which consults the **style blocks
+  first**; this read a single flattened table of `config.mark` and `config.bar`, which has no style
+  blocks in it, so a style that rounded and outlined a bar left the group with neither — and left the
+  segments holding a radius they were supposed to have surrendered. And the two branches of
+  `getGroupsForStackedBarWithCornerRadius` are not mirror images: only the horizontal one names the
+  corner channels in its `pick`, so a stack lying on its side writes them before its extent and its
+  clip rather than after. Neither the fixture gate nor the sweep can see that last one, object key
+  order being ignored by both on purpose, so it is pinned by a test of its own.
+- **Sixteen keys of a theme reached the wrong side of the compiler, and an emptied block reached
+  Vega at all.** What survives `stripAndRedirectConfig` is decided by a list upstream wrote out by
+  hand, `VL_ONLY_CONFIG_PROPERTIES`, and by a sweep at the end of it that asks about every property
+  rather than about a named few. This compiler derived the list from the idea behind it — whatever
+  only Vega-Lite understands is struck out — and the idea gives the wrong answer in both
+  directions.
+
+  Five keys are Vega-Lite's own and are nevertheless handed to Vega, which has no use for them.
+  `fieldTitle` names the formatter a guide's default title is written by, `switch (config.fieldTitle)
+  { case 'plain': return fieldDef.field; }` in `channeldef.ts`, and it is not on the list; neither is
+  `timeFormatType`; neither are `headerRow`, `headerColumn` and `headerFacet`, though the `header`
+  block beside them is struck out. Dropped here, a theme arrived at the renderer without them.
+  Eleven go the other way and are struck out although Vega-Lite alone appears to read them: the ten
+  per-direction type-based axis blocks, `axisXBand` and its kin — while `axisBand`, which this
+  compiler resolves through exactly the same chain, is *not* on the list and stays. Passed through,
+  each was a word Vega has never heard of in the configuration it applies to every axis.
+
+  The closing sweep is the part that is not about a particular key: `for (const prop in config) { if
+  (isObject(config[prop]) && isEmpty(config[prop])) delete config[prop]; }`. A block may arrive empty
+  because the specification wrote it so, `{"config": {"axis": {}}}`, or because everything in it was
+  Vega-Lite's own and has just been taken out, which is how `{"config": {"legend":
+  {"unselectedOpacity": 0.3}}}` ends. Every block this compiler knew by name dropped its own, so the
+  ones it passes through untouched — an axis, a projection, a range, a header, an empty parameter
+  list — reached Vega as empty objects nobody had asked for, in a configuration upstream does not
+  emit at all.
+
+  The sweep goes no deeper than the configuration's own properties, which is the other half of the
+  rule: `config.style` is what it asks about, not `config.style.named`. A named style written empty
+  is therefore emitted exactly as written, where this dropped it and a theme that declares its styles
+  up front and fills some of them in later arrived one style short.
+
+- **A scale flag a theme asked for: a clamp, a rounding, an axis turned round.**
+  `parseUnitScaleProperty` walks every scale property by name and, for each one the specification
+  did not state, asks `const value = util.hasProperty(scaleRules, property) ? scaleRules[property]
+  ({…}) : config.scale[property];` — eight properties work themselves out and every other one is
+  whatever the theme named. That `else` arm was missing entirely, so `config.scale.clamp` and
+  `config.scale.round`, the two flags `ScaleConfig` declares and no rule claims, did nothing at all:
+  a theme could not clamp its continuous scales, and could not ask a whole document for
+  pixel-aligned positions. Neither has a default, which is why the omission stayed invisible until
+  somebody wrote one. It is written as the general rule rather than as two reads, because that is
+  what it is — the arm takes whatever the theme names that the rules leave alone, so
+  `config.scale.base` reaches a log scale and `config.scale.align` a band through it — and which
+  scales each value reaches is the ordinary `scaleTypeSupportProperty` gate applied to a themed
+  value exactly as to a stated one: a `clamp` needs a continuous scale to be the ends of, a `round`
+  also suits a band or a point, and an ordinal colour scale takes neither. A property that *has* a
+  rule never consults the theme here even where its rule answers nothing, which is what keeps
+  `config.scale.zero: false` from reaching a bar's measure axis.
+
+  `config.scale.xReverse` is the other half, and it is the entry a document written right to left
+  sets once to turn every `x` scale round. It heads the chain that settles `reverse`: `if (channel
+  === 'x' && scaleConfig.xReverse !== undefined) { if (hasContinuousDomain(scaleType) && sort ===
+  'descending') { if (isSignalRef(scaleConfig.xReverse)) { return {signal:
+  `!${scaleConfig.xReverse.signal}`}; } else { return !scaleConfig.xReverse; } } return
+  scaleConfig.xReverse; }`. Only the tail of that was here — the part that reverses a continuous
+  range because Vega cannot sort a continuous domain and a `sort: "descending"` has to be honoured
+  some other way — so the theme's entry was never read and such a document came out left to right,
+  every chart of it. It reaches every type of `x` scale, a band of categories included, since
+  `scaleTypeSupportProperty` answers `true` for `reverse` whatever the scale is. The descending case
+  **inverts** it rather than losing to it, which is what keeps a descending axis descending in a
+  document read the other way, and an `xReverse` written as an expression is negated as an
+  expression rather than dropped. The flag reaches past the scale as well: `getBinSpacing` multiplies
+  the half-spacing that pulls each bucket's edge inward by `(reverse ? -1 : 1)`, so a histogram's
+  rects move with the range.
+
+  `a-scale-flag-a-theme-asked-for`, `a-scale-flag-an-x-axis-turned-round` and
+  `a-scale-flag-an-x-axis-turned-round-by-an-expression` are new, three because the themes they need
+  contradict each other. Between them: a band taking `round` and `align` and neither `clamp` nor
+  `base`, a linear measure taking `round` and `clamp`, a log scale whose stated `clamp: false`
+  outranks the theme while its `base` comes from it, an ordinal colour scale that takes none of the
+  four, a quantitative colour scale that takes both flags, a band of categories turned round by
+  `xReverse` while the `xOffset` scale beside it is not, a `y` that reverses from its own sort while
+  the `x` reverses from the theme, a continuous `x` sorted descending where the theme's `true` comes
+  out as `false`, a stated `reverse: true` that survives that, a binned rect whose spacing changes
+  sign, and the same chain again with the flag written as a parameter. Seven mutants, all killed.
+
+  6 of the configuration sweep's differences close with this; 21203 of 21251 agree.
+- **A gradient legend is as long as the theme asked for, and a style block reaches Vega whole.**
+  `stripAndRedirectConfig` deletes five words from `config.legend` on the way out —
+  `if (config.legend) { for (const prop of VL_ONLY_LEGEND_CONFIG) delete config.legend[prop]; }`,
+  where `VL_ONLY_LEGEND_CONFIG` is the four `gradient*Length` bounds and `unselectedOpacity`. They
+  are Vega-Lite's own vocabulary, spent before anything is emitted: `defaultGradientLength`
+  destructures the bounds out of the legend configuration and returns
+  `gradientLengthSignal(model, 'height', gradientVerticalMinLength, gradientVerticalMaxLength)` for
+  a vertical colour ramp, the same against `'width'` for a horizontal one oriented top or bottom,
+  and the bare `gradientHorizontalMinLength` for a horizontal ramp anywhere else. Passed straight
+  through, they reached the renderer as five words Vega has never heard of in the block it applies
+  to every legend — and the length they were meant to decide was decided by a constant instead, so
+  a theme that asked for a shorter ramp was answered with upstream's default hundred.
+
+  The same function is where a `config.style` block was being filtered as though it were a mark
+  config. It is not one: the Vega-Lite-only mark properties are deleted from `config.mark` and from
+  each `config[markType]`, and from nowhere else, and the redirection that follows only merges a
+  mark-type block *into* a style, `{...propConfig, ...config.style[toProp ?? prop]}`. A named style
+  therefore keeps `color`, `invalid` and the rest, where this dropped them and a theme that styled
+  one arrived at the renderer without them.
+
+  Sizing a legend's rows was wrong underneath both. `legendEntryLayout` runs for every symbol
+  legend — `entries.forEach(g => { g.width = widths[g.column]; g.height = g.bounds.y2 - g.y; })`,
+  the widths being each column's maximum — where this sized a row only when a `clipHeight` asked
+  for one. Invisible until something reads a row's rectangle: a legend a selection is bound to
+  paints its rows transparent so a click anywhere along one is caught, and a row of no size catches
+  nothing.
+- **A scale's padding is read from the theme too, and an offset scale from its own two entries.**
+  Upstream settles the whole `padding` before either half of it, and the first thing it asks is the
+  configuration: `if (isContinuousToContinuous(scaleType)) { if (scaleConfig.continuousPadding !==
+  undefined) { return scaleConfig.continuousPadding; } … return barConfig.continuousBandSize; } if
+  (scaleType === ScaleType.POINT) { return scaleConfig.pointPadding; }`. Then the outer half of a
+  band, the same shape: `if (scaleType === ScaleType.BAND) { return getFirstDefined(bandPaddingOuter,
+  paddingInnerValue / 2); }`. This compiler began each of those chains one link late. It went
+  straight to `config.bar.continuousBandSize`, so `config.scale.continuousPadding` did nothing at
+  all — a theme could not pad a continuous position scale, and could not narrow a histogram's bars
+  by the one entry written for that; and it always halved the inner padding, so
+  `config.scale.bandPaddingOuter` did nothing either and a theme asking for wider ends got the
+  built-in number. Note how far `continuousPadding` reaches: every continuous position scale on
+  either axis, a plain line's `x` included, not only a bar's.
+
+  The offset scales were a second arm of the same two rules, and this had neither:
+  `} else if (isXorYOffset(channel)) { if (scaleType === ScaleType.BAND) { return
+  scaleConfig.offsetBandPaddingInner; } }`, and for the outer `if (scaleType === ScaleType.POINT) {
+  return 0.5; } else if (scaleType === ScaleType.BAND) { return scaleConfig.offsetBandPaddingOuter;
+  }`. `offsetBandPaddingInner` and `offsetBandPaddingOuter` were never read, and since neither has a
+  default the omission was invisible until a theme wrote one. The point case read `pointPadding`,
+  which agreed only by the accident that its default is the same `0.5` — but that number is a
+  constant with a reason of its own, the half step that puts an offset point on the centre of the
+  band a bar would have filled, so a theme narrowing every other point scale used to pull those
+  points off their bands.
+
+  `a-scale-padding-a-theme-asked-for` is new: a band whose ends a theme widens, the same band with a
+  stated `padding` that outranks it, a point scale `continuousPadding` never reaches, a plain line
+  that it does, a bar where it outranks `config.bar.continuousBandSize`, and a stated `paddingOuter`
+  over the theme's. `a-scale-padding-an-offset-scale-asked-for` is the second, because a conflicting
+  theme needs a second chart: a grouped bar taking the configured offset paddings, offset points
+  keeping the constant `0.5` against a theme that says `0.2`, and a plain point scale where that
+  `0.2` does apply. Five mutants, all killed. **8 of the configuration sweep's differences close with
+  this**; 21137 of 21251 agree. 300 Vega-Lite fixtures.
+- **A mark property a theme asked for: `aria`, a role description, a rounded end, an aliased size.**
+  Four more of the places upstream calls `getMarkPropOrConfig` read the mark definition and nothing
+  else here, so a theme that spoke about them was not heard. `aria()` opens
+  `const enableAria = getMarkPropOrConfig('aria', markDef, config)` and returns `{}` when it is
+  false, so `config.point.aria: false` silences the encode block exactly as the mark's own does —
+  and this compiler, asking only the definition, went on writing a role description for a mark
+  upstream had already taken out of the accessibility tree. It also writes the switch *back*:
+  `...(enableAria ? {aria: enableAria} : {})`, a bare `true` rather than a value ref, since it is
+  Vega's own flag and not a graphic property. Nothing here wrote it at all. `getMarkGroup` asks the
+  same question for the mark itself — `...(aria === false ? {aria} : {})` — and `initMarkDef` asks
+  it for `cornerRadiusEnd` before resolving that into two of Vega's four corners, so a house style
+  that rounds the top of every bar rounded none of them.
+
+  The fourth is the tail all of them end in. `getMarkConfig` walks the style blocks under
+  Vega-Lite's name for a property, then `config[marktype]` under Vega's name and then under
+  Vega-Lite's, and only then `config.mark` under Vega's:
+
+  ```js
+  getFirstDefined(cfg, cfg, config[mark.type][vgChannel], config[mark.type][channel],
+                  vgChannel ? config.mark[vgChannel] : config.mark[channel]);
+  ```
+
+  This compiler had one lookup of the five — `config[marktype]` under Vega's name — which is enough
+  for a property Vega and Vega-Lite spell alike and nothing at all for the aliased pairs. A text
+  mark's `size` is Vega's `fontSize` and a path mark's is its `strokeWidth`, so `config.text.size`
+  sized no label and `config.line.size` thickened no line: the arm that would have answered was the
+  one under Vega-Lite's own name, never asked. A `cornerRadiusEnd` bound to a parameter was written
+  out as a value besides, where `markDefProperties` passes it through `signalOrValueRef` — a bar
+  tied to a slider was drawn with an object for a corner.
+
+  `a-mark-property-a-theme-asked-for` is new: a bar the theme rounds and names, one stating its own
+  radius and name over the theme's, a point the theme takes out of the tree, a text mark sized by
+  the theme and one stating its own, a line the theme thickens, and a bar whose radius is a
+  parameter. Seven mutants, all killed. **25 of the configuration sweep's differences close with
+  this**; 21154 of 21251 agree. 299 Vega-Lite fixtures.
+
+  What the theme's `cornerRadiusEnd` uncovers behind it is *not* fixed here, and it is why the
+  `config-bar-cornerRadiusEnd` cases still differ: a **stacked** bar with any corner radius is
+  wrapped in two groups upstream, `getGroupsForStackedBarWithCornerRadius` moving the radius and the
+  stroke onto the outer one so that the stack is rounded as a whole rather than each segment of it.
+  That path is unimplemented here and always was; until now nothing reached it from a theme, so the
+  sweep reported the missing corners instead of the missing groups. It is its own defect with its
+  own fix.
+- **What a mark does with a value it cannot place is read from the whole configuration chain.**
+  `assembleDomain` and the mark's own `defined` both ask `getMarkConfig('invalid', markDef, config)`,
+  which is
+  `getFirstDefined(styleConfig, styleConfig, config[mark.type].invalid, config.mark.invalid)`. This
+  compiler read `config.mark.invalid` and nothing else, so a theme saying `config.line.invalid` — or
+  saying it in a style block — was dropped: the chart kept the default for its kind, `filter` for a
+  point and `break-paths-show-domains` for a line, and the data pipeline then built the wrong number
+  of datasets for it.
+
+  `an-invalid-a-theme-asked-for` is new, with the mark's own value over a theme's to keep that order
+  drawn. Four mutants, all killed. **15 of the configuration sweep's differences close with this**;
+  21144 of 21251 agree.
+
+  The **style** arm of that chain is resolved but not drawn, and the fixture says why: a style block
+  written in a configuration is currently stripped from the emitted Vega where upstream passes it
+  through, so a fixture using one would fail on that instead of on this.
+
+- **A mark's default position is read from the whole chain too, and a second position reads its own
+  channel.** `pointPositionDefaultRef` asks
+  `getMarkPropOrConfig(channel, markDef, config, {vgChannel})`, which walks the definition under
+  Vega's name for the channel and then Vega-Lite's, and then the configuration the same way. Read as
+  the definition alone, a theme that places every arc at a `radius` or every label at a `theta`
+  placed nothing: the mark fell through to the default it would have taken untouched — an arc to
+  `min(width,height)/2`, a text to no angle at all.
+
+  The second position was worse, and the theme is what exposed it. Upstream's fallback names the
+  **second** channel throughout — `position2orSize(channel, markDef) || … ||
+  {[vgChannel]: pointPositionDefaultRef({model, defaultPos, channel, …})()}`, with `channel` the
+  second one — where this handed it the first. So everything that answered for a radius answered for
+  the hole in the middle of it as well, and a themed pie came out a ring with nothing in it. The
+  mark's own `radius` had leaked the same way for as long as that line existed; it took a theme to
+  make it visible, because a chart that states a radius usually states its hole too.
+
+  `a-position-a-theme-asked-for` is new: an arc whose radius a theme sets, a text whose angle and
+  radius it sets, and a mark stating its own radius over the theme's to keep that order drawn rather
+  than assumed. Three mutants, all killed. **38 of the configuration sweep's differences close with
+  this**; 21129 of 21251 agree. 298 Vega-Lite fixtures.
+
+- **A mark's size is read from the whole chain, not from the definition alone.** `getBandSize` asks
+  `getMarkPropOrConfig(useVlSizeChannel ? 'size' : sizeChannel, mark, config, {vgChannel: sizeChannel})`,
+  and that walks the definition under Vega's name for the property, then Vega-Lite's, then the style
+  blocks, then `config[marktype]` under each name in turn, then `config.mark`. This compiler read the
+  definition plus `config[marktype][width]` and stopped, so a theme that said `config.bar.size` was
+  ignored and the bar kept the bandwidth it would have had with no theme at all.
+
+  Three rules travel with it, each its own line in upstream and each missing here:
+
+  * a configured `discreteBandSize` is taken **before** the band is measured —
+    `config[mark.type]?.discreteBandSize || {band: 1}` — so the number wins and only its absence
+    falls through to the whole band. Asked after the bandwidth, as it was, a theme's band size could
+    never be reached on the scales it is written for;
+  * a band size that is a *number of pixels* **centres** the mark, where only a fraction of the band
+    leaves it at the leading edge. `defaultBandAlign` tests `isRelativeBandSize(bandSize)`, which
+    this read as "a size channel was stated" — so a themed bar sat half its width to the left;
+  * `minBandSize` is tested for **truth**, so a theme setting it to zero is asking for no floor
+    rather than a floor of nothing, and the bandwidth is written alone.
+
+  `getMarkPropOrConfig` and `getMarkConfig` are now two functions here rather than an inlined
+  approximation of them, which is what the rest of the configuration families will need.
+
+  `a-size-a-theme-asked-for` and `a-size-a-style-asked-for` are new; the second holds the two ends of
+  the chain the first cannot reach, a size found early stopping the walk. Six mutants, all killed —
+  including the one that puts the style block after the mark type's, which upstream puts first.
+  **20 of the configuration sweep's 156 differences close with this**; 21091 of 21251 agree.
+  297 Vega-Lite fixtures.
+
+- **The oracle harvests captions from an SVG it had already flattened.** `canonicalSvg` replaced
+  every run of whitespace with a single space so the written artefact would diff cleanly — and the
+  guide captions and mark descriptions are read back out of *that* file, from the very attributes it
+  had rewritten. Upstream's caption for an axis whose labels all format to nothing is
+  `values from  to `, two spaces around a value that came out empty: `domainCaption` interpolates
+  `values from ${fmt(d[0])} to ${fmt(peek(d))}` and neither end formats. The reference recorded one
+  space, and the comparison then failed against an engine that had it right.
+
+  Now only runs containing a **line break** collapse — that is the indentation the rule was for — and
+  a run of plain spaces is content and survives. No other fixture's caption or description moves,
+  which is the measure of how narrow the rule had to be.
+
+  **Two entries that were going to be written as defects are withdrawn by this.** An axis whose
+  labels are empty was said to be captioned differently here; it is not. Axes sharing a side, and a
+  left beside a right, were said to be *ordered* differently here; they are not — that reading came
+  from the same flattened reference, and five axes over three sides now agree exactly.
+  `axis-time-format-oddities` goes back to stating its four cases as axes, two of them sharing the
+  bottom, rather than working around a defect that was never in the engine.
+
+  A gate that reports a fault the code does not have is the worst shape a reference can take: it
+  costs more than a missing test, because it sends the next person to fix something that is already
+  right.
+
+- **A stack groups by the dimensions it was given and then by the facet's, concatenated rather than
+  merged.** `groupby: [...this.getGroupbyFields(), ...facetby]`. A chart that facets by the column it
+  also plots along names that column twice, and upstream writes it twice; this compiler filtered the
+  second out.
+
+  Grouping by `c` and then by `c` again is the same partition either way, so this is a difference in
+  what is *emitted* rather than in what is drawn — which is the kind the specification comparison
+  exists to catch and a picture cannot. The same rule was already written a few lines below for the
+  imputation's own groupby, and applied to only one of the two.
+
+  `a-stack-groups-by-what-it-was-given` is new, with the ordinary case beside it — faceting by a
+  different column, where the two lists have nothing in common and concatenating and merging agree.
+  Three mutants, all killed. 295 Vega-Lite fixtures.
+
+  Found by the encoding sweep's facet families, which had been reporting this one disagreement for
+  all 30 of their cases instead of the property each was there to try.
+
+- **A gradient legend over a constant column shows the whole ramp, not the one colour.** A domain
+  with no span is the one place upstream throws the domain away rather than consulting it:
+
+  ```js
+  if (!(max - min)) {
+    // expand scale if domain has zero span, fix #1479
+    scale = (scale.interpolator ? get('sequential')().interpolator(scale.interpolator())
+                                : get('linear')().interpolate(scale.interpolate()).range(scale.range())
+            ).domain([min = 0, max = 1]);
+  }
+  ```
+
+  so the ramp is sampled end to end over `[0, 1]` — `ticks(15)` there being twenty-one values — and
+  the single label sits beside its **middle**, which is what d3's `normalize` answers for coinciding
+  ends: `constant(0.5)`.
+
+  Unexpanded, the ticks between two ends that coincide are one value, so the legend collapsed to a
+  single stop: a block of colour where the scale should be, with its label adrift at the start. The
+  class had both readings in it — `position` already answered the middle and cited that rule, while
+  `fraction` answered 0 — and only the first was upstream's.
+
+  The replacement carries the scheme's **extent slice** and its interpolation space, because upstream
+  copies the scale's resolved `range()` and an extent is already resolved into it; it does not carry
+  a `log` or `pow` transform, there being no span left for one to bend.
+
+  `legend-gradient-constant-domain` is new: the constant scale, the same scale with a span to say
+  that only the degenerate case moves, and a constant one taking a slice of `viridis`. Four mutants,
+  all killed. 216 Vega differential fixtures.
+
+  Found by a Vega-Lite fixture — a `distinct` aggregate grouped so finely that every group held one
+  row — whose compiled specification already matched upstream exactly.
+
+- **A percent consumes what follows it, and a percent with nothing after it consumes itself.** d3
+  reads the character after the percent — and a pad modifier before it — looks the character up, and
+  pushes whatever the table gave back: the character itself where there is no entry, and the empty
+  string where the pattern ended first, `charAt` past the end being `""`. This engine wrote the
+  percent out instead, which is the one shape upstream never produces:
+
+  | specifier | d3 | before |
+  | --- | --- | --- |
+  | `%b%` | `Jan` | `Jan%` |
+  | `%~` | `~` | `%~` |
+  | `%-~` | `~` | `%-~` |
+  | `%-` | *(empty)* | `-` |
+
+  One rule with four faces, and the last of them is why the pad modifier is now looked for *up to*
+  the last character rather than one short of it: `%-` is a percent, a modifier, and then the end.
+
+  It surfaces wherever a **number** specifier reaches a time scale — a normalized stack on a temporal
+  axis is asked for `.0%` — and there the whole label differed by its final character.
+
+  `axis-time-format-oddities` is new and holds all four, two as axes and two as text marks. The two
+  are text because an axis whose every label is empty is described in a caption that differs here by
+  a space, and axes sharing a side are listed in a different order than upstream — both real, both
+  questions about guides rather than about this, and neither worth hiding this rule behind. 215 Vega
+  differential fixtures.
+
+- **A normalized stack's axis is a percentage, and the channel says so rather than the stack.**
+  `guideFormat` asks the definition in front of it:
+  `if (isPositionFieldOrDatumDef(fieldOrDatumDef) && fieldOrDatumDef.stack === 'normalize' && config.normalizedNumberFormat) { return numberFormat({type: 'quantitative', config, normalizeStack: true}); }`.
+  So the format is written wherever the word appears, on the channel it appears on, whatever the
+  chart makes of it — and the `type: 'quantitative'` is *passed* rather than read, so the field's own
+  measure never enters into it.
+
+  This compiler read the resolved stack instead and required the channel to be the one that stacks.
+  The two agree on the ordinary normalized bar chart and part company as soon as the word lands
+  somewhere it cannot act: a `stack` on the categorical axis of a bar chart is not a stack Vega-Lite
+  builds — the emitted transform still says `offset: "zero"` — and upstream formats that axis
+  regardless.
+
+  Two halves of the same rule that are easy to lose. The second test is a **truthiness** one, so a
+  theme setting `normalizedNumberFormat` to the empty string is asking for no percentage rather than
+  an empty one. And it is a `return` **above** the bucketed-instant branch, so a temporal axis
+  carrying a normalized stack shows percentages and no dates.
+
+  `a-normalized-stack-is-a-percentage` and `a-normalized-stack-with-no-percentage` are new. Three of
+  four mutants are killed; the fourth is the ordering, which no fixture can hold yet — the only chart
+  that reaches it labels dates with a number specifier, and a `%` at the end of a time specifier is
+  dropped by d3 where this engine keeps it. The sweep case covers it meanwhile. **The last 2 of the
+  encoding sweep's differences close with this: 9250 of 9274 agree and none differ.**
+
+- **A discrete axis with a format specifier uses it.** `tickFormat` in `vega-scale` picks the
+  formatter by asking whether the scale has a `tickFormat` of its own, which only a continuous one
+  does:
+
+  ```js
+  else if (scale.tickFormat) {
+    // if d3 scale has tickFormat, it must be continuous
+    const d = scale.domain();
+    format = locale.formatSpan(d[0], d[d.length - 1], count, specifier);
+  }
+  else if (specifier) {
+    format = locale.format(specifier);
+  }
+  ```
+
+  so a band or point scale falls past the span-resolved branch and uses the specifier **as written**.
+  Only an axis that states no specifier keeps its domain's own values, by the `defaultFormatter`
+  above both arms. This engine read that as "a discrete axis never consults a format", and said so in
+  a comment: a band axis of 1, 2 and 3 asked for `.0%` kept its numbers where upstream reads
+  100%, 200%, 300%.
+
+  Two details it would be easy to get half right. The value is **coerced**, as d3 coerces it, so a
+  band of words asked for `.0%` reads `NaN%` on every tick — which is upstream's answer, and looks
+  like the mistake it is, where quietly printing the words back looks like the axis was never asked.
+  And the specifier is used plainly rather than span-resolved: a discrete domain has no span to
+  resolve a missing precision against, so `s` takes d3's default six significant digits where a
+  continuous axis would derive one.
+
+  The spoken caption had the same gap for the same reason and is fixed with it, so what a listener
+  hears is what the axis shows.
+
+  `axis-format-on-a-discrete-scale` is new and holds all five cases, including the two that must not
+  move. 214 Vega differential fixtures.
+
+- **A bandwidth has to come from a band scale.** `defaultSizeRef` is handed the *offset's* scale
+  where there is one — `defaultSizeRef(vgSizeChannel, offsetScaleName || scaleName, offsetScale || scale, …)`
+  — and only reaches for a bandwidth once it has asked what that scale is:
+  `if (scaleType === 'band') { …bandwidth… }`. Everything else drops out of that chain onto the tail
+  a mark with no usable band size takes, which is a step less two.
+
+  This compiler read "there is an offset channel" as "there is a band to measure". That holds for the
+  offset scales a chart usually has and fails the moment one is continuous — a grouped bar offset
+  along a *number* rather than a category. `bandwidth()` of a linear scale is **0** in Vega, so those
+  bars were drawn with no width at all.
+
+  `a-bandwidth-needs-a-band-scale` is new: the same chart offset by a number and by a category, so
+  what decides the answer is the scale's kind rather than the offset channel's presence, and a third
+  row with no offset that takes its own band. **The last 4 of the encoding sweep's differences that
+  this change owns close with it**; 9248 of 9274 agree, and the 2 left are a normalized stack's axis
+  format.
+
+- **A counting aggregate answers with a number, whatever the column it counted was.** `count`,
+  `distinct`, `valid` and `missing` reduce a group to a tally, so a `type` the chart stated is about
+  the wrong thing — it describes the column going in where what comes out is a count. Upstream
+  overrides it and says so:
+  `if (type !== 'quantitative') { if (isCountingAggregateOp(aggregate)) { log.warn(…); fieldDef.type = 'quantitative'; } }`.
+
+  Left as stated, the channel keeps a band or an ordinal scale where upstream builds a linear one,
+  and everything hung off that scale follows: the axis flips to the other side, a legend becomes a
+  gradient rather than a row of symbols, and a bar takes a bandwidth it has no band for.
+
+  Only those four operations, and only over a stated type that is not already quantitative — a `sum`
+  or a `mean` leaves the stated type alone, upstream's test being `isCountingAggregateOp` rather than
+  "is an aggregate". That is also why it went unnoticed: where no type is stated the inference here
+  already answers quantitative for *any* aggregate, so the two agreed everywhere until a chart said
+  otherwise. The diagnostic upstream logs is emitted too.
+
+  `a-counting-aggregate-is-a-number` is new and draws all three cases, the `mean` included.
+  **28 of the encoding sweep's 34 differences close with this**; 9244 of 9274 agree.
+
+- **A bin suffix is not a suffix.** Upstream's `vgField` keeps them as two parameters and applies
+  them by different rules: a plain `suffix` names a column something *else* wrote beside this one —
+  a stack's `_start` and `_end` — and is appended whatever the definition is, while a `binSuffix`
+  names one of the columns the bin itself produced and is honoured only `if (isBinning(bin))`. A
+  column that **arrived** bucketed is not a binning, so the bin suffix is dropped: its name is
+  simply its own, there being no `_end` or `_mid` for a transform this chart never ran.
+
+  Collapsed into one parameter, those columns were invented. Stacking a path mark imputes over the
+  bucket as a key, and a key has to be a single column, so upstream writes the bucket's midpoint out
+  first — for a pre-binned one that formula is the no-op `0.5*lo + 0.5*lo` written back over `lo`,
+  emitted all the same because the impute is keyed on the column it names. This compiler skipped the
+  formula, having read the rule as applying to its own bins only, then keyed the impute and grouped
+  the stack on a `lo_mid` nobody had written, and drew the path from it too.
+
+  A bucketed **instant** keeps the distinction in its own smaller way: its time unit did write an
+  `_end`, so a bin suffix of `end` still reaches it, while `range` and `mid` — columns only a real
+  bin produces — are excluded by name.
+
+  One call site had already worked the rule out and written it by hand, guarding on `bin != null`
+  because `vgField` would otherwise have invented a `value_mid` for unbinned fields. That guard is
+  now the parameter's job, and it was wrong in the case it was written for: `bin != null` is true of
+  a pre-binned column as well.
+
+  `a-bucket-with-two-columns-of-its-own` grows the two stacked rows this needs, and the `stack: null`
+  that fixture carried to hold this defect out of the previous change is removed.
+
+- **A bucket that arrived bucketed keeps its far edge in a second column, and a point sits between
+  the two.** `valueRefForFieldOrDatumDef`'s `else if (isBinned(bin))` interpolates between the
+  channel's own field and the *secondary channel's* field — not between a field and an `_end` beside
+  it, which is what a bin this compiler asked for has and a pre-binned column does not. That is the
+  whole reason `bin: "binned"` requires an `x2`.
+
+  The **rect** path has read the pair all along — `rectBinPosition`, which is what makes a
+  histogram's bars span their buckets. The **point** path had no branch for it at all, so it fell to
+  the plain field reference and drew the mark on the bucket's near edge: an area or a line over data
+  that came pre-bucketed was half a bucket to the left of where upstream draws it, all the way along.
+
+  Two things it must not do, and the fixture pins both: a `bandPosition` of 0 asks for the near edge
+  by name and gets the plain column back rather than a signal computing it, and a bucketed column
+  with no second channel has no far edge to interpolate towards, so the mark stays where it was.
+  Upstream warns there; this does not, for the reason already recorded against
+  `cannotApplySizeToNonOrientedMark` — the encoder reaches no diagnostic collector.
+
+  `a-bucket-with-two-columns-of-its-own` is new. Found by a fixture rather than by the schema sweep,
+  which compares emitted specifications one mark type at a time and never paired a pre-binned channel
+  with its secondary.
+
+- **A stated `orient` is an argument to the rule that decides orientation, not a way past it.**
+  Upstream's own comment on the call says so — "set orient, which can be overridden by rules as
+  sometimes the specified orient is invalid" — and only two of the blocks in `orient()` ask for the
+  stated value: the ranged bar's, where the direction is genuinely ambiguous, and the line's.
+  Everything else answers from the encoding and then *logs* that it overrode what the chart asked
+  for. This compiler took the stated value first and inferred only in its absence, which is the same
+  answer wherever a stated orientation happens to be reachable and the wrong one everywhere else.
+
+  The blocks are a `switch` whose cases all fall through, so which of them a mark reaches is the
+  whole of the rule: a text mark tries the bar's rules, then the rule's, then the area's, then the
+  line's, and stops at the first that answers. Flattened into one pass, a mark collected the wrong
+  blocks — an area ranged along y was measured by the *bar's* ranged rule, which asks whether the
+  other channel is a number, where upstream asks only whether this one arrived bucketed. A mark that
+  matches no block at all — an arc, a trail, a geoshape — is vertical, by the `return 'vertical'`
+  under the whole switch. A **trail** is not a line here: one that states `horizontal` is vertical
+  anyway.
+
+  `an-orientation-a-mark-cannot-state` is new: the trail, a bar over a bucketed column whose first
+  block settles it before the stated value is read, and a ranged area that cannot choose where a
+  ranged bar can. **The last of the Vega-Lite sweep's differences closes with this; all 8484 agree.**
+
+- **A size stated as zero is not a zero-width mark; it is a mark with no usable size.** Upstream
+  tests the size it resolved for *truth* rather than for presence, twice on the way down:
+  `if (encoding.size || markDef.size)` decides whether to build a size at all, and
+  `else if (bandSize)` in `defaultSizeRef` decides whether to write the one `getBandSize` returned.
+  A falsy number fails both.
+
+  So `{"type": "bar", "size": 0}` falls past everything — past the bandwidth its band would have
+  given it, past `continuousBandSize` on a quantitative axis — onto the tail a mark with no size of
+  any kind takes: `getViewConfigDiscreteStep(config.view, sizeChannel) - 2`, which is 18. This
+  compiler read the size for presence and drew the invisible mark the number literally asks for. The
+  same rule governs a `width` or `height` on the mark and a `continuousBandSize` configured as zero.
+
+  Three things it deliberately does not change. An `encoding` of `{"value": 0}` is tested as
+  `encoding.size`, a channel definition, and an object is true whatever number it carries — that bar
+  really is invisible. A falsy `size` beside a truthy `width` comes out the width's, because once
+  the `size` is falsy `getBandSize` does run and it reads the Vega name first. And the mark is still
+  centred in its band, since `defaultBandAlign` asks whether the band size is *relative* and zero is
+  a number.
+
+  `a-size-stated-as-zero` is new and covers all five. **2 of the Vega-Lite sweep's differences close
+  with this**; 8483 of 8484 agree.
+
+- **Centred is what the channel came out as, not what the default was.** Upstream chooses the Vega
+  channel first — `left` is `x`, `center` is `xc`, `right` is `x2`, and the same three down the other
+  axis — and only then asks whether that channel is a centre:
+  `const center = vgChannel === 'xc' || vgChannel === 'yc'`. A centred rect-like mark is placed at
+  its band's middle, `band: 0.5`, where one left to fill the band is placed at the leading edge with
+  no band at all.
+
+  This engine read the *default* alignment instead of the resulting channel, so a bar that asked to
+  be centred was written under `xc` — the channel that means the middle — with its position still at
+  the edge. The two disagree exactly when a mark states an `align` or a `baseline` its band would not
+  have given it.
+
+  `aligned-in-its-own-band` is new: a bar centred, a bar aligned right and a tick with a middle
+  baseline, so the channel and the band are both drawn. **4 of the Vega-Lite sweep's differences
+  close with this**; 8481 of 8484 agree.
+
+- **A position reads Vega's name for its channel before Vega-Lite's.** `pointPositionDefaultRef`
+  asks `getMarkPropOrConfig(channel, markDef, config, {vgChannel})`, and that reads `mark[vgChannel]`
+  before `mark[channel]`. For a polar channel the two names differ — a radius is Vega's
+  `outerRadius` and an angle its `startAngle` — so a text mark's radius is its `outerRadius` where
+  it states one and its `radius` otherwise, the former winning when both are written.
+
+  `outerRadius` is the documented alias for `radius`, and reading only the Vega-Lite name left the
+  label unplaced: upstream writes a `radius` beside the `outerRadius` it passes through to Vega, and
+  this engine wrote only the pass-through. For `x` and `y` the two names are the same and nothing
+  changes.
+
+  `text-placed-by-an-outer-radius` is new: a pie with its slices labelled by a `radius`, its values
+  labelled by an `outerRadius`, and a third layer stating both so that which one wins is drawn as
+  well as declared. **4 of the Vega-Lite sweep's differences close with this**; 8477 of 8484 agree.
+
+- **A domain's rows are chosen by the configuration's `invalid`, never by the mark's.**
+  `assembleDomain` asks `getMarkConfig('invalid', markDef, config)` — `getMarkConfig`, not
+  `getMarkPropOrConfig`. The two differ in exactly one way and it is the one that matters here:
+  `getMarkPropOrConfig` reads `mark[channel]` first and falls through to the configuration, while
+  `getMarkConfig` reads **only** the configuration chain — a style block, `config[marktype]`,
+  `config.mark`. So an `invalid` written on the mark definition never reaches the choice of which
+  rows a domain is measured over, and one written in the configuration does.
+
+  Measured across all four modes and both mark kinds: the same `break-paths-show-domains` gives a
+  point's domains `data_0` from the mark definition and `source_0` from `config.mark`, and the same
+  `break-paths-filter-domains` gives a line's domains `data_0` from the mark definition and a
+  `data_1` of its own from the configuration. The two cells where they differ are exactly the two
+  where upstream's own table has the marks and the scales wanting different rows.
+
+  **Both sides** of that comparison come from the same value, too. This engine tested the mark
+  definition's answer for the marks against the configuration's for the scales, which is not the
+  same test and gets the common case wrong: a point whose mark definition says `invalid: null` has
+  no filter to sit below, and asking for one put a dataset in the specification that upstream does
+  not write. `getScaleDataSourceForHandlingInvalidValues` is ported whole now rather than as two
+  flags that can disagree.
+
+  `invalid-on-the-mark-definition` is new and is the pair of `invalid-break-paths-domains`: the same
+  two modes by the other route, neither needing a second dataset where the configuration's need one
+  apiece. **12 of the Vega-Lite sweep's differences close with this**; 8473 of 8484 agree.
+
+- **`cornerRadiusEnd` is a bar's word and nothing else's.** `initMarkDef` guards the whole rule with
+  `if (markDef.type === 'bar' && markDef.orient)`, so an area, a point, a tick or a rule that asks
+  for one is compiled as though it had not — upstream emits no corner property at all for them. This
+  compiler wrote `cornerRadiusTopLeft` and `cornerRadiusTopRight` onto every mark type there is, and
+  the two corners then rounded whatever the mark happened to be.
+
+  A **ranged** bar is the second half of the same rule. One whose far end is an `x2` or a `y2` has
+  two ends of its own and no *far* one to single out, so upstream writes the plain `cornerRadius` —
+  all four corners — in place of the pair.
+
+  `corner-radius-end-only-a-bar` is new: an area, a point and a tick all asking for one and getting
+  nothing, layered with a ranged bar that gets all four corners. **44 of the Vega-Lite sweep's 67
+  differences close with this**, which is 8461 of 8484 specifications agreeing.
+
+- **A plotting area is never negative.** `viewSizeLayout` measures the root group as
+  `Math.max(0, group.width || 0)` and writes the answer back into the `width` signal, so a
+  specification asking for a width of -4 gets a plotting area of zero — and every scale ranging over
+  `"width"` gets `[0, 0]` with it. This engine clamped only the *fitted* branches, so a declared
+  negative size reached the scales intact and a band scale divided it up: a bandwidth of 0.878 where
+  upstream's is 0.
+
+  The clamp is where every measurement downstream reads it rather than in each of them, which is
+  where upstream puts it too. `view-size-degenerate` is new: a chart -4 wide and -12 tall, whose
+  bars are lines and whose bottom axis is a point.
+
+- **A mark's config reaches every channel, because it is folded into the encode.** Upstream does not
+  read a mark's defaults channel by channel: `applyDefaults` builds
+  `extend({}, config.mark, config[type])`, drops each key the mark's own encode already mentions,
+  turns the rest into `{value: …}` — or `{signal: …}`, which goes to `update` rather than `enter` —
+  and merges them **beneath** the mark's own blocks. Every channel then finds its default through
+  the one path it already uses for everything else.
+
+  This engine asked a hand-written accessor instead, and a channel whose call site never asked got
+  nothing: **19 of the 57** a mark config can carry — `blend`, `angle`, `interpolate`, `fontWeight`,
+  `xc`, `yc`, `x2`, `tension`, `shape`, `defined`, `scaleX`, `scaleY`, `limit`, `dir`, `lineHeight`,
+  `orient`, `radius` and the two paints. Each worked when the mark stated it and was ignored when a
+  theme did, which is the difference between a chart and the same chart under someone's house style.
+
+  **Two loops, not one.** The mark's own config blocks carry the paint pair's rule — a `fill` or a
+  `stroke` is skipped when the encode mentions *either*, so a mark that states only its stroke does
+  not take the config's fill — and the `style` blocks that follow do not. Merging them into one loop
+  drops a Vega-Lite plotting area from the scene: it is a group styled `cell` whose block fills it
+  transparent and outlines it grey, and a chart that hides the outline with `stroke: null` has not
+  asked for the fill to go too. Caught by `concat-shared-transform` and `trellis-header-label-expr`.
+
+  **A `path` is stroked.** Writing Vega's per-type defaults down as the config blocks they are —
+  rather than as arguments threaded into a colour lookup — is what showed two of them to be wrong:
+  `path: {stroke: defaultColor}` and `shape: {stroke: defaultColor}`, where this engine gave both a
+  fill. Probed: upstream draws `<path … stroke="#4c78a8"/>` for a path mark that paints nothing
+  itself.
+
+  `config-marks` carries four more marks, one per route: a symbol taking its `shape` from the
+  config, a text its `fontWeight` and `angle`, a line its `interpolate`, and a path taking the
+  stroke. **368 of the sweep's differences close with this; 7479 of 7479 charts agree.**
+
+  **API:** `MarkSpec.configBelowDefaults` and `configAboveDefaults` are gone — a mark's defaults are
+  in its encode now, where upstream puts them. `EncodeSpec.withDefaults` is the fold.
+
+- **Centring a trellis requires an alignment, and a falsy `columns` is one row.** Four defects in the
+  grid a `layout` lays out, all cited to `vega-view-transforms`' own `gridLayout`.
+
+  **Centring requires an alignment.** Upstream's centring steps read the alignment flag —
+  `if (alignCol && get(opt.center, Column) && nrows > 1)` — and the branch an *unstated* `align`
+  takes begins `for (alignCol = false, …)`, clearing it. So `align: "none"` and no `align` at all are
+  the same branch, and neither centres anything. This engine read an absent `align` as `each`, so
+  `center: true` nudged every short cell to the middle of its row where upstream leaves it alone.
+  The two arrangements differ by exactly the slack.
+
+  **A falsy `columns` means one row.** `ncols = opt.columns || groups.length`: zero, or none at all,
+  puts every cell in a single row. Coercing it up to one turned `columns: 0` into a single tall
+  column, which is the opposite arrangement — 322 units wide where upstream draws 1942.
+
+  **A sizeless cell flushes to nothing.** `bboxFlush` is `(0, 0, item.width || 0, item.height || 0)`
+  and has no fallback. Falling back to what the cell drew was a guess, and it is the one arrangement
+  in which `flush` and `full` cannot differ: measured, a trellis of sizeless cells came out
+  identical to its own `full` layout here where upstream drew it 624 units narrower.
+
+  **A legend's grid says `each` itself.** The first of those changed what an unstated alignment
+  means, and a legend was relying on it: upstream's legend layout hard-codes `align: Each` in the
+  parameters it builds and its default configuration carries `legend: {gridAlign: 'each'}`, so the
+  legend now says so rather than taking the grid's own answer. A stated `gridAlign`, from the legend
+  or from `config.legend`, still wins.
+
+  `layout-center` carries three more grids, one per rule, and each of the four mutants is killed by
+  it. **The sweep is back to 100%: 4733 of 4733.**
+
+- **An axis reads `tickOffset` whatever its scale, and `position` only from itself.** Three defects
+  in how an axis meets the `config` block, found by sweeping the config route and all three cited to
+  upstream's source rather than inferred from the drawing.
+
+  **`tickOffset` is not a band property.** Upstream reads it in `tickBand(_)` whatever the scale is
+  and hands the same offset to the tick mark and the label mark alike; only the *band position* it
+  sits beside needs a band to multiply. Here it was added inside the band offset, which answers zero
+  for everything but a band scale — so a linear, log, time or point axis given one ignored it
+  entirely. Probed: upstream moves a linear axis's ticks and labels by exactly the offset and leaves
+  its domain line where it was.
+
+  **`position` comes from the axis, never from the config.** Every entry in upstream's
+  `buildAxisEncode` is read through `lookup(spec, config)` except this one, which is written
+  `value(spec.position, 0)` — straight off the specification with a literal zero behind it. This
+  engine read it from the merged defaults, so a theme setting `config.axis.position` moved every axis
+  in the chart and upstream moved none of them.
+
+  **The band correction is a config block, not a fallback.** Vega's own default configuration is
+  literally `axisBand: {tickOffset: -0.5}`, and `axisBand` is the **last** block
+  `extend({}, axis, xy, or, band)` merges — so it beats `config.axis.tickOffset` rather than losing
+  to it. Here the `-0.5` was a fallback below the whole chain, reached only when nothing else set a
+  `tickOffset`: the same answer for an axis that sets its own, and the wrong one for a theme that
+  does. It now sits where upstream puts it, with a specification's own `config.axisBand` still
+  winning over it.
+
+  `config-theme` carries all three: the linear axis takes the theme's `tickOffset` while both band
+  axes keep the correction, the theme's `position` moves nothing, and the top axis's own `position`
+  moves that axis. Each of the three mutants is killed by it. **The sweep is back to 100%: 4702 of
+  4702.**
+
+- **A graticule's `extent` is a pair of corners, and twelve projections nobody was comparing.**
+  `extent` was read as a flat run of four numbers, where the schema declares `[[x0, y0], [x1, y1]]`
+  and `extentMajor` and `extentMinor` three lines away already took that shape. No specification
+  writes the flat form, so an `extent` was ignored in silence and the graticule ran to the pole.
+
+  It surfaced because of the fixture that should have caught it years ago. `projection-families`
+  draws twelve projections over one graticule, and each of its `geopath` transforms named no
+  `field` — a **mark-level** transform visits scene items rather than rows, and `geopath` with no
+  field falls back to the identity accessor, which hands a scene *item* to a path generator that
+  wants geometry. Upstream answers that with an empty `d` attribute. So upstream drew twelve empty
+  outlines, this engine drew twelve empty outlines, and the fixture named after the twelve
+  projections compared nothing but the four cities on top of them. Giving it `"field": "datum"` is
+  what makes it a fixture.
+
+  Two more things had to be true for the drawing to be comparable, and both are what a real chart
+  does. The graticule stops at 60 degrees north and south, because `conicConformal` is infinite at
+  one pole: taken to the default extent it draws a line half a million pixels long, and a canvas a
+  million pixels wide is measured in units where the last digit of a double outweighs the
+  comparison's tolerance. And each panel **clips**, without which a projection that overruns its own
+  box paints over its neighbours and the chart sizes itself to whichever of the twelve reaches
+  furthest.
+
+  What that buys: a mutant that moves the gnomonic's clip cap from 60 degrees to 50 is now caught,
+  where before it changed nothing this corpus could see — `geopoint` places a city whether the
+  projection would clip it or not, so the cities could never have found it.
+
+- **A projection's `angle` is d3's, and upstream never reaches it.** Every `d3-geo` projection has an
+  `angle` setter — a rotation of the *plane* after the projection — and `vega-geo`'s projection
+  transform forwards the nineteen names `vega-projection` exports as `projectionProperties`, which
+  does not include it. Probed: a projection given an `angle` of 30 places every point exactly where
+  it did without one. This engine applied it, so a map upstream draws upright came out turned, and
+  every mark on it moved.
+
+  Found by reading rather than by the sweep: the schema does not declare `angle` either, so no sweep
+  driven by it can reach the property. `angle` is now reported as a property this engine deliberately
+  does not apply, with the reason, rather than silently dropped — the parser already had the
+  machinery and this is the first projection property to need it. `projection-angle` is new: the same
+  mercator twice, one of them asking for 30 degrees, landing exactly on top of each other.
+
+  **API:** `ProjectionSpec.angle` and `ProjectionDefinition.angle` are gone. A specification may
+  still carry `angle`; it is read, reported and not applied, which is upstream's behaviour minus the
+  silence.
+
+- **A `NaN` in an outline is a coordinate to step over, not a reason to throw the outline away.**
+  Upstream never re-reads a path it generated: a projected geometry stays a *generator function* on
+  the scene item, and the bound context and the renderer consume its calls. Here it becomes a path
+  **string** and is read back to be measured and drawn, so a coordinate upstream merely skips arrives
+  as three letters — and the reader stopped at the first of them. A mercator at `scale: 0` writes a
+  polygon that begins `M100,NaN`, which left an empty outline where upstream measures a point.
+
+  Two halves, both of them round-trip invariants. The reader accepts `NaN` and `Infinity` where a
+  number is expected, because they are words this engine's own writer emits; anything else malformed
+  still stops the reading, which is what the warning at the call sites is for. And the bounds walk
+  takes a point **one axis at a time**, which is what `Bounds.add` in `vega-scenegraph` does — four
+  independent comparisons, every one of which a NaN loses, so the axis it is on is left as it was
+  while the other still widens. Taking the point as a degenerate rectangle and unioning it put the
+  NaN through `min`, which answers NaN, and poisoned the whole outline.
+
+  `projection-degenerate` is new: a mercator at `scale: 0`, which collapses the world onto its own
+  translate and clips to a rectangle of width zero, and a stereographic at `clipAngle: 0`, which
+  stops clipping to a cap and puts its own antipode — where the formula runs to infinity — back
+  inside the map. **The projection sweep's last three differences close with this: 4104 of 4104
+  charts agree.**
+
+- **A stream that transforms a point transforms the marked ones too.** Circle clipping emits its
+  crossings as `point(x, y, 2)`, a marker `clipRejoin` reads to tell a ring that closes on itself
+  from one whose two ends merely landed together. It belongs to the clip stage and is meaningless
+  past it: d3's transform stream declares `point(x, y)` and JavaScript drops the third argument on
+  the floor, so a crossing is projected like any other vertex.
+
+  Here `DelegatingStream` forwards the marked form **unchanged**, which skips the subclass's own
+  `point` — so the one point a clip circle *put* on a line arrived at the path unprojected, in
+  radians: `L0.894,0.647` where upstream had `L174.636,-12.315`. A gnomonic map's border ran to the
+  top-left corner of the chart.
+
+  Only `precision: 0` showed it. The resampler is not built on the delegating stream and routes a
+  marked point through the same projection as any other, so every precision but zero hid it — and
+  zero is the one a chart asks for when it wants the raw vertices and nothing interpolated. Both
+  transforming streams are on a base of their own now, which is d3's `transformer`: the resampling
+  one and the rotation, which sits before the clip and so had never met a marker. A new fixture,
+  `projection-precision`, draws the same three lines twice through a gnomonic and twice through an
+  orthographic, once at each projection's default and once at zero: every line leaves the cap those
+  two clip to, so every one of them ends on a point the clip put there.
+
+- **An identity projection is not a sphere with the globe switched off.** `d3-geo`'s identity
+  projection is an affine transform — `transform(postclip(stream))` — with five setters: `scale`,
+  `translate`, `reflectX`, `reflectY` and `clipExtent`. It has no clip angle, no centre, no rotation
+  and no `precision`, and `vega-geo` applies a projection property only where the projection has a
+  setter of that name (`set` is `if (isFunction(proj[key])) proj[key](value)`), so all four are
+  dropped in silence upstream. Here the identity projection is the spherical one with a flag, so it
+  had every setter there is and honoured all four: a `clipAngle` clipped a floor plan to a circle, a
+  `center` or a `rotate` turned it.
+
+  The fifth thing it does not have is not a property and so could not be dropped like one: **there is
+  no resampling stage**. This one defaults to a threshold of 0.5 and subdivides every segment against
+  a *great-circle* midpoint — of coordinates that are already on the page. A straight edge from
+  `[-100, 20]` to `[-60, 20]` came out 1.7 pixels taller than the two points it joins, and a polygon
+  spanning the width of the world 40 wider than its own corners. Small geometry hid it: the existing
+  fixture spans 40 units and bulges by less than the comparison's tolerance.
+
+  `identity-projection` draws the same wide geometry twice, once plainly and once through a
+  projection that also asks for a clip angle, a centre, a rotation and a precision, and the two land
+  exactly on top of each other. **63 of the projection sweep's 68 differences, closed by this**;
+  4099 of 4104 charts now agree.
+
+  Holding it needed the fixture to draw at all. `identity-projection` and `config-group-projection`
+  put a mark-level `geoshape` on a **`path`** mark, and a `geoshape` writes `shape` where a `path`
+  mark reads `path` — so upstream emitted six empty `d` attributes, this engine emitted six empty
+  outlines, and the two agreed about nothing at zero bounds. Both are `shape` marks now, which is
+  the type `geoshape` feeds; every mutant of this change survived the fixture before that and none
+  survives it after. A fixture drawing nothing is not a fixture, and the two that were are the two
+  that covered the projection this change is about.
+
+- **`nice` reaches a quantize scale.** Upstream applies it by **capability** rather than by scale
+  type — `configureScale` tests `_.nice && scale.nice` — and d3 gives a quantize scale a `nice`
+  because it rounds the linear scale it is built on. This applied `nice` only where a continuous
+  scale was resolved, so a quantize scale kept the raw extent: `[8, 95]` where upstream has
+  `[0, 100]`. The cut points move with the domain, so four of five values change bucket, and an axis
+  over it labels nine ticks where upstream labels eleven. It reaches that scale and no other: probed,
+  a threshold, quantile or bin-ordinal scale asking for `nice: true` keeps its domain exactly as
+  given, having no `nice` to call. `binned-scales` carries the same quantize scale with and without
+  it, an axis over each, and a row of symbols placed by each.
+
+  The schema property sweep now agrees with upstream on all 2999 charts it compares.
+
+- **An axis whose scale can place nothing still draws its spine and its title.** A log scale whose
+  domain touches zero really is unusable, and upstream agrees — every `scale(x)` on one answers
+  null. But upstream *has* the scale all the same, so the axis that names it draws its line and its
+  title with no ticks between them, and only the marks go missing. This refused to build the scale
+  at all, which took the axis with it and reported two further errors for the encodings that named
+  it: a chart upstream draws became no chart and three complaints about this engine. The scale is
+  now built and a warning takes the error's place, `isValid` already making every position a NaN —
+  the same nothing upstream's null is. `log-scale` carries a scale with a domain of `[0, 900]` and
+  the axis that names it.
+
+- **A log scale's `base` decides its ticks, never its geometry.** d3 transforms a log scale by the
+  **natural** log whatever base was asked for — `base` reaches the ticks, the labels and `nice` and
+  nothing else. This divided the transform by `ln(base)`, which is the same answer for a sane base,
+  because a continuous scale normalises between its transformed ends and a constant divisor cancels.
+  It stops being the same answer exactly where the constant stops being one: a base of 0 makes
+  `ln(base)` negative infinity and every position `-0`, a base of 1 makes it zero and every position
+  infinite, a negative base makes it NaN. `isValid` then required `base > 1` on top, so the scale
+  refused outright. Between them a chart upstream draws perfectly well lost its marks, its axis and
+  its own size — probed, upstream maps 3 to 120 and 900 to 0 for bases 10, 0, 0.5, -4 and 1 alike,
+  and only the *ticks* tell them apart.
+
+  The ticks were a second guard on the same number. `logTicks` short-circuited `base <= 1` to
+  nothing, where d3 tests the base by **shape** rather than by size: `!(base % 1)` picks the integer
+  branch and everything else falls to the other. This engine's port of both branches was already
+  faithful, the fallback included, and the guard simply stopped it running. Base 0 takes the integer
+  branch, generates nothing there because `k < base` never runs, and falls through the *fewer than
+  half the count* fallback to linear ticks across the domain — upstream's `[100, 200, … 900]`, which
+  this returned nothing for. Base 0.5 reaches the other branch through a negative count, and base 1
+  and a negative base through a NaN one; all three correctly yield nothing.
+
+  `scale-log-padding-0.5` went with them, padding being computed in the transformed space. Five of
+  the schema sweep's six differences down to two, and `log-scale` carries a base of 0 and a base of
+  a half beside its ordinary one.
+
+- **`zero` folds into a discretizing scale's domain.** `configureDomain` applies it by scale
+  *option* rather than by scale type, so a threshold, quantile or bin-ordinal scale that asks for
+  `zero: true` gets the same per-end treatment a linear one does — and this applied it only where a
+  continuous domain was resolved, so those three ignored it.
+
+  On a threshold scale it is the **cut points** that move: probed, `[20, 50, 80]` with `zero: true`
+  is reported by upstream as `[0, 50, 80]`, which puts every value below the old first cut into a
+  different bucket. In the sweep's chart that was a symbol thirty units up the plot from where
+  upstream draws it, not a shade of colour. A domain whose low end is already negative is left
+  alone, `[-5, 50, 80]` staying as it is, because the rule moves only a positive low end and a
+  negative high one.
+
+  Applied **positionally**, to the domain as written rather than to a sorted copy: a quantile scale
+  given the literal `[60, 8, 31]` comes back from upstream as `[0, 8, 31]`, the 60 replaced where it
+  stood rather than after sorting. `binned-scales` carries the threshold case.
+
+- **An axis over an ordinal or an identity scale draws its ticks.** Both drew nothing at all:
+  `generatedTicks` had a branch for band, point, linear, transformed, time and the binned four, and
+  answered null for these two — so the guide was a bare line, or not even that.
+
+  Three things were missing, and the third only showed once the first two were right.
+
+  `IdentityScale` **discarded its declared domain**, holding `[0, 1]` whatever the specification
+  said. d3 gives `domain` and `range` the same array and then makes the scale `linearish`, so an
+  identity scale ticks exactly as a linear one does and formats its labels by the same
+  step-derived precision. It keeps the domain now — except where none was written, which is how the
+  commonest identity scale of all is spelled, `{"name": "pos", "type": "identity"}`, and where d3
+  defaults to `[0, 1]` rather than refusing.
+
+  The **ticks** themselves: an ordinal axis is ticked with its domain values at their range
+  positions, and `tickCount` does not thin them — probed, `tickCount: 2` over a three-value domain
+  still labels three. An identity axis is ticked like a linear one, each tick at the value itself.
+
+  And the **spine**: `rangeEnds` had no branch for either either, so the domain line ran the whole
+  height of the plot and the axis title was centred on that rather than on the axis — twenty units
+  out. Upstream asks the scale for range positions 0 and 1, which for an ordinal range of `[10, 40,
+  80, 118, 90, 30]` is 10 to 30 and deliberately not its widest extent.
+
+  Giving the scale a domain also changed what a **screen reader** hears, which the guide-caption
+  gate caught: upstream's `domainCaption` has no identity case, so one falls through to the
+  continuous branch and is read as "values from 1 to 5". This said "the values themselves", the
+  phrasing for a scale believed to have no domain to describe.
+
+  Fifteen of the sweep's differences down to seven.
+
+- **A discretizing scale takes a range keyword.** `range: "height"` on a quantize, threshold,
+  quantile or bin-ordinal scale was refused outright — "needs an explicit range array or a scheme" —
+  where upstream resolves the keyword *first* and then asks what kind of scale wanted it. Probed: a
+  quantize scale over `range: "height"` in a hundred-tall view reports a range of `[100, 0]` and
+  buckets into it quite happily, and so do the other three.
+
+  A refused scale takes its axis with it — `VEGA_SCALE_NOT_BUILT`, no ticks, no labels, nothing
+  drawn — so the cost was a whole axis rather than a wrong colour. `binnedRange` accepted only a
+  literal or a scheme; `numericRange` beside it has always known how to resolve `width` and `height`,
+  and it was simply never asked. The direction comes out right by the rule already there: a keyword
+  descends for a continuous scale and ascends for a discrete one, and only `bin-ordinal` of these
+  four is discrete.
+
+  Found by the schema sweep's new scale families, where every property of the quantize family
+  differed alike — the sign that the base chart was already wrong before anything was swept. Twenty
+  differences down to fifteen; the one quantize case left is a different defect, `nice: true` on a
+  quantize scale.
+
+- **The sweep reads every scale type, not just the band one.** A scale is a `oneOf` of twelve
+  branches in the schema and `propertiesOf` had always taken the band one, so a `base` belongs to a
+  log scale, an `exponent` to a power one and a `constant` to a symlog — and nine properties were
+  reachable through no family at all: those three with `clamp`, `zero`, `nice`, `bins`,
+  `domainImplicit` and `interpolate`. Each scale type has its own base chart now, with data that
+  suits it and an axis drawn against it, so the ticks it generates and the labels they carry are
+  compared too. **3022 charts, up from 2861.**
+
+  `nice` had been skipped as "not honestly enumerable", which was true of one merged property table
+  and not of a branch: per type it is a boolean, and on a **time** scale it is an enum of eight
+  intervals. `interpolate` is skipped here and named — what a scale may interpolate *through*
+  depends on what its range is made of, and every base here ranges over pixels; sweeping d3's
+  interpolators at one produced `WebKitCSSMatrix is not defined`, which is a headless *oracle* rather
+  than upstream refusing a chart, and would make this corpus say different things on different
+  machines. It wants a colour-ranged base, which is its own change.
+
+  The widening found **twenty differences in five causes**, all real:
+
+  * a **quantize** scale refuses a range *keyword*. `range: "height"` is rejected here — "a
+    'quantize' scale needs an explicit range array or a scheme" — where upstream resolves the keyword
+    to `[100, 0]` first and buckets into it quite happily. The scale is never built, so the axis that
+    names it is skipped, which is why every property of that family differed alike;
+  * an axis against an **ordinal** or an **identity** scale draws no ticks and no labels. Both scales
+    *are* built; `generatedTicks` has no branch for either and answers null. Probed on minimal
+    specifications: upstream labels an ordinal axis with its domain values and an identity axis with
+    continuous ticks across the domain. Quantile and bin-ordinal axes already agree, so this is two
+    scale types and not five;
+  * a **threshold** scale with `zero: true` folds zero into its domain upstream — `0, 50, 80` where
+    this engine keeps `20, 50, 80`;
+  * a **log** scale with a degenerate `base` — zero, a half, a negative — generates a different tick
+    sequence here;
+  * a log scale's `padding` moves an axis tick by a unit.
+
+  Recorded rather than fixed in this change: the sweep is a measurement, and each of those is its
+  own defect with its own fix.
+
+- **The sweep reads the vocabularies upstream keeps in code, not only the ones its schema states.**
+  The schema had been the sweep's whole source of values, and 121 of its 209 skips shared one
+  reason: "the schema declares no enumerable value here". That sentence covered two unlike things. A
+  property upstream **checks against a table** has a vocabulary — `interpolate` is one of seventeen
+  names in `curves.js`, `shape` one of twelve in `symbols.js`, and anything else silently draws
+  nothing — and the schema cannot say so, because a custom SVG path is a legal `shape` too. A
+  property upstream **passes through** has none: `fontStyle` is concatenated into the CSS font string
+  verbatim, so its legal values belong to the text engine and any word invented here would be testing
+  the platform.
+
+  The first kind is swept now, from lists **extracted from upstream's own pinned sources and then put
+  back through upstream's own lookups** — every name must satisfy `pathCurves` or `pathSymbols` or
+  the generator throws, so a broken extraction fails loudly rather than quietly sweeping nothing.
+  Nothing is transcribed, so a name added upstream arrives with the next `npm ci`. The second kind
+  keeps its skip and now carries its own reason instead of sharing one sentence 121 times.
+
+  Three smaller gaps closed with it. **`strokeDash` was never swept at all**: its `value` branch is a
+  bare `{"type": "array"}` and the generator required `items.type === 'number'`, so the one
+  array-valued channel there is was dropped from all nine mark types. An axis's `domainCap`, `gridCap`
+  and `tickCap` are **stated under another name** — the schema declines to enumerate them and
+  enumerates `strokeCap`, the same three words for the same canvas property, so the enumeration is
+  aliased rather than copied. And `dir` is a two-valued test in `text.js`.
+
+  **2861 charts, up from 2549**, and the widening found one difference: upstream records `dir: "ltr"`
+  where this engine records nothing. `textMetrics` asks `item.dir === 'rtl'`, so left-to-right is
+  what every other answer means — probed, the `<text>` element and the bounds are identical with it,
+  without it and with no `dir` at all, and only a `limit` makes direction visible by truncating from
+  the other end. It joins `strokeCap` and `strokeJoin` in `IMPLIED_BY_ABSENCE`, asserted in both
+  directions: the stated default agrees with silence, and an `rtl` this engine missed still fails.
 
 - **A rect is compared by the numbers it carries, not by the box they imply.** `width: -4` at `x:
   40` is a number a specification may write and upstream keeps: the item says exactly that and the

@@ -1,0 +1,378 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A heading is turned through `const titleAngle = normalizeAngle(ta);` in `assembleTitleGroup`, and a caption is not — `assembleLabelTitle` hands `labelAngle` to the same two rules exactly as it was written. The asymmetry is upstream's and it is visible, because both rules are written as a chain of comparisons against a number between zero and three hundred and sixty: a heading turned to minus one hundred degrees is a heading turned to two hundred and sixty, and two hundred and sixty is caught by `225 < angle && angle < 315` and by the arm that reads `45 <= angle && angle <= 135`, where minus one hundred falls through the first and is caught instead by `angle <= 45`. So this chart's column heading is baselined `middle` and its row heading `bottom`; handing the number over as it was written would baseline them `bottom` and `middle`, which is the same pair of words on the wrong pair of headings. The anchors show the other half of `defaultHeaderGuideAlign`. The column heading is anchored at the start, which aligns it `left` whatever the turn, and puts it against band 0 of the column band — `LAYOUT_TITLE_BAND.column.start`. The row heading must not change: it anchors itself `middle`, which is the default the function declares in its own signature — `anchor: TitleAnchor = 'middle'` — and so falls past both `case` arms to the angle, taking `left` from the turn instead of from the anchor; and `middle` has no entry in either row of `LAYOUT_TITLE_BAND`, so `getLayoutTitleBand` answers nothing and the layout is left with a `titleBand` naming the column alone rather than both bands.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "c": "alpha",
+          "v": 28,
+          "k": "one",
+          "g": "north"
+        },
+        {
+          "c": "beta",
+          "v": 55,
+          "k": "one",
+          "g": "south"
+        },
+        {
+          "c": "gamma",
+          "v": 43,
+          "k": "two",
+          "g": "north"
+        },
+        {
+          "c": "delta",
+          "v": 91,
+          "k": "two",
+          "g": "south"
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "c",
+            "g",
+            "k"
+          ],
+          "field": "v",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    },
+    {
+      "name": "column_domain",
+      "source": "data_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "k"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "row_domain",
+      "source": "data_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "g"
+          ]
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "child_width",
+      "value": 120
+    },
+    {
+      "name": "child_height",
+      "value": 80
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "offset": {
+      "rowTitle": 10,
+      "columnTitle": 10
+    },
+    "columns": {
+      "signal": "length(data('column_domain'))"
+    },
+    "bounds": "full",
+    "align": "all",
+    "titleBand": {
+      "column": 0
+    }
+  },
+  "marks": [
+    {
+      "name": "row-title",
+      "type": "group",
+      "role": "row-title",
+      "title": {
+        "text": "g",
+        "orient": "left",
+        "style": "guide-title",
+        "baseline": "bottom",
+        "align": "left",
+        "anchor": "middle",
+        "angle": -100,
+        "offset": 10
+      }
+    },
+    {
+      "name": "column-title",
+      "type": "group",
+      "role": "column-title",
+      "title": {
+        "text": "k",
+        "style": "guide-title",
+        "baseline": "middle",
+        "align": "left",
+        "anchor": "start",
+        "angle": -100,
+        "offset": 10
+      }
+    },
+    {
+      "name": "row_header",
+      "type": "group",
+      "role": "row-header",
+      "from": {
+        "data": "row_domain"
+      },
+      "sort": {
+        "field": "datum[\"g\"]",
+        "order": "ascending"
+      },
+      "title": {
+        "text": {
+          "signal": "isValid(parent[\"g\"]) ? parent[\"g\"] : \"\"+parent[\"g\"]"
+        },
+        "orient": "left",
+        "style": "guide-label",
+        "frame": "group",
+        "offset": 10
+      },
+      "encode": {
+        "update": {
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      },
+      "axes": [
+        {
+          "scale": "y",
+          "orient": "left",
+          "grid": false,
+          "title": "v",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(child_height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "name": "column_header",
+      "type": "group",
+      "role": "column-header",
+      "from": {
+        "data": "column_domain"
+      },
+      "sort": {
+        "field": "datum[\"k\"]",
+        "order": "ascending"
+      },
+      "title": {
+        "text": {
+          "signal": "isValid(parent[\"k\"]) ? parent[\"k\"] : \"\"+parent[\"k\"]"
+        },
+        "style": "guide-label",
+        "frame": "group",
+        "offset": 10
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "child_width"
+          }
+        }
+      }
+    },
+    {
+      "name": "column_footer",
+      "type": "group",
+      "role": "column-footer",
+      "from": {
+        "data": "column_domain"
+      },
+      "sort": {
+        "field": "datum[\"k\"]",
+        "order": "ascending"
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "child_width"
+          }
+        }
+      },
+      "axes": [
+        {
+          "scale": "x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "c",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "name": "cell",
+      "type": "group",
+      "style": "cell",
+      "from": {
+        "facet": {
+          "name": "facet",
+          "data": "data_0",
+          "groupby": [
+            "g",
+            "k"
+          ],
+          "aggregate": {
+            "cross": true
+          }
+        }
+      },
+      "sort": {
+        "field": [
+          "datum[\"g\"]",
+          "datum[\"k\"]"
+        ],
+        "order": [
+          "ascending",
+          "ascending"
+        ]
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "child_width"
+          },
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "facet"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+              },
+              "x": {
+                "scale": "x",
+                "field": "c"
+              },
+              "width": {
+                "signal": "max(0.25, bandwidth('x'))"
+              },
+              "y": {
+                "scale": "y",
+                "field": "v_end"
+              },
+              "y2": {
+                "scale": "y",
+                "field": "v_start"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "y",
+          "orient": "left",
+          "gridScale": "x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(child_height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "data": "data_0",
+        "field": "c",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "child_width"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "v_start",
+          "v_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "child_height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ]
+}

@@ -652,18 +652,30 @@ public class SpecCompiler(
     // way `pad` does. This is the whole of the second pass: seed `width` and `height` with the
     // fitted numbers and everything downstream follows, because a scale range, an axis extent and a
     // mark position are all measured against them.
+    // **Never negative**, however it was arrived at. `viewSizeLayout` measures the root group as
+    // `Math.max(0, group.width || 0)` and writes the result back into the `width` signal, so a
+    // specification asking for a width of -4 gets a plotting area of zero — and every scale ranging
+    // over `"width"` gets `[0, 0]` with it. Clamping only the fitted branches left the declared one
+    // handing a band scale a negative range to divide up, which came out as a bandwidth of 0.878
+    // where upstream's is 0.
     val width =
-      if (fit != null && spec.autosize.type != AutosizeType.FIT_Y) {
-        maxOf(0.0, fit.base.width - fit.over.left - fit.over.right)
-      } else {
-        viewWidth
-      }
+      maxOf(
+        0.0,
+        if (fit != null && spec.autosize.type != AutosizeType.FIT_Y) {
+          fit.base.width - fit.over.left - fit.over.right
+        } else {
+          viewWidth
+        },
+      )
     val height =
-      if (fit != null && spec.autosize.type != AutosizeType.FIT_X) {
-        maxOf(0.0, fit.base.height - fit.over.top - fit.over.bottom)
-      } else {
-        viewHeight
-      }
+      maxOf(
+        0.0,
+        if (fit != null && spec.autosize.type != AutosizeType.FIT_X) {
+          fit.base.height - fit.over.top - fit.over.bottom
+        } else {
+          viewHeight
+        },
+      )
     // The fitted size is the **view's** answer, not the specification's, so it replaces a declared
     // `width` or `height` signal for this pass rather than being overwritten by it:
     //
@@ -1111,13 +1123,19 @@ public class SpecCompiler(
         MarkSpec(
           type = MarkType.GROUP,
           name = "root",
-          encode = rootEncode(spec, plot),
           // Two blocks reach the chart's own frame and neither is a mark's. `config.group` is the
           // frame's own paint — upstream's comment says "top-level group marks" and means the root
           // rectangle — and the `config.style` blocks the specification named are what a Vega-Lite
           // chart's plotting area gets its border from. The named styles are the more specific of
-          // the two, so they are applied over it.
-          configAboveDefaults = spec.frameConfig + spec.styleAboveDefaults,
+          // the two, so they are applied over it. Folded into the encode by the same rules a mark's
+          // own defaults are, which is upstream's `applyDefaults` taking `config.group` for a frame
+          // exactly where it takes `config.<marktype>` for a mark.
+          encode =
+            rootEncode(spec, plot)
+              .withDefaults(
+                dev.aster.vega.model.VegaValue.Obj(spec.frameConfig),
+                dev.aster.vega.model.VegaValue.Obj(spec.styleAboveDefaults),
+              ),
         ),
         listOf(VegaValue.EmptyObject),
       ) { _, _, _, _ ->

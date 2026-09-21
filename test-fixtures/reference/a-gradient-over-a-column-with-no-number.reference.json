@@ -1,0 +1,387 @@
+{
+  "marks": [
+    {
+      "fill": "rgb(68, 1, 84)",
+      "height": 60,
+      "role": "mark",
+      "type": "rect",
+      "width": 52.682927,
+      "x": 5.853659,
+      "y": 0
+    },
+    {
+      "fill": "rgb(54, 94, 141)",
+      "height": 60,
+      "role": "mark",
+      "type": "rect",
+      "width": 52.682927,
+      "x": 64.390244,
+      "y": 0
+    },
+    {
+      "fill": "rgb(47, 179, 125)",
+      "height": 60,
+      "role": "mark",
+      "type": "rect",
+      "width": 52.682927,
+      "x": 122.926829,
+      "y": 0
+    },
+    {
+      "fill": "rgb(253, 231, 37)",
+      "height": 60,
+      "role": "mark",
+      "type": "rect",
+      "width": 52.682927,
+      "x": 181.463415,
+      "y": 0
+    },
+    {
+      "fill": {
+        "gradient": "linear",
+        "stops": [
+          {
+            "color": "rgb(207, 225, 242)",
+            "offset": 0
+          },
+          {
+            "color": "rgb(199, 221, 239)",
+            "offset": 0.05
+          },
+          {
+            "color": "rgb(190, 216, 236)",
+            "offset": 0.1
+          },
+          {
+            "color": "rgb(179, 211, 233)",
+            "offset": 0.15
+          },
+          {
+            "color": "rgb(168, 206, 229)",
+            "offset": 0.2
+          },
+          {
+            "color": "rgb(156, 200, 226)",
+            "offset": 0.25
+          },
+          {
+            "color": "rgb(143, 193, 222)",
+            "offset": 0.3
+          },
+          {
+            "color": "rgb(130, 186, 219)",
+            "offset": 0.35
+          },
+          {
+            "color": "rgb(116, 178, 215)",
+            "offset": 0.4
+          },
+          {
+            "color": "rgb(104, 171, 211)",
+            "offset": 0.45
+          },
+          {
+            "color": "rgb(91, 163, 207)",
+            "offset": 0.5
+          },
+          {
+            "color": "rgb(80, 155, 203)",
+            "offset": 0.55
+          },
+          {
+            "color": "rgb(69, 146, 198)",
+            "offset": 0.6
+          },
+          {
+            "color": "rgb(59, 138, 194)",
+            "offset": 0.65
+          },
+          {
+            "color": "rgb(49, 129, 189)",
+            "offset": 0.7
+          },
+          {
+            "color": "rgb(41, 120, 184)",
+            "offset": 0.75
+          },
+          {
+            "color": "rgb(32, 111, 178)",
+            "offset": 0.8
+          },
+          {
+            "color": "rgb(25, 102, 171)",
+            "offset": 0.85
+          },
+          {
+            "color": "rgb(18, 92, 164)",
+            "offset": 0.9
+          },
+          {
+            "color": "rgb(14, 83, 154)",
+            "offset": 0.95
+          },
+          {
+            "color": "rgb(10, 74, 144)",
+            "offset": 1
+          }
+        ],
+        "x1": 0,
+        "x2": 0,
+        "y1": 1,
+        "y2": 0
+      },
+      "height": 200,
+      "opacity": 1,
+      "role": "legend-gradient",
+      "stroke": "#ddd",
+      "strokeWidth": 0,
+      "type": "rect",
+      "width": 16,
+      "x": 258,
+      "y": 16
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "NaN",
+      "type": "text",
+      "x": 276,
+      "y": 116
+    },
+    {
+      "align": "left",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "fontWeight": "bold",
+      "limit": 180,
+      "opacity": 1,
+      "role": "legend-title",
+      "text": "no number",
+      "type": "text",
+      "x": 258,
+      "y": 0
+    },
+    {
+      "fill": {
+        "gradient": "linear",
+        "stops": [
+          {
+            "color": "rgb(68, 1, 84)",
+            "offset": 0
+          },
+          {
+            "color": "rgb(72, 23, 105)",
+            "offset": 0.058824
+          },
+          {
+            "color": "rgb(71, 42, 121)",
+            "offset": 0.117647
+          },
+          {
+            "color": "rgb(67, 61, 132)",
+            "offset": 0.176471
+          },
+          {
+            "color": "rgb(61, 78, 138)",
+            "offset": 0.235294
+          },
+          {
+            "color": "rgb(54, 94, 141)",
+            "offset": 0.294118
+          },
+          {
+            "color": "rgb(47, 109, 142)",
+            "offset": 0.352941
+          },
+          {
+            "color": "rgb(41, 123, 142)",
+            "offset": 0.411765
+          },
+          {
+            "color": "rgb(35, 137, 142)",
+            "offset": 0.470588
+          },
+          {
+            "color": "rgb(31, 151, 139)",
+            "offset": 0.529412
+          },
+          {
+            "color": "rgb(33, 165, 133)",
+            "offset": 0.588235
+          },
+          {
+            "color": "rgb(47, 179, 125)",
+            "offset": 0.647059
+          },
+          {
+            "color": "rgb(70, 192, 111)",
+            "offset": 0.705882
+          },
+          {
+            "color": "rgb(101, 204, 94)",
+            "offset": 0.764706
+          },
+          {
+            "color": "rgb(137, 213, 72)",
+            "offset": 0.823529
+          },
+          {
+            "color": "rgb(176, 221, 47)",
+            "offset": 0.882353
+          },
+          {
+            "color": "rgb(215, 227, 27)",
+            "offset": 0.941176
+          },
+          {
+            "color": "rgb(253, 231, 37)",
+            "offset": 1
+          }
+        ],
+        "x1": 0,
+        "x2": 0,
+        "y1": 1,
+        "y2": 0
+      },
+      "height": 200,
+      "opacity": 1,
+      "role": "legend-gradient",
+      "stroke": "#ddd",
+      "strokeWidth": 0,
+      "type": "rect",
+      "width": 16,
+      "x": 258,
+      "y": 240
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "5",
+      "type": "text",
+      "x": 276,
+      "y": 416.470588
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "10",
+      "type": "text",
+      "x": 276,
+      "y": 357.647059
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "15",
+      "type": "text",
+      "x": 276,
+      "y": 298.823529
+    },
+    {
+      "align": "left",
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "20",
+      "type": "text",
+      "x": 276,
+      "y": 240
+    },
+    {
+      "align": "left",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "fontWeight": "bold",
+      "limit": 180,
+      "opacity": 1,
+      "role": "legend-title",
+      "text": "numbers",
+      "type": "text",
+      "x": 258,
+      "y": 224
+    }
+  ],
+  "scales": {
+    "none": {
+      "domain": [
+        "NaN",
+        "NaN"
+      ],
+      "range": [
+        "rgb(207, 225, 242)",
+        "rgb(10, 74, 144)"
+      ],
+      "ticks": []
+    },
+    "some": {
+      "domain": [
+        3,
+        20
+      ],
+      "range": [
+        "rgb(68, 1, 84)",
+        "rgb(253, 231, 37)"
+      ],
+      "ticks": [
+        4,
+        6,
+        8,
+        10,
+        12,
+        14,
+        16,
+        18,
+        20
+      ]
+    },
+    "x": {
+      "bandwidth": 52.682927,
+      "domain": [
+        "alpha",
+        "beta",
+        "gamma",
+        "delta"
+      ],
+      "range": [
+        0,
+        240
+      ],
+      "step": 58.536585
+    }
+  },
+  "size": {
+    "height": 450,
+    "width": 347
+  },
+  "spec": "a-gradient-over-a-column-with-no-number.vg.json",
+  "vegaVersion": "6.3.1"
+}

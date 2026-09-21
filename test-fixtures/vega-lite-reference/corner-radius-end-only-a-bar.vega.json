@@ -1,0 +1,357 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "`cornerRadiusEnd` is a bar's word and nothing else's. `initMarkDef` guards the whole rule with `if (markDef.type === 'bar' && markDef.orient)`, so an area, a point, a tick or a rule that asks for one is compiled as though it had not: upstream emits no corner property at all for them, where this compiler wrote the two corners onto every mark type there is. The three layers here ask for it on an area, a point and a tick, and the bar in the fourth layer is the one that gets it — a **ranged** bar at that, whose far end is a `y2` rather than a baseline, which rounds all four corners rather than two. A bar with two ends of its own has no far one to single out, so upstream writes the plain `cornerRadius` in place of the pair.",
+  "background": "white",
+  "padding": 5,
+  "width": 220,
+  "height": 130,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "c": "Jan",
+          "v": 62,
+          "lo": 20,
+          "hi": 62
+        },
+        {
+          "c": "Feb",
+          "v": 48,
+          "lo": 12,
+          "hi": 48
+        },
+        {
+          "c": "Mar",
+          "v": 31,
+          "lo": 8,
+          "hi": 31
+        },
+        {
+          "c": "Apr",
+          "v": 18,
+          "lo": 4,
+          "hi": 18
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "impute",
+          "field": "v",
+          "groupby": [],
+          "key": "c",
+          "method": "value",
+          "value": 0
+        },
+        {
+          "type": "stack",
+          "groupby": [
+            "c"
+          ],
+          "field": "v",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "zero"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"lo\"]) && isFinite(+datum[\"lo\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_3",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_marks",
+      "type": "area",
+      "style": [
+        "area"
+      ],
+      "sort": {
+        "field": "x"
+      },
+      "from": {
+        "data": "data_1"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.3
+          },
+          "orient": {
+            "value": "vertical"
+          },
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "description": {
+            "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "c",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "field": "v_end"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "v_start"
+          },
+          "defined": {
+            "signal": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_marks",
+      "type": "rect",
+      "style": [
+        "bar"
+      ],
+      "from": {
+        "data": "data_2"
+      },
+      "encode": {
+        "update": {
+          "cornerRadius": {
+            "value": 5
+          },
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "bar"
+          },
+          "description": {
+            "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; lo: \" + (format(datum[\"lo\"], \"\")) + \"; hi: \" + (format(datum[\"hi\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "c"
+          },
+          "width": {
+            "signal": "max(0.25, bandwidth('x'))"
+          },
+          "y": {
+            "scale": "y",
+            "field": "lo"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "hi"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_2_marks",
+      "type": "symbol",
+      "style": [
+        "point"
+      ],
+      "from": {
+        "data": "data_3"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "c",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "field": "v"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_3_marks",
+      "type": "rect",
+      "style": [
+        "tick"
+      ],
+      "from": {
+        "data": "data_2"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "tick"
+          },
+          "description": {
+            "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; lo: \" + (format(datum[\"lo\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "c"
+          },
+          "width": {
+            "signal": "max(0.25, bandwidth('x'))"
+          },
+          "yc": {
+            "scale": "y",
+            "field": "lo"
+          },
+          "height": {
+            "value": 1
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "c"
+          },
+          {
+            "data": "data_2",
+            "field": "c"
+          },
+          {
+            "data": "data_3",
+            "field": "c"
+          }
+        ]
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "paddingInner": 0,
+      "paddingOuter": 0
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "v_start"
+          },
+          {
+            "data": "data_1",
+            "field": "v_end"
+          },
+          {
+            "data": "data_2",
+            "field": "lo"
+          },
+          {
+            "data": "data_2",
+            "field": "hi"
+          },
+          {
+            "data": "data_3",
+            "field": "v"
+          }
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "c",
+      "labelAngle": 0,
+      "labelBaseline": "top",
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "v, lo, hi",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}

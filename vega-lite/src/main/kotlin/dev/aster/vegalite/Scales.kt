@@ -710,29 +710,56 @@ internal object Scales {
     // `parseScheme`: a named colour scheme is a **range**, not a property beside one. Written as a
     // property it sat next to the `"category"` range this would otherwise default to, and Vega read
     // the range — so a chart that asked for `category20` got the ten-colour scheme.
-    def.scale?.fields?.get("scheme")?.let { scheme ->
-      return when (scheme) {
-        is VegaValue.Obj ->
-          obj {
-            put("scheme", scheme.fields["name"])
-            scheme.fields.forEach { (key, value) -> if (key != "name") put(key, value) }
-          }
-        else -> obj { put("scheme", scheme) }
+    // ```js
+    // case 'interpolate': case 'scheme': case 'domainMid':
+    //   if (!isColorChannel(channel)) {
+    //     return log.message.cannotUseScalePropertyWithNonColor(propName);
+    //   }
+    // ```
+    //
+    // **A scheme is a colour channel's word.** `channelScalePropertyIncompatability` refuses it
+    // anywhere else and `parseRangeForChannel` then falls through to the range the channel would
+    // have taken — so a position given `scheme: "category10"` is still `[0, width]`, and a chart
+    // that wrote one there is warned rather than obeyed. Written through, this handed Vega a
+    // horizontal axis whose range was a palette, and the marks were placed at colours.
+    if (channel in COLOR_CHANNELS)
+      def.scale?.fields?.get("scheme")?.let { scheme ->
+        return when (scheme) {
+          is VegaValue.Obj ->
+            obj {
+              put("scheme", scheme.fields["name"])
+              scheme.fields.forEach { (key, value) -> if (key != "name") put(key, value) }
+            }
+          else -> obj { put("scheme", scheme) }
+        }
       }
-    }
     val config = view.config
     // `rangeMin`/`rangeMax` **replace the ends** of whatever range the channel would take, rather
     // than being properties of their own: they are how a radial chart says "start the rings at
     // twenty" without writing out the expression for the other end.
     val ends = listOf(def.scale?.fields?.get("rangeMin"), def.scale?.fields?.get("rangeMax"))
     if (ends.any { it != null }) {
+      // ```js
+      // if (
+      //   (rangeMin !== undefined || rangeMax !== undefined) &&
+      //   scaleTypeSupportProperty(scaleType, 'rangeMin') &&
+      //   isArray(d) && d.length === 2
+      // ) {
+      //   return makeExplicit([rangeMin ?? d[0], rangeMax ?? d[1]]);
+      // }
+      // return makeImplicit(d);
+      // ```
+      //
+      // **Only where the range they are replacing an end of is a pair of numbers.** A colour
+      // scale's default range is the word `"ramp"`, a scheme's name rather than two values, and
+      // there is no end of it to replace — so upstream leaves the ramp alone and the two properties
+      // do nothing. This filled the missing end with a zero instead, turning `"ramp"` into
+      // `[-4, 0]`: a colour scale ranging between two numbers, which paints nothing.
       val derived = defaultRange(view, channel, def, type) as? VegaValue.Arr
-      return arr(
-        listOf(
-          ends[0] ?: derived?.values?.firstOrNull() ?: num(0),
-          ends[1] ?: derived?.values?.lastOrNull() ?: num(0),
-        )
-      )
+      if (derived != null && derived.values.size == 2) {
+        return arr(listOf(ends[0] ?: derived.values.first(), ends[1] ?: derived.values.last()))
+      }
+      return derived ?: defaultRange(view, channel, def, type)
     }
     return defaultRange(view, channel, def, type)
   }
@@ -1035,6 +1062,26 @@ internal object Scales {
       "paddingOuter",
     )
 
+  /**
+   * `scaleRules`: the properties a scale works out for itself, which is the list by exception.
+   *
+   * Upstream's fallback is `config.scale[property]` for everything *not* keyed here, so what this
+   * set is for is saying which properties are not the theme's to settle. A rule that answers
+   * nothing still answers — `padding` declines on an ordinal scale, and no `config.scale.padding`
+   * is consulted behind it.
+   */
+  private val RULED_PROPERTIES =
+    setOf(
+      "bins",
+      "interpolate",
+      "nice",
+      "padding",
+      "paddingInner",
+      "paddingOuter",
+      "reverse",
+      "zero",
+    )
+
   private fun supportsProperty(type: String, property: String): Boolean {
     val continuous = type in setOf("linear", "log", "pow", "sqrt", "symlog", "time", "utc")
     return when (property) {
@@ -1127,18 +1174,82 @@ internal object Scales {
       set("nice", bool(true))
     }
 
-    // A **point** offset scale is padded at its ends like any other point scale, and by the same
-    // number: `pointPadding` becomes its outer padding, its marks having no width to pad within.
-    if ((channel == "xOffset" || channel == "yOffset") && type == "point") {
-      set("paddingOuter", num(config.scaleConfig("pointPadding")!!))
+    // An **offset** scale is padded by its own two configuration entries, and by nothing the outer
+    // scale reads. Upstream's `paddingInner`/`paddingOuter` take the offset channels down a second
+    // arm entirely:
+    //
+    //     } else if (isXorYOffset(channel)) {
+    //       if (scaleType === ScaleType.BAND) return scaleConfig.offsetBandPaddingInner;
+    //     }
+    //     ...
+    //     } else if (isXorYOffset(channel)) {
+    //       if (scaleType === ScaleType.POINT) {
+    //         return 0.5; // so the point positions align with centers of band scales.
+    //       } else if (scaleType === ScaleType.BAND) return scaleConfig.offsetBandPaddingOuter;
+    //     }
+    //
+    // The point half is a **constant**, not `pointPadding`: half a step is what puts an offset
+    // point on the centre of the band a bar would have filled, and a theme that narrows every
+    // other point scale must not pull those points off their bands. Reading `pointPadding` here
+    // agreed only because its default happens to be the same 0.5. The band half was not read at
+    // all, so `config.scale.offsetBandPaddingInner` and `offsetBandPaddingOuter` did nothing —
+    // they have no default, which is why the omission stayed invisible until a theme set one.
+    if (channel == "xOffset" || channel == "yOffset") {
+      if (type == "point") {
+        set("paddingOuter", num(0.5))
+      } else if (type == "band") {
+        config.scaleConfig("offsetBandPaddingInner")?.let { set("paddingInner", num(it)) }
+        config.scaleConfig("offsetBandPaddingOuter")?.let { set("paddingOuter", num(it)) }
+      }
     }
     if (channelIsPosition(channel)) {
+      // `padding()`, whole. A position scale's padding is settled before its two halves are, and
+      // the first thing upstream asks is the theme:
+      //
+      //     if (isContinuousToContinuous(scaleType)) {
+      //       if (scaleConfig.continuousPadding !== undefined) {
+      //         return scaleConfig.continuousPadding;
+      //       }
+      //       const {type, orient} = markDef;
+      //       if (type === 'bar' && !(isFieldDef(fieldOrDatumDef) && (…bin || …timeUnit))) {
+      //         if ((orient === 'vertical' && channel === 'x') || …) {
+      //           return barConfig.continuousBandSize;
+      //         }
+      //       }
+      //     }
+      //     if (scaleType === ScaleType.POINT) return scaleConfig.pointPadding;
+      //
+      // `continuousPadding` was never read, so a theme could not pad a continuous position scale
+      // at all, and could not narrow a histogram's bars by the one entry written for it: the bar
+      // width fell through to `config.bar.continuousBandSize` even where the theme had spoken.
+      // Note which types it reaches — every continuous one, a plain line's `x` included, not only
+      // a bar's.
+      val derivedPadding: Double? =
+        if (type in CONTINUOUS_TO_CONTINUOUS) {
+          config.scaleConfig("continuousPadding")
+            ?: if (
+              view.spec.mark == "bar" &&
+                def.bin == null &&
+                def.timeUnit == null &&
+                ((view.markDef.orient == "vertical" && channel == "x") ||
+                  (view.markDef.orient == "horizontal" && channel == "y"))
+            ) {
+              // A bar against a continuous dimension has no band to fill, so its width comes from
+              // here.
+              config.markConfig("bar").number("continuousBandSize")
+            } else null
+        } else if (type == "point") {
+          config.scaleConfig("pointPadding")
+        } else null
+      derivedPadding?.let { set("padding", num(it)) }
+
       // A stated `padding` settles both ends of a band at once and passes through as it stands;
       // the derived inner and outer paddings are for a scale that said nothing, and writing them
-      // beside a stated one gives Vega three numbers where the specification gave it one.
-      if (type == "point") {
-        set("padding", num(config.scaleConfig("pointPadding")!!))
-      } else if (type == "band" && def.scale?.has("padding") != true) {
+      // beside a stated one gives Vega three numbers where the specification gave it one. (Only a
+      // *stated* one can suppress them here: `padding()` returns nothing for a band, which is
+      // neither continuous nor a point, so the resolved padding upstream guards on is the stated
+      // one and nothing else.)
+      if (type == "band" && def.scale?.has("padding") != true) {
         // A **stated** inner padding is the resolved one, and the outer is half of *that*: the two
         // are one decision, and deriving the outer from the configured inner beside a stated one
         // pads the ends against a gap the bands do not have.
@@ -1162,31 +1273,90 @@ internal object Scales {
             }
         set("paddingInner", num(inner))
         // Half the inner padding, so that a band's step stays a whole number of units — except
-        // around a nested group, where upstream pads both sides alike.
+        // around a nested group, where upstream pads both sides alike, and except where the theme
+        // has named an outer padding of its own:
+        //
+        //     if (hasNestedOffsetScale) return bandWithNestedOffsetPaddingOuter;
+        //     if (scaleType === ScaleType.BAND) {
+        //       return getFirstDefined(bandPaddingOuter, paddingInnerValue / 2);
+        //     }
+        //
+        // `bandPaddingOuter` heads that chain and was not read, so a theme asking for wider ends
+        // got the halved inner padding anyway. It stands behind the nested-offset entry, which is
+        // about the gap between groups rather than at the edges of the plot.
         val outer =
           if (view.hasNestedOffset(channel))
             config.scaleConfig("bandWithNestedOffsetPaddingOuter")!!
-          else inner / 2
+          else config.scaleConfig("bandPaddingOuter") ?: inner / 2
         set("paddingOuter", num(outer))
-      } else if (
-        view.spec.mark == "bar" &&
-          def.bin == null &&
-          def.timeUnit == null &&
-          ((view.markDef.orient == "vertical" && channel == "x") ||
-            (view.markDef.orient == "horizontal" && channel == "y"))
-      ) {
-        // A bar against a continuous dimension has no band to fill, so its width comes from here.
-        config.markConfig("bar").number("continuousBandSize")?.let { set("padding", num(it)) }
       }
     }
 
-    // A **continuous** domain cannot be sorted — Vega has no such thing — so a `sort: "descending"`
-    // on one reverses the *range* instead. A discrete domain sorts itself and needs none of this.
-    if (hasContinuousDomain(type) && (def.sort as? VegaValue.Str)?.value == "descending") {
-      set("reverse", bool(true))
-    }
+    // `reverse()`, whole. A **continuous** domain cannot be sorted — Vega has no such thing — so a
+    // `sort: "descending"` on one reverses the *range* instead, and a discrete domain sorts itself
+    // and needs none of that. But the chain does not start there:
+    //
+    //     if (channel === 'x' && scaleConfig.xReverse !== undefined) {
+    //       if (hasContinuousDomain(scaleType) && sort === 'descending') {
+    //         if (isSignalRef(scaleConfig.xReverse)) {
+    //           return {signal: `!${scaleConfig.xReverse.signal}`};
+    //         } else {
+    //           return !scaleConfig.xReverse;
+    //         }
+    //       }
+    //       return scaleConfig.xReverse;
+    //     }
+    //
+    // `config.scale.xReverse` is how a document written right to left turns every `x` scale round
+    // at once, and it was not read at all, so such a theme drew every chart left to right. It has
+    // no default, which is why the omission was invisible until somebody set one. Note that it
+    // reaches *every* type of `x` scale — `scaleTypeSupportProperty` answers `true` for `reverse`
+    // whatever the scale is — so a band of categories turns round with the rest.
+    //
+    // The descending case **inverts** it rather than winning over it, and that is the point: the
+    // sort already reversed the range once, so a chart whose axis runs the other way to begin with
+    // has to reverse it back. `xReverse: true` with `sort: "descending"` is `reverse: false`, not
+    // `true`, and a `reverse` written as an expression is negated as an expression.
+    val descendingContinuous =
+      hasContinuousDomain(type) && (def.sort as? VegaValue.Str)?.value == "descending"
+    val xReverse = if (channel == "x") config.raw.obj("scale")?.fields?.get("xReverse") else null
+    val reverse: VegaValue? =
+      when {
+        xReverse == null -> if (descendingContinuous) bool(true) else null
+        !descendingContinuous -> xReverse
+        xReverse is VegaValue.Bool -> bool(!xReverse.value)
+        // An expression reached here as `{"signal": …}` already: `initConfig` turns every
+        // `{"expr": …}` in `config.scale` into one before a scale ever asks.
+        else -> xReverse.string("signal")?.let { signalRef("!$it") } ?: xReverse
+      }
+    reverse?.let { set("reverse", it) }
 
     zero(view, channel, def, type, specifiedDomain)?.let { set("zero", bool(it)) }
+
+    // Every property the rules above do **not** settle is read straight from the theme, by name:
+    //
+    //     const value = util.hasProperty(scaleRules, property)
+    //       ? scaleRules[property]({…})
+    //       : config.scale[property];
+    //     if (value !== undefined) {
+    //       localScaleCmpt.set(property, value as any, false);
+    //     }
+    //
+    // That `else` arm was missing entirely, so `config.scale.clamp` and `config.scale.round` — the
+    // two flags `ScaleConfig` declares and no rule claims — did nothing: a theme could not clamp
+    // its continuous scales, and could not ask for pixel-aligned positions across a whole
+    // document. The gate that decides which scales each reaches is the ordinary one, already in
+    // `set`: a `clamp` needs a continuous scale to be the ends of, while a `round` also suits a
+    // band or a point, and neither goes near an ordinal colour scale.
+    //
+    // Written as the general rule rather than as two reads, because that is what it is — the arm
+    // takes *whatever* the theme names that the rules leave alone, so `config.scale.base` reaches
+    // a log scale and `config.scale.align` a band. A property with a rule never consults the theme
+    // here, even where the rule answers nothing: a `nice` the rule declines is left unwritten.
+    NON_TYPE_DOMAIN_RANGE_PROPERTIES.forEach { key ->
+      if (key in RULED_PROPERTIES) return@forEach
+      config.raw.obj("scale")?.fields?.get(key)?.let { set(key, it) }
+    }
 
     // The rest of what the specification stated on the scale, **asked for by name**:
     //

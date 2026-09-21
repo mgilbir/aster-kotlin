@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
@@ -694,7 +695,13 @@ internal class LegendBuilder(
     val order = GridLayout.columnMajorOrder(cells.size, columns)
     val ordered = order.map { cells[it] }
     val boxes = ordered.map { cell -> cellBox(cell, clipHeight) }
-    val align = GridLayout.Align.fromName(gridAlign)
+    // **`each`**, which is a default of upstream's own rather than the grid's: its configuration
+    // carries `legend: {gridAlign: 'each'}`, and its legend layout hard-codes `align: Each` in the
+    // parameters it builds. The grid's own answer for an unstated alignment is *none* — which is
+    // what a group layout gets — so saying it here is the difference between a legend whose entries
+    // line up in columns and one whose entries each start where the last one ended. A stated
+    // `gridAlign`, from the legend or from `config.legend`, still wins.
+    val align = GridLayout.Align.fromName(gridAlign ?: "each")
     val offsets =
       GridLayout.place(
         boxes,
@@ -711,6 +718,30 @@ internal class LegendBuilder(
         ),
       )
 
+    // `legendEntryLayout`, which runs once the legend's own bounds are settled and sizes **every**
+    // entry group of a symbol legend, not only a clipped one:
+    //
+    // ```js
+    // const widths = entries.reduce((w, g) => {
+    //   w[g.column] = Math.max(g.bounds.x2 - g.x, w[g.column] || 0);
+    //   return w;
+    // }, {});
+    // entries.forEach(g => { g.width = widths[g.column]; g.height = g.bounds.y2 - g.y; });
+    // ```
+    //
+    // A row is therefore as wide as the widest row in its **column** and as tall as what is in it.
+    // Sized only where a `clipHeight` asked for it, an ordinary legend's rows had no rectangle at
+    // all, which is invisible until something reads one: a legend a selection is bound to paints
+    // its rows transparent so that a click anywhere along one is caught, and a row of no size
+    // catches nothing.
+    fun extent(box: RectD, of: (RectD) -> Double) = of(box).takeIf { it.isFinite() } ?: 0.0
+    val columnWidths =
+      ordered.indices
+        .groupBy { it % columns }
+        .mapValues { (_, inColumn) ->
+          inColumn.maxOf { extent(boxes[it]) { box -> box.right } }
+        }
+
     return ordered.indices.map { position ->
       val offset = offsets[position]
       // The `entries` block paints the **row**, which is how a legend a selection is bound to
@@ -723,12 +754,16 @@ internal class LegendBuilder(
         children = clipped(ordered[position], clipHeight, boxes[position].right),
         fill = painted?.let { Fill.of(it) },
         transform = Transform2D.translate(offset.x, offset.y),
-        // With a `clipHeight` the entry has a rectangle of its own — `height: height ? encoder(…)`
-        // — and `g.width = Math.max(g.bounds.x2 - g.x, …)` fills the width in afterwards, so the
-        // row reaches from its **own origin** to whatever is furthest right in it. The row itself
-        // is **not** clipped: only the symbol inside it is, which is why a label longer than the
-        // row is drawn in full while a swatch taller than it is cut.
-        size = clipHeight?.let { SizeD(boxes[position].right, it) },
+        // The row reaches from its **own origin** to whatever is furthest right in its column, and
+        // down to whatever is lowest in it — which with a `clipHeight` is at least the clip, since
+        // that is the one case where the group's own rectangle joins its bounds. The row itself is
+        // **not** clipped: only the symbol inside it is, which is why a label longer than the row
+        // is drawn in full while a swatch taller than it is cut.
+        size =
+          SizeD(
+            columnWidths.getValue(position % columns),
+            extent(boxes[position]) { box -> box.bottom },
+          ),
         // Upstream calls this a "scope" group; naming it for what it is keeps a legend entry
         // distinguishable from a group mark's cell, which shares that role.
         metadata =
@@ -990,6 +1025,27 @@ internal class LegendBuilder(
     scale: VegaScale,
     scaleName: String,
   ): List<SceneNode>? {
+    // **A deliberate divergence, and the only one in this file.** Upstream draws this legend.
+    // `scale_gradient` does not ask what kind of scale it has — it samples it and stores whatever
+    // comes back as the stop's colour:
+    //
+    // ```js
+    // stops.forEach(_ => gradient.stop(fraction(_), scale(_)));
+    // ```
+    //
+    // so a `size` scale ranged `[4, 361]` yields
+    // `{"gradient": "linear", "stops": [{"color": 4, "offset": 0}, {"color": 27.8, …}]}` — a
+    // gradient whose stops are **numbers**. Vega emits it and no renderer can paint it; it is a
+    // scale's outputs written into a field that means a colour.
+    //
+    // Matching that would mean widening [GradientStop.color] from `SceneColor` to something that
+    // can hold a number, through every renderer that consumes it — the Android canvas, the SVG
+    // writer, and the Swift surface, where it is a published type and moves the foreign API
+    // snapshot. The return is a legend that still cannot be drawn. So this reports instead, which
+    // tells the reader what upstream leaves them to discover from a blank space.
+    //
+    // Reachable from Vega-Lite by `{"legend": {"type": "gradient"}}` on a size or shape channel,
+    // which is why it is a diagnostic rather than a silent skip.
     if (scale !is SequentialColorScale) {
       diagnostics.error(
         DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
@@ -1061,7 +1117,7 @@ internal class LegendBuilder(
     val labelLimit = numbers.resolve(spec.labelLimit, scaleName) ?: LegendDefaults.LABEL_LIMIT
     val labels = mutableListOf<TextNode>()
 
-    for ((index, entry) in gradientLabels(spec, scale, scaleName).withIndex()) {
+    for ((index, entry) in joinedByValue(gradientLabels(spec, scale, scaleName)).withIndex()) {
       val fraction = scale.fraction(entry.value.asNumberOrNull() ?: 0.0)
       // The end labels hang inside the swatch rather than past it, so a ramp's extremes stay
       // legible
@@ -1257,7 +1313,7 @@ internal class LegendBuilder(
     scaleName: String,
   ): (Int, Double) -> String {
     spec.values?.let { explicit ->
-      return { index, _ -> explicit.getOrNull(index)?.asString() ?: "" }
+      return { index, _ -> explicit.getOrNull(index)?.let { asLines(it) } ?: "" }
     }
     val reference = if (scale is QuantileScale) scale.thresholds else scale.legendExtent.toList()
     val step =
@@ -1287,15 +1343,70 @@ internal class LegendBuilder(
   private fun gradientStops(scale: SequentialColorScale): List<GradientStop> {
     val lo = scale.domain.first()
     val hi = scale.domain.last()
+    // ```js
+    // if (!(max - min)) {
+    //   // expand scale if domain has zero span, fix #1479
+    //   scale = (scale.interpolator
+    //     ? get('sequential')().interpolator(scale.interpolator())
+    //     : get('linear')().interpolate(scale.interpolate()).range(scale.range())
+    //   ).domain([min=0, max=1]);
+    // } else {
+    //   fraction = scaleFraction(scale, min, max);
+    // }
+    // ```
+    //
+    // **A domain with no span is drawn as the whole ramp, not as one colour.** Every other reader
+    // of such a scale answers the *middle* — [SequentialColorScale.position] returns 0.5, which is
+    // what a column that turns out constant should paint — but a legend has nothing to say with one
+    // swatch, so upstream throws the domain away and samples the ramp end to end over `[0, 1]`. It
+    // is the fix behind vega's own issue 1479, and it is the only place the domain is replaced
+    // rather than consulted.
+    //
+    // Two things go with the replacement. Upstream leaves `fraction` as `identity` rather than
+    // `scaleFraction`, and over a domain of `[0, 1]` those are the same function — the samples are
+    // already fractions of the ramp — so asking the expanded scale for the fraction is asking for
+    // the value back. And the scale it builds is a plain linear or sequential one, so a
+    // **transformed** colour scale loses its transform here: there is no span for a log or a power
+    // to bend, and bending `[0, 1]` would space the stops by an exponent the data never had.
+    //
+    // Left unexpanded, the ramp collapsed to a single stop — the ends coincide, so the ticks
+    // between them are one value — and a legend that should show the whole scale showed one block
+    // of colour with its label adrift.
+    // `if (!(max - min))` is **falsiness**, not a comparison with zero, so it catches a span of
+    // `NaN` as well as one of zero — and a domain of `[NaN, NaN]` is exactly what a colour scale
+    // over a column with no number in it has, since an extent that is not finite is discarded. So
+    // that legend draws the whole ramp too. Written as `hi - lo == 0.0`, this asked the one
+    // question
+    // JavaScript was not asking and left such a legend with no gradient at all.
+    val span = hi - lo
+    val degenerate = span == 0.0 || span.isNaN()
+    val sampled =
+      if (degenerate) {
+        SequentialColorScale(
+          name = scale.name,
+          domain = listOf(0.0, 1.0),
+          colors = scale.colors,
+          space = scale.space,
+          gamma = scale.gamma,
+          clamp = scale.clamp,
+          rampExtent = scale.rampExtent,
+        )
+      } else {
+        scale
+      }
+    val from = sampled.domain.first()
+    val to = sampled.domain.last()
     val values = LinkedHashSet<Double>()
-    values += lo
+    values += from
     values +=
-      scale.ticks(LegendDefaults.GRADIENT_STOP_COUNT).filter { it in minOf(lo, hi)..maxOf(lo, hi) }
-    values += hi
+      sampled.ticks(LegendDefaults.GRADIENT_STOP_COUNT).filter {
+        it in minOf(from, to)..maxOf(from, to)
+      }
+    values += to
     return values
-      .sortedBy { scale.fraction(it) }
+      .sortedBy { sampled.fraction(it) }
       .mapNotNull { value ->
-        scale.colorAt(value)?.let { GradientStop(scale.fraction(value), it) }
+        sampled.colorAt(value)?.let { GradientStop(sampled.fraction(value), it) }
       }
   }
 
@@ -1320,7 +1431,7 @@ internal class LegendBuilder(
           operator = scaleName,
         )
       }
-      if (readable.isNotEmpty()) return readable.map { Entry(it, it.asString()) }
+      if (readable.isNotEmpty()) return readable.map { Entry(it, asLines(it)) }
     }
     val length = numbers.resolve(spec.gradientLength, scaleName) ?: LegendDefaults.GRADIENT_LENGTH
     // Upstream scales the label count to the ramp's length rather than using a fixed five, so a
@@ -1346,6 +1457,24 @@ internal class LegendBuilder(
       }
     }
     return values.indices.map { Entry(VegaValue.Num(values[it]), labels[it]) }
+  }
+
+  /**
+   * One label per **distinct entry value**, keeping the last — upstream's `key: Value` join.
+   *
+   * A gradient legend's labels are one text mark over every entry, so the keyed join actually fires
+   * here, unlike a symbol legend's, where each entry is a group of its own and the key is unique
+   * inside it. It takes two entries whose values key alike to see it, which a ramp over an ordinary
+   * domain never produces — but a domain of `[NaN, NaN]`, which is what a colour scale over a
+   * column with no number in it has, is two entries reading `NaN` and upstream draws one label. See
+   * [guideJoinKey].
+   */
+  private fun joinedByValue(entries: List<Entry>): List<Entry> {
+    if (entries.size < 2) return entries
+    val seen = HashSet<String>(entries.size)
+    // Backwards, because the **last** of a repeated key survives; reversed again so the survivors
+    // keep the order they arrived in.
+    return entries.reversed().filter { seen.add(guideJoinKey(it.value)) }.reversed()
   }
 
   /**
@@ -1378,7 +1507,7 @@ internal class LegendBuilder(
    * `TimeTicks.label` is the no-specifier case, the same multi-format an axis falls back to: it
    * chooses its own granularity per value rather than writing them all alike.
    */
-  private fun discreteDateLabeller(spec: LegendSpec, scaleName: String): ((String) -> String)? {
+  private fun discreteDateLabeller(spec: LegendSpec, scaleName: String): ((VegaValue) -> String)? {
     val zone =
       when (spec.formatType) {
         "time" -> timeZone ?: TimeZone.currentSystemDefault()
@@ -1387,9 +1516,10 @@ internal class LegendBuilder(
       }
     val specifier = spec.format ?: spec.formatExpression?.let { numbers.resolveText(it, scaleName) }
     return { value ->
-      val instant = value.toDoubleOrNull()
+      // `Number(value)`, which is what d3 coerces with — so a null entry is epoch zero and not a
+      // word that fails to parse. See the note in [GuideCaption.spoken].
+      val instant = JsSemantics.toNumber(value)
       when {
-        instant == null -> value
         specifier == null -> TimeTicks.label(instant, zone, locale)
         else -> TimeFormat.format(instant, specifier, zone, locale)
       }
@@ -1468,7 +1598,7 @@ internal class LegendBuilder(
    */
   private fun entryValues(spec: LegendSpec, scale: VegaScale, scaleName: String): List<Entry> {
     spec.values?.let { explicit ->
-      return explicit.map { Entry(it, it.asString()) }
+      return explicit.map { Entry(it, asLines(it)) }
     }
     val count =
       numbers.resolveTickCount(spec.tickCount, scaleName) ?: LegendDefaults.SYMBOL_TICK_COUNT
@@ -1496,9 +1626,9 @@ internal class LegendBuilder(
       // no
       // entries rather than a made-up set of them.
       is IdentityScale -> emptyList()
-      is OrdinalScale -> scale.domain.map { Entry(VegaValue.Str(it), dates?.invoke(it) ?: it) }
-      is BandScale -> scale.domain.map { Entry(VegaValue.Str(it), dates?.invoke(it) ?: it) }
-      is PointScale -> scale.domain.map { Entry(VegaValue.Str(it), dates?.invoke(it) ?: it) }
+      is OrdinalScale -> scale.domain.map { Entry(it, dates?.invoke(it) ?: asLines(it)) }
+      is BandScale -> scale.domain.map { Entry(it, dates?.invoke(it) ?: asLines(it)) }
+      is PointScale -> scale.domain.map { Entry(it, dates?.invoke(it) ?: asLines(it)) }
       // A legend's own `format` wins over the scale's tick labels, exactly as an axis's does: a
       // rate scale labelled `.1%` reads "10.0%" and not "0.1".
       is LinearScale -> numeric(spec, scale.ticks(count), scale.tickLabels(count, locale), count)

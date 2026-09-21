@@ -1,0 +1,164 @@
+{
+  "marks": [
+    {
+      "fill": "steelblue",
+      "role": "mark",
+      "shapeHeight": 50,
+      "shapeLeft": 60,
+      "shapeTop": 10,
+      "shapeWidth": 35.355339,
+      "type": "arc"
+    },
+    {
+      "fill": "steelblue",
+      "role": "mark",
+      "shapeHeight": 35.355339,
+      "shapeLeft": 60,
+      "shapeTop": 24.644661,
+      "shapeWidth": 35.355339,
+      "type": "arc"
+    },
+    {
+      "fill": "steelblue",
+      "role": "mark",
+      "shapeHeight": 35.355339,
+      "shapeLeft": 60,
+      "shapeTop": 24.644661,
+      "shapeWidth": 35.355339,
+      "type": "arc"
+    },
+    {
+      "fill": "steelblue",
+      "role": "mark",
+      "shapeHeight": 35.355339,
+      "shapeLeft": 60,
+      "shapeTop": 24.644661,
+      "shapeWidth": 35.355339,
+      "type": "arc"
+    },
+    {
+      "fill": "steelblue",
+      "role": "mark",
+      "shapeHeight": 85.355339,
+      "shapeLeft": 60,
+      "shapeTop": 24.644661,
+      "shapeWidth": 50,
+      "type": "arc"
+    },
+    {
+      "fill": "steelblue",
+      "role": "mark",
+      "shapeHeight": 100,
+      "shapeLeft": 10,
+      "shapeTop": 10,
+      "shapeWidth": 50,
+      "type": "arc"
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "0 to 0.7853981633974483",
+      "type": "text",
+      "x": 120,
+      "y": 4
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "0.7853981633974483 to 0.7853981633974483",
+      "type": "text",
+      "x": 120,
+      "y": 20
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "0.7853981633974483 to 0.7853981633974483",
+      "type": "text",
+      "x": 120,
+      "y": 36
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "0.7853981633974483 to 0.7853981633974483",
+      "type": "text",
+      "x": 120,
+      "y": 52
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "0.7853981633974483 to 3.141592653589793",
+      "type": "text",
+      "x": 120,
+      "y": 68
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "3.141592653589793 to 6.283185307179586",
+      "type": "text",
+      "x": 120,
+      "y": 84
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "poisoned 0 to 1.5707963267948966",
+      "type": "text",
+      "x": 120,
+      "y": 104
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "poisoned 1.5707963267948966 to NaN",
+      "type": "text",
+      "x": 120,
+      "y": 120
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "poisoned NaN to NaN",
+      "type": "text",
+      "x": 120,
+      "y": 136
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 154,
+    "width": 386
+  },
+  "spec": "a-pie-multiplies-what-it-was-given.vg.json",
+  "vegaVersion": "6.3.1"
+}

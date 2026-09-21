@@ -12,10 +12,10 @@
     {
       "fill": "transparent",
       "role": "mark",
-      "shapeHeight": 0,
-      "shapeLeft": 0,
-      "shapeTop": 0,
-      "shapeWidth": 0,
+      "shapeHeight": 140.355,
+      "shapeLeft": -53.067,
+      "shapeTop": -55.061,
+      "shapeWidth": 190.134,
       "stroke": "#bbbbbb",
       "strokeWidth": 0.3,
       "type": "path"
@@ -90,10 +90,10 @@
     {
       "fill": "transparent",
       "role": "mark",
-      "shapeHeight": 0,
-      "shapeLeft": 92,
-      "shapeTop": 0,
-      "shapeWidth": 0,
+      "shapeHeight": 56.526,
+      "shapeLeft": 65.489,
+      "shapeTop": 8.721,
+      "shapeWidth": 137.022,
       "stroke": "#bbbbbb",
       "strokeWidth": 0.3,
       "type": "path"
@@ -168,10 +168,10 @@
     {
       "fill": "transparent",
       "role": "mark",
-      "shapeHeight": 0,
-      "shapeLeft": 184,
-      "shapeTop": 0,
-      "shapeWidth": 0,
+      "shapeHeight": 71.508,
+      "shapeLeft": 154.333,
+      "shapeTop": -12.518,
+      "shapeWidth": 143.334,
       "stroke": "#bbbbbb",
       "strokeWidth": 0.3,
       "type": "path"
@@ -246,10 +246,10 @@
     {
       "fill": "transparent",
       "role": "mark",
-      "shapeHeight": 0,
-      "shapeLeft": 0,
-      "shapeTop": 64,
-      "shapeWidth": 0,
+      "shapeHeight": 89.2,
+      "shapeLeft": -1.031,
+      "shapeTop": 49.4,
+      "shapeWidth": 86.062,
       "stroke": "#bbbbbb",
       "strokeWidth": 0.3,
       "type": "path"
@@ -324,10 +324,10 @@
     {
       "fill": "transparent",
       "role": "mark",
-      "shapeHeight": 0,
-      "shapeLeft": 92,
-      "shapeTop": 64,
-      "shapeWidth": 0,
+      "shapeHeight": 114.296,
+      "shapeLeft": 76.852,
+      "shapeTop": 36.852,
+      "shapeWidth": 114.296,
       "stroke": "#bbbbbb",
       "strokeWidth": 0.3,
       "type": "path"
@@ -402,10 +402,10 @@
     {
       "fill": "transparent",
       "role": "mark",
-      "shapeHeight": 0,
-      "shapeLeft": 184,
-      "shapeTop": 64,
-      "shapeWidth": 0,
+      "shapeHeight": 77.41,
+      "shapeLeft": 187.295,
+      "shapeTop": 55.295,
+      "shapeWidth": 77.41,
       "stroke": "#bbbbbb",
       "strokeWidth": 0.3,
       "type": "path"
@@ -480,10 +480,10 @@
     {
       "fill": "transparent",
       "role": "mark",
-      "shapeHeight": 0,
-      "shapeLeft": 0,
-      "shapeTop": 128,
-      "shapeWidth": 0,
+      "shapeHeight": 71.77,
+      "shapeLeft": 3.4,
+      "shapeTop": 124.253,
+      "shapeWidth": 77.2,
       "stroke": "#bbbbbb",
       "strokeWidth": 0.3,
       "type": "path"
@@ -558,10 +558,10 @@
     {
       "fill": "transparent",
       "role": "mark",
-      "shapeHeight": 0,
-      "shapeLeft": 92,
-      "shapeTop": 128,
-      "shapeWidth": 0,
+      "shapeHeight": 128.986,
+      "shapeLeft": 69.507,
+      "shapeTop": 93.507,
+      "shapeWidth": 128.986,
       "stroke": "#bbbbbb",
       "strokeWidth": 0.3,
       "type": "path"
@@ -636,10 +636,10 @@
     {
       "fill": "transparent",
       "role": "mark",
-      "shapeHeight": 0,
-      "shapeLeft": 184,
-      "shapeTop": 128,
-      "shapeWidth": 0,
+      "shapeHeight": 126.864,
+      "shapeLeft": 162.568,
+      "shapeTop": 94.568,
+      "shapeWidth": 126.864,
       "stroke": "#bbbbbb",
       "strokeWidth": 0.3,
       "type": "path"
@@ -714,10 +714,10 @@
     {
       "fill": "transparent",
       "role": "mark",
-      "shapeHeight": 0,
-      "shapeLeft": 0,
-      "shapeTop": 192,
-      "shapeWidth": 0,
+      "shapeHeight": 47.162,
+      "shapeLeft": -18.778,
+      "shapeTop": 198.419,
+      "shapeWidth": 121.556,
       "stroke": "#bbbbbb",
       "strokeWidth": 0.3,
       "type": "path"
@@ -792,10 +792,10 @@
     {
       "fill": "transparent",
       "role": "mark",
-      "shapeHeight": 0,
-      "shapeLeft": 92,
-      "shapeTop": 192,
-      "shapeWidth": 0,
+      "shapeHeight": 49.086,
+      "shapeLeft": 73.854,
+      "shapeTop": 197.457,
+      "shapeWidth": 120.292,
       "stroke": "#bbbbbb",
       "strokeWidth": 0.3,
       "type": "path"
@@ -870,10 +870,10 @@
     {
       "fill": "transparent",
       "role": "mark",
-      "shapeHeight": 0,
-      "shapeLeft": 184,
-      "shapeTop": 192,
-      "shapeWidth": 0,
+      "shapeHeight": 48.64,
+      "shapeLeft": 163.175,
+      "shapeTop": 197.68,
+      "shapeWidth": 125.65,
       "stroke": "#bbbbbb",
       "strokeWidth": 0.3,
       "type": "path"
@@ -939,8 +939,8 @@
   ],
   "scales": {},
   "size": {
-    "height": 286.936327,
-    "width": 300.561417
+    "height": 270,
+    "width": 290
   },
   "spec": "projection-families.vg.json",
   "vegaVersion": "6.3.1"

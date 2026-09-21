@@ -1,0 +1,237 @@
+{
+  "marks": [
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "tiny 0  signed 0",
+      "type": "text",
+      "x": 2,
+      "y": 2
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "tiny 52.085752446623616  signed 37.17307005565043",
+      "type": "text",
+      "x": 2,
+      "y": 16
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "tiny 100  signed 60.62666598535647",
+      "type": "text",
+      "x": 2,
+      "y": 30
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "tiny 100  signed 100",
+      "type": "text",
+      "x": 2,
+      "y": 44
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "negC 0  bigC 0  back 2.6520077591740154",
+      "type": "text",
+      "x": 2,
+      "y": 60
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "negC 34.58211482999904  bigC 28.22720474319175  back 2.6520077591740154",
+      "type": "text",
+      "x": 2,
+      "y": 74
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "negC 54.270523474115265  bigC 41.310531077634785  back 2.6520077591740154",
+      "type": "text",
+      "x": 2,
+      "y": 88
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "negC 100  bigC 100  back 2.6520077591740154",
+      "type": "text",
+      "x": 2,
+      "y": 102
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 5.477226,
+      "shapeLeft": -2.738613,
+      "shapeTop": 101.261387,
+      "shapeWidth": 5.477226,
+      "size": 30,
+      "type": "symbol",
+      "x": 0,
+      "y": 104
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 5.477226,
+      "shapeLeft": 25.488592,
+      "shapeTop": 101.261387,
+      "shapeWidth": 5.477226,
+      "size": 30,
+      "type": "symbol",
+      "x": 28.227205,
+      "y": 104
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 5.477226,
+      "shapeLeft": 38.571918,
+      "shapeTop": 101.261387,
+      "shapeWidth": 5.477226,
+      "size": 30,
+      "type": "symbol",
+      "x": 41.310531,
+      "y": 104
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 5.477226,
+      "shapeLeft": 97.261387,
+      "shapeTop": 101.261387,
+      "shapeWidth": 5.477226,
+      "size": 30,
+      "type": "symbol",
+      "x": 100,
+      "y": 104
+    }
+  ],
+  "scales": {
+    "bigC": {
+      "domain": [
+        -8,
+        40
+      ],
+      "range": [
+        0,
+        100
+      ],
+      "ticks": [
+        -5,
+        0,
+        5,
+        10,
+        15,
+        20,
+        25,
+        30,
+        35,
+        40
+      ]
+    },
+    "negC": {
+      "domain": [
+        -8,
+        40
+      ],
+      "range": [
+        0,
+        100
+      ],
+      "ticks": [
+        -5,
+        0,
+        5,
+        10,
+        15,
+        20,
+        25,
+        30,
+        35,
+        40
+      ]
+    },
+    "signed": {
+      "domain": [
+        -8,
+        40
+      ],
+      "range": [
+        0,
+        100
+      ],
+      "ticks": [
+        -5,
+        0,
+        5,
+        10,
+        15,
+        20,
+        25,
+        30,
+        35,
+        40
+      ]
+    },
+    "tiny": {
+      "domain": [
+        0.1,
+        0.3
+      ],
+      "range": [
+        0,
+        100
+      ],
+      "ticks": [
+        0.1,
+        0.12,
+        0.14,
+        0.16,
+        0.18,
+        0.2,
+        0.22,
+        0.24,
+        0.26,
+        0.28,
+        0.3
+      ]
+    }
+  },
+  "size": {
+    "height": 121,
+    "width": 539.738613
+  },
+  "spec": "a-symlog-is-log1p-of-x-over-c.vg.json",
+  "vegaVersion": "6.3.1"
+}

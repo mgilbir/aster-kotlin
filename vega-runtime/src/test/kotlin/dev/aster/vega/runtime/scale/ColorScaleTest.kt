@@ -74,18 +74,34 @@ class ColorScaleTest {
   // ---- domain behaviour -----------------------------------------------------
 
   @Test
-  fun `a sequential colour scale clamps by default`() {
+  fun `a colour scale does not clamp by default, it extrapolates`() {
     val scale = SequentialColorScale("s", listOf(0.0, 1.0), listOf(hex("red"), hex("blue")))
-    assertEquals("#ff0000", scale.colorAt(-5.0)?.toCssHex())
+    // d3's continuous scale is `clamp ? Math.max(0, Math.min(1, x * k10)) : x * k10`, with `clamp`
+    // false until someone sets it, and `piecewise` clamps the **segment index** rather than `t`. So
+    // this is the first segment evaluated at -1, which leaves the channels outside `0..1`: red
+    // reaches `255 + (0 - 255) * -1` over 255, which is 2.
+    val below = scale.colorAt(-1.0)
+    assertNotNull(below)
+    below!!
+    assertEquals(2.0, below.red)
+    assertEquals(-1.0, below.blue)
+    // They are pinned only on the way out, which is why a ramp between two *pure* colours looks as
+    // though it clamped: red saturates back to red.
+    assertEquals("#ff0000", below.toCssHex())
     assertEquals("#0000ff", scale.colorAt(5.0)?.toCssHex())
   }
 
   @Test
-  fun `without clamping an out-of-domain value has no colour`() {
+  fun `with clamping an out-of-domain value takes the end of the ramp`() {
     val scale =
-      SequentialColorScale("s", listOf(0.0, 1.0), listOf(hex("red"), hex("blue")), clamp = false)
-    assertNull(scale.colorAt(-1.0))
-    assertNull(scale.colorAt(2.0))
+      SequentialColorScale("s", listOf(0.0, 1.0), listOf(hex("red"), hex("blue")), clamp = true)
+    // Now the position itself is pinned, so the channels never leave the ramp.
+    val below = scale.colorAt(-5.0)
+    assertNotNull(below)
+    below!!
+    assertEquals(1.0, below.red)
+    assertEquals(0.0, below.blue)
+    assertEquals("#0000ff", scale.colorAt(5.0)?.toCssHex())
     assertNotNull(scale.colorAt(0.5))
   }
 
@@ -104,7 +120,10 @@ class ColorScaleTest {
   @Test
   fun `a non-numeric input has no colour`() {
     val scale = SequentialColorScale("s", listOf(0.0, 1.0), listOf(hex("red"), hex("blue")))
-    assertEquals(VegaValue.Null, scale.scale(VegaValue.Str("not a number")))
+    // d3's `unknown`, which is `undefined`; a sequential scale reads its input with the same line
+    // every continuous scale does.
+    assertEquals(VegaValue.Undefined, scale.scale(VegaValue.Str("not a number")))
+    assertEquals(VegaValue.Undefined, scale.scale(VegaValue.Null))
   }
 
   @Test

@@ -8,6 +8,7 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.math.log10
+import kotlin.math.log2
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -293,7 +294,15 @@ public object Ticks {
       // A wholly negative domain mirrors the positive case.
       return logTicks(-stop, -start, base, count).map { -it }.reversed()
     }
-    if (start <= 0.0 || stop <= 0.0 || base <= 1.0) return emptyList()
+    // **The base is not screened here.** d3 tests it by shape rather than by size — `!(base % 1)`
+    // picks the integer branch, and everything else falls to the other one — so a degenerate base
+    // is not an error but a different answer, and the two branches already produce it. Base 0 takes
+    // the integer branch, generates nothing there because `k < base` never runs, and then hits the
+    // *fallback below*: fewer than half the ticks asked for, so linear ticks over the domain. That
+    // is upstream's `[100, 200, … 900]` on a base-0 axis, which this returned nothing for. Base
+    // 0.5, base 1 and a negative base all reach the other branch and legitimately yield nothing,
+    // the first through a negative count and the last two through a NaN one.
+    if (start <= 0.0 || stop <= 0.0) return emptyList()
 
     val reverse = stop < start
     val lo = if (reverse) stop else start
@@ -362,7 +371,32 @@ public object Ticks {
     return result
   }
 
-  private fun log(value: Double, base: Double): Double = ln(value) / ln(base)
+  /**
+   * The logarithm d3 **chooses** rather than the one it divides for.
+   *
+   * ```js
+   * function logp(base) {
+   *   return base === Math.E ? Math.log
+   *       : base === 10 && Math.log10
+   *       || base === 2 && Math.log2
+   *       || (base = Math.log(base), x => Math.log(x) / base);
+   * }
+   * ```
+   *
+   * Three bases get the host's own function and everything else gets the division, and the
+   * difference is not cosmetic: `Math.log10(1e6)` is **exactly 6** where `ln(1e6) / ln(10)` is
+   * `5.999999999999999`. A log axis from 1 to a million then asks for ticks over `[0, 5.999…]`
+   * rather than `[0, 6]`, and the last power falls outside the range — so the axis drew **1, 100,
+   * 10,000** and upstream drew those and **1,000,000**. One tick, at the top, on the commonest log
+   * axis there is.
+   */
+  private fun log(value: Double, base: Double): Double =
+    when (base) {
+      kotlin.math.E -> ln(value)
+      10.0 -> log10(value)
+      2.0 -> log2(value)
+      else -> ln(value) / ln(base)
+    }
 
   /**
    * How many times `nice` will widen a domain before giving up and returning it unchanged.

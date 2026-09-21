@@ -346,7 +346,7 @@ class TransformReferenceTest {
         VegaJson.parse("""{"type":"dotbin","field":"data","smooth":$smooth,"step":0.65}""")
           as VegaValue.Obj
       val result = pipeline.run(rows, listOf(params), TestContext())
-      assertEquals(want, result.joinToString(",") { it.field("bin").asString() }, "smooth=$smooth")
+      assertSameNumbers(want, result.map { it.field("bin").asDouble() }, "smooth=$smooth")
     }
   }
 
@@ -373,12 +373,29 @@ class TransformReferenceTest {
         as VegaValue.Obj
     val result = pipeline.run(rows, listOf(params), TestContext())
     // Every one from upstream. 9.1, 10.4 and 6.5 are the three on a boundary.
-    assertEquals(
+    assertSameNumbers(
       "5.85,1.95,9.1,15.6,5.2,10.4,7.8,10.4,2.6,7.15,5.85,8.45,6.5,9.1,4.55,11.7,3.25,10.4," +
         "4.55,10.4,7.15,1.95,7.15,17.55,5.85,7.8,7.8,11.7,10.4,13.65,14.3,14.95,9.75,11.7,6.5," +
         "7.15,10.4,7.15,7.8,5.2,4.55,2.6,7.8,10.4,4.55,13,9.1,12.35",
-      result.joinToString(",") { it.field("bin0").asString() },
+      result.map { it.field("bin0").asDouble() },
     )
+  }
+
+  /**
+   * Upstream's numbers, compared **as numbers**.
+   *
+   * These lists used to be compared as one comma-joined string built with `asString`, which is
+   * `String(x)` and shows every digit a double has. That worked only because `asString` used to
+   * round to six decimals on the way, so a bin at `9.399999999999999` read `9.4` and the comparison
+   * was a tolerance wearing a formatter's clothes. One ulp of accumulated arithmetic is exactly
+   * what it was hiding, and it is a real tolerance now — tighter than the six decimals were.
+   */
+  private fun assertSameNumbers(expected: String, actual: List<Double>, message: String = "") {
+    val want = expected.split(",").map { it.trim().toDouble() }
+    assertEquals(want.size, actual.size, "count $message")
+    want.zip(actual).forEachIndexed { index, (a, b) ->
+      assertEquals(a, b, 1e-9, "at $index $message")
+    }
   }
 
   // ---- aggregate ------------------------------------------------------------

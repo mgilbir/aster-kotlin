@@ -27,7 +27,7 @@ end to end — expressions, signals, all 51 of upstream's 51 documented data tra
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-209 Vega differential fixtures and 283 Vega-Lite fixtures pass, every one of them matching upstream
+236 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -39,7 +39,7 @@ and what each was added to pin down. Every name in it is checked to still exist 
 | `bar` | 48 | band and linear scales, rect encoder, axes |
 | `stacked-bar` | 42 | stack and aggregate transforms, signals, signal-valued scale property, conditional fill, gridlines |
 | `line-area` | 51 | line, area, symbol and text encoders, and a second area declared horizontal |
-| `log-scale` | 75 | log axis with blanked labels, sqrt scale |
+| `log-scale` | 99 | log axis with blanked labels, sqrt scale, two log axes with a degenerate base, and one whose domain touches zero |
 | `colour-scheme` | 39 | ordinal category10 scheme, interpolated sequential colour |
 | `facet-trellis` | 55 | faceted group marks, nested scopes, per-cell scales and axes, the `parent` signal |
 | `legends` | 28 | a symbol legend beside the chart and a gradient legend below it |
@@ -73,11 +73,11 @@ and what each was added to pin down. Every name in it is checked to still exist 
 | `label-overlap` | 90 | a parity axis, a greedy one, and a ramp that thins its labels unasked |
 | `axis-label-angle` | 33 | labels turned 45 degrees, hung Vega's way and corrected Vega-Lite's |
 | `config-theme` | 42 | a theme in `config`, every level of the precedence chain visible at once |
-| `config-marks` | 31 | a theme reaching the marks, and a rect that encodes only a stroke |
+| `config-marks` | 34 | a theme reaching the marks, a rect that encodes only a stroke, and a path taking the stroke Vega's own configuration gives it |
 | `arc-padding` | 10 | a padded, round-cornered donut beside a pie of the same data |
 | `window` | 43 | a running total and a three-point moving average, partitioned by series |
 | `sequence-lookup` | 27 | a curve generated from nothing, over bars joined to a second dataset |
-| `scale-variants` | 43 | a symlog axis over both signs, a pow axis, a reversed point scale |
+| `scale-variants` | 77 | a symlog axis over both signs, a pow axis, a reversed point scale, a quantize scale whose range is a keyword, and ordinal and identity scales, whose axes drew no ticks at all |
 | `negative-labels` | 45 | where the minus sign applies and where the hyphen stays |
 | `label-limit` | 33 | labels truncated at the limit nobody set, and at an explicit one |
 | `step-lines` | 24 | the three staircase interpolations and a stepped area |
@@ -91,7 +91,7 @@ and what each was added to pin down. Every name in it is checked to still exist 
 | `density-plot` | 40 | a kernel density over a dot plot, with the theoretical normal behind both |
 | `treemap` | 18 | one tree drawn twice: a squarified treemap and an icicle plot |
 | `tree-layouts` | 31 | a circle pack beside a tidy node-link diagram, with its links |
-| `binned-scales` | 69 | one skewed column through all four discretizing scales |
+| `binned-scales` | 151 | one skewed column through all four discretizing scales, a threshold scale that folds zero into its cut points, and a quantize scale with and without `nice` |
 | `local-time-dst` | 35 | a local time scale across the spring clock change, beside a UTC one |
 | `bin-to-ordinal` | 36 | the bin transform feeding a bin-ordinal scale, labels placed by `scale()` |
 | `image-marks` | 18 | every image align and baseline anchor, and one stretched rather than fitted |
@@ -194,7 +194,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 209 Vega differential fixtures and 283 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 236 Vega differential fixtures and 332 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -226,7 +226,7 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests, and every renderer now exposes the tree: the Android View, the Swift one and Compose Multiplatform. Not verified on physical hardware or with a real user |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 209 Vega differential fixtures |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 236 Vega differential fixtures |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -5817,7 +5817,7 @@ compose instead of one replacing the other. It is the axis's own `withLabelText`
 on both guides, which is why it was worth having one function for it.
 
 `legend-label-expr.vl.json` arms both gates and both of them failed before the fix — the specification
-comparison on the stray property, and the scene comparison on labels drawn at full length. 283
+comparison on the stray property, and the scene comparison on labels drawn at full length. 332
 Vega-Lite fixtures now.
 
 ### The order of a date, which the locale seam could not reach
@@ -5831,7 +5831,7 @@ did not pass it to `TimeUnits.specifier`.
 
 Upstream has no lever for it either — its `timeUnitSpecifier` takes no locale, and `VEGALITE_TIMEFORMAT`
 is a module constant — so this is an addition rather than a port. Both new tables are therefore
-**empty by default** and the emitted specification is byte-for-byte what it was, which is what the 283
+**empty by default** and the emitted specification is byte-for-byte what it was, which is what the 332
 Vega-Lite fixtures compare against.
 
 Two tables, because there are two places a date's shape is decided and they are different tables.
@@ -7872,4 +7872,999 @@ hit index and `Scene.walk` all apply it. What was wrong is subtler and worth mor
   in this channel, which is why the corpus had no fixture for it after all this time.
 
 The build-time sort is gone. `paintOrder` was always the single place this belongs, and now it is
-the only one. 195 Vega fixtures pass.
+the only one. 228 Vega fixtures pass.
+
+### Two grids over one table, in the order they were built
+
+A trellis writes the distinct values it splits on into a dataset of its own, and that dataset stands
+**beside the table it reads** rather than at the end of the chart's data — a plot's own data is
+assembled when that plot is, so one grid's values come between its table and the next plot's. This
+compiler placed it at the index just after that table:
+
+```kotlin
+val at = data.indexOfFirst { it.string("name") == reads }
+if (at >= 0) data.addAll(at + 1, domains) else data += domains
+```
+
+Which is right for one plot and wrong for two, as soon as the two read the *same* table. Each is
+assembled in turn, each finds the same `at`, and each inserts at `at + 1` — so the second landed in
+**front** of the first and the two grids' values came out back to front: `concat_1_column_domain`
+before `concat_0_column_domain`. Upstream assembles in order and appends, so the fix is to skip past
+the values already standing there rather than to insert among them.
+
+The shape that shows it is a concatenation whose members facet on **one** column, which is also why
+it went unseen for so long: members faceting on *different* columns get a table each, so each domain
+is interleaved with its own table and the bug cannot arise. `a-heading-a-theme-wrote-itself` was
+originally that `hconcat` and had to be rewritten to facet on `row` and `column` in a single chart to
+get past it; this is the finding it left behind, recorded in the pull request that changed it.
+
+`two-grids-over-one-table.vl.json` carries both halves — two panels on the same column, then a third
+on a different one to pin the interleaving that was already right. Its two same-column panels differ
+only in how they caption their cells, which keeps the fixture about the order of the datasets rather
+than their contents. Three mutants die on it: the old `at + 1`, a skip that steps past *everything*
+rather than only the domains, and an append to the end of the chart's data. 332 Vega-Lite fixtures.
+
+### A date that is not a date, and the eight pixels it explains
+
+Two fixtures' worth of labels differed by one character, and the difference was recorded as an
+unexplained eight pixels of chart height. It is one character because the labels are **turned on
+their side**, where a label's width is the chart's height; and it is a label because a column of
+words told to read as dates reaches a formatter that had nothing to say about it.
+
+`formatType: "time"` decides the grammar before the scale gets a say, and it reaches further than
+the labels — `isFieldOrDatumDefForTimeFormat` is `formatType === 'time' || (!formatType &&
+isTemporalFieldDef(...))`, so the column is *parsed* as well. Four separate things were wrong along
+that chain, and each was a rule read off upstream rather than arithmetic:
+
+1. **`toDate` answered nothing for what it could not read.** Upstream's is
+   `_ == null || _ === '' ? null : parser(_)` with `defaultParser` ending in `Date.parse(_)`, and
+   `Date.parse('one')` is **`NaN`** — a number, not an absence. `DateValues.parse` is a parser and
+   rightly says no by answering null; turning that into a null *value* made an unreadable date
+   vanish where upstream keeps it. `ToDateTest` pins all three answers.
+2. **`TimeFormat` had no answer for an instant that is not a number**, and `at(NaN, zone)` truncated
+   to zero — so a label read **1970**. Every getter of an Invalid Date answers `NaN`, and d3 formats
+   those through the *same* padding as any other field: `%Y` pads three characters to four and
+   writes `0NaN`, `%d` is two wide and leaves `NaN` alone, `%-Y` drops the padding. Carried by
+   making the date fields nullable rather than by a second directive table, so the whole of it falls
+   out of the one `pad` — including the three answers that are accidents of JavaScript, `%I` being
+   `12` because `NaN` is falsy, `%p` being `AM` because `NaN >= 12` is false, and `%q` being `1`
+   because `~~NaN` is `0`.
+3. **The multi-format asked the negated question.** `!(floor(millis) >= millis)` and
+   `floor(millis) < millis` are the same of every real number and opposite of `NaN`, so where d3
+   falls through six tests to the **year** this cascade said yes at the first and labelled a
+   millisecond. That is the `0NaN` against `NaN`, and the eight pixels.
+4. **Both guides bailed out before the formatter.** Upstream's `tickFormat` chooses by format type
+   and then hands the formatter every tick, coercing with `new Date(+value)`; answering the value's
+   own text instead is a label of a different width.
+
+Two more came out of the vectors rather than out of the chart: `%f` is the **milliseconds with
+`"000"` appended** and not a six-wide field — the same for every real instant, `NaN000` against
+`000NaN` for one that is not — and `%Z` is the one directive upstream implements twice, the UTC form
+being `function formatUTCZone() { return "+0000"; }` and reading no date at all. The **pad modifier
+did not reach the year** either: `%-Y` of the year 24 is `24` upstream and was `0024` here, because
+`%Y`, `%y`, `%G` and `%g` went through a second padding function that never consulted it.
+
+`oracle-js/src/record-invalid-date-formats.mjs` records d3's own answer for every directive crossed
+with every modifier, both zones, and the multi-format — 280 vectors, replayed by
+`InvalidDateFormatTest`. Like `record-number-strings.mjs` it replays no upstream *test*, because
+there is none: d3's suite formats dates and an Invalid Date is not one. Nothing in this repository
+states what any of these should be.
+
+`a-date-that-is-not-a-date.vl.json` arms both gates. Its fourth panel is what makes the *parse*
+visible rather than only its labels — a nominal text channel writes `isValid(datum["a"]) ?
+datum["a"] : "" + datum["a"]`, and `isValid` is false of a NaN exactly as it is of a null, so the
+second arm runs either way and prints the two apart. Without it every mutant of `toDate` survived.
+332 Vega-Lite fixtures.
+
+**And the reason a sibling was a test rather than a fixture is gone.** `GuideFormatTypeTest` pinned
+the format-type rules with unit assertions and said why: every chart they need is degenerate, and
+upstream's rendering of them was eight pixels taller for a reason nobody had explained. This was
+that reason. `a-format-type-decides-the-parse.vl.json` now carries them as a drawing as well — a
+category spoken as a joined list beside one spoken plainly, and a temporal field whose axis says
+`number` and is therefore never parsed beside the same field parsed as usual. The test stays,
+because it names which rule broke where a fixture only says that something did; its false
+justification does not.
+
+**What this found and did not fix.** A row whose word is the empty string puts a genuine null into
+the chart, and two further rules turn on it — the first is the next entry below, and the second is
+still open. The empty-string rule is pinned by `ToDateTest` in the meantime rather than by a fixture
+that would fail for a reason that is not about dates.
+
+### A stack's groups are keyed by JSON, and JSON cannot write every double
+
+`Stack` partitions with one line, and the line is the whole finding:
+
+```js
+k = JSON.stringify(groupby.map(get));
+```
+
+Not the object-backed `fastmap` that `aggregate` and `window` group through — which is a difference
+this engine already knew about and had written down, because `'' + 1001` and `'' + "1001"` are the
+same string while `[1001]` and `["1001"]` are not, so the number and the word are two groups in a
+stack and one in an aggregate. Keying on the raw values kept that half and missed the other:
+**`JSON.stringify` also merges.**
+
+A non-finite number is written `null`, so a NaN, an infinity and an actual null all key to `[null]`
+and stack as one group. A negative zero is written `0`, so it joins the zeroes — where a `Double`'s
+own `equals` holds `-0.0` apart from `0.0`. Both were three groups here where upstream had one, and
+a stack's totals are its scale's domain, so the whole chart came out a different height: the fixture
+below had upstream's y axis reaching 13 and this engine's reaching 7.
+
+None of it is exotic. `toDate` of a word is a NaN, and a `formatType: "time"` over a column of words
+is enough to ask for one — which is how this was found, from the row that could not go into
+`a-date-that-is-not-a-date.vl.json`.
+
+The fix is upstream's line: key by `VegaJson.write` of the group values, which already implements
+`JSON.stringify`'s number rules — non-finite to `null`, everything else through `Decimals.jsString`
+— rather than transcribing them a second time. `stack-groups-by-json.vg.json` carries five kinds of
+group value at once: two words that must stay apart, a NaN, an infinity and a null that must become
+one group, and a zero beside a negative zero that must become another. Written as `0/0` and `1/0`,
+because `NaN` and `Infinity` are not names Vega's expression language knows — `Unrecognized signal
+name: "Infinity"`. Three mutants die on it: the raw-value key, an `aggregate`-style text key, and a
+JSON writer that prints a non-finite number as itself. 228 Vega fixtures.
+
+**And a third cause in the same chain**, which is the next entry: a discrete scale's domain held
+text, so a null entry became the word `null` and coerced to `NaN` where upstream's `+null` is `0`.
+
+### A discrete scale's domain holds values, not their text
+
+`BandScale.domain` was a `List<String>`, and the word for a value is not the value. `+null` is `0`
+and `+"null"` is `NaN`; `+true` is `1` and `+"true"` is `NaN`; and `1001` is a number that a `Map`
+does not find under the key `"1001"`. Upstream keeps the values, so all three differences were ours.
+
+The one place they were thrown away was the last line of `discreteDomain`, `values.map {
+it.asString() }.distinct()` — and replacing it took **three** rules apart that had been one, none of
+them derivable from the others:
+
+- A **data-driven** domain is built by *grouping* the dataset, and a group's key is `'' + value`, so
+  `1001` and `"1001"` fall in one group. What the group keeps is that group's **first raw value** —
+  the number, not the word. `orderedDomain` already did this, with the values intact.
+- A **literal** domain never meets a grouping. It is handed to the scale, and d3 dedups it through
+  the `InternMap` its index is built on — by *value*, so `[1001, "1001"]` stays **two** entries
+  upstream where a text dedup makes it one. Nothing in the corpus reached this: the first draft of
+  the fix deduped by text at both ends, every gate passed, and what said otherwise was a **mutant of
+  that line surviving**.
+- The index itself is that `InternMap`: `keyof` interns an object by its `valueOf`, so a date and
+  the milliseconds it stands for are one key, and a `Map` keys by SameValueZero, so `0` and `-0` are
+  one key where a `Double`'s own `equals` holds them apart.
+
+A fourth rule came with them, in the same `Map`: a band scale answers **`undefined`** for a value it
+does not hold, not a null. `index.get(d)` and nothing more. An expression prints that as the word
+`undefined` and a mark encoding leaves the property absent, where a null writes both.
+
+Two transcriptions fell out on the way. The guides coerced with `asDouble`, which answers `NaN` for
+a null and a flag where d3's `new Date(+value)` answers `0` and `1` — `JsSemantics.toNumber` is the
+one that is `Number(x)`. And a caption's long date form named the American clock in a constant,
+`%I:%M:%S %p`, when `VegaLocale.time` already carried d3's `%-I:%M:%S %p`: a second transcription of
+a table that existed, drifted by one character, so upstream read `1:00:01 AM` where this read
+`01:00:01 AM`. Only before ten in the morning, and only in a caption — which is why nothing caught
+it until a band over a **null** put epoch zero on an axis. The constant is gone; `%X` expands
+through the locale.
+
+`discrete-domain-keeps-its-values.vg.json` carries both ways a domain arrives and asks the scale
+directly for each value rather than reading an axis, because **an axis joins its label items by the
+value's text**: two bands both reading `1001` collapse into one label at the later band, so an axis
+shows three where the domain has six. That is a rule of its own and it is the open question below.
+Seven mutants die on the fixture. 228 Vega fixtures.
+
+**Found here, and the next entry closes it.** An axis over a discrete scale draws one item per
+distinct *value* rather than one per band. It is visible only where two domain entries share a text,
+which before this change could not happen.
+
+### An axis joins its ticks by value, and a legend does not
+
+An axis's three value-driven marks are data joins with a **key**, and all three spell it the same:
+
+```js
+{type: RuleMark, role: AxisGridRole, key: Value, from: dataRef, encode, ...}
+```
+
+`Value` is the string `'value'`, so the join is on `datum.value`; a keyed join holds one tuple per
+key and a later arrival overwrites an earlier one. Two ticks whose values key alike therefore leave
+**one** item, at the later one's position. And the key is an object property, which makes it the
+value's *text* — so `1001` and `"1001"` are one key, as are a null and the word for one.
+
+A domain of five draws three grid lines, three ticks and three labels. This engine drew five of
+each, and could not have done otherwise before the entry above: a domain of text has no two entries
+that share a text.
+
+The **legend** does not collapse, and the reason is structural rather than a second rule — its entry
+marks carry the same `key: Value`, but a legend builds a *group per entry*, so the key is unique
+inside each. Five swatches beside three ticks over the same five values is what
+`an-axis-joins-its-ticks-by-value.vg.json` draws, and having both in one fixture is the point: the
+key is the same and the outcome is not.
+
+Applied in `ticksFor`, which is the one place every axis mark reads its ticks from, rather than in
+the eight branches that build them. Four mutants die on it: no join, the *first* of a repeated key
+winning instead of the last, joining by the value rather than by its text, and joining by the
+**label** rather than the value — that last one is not hypothetical, because a format can give two
+distinct values one label and the corpus has such axes. 228 Vega fixtures.
+
+The note on the entry above said "one label per distinct label text", which was the right shape and
+the wrong field; it is the value's text, and the mutant that joins by the label is what said so.
+
+### What a scale does with a value that is not a number, which is one line of d3
+
+```js
+function scale(x) {
+  return x == null || isNaN(x = +x) ? unknown : …;
+}
+```
+
+Two rules in it, and this engine had neither quite right.
+
+**Nothing is caught before the coercion.** `x == null` is the loose test, so a null and an undefined
+never reach `+` at all. That is what separates a null from an **empty cell**, and the separation is
+the whole practical point of this change: a column read from a CSV is full of empty cells, and
+upstream places them at **zero** while a null is placed nowhere.
+
+**Everything else goes through `+`, which is `Number(x)` and not a parse.** This engine read a
+string with `toDoubleOrNull` — a parse, which rejects `""` — so every empty cell was dropped from
+the chart instead of landing at zero. An empty array is `0` too, and a flag is `1`.
+
+And the answer for the cases it does refuse is `unknown`, which is **`undefined`** and not a null or
+a NaN. The note that used to sit on `LinearScale.scale` argued for `Num(NaN)` over a null, and its
+reasoning was right and its conclusion one step short: Vega-Lite decides whether a bar is too thin
+to see with `abs(scale(x, a) - scale(x, b))`, and answering *zero* there says the bar has no width.
+An undefined does not — `undefined - 5` is `NaN` exactly as a NaN would be — so the arithmetic that
+note cared about is unchanged, and everything that can tell the two apart now agrees: `'' + scale(…)`
+reads `undefined`, and a mark encoding leaves the property absent rather than writing one.
+
+**`quantize` and `threshold` do not share the line**, which is the part that could only be found by
+asking:
+
+```js
+return x != null && x <= x ? range[bisect(domain, x, 0, n)] : unknown;
+```
+
+`x <= x` is a NaN test that works on any type, and it lets a **word** through — `"abc" <= "abc"` is
+true, string comparison being perfectly happy. So a word reaches the bisect, where every comparison
+against a number is false, and the search lands on the **first** range entry. Probed:
+`scale("abc")` is `lo` where a linear scale over the same value answers nothing at all. Everything
+with a number in it behaves as though coerced, because JavaScript's `<` coerces.
+
+A quantile scale's *samples* are filtered with the same line as its lookup — `d != null && !isNaN(d
+= +d)` — so an empty cell is a sample at zero rather than a row that was never there. That one
+showed as a domain of two where upstream had four.
+
+**The guard is on the input, not on the answer**, and getting that backwards was a defect this
+change introduced before the value sweep below caught it. d3 tests `x == null || isNaN(x = +x)` and
+then does the arithmetic whatever it comes to — so a **log** scale asked for `-5` answers `NaN`, a
+perfectly good number having no logarithm, while the same scale asked for a *word* answers nothing.
+The empty cell separates them: it coerces to `0`, passes the guard, and its logarithm is `NaN` too.
+
+An **ordinal** scale has no coercion at all — its index is keyed by the value — so it is the
+clearest statement of what `unknown` is, and it was answering a null too. So was a scale with an
+**empty range**, which is legal and answers `unknown` for every value including the ones its domain
+holds, `range[index % 0]` being `range[NaN]`.
+
+`a-scale-coerces-what-it-is-given.vg.json` asks all five scale families the same six questions — a
+number, nothing, an empty cell, an empty list, a flag and a word — and draws both the symbol each
+answer places and the answer itself as text, so a value that is placed and one that is not are told
+apart by characters rather than by an absence. Seven mutants die on it. 228 Vega fixtures.
+
+**And the question that raised — answered by measuring it.** `asDouble` was documented as "Vega's
+coercion to number" and is not `Number()`: it answers `NaN` for a null, an empty string and an empty
+array where JavaScript answers `0`. The obvious reading is that it is a broken coercion and all 148
+of its call sites are suspect. It is not. Making it faithful to `Number()` and running the whole
+corpus moved **two** tests, and one of them says why: `extent` over a column of nulls went from
+nothing to `[0, 0]`. d3's `extent` draws the same line this does — `value != null && value >= value`
+— because an aggregate has to *skip* a row with no number in it, and `NaN` is how that is said.
+
+So the two are different jobs that agree wherever a value has a number in it: `Number` is a
+coercion, with an answer for everything and zero as the answer for nothing; `asDouble` is a reading,
+where `NaN` means there was nothing to read. Both are now documented as such, on the function and in
+the test that pins it, so the next person to notice the difference does not "fix" it. The scales are
+the place upstream really does coerce, and they are the ones that changed.
+
+### A value sweep: hold the specification still and vary the column
+
+Every corpus here varies the **specification**. The fixtures, the gallery, the 1981 wild
+specifications and the Deneb templates are charts somebody drew; the schema sweep is one chart with
+one property changed; the Vega-Lite sweep is one encoding changed. All of them hold the *data*
+still, and the data in all of them is tidy — numbers where numbers go, words where words go.
+
+Real data is not tidy, and that is where every difference of the last day came from:
+
+- `toDate` of a word is `NaN` and not nothing;
+- a stack's groups are keyed by `JSON.stringify`, so a NaN stacks with the nulls;
+- a discrete domain holds values, so `+null` is `0` and `+"null"` is `NaN`;
+- a scale reads `""` as **zero** and a null as nothing;
+- `quantize` does not coerce at all, so a word lands in the first bucket;
+- an axis joins its ticks by value, so two entries with one text draw one tick.
+
+Not one was reachable by changing a property, because none of them is about a property. So this
+sweep holds the specification still and varies the **column**: sixteen columns, each chosen because
+JavaScript treats it differently from the obvious reading, across twelve charts chosen for the
+journeys a value takes — a scale of each family, a stack, an aggregate, a discrete domain, a legend
+that enumerates it, and a text mark that simply writes it out. **192 cases**, all of which upstream
+renders.
+
+`scripts/value-sweep.sh` runs it and `ValueSweepTest` is the comparison, **report-only** as the
+other sweeps are. It earned its place before it was committed: it found a defect in the change
+directly beneath it in this stack — a scale guarded on its answer rather than on its input, so a log
+scale of `-5` reported nothing where upstream reports `NaN`. That is fixed, and the fixture that
+pins it names the log scale for that reason.
+
+**169 of 192 agree.** What the other 23 are, ranked by where they cluster rather than by what they
+say, because the shapes repeat:
+
+- **the time-scale chart, 13 cases** — a time scale over an odd column, *including the control
+  column of 1, 2, 3, 4*, which is a sub-second domain and therefore about tick granularity rather
+  than about odd values;
+- **the log-scale chart, 3** — its labels at the notation thresholds, `1e21` and `1e-7`;
+- **the pie chart, 2** — a column holding a null or an empty cell;
+- **four charts, one case each** — a legend label, a quantile domain, a written-out value and a
+  band label, all at the notation thresholds or past exact integers;
+- **one refusal** — this engine draws nothing where upstream draws the chart with an empty axis: a
+  time scale over `1e21` milliseconds ends in a `FATAL` `VEGA_COMPILE_FAILED`,
+  `DateTimeException: Invalid value for Year`, caught inside the compiler.
+
+(Written as a list and not a table on purpose: `DocumentedNumbersTest` reads a row of the shape
+`| \`name\` | count |` as a claim about a **fixture** that must exist on disk, and these are the
+sweep's chart names. The gate was right to object.)
+
+The last of those is the one that is not cosmetic. The exception does **not** escape `compileJson`;
+the compiler catches it and reports a fatal diagnostic, which is the policy working. What is wrong
+is that there is anything to catch: ECMA-262 clips a time value to ±8.64e15 milliseconds and calls
+anything outside it an *Invalid Date*, so upstream's domain here is `[0, NaN]` and its axis draws no
+labels at all. `TimeClip` is already written down in this repository — and it is private to the
+expression module, so the scales and the ticks never see it. It is the next thing to fix.
+
+Recorded rather than fixed here, which is what a sweep is for: the measurement comes first, and each
+row above is its own change.
+
+### A time value past the calendar is a value, not a failure
+
+A time scale's domain is a list of **dates**, and a date has a range. ECMA-262's `TimeClip` calls
+anything past ±8.64e15 milliseconds — about ±271,821 years — an *Invalid Date*, whose time value is
+`NaN`. So a column reaching `1e21` gives upstream a domain of `[0, NaN]` and an axis with **no
+labels at all**.
+
+This engine carried the number through: it saturated on the way to a `Long`, asked for the year
+292,278,994, and `LocalDate` will not build one. The compile ended in a `FATAL`
+`VEGA_COMPILE_FAILED` and drew nothing where upstream draws the chart.
+
+The exception did not escape — `compileJson` caught it and reported a diagnostic, which is the
+policy working, and I said otherwise once before checking. What is wrong is that there was anything
+to catch. `JsDate.clip` is this rule and it was **already written down here**, in `vega-model` where
+a scale can see it; only the expression functions were using it. One `map` on the domain.
+
+`a-time-value-past-the-calendar.vg.json` says where the bound is rather than merely that there is
+one: a domain ending exactly at `8640000000000000`, which is a date; one ending a single millisecond
+later, which is not; and one over a column carrying an **infinity**, written by a formula because
+JSON cannot spell one. Beside them the same column read as a **linear** scale, which has no such
+bound and places every value — so the fixture says the clipping belongs to the date and not to the
+number. Three mutants die: no clip, a clip a day too wide, and a clip that tests only the magnitude.
+
+Found by the value sweep on the day it was written. 228 Vega fixtures.
+
+### An axis keys a date by its second, because that is what a date's text is
+
+The tick join of the entry above keys on `String(datum.value)`, and a time scale's tick values are
+**dates**. `Date.prototype.toString` writes down to the second —
+`Thu Jan 01 1970 01:00:00 GMT+0100 (Central European Standard Time)` — with no milliseconds in it.
+So every tick inside one second keys alike and the join keeps one of them.
+
+A domain three milliseconds wide is the case: `timeTicks(new Date(1), new Date(4), 4)` answers four
+dates and **one** distinct string between them, so upstream draws a single grid line, a single tick
+and a single label. This engine drew four of each, its tick values being numbers.
+
+Two changes, and the first is the one that matters: a time scale's tick now carries a
+`VegaValue.Timestamp` rather than a `Num`, which is what upstream's tick datum is. The key then
+falls out — a timestamp keys by its second, everything else by its text. Written as the second
+rather than as the sentence, which would mean reproducing a zone's display name out of the host's
+tables to compare two ticks that are always in the same zone; the equivalence is exact either way,
+two instants sharing a `toString` exactly when they share a second.
+
+`an-axis-keys-a-date-by-its-second.vg.json` draws three axes over the same four numbers: a time
+scale three milliseconds wide, which collapses to one; the same scale ticked a second apart, where
+all four survive; and a **linear** scale, whose values are numbers and whose four keys differ. The
+second and third are there so the fixture says the collapse is the *key* and not a count.
+
+Found by the value sweep, where it was the largest cluster: thirteen cases, including the control
+column of 1, 2, 3, 4 — a sub-second domain being what that chart has whatever the column holds.
+
+### `String(x)` for a number is not how a coordinate is written down
+
+JavaScript writes the shortest decimal that reads back as the same double, and switches to the
+exponent form at two thresholds: **below 10^-6** and **at or above 10^21**. Between them it never
+does, so `1e20` is written out in full and `1e21` is `1e+21`, one step later.
+
+`VegaValue.asString` went through `canonicalNumberString`, which is a **coordinate** formatter with
+its own stated rules — six decimal places, and never the exponent form, because an SVG attribute
+parser and a golden diff both read a plain decimal more reliably. Right for an `x`, wrong for a
+label: a text mark over `1e-7` read `0`, having rounded away, and one over `1e21` read
+`1000000000000000000000`.
+
+Both functions stay, because both jobs are real. It is the same pair as [asDouble] beside
+`JsSemantics.toNumber` — a reading and a coercion that agree on everything a chart usually holds —
+and the same lesson twice in one day: a second transcription of a language rule drifts, and the
+place it drifts is the place nothing normal reaches.
+
+Two tests moved with it, and they are worth naming. `TransformReferenceTest` compared a list of bin
+positions as one comma-joined string built with `asString`, which worked only because `asString`
+rounded to six decimals on the way: a bin at `9.399999999999999` read `9.4`. That was a tolerance
+wearing a formatter's clothes, and it is an explicit one now — 1e-9, tighter than the six decimals
+were.
+
+`a-number-written-as-text.vg.json` puts both thresholds and the values either side of each through
+the three routes that share the coercion: a text mark whose content is the column, an ordinal legend
+that enumerates it, and a band axis whose domain entries are its labels.
+
+### A pie multiplies what it was given, and a null multiplied is zero
+
+Upstream's `Pie` never coerces the column. It keeps the raw values, divides by d3's `sum` of them,
+and writes the angles with a multiplication:
+
+```js
+values = data.map(field),
+k = (stop - start) / sum(values),
+…
+t[startAngle] = a;
+t[endAngle] = a += v * k;
+```
+
+Two readings of one column, and both are JavaScript's. `sum` coerces and keeps only what is truthy
+— `if (value = +value) sum += value` — so a null, an empty cell, a zero and a word all contribute
+nothing to the total. The *slice* is `v * k` on the raw value, and `*` coerces: `null * k` is `0`
+and `"" * k` is `0`, each leaving a slice of no width and the next one exactly where it was.
+
+This engine read the column with `asDouble`, which is a **parser** and answers `NaN` for both. In a
+sum that is harmless — the NaN is skipped, as it is upstream. In an accumulating angle it is not:
+`a += NaN` makes every slice after it NaN too, so a single empty cell did not draw a slice of
+nothing, it emptied the rest of the pie.
+
+A **word** is the case that must stay NaN, because `"abc" * k` is NaN upstream as well and poisons
+the angle there for the same reason. Three values that are not numbers, three different answers, and
+that is why `a-pie-multiplies-what-it-was-given.vg.json` puts all of them in one chart — a null, an
+empty cell and a zero against the second dataset's word. Two mutants die on it.
+
+The same distinction as `asDouble` beside `Number()`, in a transform this time: a reading where
+upstream sums, a coercion where upstream multiplies, and one function that cannot be both.
+
+Found by the value sweep. 228 Vega fixtures.
+
+### A quantile with nothing to cut on is still a scale, and a bisect settles left
+
+Two rules, found together because the first exposed the second.
+
+**A quantile scale's samples are filtered** with `d != null && !isNaN(d = +d)`, so a column of date
+*strings* leaves none. Upstream builds the scale anyway — probed, `domain: []` and
+`quantiles: [null, null]` — where this engine reported an error and built nothing, leaving a mark's
+colour channel naming a scale that was not there.
+
+Keeping it exposed the second. Upstream answers the **first** range entry for every number such a
+scale is asked about; this answered the **last**. The thresholds are the quantiles of an empty
+column, which are `NaN`, and d3's bisector compares with
+
+```js
+if (compare(a[mid], x) <= 0) lo = mid + 1; else hi = mid;
+```
+
+`ascending(NaN, x)` is `NaN`, `NaN <= 0` is false, and the search moves **left**. This engine asked
+the negation — `if (x < values[mid]) hi = mid else lo = mid + 1` — which agrees on every pair of
+numbers and disagrees the moment the *pivot* is `NaN`, because a comparison against a NaN is false
+whichever way round it is written. One line, and it is d3's own direction now.
+
+The needle was already handled: `bisectRight` returns `high` for a `NaN` **x**, which is d3's own
+short-circuit `if (compare(x, x) !== 0) return hi`. It was only the pivot that had no rule.
+
+`a-quantile-with-no-samples.vg.json` puts three quantile scales over one table — a column with no
+number in it, a column with exactly one, and an ordinary column — so the fixture says what an empty
+domain costs and what it does not. Two mutants die.
+
+**Not reproduced, and recorded rather than guessed at.** `threshold` and `bin-ordinal` keep their
+scales too over the same column, both reporting `domain: [null, null]`, and a `bin-ordinal` answers
+`unknown` where a `threshold` answers its first entry. No case in any corpus reaches either, so
+neither is changed here.
+
+Found by the value sweep, which is now at **188 of 192**. 228 Vega fixtures.
+
+### A log axis labels with twelve significant digits
+
+A log scale is the one family `tickFormat` sends down a branch of its own:
+
+```js
+else if (isLogarithmic(type)) {
+  const varfmt = locale.formatFloat(specifier);
+  …
+}
+```
+
+and `formatFloat` fills in `precision = 12` when the specifier names none. So a log tick is written
+with `,` at **twelve significant digits**, which is exactly where the exponent form begins:
+`100,000,000,000` is written out and `1e+12` is not.
+
+This engine used a fixed decimal count — how many places follow the point, not how many digits are
+worth showing — so every power past a million came out in full. That is not only a different label:
+an axis is as wide as its longest label and a chart is as wide as its axis, which is how the value
+sweep found it, as a **surface width** rather than as text.
+
+`NumberFormat` already parsed the specifier and already agreed with `formatFloat` value for value —
+probed across the thresholds before anything was changed — so the fix names the specifier and
+nothing else.
+
+`a-log-axis-labels-with-twelve-digits.vg.json` has three axes. One spans `1` to `10^15`, crossing
+the threshold; one spans a narrow decade, to say ordinary labels are untouched; and the third spans
+`10^10` to `10^12` so that `100,000,000,000` is a tick — **exactly twelve digits**, the last width
+written out in full. The first draft had only the first two, and a mutant that set the precision to
+eleven survived them: every tick it drew needed either eleven digits or thirteen, so the boundary
+itself was never tested. Three mutants die on it now — eleven digits, thirteen, and the grouping
+dropped.
+
+Found by the value sweep, now at **190 of 192**. 228 Vega fixtures.
+
+### A stack propagates what it cannot add
+
+Upstream reads a stack's column with a plain coercion and adds the result to a running cursor, and
+**nothing is substituted for what that comes to**:
+
+```js
+v = +field(t);
+if (v < 0) { t[y0] = lastNeg; t[y1] = lastNeg += v; }
+else       { t[y0] = lastPos; t[y1] = lastPos += v; }
+```
+
+A `NaN` is not less than zero, so it takes the positive branch and poisons the cursor: that row
+gets a `y0` and no `y1`, and every row after it **in the same group** gets neither. The totals do
+the same — `partition` sums `Math.abs(field(g[i]))` with no guard of its own.
+
+This engine answered `0` for a value it could not read, which is not a missing piece of a chart but
+a different chart: the segment was drawn flat on the baseline and the rest of the stack carried on
+as though nothing had happened. A column of unreadable dates stacked to a flat zero, so its axis
+came out `[0, 0]` — ticks, labels, the lot — where upstream's is `[NaN, NaN]` and draws nothing.
+
+The same distinction as the pie two entries above, and for the same reason: a cursor accumulates, so
+a reading that answers zero for "no number here" is not merely imprecise, it is the wrong shape.
+Third time this pair has come apart — `asDouble` against `Number()`, a parser against a
+multiplication, and now a parser against an addition.
+
+`a-stack-propagates-what-it-cannot-add.vg.json` holds three groups: one with a word among its
+numbers, one with the same rows and no word, and one with nothing readable at all. Beside them a
+second dataset whose every row is unreadable, so its scale is `[NaN, NaN]` and its axis has **no
+ticks** — which is the half a fallback to `[0, 0]` quietly replaces with an axis nobody asked for.
+
+Found by the value sweep, now at **191 of 192**. 228 Vega fixtures.
+
+### A logarithm has a base, not a division — and the value sweep reaches 100%
+
+d3 picks the logarithm rather than computing it:
+
+```js
+function logp(base) {
+  return base === Math.E ? Math.log
+      : base === 10 && Math.log10
+      || base === 2 && Math.log2
+      || (base = Math.log(base), x => Math.log(x) / base);
+}
+```
+
+Three bases get the host's own function and every other base gets the division. This engine always
+divided, and the difference is one bit: `Math.log10(1e6)` is **exactly 6** where `ln(1e6) / ln(10)`
+is `5.999999999999999`.
+
+That bit is a whole tick. A log axis from one to a million asks for ticks over the *exponents*, so
+it asked over `[0, 5.999…]` rather than `[0, 6]`, `tickSpec` decremented its upper index because
+`3 × 2` exceeded the stop, and the top power fell out: the axis drew **1, 100, 10,000** where
+upstream draws those and **1,000,000**. The commonest log axis there is, missing its largest label.
+
+`a-logarithm-has-a-base.vg.json` has one axis per branch: base 10 to a million, base **2** to 1024,
+and base **3** to 19,683. The third is the interesting control — it has no host function upstream
+either, so it takes the division there too and stops at 6,561 rather than reaching its own top
+power. Reproducing that is the point: the fix is *which* bases are special, not a general tightening
+of the arithmetic.
+
+**A mutant that divides for base 2 survives, and that is the honest answer rather than a gap.**
+`Math.log2` and `ln(x) / ln(2)` disagree in the last bit for tens of thousands of integers — 55,823
+of the first 200,000 — and for **no power of two**, which is what a log axis ticks at. Searched
+rather than assumed. The base-2 arm is the faithful port and its effect is not observable through
+ticks in any domain that can be written; base 10 is the half that is observable, and it is pinned by
+the first axis.
+
+Found by the value sweep, which is now at **192 of 192**, having started at 165 the day it was
+written. 228 Vega fixtures.
+
+**Observed and not reproduced.** `powp` has a matching asymmetry — base 10 uses
+`pow10(x) = isFinite(x) ? +("1e" + x) : …` rather than `Math.pow(10, x)` — and the two agree on
+every integer exponent probed. They differ only for a **fractional** one, where `pow10` answers
+`NaN` and `Math.pow` answers a real number, which a log axis reaches only when its exponent ticks
+are fractional. No case in any corpus produces one, so it is written down rather than guessed at.
+
+
+### The value sweep reaches further: 25 columns, 20 charts, 500 cases
+
+A sweep that agrees with upstream everywhere has stopped being an instrument. The value sweep
+reached 192 of 192 in the change above, which is the point at which the useful thing to do with it
+is not to retire it but to widen it — the same course the schema sweep took.
+
+Widened along both axes it has, because the two find different things.
+
+**Nine more columns**, each a reason rather than a spread: the word `Infinity`, which `Number` reads
+as a number no arithmetic recovers from; hexadecimal text, where `Number` says 16 and `parseFloat`
+says 0; exponent notation written out in both cases; a leading sign; **a list inside a cell**, where
+`Number([3])` is 3, `Number([1,2])` is `NaN` and `String([1,2])` is `1,2`; a number that is also a
+plausible instant; letters outside the Latin block, whose widths come from a different part of the
+font table; a label far wider than its neighbours; and the values either side of `0.1 + 0.2`.
+
+**Eight more charts**, each a *journey* rather than a picture — a `pow` scale and a `symlog` scale,
+the two continuous families the sweep had no chart for; a `point` scale, band's sibling with a step
+of its own; a **gradient** legend, which is the only continuous guide and the sweep drew none; a
+`bin`, which asks the column for an extent before choosing a step; a `collect` sort, which is a
+comparator over values of mixed type; a `window` running total, an accumulator of the same family as
+the stack; and the number formatters, which read the column three ways.
+
+**500 cases. Upstream refuses one** — a gradient legend over a domain that reaches infinity throws
+`I[i] is not a function` inside upstream itself, which is recorded as a refusal and is an agreement.
+
+**481 of 499 agree.** The 18 that do not are five causes, not eighteen:
+
+- **an infinite extent, 9 cases.** `Extent.js` ends `if (!Number.isFinite(min) || !Number.isFinite(max)) { warn; min = max = undefined; }` — an extent that is not finite is **no extent at all**, and that covers a column of `Infinity` and a column with no number in it alike. Upstream's domain is then `[undefined, undefined]`, its scale answers `NaN` for every value and its axis draws no ticks; this engine computes a domain from the finite values and draws five.
+- **a list inside a cell, 4 cases.** A text mark whose `text` is an array is **multi-line text, one line per element** — `[1,2]` is two lines and 24 pixels tall, `["a",null,"c"]` is three and 37. Probed. This engine writes `1,2` on one line, which is `String([1,2])` and the wrong rule, and every legend entry below it sits 12 pixels too high.
+- **a colour ramp that clamps, 1 case.** A continuous colour scale does not clamp: upstream's blues ramp evaluated below its domain extrapolates to `rgb(255, 255, 255)`, and this engine answers the colour at the domain's own minimum.
+- **`min` and `max` over values that do not coerce, 1 case.** `AggregateOps.js` initialises both to `undefined` and adds with `if (v > m.max || m.max === undefined)` — the **JavaScript relational operator** on the raw value, which compares two strings as strings. Upstream's max over `[[1,2],[3],4,5]` is 5; this engine's is `1,2`.
+- **`symlog`, 1 case.** One label differs in its last two digits. d3's transform is
+  `Math.sign(x) * Math.log1p(Math.abs(x / c))`; this engine's scale writes `ln(1 + |x| / c)`, which
+  is the same rule transcribed twice — and the expression module's `symlog` already has it right.
+
+Recorded rather than fixed here, which is what a sweep is for. Each of the five is its own change.
+`-PvalueSweepCase=<substring>[,…]` prints every difference for the cases that match, because the
+tally ranks *shapes* with the numbers taken out and by the time you are fixing one you need the
+numbers back.
+
+(A list and not a table, for the reason the first value-sweep entry gives: `DocumentedNumbersTest`
+reads `| \`name\` | count |` as a claim about a fixture on disk, and these are chart names.)
+
+### An infinite extent is no extent at all
+
+A column holding the word `Infinity` drew an axis with five labels. Upstream draws none.
+
+`Extent.js` is short enough to quote whole in its last four lines:
+
+```js
+if (!Number.isFinite(min) || !Number.isFinite(max)) {
+  pulse.dataflow.warn(`Infinite extent${name}: [${min}, ${max}]`);
+  min = max = undefined;
+}
+```
+
+Two things there are easy to get backwards, and this engine had both. The infinity is **not
+filtered on the way in** — `Number.isFinite` is asked of the *result*, so a single infinite value
+takes the whole extent with it rather than being skipped so the finite values can report theirs.
+And what replaces an infinite extent is `undefined`, not a repaired number: the scale's domain
+becomes `[undefined, undefined]`, every value it is asked about comes back `NaN`, and the axis over
+it draws no ticks and no labels at all.
+
+The same line covers three columns that look unrelated. A column of infinities is discarded because
+`max` is `Infinity`. A column with no number anywhere in it is discarded because the extent never
+moved off its `[+Infinity, -Infinity]` start — `NaN` fails every comparison, which is upstream's own
+comment on the loop. A column with no rows is discarded for that second reason too. All three are
+one rule, and it is the rule about the **result**.
+
+**Transcribed twice, and only one of the two was right** — the fourth time this week. The `extent`
+transform had it exactly, comment for comment. The scale resolver had a second copy reading
+`values.map { it.asDouble() }.filter { it.isFinite() }`, which is wrong on both halves: `asDouble`
+is a *reading* and not `Number()`, and the filter drops what upstream lets take the extreme. So the
+transform published no extent for a column while the scale over that same column reported `[2, 4]`,
+and nothing anywhere said the two disagreed. The rule now lives once, in
+`ExtentTransform.extentOf`, and both call it.
+
+`an-infinite-extent-is-no-extent` pins it with four columns that separate the causes — the word
+`Infinity`, an infinity reached by dividing by zero so the rule is visibly not about strings, a
+column of words, and an ordinary column — and writes both the scale's answers and the transform's
+published signal, so the two transcriptions are compared against each other as well as against
+upstream. Three mutants: the old second reading, a filter that drops the infinity before comparing,
+and a fallback to `[0, 1]`.
+
+Found by the widened value sweep, where it was the largest cluster: nine cases across seven charts.
+229 Vega fixtures.
+
+### A label that is a list is a list of lines
+
+`vega-scenegraph`'s `util/text.js` decides every multi-line label there is, in three lines:
+
+```js
+function lineArray(_) {
+  return isArray(_) ? _.length > 1 ? _ : _[0] : _;
+}
+```
+
+An array of more than one element **is** the list of lines. An array of exactly one is that one
+element. An empty array is `undefined`, which `textValue` writes as the empty string. So a cell
+holding `[1, 2]` is a label two lines tall — probed, 24 pixels against 11 — and `String([1,2])`,
+which is `1,2` on one line, is the wrong rule wherever a label is drawn.
+
+**Written three times, and the third was missing.** A guide *title* had it. A **mark's** text channel
+had it, and correctly passes the list itself rather than a joined string, because a mark can carry a
+`lineBreak` that upstream ignores for an array. An axis label and a legend label had neither: they
+went through `asString()`, which joins an array with commas. So a band axis over a column of lists
+drew `1,2` on one line where upstream draws two, and — because those labels are rotated — the
+difference showed up as the axis being *wider*, not taller. In the legend it was plainer: every
+entry below a two-line one sat twelve pixels too high, symbol and label alike.
+
+Nested data is not exotic. A column holds a list the moment anything groups, folds or aggregates
+into one, and a scale domain takes those values as they are.
+
+The rule now lives once, as `asLines`, and the title path calls it instead of repeating it.
+
+`a-label-that-is-a-list-of-lines` draws the three transcriptions over one column — a rotated band
+axis, an ordinal legend, and the text mark that was already right — so they are compared against
+each other as well as against upstream. Two mutants die on it: an axis label joined with commas and
+a legend label joined with commas.
+
+**Upstream's three cases collapse to two**, and finding that out is what the other two mutants were
+for. A `when` spelling out `lineArray`'s empty-array and one-element arms went in first, and
+deleting either of them changed nothing anywhere — joining a one-element list gives that element and
+joining an empty one gives the empty string, so no input can tell the branches apart once the lines
+are one newline-joined string. They are gone, and the reason is written where they were, because the
+next reader will want to put them back.
+
+Found by the widened value sweep: four cases, second-largest cluster. 236 Vega differential
+fixtures.
+
+### A maximum compares as JavaScript does, not as arithmetic does
+
+An aggregate's `max` over a column of lists reported `1,2` where upstream reports `5`.
+
+`AggregateOps.js` is where the rule is:
+
+```js
+max: {
+  init: m => m.max = undefined,
+  add:  (m, v) => { if (v > m.max || m.max === undefined) m.max = v; },
+}
+```
+
+Two things, and this engine had the first and not the second. The extreme is tracked over the
+**raw** value rather than a coerced one, which was already right here and is why a word in a numeric
+column never displaces a number — `1 > "abc"` and `"abc" > 1` are both false. And `>` is
+JavaScript's relational operator, which is not a numeric comparison.
+
+ECMA-262 7.2.13 applies `ToPrimitive` with the **number** hint to *both* sides before it asks
+whether it is looking at two strings. An array's `valueOf` gives back the array, which is not a
+primitive, so it falls through to `toString` and the join: `[1,2]` becomes `1,2`, and `[3] > [1,2]`
+is `"3" > "1,2"`, which is true. This engine's `compare` asked "are both of them already strings"
+instead — a reasonable-looking shortcut that is the same test one step too late. With two arrays it
+fell through to the numeric branch, read `NaN` on both sides, answered "no comparison", and so the
+maximum never moved off the first row it was given.
+
+The hint is where this parts company with `+` next door, which was already written down correctly:
+`+` uses the **default** hint, under which a `Date` prefers its sentence, and a relational
+comparison uses the number hint, under which it prefers its instant. So `date1 < date2` compares
+instants while `date1 + date2` concatenates two sentences, and both are right. A mutant that
+primitivizes a date to its sentence dies.
+
+`RelationalComparisonTest` replays eighteen comparisons probed against `node`, including the rows
+that look wrong: `[] <= 0` is true while `[] < 0` is false, `[1,2] <= "1,2"` is true because both
+sides end up strings, and `[10] < [9]` is true because `"10"` sorts before `"9"`.
+
+`a-maximum-compares-as-javascript-does` pins the chart end with three columns — lists, words beside
+numbers, and an ordinary one — and writes `argmin`/`argmax` beside `min`/`max` because those reach
+their answer by a different route and genuinely disagree: the maximum of the nested column is `5`
+while the arg-maximum is the row holding `[3]`.
+
+Found by the widened value sweep. 236 Vega differential fixtures.
+
+### A symlog is log1p of x over c
+
+One label in the widened value sweep differed in its last two digits: a symlog scale placed 0.2 at
+`57.497097064051715` where upstream has `57.497097064051665`.
+
+d3's transform is one line:
+
+```js
+function transformSymlog(c) {
+  return function(x) { return Math.sign(x) * Math.log1p(Math.abs(x / c)); };
+}
+```
+
+Every part of it is load-bearing.
+
+**`log1p`, not `ln(1 + t)`.** The same function, not the same arithmetic: adding one to a small
+number throws away the low bits before the logarithm ever sees them. That is the two digits above,
+and two digits is exactly enough to fail a comparison.
+
+**`Math.abs(x / c)`, not `abs(x) / c`.** They agree for a positive constant and part company for a
+negative one, where the first is still the logarithm of something positive and the second is `NaN`.
+A `symlog` with a negative constant is legal and upstream draws it.
+
+**`Math.sign(x)`, which is zero at zero**, so a symlog of `-0` is `-0`.
+
+**Transcribed three times, and only one was right** — the fifth time this week, and the first with
+three copies rather than two. The positional scale wrote `if (t < 0) -ln(1 - t) else ln(1 + t)`.
+The colour-ramp transform beside it wrote `if (x < 0) -ln(1 + |x| / c) else ln(1 + x / c)`, which
+divides after taking the absolute value and so is the one that breaks on a negative constant. The
+expression module's `pan` and `zoom` had it exactly, `log1p` and all. The two in the scale module
+now share one definition; the third cannot share it, because its module sits below, and it says so
+in a comment beside itself.
+
+The inverse is the same shape — `Math.sign(x) * Math.expm1(Math.abs(x)) * c` — and had the same
+defect, `exp(x) - 1` for `expm1`.
+
+`a-symlog-is-log1p-of-x-over-c` writes the scaled values out through a text mark rather than leaving
+them to the marks' positions, because the difference is in the last digits and a coordinate is
+rounded long before it reaches the page. Four scales: a domain near zero for `log1p`, a negative
+constant for the division, a domain spanning zero, and an `invert` for the inverse. Three mutants
+die there.
+
+**The sign cannot be seen from a chart, and `SymlogTransformTest` is where it is pinned instead.**
+A mutant that branches on `value < 0` rather than multiplying by `Math.sign` differs only at a
+negative zero, and a scale normalizes the transform's answer against its domain immediately — that
+arithmetic absorbs a `-0` before anything can look at it. Searched for a specification that could
+see it and there is none, so the arm is pinned by a unit test on the transform rather than left
+unclaimed. The same test carries the two observable decisions as reference values read off `node`,
+which is what makes it a transcription check and not a restatement.
+
+Found by the widened value sweep. 236 Vega differential fixtures.
+
+### A colour ramp does not clamp
+
+A continuous colour scale asked for a value below its domain answered the ramp's own first colour.
+Upstream answers white — a colour that is nowhere in the scheme.
+
+d3's continuous scale is
+
+```js
+clamp ? Math.max(0, Math.min(1, x * k10)) : x * k10
+```
+
+with `clamp` false until someone sets it, and giving the scale a colour range does not change that.
+So the position runs below zero or above one, and the ramp is *extrapolated* through it. The
+extrapolation is d3's `piecewise`, and the whole of it is where the clamp sits:
+
+```js
+var i = Math.max(0, Math.min(n - 1, Math.floor(t *= n)));
+return I[i](t - i);
+```
+
+**On the segment index, not on `t`.** A third of a domain below the start of a sixteen-stop scheme
+picks segment 0 and evaluates it at `-5`; the channels then saturate on the way out, which is why
+the answer is `rgb(255, 255, 255)` and not a blue. Above the domain the same ramp reaches black.
+
+This engine had both halves wrong and in the same direction, which is why it looked consistent: the
+scale clamped by **default**, and when told not to it returned **no colour at all** for anything
+outside the domain — where upstream has a colour for every finite number. The specification's own
+`clamp` was never read, so `"clamp": true` and saying nothing drew the same chart and the difference
+was unreachable from a specification.
+
+Probed across six scale shapes before changing anything. A range written out as two colours follows
+the identical rule and only *looks* clamped: extrapolating past pure black or pure white saturates
+back to itself, so `range: ["#000000", "#ffffff"]` is the same arithmetic with an invisible result.
+That is worth knowing, because it is what made the defect survive every fixture that used one.
+
+`a-colour-ramp-does-not-clamp` draws four rows of swatches — the default, the same scale with
+`clamp: true`, a written-out pair, and a `lab` interpolator — over five values, three inside the
+domain and two outside. Five mutants die: the specification no longer deciding, answering nothing
+when unclamped, clamping the parameter instead of the segment index, and each of the two
+interpolators clamping its own parameter.
+
+**The constructor's default is not reachable from a specification** and a mutant that flips it back
+survives. The resolver now always passes `spec.clamp`, so what a chart sees is decided one line
+earlier, and that line is pinned. Said rather than papered over.
+
+**Observed and not fixed here.** `scale('ramp', 1)` inside an expression returns `rgb(207, 225, 242)`
+upstream and `#cfe1f2` here — the same colour, spelled differently. The scene comparison never sees
+it because the normalizer canonicalizes a mark's fill, and it shows only when an expression writes a
+scale's answer into a label. It is a different question from clamping — how a colour is written,
+not which colour it is — and it is the next change.
+
+236 Vega differential fixtures.
+
+### A null line is an empty line
+
+`textValue` is the last thing upstream does to a line before drawing it:
+
+```js
+const text = line == null ? '' : (line + '').trim();
+```
+
+**A null line is an empty line**, not the four letters that spell it. This engine wrote `null`
+there, so a text mark over a cell holding `["a", null, "c"]` had a word in the middle where upstream
+leaves a gap.
+
+Two more ways to the same wrong answer sat beside it. A list of **one** element was handed back to
+the ordinary single-string path rather than kept as a line list, so `[null]` came out as the word by
+a different route — and, more quietly, a `lineBreak` on such a mark was honoured where upstream
+ignores it, because `textLines` asks `!isArray(item.text)` of the *original* and an array of one is
+still an array. And an **empty** list produced no text at all, where `lineArray` collapses `[]` to
+`undefined` and `textValue` writes that as the empty string: one empty line, a line's height tall.
+
+`a-null-line-is-an-empty-line` pins the first two; a third mutant, which drops the empty-list guard,
+**survives**. An empty line and no line at all differ in this engine's own text metrics, but the
+item is empty either way and the comparison cannot see it. The guard is the faithful reading and it
+stays; saying so is better than deleting a line that is right because nothing catches it.
+
+No scale reads that column on purpose, and that is the interesting part.
+
+**Observed and not reproduced: a discrete domain over a column of lists.** Upstream keys such a
+domain by the value's **string** form, and `String([null])` is `""` — so `[null]` and `[]` are one
+entry and a band axis over the five rows here draws four ticks. This engine keys by the value and
+draws five. The fix is one line — `Array.prototype.join` writes an empty string for a null element,
+which `JsSemantics.toStringValue` has always known and `VegaValue.asString` does not — and it was
+written, and then taken out again, because it is not one line.
+
+The reason is the **caption**, which disagrees with the domain about the same list. Upstream's aria
+text for that axis is `a,null,c, null, 1,null, only` — with the word — because a caption is built
+from the *formatted labels*, and a label has been through `String` **per element** by then.
+The domain key is `String` of the **whole array**, where a null joins as nothing. So `a,,c` and
+`a,null,c` are both correct, for different questions, and making `asString` right for the first
+broke the second — a gate caught it immediately. Two transcriptions that genuinely differ is the
+opposite of the shape this week has been full of, and it is the next change rather than this one.
+
+236 Vega differential fixtures.
+
+### A quantile cut that lands on a sample
+
+d3-array's `quantileSorted` ends:
+
+```js
+var i = (n - 1) * p, i0 = Math.floor(i),
+    value0 = +values[i0], value1 = +values[i0 + 1];
+return value0 + (value1 - value0) * (i - i0);
+```
+
+It evaluates that product even when `i` lands exactly on a sample and the weight is zero. Returning
+`values[i0]` there is the obvious saving and is exact for every finite column — and wrong for one
+holding an infinity, because `(Infinity - 2) * 0` is **NaN**, not zero.
+
+Four samples and a three-colour range is the shape that reaches it, the cuts sitting at `i = 1` and
+`i = 2` exactly. Over the column `Infinity, -Infinity, 1, 2` upstream's thresholds are `[1, NaN]`
+and this engine's were `[1, 2]`. A NaN cut point is not a missing one: it is a boundary every
+comparison fails, so a bisection walks left rather than right, and two of the four marks came out
+the wrong colour.
+
+The short circuit hid a second slip in the same line. d3 reads `values[i0 + 1]` for the upper
+sample; this read `values[ceil(i)]`, which names the *same* sample again whenever the position is a
+whole number — invisible while the short circuit returned before reaching it, and invisible for
+finite data afterwards, because the weight is zero exactly when they differ. Only an infinity
+separates them, which is why nothing had ever caught it.
+
+`a-quantile-cut-that-lands-on-a-sample` kills both, and carries the same shape without the infinity
+so the fixture says what this costs an ordinary chart, which is nothing.
+
+**A third mutant survives and is equivalent where it can be seen.** Writing the interpolation as
+`value0 * (1 - w) + value1 * w` instead of d3's `value0 + (value1 - value0) * w` is the same line in
+algebra and not in floating point — but the only case that observes the difference here has `w = 0`
+and an infinite `value1`, where both forms reach NaN. d3's form is kept because it is d3's form.
+
+Found by the widened value sweep, which went 481 to 495 of 499 across this stack. 236 Vega
+differential fixtures.
+
+### A gradient over a column with no number, and the sweep reaches 100%
+
+The last three cases of the widened value sweep were one chart: a gradient legend over a colour
+scale whose column holds no number at all. The extent is discarded, so the domain is `[NaN, NaN]`,
+and two separate rules decide what gets drawn.
+
+**The degenerate test is falsiness, not a comparison with zero.** Upstream's is
+
+```js
+if (!(max - min)) { /* expand the scale to [0, 1] and sample the whole ramp */ }
+```
+
+and `!(NaN)` is true. So a NaN span is degenerate exactly as a zero span is — the domain is thrown
+away and the ramp is sampled end to end, 21 stops. Written here as `hi - lo == 0.0`, which asks the
+one question JavaScript is not asking, the swatch came out with no gradient at all. The zero-span
+half of that rule was already right and already fixed once; this is the arm beside it.
+
+**A gradient legend's labels join by value, and this engine's did not.** Automatic label generation
+produces nothing over a NaN domain, so upstream falls back to the domain's two ends — `NaN !== NaN`
+is true, so it takes that branch — and makes **two** entries, which the label mark's `key: Value`
+join then collapses to **one**, both keying as the text `NaN`.
+
+That is the other half of a finding already in this file. Six guide marks upstream carry
+`key: Value`: an axis's grid, ticks and labels, and a legend's gradient labels, discrete gradient
+and symbol groups. The earlier note read the symbol legend correctly — it builds a *group per
+entry*, so the key is unique inside each group and the join never fires — and then generalised it
+to "a legend does not", which is what left the gradient legend, whose labels are one mark over
+every entry, joining nothing. The rule now lives once as `guideJoinKey` and both callers use it; a
+mutant that keys a date by its whole instant rather than by its second dies on the axis fixture
+that found that rule in the first place.
+
+`a-gradient-over-a-column-with-no-number` pins both, beside an ordinary column that says what they
+cost a chart with numbers in it, which is nothing. Three mutants die. A fourth — keeping the
+**first** of a repeated key rather than the last — survives, and is equivalent here: the two
+entries it chooses between are both `NaN`, with the same label and the same position.
+
+**The widened sweep is now 499 of 499.** It opened at 481 and cost nine changes, of which five were
+a rule transcribed twice and one was a rule transcribed three times. 236 Vega differential fixtures.

@@ -7,6 +7,7 @@ import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asString
 import dev.aster.vega.model.spec.ChannelValue
 import dev.aster.vega.model.spec.NumberValue
 
@@ -133,12 +134,8 @@ public class NumberResolver(
    * as the lines and collapses a one-element array to its element. Stringifying it instead joins
    * the lines with a comma and draws them on one, which is a different chart and a wider legend.
    */
-  public fun resolveLines(expression: String, owner: String): String? {
-    val value = resolveValue(expression, owner) ?: return null
-    if (value !is VegaValue.Arr) return JsSemantics.toStringValue(value)
-    if (value.values.size == 1) return JsSemantics.toStringValue(value.values.first())
-    return value.values.joinToString("\n") { JsSemantics.toStringValue(it) }
-  }
+  public fun resolveLines(expression: String, owner: String): String? =
+    resolveValue(expression, owner)?.let { asLines(it) }
 
   /** The raw value of a signal, for a property whose shape depends on what the signal holds. */
   public fun resolveValue(expression: String, owner: String): VegaValue? =
@@ -182,3 +179,67 @@ public class NumberResolver(
         }
     }
 }
+
+/**
+ * Upstream's `lineArray`, as one string with the lines separated by newlines.
+ *
+ * `vega-scenegraph`'s `util/text.js` is three lines and decides every multi-line label there is:
+ * ```js
+ * function lineArray(_) {
+ *   return isArray(_) ? _.length > 1 ? _ : _[0] : _;
+ * }
+ * ```
+ *
+ * An array of more than one element **is** the list of lines; an array of exactly one is that one
+ * element; an empty array is `undefined`, which `textValue` writes as the empty string. So a cell
+ * holding `[1, 2]` is a label two lines tall, and `String([1,2])` — `1,2` on one line — is the
+ * wrong rule everywhere a label is drawn.
+ *
+ * Newline-joined rather than carried as a list because that is what this engine's text layout
+ * reads: [dev.aster.vega.scene.TextRun.displayLines] splits on newlines when no explicit line list
+ * is given. A **mark's** text channel is the exception and passes the list itself, because a mark
+ * can carry a `lineBreak` that upstream ignores for an array and would otherwise re-split these.
+ *
+ * Written three times before this: for a guide title, for a mark's text channel, and nowhere at all
+ * for an axis or legend label — which is how a band axis over a column of lists drew `1,2` on one
+ * line where upstream draws two, and put every legend entry below it twelve pixels too high.
+ *
+ * **Upstream's three cases collapse to two here**, which is worth saying rather than spelling out a
+ * `when` that looks like the original: joining a one-element list gives that element, and joining
+ * an empty one gives the empty string, so no input can tell those two branches from the general
+ * case. They were written out first, and two mutants that deleted them survived every fixture —
+ * which is what a redundant branch looks like from the outside.
+ */
+internal fun asLines(value: VegaValue): String =
+  if (value !is VegaValue.Arr) JsSemantics.toStringValue(value)
+  else value.values.joinToString("\n") { JsSemantics.toStringValue(it) }
+
+/**
+ * The key a **guide mark** joins on, which is `String(datum.value)`.
+ *
+ * Every value-driven guide mark upstream builds is a keyed data join, and all of them are spelled
+ * the same way — `{type: RuleMark, role: AxisGridRole, key: Value, from: dataRef, …}`. `Value` is
+ * the string `'value'`, so the key is `datum.value` read as an object property, which makes it the
+ * value's *text*: `1001` and `"1001"` are one key, and so are a null and the word for one. A keyed
+ * join holds one tuple per key and a later arrival overwrites an earlier one, so two entries whose
+ * values key alike leave a single item.
+ *
+ * Shared because **six** marks carry it: an axis's grid, ticks and labels, and a legend's gradient
+ * labels, discrete gradient and symbol groups. A symbol legend is the one where it never fires — it
+ * builds a *group per entry*, so the key is unique inside each group — and reading that as "a
+ * legend does not join" is what left the **gradient** legend, whose labels are one mark over every
+ * entry, joining nothing. Two entries reading `NaN` drew two labels where upstream draws one.
+ *
+ * **A date's text has no milliseconds in it.** `Date.prototype.toString` writes down to the second,
+ * so every tick of a time scale inside one second keys alike and a domain a few milliseconds wide
+ * draws one tick where it generated four. Probed: `timeTicks(new Date(1), new Date(4), 4)` answers
+ * four dates with one distinct string between them. Written as the second rather than as that
+ * sentence, which would have to reproduce a zone's display name out of the host's own tables to
+ * compare two instants that are always in the same zone anyway — the equivalence is exact, two
+ * instants sharing a `toString` exactly when they share a second.
+ */
+internal fun guideJoinKey(value: VegaValue): String =
+  when (value) {
+    is VegaValue.Timestamp -> "date:${kotlin.math.floor(value.epochMillis / 1000.0)}"
+    else -> value.asString()
+  }

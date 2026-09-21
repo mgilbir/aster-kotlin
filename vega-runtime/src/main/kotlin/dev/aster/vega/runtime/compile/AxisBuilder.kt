@@ -1,11 +1,12 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.expression.JsSemantics
+import dev.aster.vega.expression.NumberFormat
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asNumberOrNull
-import dev.aster.vega.model.asString
 import dev.aster.vega.model.isNullish
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.spec.Anchor
@@ -18,7 +19,9 @@ import dev.aster.vega.model.time.TimeStepper
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.BinOrdinalScale
 import dev.aster.vega.runtime.scale.BinnedScale
+import dev.aster.vega.runtime.scale.IdentityScale
 import dev.aster.vega.runtime.scale.LinearScale
+import dev.aster.vega.runtime.scale.OrdinalScale
 import dev.aster.vega.runtime.scale.PointScale
 import dev.aster.vega.runtime.scale.PositionScale
 import dev.aster.vega.runtime.scale.QuantileScale
@@ -895,6 +898,15 @@ public class AxisBuilder(
     when (scale) {
       is PositionScale -> scale.range
       is BinnedScale -> scale.rangeValues.mapNotNull { it.asNumberOrNull() }.takeIf { it.size >= 2 }
+      // The **first and last range entries**, which for an ordinal scale is not the same as its
+      // widest and narrowest: a range of `[10, 40, 80, 118, 90, 30]` spans its line from 10 to 30,
+      // because upstream asks the scale for range positions 0 and 1 rather than for an extent. Both
+      // of these fell through to null, so the line was drawn across the whole plotting area and the
+      // title was centred on that instead of on the axis — a spine twice the length upstream draws
+      // and a title twenty units out.
+      is OrdinalScale ->
+        scale.rangeValues.mapNotNull { it.asNumberOrNull() }.takeIf { it.size >= 2 }
+      is IdentityScale -> scale.range
       else -> null
     }
 
@@ -916,7 +928,61 @@ public class AxisBuilder(
    * which is none, and both labels read as whole numbers. Reproduced, because a specification
    * written against upstream is looking at those labels.
    */
-  private fun ticksFor(scale: VegaScale, spec: AxisSpec, specifier: String?): List<Tick>? {
+  private fun ticksFor(scale: VegaScale, spec: AxisSpec, specifier: String?): List<Tick>? =
+    rawTicks(scale, spec, specifier)?.let { ticks ->
+      // **`tickOffset` is not a band property.** Upstream reads it in `tickBand(_)` whatever the
+      // scale is and hands the same `offset` to the tick mark and the label mark alike; only the
+      // *band position* it sits beside needs a band to multiply. Here it was added inside
+      // [bandOffset], which answers zero for everything but a band scale — so a linear, log, time
+      // or point axis given a `tickOffset` ignored it, and upstream moved its ticks and its labels
+      // by exactly that much. Probed: a linear axis at `tickOffset: 8` has every tick 8 further
+      // along and its domain line exactly where it was.
+      //
+      // Applied here, once, rather than in each of the eight branches that build ticks. The extra
+      // tick [withExtraTick] appends is built from a raw scale position afterwards and adds the
+      // offset itself, which is why it is not shifted twice.
+      val offset = (scale as? PositionScale)?.let { tickOffset(it, spec) } ?: 0.0
+      val shifted =
+        if (offset == 0.0) ticks
+        else
+          ticks.map {
+            it.copy(position = it.position + offset, labelPosition = it.labelPosition?.plus(offset))
+          }
+      joinedByValue(shifted)
+    }
+
+  /**
+   * One item per **distinct tick value as text**, keeping the last.
+   *
+   * An axis's three value-driven marks are data joins with a key, all three spelled the same way:
+   * ```js
+   * {type: RuleMark, role: AxisGridRole, key: Value, from: dataRef, encode, ...}
+   * ```
+   *
+   * — `Value` being the string `'value'`, so the join is on `datum.value`. A keyed join holds one
+   * tuple per key and a later arrival **overwrites** an earlier one, so two ticks whose values key
+   * alike leave a single item, at the later one's position. The key is an object property, which
+   * makes it the value's *text*: `1001` and `"1001"` are one key, and so are a null and the word
+   * for one.
+   *
+   * It takes a domain holding two values with one text to see this at all, which is why nothing did
+   * until a discrete domain started holding values rather than their text. Five entries draw three
+   * grid lines, three ticks and three labels.
+   *
+   * A **legend** does not do this, and not because the rule is different — its entry marks carry
+   * the same `key: Value`. A legend builds a *group per entry*, so the key is unique inside each
+   * one and there is nothing to collapse. Five swatches beside three ticks over the same five
+   * values, which is what the fixture draws.
+   */
+  private fun joinedByValue(ticks: List<Tick>): List<Tick> {
+    if (ticks.size < 2) return ticks
+    val seen = HashSet<String>(ticks.size)
+    // Backwards, because the **last** of a repeated key is the one that survives; reversed again so
+    // the survivors keep the order they appear in.
+    return ticks.reversed().filter { seen.add(guideJoinKey(it.value)) }.reversed()
+  }
+
+  private fun rawTicks(scale: VegaScale, spec: AxisSpec, specifier: String?): List<Tick>? {
     // A scale with `bins` has its tick values already decided: upstream's `tickValues` returns the
     // boundaries themselves rather than asking the scale to generate any. An axis that *also* names
     // `values` still wins, as it does upstream, where `values` is checked first.
@@ -1238,20 +1304,20 @@ public class AxisBuilder(
   private fun bandOffset(scale: PositionScale, spec: AxisSpec): Double {
     if (scale !is BandScale) return 0.0
     val position = numbers.resolve(spec.bandPosition, spec.scale) ?: AxisDefaults.BAND_POSITION
-    return scale.bandwidth * position + tickOffset(scale, spec)
+    return scale.bandwidth * position
   }
 
   /**
    * `tickOffset`: how far a tick is nudged along the axis once its band position has placed it.
    *
-   * The default is upstream's, and it is **not** zero for a band scale: `config.axisBand` carries a
-   * `-0.5` that corrects the half-pixel the axis group's own translation adds, and it applies to a
-   * band scale only — a point or ordinal axis never sees that block. A specification aiming ticks
-   * at the band boundaries has to switch it off explicitly, which is why the property exists.
+   * The default is zero. A band axis's `-0.5` — the correction for the half pixel the axis group's
+   * own translation adds — is not a default here at all: it is `config.axisBand`, which the parser
+   * merges into the axis's properties **above** `config.axis` and below the axis's own, exactly
+   * where upstream's `extend({}, axis, xy, or, band)` puts it. Kept as a fallback here it was
+   * reached only when nothing else set a `tickOffset`, so a theme that set one lost the correction.
    */
   private fun tickOffset(scale: PositionScale, spec: AxisSpec): Double =
-    numbers.resolve(spec.tickOffset, spec.scale)
-      ?: if (scale is BandScale) -AxisDefaults.CRISP_OFFSET else 0.0
+    numbers.resolve(spec.tickOffset, spec.scale) ?: 0.0
 
   /**
    * Where a band axis's label sits, which is the band's **centre** whatever the ticks do.
@@ -1261,8 +1327,7 @@ public class AxisBuilder(
    * they were.
    */
   private fun labelOffsetAlong(scale: PositionScale, spec: AxisSpec): Double =
-    if (scale !is BandScale) 0.0
-    else scale.bandwidth * AxisDefaults.BAND_POSITION + tickOffset(scale, spec)
+    if (scale !is BandScale) 0.0 else scale.bandwidth * AxisDefaults.BAND_POSITION
 
   /**
    * How an explicit value is labelled.
@@ -1282,10 +1347,19 @@ public class AxisBuilder(
     // band of instants, since there is no temporal scale anywhere to infer it from.
     // `formatType` decides the grammar and the shared formatter knows how; see [GuideFormat].
     GuideFormat.timeLabeller(format, formatType, locale, timeZone)?.let { write ->
-      return { value ->
-        val instant = value.asDouble()
-        if (instant.isNaN()) value.asString() else write(instant)
-      }
+      // Whatever the tick is, coerced — which is what upstream does and *not* what falling back to
+      // the value's own text does. `tickFormat` chooses the formatter from the format type and then
+      // hands it every tick; d3 coerces with `new Date(+value)`, so a band of words reads `0NaN`
+      // rather than reading the words. A chart gets here by naming `formatType: "time"` over a
+      // column that is not dates, which Vega-Lite also parses with `toDate` — so the words are
+      // already gone by the time the axis sees them.
+      //
+      // **`Number(value)` and not `asDouble`**, which are the same for a number and a word and
+      // differ for everything else a discrete domain can hold: `+null` is `0` and `+true` is `1`,
+      // where `asDouble` answers `NaN` for both. A null band is labelled `01 AM` upstream — epoch
+      // zero — and was labelled `0NaN` here for as long as the domain held text, which could not
+      // tell a null from the word for one.
+      return { value -> write(JsSemantics.toNumber(value)) }
     }
     // A **time** scale reads its specifier as a time specifier, without needing a `formatType` to
     // say so: upstream's `tickFormat` asks the scale, and a temporal scale's own formatter is d3's
@@ -1293,16 +1367,39 @@ public class AxisBuilder(
     // which printed the epoch milliseconds unchanged — a chart labelled `1580515200000` where
     // upstream labelled it `Feb 01`.
     if (format != null && scale is TimeScale) {
-      return { value ->
-        val instant = value.asDouble()
-        if (instant.isNaN()) value.asString()
-        else TimeFormat.format(instant, format, scale.zone, locale)
-      }
+      // Coerced, not fallen back on — see the note on the format-type branch above.
+      return { value -> TimeFormat.format(value.asDouble(), format, scale.zone, locale) }
     }
-    // An explicit specifier replaces the precision the scale would have chosen, and applies only
-    // where there is a number to format: upstream coerces a discrete domain's own values to strings
-    // and never consults it, so a band axis keeps its labels whatever this says.
-    if (format != null && scale !is BandScale && scale !is PointScale) {
+    // A **discrete** scale with a specifier formats with it too, and plainly — `locale.format`, not
+    // the span-resolved formatter a continuous scale gets. `tickFormat` in `vega-scale` picks by
+    // asking whether the scale *has* a `tickFormat` of its own, which only a continuous one does:
+    //
+    //     else if (scale.tickFormat) {
+    //       // if d3 scale has tickFormat, it must be continuous
+    //       const d = scale.domain();
+    //       format = locale.formatSpan(d[0], d[d.length - 1], count, specifier);
+    //     }
+    //     else if (specifier) {
+    //       format = locale.format(specifier);
+    //     }
+    //
+    // so a band or point scale falls to the second arm and uses the specifier as written. Only an
+    // axis that states **no** specifier keeps its domain's own values, by the `defaultFormatter`
+    // above both arms — and that is the case the comment here used to describe, generalised into a
+    // claim that a discrete axis "never consults" a format at all. It does: a band axis of 1, 2 and
+    // 3 asked for `.0%` reads 100%, 200%, 300%.
+    //
+    // There is no span to resolve the precision against, a discrete domain having no arithmetic in
+    // it, which is why this arm formats the value as it stands.
+    // Applied to whatever the value is, including a category that is not a number at all. d3's
+    // formatter coerces its argument, so a band axis of words asked for `.0%` reads `NaN%` on every
+    // tick — which is upstream's answer and looks like the mistake it is, where quietly printing
+    // the words back looks like the axis was never asked.
+    if (format != null && (scale is BandScale || scale is PointScale)) {
+      return { value -> NumberFormat.format(value.asDouble(), format, locale) }
+    }
+    // An explicit specifier replaces the precision a **continuous** scale would have chosen.
+    if (format != null) {
       // Upstream resolves the specifier against the *span* being labelled, so a specifier that
       // names no precision takes as many decimals as the tick step needs rather than d3's fixed
       // six.
@@ -1311,11 +1408,13 @@ public class AxisBuilder(
           is LinearScale -> scale.domain
           is TransformedScale -> scale.domain
           is TimeScale -> scale.domain
+          // Unreachable: the discrete scales returned above, and this `when` is over the rest.
+          else -> listOf(0.0, 1.0)
         }
       val labeller = Ticks.spanFormatter(format, numeric.first(), numeric.last(), count, locale)
       return { value ->
         val number = value.asDouble()
-        if (number.isNaN()) value.asString() else labeller(number)
+        if (number.isNaN()) asLines(value) else labeller(number)
       }
     }
     return when (scale) {
@@ -1331,7 +1430,7 @@ public class AxisBuilder(
         TimeTicks.label(value.asDouble(), scale.zone, locale)
       }
       else -> { value ->
-        value.asString()
+        asLines(value)
       }
     }
   }
@@ -1352,23 +1451,48 @@ public class AxisBuilder(
         val alongTick = bandOffset(scale, spec)
         val alongLabel = labelOffsetAlong(scale, spec)
         scale.domain.map { value ->
-          val start = scale.position(VegaValue.Str(value))
-          Tick(
-            label(VegaValue.Str(value)),
-            start + alongTick,
-            VegaValue.Str(value),
-            labelPosition = start + alongLabel,
-          )
+          val start = scale.position(value)
+          Tick(label(value), start + alongTick, value, labelPosition = start + alongLabel)
         }
       }
       is PointScale -> {
         val label = labeller(scale, scale.domain.size, specifier, spec.formatType)
+        scale.domain.map { value -> Tick(label(value), scale.position(value), value) }
+      }
+      // An **ordinal** scale's ticks are its domain, each placed wherever the scale sends it. It is
+      // the discrete case the band and point branches already cover, and it had no branch at all —
+      // so an axis over one drew nothing. `tickCount` does not thin them: upstream hands a discrete
+      // scale's whole domain to the axis, and probed, `tickCount: 2` over a three-value domain
+      // still labels all three.
+      //
+      // The position is whatever the scale maps a value *to*, which for an ordinal scale ranging
+      // over colours is not a number: NaN then, as the binned branch does, and upstream writes the
+      // same NaN onto the item and draws nothing.
+      is OrdinalScale ->
         scale.domain.map { value ->
-          Tick(
-            label(VegaValue.Str(value)),
-            scale.position(VegaValue.Str(value)),
-            VegaValue.Str(value),
+          val at = scale.scale(value).asNumberOrNull() ?: Double.NaN
+          // A discrete domain's values *are* its labels, which is the rule the binned scales follow
+          // too: upstream asks the scale for a `tickFormat`, an ordinal scale has none, and the
+          // fallback is plain string coercion.
+          Tick(asLines(value), at, value)
+        }
+      // An **identity** scale is `linearish` in d3, so its ticks are a linear scale's over its own
+      // domain — and its position is the value itself, the scale being the identity. Upstream
+      // labels fourteen ticks on a domain of `[8, 76]` where this drew none.
+      is IdentityScale -> {
+        val count =
+          GuideFormat.countWithMinStep(
+            numbers.resolveTickCount(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT,
+            numbers.resolve(spec.tickMinStep, spec.scale),
+            scale.domain,
+            linear = true,
           )
+        val low = scale.domain.first()
+        val high = scale.domain.last()
+        val label = numericLabeller(low, high, count, specifier, spec.formatType)
+        // The position **is** the value: that is the whole of what an identity scale does.
+        Ticks.ticks(low, high, count).map { value ->
+          Tick(label(VegaValue.Num(value)), value, VegaValue.Num(value))
         }
       }
       is LinearScale -> {
@@ -1451,12 +1575,15 @@ public class AxisBuilder(
         // time
         // axis was ignored and every label came back multi-formatted.
         val format = labeller(scale, count, specifier, spec.formatType)
+        // The tick's value is a **date**, which is what upstream's is — `timeTicks` answers
+        // `Date` objects — and it decides more than how the value reads back: the join keys on
+        // it, and a date's text has no milliseconds in it.
         scale.ticks(count).zip(scale.tickLabels(count, locale)).map { (value, label) ->
           Tick(
             if (specifier == null && spec.formatType == null) label
             else format(VegaValue.Num(value)),
             scale.apply(value),
-            VegaValue.Num(value),
+            VegaValue.Timestamp(value),
           )
         }
       }
@@ -1508,23 +1635,43 @@ public class AxisBuilder(
     formatType: String?,
   ): (VegaValue) -> String {
     if (scale is QuantizeScale) {
-      GuideFormat.timeLabeller(specifier, formatType, locale, timeZone)?.let { write ->
-        return { value ->
-          val instant = value.asDouble()
-          if (instant.isNaN()) value.asString() else write(instant)
-        }
-      }
-      val low = scale.domain.firstOrNull() ?: 0.0
-      val high = scale.domain.lastOrNull() ?: 1.0
-      if (specifier != null) {
-        val labeller = Ticks.spanFormatter(specifier, low, high, count, locale)
-        return { value -> labeller(value.asDouble()) }
-      }
-      val step = Ticks.stepFrom(Ticks.tickIncrement(low, high, count))
-      val precision = if (step.isFinite()) Ticks.precisionForStep(step) else 0
-      return { value -> formatTickLabel(value.asDouble(), precision, locale) }
+      return numericLabeller(
+        scale.domain.firstOrNull() ?: 0.0,
+        scale.domain.lastOrNull() ?: 1.0,
+        count,
+        specifier,
+        formatType,
+      )
     }
-    return { value -> value.asString() }
+    return { value -> asLines(value) }
+  }
+
+  /**
+   * How a tick over a **continuous numeric domain** is written, when the scale has no say in it.
+   *
+   * A quantize scale gets one of these because d3 builds it on a linear scale and borrows that
+   * scale's `tickFormat`; an identity scale gets one because d3 makes it `linearish`, which is the
+   * same borrowing by another name. The precision comes from the step between ticks, so a domain
+   * stepped by five is labelled in whole numbers and one stepped by a tenth is not.
+   */
+  private fun numericLabeller(
+    low: Double,
+    high: Double,
+    count: Int,
+    specifier: String?,
+    formatType: String?,
+  ): (VegaValue) -> String {
+    GuideFormat.timeLabeller(specifier, formatType, locale, timeZone)?.let { write ->
+      // Coerced, not fallen back on — see the note on [labeller]'s format-type branch.
+      return { value -> write(value.asDouble()) }
+    }
+    if (specifier != null) {
+      val labeller = Ticks.spanFormatter(specifier, low, high, count, locale)
+      return { value -> labeller(value.asDouble()) }
+    }
+    val step = Ticks.stepFrom(Ticks.tickIncrement(low, high, count))
+    val precision = if (step.isFinite()) Ticks.precisionForStep(step) else 0
+    return { value -> formatTickLabel(value.asDouble(), precision, locale) }
   }
 
   /**

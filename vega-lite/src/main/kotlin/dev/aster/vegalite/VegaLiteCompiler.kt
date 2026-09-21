@@ -1057,8 +1057,21 @@ private class Compilation(
         )
       // Beside the table it reads, not at the end of the chart's: a plot's own data is assembled
       // when that plot is, so a grid's values stand between its table and the next plot's.
+      //
+      // **After anything already put there**, which matters as soon as two plots read the *same*
+      // table: each is assembled in turn and each would otherwise insert at the same index, so the
+      // second landed in front of the first and the two grids' values came out back to front. A
+      // concatenation whose members facet on one column is exactly that shape. Upstream assembles
+      // in order and appends, so the fix is to skip past the values already standing there rather
+      // than to insert among them.
       val at = data.indexOfFirst { it.string("name") == reads }
-      if (at >= 0) data.addAll(at + 1, domains) else data += domains
+      if (at >= 0) {
+        var after = at + 1
+        while (after < data.size && data[after].string("name")?.endsWith("_domain") == true) {
+          after++
+        }
+        data.addAll(after, domains)
+      } else data += domains
     }
     // A grid **wrapping a concatenation** writes its own values beside the chart's table too: the
     // cells' values are the whole table's, whatever the cell turns out to hold.
@@ -4524,12 +4537,39 @@ private class Compilation(
     }
   }
 
+  /**
+   * `assembleScalesForModel`, whose **key order is written out** rather than left to insertion:
+   * ```js
+   * const {name, type, selectionExtent, domains: _d, range: _r, reverse, ...otherScaleProps} = scale;
+   * scales.push({
+   *   name, type,
+   *   ...(domain ? {domain} : {}),
+   *   ...(domainRaw ? {domainRaw} : {}),
+   *   range,
+   *   ...(reverse !== undefined ? {reverse} : {}),
+   *   ...otherScaleProps,
+   * });
+   * ```
+   *
+   * Six names ahead of the rest, and `domainRaw` and `reverse` are the two this compiler left to
+   * fall in wherever they happened to be set — a selection's raw domain after the range, a reverse
+   * anywhere at all.
+   *
+   * **No gate here can see it**: `SpecDiff` ignores object key order by design, so the fixtures,
+   * the scene comparison and the schema sweep all agree either way. It is still a difference from
+   * the bytes upstream writes, and a reader diffing the two by eye sees it, so it is pinned by
+   * [ScaleKeyOrderTest] on the precedent of `JavaScriptKeyOrderTest`.
+   */
   private fun assembleScale(component: ScaleComponent): VegaValue = obj {
     put("name", component.name())
     put("type", component.type)
     put("domain", domainValue(component))
+    put("domainRaw", component.properties["domainRaw"])
     put("range", component.properties["range"])
-    component.properties.forEach { (key, value) -> if (key != "range") put(key, value) }
+    put("reverse", component.properties["reverse"])
+    component.properties.forEach { (key, value) ->
+      if (key !in HOISTED_SCALE_PROPERTIES) put(key, value)
+    }
   }
 
   /**
@@ -4752,10 +4792,10 @@ private class Compilation(
     // the `x` the layer above it brought, and the two came out the other way round.
     fun each(channel: String) = components.values.filter { it.first == channel }.map { it.second }
     val (xs, ys) = each("x") to each("y")
-    return xs.mapNotNull { Guides.assembleAxis(it, "grid") } +
-      ys.mapNotNull { Guides.assembleAxis(it, "grid") } +
-      xs.mapNotNull { Guides.assembleAxis(it, "main") } +
-      ys.mapNotNull { Guides.assembleAxis(it, "main") }
+    return xs.mapNotNull { Guides.assembleAxis(it, "grid", config) } +
+      ys.mapNotNull { Guides.assembleAxis(it, "grid", config) } +
+      xs.mapNotNull { Guides.assembleAxis(it, "main", config) } +
+      ys.mapNotNull { Guides.assembleAxis(it, "main", config) }
   }
 
   /**
@@ -5089,6 +5129,14 @@ private class Compilation(
     }
 
   private companion object {
+    /**
+     * The scale keys `assembleScalesForModel` writes by name, and so must not be written twice.
+     *
+     * `domain` and `range` are computed rather than copied and were already excluded; `domainRaw`
+     * and `reverse` are named in upstream's literal too and are hoisted with them.
+     */
+    val HOISTED_SCALE_PROPERTIES = setOf("domain", "domainRaw", "range", "reverse")
+
     /** The properties `mergeIfNoConflict` compares — see [sharesProjectionProperties]. */
     val PROJECTION_PROPERTIES =
       listOf(

@@ -13,11 +13,14 @@
 # writes one small bar chart per (property, value) pair — the same chart every time with one property
 # changed, so a difference names its own cause — renders each with upstream, and compares.
 #
-# The families are `axis`, `legend`, `title`, `scale`, a mark's own properties, and one per **mark
-# type** for the encode channels every item carries — the widest declared surface there is. A
-# property is swept where the schema says enough to choose values honestly (an enum, a boolean, a
-# number, a colour); anything else is skipped **and counted**, with the reason, in the manifest. See
-# `oracle-js/src/property-sweep.js`.
+# The families are `axis`, `legend`, `title`, one per **scale type**, one per **projection type**, the
+# **view** itself, the **layout** of a group of groups, the `config` block behind each guide and each
+# mark type and each range name, a mark's own properties, and one per **mark type** for the encode
+# channels every item carries — the widest declared surface there is. A property is swept where the schema says enough to choose values
+# honestly (an enum, a boolean, a number, a colour), or where upstream fixes a vocabulary its schema
+# leaves open; anything else is skipped **and counted**, with the reason, in the manifest. A scale
+# type and a projection type each bring their own base chart, because which properties mean anything
+# is the type's own question. See `oracle-js/src/property-sweep.js`.
 #
 # **A measurement, not a gate**, the same course the gallery and Deneb sweeps took: a sweep of a
 # surface nobody has finished porting would paint every branch red for reasons unconnected to it.

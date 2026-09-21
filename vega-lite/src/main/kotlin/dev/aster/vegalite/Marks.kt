@@ -2,6 +2,7 @@ package dev.aster.vegalite
 
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asBoolean
 import dev.aster.vega.model.canonicalNumberString
 
 /**
@@ -174,9 +175,14 @@ internal object Marks {
         value != VegaValue.Null &&
         value != VegaValue.Bool(false) &&
         (value as? VegaValue.Num)?.value != 0.0
-    val hasRadius =
-      VG_CORNER_RADIUS.any { rounded(styled(view, it)) } ||
-        rounded(view.markDef.raw.fields["cornerRadiusEnd"])
+    // Asked of the mark definition `initMarkDef` has already rewritten — which is the whole of the
+    // difference between a rounded stack and a square one, because `cornerRadiusEnd` is not one of
+    // the five channels this asks about and only reaches them through that rewrite. Reading the
+    // *written* definition instead, as this did, saw a radius only when the chart stated one on the
+    // mark itself: a theme that rounds every bar — `config.bar.cornerRadiusEnd`, `config.mark`, or
+    // a
+    // style block — rounded each segment of a stack separately, joins and all.
+    val hasRadius = VG_CORNER_RADIUS.any { rounded(cornerRadius(view, it)) }
     if (!hasRadius) return null
 
     val channel = stack.fieldChannel
@@ -197,7 +203,19 @@ internal object Marks {
     val groupUpdate = LinkedHashMap<String, VegaValue>()
     // Everything that places the stack *across* its own direction belongs to the group; everything
     // along it is the group's own measured extent.
-    for (key in listOf(other, "${other}c", "${other}2", thickness)) {
+    //
+    // The two branches are not mirror images, and upstream's asymmetry is load-bearing for the
+    // order the group's properties come out in:
+    //
+    //     pick(mark.encode.update, ['y', 'yc', 'y2', 'height', ...VG_CORNERRADIUS_CHANNELS])   // x
+    //     pick(mark.encode.update, ['x', 'xc', 'x2', 'width'])                                // y
+    //
+    // A stack along **x** picks the corner radii up here, so they are written before the extent and
+    // the clip; a stack along **y** leaves them to the loop below, which appends them after. The
+    // loop assigns into a key that already exists without moving it, so naming them here is what
+    // puts them in front.
+    val across = listOf(other, "${other}c", "${other}2", thickness)
+    for (key in if (channel == "x") across + VG_CORNER_RADIUS else across) {
       update[key]?.let { groupUpdate[key] = it }
     }
     groupUpdate[channel] = signalRef(extent("min"))
@@ -225,11 +243,16 @@ internal object Marks {
     }
     markUpdate[thickness] = obj { put("field", obj { put("group", thickness) }) }
 
+    // `getMarkConfig(key, model.markDef, model.config)` for both loops — the **style blocks** first
+    // and then the two configuration blocks, not the flattened mark table. A `config.style.bar`
+    // that rounded or outlined every bar was invisible to a stack read through the flat table: the
+    // group was built with neither the radius nor the stroke, and the segments kept a radius they
+    // were supposed to have surrendered.
     for (key in VG_CORNER_RADIUS) {
-      val configured = view.config.markConfig("bar").fields[key]
+      val configured = markConfigValue(view, key)
       val own = markUpdate.remove(key)
       if (own != null) groupUpdate[key] = own
-      else if (configured != null) groupUpdate[key] = obj { put("value", configured) }
+      else if (configured != null) groupUpdate[key] = markProperty(configured)
       // A radius the *configuration* put on every bar has already been moved up, so the segments
       // have to say they have none — Vega would otherwise apply the style block underneath.
       if (configured != null) markUpdate[key] = obj { put("value", 0) }
@@ -237,10 +260,7 @@ internal object Marks {
     for (key in STROKE_PROPERTIES) {
       val own = markUpdate[key]
       if (own != null) groupUpdate[key] = own
-      else
-        view.config.markConfig("bar").fields[key]?.let {
-          groupUpdate[key] = obj { put("value", it) }
-        }
+      else markConfigValue(view, key)?.let { groupUpdate[key] = markProperty(it) }
     }
     if (groupUpdate.containsKey("stroke")) {
       groupUpdate["strokeForeground"] = obj { put("value", true) }
@@ -416,7 +436,11 @@ internal object Marks {
             view.markDef.raw.fields["tooltip"].isTruthy()
         put("interactive", VegaValue.Bool(own))
       }
-      if (view.markDef.raw.fields["aria"] == VegaValue.Bool(false)) {
+      // `getMarkGroup`: `const aria = getMarkPropOrConfig('aria', markDef, config)` — the **whole**
+      // chain, so a theme that switches the accessibility tree off for every point takes the marks
+      // out of it just as a mark that says so itself does. Read as the definition alone, a chart
+      // themed `config.point.aria: false` kept its points in the tree.
+      if (markPropOrConfig(view, "aria") == VegaValue.Bool(false)) {
         put("aria", VegaValue.Bool(false))
       }
       // A line or an area is drawn in the order its points arrive, so the dimension has to be
@@ -724,16 +748,84 @@ internal object Marks {
       "horizontal" to listOf("cornerRadiusTopRight", "cornerRadiusBottomRight"),
     )
 
+  /**
+   * `initMarkDef`'s `cornerRadiusEnd` rewrite: the corners it claims, and the radius it puts there.
+   *
+   * ```js
+   * const cornerRadiusEnd = getMarkPropOrConfig('cornerRadiusEnd', markDef, config);
+   * if (cornerRadiusEnd !== undefined) {
+   *   const newProps = ... ? (['cornerRadius'] as const) : BAR_CORNER_RADIUS_END_INDEX[markDef.orient];
+   *   for (const newProp of newProps) {
+   *     markDef[newProp] = cornerRadiusEnd;
+   *   }
+   * ```
+   *
+   * Separate from the writing of it because two rules need the answer: the encode block below, and
+   * the test that decides whether a stacked bar is drawn in a group of its own. That test asks the
+   * *rewritten* definition for its corners, so it has to be able to see this rewrite rather than
+   * only its output.
+   *
+   * It is read through `getMarkPropOrConfig`, so a theme that rounds the top of every bar —
+   * `config.bar.cornerRadiusEnd` — rounds them, and this compiler, reading the definition alone,
+   * drew square corners under it.
+   */
+  private fun cornerRadiusEnd(view: UnitView): Pair<List<String>, VegaValue>? {
+    val radius = markPropOrConfig(view, "cornerRadiusEnd") ?: return null
+    // **A bar, and one with an orientation.** `initMarkDef` guards the whole rule with
+    // `if (markDef.type === 'bar' && markDef.orient)`, so every other mark type ignores the
+    // property outright — an arc, an area, a circle, a point, a rect, a rule, a text, a tick and
+    // a trail all compiled to two rounded corners here and to nothing at all upstream.
+    if (view.spec.mark != "bar") return null
+    val orient = view.markDef.orient ?: return null
+    // A **ranged** bar rounds all four corners rather than two. One whose far end is an `x2` or a
+    // `y2` has two ends of its own and no *far* one to single out, so upstream writes the plain
+    // `cornerRadius` instead of the pair.
+    val ranged =
+      (orient == "horizontal" && view.spec.encoding["x2"] != null) ||
+        (orient == "vertical" && view.spec.encoding["y2"] != null)
+    return (if (ranged) listOf("cornerRadius") else CORNER_RADIUS_END.getValue(orient)) to radius
+  }
+
+  /**
+   * `getMarkPropOrConfig(corner, markDef, config)` asked of the **rewritten** mark definition.
+   *
+   * `markDef[newProp] = cornerRadiusEnd` is an assignment and not a default, so a bar that states
+   * both a `cornerRadiusEnd` and one of the corners that word resolves into comes out with the
+   * *end* radius on it: `{"cornerRadiusEnd": 6, "cornerRadiusTopLeft": 2}` is two sixes upstream.
+   */
+  private fun cornerRadius(view: UnitView, corner: String): VegaValue? {
+    cornerRadiusEnd(view)?.let { (corners, radius) -> if (corner in corners) return radius }
+    return markPropOrConfig(view, corner)
+  }
+
   private fun markDefProperties(view: UnitView): VegaValue.Obj = obj {
-    view.markDef.raw.fields["cornerRadiusEnd"]?.let { radius ->
-      val orient = view.markDef.orient ?: "vertical"
-      CORNER_RADIUS_END.getValue(orient).forEach { corner ->
-        put(corner, obj { put("value", radius) })
-      }
+    val endCorners = cornerRadiusEnd(view)
+    // `markDef[newProp] = cornerRadiusEnd` and then `markDefProperties` writes it out with
+    // `signalOrValueRef`, so a radius stated as an expression is a **signal** here as anywhere
+    // else — written out as a value, a bar bound to a slider was drawn with an object for a
+    // corner.
+    endCorners?.let { (corners, radius) ->
+      corners.forEach { corner -> put(corner, markProperty(radius)) }
     }
+    // ```js
+    // const specifiedCursor = getMarkPropOrConfig('cursor', markDef, config);
+    // if (specifiedCursor === undefined) { markDef.cursor = cursor(markDef, encoding, config); }
+    // …
+    // function cursor(markDef, encoding, config) {
+    //   if (encoding.href || markDef.href || getMarkPropOrConfig('href', markDef, config)) {
+    //     return 'pointer';
+    //   }
+    //   return markDef.cursor;
+    // }
+    // ```
+    //
     // A mark that links somewhere shows the pointer, there being nothing else about it that looks
-    // clickable — `baseEncodeEntry`'s `cursor` rule, which is about the *encoding* and not a style.
-    if (view.spec.encoding["href"] != null && view.markDef.raw.fields["cursor"] == null) {
+    // clickable. **Three places say it links**, and this read only the first: the `href` channel,
+    // the mark's own `href`, and an `href` anywhere in the configuration chain — a theme that gives
+    // every bar the same link. Both guards run through the chain too: a `cursor` the theme settles
+    // suppresses the pointer exactly as one on the mark does.
+    val linked = view.spec.encoding["href"] != null || markPropOrConfig(view, "href") != null
+    if (linked && markPropOrConfig(view, "cursor") == null) {
       put("cursor", obj { put("value", "pointer") })
     }
     if (view.spec.mark == "area" && view.markDef.orient != null) {
@@ -784,6 +876,12 @@ internal object Marks {
       // no mark at all, so [VG_MARK_PROPERTIES] never lets them through. `radius` is a Vega
       // property on every mark and goes out under its own name.
       if (key in TEXT_ONLY_MARK_PROPERTIES && view.spec.mark != "text") continue
+      // A corner `cornerRadiusEnd` has already claimed is **not** written again from the mark's own
+      // words. `initMarkDef` assigns over it — `markDef[newProp] = cornerRadiusEnd` — so by the
+      // time
+      // anything reads the definition the stated corner is gone. Written in this order the stated
+      // one won instead, and a bar asking for a rounded top and a square top-left got the square.
+      if (endCorners != null && key in endCorners.first) continue
       put(key, markProperty(value))
     }
   }
@@ -812,7 +910,7 @@ internal object Marks {
    * theme's own expressions are already signals by the time they are read — `initConfig` makes them
    * so — and wrapped in a value they reached the renderer as an object where a colour was wanted.
    */
-  private fun markProperty(value: VegaValue): VegaValue {
+  fun markProperty(value: VegaValue): VegaValue {
     val stated = value as? VegaValue.Obj
     if (stated?.fields?.keys == setOf("signal")) return stated
     val expression = stated?.takeIf { it.fields.keys == setOf("expr") }
@@ -1171,7 +1269,16 @@ internal object Marks {
     val value =
       own
         ?: if (vgChannel != channel || !ignoreVgConfig) {
-          view.config.markConfig(view.spec.mark).fields[vgChannel]
+          // `getMarkConfig`, the whole of it, and not one lookup out of it. The tail of
+          // `getMarkPropOrConfig` is `return getMarkConfig(channel, mark, config, opt)`, which
+          // walks
+          // the style blocks under the **Vega-Lite** name, then `config[marktype]` under Vega's
+          // name
+          // and then under Vega-Lite's, and only then `config.mark` under Vega's. Read as
+          // `config[marktype][vgChannel]` alone, everything the other three arms answer was lost:
+          // `config.text.size` never became a font size, `config.line.size` never became a stroke
+          // width, and a style block that sized a mark sized nothing.
+          markConfigValue(view, channel, vgChannel)
         } else {
           null
         }
@@ -1290,7 +1397,24 @@ internal object Marks {
     // it: no role description and no spoken summary. It is a *mark* property rather than an encode
     // channel, and it is how a composite mark hides its own scaffolding — an error bar's two caps
     // are read as part of the bar, not as three separate objects.
-    if (view.markDef.raw.fields["aria"] == VegaValue.Bool(false)) return@obj
+    //
+    // It is read off the **whole** chain, not the definition alone:
+    //
+    //     const enableAria = getMarkPropOrConfig('aria', markDef, config);
+    //     if (enableAria === false) return {};
+    //     return {...(enableAria ? {aria: enableAria} : {}), ...ariaRoleDescription(model), …};
+    //
+    // so a theme's `config.point.aria: false` silences the encode block exactly as the mark's own
+    // does — and this compiler, asking only the definition, went on to write a role description for
+    // a mark upstream had already taken out of the tree.
+    val enableAria = markPropOrConfig(view, "aria")
+    if (enableAria == VegaValue.Bool(false)) return@obj
+    // And the other way about: `aria: true` is written **into** the encode block, as a bare `true`
+    // rather than as a value ref — it is Vega's own switch and not a graphic property, so there is
+    // no reference to wrap it in. Nothing here wrote it at all, so a chart that asked for the
+    // accessibility tree back on — `config.mark.aria: true` over a `config.aria: false`, or a
+    // single mark saying so — was compiled as though it had not asked.
+    if (enableAria.isTruthy()) put("aria", enableAria!!)
     val mark = view.spec.mark
     // `config.aria: false` says there is no accessibility tree to describe anything *to*, and
     // `ariaRoleDescription` is skipped for the whole chart by it. Upstream tests it separately in
@@ -1298,8 +1422,10 @@ internal object Marks {
     // description the specification **asked for** is still written under it.
     if (view.config.raw.fields["aria"] != VegaValue.Bool(false)) {
       // A mark may say what it *is* rather than what it is drawn with: a box plot's box is a rect,
-      // and calling it a rect to a screen reader is naming the tool instead of the thing.
-      val stated = view.markDef.raw.fields["ariaRoleDescription"]
+      // and calling it a rect to a screen reader is naming the tool instead of the thing. A theme
+      // may say it for every mark of a type at once — `getMarkPropOrConfig` again — which is how a
+      // house style names its bars "column" without touching a single chart.
+      val stated = markPropOrConfig(view, "ariaRoleDescription")?.takeIf { it != VegaValue.Null }
       if (stated != null) put("ariaRoleDescription", obj { put("value", stated) })
       else if (mark !in VG_MARK_NAMES) put("ariaRoleDescription", obj { put("value", mark) })
     }
@@ -1528,7 +1654,13 @@ internal object Marks {
             is VegaValue.Str -> title.value
             is VegaValue.Arr ->
               title.values.mapNotNull { (it as? VegaValue.Str)?.value }.joinToString(", ")
-            else -> continue
+            // **A field with no title is still announced, under an empty name.** The template is
+            // `"${title}: " + …` and an undefined title interpolates to nothing, so upstream writes
+            // `": " + (format(datum["__count"], ""))` and the reader hears the number with no
+            // label.
+            // Reachable only since `config.fieldTitle: "plain"` began to be honoured: `plain` is
+            // `fieldDef.field`, and a count has no field, where every other formatter names one.
+            else -> ""
           }
         if (out.containsKey(key)) continue
         // A **normalized** stack is announced as the share it takes, not the number behind it: the
@@ -1646,7 +1778,13 @@ internal object Marks {
         val plain = "datum[${quoted(def.field.orEmpty())}]"
         "isValid($plain) ? isArray($plain) ? join($plain, '$separator') : $plain : \"\"+$plain"
       }
-      def.type == MeasureType.TEMPORAL || def.timeUnit != null -> {
+      // The same `isFieldOrDatumDefForTimeFormat` the implicit parse turns on, and for the same
+      // reason: `formatType === 'time' || (!formatType && isTemporalFieldDef(def))`. A stated
+      // format type that is **not** `time` takes an instant out of the time branch entirely, so a
+      // date whose axis names `formatType: "number"` is spoken as the plain column it arrives as —
+      // which is consistent, since upstream does not parse it into a date either.
+      def.formatType == "time" ||
+        (def.formatType == null && (def.type == MeasureType.TEMPORAL || def.timeUnit != null)) -> {
         val timeUnit = def.timeUnit
         // `normalizeTimeUnit` reads the `utc` out of the unit's name wherever it sits, so
         // `binnedutcyearmonth` is universal time as much as `utcmonth` is.
@@ -1682,7 +1820,22 @@ internal object Marks {
       // this one alone".
       def.type == MeasureType.QUANTITATIVE || !stated.isNullOrEmpty() ->
         "format($accessor, \"$number\")"
-      !arrays -> "isValid($accessor) ? $accessor : \"\"+$accessor"
+      // ```js
+      // if (
+      //   isFieldDef(channelDef) && isDiscrete(channelDef.type) && !channelDef.timeUnit &&
+      //   !getFormatMixins(channelDef).format && !getFormatMixins(channelDef).formatType
+      // ) {
+      //   return {signal: `isValid(f) ? isArray(f) ? join(f, '\n') : f : ""+f`};
+      // }
+      // return textRef(channelDef, config, expr);
+      // ```
+      //
+      // **A stated `formatType` takes the array form away**, as a stated `format` already did here.
+      // `getFormatMixins` reads the *guide's* pair for anything that is not a plain string
+      // definition — `getGuide(fieldDef)` — so an `axis: {"formatType": "number"}` is what settles
+      // it, not something on the channel itself. Checking only the format, a category whose axis
+      // named a format type was still spoken as a joined list where upstream speaks it plainly.
+      !arrays || def.formatType != null -> "isValid($accessor) ? $accessor : \"\"+$accessor"
       else -> {
         // `addLineBreaksToTooltip` builds this one from the **column's own name** rather than from
         // what the aggregate wrote: `datum["<field>"]`, spelled out. It tells on an `argmin`, whose
@@ -1730,9 +1883,13 @@ internal object Marks {
       if (!Scales.hasContinuousDomain(scaleType)) continue
       if (def.aggregate in COUNTING_OPS) continue
       if (view.config.scaleInvalid(channel) != null) continue
-      // A bin suffix names a *bin's* column, so it only reaches a binned field: `vgField` ignores
-      // it otherwise, and appending it here invented a `value_mid` no transform ever wrote.
-      fields += Fields.datumAccess(def, suffix = if (imputed && def.bin != null) "mid" else null)
+      // A bin suffix names a *bin's* column, so it only reaches a field whose bin this compiler
+      // ran, and that is now [Fields.vgField]'s own rule rather than a guard spelled out here. It
+      // was spelled out here because the rule was missing: a plain suffix applies to anything, so
+      // `value_mid` was being invented for unbinned fields and `lo_mid` for a column that arrived
+      // bucketed — the second of which the hand-written guard did not catch, `bin != null` being
+      // true of both kinds.
+      fields += Fields.datumAccess(def, binSuffix = if (imputed) "mid" else null)
     }
     if (fields.isEmpty()) return null
     return signalRef(fields.joinToString(" && ") { "isValid($it) && isFinite(+$it)" })
@@ -2012,6 +2169,58 @@ internal object Marks {
           "${Fields.expressionNumber(position)} * $end)"
       )
     }
+
+    // ```js
+    // } else if (isBinned(bin)) {
+    //   if (isFieldDef(channel2Def)) {
+    //     return interpolatedSignalRef({scaleName, fieldOrDatumDef: channelDef,
+    //                                   fieldOrDatumDef2: channel2Def, bandPosition, offset});
+    //   } else {
+    //     log.warn(log.message.channelRequiredForBinned(channel2));
+    //   }
+    // ```
+    //
+    // A column that **arrived** bucketed keeps its far edge in a second column rather than in an
+    // `_end` beside it, which is the whole reason `bin: "binned"` requires an `x2`. A mark placed
+    // at
+    // a *point* is placed between the two, and this branch is the only one that knows how to find
+    // that far edge: the bucketed branch above reads an `_end` that a pre-binned column does not
+    // have, so it is guarded on [Binning.Bin] and never fires here.
+    //
+    // The **rect** path has read the pair all along — `rectBinPosition`, which is what makes a
+    // histogram's bars span their buckets — and the point path had nothing, so it fell to the plain
+    // field reference at the bottom and drew the mark on the bucket's *near edge*. An area or a
+    // line
+    // over data that came pre-bucketed was therefore half a bucket to the left of where upstream
+    // draws it, all the way along.
+    //
+    // Only the **main** channel, and only where the second one is a column: `channel2Def` is the
+    // secondary channel's definition and the guard is `isFieldDef`. Without it there is no far edge
+    // to interpolate towards and upstream leaves the mark where it was — after warning, which this
+    // does not: `UnitView` carries no diagnostic collector, the same gap already recorded for
+    // `cannotApplySizeToNonOrientedMark` in [positionAndSize]. The drawing is upstream's either
+    // way;
+    // only the explanation is missing.
+    val secondaryDef = secondaryChannel(channel)?.let { view.spec.encoding[it] }
+    if (
+      def.datum == null &&
+        channel == mainChannel(channel) &&
+        def.bin == Binning.PreBinned &&
+        secondaryDef?.isFieldDef == true
+    ) {
+      return interpolated(
+        view,
+        mainChannel(channel),
+        Fields.vgField(def),
+        Fields.vgField(secondaryDef),
+        // `bandPosition = 0.5` is `interpolatedSignalRef`'s own default, and it is where the middle
+        // of the bucket comes from: [bandPosition] answers null for a column that arrived bucketed,
+        // having no `bin` of this compiler's own to read a default from.
+        bandPosition(view, def, secondaryDef) ?: 0.5,
+        visualOffset,
+      )
+    }
+
     return obj {
       put("scale", scaleName(view, mainChannel(channel)))
       val datum = def.datum
@@ -2057,7 +2266,26 @@ internal object Marks {
    */
   private fun defaultPositionRef(view: UnitView, channel: String, defaultPos: String?): VegaValue? {
     val main = mainChannel(channel)
-    view.markDef.raw.fields[channel]?.let {
+    // **Vega's name for the channel first, then Vega-Lite's.** `pointPositionDefaultRef` asks
+    // `getMarkPropOrConfig(channel, markDef, config, {vgChannel})`, and that reads
+    // `mark[vgChannel]`
+    // before `mark[channel]` — so a text mark's radius is its `outerRadius` where it states one and
+    // its `radius` otherwise, with the former winning when both are written. `outerRadius` is the
+    // documented alias for `radius`, and reading only the Vega-Lite name meant a text placed by a
+    // stated outer radius was not placed at all: upstream writes `radius` beside the `outerRadius`
+    // it passes through, and this wrote only the pass-through.
+    //
+    // For `x` and `y` the two names are the same and nothing changes.
+    // And then the **configuration**, which is the rest of what `getMarkPropOrConfig` is: the style
+    // blocks, `config[marktype]` under each of the two names in turn, and `config.mark`. Read as
+    // the
+    // definition alone, a theme that places every arc at a `radius` or every label at a `theta`
+    // placed nothing: the mark fell through to the default it would have taken untouched — an arc
+    // to
+    // `min(width,height)/2`, a text to no angle at all — and 50 of the configuration sweep's cases
+    // were that one omission across `config.arc` and `config.text`.
+    val vgChannel = vgPositionChannel(channel)
+    markPropOrConfig(view, channel, vgChannel = vgChannel)?.let {
       if (it == VegaValue.Str("width")) return obj { put("field", obj { put("group", "width") }) }
       if (it == VegaValue.Str("height")) return obj { put("field", obj { put("group", "height") }) }
       // `signalOrValueRef`, as every other mark property is built: a position written `{"expr": …}`
@@ -2204,7 +2432,21 @@ internal object Marks {
     view.markDef.raw.fields[vgPositionChannel(channel2)]?.let {
       return obj { put("value", it) }
     }
-    return defaultPositionRef(view, channel, defaultPos2)
+    // **The second channel's own default, not the first's.** Upstream's fallback names `channel`
+    // throughout and `channel` there *is* the second one:
+    //
+    //     position2orSize(channel, markDef) || position2orSize(channel, styleConfig) ||
+    //     position2orSize(channel, config[mark]) || position2orSize(channel, config.mark) ||
+    //     {[vgChannel]: pointPositionDefaultRef({model, defaultPos, channel, …})()}
+    //
+    // Handed the first channel instead, everything that answers for a radius answered for the hole
+    // in the middle of it as well: a theme's `config.arc.radius` came back out as the
+    // `innerRadius`,
+    // so a themed pie was drawn as a ring with nothing in it. The mark's own `radius` had leaked
+    // the
+    // same way for as long as this line has existed; it took a theme to make it visible, because a
+    // chart that states a radius usually states the hole too.
+    return defaultPositionRef(view, channel2, defaultPos2)
   }
 
   /**
@@ -2262,6 +2504,83 @@ internal object Marks {
    * quarter of a unit would otherwise disappear at the same moment the axis still claims it is
    * there.
    */
+  /**
+   * `getMarkStyleConfig`: the style blocks a mark belongs to, the last one that speaks winning.
+   *
+   * A mark's styles are its own type followed by whatever its `style` names — so `config.style.bar`
+   * reaches every bar, and a chart that names `style: "annotation"` reaches that block too.
+   */
+  private fun styleConfigValue(view: UnitView, channel: String): VegaValue? {
+    val named =
+      when (val style = view.markDef.raw.fields["style"]) {
+        is VegaValue.Str -> listOf(style.value)
+        is VegaValue.Arr -> style.values.mapNotNull { (it as? VegaValue.Str)?.value }
+        else -> emptyList()
+      }
+    return (listOf(view.spec.mark) + named)
+      .mapNotNull { view.config.style(it)?.fields?.get(channel) }
+      .lastOrNull()
+  }
+
+  /**
+   * `getMarkConfig`: the **configuration chain only**, never the mark definition.
+   *
+   * ```js
+   * const cfg = getMarkStyleConfig(channel, mark, config.style);
+   * return getFirstDefined(
+   *   vgChannel ? cfg : undefined,
+   *   cfg,
+   *   vgChannel ? config[mark.type][vgChannel] : undefined,
+   *   config[mark.type][channel],
+   *   vgChannel ? config.mark[vgChannel] : config.mark[channel],
+   * );
+   * ```
+   *
+   * The order is the whole of it, and the last line is the one with a comment upstream: "If there
+   * is vgChannel, skip vl channel. For example, vl size for text is vg fontSize, but
+   * `config.mark.size` is only for point size." So a `size` in `config.mark` is *not* a text mark's
+   * font size, while a `size` in `config.text` is.
+   */
+  fun markConfigValue(
+    view: UnitView,
+    channel: String,
+    vgChannel: String? = null,
+  ): VegaValue? {
+    styleConfigValue(view, channel)?.let {
+      return it
+    }
+    val (own, shared) = view.config.markBlocks(view.spec.mark)
+    if (vgChannel != null)
+      own.fields[vgChannel]?.let {
+        return it
+      }
+    own.fields[channel]?.let {
+      return it
+    }
+    return shared.fields[vgChannel ?: channel]
+  }
+
+  /**
+   * `getMarkPropOrConfig`: the mark definition first — under Vega's name for the property before
+   * Vega-Lite's — and then the configuration chain.
+   *
+   * The pair of them is how every mark property in Vega-Lite is resolved, and reading only the
+   * definition is why a theme that set a `size`, a `radius` or a `discreteBandSize` was ignored:
+   * the chart drew the default it would have drawn with no theme at all.
+   */
+  private fun markPropOrConfig(
+    view: UnitView,
+    channel: String,
+    vgChannel: String? = null,
+  ): VegaValue? {
+    val raw = view.markDef.raw
+    if (vgChannel != null && raw.fields.containsKey(vgChannel)) return raw.fields[vgChannel]
+    raw.fields[channel]?.let {
+      return it
+    }
+    return markConfigValue(view, channel, vgChannel)
+  }
+
   private fun positionAndSize(
     view: UnitView,
     channel: String,
@@ -2285,6 +2604,8 @@ internal object Marks {
     val minBandSize = markConfig.number("minBandSize")
 
     val declaredSize = view.spec.encoding["size"]
+    // `markDef.size` for the *first* test — `if (encoding.size || markDef.size)` reads the
+    // definition and nothing else, a theme's size never deciding whether a size is built at all.
     val markSize = view.markDef.raw.fields["size"]
 
     // `getBandSize` asks for the size under its **Vega** name before anything else:
@@ -2306,15 +2627,23 @@ internal object Marks {
     // a style is not a size, and upstream leaves a bar styled that way filling its band. Its own
     // comment says why: "if there is vgChannel, skip vl channel. For example, vl size for text is
     // vg fontSize, but config.mark.size is only for point size."
-    val markSizeChannel =
-      sizeChannel
-        ?.let { view.markDef.raw.fields[it] ?: markConfig.fields[it] }
-        ?.takeIf { (it as? VegaValue.Obj)?.fields?.containsKey("band") != true }
-
     val useVlSizeChannel =
       view.spec.mark == "tick" ||
         (view.markDef.orient == "horizontal" && channel == "y") ||
         (view.markDef.orient == "vertical" && channel == "x")
+
+    // `getBandSize` asks `getMarkPropOrConfig(useVlSizeChannel ? 'size' : sizeChannel, mark,
+    // config,
+    // {vgChannel: sizeChannel})` — the **whole** chain, definition then theme, not the definition
+    // alone. Read as the definition plus `config[type][width]`, a theme that set `config.bar.size`
+    // or `config.mark.width` was ignored and the bar kept the bandwidth it would have had with no
+    // theme at all.
+    val markSizeChannel =
+      sizeChannel
+        ?.let {
+          markPropOrConfig(view, if (useVlSizeChannel) "size" else it, vgChannel = it)
+        }
+        ?.takeIf { (it as? VegaValue.Obj)?.fields?.containsKey("band") != true }
 
     // **Not reported, and that is a gap rather than a decision about silence.** Upstream logs
     // `cannotApplySizeToNonOrientedMark` here, and a reader who wrote a `size` that does nothing is
@@ -2322,31 +2651,136 @@ internal object Marks {
     // have to thread one, which is a change of its own rather than part of this fix. The drawing is
     // upstream's either way; only the explanation is missing.
 
+    // `defaultSizeRef`'s tail, reached by every mark whose band size came out unusable. It is not
+    // only the "nothing was stated" case: a size stated as zero arrives here too, which is why it
+    // is named for the absent band size rather than for the absent property.
+    fun noBandSize(): VegaValue =
+      // `defaultSizeRef` asks whether the channel has a field **first**. A rect-based mark with
+      // nothing encoded on this channel spans the plot rather than sitting somewhere in it at a
+      // default width, and it keeps back exactly what a band scale's inner padding would have kept
+      // back — so a lone row of ticks is as thick as one row of a trellis of them, and a boxplot of
+      // one column is as thick as one row of boxes.
+      if (def == null) {
+        val padding =
+          view.config.scaleConfig(
+            when (view.spec.mark) {
+              "bar" -> "barBandPaddingInner"
+              "tick" -> "tickBandPaddingInner"
+              else -> "rectBandPaddingInner"
+            }
+          )!!
+        // The *plain* `width` or `height`, not this plot's own name for it: a plot with nothing on
+        // the other channel has no gridline scale, so its group already defines the plain name as
+        // an alias — `assembleAxisSignals` — and upstream writes the expression against that.
+        signalRef("${canonicalNumberString(1 - padding)} * $sizeChannel")
+      } else {
+        // `const defaultStep = getViewConfigDiscreteStep(config.view, sizeChannel)` — the step of
+        // the dimension this mark is being sized along, not whichever `view.step` is.
+        obj { put("value", view.config.discreteStep(sizeChannel!!) - 2) }
+      }
+
+    // `isRelativeBandSize(bandSize)` in [defaultCentred]'s own words: only a fraction of a band is
+    // relative, and every other answer below — a stated size, a configured `discreteBandSize`, a
+    // `continuousBandSize`, the tail's step less two — is a number of pixels.
+    var bandSizeRelative = false
     val sizeRef: VegaValue =
       when {
         declaredSize != null && useVlSizeChannel && sizeChannel != null ->
           nonPosition(view, "size", sizeChannel).fields[sizeChannel] ?: VegaValue.EmptyObject
         // A mark's stated size may be an **expression** — `{"size": {"expr": 20}}` — and then it is
         // a signal, as it is everywhere else a value is read.
-        markSize != null && useVlSizeChannel ->
+        markSize?.asBoolean() == true && useVlSizeChannel ->
           literalRef(markSize)?.let { (key, value) -> obj { put(key, value) } }
             ?: VegaValue.EmptyObject
         // The band size proper, which `getBandSize` settles before it looks at the scale at all.
-        markSizeChannel != null ->
+        // Below the one above, and that is upstream's order rather than `getBandSize`'s own: a
+        // truthy `size` on the mark is answered before `getBandSize` is ever called, so a bar
+        // written `{"size": 10, "width": 20}` is ten wide. Once the `size` is falsy and the call
+        // does happen, `getMarkPropOrConfig` reads the **Vega** name first and the same bar written
+        // `{"size": 0, "width": 20}` is twenty.
+        markSizeChannel?.asBoolean() == true ->
           literalRef(markSizeChannel)?.let { (key, value) -> obj { put(key, value) } }
             ?: VegaValue.EmptyObject
+        // **A size stated as zero is not a zero-width mark; it is a mark with no usable size.**
+        // Upstream tests the size it resolved for *truth* rather than for presence, twice on the
+        // way down: `if (encoding.size || markDef.size)` decides whether to build a size at all,
+        // and then `else if (bandSize)` in `defaultSizeRef` decides whether to write the one
+        // `getBandSize` returned. A falsy number fails both, so `{"type": "bar", "size": 0}` falls
+        // past everything below — past the bandwidth its band would have given it, past
+        // `continuousBandSize` on a quantitative axis — and lands on the same tail a mark with no
+        // size of any kind takes, which is a step less two: 18. This engine read the size for
+        // presence and drew the invisible bar the number literally asks for.
+        //
+        // It still counts as a size for the *placement*, though, and that is not an inconsistency
+        // in upstream so much as a second reading of the same word: `defaultBandAlign` asks whether
+        // the band size is **relative**, and zero is a number, so the mark is centred in its band
+        // exactly as a mark 18 wide would be. [sizeWasHonoured] below is left reading presence for
+        // that reason.
+        //
+        // An `encoding` of `{"value": 0}` is a different thing and does draw nothing: the test
+        // there is on `encoding.size`, the channel definition, and an object is true whatever
+        // number it carries.
+        (markSize != null && useVlSizeChannel) || markSizeChannel != null -> noBandSize()
+        // **A bandwidth has to come from a band scale.** `defaultSizeRef` is handed the *offset's*
+        // scale where there is one —
+        // `defaultSizeRef(vgSizeChannel, offsetScaleName || scaleName, offsetScale || scale, …)` —
+        // and only reaches for a bandwidth once it has asked what that scale is:
+        //
+        //     if (isRelativeBandSize(bandSize)) {
+        //       if (scale) {
+        //         const scaleType = scale.get('type');
+        //         if (scaleType === 'band') { …bandwidth… }
+        //         else if (bandSize.band !== 1) {
+        // log.warn(cannotUseRelativeBandSizeWithNonBandScale) }
+        //       } else { return {mult: bandSize.band, field: {group: sizeChannel}}; }
+        //     }
+        //     // no valid band size
+        //
+        // Anything else drops out of that chain onto the tail below. This read "there is an offset
+        // channel" as "there is a band to measure", which is true of the offset scales a chart
+        // usually has and false as soon as one is continuous — a grouped bar whose offset is a
+        // *number* rather than a category. `bandwidth()` of a linear scale is **0** in Vega, so the
+        // bars came out with no width at all where upstream gives them a step less two.
+        //
+        // The kind asked is the one the size is measured on, which is the offset's where there is
+        // an offset — not [bandingType], which answers the position's first because that is what
+        // `getBandSize` is given.
         offsetChannel != null || bandingType == "band" -> {
-          // The width of one *nested* mark where there is an offset scale, and of the whole band
-          // where there is not — times the fraction of it the mark asked for, if it asked.
-          val band = offsetChannel ?: channel
-          val fraction = relativeBandSize(view, channel)
-          val bandwidth =
-            if (fraction == 1.0) "bandwidth('${view.scale(band)}')"
-            else "${Fields.expressionNumber(fraction)} * bandwidth('${view.scale(band)}')"
-          signalRef(
-            if (minBandSize != null) "max(${canonicalNumberString(minBandSize)}, $bandwidth)"
-            else bandwidth
-          )
+          // `config[mark.type]?.discreteBandSize || {band: 1}` — a **configured** band size for a
+          // rect-based mark on a discrete scale is a number of pixels and is taken before the band
+          // is measured at all; only its absence falls through to the whole band. Asked after the
+          // bandwidth instead, as it was, a theme's `discreteBandSize` could never be reached on
+          // the scales it is written for, and the `|| {band: 1}` is why a zero cannot reach it
+          // either.
+          val themed =
+            if (view.spec.mark in RECT_BASED_MARKS)
+              markConfig.number("discreteBandSize")?.takeIf { it != 0.0 }
+            else null
+          if (themed != null) {
+            obj { put("value", themed) }
+          } else {
+            // The one branch whose band size is **relative**: a fraction of a band rather than a
+            // number of pixels. [defaultCentred] below turns on it.
+            bandSizeRelative = true
+            // The width of one *nested* mark where there is an offset scale, and of the whole band
+            // where there is not — times the fraction of it the mark asked for, if it asked.
+            val band = offsetChannel ?: channel
+            if (view.scaleType(band) != "band") noBandSize()
+            else {
+              val fraction = relativeBandSize(view, channel)
+              val bandwidth =
+                if (fraction == 1.0) "bandwidth('${view.scale(band)}')"
+                else "${Fields.expressionNumber(fraction)} * bandwidth('${view.scale(band)}')"
+              signalRef(
+                // `minBandSize ? max(…) : bandWidth` — a **truthy** test, so a theme that sets it
+                // to zero is asking for no floor rather than for a floor of nothing, and upstream
+                // writes the bandwidth alone.
+                if (minBandSize != null && minBandSize != 0.0)
+                  "max(${canonicalNumberString(minBandSize)}, $bandwidth)"
+                else bandwidth
+              )
+            }
+          }
         }
         // A rect-based mark on a **continuous** scale is `continuousBandSize` wide — five units for
         // a bar — not a step less two. `getBandSize` asks the scale's kind first and only reaches
@@ -2356,36 +2790,22 @@ internal object Marks {
           !Scales.hasDiscreteDomain(scaleType) &&
           view.spec.mark in RECT_BASED_MARKS &&
           markConfig.number("continuousBandSize") != null ->
-          obj { put("value", markConfig.number("continuousBandSize")) }
-        else -> {
-          val discreteBandSize = markConfig.number("discreteBandSize")
-          when {
-            // `defaultSizeRef` asks whether the channel has a field **first**. A rect-based mark
-            // with nothing encoded on this channel spans the plot rather than sitting somewhere in
-            // it at a default width, and it keeps back exactly what a band scale's inner padding
-            // would have kept back — so a lone row of ticks is as thick as one row of a trellis of
-            // them, and a boxplot of one column is as thick as one row of boxes.
-            def == null -> {
-              val padding =
-                view.config.scaleConfig(
-                  when (view.spec.mark) {
-                    "bar" -> "barBandPaddingInner"
-                    "tick" -> "tickBandPaddingInner"
-                    else -> "rectBandPaddingInner"
-                  }
-                )!!
-              // The *plain* `width` or `height`, not this plot's own name for it: a plot with
-              // nothing on the other channel has no gridline scale, so its group already defines
-              // the plain name as an alias — `assembleAxisSignals` — and upstream writes the
-              // expression against that.
-              signalRef("${canonicalNumberString(1 - padding)} * $sizeChannel")
-            }
-            discreteBandSize != null -> obj { put("value", discreteBandSize) }
-            // `const defaultStep = getViewConfigDiscreteStep(config.view, sizeChannel)` — the step
-            // of the dimension this mark is being sized along, not whichever `view.step` is.
-            else -> obj { put("value", view.config.discreteStep(sizeChannel!!) - 2) }
-          }
-        }
+          // Configured as zero, it is a band size that fails the same truth test as a stated one —
+          // `getBandSize` returns the 0 it found here rather than looking any further, and
+          // `defaultSizeRef` then declines to write it.
+          markConfig
+            .number("continuousBandSize")
+            ?.takeIf { it != 0.0 }
+            ?.let { obj { put("value", it) } } ?: noBandSize()
+        // A configured `discreteBandSize` of zero is the one falsy size that does **not** land on
+        // the tail by way of being ignored: `config[mark.type]?.discreteBandSize || {band: 1}`
+        // substitutes the whole band for it, and a relative band size of one over a scale that is
+        // not a band scale drops out of `defaultSizeRef`'s chain untouched — onto the same tail,
+        // by a different road. The band scales themselves never reach this line; they are answered
+        // by the bandwidth branch above.
+        markConfig.number("discreteBandSize")?.takeIf { it != 0.0 } != null ->
+          obj { put("value", markConfig.number("discreteBandSize")) }
+        else -> noBandSize()
       }
 
     // `defaultBandAlign`: a rect filling a *relative* band starts at the band's leading edge; one
@@ -2404,8 +2824,25 @@ internal object Marks {
     // exactly as one given a `size` is. Upstream writes `xc` with `band: 0.5` for a `rect` on a
     // nominal scale with `"width": 20`, where a mark left to fill the band gets `x` and a
     // bandwidth.
-    val centred = bandingType != "band" || sizeWasHonoured || markSizeChannel != null
-    val vgChannel = alignedPositionChannel(view, channel, centred)
+    // ```js
+    // const defaultBandAlign =
+    //   (scale || offsetScale)?.get('type') === 'band' && isRelativeBandSize(bandSize)
+    //     && !hasSizeFromMarkOrEncoding ? 'top' : 'middle';
+    // ```
+    //
+    // A mark fills its band from the leading edge only where the band size it took is a **fraction
+    // of that band**; any size in pixels centres it. Read as "a size channel was stated", a band
+    // size a *theme* supplied — `config.bar.discreteBandSize`, which is a number — left the mark at
+    // the edge, so a themed bar sat half its width to the left of where upstream draws it.
+    val defaultCentred = bandingType != "band" || sizeWasHonoured || !bandSizeRelative
+    val vgChannel = alignedPositionChannel(view, channel, defaultCentred)
+    // **Centred is what the channel came out as, not what the default was.** Upstream reads
+    // `const center = vgChannel === 'xc' || vgChannel === 'yc'` *after* choosing the channel, so a
+    // mark that states `align: "center"` over a band it would otherwise start at is centred in the
+    // band — `xc` with a `band` of 0.5 — and this read the default instead and wrote `xc` with no
+    // band at all, placing the mark on the band's leading edge under a channel that means its
+    // middle.
+    val centred = vgChannel == "xc" || vgChannel == "yc"
 
     val posRef =
       if (def != null) {

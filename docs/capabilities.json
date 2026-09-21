@@ -1730,7 +1730,7 @@
         "ScalesTest"
       ],
       "tests_text": "`ScalesTest`, `FixtureDifferentialTest` (`scheme-forms`, `packed-bubble`)",
-      "notes": "An explicit range array, a column of the data, or a scheme. A **categorical** scheme is the range and cycles when the domain outruns it; a **continuous** one is a function, and upstream samples it once per domain value instead — sixteen categories over `blues` give sixteen shades, not the same eleven and then five again",
+      "notes": "An explicit range array, a column of the data, or a scheme. A **categorical** scheme is the range and cycles when the domain outruns it; a **continuous** one is a function, and upstream samples it once per domain value instead — sixteen categories over `blues` give sixteen shades, not the same eleven and then five again. An axis over one is ticked and labelled: an ordinal axis with its domain values at their range positions, `tickCount` not thinning them, and an identity axis like a linear one — d3 makes it `linearish` — with each tick at the value itself. The domain line spans the scale's first and last range entries, which for an ordinal scale is not its widest extent",
       "milestone": "3"
     },
     {
@@ -1743,7 +1743,7 @@
         "TransformedScalesTest"
       ],
       "tests_text": "`TransformedScalesTest`, `FixtureDifferentialTest`",
-      "notes": "Configurable base; a domain spanning or touching zero is reported rather than adjusted. Ticks are the powers and their multiples, falling back to linear spacing when that is too sparse, and crowded labels are blanked as d3 does",
+      "notes": "Configurable base; a domain spanning or touching zero is reported rather than adjusted. Ticks are the powers and their multiples, falling back to linear spacing when that is too sparse, and crowded labels are blanked as d3 does. The `base` reaches the ticks, the labels and `nice` and **never the geometry**: d3 transforms by the natural log whatever base was asked for, so a base of 0, 1, a half or a negative number places its marks exactly where a base-10 scale would and differs only in which ticks it generates. A domain touching zero is a different matter and has no positions at all, which is upstream's answer too; the scale is built regardless, so the axis that names it still draws its line and its title with nothing between them",
       "milestone": "3"
     },
     {
@@ -1879,8 +1879,8 @@
         "BinnedScaleTest",
         "FixtureDifferentialTest"
       ],
-      "tests_text": "`BinnedScaleTest` (upstream vectors), `FixtureDifferentialTest` (`binned-scales`)",
-      "notes": "Equal-width intervals of the domain, so a skewed column crowds into one bucket. Cut points are computed in d3's own form rather than accumulated, so they do not drift across a wide domain",
+      "tests_text": "`BinnedScaleTest` (upstream vectors), `FixtureDifferentialTest` (`binned-scales`, `scale-variants`)",
+      "notes": "Equal-width intervals of the domain, so a skewed column crowds into one bucket. Cut points are computed in d3's own form rather than accumulated, so they do not drift across a wide domain. A **range keyword** is a range like any other: `range: \"height\"` resolves to `[height, 0]` before the scale is built, which is two buckets, and the same holds for a threshold, quantile or bin-ordinal scale. Refusing one cost the axis as well as the scale. `nice` reaches it and only it of the four: upstream applies `nice` by **capability** — `_.nice && scale.nice` — and d3 gives a quantize scale a `nice` because it rounds the linear scale underneath, where a threshold, quantile or bin-ordinal scale has none and ignores the option entirely",
       "milestone": "6"
     },
     {
@@ -1906,7 +1906,7 @@
         "FixtureDifferentialTest"
       ],
       "tests_text": "`BinnedScaleTest` (upstream vectors), `FixtureDifferentialTest` (`binned-scales`)",
-      "notes": "The domain *is* the cut points, so there is one more range value than domain value. A mismatched count is reported rather than silently truncated",
+      "notes": "The domain *is* the cut points, so there is one more range value than domain value. A mismatched count is reported rather than silently truncated. `zero: true` folds zero into the **cut points** — `[10, 50]` becomes `[0, 50]` — because upstream applies `zero` by scale option rather than by scale type; a quantile and a bin-ordinal scale take it the same way",
       "milestone": "6"
     },
     {
@@ -4880,8 +4880,8 @@
         "FixtureDifferentialTest",
         "ScalesTest"
       ],
-      "tests_text": "`FixtureDifferentialTest` (`identity-scale`), `ScalesTest`",
-      "notes": "The last scale type upstream registers that this engine did not build, so `ScaleResolver`'s `when` no longer needs an `else` and the compiler now enforces that every type is handled. It maps the value itself, which is how a specification hands final coordinates to a channel that expects a scale; its `[0, 1]` domain is d3's and is never consulted, existing only so `domain('name')` answers something. A value that does not coerce maps to **nothing** rather than to NaN — d3's `unknown` — so the mark does not draw",
+      "tests_text": "`FixtureDifferentialTest` (`identity-scale`, `scale-variants`), `ScalesTest`",
+      "notes": "The last scale type upstream registers that this engine did not build, so `ScaleResolver`'s `when` no longer needs an `else` and the compiler now enforces that every type is handled. It maps the value itself, which is how a specification hands final coordinates to a channel that expects a scale; its `[0, 1]` domain is d3's and is never consulted, existing only so `domain('name')` answers something. A value that does not coerce maps to **nothing** rather than to NaN — d3's `unknown` — so the mark does not draw. It has a **domain** all the same — d3 gives `domain` and `range` the same array and then makes the scale `linearish` — so an axis over one is ticked and labelled like a linear axis, each tick sitting at the value itself, and a screen reader hears it described as `values from … to …`. With no domain written, which is how one is usually spelled, the default is `[0, 1]`",
       "milestone": "4"
     },
     {

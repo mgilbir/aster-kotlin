@@ -1009,7 +1009,7 @@ public final class dev/aster/vega/runtime/scale/BandScale : dev/aster/vega/runti
 	public final fun getRound ()Z
 	public final fun getStart ()D
 	public final fun getStep ()D
-	public final fun invert (D)Ljava/lang/String;
+	public final fun invert (D)Ldev/aster/vega/model/VegaValue;
 	public final fun invertRange (DD)Ljava/util/List;
 	public fun position (Ldev/aster/vega/model/VegaValue;)D
 	public fun scale (Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
@@ -1080,7 +1080,10 @@ public final class dev/aster/vega/runtime/scale/ForeignScale {
 }
 
 public final class dev/aster/vega/runtime/scale/IdentityScale : dev/aster/vega/runtime/scale/VegaScale {
-	public fun <init> (Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun formatTick (DILdev/aster/vega/model/locale/VegaLocale;)Ljava/lang/String;
+	public static synthetic fun formatTick$default (Ldev/aster/vega/runtime/scale/IdentityScale;DILdev/aster/vega/model/locale/VegaLocale;ILjava/lang/Object;)Ljava/lang/String;
 	public fun getBins ()Ljava/util/List;
 	public final fun getDomain ()Ljava/util/List;
 	public fun getName ()Ljava/lang/String;
@@ -1159,7 +1162,7 @@ public final class dev/aster/vega/runtime/scale/PointScale : dev/aster/vega/runt
 	public fun getRange ()Ljava/util/List;
 	public final fun getRound ()Z
 	public final fun getStep ()D
-	public final fun invert (D)Ljava/lang/String;
+	public final fun invert (D)Ldev/aster/vega/model/VegaValue;
 	public final fun invertRange (DD)Ljava/util/List;
 	public fun position (Ldev/aster/vega/model/VegaValue;)D
 	public fun scale (Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;

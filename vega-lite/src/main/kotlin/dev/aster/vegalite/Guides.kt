@@ -38,6 +38,99 @@ internal object Guides {
    * marks and carries no labels or domain, while the axis is painted in front. Each property knows
    * which half it belongs to.
    */
+  /**
+   * `AXIS_COMPONENT_PROPERTIES`, which is what `parseAxis` walks when it fills a component and
+   * therefore the order every axis property is written in.
+   *
+   * `[disable, gridScale, scale, ...COMMON_AXIS_PROPERTIES_INDEX, labelExpr, encode]`, with the
+   * common block alphabetical from `orient` to `zindex`. Read off upstream rather than guessed, and
+   * checked against a compiled axis carrying every one of them.
+   */
+  val AXIS_PROPERTY_ORDER: List<String> =
+    listOf(
+      "disable",
+      "gridScale",
+      "scale",
+      "orient",
+      "aria",
+      "bandPosition",
+      "description",
+      "domain",
+      "domainCap",
+      "domainColor",
+      "domainDash",
+      "domainDashOffset",
+      "domainOpacity",
+      "domainWidth",
+      "format",
+      "formatType",
+      "grid",
+      "gridCap",
+      "gridColor",
+      "gridDash",
+      "gridDashOffset",
+      "gridOpacity",
+      "gridWidth",
+      "labelAlign",
+      "labelAngle",
+      "labelBaseline",
+      "labelBound",
+      "labelColor",
+      "labelFlush",
+      "labelFlushOffset",
+      "labelFont",
+      "labelFontSize",
+      "labelFontStyle",
+      "labelFontWeight",
+      "labelLimit",
+      "labelLineHeight",
+      "labelOffset",
+      "labelOpacity",
+      "labelOverlap",
+      "labelPadding",
+      "labels",
+      "labelSeparation",
+      "maxExtent",
+      "minExtent",
+      "offset",
+      "position",
+      "tickBand",
+      "tickCap",
+      "tickColor",
+      "tickCount",
+      "tickDash",
+      "tickDashOffset",
+      "tickExtra",
+      "tickMinStep",
+      "tickOffset",
+      "tickOpacity",
+      "tickRound",
+      "ticks",
+      "tickSize",
+      "tickWidth",
+      "title",
+      "titleAlign",
+      "titleAnchor",
+      "titleAngle",
+      "titleBaseline",
+      "titleColor",
+      "titleFont",
+      "titleFontSize",
+      "titleFontStyle",
+      "titleFontWeight",
+      "titleLimit",
+      "titleLineHeight",
+      "titleOpacity",
+      "titlePadding",
+      "titleX",
+      "titleY",
+      "translate",
+      "values",
+      "zindex",
+      "labelExpr",
+      "encode",
+    )
+
   private val MAIN_ONLY =
     setOf(
       "aria",
@@ -198,6 +291,38 @@ internal object Guides {
      */
     val explicitProperties: MutableSet<String> = mutableSetOf()
 
+    /**
+     * The properties in the order upstream writes them: **everything explicit, then everything
+     * implicit**, each in `AXIS_COMPONENT_PROPERTIES` order.
+     *
+     * ```js
+     * public combine(): Partial<T> {
+     *   return {
+     *     ...this.explicit, // Explicit properties comes first
+     *     ...this.implicit,
+     *   };
+     * }
+     * ```
+     *
+     * and each half is in that order because `parseAxis` fills the component by walking
+     * `AXIS_COMPONENT_PROPERTIES` — `for (const property of AXIS_COMPONENT_PROPERTIES) { … }` —
+     * rather than in whatever order the rules happen to fire.
+     *
+     * This walked its own insertion order instead, which agrees wherever the two coincide and not
+     * otherwise: an axis stating a `labelAngle` wrote it before the `labelAlign` that the angle
+     * *derives*, where upstream writes the stated one after every implicit one it does not share a
+     * name with. **No gate here can see it** — `SpecDiff` ignores object key order by design — so
+     * it is pinned by `AxisKeyOrderTest` rather than by a fixture.
+     */
+    fun orderedProperties(): List<Map.Entry<String, VegaValue>> {
+      val rank = AXIS_PROPERTY_ORDER.withIndex().associate { (index, name) -> name to index }
+      // A name upstream does not list sorts after everything it does, keeping its own relative
+      // order — the same place a spread of unknown keys would put it.
+      fun position(name: String) = rank[name] ?: (AXIS_PROPERTY_ORDER.size + 1)
+      val (explicit, implicit) = properties.entries.partition { it.key in explicitProperties }
+      return explicit.sortedBy { position(it.key) } + implicit.sortedBy { position(it.key) }
+    }
+
     fun set(name: String, value: VegaValue?) {
       if (value != null && !properties.containsKey(name)) properties[name] = value
     }
@@ -250,13 +375,44 @@ internal object Guides {
     // scale, and returning nothing at all here let the other layers put it back.
     if (def.axisDisabled) return AxisComponent(channel).also { it.disabled = true }
     val user = def.axis
+    // ```js
+    // const orient =
+    //   axis?.orient ||
+    //   config[channel === 'x' ? 'axisX' : 'axisY']?.orient ||
+    //   config.axis?.orient ||
+    //   defaultOrient(channel);
+    // ```
+    //
+    // The side an axis is on is settled **before** the theme's blocks are gathered, because it
+    // chooses one of them — `axis${titleCase(orient)}` — and because every label on the axis is
+    // turned to face it. Only three places are asked, and which three is the whole of the split
+    // below: the axis's own statement, the theme's block for this direction, and the theme's block
+    // for every axis at once. A theme writing its side in a block named after a **scale** —
+    // `config.axisBand`, `config.axisQuantitative` — is not asked here, so such an axis is drawn
+    // on the side the block names while its labels are turned as though it had stayed where it was.
+    // Reading only the axis's own statement left a theme that moves every axis to the top unread.
+    //
+    // `||` and not `??`, so the chain steps past a side the axis wrote down **falsily** as much as
+    // past one it did not write at all: an axis carrying `"orient": null` — which is how a
+    // generated specification says "no opinion" — takes the theme's side, and one carrying
+    // `"orient": ""` does too.
+    val statedOrient = user?.fields?.get("orient")?.takeIf { it.isTruthy() }
+    val themedOrient =
+      if (statedOrient != null) null
+      else
+        view.config.raw.obj(if (channel == "x") "axisX" else "axisY")?.string("orient")
+          ?: view.config.raw.obj("axis")?.string("orient")
+    // `defaultOrient`: the bottom for a horizontal axis, the left for a vertical one.
+    val side =
+      (statedOrient as? VegaValue.Str)?.value
+        ?: themedOrient
+        ?: if (channel == "x") "bottom" else "left"
     // The blocks a theme may write this axis in, most specific first — `config.axisX` as much as
-    // `config.axis`. `getAxisConfig` asks the same chain for **every** axis property, not only the
-    // ones Vega has never heard of, so a theme that turns its horizontal labels upright or takes
-    // every caption off is read here and not just where a conditional value is.
-    val configuredSide = user?.string("orient") ?: if (channel == "x") "bottom" else "left"
-    val (vegaLiteOnlyConfigs, vegaConfigs) =
-      view.config.axisConfigFamilies(channel, type, configuredSide)
+    // `config.axis`, and `axis${titleCase(side)}` for the edge it has just been settled on.
+    // `getAxisConfig` asks the same chain for **every** axis property, not only the ones Vega has
+    // never heard of, so a theme that turns its horizontal labels upright or takes every caption
+    // off is read here and not just where a conditional value is.
+    val (vegaLiteOnlyConfigs, vegaConfigs) = view.config.axisConfigFamilies(channel, type, side)
     // `getStyleConfig(property, axis.style, config.style)`: an axis may **name style blocks**, and
     // they outrank every configuration family. That is how a document keeps its axis styling in one
     // place and points an axis at it by name, and it is the only way to reach the properties a
@@ -322,8 +478,15 @@ internal object Guides {
     }
 
     axis.set("scale", str(view.scale(channel)))
-    axis.explicitOrient = user?.fields?.get("orient") != null
-    axis.set("orient", str(if (channel == "x") "bottom" else "left"))
+    axis.explicitOrient = statedOrient != null
+    // `orient` is one of `propsToAlwaysIncludeConfig`, which is why a themed side is written onto
+    // the axis rather than left in the configuration for Vega to apply: Vega has no `config.axis
+    // .orient` of its own to read it from. The side a block named after a **scale** states is
+    // written out too, and beats the one the chain above resolved — `getAxisConfig` asks
+    // `vlOnlyAxisConfig` before `vgAxisConfig` — so `config.axisBand.orient` moves the axis while
+    // `config.axisX.orient` is still what its labels were turned for.
+    if (statedOrient != null) axis.set("orient", asSignal(statedOrient))
+    else derived("orient", str(side))
 
     // The gridlines belong to *this* scale but are drawn across the other one's extent. Whether
     // there are any is a *default* — a continuous field-driven axis has them — and a theme saying
@@ -449,7 +612,6 @@ internal object Guides {
         ?: themeAngle
         ?: if (channel == "x" && def.type?.isDiscrete == true && def.timeUnit == null) 270.0
         else null
-    val side = user?.string("orient") ?: if (channel == "x") "bottom" else "left"
     // An angle a *signal* supplies cannot be compared here, so the comparison is written out and
     // handed to Vega: `defaultLabelAlign`'s signal branch. The two answers then have to live on the
     // labels' own `encode`, an axis property taking a constant rather than a rule.
@@ -519,23 +681,56 @@ internal object Guides {
       derived("labelOverlap", if (greedy) str("greedy") else bool(true))
     }
 
+    // A normalized stack is a proportion, so its axis is a percentage — `normalizedNumberFormat`,
+    // which defaults to `.0%`. Left off, the labels read 0, 0.2, 0.4 for what the chart draws as
+    // fifths of a whole.
+    //
+    // **The channel definition's own `stack`, and not the stack the view resolved.** `guideFormat`
+    // asks the definition in front of it:
+    //
+    //     if (isPositionFieldOrDatumDef(fieldOrDatumDef) && fieldOrDatumDef.stack === 'normalize'
+    //         && config.normalizedNumberFormat) {
+    //       return numberFormat({type: 'quantitative', config, normalizeStack: true});
+    //     }
+    //
+    // so it is written wherever the word appears, on the channel it appears on, whatever the chart
+    // makes of it. The two readings agree on the ordinary normalized bar chart and part company as
+    // soon as the word lands somewhere it cannot act: a `stack` on the *categorical* axis of a bar
+    // chart is not the stack Vega-Lite builds — the emitted transform still says `offset: "zero"` —
+    // and upstream formats that axis `.0%` all the same, band scale, category labels and all.
+    //
+    // Note `type: 'quantitative'`, passed rather than read: the field's own measure does not come
+    // into it, which is what makes the categorical case come out the way it does.
+    //
+    // It is a **return**, above the time branch rather than beside it, so it takes the place of a
+    // bucketed instant's specifier instead of being overwritten by it: a temporal axis carrying a
+    // normalized stack is a percentage and shows no dates at all. Written below, this compiler
+    // would have agreed on the first of the two cases and not the second.
+    //
+    // `&& config.normalizedNumberFormat` is a **truthiness** test, so a theme that sets it to the
+    // empty string is asking for no percentage rather than for an empty one, and the axis falls
+    // through to whatever it would otherwise have shown.
+    val normalized =
+      def.raw.string("stack") == "normalize" && view.config.normalizedNumberFormat.isNotEmpty()
+    if (normalized) {
+      derived("format", str(view.config.normalizedNumberFormat))
+    }
+
     // Labels for a bucketed instant, and a tick step no finer than the bucket.
     if (def.timeUnit != null) {
+      // Below the percentage above, and that ordering is the whole of upstream's `return`:
+      // [AxisComponent.set] keeps the **first** answer for a property, so whichever of these two
+      // runs first is the format. Swap them and a bucketed instant carrying a normalized stack is
+      // labelled with its months.
       derived("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit, view.config.locale)))
+      // The tick step is `properties.ts`'s and not `guideFormat`'s, so the percentage does not
+      // reach it: a bucket is still a bucket wide however its labels are written.
       Fields.timeUnitDuration(def.timeUnit)?.let { derived("tickMinStep", signalRef(it)) }
     }
     // `guideFormatType`: a specifier is a *time* specifier, and Vega has to be told so wherever the
     // scale itself does not already say it. A time or utc scale formats instants by nature; a band
     // scale of month names does not, and without this its labels come out as raw numbers.
     formatType(def, type)?.let { derived("formatType", str(it)) }
-
-    // A normalized stack is a proportion, so its axis is a percentage —
-    // `config.normalizedNumberFormat`,
-    // which defaults to `.0%`. Left off, the labels read 0, 0.2, 0.4 for what the chart draws as
-    // fifths of a whole.
-    if (view.stack?.offset == "normalize" && channel == view.stack.fieldChannel) {
-      derived("format", str(view.config.normalizedNumberFormat))
-    }
 
     tickCount(view, channel, def, type)?.let { derived("tickCount", it) }
 
@@ -558,6 +753,12 @@ internal object Guides {
     // exclude is every word nobody has written yet.
     for (key in AXIS_PROPERTIES) {
       val value = user?.fields?.get(key) ?: continue
+      // `orient` is settled above and not here. It is one of the properties `axisRules` answers
+      // for, and its rule — `orient: ({orient}) => orient` — reads the side the chain resolved
+      // rather than `axis.orient`, so what the axis wrote down reaches the output only through
+      // that chain. Copied across raw, an axis saying `"orient": null` said it to Vega instead of
+      // stepping past its own falsy word into the theme's side.
+      if (key == "orient") continue
       // ```js
       // export function numberFormat({type, specifiedFormat, config, normalizeStack}) {
       //   // Specified format in axis/legend has higher precedence than fieldDef.format
@@ -622,6 +823,18 @@ internal object Guides {
     // beside it would settle the property for this axis alone and beat the theme with a default.
     for (property in AXIS_PROPERTIES) {
       if (axis.properties.containsKey(property)) continue
+      // ```js
+      // isAxisProperty(property) && property !== 'values'
+      //   ? getAxisConfig(property, config.style, axis.style, axisConfigs)
+      //   : {};
+      // ```
+      //
+      // The theme is never asked about `values`, and it is the only property excluded by name. The
+      // ticks an axis shows are the values of *its* column, and a theme cannot know them: a list
+      // written once in `config.axisQuantitative` would be forced onto every measured axis in the
+      // document, whatever each of them is measuring. `defaultTickCount` reads `axis.values` for
+      // the same reason — only what the specification stated suppresses the count.
+      if (property == "values") continue
       val themed = configured(property) ?: continue
       // A themed **signal** or conditional is written out from any block: Vega can read neither
       // from its own configuration, and a conditional is not a Vega property at all. So is one of
@@ -1189,17 +1402,26 @@ internal object Guides {
   /** `labelAlign`/`labelBaseline` of null are decisions the axis keeps and Vega is not shown. */
   private val NULLABLE_LABEL_PROPERTIES = setOf("labelAlign", "labelBaseline")
 
-  fun assembleAxis(axis: AxisComponent, kind: String): VegaValue? {
+  fun assembleAxis(axis: AxisComponent, kind: String, config: Config): VegaValue? {
     val grid = (axis.properties["grid"] as? VegaValue.Bool)?.value == true
     if (kind == "grid" && !grid) return null
     val labelExpr = (axis.properties["labelExpr"] as? VegaValue.Str)?.value
 
+    // The document's own `aria: false` is **written into the component**, not appended to the
+    // finished axis. Upstream spreads it after `...axis`, which in JavaScript overwrites an
+    // existing
+    // key *in place* and appends only a new one — and its component already carries an `aria`, so
+    // the value lands at the property's own position rather than at the end. Appending it here put
+    // it after every label and tick property instead. Overwriting rather than defaulting is still
+    // the rule: an axis that states `aria: true` is overruled, because a document that is not in
+    // the accessibility tree has no axes in it either.
+    if (config.raw.fields["aria"] == VegaValue.Bool(false)) axis.override("aria", bool(false))
     return obj {
       put("scale", axis.properties["scale"])
       put("orient", axis.properties["orient"])
       val zindex = axis.properties["zindex"] ?: num(0)
       if (kind == "grid") {
-        axis.properties.forEach { (key, value) ->
+        axis.orderedProperties().forEach { (key, value) ->
           if (key == "encode") encodeFor(value, kind)?.let { put(key, it) }
           else if (
             key !in setOf("scale", "orient", "zindex", "labelExpr") &&
@@ -1236,7 +1458,7 @@ internal object Guides {
             .takeIf { it.isNotEmpty() }
             ?.let { put("title", str(it.joinToString(", "))) }
         var wroteEncode = false
-        axis.properties.forEach { (key, value) ->
+        axis.orderedProperties().forEach { (key, value) ->
           if (key == "encode") {
             val own = encodeFor(value, kind)
             val withText = if (labelExpr == null) own else withLabelText(own, labelExpr)
@@ -1253,6 +1475,18 @@ internal object Guides {
           }
         }
         if (labelExpr != null && !wroteEncode) put("encode", withLabelText(null, labelExpr))
+        // ```js
+        // ...axis,
+        // ...(config.aria === false ? {aria: false} : {}),
+        // ```
+        //
+        // `config.aria: false` takes the whole drawing out of the accessibility tree, and a guide
+        // has to say so on itself — there is nothing for a reader to be told about an axis that is
+        // not being described. Written **after** the axis's own properties, so it overrules an
+        // `"aria": true` the axis states: the document's decision is about the document, and an
+        // axis cannot opt back into a tree the chart is not in. The gridlines need no such rule —
+        // they are `aria: false` whatever the theme says, being a repetition of the axis beside
+        // them. The legend's twin is guarded by `legend.aria == undefined` and this one is not.
         put("zindex", zindex)
       }
     }
@@ -1427,7 +1661,18 @@ internal object Guides {
     // **month** or a **day**, which are continuous in the data and a short list to the reader. Four
     // quarters are four swatches, not a bar with a gradient along it.
     val namedUnits = def.timeUnit in setOf("quarter", "month", "day")
-    val gradient = channel in setOf("color", "fill", "stroke") && continuous && !namedUnits
+    // `getLegendType` is `getFirstDefined(legend.type, defaultType(params))`, so a channel that
+    // **states** its legend's kind gets it: a continuous colour told `type: "symbol"` is a row of
+    // swatches, and a size told `type: "gradient"` is a ramp. Read as the inferred kind alone, a
+    // stated one was ignored and every rule keyed off the kind — which properties survive, whether
+    // a `gradientLength` is written, which encode block is built — followed the wrong one.
+    val inferredGradient = channel in setOf("color", "fill", "stroke") && continuous && !namedUnits
+    val gradient =
+      when (def.legend?.string("type")) {
+        "gradient" -> true
+        "symbol" -> false
+        else -> inferredGradient
+      }
 
     // `if (explicit || config.legend[property] === undefined)`: a property the **theme** states is
     // not written onto the component at all. It is already in the Vega `config.legend` block that
@@ -1484,10 +1729,10 @@ internal object Guides {
         parts["labels"] = obj { put("update", obj { put("text", it) }) }
       }
       if (gradient) {
-        // A colour ramp is drawn as a bar whose length follows the plot, within Vega's own limits —
-        // and **which** measure of the plot depends on which way the ramp runs. A horizontal one is
-        // as long as the plot is wide and no shorter than a hundred units; a vertical one follows
-        // the height and may be as short as sixty-four.
+        // A colour ramp is drawn as a bar whose length follows the plot, within limits the theme
+        // sets — and **which** measure of the plot depends on which way the ramp runs. A horizontal
+        // one is as long as the plot is wide and by default no shorter than a hundred units; a
+        // vertical one follows the height and by default may be as short as sixty-four.
         // The *view's* own size signal, not the plain name: inside a concatenation the plotting
         // area is `concat_0_childHeight` and `height` is either something else or nothing at all,
         // so a ramp measured against it came out the wrong length or not at all.
@@ -1506,12 +1751,37 @@ internal object Guides {
         // A horizontal ramp beside the plot, or placed by hand with `orient: "none"`, has no width
         // to follow — it is simply the shortest a horizontal ramp may be. A vertical one follows
         // the height wherever it sits, there being a height either way.
+        //
+        // The two numbers in that clamp are the **theme's**, not this compiler's. They are four of
+        // the five words `config.legend` has that Vega has never heard of, so they never leave as
+        // configuration; `defaultGradientLength` destructures them out of the legend config and
+        // spends them here, and `defaultLegendConfig` is where the values below come from:
+        //
+        //     export const defaultLegendConfig: LegendConfig<SignalRef> = {
+        //       gradientHorizontalMaxLength: 200,
+        //       gradientHorizontalMinLength: 100,
+        //       gradientVerticalMaxLength: 200,
+        //       gradientVerticalMinLength: 64, // This is Vega's minimum.
+        //       unselectedOpacity: 0.35,
+        //     };
+        //
+        // Hard-coded, a theme that asked for a shorter ramp was answered with a hundred-unit one:
+        // the numbers reached the renderer as unknown configuration instead of as this legend's
+        // length. `gradientLength` itself is a Vega word and stays in the block, which is why it is
+        // the *theme* that settles the length when it states one — `derived` stands aside.
         val horizontal = legendRuns == "horizontal"
         val alongThePlot = !horizontal || legendOrient == "top" || legendOrient == "bottom"
         val measure = if (horizontal) view.sizeSignal("x") else view.sizeSignal("y")
-        val shortest = if (horizontal) 100 else 64
-        if (alongThePlot) derived("gradientLength", signalRef("clamp($measure, $shortest, 200)"))
-        else derived("gradientLength", num(shortest.toDouble()))
+        val bound = if (horizontal) "gradientHorizontal" else "gradientVertical"
+        val shortest =
+          view.config.raw.obj("legend")?.number("${bound}MinLength")
+            ?: if (horizontal) 100.0 else 64.0
+        val longest = view.config.raw.obj("legend")?.number("${bound}MaxLength") ?: 200.0
+        if (alongThePlot) {
+          val clamp =
+            "clamp($measure, ${canonicalNumberString(shortest)}, ${canonicalNumberString(longest)})"
+          derived("gradientLength", signalRef(clamp))
+        } else derived("gradientLength", num(shortest))
       } else {
         // The type is written only where it *disagrees* with what Vega would pick: a symbol legend
         // over a continuous colour scale has to say so, and everywhere else a symbol is already
@@ -1556,6 +1826,44 @@ internal object Guides {
       // it too.
       def.legend?.fields?.forEach { (key, value) ->
         if (key !in LEGEND_PROPERTIES) return@forEach
+        // ```js
+        // type: ({legendType, scaleType, channel}) => {
+        //   if (isColorChannel(channel) && isContinuousToContinuous(scaleType)) {
+        //     if (legendType === 'gradient') { return undefined; }
+        //   } else if (legendType === 'symbol') { return undefined; }
+        //   return legendType;
+        // },
+        // ```
+        //
+        // **A legend that is the kind it would have been anyway does not say so.** A continuous
+        // colour is a ramp and a size is a row of swatches, so writing `type` for either is writing
+        // Vega's own default back at it. Only the kind that had to be *asked* for is written — a
+        // colour told to be symbols, a size told to be a ramp. This wrote whatever the chart
+        // stated,
+        // so the redundant half came out too.
+        if (key == "type") {
+          val redundant =
+            if (channel in setOf("color", "fill", "stroke") && continuous) gradient else !gradient
+          if (redundant) return@forEach
+        }
+        // ```js
+        // for (const property of LEGEND_COMPONENT_PROPERTIES) {
+        //   if (
+        //     (legendType === 'gradient' && property.startsWith('symbol')) ||
+        //     (legendType === 'symbol' && property.startsWith('gradient'))
+        //   ) {
+        //     continue;
+        //   }
+        // ```
+        //
+        // **A legend keeps only the words its own kind understands**, and the test is the property
+        // name's *prefix*. A ramp has no symbols to colour and a row of swatches has no ramp, so a
+        // `symbolFillColor` on a gradient legend and a `gradientStrokeColor` on a symbol one are
+        // dropped where they are read rather than ignored where they are drawn. Written through,
+        // Vega was handed a legend carrying the settings of the kind it is not — 444 of the guide
+        // sweep's cases, which is every colour name the schema declares times three properties.
+        if (gradient && key.startsWith("symbol")) return@forEach
+        if (!gradient && key.startsWith("gradient")) return@forEach
         if (key == "values" && value is VegaValue.Arr) put(key, valueArray(def, value))
         else put(key, asSignal(value))
       }
@@ -1767,13 +2075,17 @@ internal object Guides {
     // every mark of this type settles the swatch too, so a bar outlined two units thick has a
     // swatch outlined two units thick. Only the properties Vega names, and only from the
     // configuration — the mark's own are already in the colour encoding below.
-    val markConfig = view.config.markConfig(view.spec.mark)
     for (property in FILL_STROKE_CONFIG) {
       // The two colours are dropped again where *this* legend is the one explaining them: a swatch
       // cannot show a scale it is itself the key to. Upstream deletes them from the same block.
       if (property == "fill" && (channel == "fill" || (filled && channel == "color"))) continue
       if (property == "stroke" && (channel == "stroke" || (!filled && channel == "color"))) continue
-      markConfig.fields[property]?.let { fields[property] = obj { put("value", it) } }
+      // **`getMarkConfig`, and so the style blocks too.** `applyMarkConfig` walks the whole chain —
+      // a style block first, then `config[marktype]`, then `config.mark` — and this asked the
+      // flattened table of the last two, which has no styles in it at all. So a chart whose marks
+      // name a style that outlines them left the legend's swatches unoutlined, and where the style
+      // was the *only* thing painting them the legend got no `encode` block whatsoever.
+      Marks.markConfigValue(view, property)?.let { fields[property] = Marks.markProperty(it) }
     }
     // ```js
     // } else if (hasProperty(out.fill, 'field')) {
@@ -1831,7 +2143,25 @@ internal object Guides {
     // opacity is tested for **truth**, so a mark drawn at zero has no swatch opacity written at all
     // rather than a swatch drawn at nothing. `point: "transparent"` on a line is exactly that: the
     // overlay is `{opacity: 0}`, and its legend is the line's own key.
-    if (channel != "opacity") {
+    // ```js
+    // const symbolOpacity = legendCmpt.get('symbolOpacity') ?? config.legend.symbolOpacity;
+    // const opacity = symbolOpacity === undefined
+    //   ? (getMaxValue(encoding.opacity) ?? markDef.opacity)
+    //   : undefined;
+    // ```
+    //
+    // **A legend that names its swatches' opacity has said all there is to say.** `symbolOpacity`
+    // is a property of the legend and lands on the swatch through Vega's own legend handling, so
+    // upstream stops deriving one from the mark — `opacity` is `undefined` and nothing is written
+    // into the encode block. Derived anyway, as this did, the mark's opacity was written *over* the
+    // legend's: a chart asking for swatches at a tenth got them at the marks' seven tenths.
+    //
+    // Tested for **presence**, not for truth: a legend asking for zero has still said what it
+    // wants, and the derived value is suppressed all the same.
+    val statedSymbolOpacity =
+      view.spec.encoding[channel]?.legend?.fields?.get("symbolOpacity")
+        ?: view.config.raw.obj("legend")?.fields?.get("symbolOpacity")
+    if (channel != "opacity" && statedSymbolOpacity == null) {
       symbolOpacityValue(view)
         ?.takeIf { it.isTruthy() }
         ?.let { fields["opacity"] = obj { put("value", it) } }

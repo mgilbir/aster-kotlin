@@ -394,8 +394,7 @@ public class MarkEncoder(
         children = contents(datum, index, extent, PointD(x, y)),
         transform = if (x == 0.0 && y == 0.0) Transform2D.Identity else Transform2D.translate(x, y),
         size = size,
-        cornerRadius =
-          number(channels["cornerRadius"], datum) ?: MarkConfig(spec).number("cornerRadius") ?: 0.0,
+        cornerRadius = number(channels["cornerRadius"], datum) ?: 0.0,
         cornerRadiusTopLeft = number(channels["cornerRadiusTopLeft"], datum),
         cornerRadiusTopRight = number(channels["cornerRadiusTopRight"], datum),
         cornerRadiusBottomRight = number(channels["cornerRadiusBottomRight"], datum),
@@ -438,12 +437,9 @@ public class MarkEncoder(
     if (horizontal == null || vertical == null) return null
 
     val style = style(channels, datum, spec)
-    val config = MarkConfig(spec)
-    val cornerRadius =
-      number(channels["cornerRadius"], datum) ?: config.number("cornerRadius") ?: 0.0
+    val cornerRadius = number(channels["cornerRadius"], datum) ?: 0.0
 
-    fun corner(name: String): Double? =
-      number(channels["cornerRadius$name"], datum) ?: config.number("cornerRadius$name")
+    fun corner(name: String): Double? = number(channels["cornerRadius$name"], datum)
 
     return RectNode(
       id = ids.allocate(),
@@ -485,7 +481,7 @@ public class MarkEncoder(
         // filled shape rather than a stroked one, a width of zero would have bounded it flat along
         // its own centre line. A *negative* size is truthy and kept.
         point(channels, datum) to
-          ((number(channels["size"], datum) ?: MarkConfig(spec).number("size"))?.takeIf {
+          (number(channels["size"], datum)?.takeIf {
             it != 0.0 && !it.isNaN()
           } ?: 1.0)
       }
@@ -616,7 +612,6 @@ public class MarkEncoder(
     // mark's own container disagrees with upstream's. `ArcPath` has always had d3's swap; this
     // function never let it see the values.
 
-    val config = MarkConfig(spec)
     val style = style(channels, datum, spec)
     val path =
       ArcPath.build(
@@ -626,10 +621,9 @@ public class MarkEncoder(
         outerRadius = outerRadius,
         startAngle = startAngle,
         endAngle = endAngle,
-        padAngle = number(channels["padAngle"], datum) ?: config.number("padAngle") ?: 0.0,
-        cornerRadius =
-          number(channels["cornerRadius"], datum) ?: config.number("cornerRadius") ?: 0.0,
-        padRadius = number(channels["padRadius"], datum) ?: config.number("padRadius"),
+        padAngle = number(channels["padAngle"], datum) ?: 0.0,
+        cornerRadius = number(channels["cornerRadius"], datum) ?: 0.0,
+        padRadius = number(channels["padRadius"], datum),
       )
     // **`angle` turns an arc about its own centre.** Every mark built by `markItemPath` is drawn
     // through `context.translate(x, y); context.rotate(angle)` and bounded through a rotated bound
@@ -703,10 +697,7 @@ public class MarkEncoder(
       // `xc` has no `x` channel to read.
       x = x,
       y = y,
-      size =
-        number(channels["size"], datum)
-          ?: MarkConfig(spec).number("size")
-          ?: MarkDefaults.SYMBOL_SIZE,
+      size = number(channels["size"], datum) ?: MarkDefaults.SYMBOL_SIZE,
       shape = shape ?: SymbolShape.CIRCLE,
       customPath = outline,
       angleDegrees = number(channels["angle"], datum) ?: 0.0,
@@ -800,26 +791,15 @@ public class MarkEncoder(
     // Every one of these falls back to the mark's own configuration and to the **style blocks** it
     // names — a label styled `{align: "left", baseline: "middle", dx: 3}` says nothing in its
     // encoding, and reading only the encoding left it centred on its anchor with no nudge at all.
-    val markConfig = MarkConfig(spec)
-    val nudge =
-      PointD(
-        number(channels["dx"], datum) ?: markConfig.number("dx") ?: 0.0,
-        number(channels["dy"], datum) ?: markConfig.number("dy") ?: 0.0,
-      )
+    val nudge = PointD(number(channels["dx"], datum) ?: 0.0, number(channels["dy"], datum) ?: 0.0)
     val offset =
       if (angle == 0.0) nudge else Transform2D.rotateDegrees(angle).apply(nudge.x, nudge.y)
     val style = style(channels, datum, spec)
 
     val textStyle =
       TextStyle(
-        fontFamily =
-          string(channels["font"], datum)
-            ?: markConfig.text("font")
-            ?: MarkDefaults.TEXT_FONT_FAMILY,
-        fontSize =
-          number(channels["fontSize"], datum)
-            ?: markConfig.number("fontSize")
-            ?: MarkDefaults.TEXT_FONT_SIZE,
+        fontFamily = string(channels["font"], datum) ?: MarkDefaults.TEXT_FONT_FAMILY,
+        fontSize = number(channels["fontSize"], datum) ?: MarkDefaults.TEXT_FONT_SIZE,
         fontWeight = fontWeight(channels, datum),
         // `italic` and `normal` are the two this engine's text styles have. `oblique` is CSS's
         // third and drew **upright** with nothing said about it, in a file where `strokeCap` and
@@ -848,8 +828,8 @@ public class MarkEncoder(
         // fixture caught this engine not doing.
         lines = textLines,
         style = textStyle,
-        align = textAlign(string(channels["align"], datum) ?: markConfig.text("align")),
-        baseline = textBaseline(string(channels["baseline"], datum) ?: markConfig.text("baseline")),
+        align = textAlign(string(channels["align"], datum)),
+        baseline = textBaseline(string(channels["baseline"], datum)),
         // Only a limit greater than zero truncates, which is upstream's `textValue`. A negative
         // one is not a truncation from the other end — `dir: "rtl"` is what keeps a label's tail.
         limit = number(channels["limit"], datum) ?: 0.0,
@@ -1207,69 +1187,42 @@ public class MarkEncoder(
   /** A mark's resolved paint, with Vega's per-type defaults applied. */
   private data class Style(val fill: Fill?, val stroke: Stroke?, val opacity: Double)
 
+  /**
+   * A mark's paint, read from its channels alone.
+   *
+   * Every default a mark has — `config.mark`, Vega's own block for the type, a theme's block, the
+   * `style` blocks the mark names — has already been folded into those channels by
+   * [EncodeSpec.withDefaults], which is where upstream folds them too. There is nothing left to
+   * interleave here: the paint pair's rule ("a mark that states *either* paint takes neither
+   * default") is applied at the fold, where it can see the whole encode, rather than per channel
+   * where it could only ever see one.
+   *
+   * An **encoded null** is still a statement — this mark has no paint of that kind — and
+   * [paintedNothing] is what asks. The fold leaves such a channel alone precisely because the mark
+   * stated it.
+   */
   private fun style(channels: EncodeEntry, datum: VegaValue, spec: MarkSpec): Style {
-    val defaults = MarkConfig(spec)
-    // Upstream's pairing rule: a mark that encodes *either* paint channel gets **neither**
-    // default. So a rect outlined with a stroke and no fill is an outline, where checking only
-    // `fill` would have filled it with the built-in blue.
-    val paintsItself = channels["fill"] != null || channels["stroke"] != null
-    // …the **built-in** default, that is. A style block's own paint is not a default in that sense:
-    // a plotting area is a group styled `cell`, whose block fills it transparent and outlines it
-    // grey, and a chart that hides the outline by encoding `stroke: null` has not thereby asked for
-    // the fill to go as well. Suppressing both dropped the group from the scene altogether.
     val fillColour =
-      // An **encoded null** is a statement: this mark has no paint of that kind, so it must not
-      // fall through to the style block's. `paintedNothing` is what asks; the fall-through below is
-      // upstream's own default for the mark type.
       if (paintedNothing(channels["fill"], datum)) null
-      else
-        paintOf(channels["fill"], datum, "fill", spec)
-          // …the **built-in** default is what a mark painting itself gives up, not the style
-          // block's: a group styled `cell` is filled transparent and outlined grey, and a chart
-          // that hides the outline by encoding `stroke: null` has not asked for the fill to go too.
-          ?: defaults
-            .colour("fill", MarkDefaults.fillFor(spec.type).takeIf { !paintsItself })
-            ?.let { ScenePaint.Solid(it) }
-    // ```js
-    // if (item.stroke && item.opacity !== 0 && item.strokeOpacity !== 0) { … bounds.expand(e); }
-    // ```
-    //
+      else paintOf(channels["fill"], datum, "fill", spec)
     // `boundStroke` asks whether the item **has** a stroke, not whether that stroke is a colour, so
     // a mark whose stroke is a string nothing can parse is still measured as stroked. That is not a
     // hypothetical: a templated dashboard writes `{"name": "strokeColor", "value": "'#FFFFFF'"}`,
     // quotes and all, and upstream carries the quoted string through to the scenegraph. Dropping it
     // here left every such mark a stroke-width narrower than upstream's — which under `fit` moves
     // the plotting area, the scale ranges and every mark in the chart, not just the outline.
-    //
-    // Transparent, because that is what the drawing comes to: a renderer handed a colour it cannot
-    // read paints nothing with it — SVG ignores the attribute and the initial stroke is `none`. The
-    // warning above still says so.
     val strokeColour =
       if (paintedNothing(channels["stroke"], datum)) null
-      else
-        paintOf(channels["stroke"], datum, "stroke", spec, keepUnreadable = true)
-          ?: defaults
-            .colour("stroke", MarkDefaults.strokeFor(spec.type).takeIf { !paintsItself })
-            ?.let { ScenePaint.Solid(it) }
-    val fillOpacity =
-      number(channels["fillOpacity"], datum) ?: defaults.number("fillOpacity") ?: 1.0
-    val strokeOpacity =
-      number(channels["strokeOpacity"], datum) ?: defaults.number("strokeOpacity") ?: 1.0
+      else paintOf(channels["stroke"], datum, "stroke", spec, keepUnreadable = true)
+    val fillOpacity = number(channels["fillOpacity"], datum) ?: 1.0
+    val strokeOpacity = number(channels["strokeOpacity"], datum) ?: 1.0
     val strokeWidth =
-      number(channels["strokeWidth"], datum)
-        ?: defaults.number("strokeWidth")
-        ?: MarkDefaults.strokeWidthFor(spec.type)
-    val strokeDash =
-      numberList(channels["strokeDash"], datum) ?: defaults.numbers("strokeDash") ?: emptyList()
-    val cap = strokeCap(string(channels["strokeCap"], datum) ?: defaults.text("strokeCap"), spec)
-    val join =
-      strokeJoin(string(channels["strokeJoin"], datum) ?: defaults.text("strokeJoin"), spec)
-    val dashOffset =
-      number(channels["strokeDashOffset"], datum) ?: defaults.number("strokeDashOffset") ?: 0.0
-    val miterLimit =
-      number(channels["strokeMiterLimit"], datum)
-        ?: defaults.number("strokeMiterLimit")
-        ?: Stroke.DEFAULT_MITER_LIMIT
+      number(channels["strokeWidth"], datum) ?: MarkDefaults.strokeWidthFor(spec.type)
+    val strokeDash = numberList(channels["strokeDash"], datum) ?: emptyList()
+    val cap = strokeCap(string(channels["strokeCap"], datum), spec)
+    val join = strokeJoin(string(channels["strokeJoin"], datum), spec)
+    val dashOffset = number(channels["strokeDashOffset"], datum) ?: 0.0
+    val miterLimit = number(channels["strokeMiterLimit"], datum) ?: Stroke.DEFAULT_MITER_LIMIT
 
     return Style(
       fill = fillColour?.let { Fill(it, fillOpacity) },
@@ -1286,39 +1239,8 @@ public class MarkEncoder(
             miterLimit = miterLimit,
           )
         },
-      opacity = number(channels["opacity"], datum) ?: defaults.number("opacity") ?: 1.0,
+      opacity = number(channels["opacity"], datum) ?: 1.0,
     )
-  }
-
-  /**
-   * A mark's `config` defaults, resolved either side of the engine's built-in per-type block.
-   *
-   * `config.mark` loses to the built-ins and `config.{marktype}` plus the mark's `style` blocks
-   * beat them. That ordering is upstream's and is not what the names suggest: it is why setting
-   * `config.mark.fill` leaves a rect blue and setting `config.rect.fill` recolours it — the default
-   * configuration already fills `config.rect` in.
-   */
-  private class MarkConfig(spec: MarkSpec) {
-    private val below = spec.configBelowDefaults
-    private val above = spec.configAboveDefaults
-
-    fun colour(key: String, builtin: SceneColor?): SceneColor? =
-      above[key]?.let { SceneColor.parse(it.asString()) }
-        ?: builtin
-        ?: below[key]?.let { SceneColor.parse(it.asString()) }
-
-    fun number(key: String): Double? = value(key)?.asDouble()?.takeIf { !it.isNaN() }
-
-    fun text(key: String): String? = value(key)?.takeIf { it is VegaValue.Str }?.asString()
-
-    fun numbers(key: String): List<Double>? =
-      (value(key) as? VegaValue.Arr)
-        ?.values
-        ?.map { it.asDouble() }
-        ?.takeIf { list -> list.isNotEmpty() && list.all { it.isFinite() } }
-
-    /** For everything but the paints there is no built-in in between, so the two just stack. */
-    private fun value(key: String): VegaValue? = above[key] ?: below[key]
   }
 
   private fun strokeCap(name: String?, spec: MarkSpec): StrokeCap =
@@ -1654,9 +1576,33 @@ public class MarkEncoder(
    */
   private fun arrayLines(channel: ChannelValue?, datum: VegaValue): List<String>? {
     val array = value(channel, datum) as? VegaValue.Arr ?: return null
-    if (array.values.size <= 1) return null
-    return array.values.map { it.asString().trim() }
+    // **Every array, including an empty one and one of a single element.** `lineArray` collapses
+    // those two to `_[0]` — the element, or `undefined` — but `textLines` asks
+    // `!isArray(item.text)`
+    // of the **original**, so a `lineBreak` is ignored for all three alike and the collapse is only
+    // about how many lines there are. Returning null here for the short ones handed them back to
+    // the
+    // `lineBreak` path, and `[]` came out as no text rather than one empty line.
+    if (array.values.isEmpty()) return listOf("")
+    return array.values.map { lineText(it) }
   }
+
+  /**
+   * One line of a mark's text, as upstream's `textValue` writes it.
+   *
+   * ```js
+   * const text = line == null ? '' : (line + '').trim();
+   * ```
+   *
+   * **A null line is an empty line**, not the four letters that spell it — and that is the one
+   * place in this engine where a guide and a mark genuinely disagree about the same value. A
+   * guide's label has already been through its formatter by the time it is lines, and the default
+   * formatter is `String`, so an axis over a cell holding `["a", null, "c"]` really does write
+   * `null` on its middle line while the text mark beside it writes nothing there. Probed both, in
+   * one view, before believing it.
+   */
+  private fun lineText(value: VegaValue): String =
+    if (value.isNullish) "" else value.asString().trim()
 
   /**
    * A channel as text, or null when it holds nothing.

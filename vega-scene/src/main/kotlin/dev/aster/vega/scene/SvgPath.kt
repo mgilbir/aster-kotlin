@@ -34,6 +34,12 @@ public object SvgPath {
   /** Returns the parsed path, and whether the whole string was understood. */
   public data class Result(val path: PathData, val complete: Boolean)
 
+  /** The two number words a path may hold that are not digits; see [Reader.number]. */
+  private class NonFinite(val name: String, val value: Double)
+
+  private val NON_FINITE =
+    listOf(NonFinite("NaN", Double.NaN), NonFinite("Infinity", Double.POSITIVE_INFINITY))
+
   public fun parse(source: String): Result {
     val reader = Reader(source)
     val builder = PathBuilder()
@@ -312,6 +318,22 @@ public object SvgPath {
       skipSeparators()
       val start = index
       if (index < source.length && (source[index] == '+' || source[index] == '-')) index++
+      // `NaN` and `Infinity`, which no hand-written path contains and this engine's own writer
+      // emits. A projected geometry becomes a path *string* here and is read back to be measured
+      // and drawn, where upstream keeps a generator function and never re-reads anything — so a
+      // coordinate its bound context merely skips arrives here as three letters. A projection at
+      // `scale: 0` writes a polygon that begins `M100,NaN`, and stopping at the first of them threw
+      // the whole outline away: an empty path where upstream measures a point.
+      //
+      // Only these two words, and only where a number is expected. Anything else malformed still
+      // stops the reading, which is what the warning at the call sites is for.
+      val negative = index > start && source[start] == '-'
+      for (word in NON_FINITE) {
+        if (source.startsWith(word.name, index)) {
+          index += word.name.length
+          return if (negative) -word.value else word.value
+        }
+      }
       var sawDigit = false
       var sawDot = false
       while (index < source.length) {

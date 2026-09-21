@@ -341,7 +341,7 @@ internal class DataPipeline(
     // The scales measure the rows *before* the filter where they want the invalid ones and the
     // marks do not — a named point above the filter, which is upstream's `preFilterInvalid`.
     val preFilter =
-      if (view.marksExcludeInvalid && !view.scalesExcludeInvalid) {
+      if (view.scaleDataSource == UnitView.ScaleDataSource.PRE_FILTER) {
         OutputNode(view.prefixed("prefilter")).also {
           head.then(it)
           head = it
@@ -378,7 +378,7 @@ internal class DataPipeline(
     // And *below* the filter where the marks want the invalid rows and the scales do not: a path
     // drawn with a break at the gap, over a domain measured without it — `postFilterInvalid`.
     val post =
-      if (!view.marksExcludeInvalid && view.scalesExcludeInvalid) {
+      if (view.scaleDataSource == UnitView.ScaleDataSource.POST_FILTER) {
         filterInvalidNode(force = true)?.let { filter ->
           head = head.then(filter)
           OutputNode(view.prefixed("postfilter")).also { head.then(it) }
@@ -465,7 +465,26 @@ internal class DataPipeline(
       // an ordinal scale is bucketed from a date exactly as a temporal one is.
       // No exception for an aggregate: a `mean` over a date column still needs the column read as
       // dates first, or it averages the strings' character codes.
-      if (def.type == MeasureType.TEMPORAL || def.timeUnit != null) {
+      // ```js
+      // export function isFieldOrDatumDefForTimeFormat(fieldOrDatumDef): boolean {
+      //   const {formatType} = getFormatMixins(fieldOrDatumDef);
+      //   return formatType === 'time' || (!formatType && isTemporalFieldDef(fieldOrDatumDef));
+      // }
+      // ```
+      //
+      // **A stated `formatType` decides it, and the answer is not always yes.** A column read as a
+      // date is one whose guide formats it as *time*, or one typed temporal that says nothing about
+      // its format at all. So a temporal field whose axis names `formatType: "number"` is **not**
+      // parsed: upstream emits the source rows untouched, with no formula and no dataset derived
+      // from one, and leaves a time scale standing over the raw strings. That is upstream's answer
+      // and not a good chart, but it is the one a specification written that way is given.
+      //
+      // `getFormatMixins` reads the guide's pair for anything that is not a plain string
+      // definition, so it is the `axis` block that settles this rather than the channel itself.
+      val timeFormatted =
+        def.formatType == "time" ||
+          (def.formatType == null && (def.type == MeasureType.TEMPORAL || def.timeUnit != null))
+      if (timeFormatted) {
         parse[field] = "date"
       } else if (def.type == MeasureType.QUANTITATIVE && def.aggregate in MIN_MAX_OPS) {
         // Upstream's own comment: "we need to parse numbers to support correct min and max". Every
@@ -1102,7 +1121,10 @@ internal class DataPipeline(
         // fields not being imputable at once.
         when {
           dimension.bin == null -> listOf(Fields.vgField(dimension))
-          stack.impute -> listOf(Fields.vgField(dimension, suffix = "mid"))
+          // A **bin** suffix: the midpoint is a column the binning wrote, so a dimension that
+          // arrived bucketed groups by its own name — it has no `_mid` for a transform this chart
+          // never ran, and grouping by one keyed the stack on a column that does not exist.
+          stack.impute -> listOf(Fields.vgField(dimension, binSuffix = "mid"))
           dimension.bin is Binning.Bin ->
             listOf(Fields.vgField(dimension), Fields.vgField(dimension, suffix = "end"))
           // A column that arrived already binned has no `_end` of its own, and upstream's
@@ -1113,7 +1135,14 @@ internal class DataPipeline(
     return StackNode(
       field = Fields.vgField(def),
       // The facet's own fields group every accumulation, so a stack stays inside its cell.
-      groupby = dimensions + facetting.filterNot { it in dimensions },
+      //
+      // `groupby: [...this.getGroupbyFields(), ...facetby]` — **concatenated, not merged**, which
+      // is the same rule already written below for the imputation's own groupby and was applied to
+      // only one of the two. A chart that facets by the column it also plots along names that
+      // column twice, and upstream emits it twice: grouping by `c` and then by `c` again is the
+      // same partition either way, so this is a difference in what is written rather than in what
+      // is drawn — and what is written is what this corpus compares.
+      groupby = dimensions + facetting,
       // `if (!s.field.includes(field))` — the stack's sort names each field **once**. Two channels
       // over one column is one thing to sort by, and repeating it in the pair of parallel lists is
       // a comparator that reads the same column twice.
@@ -1152,9 +1181,15 @@ internal class DataPipeline(
         else
           stack.groupbyChannels.mapNotNull { channel ->
             val dimension = view.spec.fieldDef(channel) ?: return@mapNotNull null
-            if (dimension.bin !is Binning.Bin) return@mapNotNull null
+            // `for (const dimensionFieldDef of dimensionFieldDefs) { const {bin} = …; if (bin) {`
+            // — **any** bin, including one the data arrived with. The formula that comes out for
+            // one of those is a no-op, `0.5*lo + 0.5*lo` written back over `lo`, because both
+            // edges resolve to the same column; upstream emits it anyway and the impute below is
+            // keyed on the column it names. Read as this compiler's own bin only, the formula was
+            // skipped and the impute keyed on a `_mid` nobody wrote.
+            if (dimension.bin == null) return@mapNotNull null
             val start = Fields.datumAccess(dimension)
-            val end = Fields.datumAccess(dimension, suffix = "end")
+            val end = Fields.datumAccess(dimension, binSuffix = "end")
             val near = dimension.raw.number("bandPosition") ?: 0.5
             obj {
               put("type", "formula")
@@ -1164,7 +1199,7 @@ internal class DataPipeline(
                   "${Fields.expressionNumber(near)}*$start+" +
                   "${Fields.expressionNumber(1 - near)}*$end : $start",
               )
-              put("as", Fields.vgField(dimension, suffix = "mid", forAs = true))
+              put("as", Fields.vgField(dimension, binSuffix = "mid", forAs = true))
             }
           },
       component =

@@ -158,6 +158,32 @@ class DifferentialEquivalenceTest {
   }
 
   @Test
+  fun `a stated left-to-right direction is the same as none`() {
+    // `textMetrics` asks `item.dir === 'rtl'`, so `ltr` is the default written down: the `<text>`
+    // element and the bounds are identical with it, without it, and the direction only becomes
+    // visible under a `limit`. Upstream records whatever the specification wrote; this engine
+    // records the direction only when it is `rtl`.
+    val upstream = text(mapOf("x" to 10.0), mapOf("text" to "a", "dir" to "ltr"))
+    val ours = text(mapOf("x" to 10.0), mapOf("text" to "a"))
+    assertEquals(
+      emptyList<Differential.Difference>(),
+      Differential.compareMarks(listOf(upstream), listOf(ours)),
+    )
+  }
+
+  @Test
+  fun `a right-to-left direction this engine missed still fails`() {
+    // The half that matters: the leniency above must not swallow the one direction that changes
+    // what is drawn.
+    val upstream = text(mapOf("x" to 10.0), mapOf("text" to "a", "dir" to "rtl"))
+    val ours = text(mapOf("x" to 10.0), mapOf("text" to "a"))
+    assertEquals(
+      listOf("text/axis-label[0].dir: expected rtl, got ltr"),
+      Differential.compareMarks(listOf(upstream), listOf(ours)).map { it.toString() },
+    )
+  }
+
+  @Test
   fun `the relative weights resolve against normal`() {
     for ((keyword, resolved) in listOf("bolder" to "700", "lighter" to "100", "bold" to "700")) {
       val upstream = text(mapOf("x" to 10.0), mapOf("fontWeight" to keyword))

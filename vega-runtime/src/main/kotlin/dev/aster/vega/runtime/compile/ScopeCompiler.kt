@@ -939,8 +939,9 @@ internal class ScopeCompiler(
       cells
         .flatMap { part -> part.nodes.indices.map { part.boxOf(it) } }
         .mapIndexed { index, box -> cellNodes[index].transform.mapBounds(box) }
+    // The same falsy rule the grid itself uses; see [gridTogether].
     val columns =
-      numbers.resolveInt(layout.columns, "layout")?.coerceAtLeast(1)
+      numbers.resolveInt(layout.columns, "layout")?.takeIf { it >= 1 }
         ?: cellNodes.size.coerceAtLeast(1)
     val rows = if (cellNodes.isEmpty()) 1 else ceil(cellNodes.size / columns.toDouble()).toInt()
 
@@ -1109,20 +1110,28 @@ internal class ScopeCompiler(
 
     // `bounds: "flush"` measures a cell by its **declared** extent rather than by how far its
     // contents reach, so an axis label hanging off to the left is allowed to collide with the cell
-    // beside it instead of pushing it across. Upstream's `bboxFlush` is `(0, 0, width, height)`,
-    // and a group that declared no size falls back to what it drew — there is nothing else to use.
+    // beside it instead of pushing it across.
+    //
+    // Upstream's `bboxFlush` is `(0, 0, item.width || 0, item.height || 0)` and there is **no**
+    // fallback: a cell that declares no size flushes to nothing, and a grid of such cells collapses
+    // to its padding. Falling back to what the cell drew was a guess, and it is the one arrangement
+    // where `flush` and `full` cannot differ — measured, a trellis of sizeless cells came out
+    // identical to its own `full` layout here where upstream drew it 624 units narrower.
     val flush = layout.bounds == "flush"
     val boxes = cellParts.flatMap { (_, entry) ->
       entry.second.nodes.indices.map { position ->
         val node = entry.second.nodes[position]
         val declared = (node as? GroupNode)?.size
-        if (flush && declared != null) RectD(0.0, 0.0, declared.width, declared.height)
+        if (flush) RectD(0.0, 0.0, declared?.width ?: 0.0, declared?.height ?: 0.0)
         else entry.second.boxOf(position)
       }
     }
     val options =
       GridLayout.Options(
-        columns = numbers.resolveInt(layout.columns, "layout")?.coerceAtLeast(1) ?: boxes.size,
+        // `ncols = opt.columns || groups.length`: a **falsy** column count — zero, or none at all —
+        // means every cell in one row, not one cell per row. Coercing it up to 1 turned a
+        // `columns: 0` into a single tall column, which is the opposite arrangement.
+        columns = numbers.resolveInt(layout.columns, "layout")?.takeIf { it >= 1 } ?: boxes.size,
         rowPadding = numbers.resolve(layout.rowPadding, "layout") ?: 0.0,
         columnPadding = numbers.resolve(layout.columnPadding, "layout") ?: 0.0,
         alignColumn = GridLayout.Align.fromName(layout.alignColumn),

@@ -1,0 +1,338 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A theme may speak about an axis in a block named after the **kind of scale** under it — `config.axisBand`, `config.axisQuantitative` and their per-direction twins — and `getAxisConfigs` keeps those apart from the blocks Vega itself knows: `vlOnlyConfigTypes` against `vgConfigTypes = ['axis', axisOrient, axisChannel]`. Two consequences meet on the horizontal axis of the first chart. `getAxisConfig` asks `vlOnlyAxisConfig` before `vgAxisConfig`, so the `bottom` this theme writes in `config.axisBand` is the side the axis is drawn on, beating the `top` in `config.axisX`; but `parseAxis` resolves the orient it computes *from* — the one every label is turned to face — out of `axis.orient`, `config.axisX` and `config.axis` alone, and a block named after a scale is not among them. So the axis is at the bottom and its category names are anchored by their left ends, which is how a label on a *top* axis is anchored: upstream's own two-tier reading, reproduced rather than repaired, and the only case where the side written on an axis and the side its labels were turned for are different. The second chart states the other half of the same theme: its horizontal scale is continuous, so `config.axisBand` does not apply to it and it takes `top` from `config.axisX`, while its vertical scale is a band and takes `bottom` from `config.axisBand`. Both charts also show the one axis property a theme is never asked about. `isAxisProperty(property) && property !== 'values'` excludes it by name, because the ticks an axis shows are values of its own column and a theme cannot know them — a list written once in `config.axisQuantitative` would be forced onto every measured axis in the document, whatever each of them is measuring. This compiler wrote it out from every Vega-Lite-only block, so both measured axes here showed ticks at 20 and 60 and nowhere else; upstream shows neither, and leaves the tick count it computed from the plot's height standing beside it.",
+  "background": "white",
+  "padding": 5,
+  "width": 200,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "c": "alpha",
+          "v": 28
+        },
+        {
+          "c": "beta",
+          "v": 55
+        },
+        {
+          "c": "gamma",
+          "v": 43
+        },
+        {
+          "c": "delta",
+          "v": 91
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "c"
+          ],
+          "field": "v",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "childHeight",
+      "value": 120
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "columns": 1,
+    "bounds": "full",
+    "align": "each"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "concat_0_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_0_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_0"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_0_x",
+                "field": "c"
+              },
+              "width": {
+                "signal": "max(0.25, bandwidth('concat_0_x'))"
+              },
+              "y": {
+                "scale": "concat_0_y",
+                "field": "v_end"
+              },
+              "y2": {
+                "scale": "concat_0_y",
+                "field": "v_start"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "gridScale": "concat_0_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "c",
+          "labelAlign": "left",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "grid": false,
+          "title": "v",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_1_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_1_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_0"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"v: \" + (format(datum[\"v\"], \"\")) + \"; c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"])"
+              },
+              "x": {
+                "scale": "concat_1_x",
+                "field": "v_end"
+              },
+              "x2": {
+                "scale": "concat_1_x",
+                "field": "v_start"
+              },
+              "y": {
+                "scale": "concat_1_y",
+                "field": "c"
+              },
+              "height": {
+                "signal": "max(0.25, bandwidth('concat_1_y'))"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_1_x",
+          "orient": "top",
+          "gridScale": "concat_1_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_x",
+          "orient": "top",
+          "grid": false,
+          "title": "v",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_y",
+          "orient": "bottom",
+          "grid": false,
+          "title": "c",
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "concat_0_x",
+      "type": "band",
+      "domain": {
+        "data": "data_0",
+        "field": "c",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "concat_0_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "v_start",
+          "v_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_1_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "v_start",
+          "v_end"
+        ]
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_1_y",
+      "type": "band",
+      "domain": {
+        "data": "data_0",
+        "field": "c",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "childHeight"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    }
+  ],
+  "config": {
+    "axisBand": {
+      "orient": "bottom"
+    },
+    "axisX": {
+      "orient": "top"
+    }
+  }
+}

@@ -49,9 +49,46 @@ internal class UnitView(
    * two consumers are the mark's `defined` and the data flow's filter, and they have to agree:
    * filtering a row the path was going to break at removes the break along with the row.
    */
+  /**
+   * `getMarkConfig('invalid', markDef, config)` — the **whole** configuration chain, not
+   * `config.mark` alone.
+   *
+   * ```js
+   * const cfg = getMarkStyleConfig(channel, mark, config.style);
+   * return getFirstDefined(cfg, cfg, config[mark.type][channel], config.mark[channel]);
+   * ```
+   *
+   * so a theme saying `config.line.invalid` speaks for every line, and one saying
+   * `config.style.annotation.invalid` speaks for every mark that names that style. Read as
+   * `config.mark.invalid` and nothing else, a per-mark-type or styled `invalid` was dropped on the
+   * floor — the chart kept the default for its kind, which is `filter` for a point and
+   * `break-paths-show-domains` for a line, and the data pipeline then built the wrong number of
+   * datasets for it.
+   *
+   * The mark type's block outranks `config.mark`, which is the order [Config.markConfig] already
+   * merges them in; the style blocks outrank both and are asked here, last one winning, because a
+   * mark's styles are its own type followed by whatever its `style` names.
+   */
+  private val themedInvalid: VegaValue?
+    get() {
+      val named =
+        when (val style = markDef.raw.fields["style"]) {
+          is VegaValue.Str -> listOf(style.value)
+          is VegaValue.Arr -> style.values.mapNotNull { (it as? VegaValue.Str)?.value }
+          else -> emptyList()
+        }
+      (listOf(spec.mark) + named)
+        .mapNotNull { config.style(it)?.fields?.get("invalid") }
+        .lastOrNull()
+        ?.let {
+          return it
+        }
+      return config.markConfig(spec.mark).fields["invalid"]
+    }
+
   val invalidDataMode: String
     get() {
-      val stated = markDef.raw.fields["invalid"] ?: config.markInvalid
+      val stated = markDef.raw.fields["invalid"] ?: themedInvalid
       val isPath = spec.mark in PATH_MARKS
       val forPathOrNot = if (isPath) "break-paths-show-domains" else "filter"
       if (stated == null) return forPathOrNot
@@ -82,13 +119,82 @@ internal class UnitView(
         else -> false
       }
 
-  val scalesExcludeInvalid: Boolean
-    get() =
-      when (invalidDataMode) {
-        "filter",
-        "break-paths-filter-domains" -> true
-        else -> false
+  /**
+   * Which output the **scales** read, which is `getScaleDataSourceForHandlingInvalidValues` whole.
+   *
+   * ```ts
+   * const {marks, scales} = getDataSourcesForHandlingInvalidValues(props);
+   * if (marks === scales) return DataSourceType.Main;
+   * return scales === 'include-invalid-values' ? PreFilterInvalid : PostFilterInvalid;
+   * ```
+   *
+   * **Both** sides of that comparison come from the same `invalid`, and that `invalid` is the
+   * configuration's alone — see [scaleInvalidDataMode]. Comparing the mark definition's answer for
+   * the marks against the configuration's for the scales is not the same test and gets the common
+   * case wrong: a point whose mark definition says `invalid: null` has no filter to sit below, and
+   * asking for one put a dataset in the specification that upstream does not write.
+   */
+  val scaleDataSource: ScaleDataSource
+    get() {
+      val isPath = spec.mark in PATH_MARKS
+      val marksExclude =
+        when (scaleInvalidDataMode) {
+          "filter" -> true
+          "break-paths-show-domains",
+          "break-paths-filter-domains" -> !isPath
+          else -> false
+        }
+      val scalesExclude =
+        when (scaleInvalidDataMode) {
+          "filter",
+          "break-paths-filter-domains" -> true
+          else -> false
+        }
+      return when {
+        marksExclude == scalesExclude -> ScaleDataSource.MAIN
+        scalesExclude -> ScaleDataSource.POST_FILTER
+        else -> ScaleDataSource.PRE_FILTER
       }
+    }
+
+  /**
+   * The mode the **scales** are resolved against, which is the configuration's and not the mark's.
+   *
+   * `assembleDomain` asks `getMarkConfig('invalid', markDef, config)` — `getMarkConfig`, not
+   * `getMarkPropOrConfig`. The two differ in exactly one way and it is the one that matters here:
+   * `getMarkPropOrConfig` reads `mark[channel]` first and falls through to the configuration, while
+   * `getMarkConfig` reads **only** the configuration chain — a style block, `config[marktype]`,
+   * `config.mark`. So an `invalid` written on the mark definition never reaches the choice of which
+   * rows a domain is measured over, and one written in the configuration does.
+   *
+   * Measured rather than assumed, across all four modes and both mark kinds: the same
+   * `break-paths-show-domains` gives a point's domains `data_0` from the mark definition and
+   * `source_0` from `config.mark`, and the same `break-paths-filter-domains` gives a line's domains
+   * `data_0` from the mark definition and a `data_1` of its own from the configuration. The two
+   * cells where they differ are exactly the two where upstream's own table has the marks and the
+   * scales wanting different rows.
+   *
+   * Whether upstream means this is not a question this port can answer; what it emits is.
+   */
+  private val scaleInvalidDataMode: String
+    get() {
+      val isPath = spec.mark in PATH_MARKS
+      val forPathOrNot = if (isPath) "break-paths-show-domains" else "filter"
+      val stated = themedInvalid ?: return forPathOrNot
+      if (stated is VegaValue.Null) return "show"
+      return when (val named = (stated as? VegaValue.Str)?.value) {
+        null,
+        "break-paths-show-path-domains" -> forPathOrNot
+        else -> named
+      }
+    }
+
+  /** The three outputs a scale's domain can be measured over; see [scaleDataSource]. */
+  enum class ScaleDataSource {
+    MAIN,
+    PRE_FILTER,
+    POST_FILTER,
+  }
 
   /** Merged scale type per channel, filled in once every view has contributed. */
   var scaleTypes: Map<String, String> = emptyMap()

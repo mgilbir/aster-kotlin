@@ -1,0 +1,460 @@
+{
+  "marks": [
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 42.5,
+      "x2": 42.5,
+      "y": 120.5,
+      "y2": 125.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 86.5,
+      "x2": 86.5,
+      "y": 120.5,
+      "y2": 125.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 130.5,
+      "x2": 130.5,
+      "y": 120.5,
+      "y2": 125.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 174.5,
+      "x2": 174.5,
+      "y": 120.5,
+      "y2": 125.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 218.5,
+      "x2": 218.5,
+      "y": 120.5,
+      "y2": 125.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "1",
+      "type": "text",
+      "x": 42.5,
+      "y": 127.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "2.5",
+      "type": "text",
+      "x": 86.5,
+      "y": 127.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "4",
+      "type": "text",
+      "x": 130.5,
+      "y": 127.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "0",
+      "type": "text",
+      "x": 174.5,
+      "y": 127.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "100",
+      "type": "text",
+      "x": 218.5,
+      "y": 127.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-domain",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 20.5,
+      "x2": 240.5,
+      "y": 120.5,
+      "y2": 120.5
+    },
+    {
+      "fill": "rgb(207, 225, 242)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 24,
+      "y": 0
+    },
+    {
+      "fill": "rgb(91, 163, 207)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 68,
+      "y": 0
+    },
+    {
+      "fill": "rgb(10, 74, 144)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 112,
+      "y": 0
+    },
+    {
+      "fill": "rgb(255, 255, 255)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 156,
+      "y": 0
+    },
+    {
+      "fill": "rgb(0, 0, 0)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 200,
+      "y": 0
+    },
+    {
+      "fill": "rgb(207, 225, 242)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 24,
+      "y": 22
+    },
+    {
+      "fill": "rgb(91, 163, 207)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 68,
+      "y": 22
+    },
+    {
+      "fill": "rgb(10, 74, 144)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 112,
+      "y": 22
+    },
+    {
+      "fill": "rgb(207, 225, 242)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 156,
+      "y": 22
+    },
+    {
+      "fill": "rgb(10, 74, 144)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 200,
+      "y": 22
+    },
+    {
+      "fill": "rgb(0, 0, 0)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 24,
+      "y": 44
+    },
+    {
+      "fill": "rgb(128, 128, 128)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 68,
+      "y": 44
+    },
+    {
+      "fill": "rgb(255, 255, 255)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 112,
+      "y": 44
+    },
+    {
+      "fill": "rgb(0, 0, 0)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 156,
+      "y": 44
+    },
+    {
+      "fill": "rgb(255, 255, 255)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 200,
+      "y": 44
+    },
+    {
+      "fill": "rgb(31, 119, 180)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 24,
+      "y": 66
+    },
+    {
+      "fill": "rgb(176, 126, 111)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 68,
+      "y": 66
+    },
+    {
+      "fill": "rgb(255, 127, 14)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 112,
+      "y": 66
+    },
+    {
+      "fill": "rgb(0, 113, 226)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 156,
+      "y": 66
+    },
+    {
+      "fill": "rgb(255, 0, 255)",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 36,
+      "x": 200,
+      "y": 66
+    }
+  ],
+  "scales": {
+    "at": {
+      "bandwidth": 0,
+      "domain": [
+        1,
+        2.5,
+        4,
+        0,
+        100
+      ],
+      "range": [
+        20,
+        240
+      ],
+      "step": 44
+    },
+    "lab": {
+      "domain": [
+        1,
+        4
+      ],
+      "range": [
+        "rgb(31, 119, 180)",
+        "rgb(255, 127, 14)"
+      ],
+      "ticks": [
+        1,
+        1.2,
+        1.4,
+        1.6,
+        1.8,
+        2,
+        2.2,
+        2.4,
+        2.6,
+        2.8,
+        3,
+        3.2,
+        3.4,
+        3.6,
+        3.8,
+        4
+      ]
+    },
+    "pair": {
+      "domain": [
+        1,
+        4
+      ],
+      "range": [
+        "rgb(0, 0, 0)",
+        "rgb(255, 255, 255)"
+      ],
+      "ticks": [
+        1,
+        1.2,
+        1.4,
+        1.6,
+        1.8,
+        2,
+        2.2,
+        2.4,
+        2.6,
+        2.8,
+        3,
+        3.2,
+        3.4,
+        3.6,
+        3.8,
+        4
+      ]
+    },
+    "pinned": {
+      "domain": [
+        1,
+        4
+      ],
+      "range": [
+        "rgb(207, 225, 242)",
+        "rgb(10, 74, 144)"
+      ],
+      "ticks": [
+        1,
+        1.2,
+        1.4,
+        1.6,
+        1.8,
+        2,
+        2.2,
+        2.4,
+        2.6,
+        2.8,
+        3,
+        3.2,
+        3.4,
+        3.6,
+        3.8,
+        4
+      ]
+    },
+    "ramp": {
+      "domain": [
+        1,
+        4
+      ],
+      "range": [
+        "rgb(207, 225, 242)",
+        "rgb(10, 74, 144)"
+      ],
+      "ticks": [
+        1,
+        1.2,
+        1.4,
+        1.6,
+        1.8,
+        2,
+        2.2,
+        2.4,
+        2.6,
+        2.8,
+        3,
+        3.2,
+        3.4,
+        3.6,
+        3.8,
+        4
+      ]
+    }
+  },
+  "size": {
+    "height": 147,
+    "width": 270
+  },
+  "spec": "a-colour-ramp-does-not-clamp.vg.json",
+  "vegaVersion": "6.3.1"
+}

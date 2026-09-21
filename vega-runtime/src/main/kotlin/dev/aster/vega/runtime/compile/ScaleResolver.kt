@@ -1,6 +1,7 @@
 package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.dataflow.transform.AggregateOp
+import dev.aster.vega.dataflow.transform.ExtentTransform
 import dev.aster.vega.dataflow.transform.aggregateOver
 import dev.aster.vega.dataflow.transform.compareFieldValues
 import dev.aster.vega.expression.JsSemantics
@@ -20,6 +21,7 @@ import dev.aster.vega.model.spec.RangeSpec
 import dev.aster.vega.model.spec.ScaleSpec
 import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.model.spec.SchemeRef
+import dev.aster.vega.model.time.JsDate
 import dev.aster.vega.model.time.TimeInterval
 import dev.aster.vega.model.time.TimeStepper
 import dev.aster.vega.runtime.scale.BandScale
@@ -41,6 +43,8 @@ import dev.aster.vega.runtime.scale.Ticks
 import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.runtime.scale.TimeTicks
 import dev.aster.vega.runtime.scale.VegaScale
+import dev.aster.vega.runtime.scale.internKey
+import dev.aster.vega.runtime.scale.scaleNumber
 import dev.aster.vega.scene.ColorSpaces
 import dev.aster.vega.scene.SceneColor
 import kotlin.math.abs
@@ -106,10 +110,23 @@ public class ScaleResolver(
       // A linear scale with a colour range is a colour scale, not a positional one.
       ScaleType.LINEAR -> if (hasColorRange(spec)) buildSequentialColor(spec) else buildLinear(spec)
       ScaleType.SEQUENTIAL -> buildSequentialColor(spec)
-      // Nothing to build: an identity scale has no domain, no range and no interpolation. It exists
-      // so
-      // a channel that wants a scale can be handed coordinates that are already final.
-      ScaleType.IDENTITY -> IdentityScale(spec.name)
+      // Nothing to *map*: an identity scale hands back the coordinate it was given, which is what
+      // it exists for. It does have a **domain** all the same — d3 gives `domain` and `range` the
+      // same array and then makes the scale `linearish` — and an axis drawn against one is ticked
+      // over it like any other. Discarding it left that axis empty.
+      ScaleType.IDENTITY ->
+        IdentityScale(
+          spec.name,
+          // **Only when one is written.** An identity scale is the one kind a specification
+          // routinely declares with no domain at all — `{"name": "pos", "type": "identity"}` is the
+          // whole of it, because the coordinates are already final and nothing needs mapping — and
+          // d3 defaults the domain to `[0, 1]` there rather than refusing. Asking the ordinary
+          // resolver for a domain that is not there turned the commonest identity scale of all into
+          // a scale that would not build.
+          if (spec.domain == DomainSpec.Unset) listOf(0.0, 1.0)
+          else
+            continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null,
+        )
       // A **transformed** scale with a colour range is a colour scale too, and the ramp is walked
       // in the scale's own space: `sqrt` over `[0, 100]` paints 25 the midpoint colour, because the
       // square roots make it the midpoint. Read off a live view. Refusing these left a choropleth
@@ -323,6 +340,10 @@ public class ScaleResolver(
       colors = if (reversed(spec) && !ramp) colors.reversed() else colors,
       space = space,
       gamma = spec.interpolateGamma ?: 1.0,
+      // **Read from the specification**, which it was not: the scale's own default of `true` was
+      // taken every time, so `"clamp": true` and saying nothing drew the same chart and the
+      // difference upstream draws — an extrapolated ramp against a pinned one — was unreachable.
+      clamp = spec.clamp,
       transform = transform,
       rampExtent =
         if (!ramp) listOf(0.0, 1.0)
@@ -572,13 +593,20 @@ public class ScaleResolver(
     val scale =
       LogScale(spec.name, domain, oriented(range, reversed(spec)), base, spec.clamp, spec.round)
     if (!scale.isValid) {
-      diagnostics.error(
+      // **The scale is still built.** A log domain that touches zero cannot place anything, and
+      // upstream agrees — every `scale(x)` on one answers null — but upstream *has* the scale all
+      // the same: the axis that names it still draws its line and its title, and only the marks go
+      // missing. Refusing it here took the axis with it and reported two further errors for the
+      // encodings that named it, so a chart upstream draws became no chart and three complaints
+      // about this engine. `isValid` already makes every position a NaN, which is the same nothing
+      // upstream's null is, so building it is both faithful and sufficient. It warns rather than
+      // errors: the odd thing here is the specification, and the drawing is upstream's.
+      diagnostics.warn(
         DiagnosticCodes.SCALE_INVALID_DOMAIN,
         "Log scale '${spec.name}' has a domain of $domain, which spans or touches zero; " +
           "marks using it cannot be positioned",
         operator = spec.name,
       )
-      return null
     }
     return scale
   }
@@ -776,8 +804,19 @@ public class ScaleResolver(
     // `!scale.bins && (linear || pow || sqrt)` — a time scale never zeroes unless a specification
     // asks it to, and an explicit `zero: true` still applies.
     val domain =
-      continuousDomain(spec, zeroDefault = false, fallback = emptyList())?.takeIf { it.size >= 2 }
-        ?: return null
+      continuousDomain(spec, zeroDefault = false, fallback = emptyList())
+        // **Clipped, because a time scale's domain is a list of dates and not of numbers.** Vega
+        // hands each value to `new Date(x)`, and ECMA-262's `TimeClip` calls anything past
+        // ±8.64e15 milliseconds an *Invalid Date* whose time value is `NaN`. So a column reaching
+        // `1e21` gives upstream a domain of `[0, NaN]` and an axis with no labels at all — where
+        // this engine carried the number through, saturated it on the way to a `Long`, and asked
+        // for the year 292278994. `LocalDate` will not build one, and the compile ended in a fatal
+        // `DateTimeException` with no chart rather than in the empty axis upstream draws.
+        //
+        // [JsDate.clip] is that rule, and it was already written down here — in `vega-model`, where
+        // a scale can see it. Only the expression functions were using it.
+        ?.map { JsDate.clip(it) }
+        ?.takeIf { it.size >= 2 } ?: return null
     val padded = padded(domain, range, spec)
     val niced =
       if (spec.nice && !rawApplies(spec)) {
@@ -965,15 +1004,25 @@ public class ScaleResolver(
           if (ramp == null && colors.size > wanted) sampleEvenly(colors, wanted) else colors
         (if (reversed(spec)) taken.reversed() else taken).map { VegaValue.Str(it.toCssHex()) }
       }
-      else -> {
-        diagnostics.error(
-          DiagnosticCodes.SCALE_INVALID_DOMAIN,
-          "A '${spec.type.name.lowercase().replace('_', '-')}' scale needs an explicit range " +
-            "array or a scheme (scale '${spec.name}')",
-          operator = spec.name,
-        )
-        null
-      }
+      // A **range keyword** is a range like any other once it is resolved. `range: "height"` reads
+      // as `[height, 0]` — a two-element list, and two elements is a perfectly good set of buckets
+      // — and upstream resolves the keyword before it ever asks what kind of scale is asking:
+      // probed, a quantize scale over `range: "height"` in a 100-tall view reports a range of
+      // `[100, 0]` and buckets into it. This refused the whole scale instead, and a refused scale
+      // takes its axis with it: `VEGA_SCALE_NOT_BUILT`, no ticks, no labels, nothing drawn. The
+      // schema sweep found it because every scale type now gets a base chart, and every property of
+      // the quantize one differed alike.
+      else ->
+        numericRange(spec)?.map { VegaValue.Num(it) }
+          ?: run {
+            diagnostics.error(
+              DiagnosticCodes.SCALE_INVALID_DOMAIN,
+              "A '${spec.type.name.lowercase().replace('_', '-')}' scale needs an explicit range " +
+                "array, a range keyword or a scheme (scale '${spec.name}')",
+              operator = spec.name,
+            )
+            null
+          }
     }
 
   /** How many colours a scheme is asked for, which a signal may decide. */
@@ -994,15 +1043,28 @@ public class ScaleResolver(
 
   private fun buildQuantize(spec: ScaleSpec): QuantizeScale? {
     val range = binnedRange(spec, buckets = null) ?: return null
-    val domain =
+    // `nice` is applied by **capability**, not by scale type: `configureScale` in `vega-encode`
+    // tests `_.nice && scale.nice`, and of the four discretizing scales only a quantize scale has a
+    // `nice` — d3 gives it one because it rounds the linear scale it is built on. So this is the
+    // one place `nice` generalises past the continuous scales, and it must not generalise further:
+    // probed, a threshold, quantile or bin-ordinal scale asking for `nice: true` keeps its domain
+    // exactly as given.
+    var domain =
       continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null
+    if (spec.nice && !rawApplies(spec)) domain = niceOf(domain, spec)
     return QuantizeScale(spec.name, domain, range)
   }
 
   private fun buildQuantile(spec: ScaleSpec): QuantileScale? {
     val range = binnedRange(spec, buckets = null) ?: return null
     // Every value, not the extent: a quantile scale cuts by count, so it needs the whole column.
-    val domain = fullNumericDomain(spec) ?: return null
+    //
+    // **A column with no number in it is still a scale**, and upstream builds one: probed, a
+    // quantile over four date *strings* has `domain: []` and `quantiles: [null, null]`, and it
+    // answers the **first** range entry for any number — a null threshold makes d3's `ascending`
+    // return `NaN`, and a bisect whose comparison is NaN settles at the low end. Dropping the scale
+    // instead left the chart with a colour channel that named a scale which was not there.
+    val domain = fullNumericDomain(spec, allowEmpty = true) ?: return null
     return QuantileScale(spec.name, domain, range)
   }
 
@@ -1061,7 +1123,7 @@ public class ScaleResolver(
    * Duplicates are kept, which matters: `quantile` cuts by count, so dropping a repeated value
    * would move every quartile.
    */
-  private fun fullNumericDomain(spec: ScaleSpec): List<Double>? {
+  private fun fullNumericDomain(spec: ScaleSpec, allowEmpty: Boolean = false): List<Double>? {
     val values =
       when (val domain = spec.domain) {
         is DomainSpec.Literal -> literalDomain(domain.values, spec.name)
@@ -1079,8 +1141,16 @@ public class ScaleResolver(
           return null
         }
       }
-    val numbers = values.map { it.asDouble() }.filterNot { it.isNaN() }
-    if (numbers.isEmpty()) {
+    // `d != null && !isNaN(d = +d)`, which is d3's own filter for a quantile scale's samples and
+    // the same line every scale reads a value with — so an empty cell is a **sample at zero** and
+    // not a row that was never there. [scaleNumber] is that line; `asDouble` parses a string where
+    // `Number` coerces one, and dropped every empty cell in the column.
+    val numbers = values.map { scaleNumber(it) }.filterNot { it.isNaN() }
+    // [allowEmpty] is the quantile case, where upstream keeps the scale and its empty domain; see
+    // the note there. `threshold` and `bin-ordinal` also keep theirs — probed, both report a domain
+    // of `[null, null]` over the same column — and neither is reproduced here yet, there being no
+    // case in any corpus that reaches them. Recorded rather than guessed at.
+    if (numbers.isEmpty() && !allowEmpty) {
       diagnostics.error(
         DiagnosticCodes.SCALE_INVALID_DOMAIN,
         "Scale '${spec.name}' has no numeric values in its domain",
@@ -1088,7 +1158,27 @@ public class ScaleResolver(
       )
       return null
     }
-    return numbers
+    // **`zero` folds into these domains too.** `configureDomain` applies it by scale *option* and
+    // not by scale type, so a threshold, quantile or bin-ordinal scale that asks for it gets the
+    // same per-end treatment a linear one does — probed, `[20, 50, 80]` with `zero: true` is
+    // reported by upstream as `[0, 50, 80]` on all three, and `[-5, 50, 80]` is left alone because
+    // the low end is already past zero. It is the cut points that move, so every datum below the
+    // old first cut changes bucket: a symbol at the top of the plot instead of near the bottom.
+    //
+    // **Positionally**, on the domain as written rather than on a sorted copy: a quantile scale
+    // given the literal `[60, 8, 31]` comes back from upstream as `[0, 8, 31]`, the 60 replaced
+    // where it stood.
+    return withZero(numbers, spec)
+  }
+
+  /** Upstream's per-end `zero`: only a positive low end and a negative high end move. */
+  private fun withZero(domain: List<Double>, spec: ScaleSpec): List<Double> {
+    if (spec.zero != true || domain.isEmpty()) return domain
+    val folded = domain.toMutableList()
+    val last = folded.size - 1
+    if (folded[0] > 0.0) folded[0] = 0.0
+    if (folded[last] < 0.0) folded[last] = 0.0
+    return folded
   }
 
   // ---- domains --------------------------------------------------------------
@@ -1200,20 +1290,24 @@ public class ScaleResolver(
           return null
         }
       }
-    val numbers = values.map { it.asDouble() }.filter { it.isFinite() }
-    if (numbers.isEmpty()) {
-      // **Not** a fallback to `[0, 1]`. Upstream's extent of nothing is `[undefined, undefined]`,
-      // and its own arithmetic turns that into `[NaN, NaN]` — a scale that generates no ticks and
-      // positions nothing, so the axis over it draws nothing at all. That is the whole point in a
-      // chart that switches between two views by emptying one of the datasets: substituting a
-      // usable domain draws the axis of the view nobody asked for. `domainMin` and `domainMax`
-      // still replace their end, which is how such a scale keeps one real bound.
-      return Double.NaN..Double.NaN
-    }
-    return numbers.min()..numbers.max()
+    // **Not** a fallback to `[0, 1]` when there is no extent. Upstream's extent of nothing is
+    // `[undefined, undefined]`, and its own arithmetic turns that into `[NaN, NaN]` — a scale that
+    // generates no ticks and positions nothing, so the axis over it draws nothing at all. That is
+    // the whole point in a chart that switches between two views by emptying one of the datasets:
+    // substituting a usable domain draws the axis of the view nobody asked for. `domainMin` and
+    // `domainMax` still replace their end, which is how such a scale keeps one real bound.
+    //
+    // [ExtentTransform.extentOf] and not a second reading of the same rule: this used to say
+    // `values.map { it.asDouble() }.filter { it.isFinite() }`, which is wrong twice over.
+    // `asDouble`
+    // is a *reading* and not `Number()`, and the filter **drops** a non-finite value where upstream
+    // lets it take the extreme and then discards the extent entirely — so a column holding the word
+    // `Infinity` reported the extent of the two ordinary numbers beside it, and drew an axis
+    // upstream leaves blank.
+    return ExtentTransform.extentOf(values) ?: (Double.NaN..Double.NaN)
   }
 
-  private fun discreteDomain(domain: DomainSpec, scaleName: String): List<String>? {
+  private fun discreteDomain(domain: DomainSpec, scaleName: String): List<VegaValue>? {
     val values =
       when (domain) {
         // An explicit domain is never sorted, whatever `sort` says: upstream reads the array
@@ -1238,8 +1332,23 @@ public class ScaleResolver(
           return null
         }
       }
-    // Vega's discrete domains keep first-seen order and drop duplicates.
-    return values.map { it.asString() }.distinct()
+    // Vega's discrete domains keep first-seen order and drop duplicates, **by value** — and the
+    // text dedup that reads like the same rule has already happened somewhere else, for one of the
+    // two ways a domain arrives.
+    //
+    // A *data-driven* domain is built by grouping the dataset, and a group's key is `'' + value`,
+    // so `1001` and `"1001"` fall in one group and the entry kept is that group's **first raw
+    // value** — the number, not the word. [orderedDomain] does that, with the values intact.
+    //
+    // A *literal* domain never meets a grouping. It is handed to the scale, and d3 dedups it
+    // through the `InternMap` its index is built on — by value, so `[1001, "1001"]` stays **two**
+    // entries upstream. Deduping by text here collapsed it to one, which no fixture caught until a
+    // mutant of this very line survived: the data-driven path had already done the text dedup, so
+    // the two rules agreed everywhere the corpus looked.
+    //
+    // [internKey] is the `InternMap` rule, so this is that map's key and not a second reading of
+    // it — a date and the milliseconds it stands for are one entry, and so are `0` and `-0`.
+    return values.distinctBy { internKey(it) }
   }
 
   /**

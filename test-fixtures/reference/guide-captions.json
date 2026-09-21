@@ -1,5 +1,95 @@
 [
  {
+  "fixture": "a-colour-ramp-does-not-clamp",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 5 values: 1, 2.5, 4, 0, 100"
+ },
+ {
+  "fixture": "a-gradient-over-a-column-with-no-number",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'no number' for fill color with values from NaN to NaN"
+ },
+ {
+  "fixture": "a-gradient-over-a-column-with-no-number",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'numbers' for fill color with values from 3 to 20"
+ },
+ {
+  "fixture": "a-label-that-is-a-list-of-lines",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: 1,2, 3, plain, a,b,c"
+ },
+ {
+  "fixture": "a-label-that-is-a-list-of-lines",
+  "kind": "legend",
+  "caption": "Symbol legend for fill color with 4 values: 1,2, 3, plain, a,b,c"
+ },
+ {
+  "fixture": "a-log-axis-labels-with-twelve-digits",
+  "kind": "axis",
+  "caption": "Y-axis for a log scale with values from 1 to 1e+15"
+ },
+ {
+  "fixture": "a-log-axis-labels-with-twelve-digits",
+  "kind": "axis",
+  "caption": "Y-axis for a log scale with values from 1 to 1,000"
+ },
+ {
+  "fixture": "a-log-axis-labels-with-twelve-digits",
+  "kind": "axis",
+  "caption": "Y-axis for a log scale with values from 10,000,000,000 to 1e+12"
+ },
+ {
+  "fixture": "a-logarithm-has-a-base",
+  "kind": "axis",
+  "caption": "Y-axis for a log scale with values from 1 to 1,000,000"
+ },
+ {
+  "fixture": "a-logarithm-has-a-base",
+  "kind": "axis",
+  "caption": "Y-axis for a log scale with values from 1 to 1,024"
+ },
+ {
+  "fixture": "a-logarithm-has-a-base",
+  "kind": "axis",
+  "caption": "Y-axis for a log scale with values from 1 to 19,683"
+ },
+ {
+  "fixture": "a-null-line-is-an-empty-line",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 5 values: one, two, three, four, five"
+ },
+ {
+  "fixture": "a-number-written-as-text",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 6 values: 1e-7, 0.000001, 100000000000000000000, 1e+21, 0.1, 5e-324"
+ },
+ {
+  "fixture": "a-number-written-as-text",
+  "kind": "legend",
+  "caption": "Symbol legend for fill color with 6 values: 1e-7, 0.000001, 100000000000000000000, 1e+21, 0.1, 5e-324"
+ },
+ {
+  "fixture": "a-scale-coerces-what-it-is-given",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 20"
+ },
+ {
+  "fixture": "a-stack-propagates-what-it-cannot-add",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 8"
+ },
+ {
+  "fixture": "a-stack-propagates-what-it-cannot-add",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from NaN to NaN"
+ },
+ {
+  "fixture": "a-time-value-past-the-calendar",
+  "kind": "axis",
+  "caption": "Y-axis for a time scale with values from Thursday, 01 January 1970, 1:00:00 AM to , NaN  0NaN, 12:NaN:NaN AM"
+ },
+ {
   "fixture": "aggregate-ops-rest",
   "kind": "axis",
   "caption": "X-axis titled 'variance' for a linear scale with values from 0 to 14"
@@ -18,6 +108,41 @@
   "fixture": "aggregate-ops-tail",
   "kind": "legend",
   "caption": "Symbol legend titled 'operation' for fill color with 4 values: sum, prod, exp, expb"
+ },
+ {
+  "fixture": "an-axis-joins-its-ticks-by-value",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 5 values: 1001, 1001, null, null, true"
+ },
+ {
+  "fixture": "an-axis-joins-its-ticks-by-value",
+  "kind": "legend",
+  "caption": "Symbol legend for fill color with 5 values: 1001, 1001, null, null, true"
+ },
+ {
+  "fixture": "an-axis-keys-a-date-by-its-second",
+  "kind": "axis",
+  "caption": "Y-axis for a time scale with values from Thursday, 01 January 1970, 1:00:00 AM to Thursday, 01 January 1970, 1:00:00 AM"
+ },
+ {
+  "fixture": "an-axis-keys-a-date-by-its-second",
+  "kind": "axis",
+  "caption": "Y-axis for a time scale with values from Thursday, 01 January 1970, 1:00:00 AM to Thursday, 01 January 1970, 1:00:04 AM"
+ },
+ {
+  "fixture": "an-axis-keys-a-date-by-its-second",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 4"
+ },
+ {
+  "fixture": "an-infinite-extent-is-no-extent",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from NaN to NaN"
+ },
+ {
+  "fixture": "an-infinite-extent-is-no-extent",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 4"
  },
  {
   "fixture": "area-gaps",
@@ -108,6 +233,31 @@
   "fixture": "axis-extent-crossed",
   "kind": "axis",
   "caption": "Y-axis titled 'amount' for a linear scale with values from 0 to 55"
+ },
+ {
+  "fixture": "axis-format-on-a-discrete-scale",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: 100%, 200%, 300%"
+ },
+ {
+  "fixture": "axis-format-on-a-discrete-scale",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: $1.00, $2.00, $3.00"
+ },
+ {
+  "fixture": "axis-format-on-a-discrete-scale",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 3 values: NaN%, NaN%, NaN%"
+ },
+ {
+  "fixture": "axis-format-on-a-discrete-scale",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 3 values: alpha, bravo, charlie"
+ },
+ {
+  "fixture": "axis-format-on-a-discrete-scale",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: 1.00000, 2.00000, 3.00000"
  },
  {
   "fixture": "axis-label-angle",
@@ -228,6 +378,26 @@
   "fixture": "axis-tick-min-step",
   "kind": "axis",
   "caption": "X-axis titled 'a log scale, capped but not walked down' for a log scale with values from 1 to 1,000"
+ },
+ {
+  "fixture": "axis-time-format-oddities",
+  "kind": "axis",
+  "caption": "X-axis for a utc scale with values from ~ to ~"
+ },
+ {
+  "fixture": "axis-time-format-oddities",
+  "kind": "axis",
+  "caption": "X-axis for a utc scale with values from ~ to ~"
+ },
+ {
+  "fixture": "axis-time-format-oddities",
+  "kind": "axis",
+  "caption": "X-axis for a utc scale with values from January to March"
+ },
+ {
+  "fixture": "axis-time-format-oddities",
+  "kind": "axis",
+  "caption": "Y-axis for a utc scale with values from  to "
  },
  {
   "fixture": "axis-values",
@@ -398,6 +568,16 @@
   "fixture": "binned-scales",
   "kind": "axis",
   "caption": "X-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "binned-scales",
+  "kind": "axis",
+  "caption": "X-axis titled 'Quantize' for a quantize scale with 3 boundaries: 30, 52, 73"
+ },
+ {
+  "fixture": "binned-scales",
+  "kind": "axis",
+  "caption": "X-axis titled 'Quantize, niced' for a quantize scale with 3 boundaries: 25, 50, 75"
  },
  {
   "fixture": "box-plot",
@@ -848,6 +1028,21 @@
   "fixture": "density-plot",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0.00 to 0.16"
+ },
+ {
+  "fixture": "discrete-domain-keeps-its-values",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: Thursday, 01 January 1970, 1:00:01 AM, Thursday, 01 January 1970, 1:00:00 AM, Thursday, 01 January 1970, 1:00:00 AM"
+ },
+ {
+  "fixture": "discrete-domain-keeps-its-values",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: 1001, null, true"
+ },
+ {
+  "fixture": "discrete-domain-keeps-its-values",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 9"
  },
  {
   "fixture": "diverging-colour",
@@ -1315,6 +1510,21 @@
   "caption": "Gradient legend titled 'by signal' for fill color with values from 15 January to 16 October"
  },
  {
+  "fixture": "legend-gradient-constant-domain",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'Constant' for fill color with values from 7.000000 to 7.000000"
+ },
+ {
+  "fixture": "legend-gradient-constant-domain",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'Varied' for fill color with values from 1 to 9"
+ },
+ {
+  "fixture": "legend-gradient-constant-domain",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'Sliced' for fill color with values from 7.000000 to 7.000000"
+ },
+ {
   "fixture": "legend-grid-align",
   "kind": "legend",
   "caption": "Symbol legend titled 'each' for size with values from 0 to 2,500"
@@ -1538,6 +1748,21 @@
   "fixture": "log-scale",
   "kind": "axis",
   "caption": "X-axis for a log scale with values from 1 to 1,000"
+ },
+ {
+  "fixture": "log-scale",
+  "kind": "axis",
+  "caption": "X-axis titled 'Base 0' for a log scale with values from 3 to 900"
+ },
+ {
+  "fixture": "log-scale",
+  "kind": "axis",
+  "caption": "X-axis titled 'Base 0.5' for a log scale with values from 3 to 900"
+ },
+ {
+  "fixture": "log-scale",
+  "kind": "axis",
+  "caption": "X-axis titled 'Domain touches zero' for a log scale with values from 0 to 900"
  },
  {
   "fixture": "log-scale",
@@ -1880,6 +2105,21 @@
   "caption": "Y-axis for a discrete scale with 5 values: a, b, c, d, e"
  },
  {
+  "fixture": "scale-variants",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Quantize, keyword range' for a quantize scale with 1 boundary: 202"
+ },
+ {
+  "fixture": "scale-variants",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Ordinal' for a discrete scale with 5 values: a, b, c, d, e"
+ },
+ {
+  "fixture": "scale-variants",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Identity' for a identity scale with values from 1 to 5"
+ },
+ {
   "fixture": "scheme-forms",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 5 values: 0, 1, 2, 3, 4"
@@ -1998,6 +2238,16 @@
   "fixture": "stack-diverging",
   "kind": "legend",
   "caption": "Symbol legend titled 'Series' for fill color with 3 values: gain, loss, other"
+ },
+ {
+  "fixture": "stack-groups-by-json",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 7 values: p, q, nan, inf, null, zero, negzero"
+ },
+ {
+  "fixture": "stack-groups-by-json",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 13"
  },
  {
   "fixture": "stack-offsets",
@@ -2273,6 +2523,16 @@
   "fixture": "u-district-cuisine",
   "kind": "title",
   "caption": "Title text 'A Mile-Long Global Food Market: Mapping Cuisine from “The Ave”'"
+ },
+ {
+  "fixture": "view-size-degenerate",
+  "kind": "axis",
+  "caption": "X-axis titled 'category' for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "view-size-degenerate",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 55"
  },
  {
   "fixture": "window",

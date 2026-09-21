@@ -1,6 +1,6 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "A theme in `config`: guide styles at the bottom of the chain, then axis, then axisX, then axisBottom, then axisBand, with one axis overriding the lot from its own properties.",
+  "description": "A theme in `config`: guide styles at the bottom of the chain, then axis, then axisX, then axisBottom, then axisBand, with one axis overriding the lot from its own properties. Two of those properties are here for where they are *not* read. `tickOffset` is a plain axis property and not a band one, so the linear axis takes the theme's 6 and moves its ticks and its labels by it — while both band axes keep the -0.5 that Vega's own default `config.axisBand` carries, because that block is merged last and beats `config.axis`. And `position` is the one axis property upstream reads from the specification alone: `value(spec.position, 0)` where every other entry in the same block goes through `lookup(spec, config)`. So the theme's 10 moves nothing at all, and the 7 the top axis asks for itself moves that axis.",
   "width": 200,
   "height": 120,
   "padding": 5,
@@ -14,7 +14,9 @@
       "tickColor": "#aa4444",
       "domainColor": "#aa4444",
       "labelPadding": 4,
-      "gridColor": "#dddddd"
+      "gridColor": "#dddddd",
+      "tickOffset": 6,
+      "position": 10
     },
     "axisX": {"tickSize": 6, "tickColor": "#4444aa"},
     "axisBottom": {"tickSize": 9, "labelPadding": 6},
@@ -60,7 +62,7 @@
   ],
   "axes": [
     {"orient": "bottom", "scale": "x", "title": "Band, themed all the way down"},
-    {"orient": "top", "scale": "x", "tickSize": 2, "tickColor": "#000000"},
+    {"orient": "top", "scale": "x", "tickSize": 2, "tickColor": "#000000", "position": 7},
     {"orient": "left", "scale": "y", "tickCount": 4, "grid": true, "title": "Linear"}
   ],
   "legends": [{"fill": "colour", "title": "Series"}],

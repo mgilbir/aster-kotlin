@@ -1,0 +1,306 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A mark's default position is read from the **whole** chain. `pointPositionDefaultRef` asks `getMarkPropOrConfig(channel, markDef, config, {vgChannel})`, which walks the definition under Vega's name for the channel and then Vega-Lite's, and then the configuration the same way — the style blocks, `config[marktype]` under each name, `config.mark`. Read as the definition alone, a theme that places every arc at a radius or every label at an angle placed nothing at all: the mark fell through to the default it would have taken untouched, an arc to `min(width,height)/2` and a text to no angle. The first row is an arc whose radius a theme sets; the second is a text whose angle and radius a theme sets, so the labels stand off the centre at a fixed turn rather than following their slices. A theme's value is still outranked by the mark's own, which the third row states to keep that order drawn rather than assumed.",
+  "background": "white",
+  "padding": 5,
+  "width": 160,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "c": "alpha",
+          "v": 30
+        },
+        {
+          "c": "beta",
+          "v": 20
+        },
+        {
+          "c": "gamma",
+          "v": 50
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [],
+          "field": "v",
+          "sort": {
+            "field": [
+              "c"
+            ],
+            "order": [
+              "ascending"
+            ]
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "childHeight",
+      "value": 160
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "columns": 1,
+    "bounds": "full",
+    "align": "each"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "concat_0_group",
+      "style": "view",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_0_marks",
+          "type": "arc",
+          "style": [
+            "arc"
+          ],
+          "from": {
+            "data": "data_0"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "scale": "color",
+                "field": "c"
+              },
+              "description": {
+                "signal": "\"v: \" + (format(datum[\"v\"], \"\")) + \"; c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"])"
+              },
+              "x": {
+                "signal": "width",
+                "mult": 0.5
+              },
+              "y": {
+                "signal": "childHeight",
+                "mult": 0.5
+              },
+              "outerRadius": {
+                "value": 55
+              },
+              "innerRadius": {
+                "value": 0
+              },
+              "startAngle": {
+                "scale": "concat_0_theta",
+                "field": "v_end"
+              },
+              "endAngle": {
+                "scale": "concat_0_theta",
+                "field": "v_start"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_1_group",
+      "style": "view",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_1_marks",
+          "type": "text",
+          "style": [
+            "text"
+          ],
+          "from": {
+            "data": "source_0"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "black"
+              },
+              "description": {
+                "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"])"
+              },
+              "x": {
+                "signal": "width",
+                "mult": 0.5
+              },
+              "y": {
+                "signal": "childHeight",
+                "mult": 0.5
+              },
+              "text": {
+                "signal": "isValid(datum[\"c\"]) ? datum[\"c\"] : \"\"+datum[\"c\"]"
+              },
+              "align": {
+                "value": "center"
+              },
+              "baseline": {
+                "value": "middle"
+              },
+              "radius": {
+                "value": 70
+              },
+              "theta": {
+                "value": 1.2
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_2_group",
+      "style": "view",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_2_marks",
+          "type": "arc",
+          "style": [
+            "arc"
+          ],
+          "from": {
+            "data": "data_0"
+          },
+          "encode": {
+            "update": {
+              "radius": {
+                "value": 40
+              },
+              "fill": {
+                "scale": "color",
+                "field": "c"
+              },
+              "description": {
+                "signal": "\"v: \" + (format(datum[\"v\"], \"\")) + \"; c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"])"
+              },
+              "x": {
+                "signal": "width",
+                "mult": 0.5
+              },
+              "y": {
+                "signal": "childHeight",
+                "mult": 0.5
+              },
+              "outerRadius": {
+                "value": 40
+              },
+              "innerRadius": {
+                "value": 0
+              },
+              "startAngle": {
+                "scale": "concat_2_theta",
+                "field": "v_end"
+              },
+              "endAngle": {
+                "scale": "concat_2_theta",
+                "field": "v_start"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "data_0",
+        "field": "c",
+        "sort": true
+      },
+      "range": "category"
+    },
+    {
+      "name": "concat_0_theta",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "v_start",
+          "v_end"
+        ]
+      },
+      "range": [
+        0,
+        6.283185307179586
+      ],
+      "zero": true
+    },
+    {
+      "name": "concat_2_theta",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "v_start",
+          "v_end"
+        ]
+      },
+      "range": [
+        0,
+        6.283185307179586
+      ],
+      "zero": true
+    }
+  ],
+  "config": {
+    "style": {
+      "arc": {
+        "radius": 55
+      },
+      "text": {
+        "theta": 1.2,
+        "radius": 70
+      }
+    }
+  }
+}

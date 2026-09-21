@@ -1,0 +1,1026 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A channel may tell its legend which kind to be, and a legend that names its swatches' opacity has said all there is to say. `getLegendType` is `getFirstDefined(legend.type, defaultType(params))`, so a stated kind wins outright, and every rule keyed off the kind follows it: which properties survive the prefix filter, whether a `gradientLength` is written, which encode block is built. The first row is a continuous colour — a ramp by default — told to be **symbols**, and it writes its `type` because it had to be asked for. The second and third are the halves that must not move: a colour told to be the ramp it already was, and a size told to be the swatches it already was, where upstream writes no `type` at all — `if (isColorChannel(channel) && isContinuousToContinuous(scaleType)) { if (legendType === 'gradient') return undefined; } else if (legendType === 'symbol') return undefined;` — because writing it would be writing Vega's own default back at it. The fourth names a `symbolOpacity`, which upstream lets reach the swatch through Vega's own legend handling and therefore stops deriving one from the mark: `const opacity = symbolOpacity === undefined ? (getMaxValue(encoding.opacity) ?? markDef.opacity) : undefined`. Derived anyway, the mark's opacity was written over the legend's, and a chart asking for swatches at a tenth got them at the marks' seven tenths; the test is for presence rather than truth, which the fifth row draws: a legend asking for **zero** has still said what it wants, and the derived value is suppressed all the same — read for truth, a zero would fall through and the swatches would come back at the marks' opacity, which is the opposite of what was asked. **The scales are resolved independently, and that is not decoration**: a concatenation shares its scales by default, so every `color` in it is one scale and every `size` is one, and the legends follow. An earlier draft of this fixture gave each row a field of its own and *still* collapsed four cases into two legends — a distinct field is not enough, the resolution has to say so. The remaining half of the rule — a *size* told to be a ramp — is not drawn here: the specification for it is correct, and this runtime does not render a gradient legend for a scale that carries no colours, which is a gap of its own and not this one.",
+  "background": "white",
+  "padding": 5,
+  "width": 160,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "c": "alpha",
+          "v": 28,
+          "w": 3,
+          "p": 1,
+          "q": 4,
+          "r": 7,
+          "s": 10
+        },
+        {
+          "c": "beta",
+          "v": 55,
+          "w": 7,
+          "p": 2,
+          "q": 5,
+          "r": 8,
+          "s": 11
+        },
+        {
+          "c": "gamma",
+          "v": 43,
+          "w": 5,
+          "p": 3,
+          "q": 6,
+          "r": 9,
+          "s": 12
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "w"
+          ],
+          "field": "v",
+          "sort": {
+            "field": [
+              "p"
+            ],
+            "order": [
+              "descending"
+            ]
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"w\"]) && isFinite(+datum[\"w\"]) && isValid(datum[\"v\"]) && isFinite(+datum[\"v\"]) && isValid(datum[\"p\"]) && isFinite(+datum[\"p\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "w"
+          ],
+          "field": "v",
+          "sort": {
+            "field": [
+              "q"
+            ],
+            "order": [
+              "descending"
+            ]
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"w\"]) && isFinite(+datum[\"w\"]) && isValid(datum[\"v\"]) && isFinite(+datum[\"v\"]) && isValid(datum[\"q\"]) && isFinite(+datum[\"q\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_3",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"w\"]) && isFinite(+datum[\"w\"]) && isValid(datum[\"v\"]) && isFinite(+datum[\"v\"]) && isValid(datum[\"r\"]) && isFinite(+datum[\"r\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_4",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"w\"]) && isFinite(+datum[\"w\"]) && isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_5",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"w\"]) && isFinite(+datum[\"w\"]) && isValid(datum[\"v\"]) && isFinite(+datum[\"v\"]) && isValid(datum[\"s\"]) && isFinite(+datum[\"s\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "childHeight",
+      "value": 60
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "columns": 1,
+    "bounds": "full",
+    "align": "each"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "concat_0_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_0_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_1"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "scale": "concat_0_color",
+                "field": "p"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"w: \" + (format(datum[\"w\"], \"\")) + \"; v: \" + (format(datum[\"v\"], \"\")) + \"; p: \" + (format(datum[\"p\"], \"\"))"
+              },
+              "xc": {
+                "scale": "concat_0_x",
+                "field": "w"
+              },
+              "width": {
+                "value": 5
+              },
+              "y": {
+                "scale": "concat_0_y",
+                "field": "v_end"
+              },
+              "y2": {
+                "scale": "concat_0_y",
+                "field": "v_start"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_0_x",
+          "orient": "bottom",
+          "gridScale": "concat_0_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "gridScale": "concat_0_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "w",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "grid": false,
+          "title": "v",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ],
+      "legends": [
+        {
+          "type": "symbol",
+          "fill": "concat_0_color",
+          "symbolType": "square",
+          "title": "p"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_1_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_1_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_2"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "scale": "concat_1_color",
+                "field": "q"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"w: \" + (format(datum[\"w\"], \"\")) + \"; v: \" + (format(datum[\"v\"], \"\")) + \"; q: \" + (format(datum[\"q\"], \"\"))"
+              },
+              "xc": {
+                "scale": "concat_1_x",
+                "field": "w"
+              },
+              "width": {
+                "value": 5
+              },
+              "y": {
+                "scale": "concat_1_y",
+                "field": "v_end"
+              },
+              "y2": {
+                "scale": "concat_1_y",
+                "field": "v_start"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "gridScale": "concat_1_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "gridScale": "concat_1_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "w",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "grid": false,
+          "title": "v",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ],
+      "legends": [
+        {
+          "fill": "concat_1_color",
+          "gradientLength": {
+            "signal": "clamp(childHeight, 64, 200)"
+          },
+          "title": "q"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_2_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_2_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "from": {
+            "data": "data_3"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"w: \" + (format(datum[\"w\"], \"\")) + \"; v: \" + (format(datum[\"v\"], \"\")) + \"; r: \" + (format(datum[\"r\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_2_x",
+                "field": "w"
+              },
+              "y": {
+                "scale": "concat_2_y",
+                "field": "v"
+              },
+              "size": {
+                "scale": "concat_2_size",
+                "field": "r"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_2_x",
+          "orient": "bottom",
+          "gridScale": "concat_2_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_2_y",
+          "orient": "left",
+          "gridScale": "concat_2_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_2_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "w",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "concat_2_y",
+          "orient": "left",
+          "grid": false,
+          "title": "v",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ],
+      "legends": [
+        {
+          "size": "concat_2_size",
+          "symbolType": "circle",
+          "title": "r",
+          "encode": {
+            "symbols": {
+              "update": {
+                "fill": {
+                  "value": "transparent"
+                },
+                "stroke": {
+                  "value": "#4c78a8"
+                },
+                "opacity": {
+                  "value": 0.7
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_3_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_3_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "from": {
+            "data": "data_4"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"w: \" + (format(datum[\"w\"], \"\")) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_3_x",
+                "field": "w"
+              },
+              "y": {
+                "scale": "concat_3_y",
+                "field": "v"
+              },
+              "size": {
+                "scale": "concat_3_size",
+                "field": "v"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_3_x",
+          "orient": "bottom",
+          "gridScale": "concat_3_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_3_y",
+          "orient": "left",
+          "gridScale": "concat_3_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_3_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "w",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "concat_3_y",
+          "orient": "left",
+          "grid": false,
+          "title": "v",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ],
+      "legends": [
+        {
+          "symbolOpacity": 0.1,
+          "size": "concat_3_size",
+          "symbolType": "circle",
+          "title": "v",
+          "encode": {
+            "symbols": {
+              "update": {
+                "fill": {
+                  "value": "transparent"
+                },
+                "stroke": {
+                  "value": "#4c78a8"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_4_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_4_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "from": {
+            "data": "data_5"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"w: \" + (format(datum[\"w\"], \"\")) + \"; v: \" + (format(datum[\"v\"], \"\")) + \"; s: \" + (format(datum[\"s\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_4_x",
+                "field": "w"
+              },
+              "y": {
+                "scale": "concat_4_y",
+                "field": "v"
+              },
+              "size": {
+                "scale": "concat_4_size",
+                "field": "s"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_4_x",
+          "orient": "bottom",
+          "gridScale": "concat_4_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_4_y",
+          "orient": "left",
+          "gridScale": "concat_4_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_4_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "w",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "concat_4_y",
+          "orient": "left",
+          "grid": false,
+          "title": "v",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ],
+      "legends": [
+        {
+          "symbolOpacity": 0,
+          "size": "concat_4_size",
+          "symbolType": "circle",
+          "title": "s",
+          "encode": {
+            "symbols": {
+              "update": {
+                "fill": {
+                  "value": "transparent"
+                },
+                "stroke": {
+                  "value": "#4c78a8"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "concat_0_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "field": "w"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": false,
+      "padding": 5
+    },
+    {
+      "name": "concat_0_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "fields": [
+          "v_start",
+          "v_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_0_color",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "field": "p"
+      },
+      "range": "ramp",
+      "interpolate": "hcl",
+      "zero": false
+    },
+    {
+      "name": "concat_1_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "w"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": false,
+      "padding": 5
+    },
+    {
+      "name": "concat_1_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "fields": [
+          "v_start",
+          "v_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_1_color",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "q"
+      },
+      "range": "ramp",
+      "interpolate": "hcl",
+      "zero": false
+    },
+    {
+      "name": "concat_2_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_3",
+        "field": "w"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_2_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_3",
+        "field": "v"
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_2_size",
+      "type": "linear",
+      "domain": {
+        "data": "data_3",
+        "field": "r"
+      },
+      "range": [
+        4,
+        361
+      ],
+      "zero": true
+    },
+    {
+      "name": "concat_3_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_4",
+        "field": "w"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_3_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_4",
+        "field": "v"
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_3_size",
+      "type": "linear",
+      "domain": {
+        "data": "data_4",
+        "field": "v"
+      },
+      "range": [
+        4,
+        361
+      ],
+      "zero": true
+    },
+    {
+      "name": "concat_4_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_5",
+        "field": "w"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_4_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_5",
+        "field": "v"
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_4_size",
+      "type": "linear",
+      "domain": {
+        "data": "data_5",
+        "field": "s"
+      },
+      "range": [
+        4,
+        361
+      ],
+      "zero": true
+    }
+  ]
+}

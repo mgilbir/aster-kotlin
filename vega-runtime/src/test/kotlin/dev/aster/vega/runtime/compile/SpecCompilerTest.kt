@@ -538,7 +538,11 @@ class SpecCompilerTest {
     assertEquals(100.0, y.apply(20.0), 1e-9)
 
     val band = compiled.scales["b"] as dev.aster.vega.runtime.scale.BandScale
-    assertEquals(listOf("a", "b"), band.domain, "the domain keeps its order")
+    assertEquals(
+      listOf(VegaValue.Str("a"), VegaValue.Str("b")),
+      band.domain,
+      "the domain keeps its order",
+    )
     assertEquals(listOf(100.0, 0.0), band.range)
   }
 

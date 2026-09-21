@@ -1,0 +1,123 @@
+{
+  "marks": [
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "none #eee | one #eee | all #eee",
+      "type": "text",
+      "x": 2,
+      "y": 6
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "none #eee | one #eee | all #999",
+      "type": "text",
+      "x": 2,
+      "y": 24
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "none #eee | one #eee | all #333",
+      "type": "text",
+      "x": 2,
+      "y": 42
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "none #eee | one #eee | all #333",
+      "type": "text",
+      "x": 2,
+      "y": 60
+    },
+    {
+      "fill": "#eee",
+      "height": 25,
+      "role": "mark",
+      "type": "rect",
+      "width": 30,
+      "x": 160,
+      "y": 70
+    },
+    {
+      "fill": "#eee",
+      "height": 25,
+      "role": "mark",
+      "type": "rect",
+      "width": 30,
+      "x": 200,
+      "y": 70
+    },
+    {
+      "fill": "#eee",
+      "height": 25,
+      "role": "mark",
+      "type": "rect",
+      "width": 30,
+      "x": 240,
+      "y": 70
+    },
+    {
+      "fill": "#eee",
+      "height": 25,
+      "role": "mark",
+      "type": "rect",
+      "width": 30,
+      "x": 280,
+      "y": 70
+    }
+  ],
+  "scales": {
+    "all": {
+      "domain": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "range": [
+        "#eee",
+        "#999",
+        "#333"
+      ]
+    },
+    "none": {
+      "domain": [],
+      "range": [
+        "#eee",
+        "#999",
+        "#333"
+      ]
+    },
+    "one": {
+      "domain": [
+        5
+      ],
+      "range": [
+        "#eee",
+        "#999",
+        "#333"
+      ]
+    }
+  },
+  "size": {
+    "height": 110,
+    "width": 320
+  },
+  "spec": "a-quantile-with-no-samples.vg.json",
+  "vegaVersion": "6.3.1"
+}
