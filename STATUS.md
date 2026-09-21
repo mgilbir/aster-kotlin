@@ -27,7 +27,7 @@ end to end — expressions, signals, all 51 of upstream's 51 documented data tra
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-231 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
+232 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -194,7 +194,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 231 Vega differential fixtures and 332 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 232 Vega differential fixtures and 332 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -226,7 +226,7 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests, and every renderer now exposes the tree: the Android View, the Swift one and Compose Multiplatform. Not verified on physical hardware or with a real user |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 231 Vega differential fixtures |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 232 Vega differential fixtures |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -8599,7 +8599,7 @@ joining an empty one gives the empty string, so no input can tell the branches a
 are one newline-joined string. They are gone, and the reason is written where they were, because the
 next reader will want to put them back.
 
-Found by the widened value sweep: four cases, second-largest cluster. 231 Vega differential
+Found by the widened value sweep: four cases, second-largest cluster. 232 Vega differential
 fixtures.
 
 ### A maximum compares as JavaScript does, not as arithmetic does
@@ -8643,4 +8643,56 @@ numbers, and an ordinary one — and writes `argmin`/`argmax` beside `min`/`max`
 their answer by a different route and genuinely disagree: the maximum of the nested column is `5`
 while the arg-maximum is the row holding `[3]`.
 
-Found by the widened value sweep. 231 Vega differential fixtures.
+Found by the widened value sweep. 232 Vega differential fixtures.
+
+### A symlog is log1p of x over c
+
+One label in the widened value sweep differed in its last two digits: a symlog scale placed 0.2 at
+`57.497097064051715` where upstream has `57.497097064051665`.
+
+d3's transform is one line:
+
+```js
+function transformSymlog(c) {
+  return function(x) { return Math.sign(x) * Math.log1p(Math.abs(x / c)); };
+}
+```
+
+Every part of it is load-bearing.
+
+**`log1p`, not `ln(1 + t)`.** The same function, not the same arithmetic: adding one to a small
+number throws away the low bits before the logarithm ever sees them. That is the two digits above,
+and two digits is exactly enough to fail a comparison.
+
+**`Math.abs(x / c)`, not `abs(x) / c`.** They agree for a positive constant and part company for a
+negative one, where the first is still the logarithm of something positive and the second is `NaN`.
+A `symlog` with a negative constant is legal and upstream draws it.
+
+**`Math.sign(x)`, which is zero at zero**, so a symlog of `-0` is `-0`.
+
+**Transcribed three times, and only one was right** — the fifth time this week, and the first with
+three copies rather than two. The positional scale wrote `if (t < 0) -ln(1 - t) else ln(1 + t)`.
+The colour-ramp transform beside it wrote `if (x < 0) -ln(1 + |x| / c) else ln(1 + x / c)`, which
+divides after taking the absolute value and so is the one that breaks on a negative constant. The
+expression module's `pan` and `zoom` had it exactly, `log1p` and all. The two in the scale module
+now share one definition; the third cannot share it, because its module sits below, and it says so
+in a comment beside itself.
+
+The inverse is the same shape — `Math.sign(x) * Math.expm1(Math.abs(x)) * c` — and had the same
+defect, `exp(x) - 1` for `expm1`.
+
+`a-symlog-is-log1p-of-x-over-c` writes the scaled values out through a text mark rather than leaving
+them to the marks' positions, because the difference is in the last digits and a coordinate is
+rounded long before it reaches the page. Four scales: a domain near zero for `log1p`, a negative
+constant for the division, a domain spanning zero, and an `invert` for the inverse. Three mutants
+die there.
+
+**The sign cannot be seen from a chart, and `SymlogTransformTest` is where it is pinned instead.**
+A mutant that branches on `value < 0` rather than multiplying by `Math.sign` differs only at a
+negative zero, and a scale normalizes the transform's answer against its domain immediately — that
+arithmetic absorbs a `-0` before anything can look at it. Searched for a specification that could
+see it and there is none, so the arm is pinned by a unit test on the transform rather than left
+unclaimed. The same test carries the two observable decisions as reference values read off `node`,
+which is what makes it a transcription check and not a restatement.
+
+Found by the widened value sweep. 232 Vega differential fixtures.

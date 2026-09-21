@@ -12,10 +12,13 @@ import dev.aster.vega.scene.ColorSpaces
 import dev.aster.vega.scene.SceneColor
 import kotlin.math.abs
 import kotlin.math.exp
+import kotlin.math.expm1
 import kotlin.math.floor
 import kotlin.math.ln
+import kotlin.math.ln1p
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlin.math.sign
 
 /**
  * Scale implementations, ported from d3-scale, which is what upstream Vega uses.
@@ -890,14 +893,34 @@ public class SymlogScale(
   round: Boolean = false,
 ) : TransformedScale(name, domain, range, clamp, round) {
 
-  override fun forward(value: Double): Double {
-    val scaled = value / constant
-    return if (scaled < 0.0) -ln(1.0 - scaled) else ln(1.0 + scaled)
-  }
+  override fun forward(value: Double): Double = symlogForward(value, constant)
 
-  override fun backward(value: Double): Double =
-    if (value < 0.0) -constant * (exp(-value) - 1.0) else constant * (exp(value) - 1.0)
+  override fun backward(value: Double): Double = symlogBackward(value, constant)
 }
+
+/**
+ * d3's `transformSymlog`: `Math.sign(x) * Math.log1p(Math.abs(x / c))`.
+ *
+ * Every part of that one line is load-bearing, and this engine had written it out three times with
+ * three different readings.
+ *
+ * **`log1p`, not `ln(1 + t)`.** They are the same function and not the same arithmetic: adding one
+ * to a small number throws away the low bits before the logarithm ever sees them. A symlog scale
+ * over `[0.1, 0.30000000000000004]` placed a value at `…4051715` where upstream has `…4051665` —
+ * the last two digits, which is exactly as much as this costs and exactly enough to fail a
+ * comparison.
+ *
+ * **`Math.abs(x / c)`, and not `abs(x) / c`.** They agree for a positive constant and differ for a
+ * negative one, where the first is still a logarithm of something positive and the second is `NaN`.
+ *
+ * **`Math.sign(x)`, which is zero at zero**, so `symlog(-0)` is `-0` rather than `0`.
+ */
+internal fun symlogForward(value: Double, constant: Double): Double =
+  sign(value) * ln1p(abs(value / constant))
+
+/** Its inverse, d3's `transformSymexp`: `Math.sign(x) * Math.expm1(Math.abs(x)) * c`. */
+internal fun symlogBackward(value: Double, constant: Double): Double =
+  sign(value) * expm1(abs(value)) * constant
 
 /**
  * A continuous scale over instants, in epoch milliseconds.
@@ -1399,10 +1422,9 @@ public sealed interface ScaleTransform {
     override fun forward(value: Double): Double = ln(abs(value)) / logBase
   }
 
-  /** `symlog`, which does handle zero and both signs: `sign(x) * ln(1 + |x| / constant)`. */
+  /** `symlog`, which does handle zero and both signs. See [symlogForward]. */
   public data class Symlog(public val constant: Double = 1.0) : ScaleTransform {
-    override fun forward(value: Double): Double =
-      if (value < 0.0) -ln(1.0 + abs(value) / constant) else ln(1.0 + value / constant)
+    override fun forward(value: Double): Double = symlogForward(value, constant)
   }
 }
 

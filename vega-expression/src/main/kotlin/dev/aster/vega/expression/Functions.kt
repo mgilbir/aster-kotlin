@@ -1538,6 +1538,11 @@ public object Functions {
   ) {
     map[name] = ExpressionFunction { args ->
       val constant = if (pan) args.number(2) else args.number(3)
+      // d3's `transformSymlog`/`transformSymexp`. The scale module has the same pair, as
+      // `symlogForward`/`symlogBackward`, and they cannot share a definition because that module
+      // sits above this one — so if one of them changes, change both. This copy is the one that was
+      // right when the other two drifted: `log1p` rather than `ln(1 + t)`, and `abs(x / c)` rather
+      // than `abs(x) / c`.
       val lift: (Double) -> Double = { kotlin.math.sign(it) * ln1p(abs(it / constant)) }
       val ground: (Double) -> Double = { kotlin.math.sign(it) * expm1(abs(it)) * constant }
       if (pan) panned(args.at(0), args.number(1), lift, ground)
