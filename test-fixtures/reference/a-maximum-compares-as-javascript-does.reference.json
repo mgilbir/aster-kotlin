@@ -1,0 +1,77 @@
+{
+  "marks": [
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "nested 1,2 .. 5   mixed a .. b   plain 1 .. 4",
+      "type": "text",
+      "x": 2,
+      "y": 2
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "argmin row 1   argmax row 4",
+      "type": "text",
+      "x": 2,
+      "y": 18
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "1,2",
+      "type": "text",
+      "x": 2,
+      "y": 40
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "3",
+      "type": "text",
+      "x": 72,
+      "y": 40
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "4",
+      "type": "text",
+      "x": 142,
+      "y": 40
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "5",
+      "type": "text",
+      "x": 212,
+      "y": 40
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 80,
+    "width": 336
+  },
+  "spec": "a-maximum-compares-as-javascript-does.vg.json",
+  "vegaVersion": "6.3.1"
+}

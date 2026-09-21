@@ -27,7 +27,7 @@ end to end — expressions, signals, all 51 of upstream's 51 documented data tra
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-230 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
+231 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -194,7 +194,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 230 Vega differential fixtures and 332 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 231 Vega differential fixtures and 332 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -226,7 +226,7 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests, and every renderer now exposes the tree: the Android View, the Swift one and Compose Multiplatform. Not verified on physical hardware or with a real user |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 230 Vega differential fixtures |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 231 Vega differential fixtures |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -8599,5 +8599,48 @@ joining an empty one gives the empty string, so no input can tell the branches a
 are one newline-joined string. They are gone, and the reason is written where they were, because the
 next reader will want to put them back.
 
-Found by the widened value sweep: four cases, second-largest cluster. 230 Vega differential
+Found by the widened value sweep: four cases, second-largest cluster. 231 Vega differential
 fixtures.
+
+### A maximum compares as JavaScript does, not as arithmetic does
+
+An aggregate's `max` over a column of lists reported `1,2` where upstream reports `5`.
+
+`AggregateOps.js` is where the rule is:
+
+```js
+max: {
+  init: m => m.max = undefined,
+  add:  (m, v) => { if (v > m.max || m.max === undefined) m.max = v; },
+}
+```
+
+Two things, and this engine had the first and not the second. The extreme is tracked over the
+**raw** value rather than a coerced one, which was already right here and is why a word in a numeric
+column never displaces a number — `1 > "abc"` and `"abc" > 1` are both false. And `>` is
+JavaScript's relational operator, which is not a numeric comparison.
+
+ECMA-262 7.2.13 applies `ToPrimitive` with the **number** hint to *both* sides before it asks
+whether it is looking at two strings. An array's `valueOf` gives back the array, which is not a
+primitive, so it falls through to `toString` and the join: `[1,2]` becomes `1,2`, and `[3] > [1,2]`
+is `"3" > "1,2"`, which is true. This engine's `compare` asked "are both of them already strings"
+instead — a reasonable-looking shortcut that is the same test one step too late. With two arrays it
+fell through to the numeric branch, read `NaN` on both sides, answered "no comparison", and so the
+maximum never moved off the first row it was given.
+
+The hint is where this parts company with `+` next door, which was already written down correctly:
+`+` uses the **default** hint, under which a `Date` prefers its sentence, and a relational
+comparison uses the number hint, under which it prefers its instant. So `date1 < date2` compares
+instants while `date1 + date2` concatenates two sentences, and both are right. A mutant that
+primitivizes a date to its sentence dies.
+
+`RelationalComparisonTest` replays eighteen comparisons probed against `node`, including the rows
+that look wrong: `[] <= 0` is true while `[] < 0` is false, `[1,2] <= "1,2"` is true because both
+sides end up strings, and `[10] < [9]` is true because `"10"` sorts before `"9"`.
+
+`a-maximum-compares-as-javascript-does` pins the chart end with three columns — lists, words beside
+numbers, and an ordinary one — and writes `argmin`/`argmax` beside `min`/`max` because those reach
+their answer by a different route and genuinely disagree: the maximum of the nested column is `5`
+while the arg-maximum is the row holding `[3]`.
+
+Found by the widened value sweep. 231 Vega differential fixtures.

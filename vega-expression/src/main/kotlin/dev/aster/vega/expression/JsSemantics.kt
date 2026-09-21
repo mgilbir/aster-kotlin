@@ -248,16 +248,46 @@ public object JsSemantics {
    * Two strings compare lexicographically — so `"10" < "9"` is true — and anything else compares
    * numerically. Returns `null` when the comparison is undefined (a `NaN` operand), which the
    * caller turns into `false`.
+   *
+   * **`ToPrimitive` first, on both sides**, which is ECMA-262 7.2.13 step 1 and is not the same
+   * test as "are both of them strings". An array primitivizes to a string — `[1,2]` to `1,2` — so
+   * `[3] > [1,2]` is a comparison of `"3"` against `"1,2"` and is **true**, where reading both as
+   * numbers gives `NaN` and no answer at all. That is not a curiosity: an aggregate's `max` is `if
+   * (v > m.max) m.max = v` over the raw values, so over a column of lists it kept the first row
+   * forever and reported `1,2` where upstream reports 5.
+   *
+   * The hint is **number**, which is where this parts company with [concatenates] next door: `+`
+   * uses the *default* hint, under which a `Date` prefers its string, and a relational comparison
+   * uses the number hint, under which it prefers its time value. So `date1 < date2` compares
+   * instants while `date1 + date2` concatenates two sentences, and both are right.
    */
   public fun compare(left: VegaValue, right: VegaValue): Int? {
-    if (left is VegaValue.Str && right is VegaValue.Str) {
-      return left.value.compareTo(right.value)
+    val a = toPrimitiveNumberHint(left)
+    val b = toPrimitiveNumberHint(right)
+    if (a is VegaValue.Str && b is VegaValue.Str) {
+      return a.value.compareTo(b.value)
     }
-    val a = toNumber(left)
-    val b = toNumber(right)
-    if (a.isNaN() || b.isNaN()) return null
-    return a.compareTo(b)
+    val x = toNumber(a)
+    val y = toNumber(b)
+    if (x.isNaN() || y.isNaN()) return null
+    return x.compareTo(y)
   }
+
+  /**
+   * `ToPrimitive(value, number)`: what a relational comparison sees before it compares anything.
+   *
+   * Only the three object types move. An array's `valueOf` returns the array itself, which is not a
+   * primitive, so the conversion falls through to `toString` and the join — and an ordinary object
+   * falls through to `[object Object]` the same way. A `Date` under the **number** hint is its time
+   * value, so it is left alone for [toNumber] to read.
+   */
+  private fun toPrimitiveNumberHint(value: VegaValue): VegaValue =
+    when (value) {
+      is VegaValue.Arr,
+      is VegaValue.Obj,
+      is VegaValue.Pattern -> VegaValue.Str(toStringValue(value))
+      else -> value
+    }
 
   // ---- bitwise --------------------------------------------------------------
 
