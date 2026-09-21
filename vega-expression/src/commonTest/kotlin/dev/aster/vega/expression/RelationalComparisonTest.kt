@@ -57,7 +57,7 @@ class RelationalComparisonTest {
   }
 
   @Test
-  fun `an array against a number is numeric, so a list of two answers nothing`() {
+  fun `an array against a number is numeric so a list of two answers nothing`() {
     // "1,2" is not a number, so every comparison with 4 is false — including `>=`.
     assertEquals(false, less(arr(1, 2), num(4.0)))
     assertEquals(false, greater(arr(1, 2), num(4.0)))
@@ -67,7 +67,7 @@ class RelationalComparisonTest {
   }
 
   @Test
-  fun `an empty array is the empty string, which is zero against a number`() {
+  fun `an empty array is the empty string and so is zero against a number`() {
     assertEquals(false, less(arr(), num(0.0)))
     assertEquals(true, lessOrEqual(arr(), num(0.0)))
     // Against the empty string it is a *string* comparison, and they are equal.
@@ -91,7 +91,7 @@ class RelationalComparisonTest {
   }
 
   @Test
-  fun `a date compares as its instant, which is the number hint and not the default one`() {
+  fun `a date compares as its instant under the number hint and not the default one`() {
     assertEquals(true, less(VegaValue.Timestamp(0.0), VegaValue.Timestamp(1.0)))
     // `datetime(0) < 1` is true: the relational comparison reads the time value, where `+` would
     // have read the sentence. The two hints differ for exactly this type.
@@ -106,7 +106,7 @@ class RelationalComparisonTest {
   }
 
   @Test
-  fun `a flag and a null are read as numbers, not as words`() {
+  fun `a flag and a null are read as numbers rather than as words`() {
     // `true < [1]` is false and `true <= [1]` is true: 1 against "1" is not two strings, so both
     // reach 1. A reading that stringified the flag would have compared "true" with "1".
     assertEquals(false, less(VegaValue.Bool(true), arr(1)))

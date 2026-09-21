@@ -240,6 +240,7 @@ public final class dev/aster/vega/dataflow/transform/DotBinTransform : dev/aster
 public final class dev/aster/vega/dataflow/transform/ExtentTransform : dev/aster/vega/dataflow/transform/Transform {
 	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/ExtentTransform;
 	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public final fun extentOf (Ljava/lang/Iterable;)Lkotlin/ranges/ClosedFloatingPointRange;
 	public fun getPublishesSignal ()Z
 	public fun getType ()Ljava/lang/String;
 }

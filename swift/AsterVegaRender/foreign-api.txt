@@ -1217,6 +1217,7 @@ ExpressionSyntaxException.offset
 ExpressionSyntaxException.source
 ExtentTransform
 ExtentTransform.apply(input:params:context:)
+ExtentTransform.extentOf(values:)
 ExtentTransform.init()
 ExtentTransform.publishesSignal
 ExtentTransform.shared
