@@ -40,6 +40,30 @@
   "hidden": false
  },
  {
+  "fixture": "a-domain-a-signal-holds",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-domain-a-signal-holds",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-domain-a-signal-holds",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "a-gradient-over-a-column-with-no-number",
   "kind": "group",
   "role": "graphics-object",
@@ -81,6 +105,38 @@
  },
  {
   "fixture": "a-label-that-is-a-list-of-lines",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-list-keyed-and-a-list-captioned",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-list-keyed-and-a-list-captioned",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-list-keyed-and-a-list-captioned",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-list-keyed-and-a-list-captioned",
   "kind": "group",
   "role": "graphics-object",
   "roleDescription": "group mark container",
@@ -292,6 +348,38 @@
   "kind": "text",
   "role": "graphics-object",
   "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-short-domain-is-still-a-scale",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-short-domain-is-still-a-scale",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-short-domain-is-still-a-scale",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-short-domain-is-still-a-scale",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
   "label": null,
   "hidden": false
  },

@@ -159,7 +159,13 @@ public class LinearScale(
 ) : PositionScale, InvertibleScale {
 
   init {
-    require(domain.size >= 2) { "A linear scale needs at least two domain values, got $domain" }
+    // **A domain of fewer than two values is still a scale**, which this used to refuse. d3 builds
+    // one, places nothing through it and answers `NaN`: `domain([])` scales 7 to `NaN`, and so does
+    // `domain([5])`. So upstream has a scale for a chart to name and every `scale()` naming it
+    // answers `NaN`, where refusing to build one made the scale **absent** — the expression then
+    // reported an undefined scale, and a chart lost its marks to a diagnostic about something it
+    // had
+    // not got wrong. The `NaN` itself comes from [unrounded].
     require(range.size >= 2) { "A linear scale needs at least two range values, got $range" }
   }
 
@@ -202,6 +208,11 @@ public class LinearScale(
 
   private fun unrounded(x: Double): Double {
     if (x.isNaN()) return Double.NaN
+    // Fewer than two stops is d3's `NaN`, and there it falls out of the arithmetic rather than
+    // being tested for: `normalize` reads `domain[0]` and `domain[1]`, and an absent end is
+    // `undefined`, which poisons the subtraction. Written as a test here because Kotlin throws on
+    // the index instead of answering `undefined`.
+    if (stops < 2) return Double.NaN
     // A zero-extent domain has no gradient; d3 returns the range midpoint rather than dividing by
     // 0.
     val d0 = domain[0]
@@ -275,6 +286,7 @@ public class LinearScale(
     // reads 1. A brush or a tooltip built on that selects data the scale says is not there.
     val clamped = if (clamp) position.coerceIn(minOf(r0, r1), maxOf(r0, r1)) else position
     val t = (clamped - r0) / (r1 - r0)
+    if (stops < 2) return Double.NaN
     return domain[0] + t * (domain[1] - domain[0])
   }
 
@@ -301,8 +313,23 @@ public class LinearScale(
     return domain[segment] * (1 - t) + domain[segment + 1] * t
   }
 
+  /**
+   * The domain's ends as d3 reads them, which is **`undefined` for an end that is not there**.
+   *
+   * `domain[0]` on an empty list is `undefined` in JavaScript and an exception in Kotlin, and every
+   * tick rule downstream is written to take the `NaN` that `undefined` coerces to: `ticks(NaN, NaN,
+   * n)` is `[]`, which is exactly what upstream draws over an empty domain. A single-valued domain
+   * needs no special case either — `start == stop` gives `[start]`, and upstream draws that one
+   * tick.
+   */
+  private val domainStart: Double
+    get() = domain.firstOrNull() ?: Double.NaN
+
+  private val domainEnd: Double
+    get() = domain.lastOrNull() ?: Double.NaN
+
   public fun ticks(count: Int = DEFAULT_TICK_COUNT): List<Double> =
-    Ticks.ticks(domain.first(), domain.last(), count)
+    Ticks.ticks(domainStart, domainEnd, count)
 
   /** Default label text for a tick, matching Vega's digits-from-step behaviour. */
   public fun formatTick(
@@ -310,7 +337,7 @@ public class LinearScale(
     count: Int = DEFAULT_TICK_COUNT,
     locale: VegaLocale = VegaLocale.EnglishUS,
   ): String {
-    val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
+    val step = Ticks.stepFrom(Ticks.tickIncrement(domainStart, domainEnd, count))
     val precision = if (step.isFinite()) Ticks.precisionForStep(step) else DEGENERATE_PRECISION
     return formatTickLabel(value, precision, locale)
   }

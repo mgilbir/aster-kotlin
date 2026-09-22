@@ -597,6 +597,40 @@ function CHARTS() {
   ];
 }
 
+/**
+ * What the chart **says**, as against what it draws.
+ *
+ * A guide's caption is an `aria-label` attribute, so the scenegraph comparison cannot see it: every
+ * other field of this reference comes from `view.scenegraph()`, and the captions are not in it. That
+ * is a whole surface this sweep was blind to — and the rules behind it are not the ones behind the
+ * geometry. A caption is built from the **labels**, so it reads a value through the formatter, where
+ * a scale's domain keys the same value by `String` of the whole array; one column of lists is
+ * captioned `a,null,c` and keyed `a,,c`, and only one of those two was ever compared here.
+ *
+ * Rendered to SVG for it, which is where upstream puts the attribute, and read back with the same
+ * expression `scripts/oracle.sh` uses on the fixtures — so a caption means the same thing in both
+ * corpora.
+ */
+async function captionsOf(view) {
+  const svg = await view.toSVG();
+  const unescape = (s) =>
+    s
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, '&');
+  const found = [];
+  const pattern = /aria-roledescription="(axis|legend|title|subtitle)" aria-label="([^"]*)"/g;
+  let m;
+  while ((m = pattern.exec(svg)) !== null) {
+    found.push({ kind: m[1], caption: unescape(m[2]) });
+  }
+  // Sorted, because the order a screen reader meets them in is the scene tree's and not the
+  // caption's — the same reason `GuideCaptionTest` compares them sorted.
+  return found.sort((a, b) => (a.kind + a.caption).localeCompare(b.kind + b.caption));
+}
+
 function withColumn(chart, column) {
   const spec = JSON.parse(JSON.stringify(chart.spec));
   const rows = column.values.map((v, i) => ({ v, k: `r${i}`, n: i + 1 }));
@@ -659,6 +693,7 @@ for (const one of cases) {
     spec: `${one.name}.vg.json`,
     size: surfaceSize(view, one.spec),
     scales: normalizeScales(view, scaleNames),
+    captions: await captionsOf(view),
     ...normalizeScene(view.scenegraph().root),
   };
   writeFileSync(join(referenceDir, `${one.name}.reference.json`), canonicalJson(reference));

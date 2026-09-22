@@ -5,8 +5,13 @@ package dev.aster.vega.runtime.differential
 import dev.aster.vega.fixtures.VegaHeadlessTextEngine
 import dev.aster.vega.loader.FileDataLoader
 import dev.aster.vega.model.DiagnosticSeverity
+import dev.aster.vega.model.VegaJson
+import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asString
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.runtime.compile.SpecCompiler
+import dev.aster.vega.scene.GroupNode
+import dev.aster.vega.scene.SceneNode
 import java.io.File
 import java.util.Locale
 import org.junit.jupiter.api.Assumptions.assumeTrue
@@ -85,7 +90,8 @@ class ValueSweepTest {
           }
           sizeDifference(reference, scene) +
             Differential.compareMarks(reference.marks, Differential.flattenScene(scene)) +
-            Differential.compareScales(reference.scales, compiled.scales)
+            Differential.compareScales(reference.scales, compiled.scales) +
+            captionDifferences(File(referenceDir, "$name.reference.json"), scene)
         } catch (error: Throwable) {
           val key = "threw: ${error::class.simpleName}: ${shape(error.message ?: "")}"
           causes.getOrPut(key) { linkedSetOf() } += name
@@ -161,6 +167,64 @@ class ValueSweepTest {
     println()
     println("per case: ${File(referenceDir.parentFile, "report.tsv")}")
     println("==== end ====")
+  }
+
+  /**
+   * What the chart **says**, compared with what upstream says.
+   *
+   * Every other field this sweep compares comes from the scenegraph, and a guide's caption is not
+   * in it: upstream writes it as an `aria-label` attribute, so 499 charts were being compared
+   * without anyone listening to one of them. The rules behind a caption are not the rules behind
+   * the geometry either — it is built from the **labels**, so it reads a value through the
+   * formatter, where a discrete domain keys that same value by `String` of the whole array. One
+   * column of lists is captioned `a,null,c` and keyed `a,,c`, and only the second was ever checked
+   * here.
+   *
+   * Read straight out of the reference file rather than through [Differential.Reference], because
+   * the fixture corpus's references carry no `captions` field and this is the sweep's own question.
+   *
+   * **Sorted within a kind**, as `GuideCaptionTest` compares them: the order a screen reader meets
+   * two axes in is the scene tree's and not the caption's, so comparing by position would report a
+   * difference for a chart that says exactly the right things in a different order.
+   */
+  private fun captionDifferences(
+    file: File,
+    scene: dev.aster.vega.scene.Scene,
+  ): List<Differential.Difference> {
+    val root = VegaJson.parse(file.readText()) as VegaValue.Obj
+    val wanted =
+      (root.fields["captions"] as? VegaValue.Arr)?.values.orEmpty().map {
+        val obj = it as VegaValue.Obj
+        obj.fields["kind"]!!.asString() to obj.fields["caption"]!!.asString()
+      }
+    val ours = mutableListOf<Pair<String, String>>()
+    fun walk(node: SceneNode) {
+      val kind =
+        when (node.metadata.role) {
+          "axis" -> "axis"
+          "legend" -> "legend"
+          "title-text" -> "title"
+          "title-subtitle" -> "subtitle"
+          else -> null
+        }
+      if (kind != null) node.metadata.accessibility?.let { ours += kind to it.label }
+      if (node is GroupNode) node.children.forEach(::walk)
+    }
+    walk(scene.root)
+
+    return buildList {
+      for (kind in (wanted.map { it.first } + ours.map { it.first }).distinct().sorted()) {
+        val want = wanted.filter { it.first == kind }.map { it.second }.sorted()
+        val got = ours.filter { it.first == kind }.map { it.second }.sorted()
+        if (want.size != got.size) {
+          add(Differential.Difference("$kind caption count", "${want.size}", "${got.size}"))
+          continue
+        }
+        want.zip(got).forEach { (a, b) ->
+          if (a != b) add(Differential.Difference("$kind caption", a, b))
+        }
+      }
+    }
   }
 
   /** The surface size, as a [Differential.Difference] so it ranks beside every other cause. */

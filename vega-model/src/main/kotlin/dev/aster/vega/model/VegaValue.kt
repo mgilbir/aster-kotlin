@@ -212,7 +212,15 @@ public fun VegaValue.asString(): String =
     is VegaValue.Bool -> value.toString()
     is VegaValue.Null -> "null"
     is VegaValue.Undefined -> "undefined"
-    is VegaValue.Arr -> values.joinToString(",") { it.asString() }
+    // **`Array.prototype.join`**, which writes an **empty string** for a null or undefined element:
+    // `String([null])` is `""`, `String([1, null])` is `"1,"` and `String(["a", null, "c"])` is
+    // `"a,,c"`. Not a curiosity — this is the key a data-driven discrete domain groups by,
+    // upstream's
+    // `'' + value`, so `[null]` and `[]` are **one** category there and a band axis over both draws
+    // one tick. Writing `null` here gave it two.
+    //
+    // A *caption* reads the same column differently and correctly so; see `GuideCaption.spoken`.
+    is VegaValue.Arr -> values.joinToString(",") { if (it.isNullish) "" else it.asString() }
     is VegaValue.Obj -> fields.entries.joinToString(",") { "${it.key}:${it.value.asString()}" }
     // `'' + regexp('a.b','i')` is `/a.b/i`, which is the literal a reader would have written.
     is VegaValue.Pattern -> text

@@ -5,6 +5,16 @@
   "caption": "X-axis for a discrete scale with 5 values: 1, 2.5, 4, 0, 100"
  },
  {
+  "fixture": "a-domain-a-signal-holds",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0.000000 to 0.000000"
+ },
+ {
+  "fixture": "a-domain-a-signal-holds",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
   "fixture": "a-gradient-over-a-column-with-no-number",
   "kind": "legend",
   "caption": "Gradient legend titled 'no number' for fill color with values from NaN to NaN"
@@ -23,6 +33,16 @@
   "fixture": "a-label-that-is-a-list-of-lines",
   "kind": "legend",
   "caption": "Symbol legend for fill color with 4 values: 1,2, 3, plain, a,b,c"
+ },
+ {
+  "fixture": "a-list-keyed-and-a-list-captioned",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: a,null,c, null, 1,null, only"
+ },
+ {
+  "fixture": "a-list-keyed-and-a-list-captioned",
+  "kind": "legend",
+  "caption": "Symbol legend for fill color with 4 values: a,null,c, null, 1,null, only"
  },
  {
   "fixture": "a-log-axis-labels-with-twelve-digits",
@@ -73,6 +93,11 @@
   "fixture": "a-scale-coerces-what-it-is-given",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0 to 20"
+ },
+ {
+  "fixture": "a-short-domain-is-still-a-scale",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from NaN to NaN"
  },
  {
   "fixture": "a-stack-propagates-what-it-cannot-add",

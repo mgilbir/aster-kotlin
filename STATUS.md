@@ -27,7 +27,7 @@ end to end — expressions, signals, all 51 of upstream's 51 documented data tra
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-236 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
+239 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -194,7 +194,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 236 Vega differential fixtures and 332 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 239 Vega differential fixtures and 332 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -226,7 +226,7 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests, and every renderer now exposes the tree: the Android View, the Swift one and Compose Multiplatform. Not verified on physical hardware or with a real user |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 236 Vega differential fixtures |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 239 Vega differential fixtures |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -8599,7 +8599,7 @@ joining an empty one gives the empty string, so no input can tell the branches a
 are one newline-joined string. They are gone, and the reason is written where they were, because the
 next reader will want to put them back.
 
-Found by the widened value sweep: four cases, second-largest cluster. 236 Vega differential
+Found by the widened value sweep: four cases, second-largest cluster. 239 Vega differential
 fixtures.
 
 ### A maximum compares as JavaScript does, not as arithmetic does
@@ -8643,7 +8643,7 @@ numbers, and an ordinary one — and writes `argmin`/`argmax` beside `min`/`max`
 their answer by a different route and genuinely disagree: the maximum of the nested column is `5`
 while the arg-maximum is the row holding `[3]`.
 
-Found by the widened value sweep. 236 Vega differential fixtures.
+Found by the widened value sweep. 239 Vega differential fixtures.
 
 ### A symlog is log1p of x over c
 
@@ -8695,7 +8695,7 @@ see it and there is none, so the arm is pinned by a unit test on the transform r
 unclaimed. The same test carries the two observable decisions as reference values read off `node`,
 which is what makes it a transcription check and not a restatement.
 
-Found by the widened value sweep. 236 Vega differential fixtures.
+Found by the widened value sweep. 239 Vega differential fixtures.
 
 ### A colour ramp does not clamp
 
@@ -8748,7 +8748,7 @@ it because the normalizer canonicalizes a mark's fill, and it shows only when an
 scale's answer into a label. It is a different question from clamping — how a colour is written,
 not which colour it is — and it is the next change.
 
-236 Vega differential fixtures.
+239 Vega differential fixtures.
 
 ### A null line is an empty line
 
@@ -8791,7 +8791,7 @@ The domain key is `String` of the **whole array**, where a null joins as nothing
 broke the second — a gate caught it immediately. Two transcriptions that genuinely differ is the
 opposite of the shape this week has been full of, and it is the next change rather than this one.
 
-236 Vega differential fixtures.
+239 Vega differential fixtures.
 
 ### A quantile cut that lands on a sample
 
@@ -8827,7 +8827,7 @@ so the fixture says what this costs an ordinary chart, which is nothing.
 algebra and not in floating point — but the only case that observes the difference here has `w = 0`
 and an infinite `value1`, where both forms reach NaN. d3's form is kept because it is d3's form.
 
-Found by the widened value sweep, which went 481 to 495 of 499 across this stack. 236 Vega
+Found by the widened value sweep, which went 481 to 495 of 499 across this stack. 239 Vega
 differential fixtures.
 
 ### A gradient over a column with no number, and the sweep reaches 100%
@@ -8867,4 +8867,314 @@ cost a chart with numbers in it, which is nothing. Three mutants die. A fourth �
 entries it chooses between are both `NaN`, with the same label and the same position.
 
 **The widened sweep is now 499 of 499.** It opened at 481 and cost nine changes, of which five were
-a rule transcribed twice and one was a rule transcribed three times. 236 Vega differential fixtures.
+a rule transcribed twice and one was a rule transcribed three times. 239 Vega differential fixtures.
+
+### The iOS UI gate is red on Xcode 27, and what that is not
+
+`scripts/check.sh`'s `ios-ui` gate fails on this machine and passes on CI. The whole of what is
+known is written down here because the machine is about to be upgraded, and the upgrade destroys
+the evidence.
+
+**The signature.** Of the three `AccessibilityUITests`, the **second** one run —
+`testEveryBarIsItsOwnElementLabelledWithItsDatum` — is reported as
+`Test crashed with signal kill`. Every one of its assertions passes first: the log shows all eight
+bars found, `Jan: 28` through `Aug: 87`, then `Tear Down`, then
+`Restarting after unexpected exit, crash, or test timeout`. The runner restarts and the third test
+passes. Run **alone** it passes in 36.9 seconds.
+
+So nothing about that test is failing. What dies is the simulator underneath it.
+
+**What actually crashes.** `SpringBoard` — the simulator's home screen, not the demo — aborts with
+
+```
+Termination Reason: Namespace METAL, Code 102,
+Connection to SimMetalHost (version=L10/R10, profile=8) XPC service was lost:
+XPC_ERROR_CONNECTION_INTERRUPTED
+```
+
+on the queue that renders **home-screen app icons**, inside
+`-[MTLSimDevice newTextureWithDescriptor:]`. Beside it in `~/Library/Logs/DiagnosticReports` are
+`SimRenderServer` crashing with `EXC_BREAKPOINT` inside CoreSimulator's own code, plus `backboardd`
+and `testmanagerd`, all at the same timestamps. When the simulator's Metal host goes, every Metal
+client in that simulator goes with it, and the app under test is collateral — which is why the
+failure lands on whichever test happens to be running.
+
+**Four things it is not**, each checked rather than assumed:
+
+- **Not the engine.** CI ran the same three tests on the same commits and reported
+  `3 case(s), 0 failing`. And the gate fails identically on `f5ddae6f`, the commit before the
+  83-PR stack landed.
+- **Not a damaged simulator.** Both `AsterVega-*` devices were deleted and one recreated from
+  scratch by the gate. Identical failure, same position.
+- **Not `simslim`.** It is installed (`0.10.0`, Homebrew, the same day), and disabling simulator
+  daemons is exactly the shape of thing that could cause this — but no device in any set is
+  slimmed, the device has no `data/var/db/com.apple.xpc.launchd/` at all, and the shared runtime
+  has no modified launch daemon or agent. A device made after the deletion fails the same way.
+- **Not a universal simulator bug.** GitHub's runner runs the same script and passes.
+
+**What is left is the toolchain, and the seam is visible.** CI runs **Xcode 26.6** (`17F113`); this
+machine runs **Xcode 27.0** (`27A266a`) on **macOS 26.6.2** (`25G83`), with CoreSimulator
+**1171.7** and the **iOS 26.5** runtime (`23F77`).
+
+The part that matters is *where* CoreSimulator lives:
+
+```
+/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/Resources/
+    SimRenderingServices.simdeviceio/Contents/XPCServices/SimRenderServer.xpc
+    SimRenderingServices.simdeviceio/Contents/XPCServices/SimMetalHost.xpc
+```
+
+**Outside `Xcode.app`, machine-wide, one copy**, owned by the newest Xcode installed — `Xcode.app`
+bundles none of its own. So the two processes that crash are Xcode 27's, and installing an older
+Xcode beside it would not give them back: only removing the newer one would. Meanwhile Xcode 27.0
+declares `LSMinimumSystemVersion = 26.6` while being built against macOS 27 (`DTSDKName =
+macosx27.0.internal`, shipping `MacOSX27.0.sdk`). This machine is therefore at the exact floor of
+what that Xcode supports: its newest simulator host framework against a host Metal stack one major
+version older than the one it was developed against.
+
+That is a hypothesis with a mechanism, not a diagnosis. **CI differs in both toolchain and
+hardware**, so "Xcode 27's simulator" and "this particular Mac" are not separated, and there is no
+second Xcode or second iOS runtime installed here to separate them with.
+
+**What would settle it**, cheapest first: install an **older iOS runtime** beside 26.5 and point the
+gate at it — that splits the runtime from the host framework without touching anything else; then
+macOS **26.7**; then macOS **27 Golden Gate** (`26A428`), which aligns the OS with the Xcode already
+installed and is the best-odds single change. All three were available from
+`softwareupdate --list-full-installers` on 2026-09-22.
+
+**No retry flag.** `-retry-tests-on-failure` would turn this green, and would hide a real crash
+exactly as well as it hides this one. The gate is honestly red until the cause is known.
+
+### A list is keyed one way and captioned another, and both are upstream's
+
+Left open by the value-sweep work, and this is the resolution: the two readings that could not be
+made one function.
+
+A data-driven discrete domain **groups** by `'' + value`, which for an array is
+`Array.prototype.join` — a null element contributes **nothing**. A **caption** is built from the
+**labels**, and a label has been through the formatter by then, which for a discrete scale with no
+format is `String` applied to **each element** — under which a null is the four letters. Upstream's
+own output for one column of lists, harvested in the same run:
+
+```
+x domain: ["a,,c", "", "1,", "only"]
+caption:  X-axis for a discrete scale with 4 values: a,null,c, null, 1,null, only
+```
+
+Five rows, **four** bands: `[null]` and `[]` both key as the empty string and are one category.
+The caption of that same axis names a null out loud.
+
+This engine had `VegaValue.asString` joining an array with each element's own text — the caption's
+rule standing in the key's place — so the domain gained a fifth band upstream does not draw. The
+one-line fix to `asString` was written during the earlier change and **taken out again**, because
+it corrected the domain and broke the caption in the same run. That was the evidence that the rule
+is genuinely two-sided rather than transcribed twice: the six defects before it were one rule
+drifting into two copies, and this is the opposite shape — two rules that a single function had
+been asked to answer.
+
+So `asString` is now the **key's** rule, `Array.prototype.join`, and `GuideCaption.captionText` is
+the **caption's**, per element. Each says what the other is for.
+
+`a-list-keyed-and-a-list-captioned` puts both on one chart — a band axis and an ordinal legend over
+the column, and a text mark writing the raw cell — so the disagreement is visible rather than
+inferred. Three mutants die: the key taking the caption's rule, the caption taking the key's, and
+the key joining without its comma.
+
+239 Vega differential fixtures.
+
+### The value sweep hears what a chart says
+
+The sweep compared what 499 charts **draw** — marks, scales, surface — and nothing about what they
+**say**. A guide's caption is an `aria-label` attribute, so it is not in the scenegraph at all, and
+every field the reference carried came from the scenegraph.
+
+That is not a small omission, because a caption does not follow the geometry's rules. It is built
+from the **labels**, so it reads a value through the formatter; a scale's domain keys that same
+value by `String` of the whole array. One column of lists is captioned `a,null,c` and keyed `a,,c`
+— the split resolved in the change above — and only the keyed half was ever compared here. That
+defect was found by the fixture corpus, which does harvest captions, and the sweep with its 25
+columns of deliberately awkward values could not have found it.
+
+So the sweep now renders each case to SVG as well, reads the captions back with the same expression
+`scripts/oracle.sh` uses on the fixtures, and compares them sorted within a kind — the order two
+axes reach a screen reader in is the scene tree's, not the caption's.
+
+**324 of the 499 cases carry at least one caption**, and all 499 still agree: **499 of 499**.
+
+A widening that finds nothing is worth exactly as much as the confidence that it *could* have. So
+it was checked rather than assumed: a mutant that changes what a discrete caption says takes the
+tally from 499 matched to **224**, with 275 cases differing. The comparison is live over 275 cases
+and the engine passes it.
+
+No engine change. The instrument grew a sense it did not have.
+
+### A signal sweep: what a chart becomes after something is written into it
+
+Every corpus here compares a chart **as first drawn**. The fixtures, the gallery, the 1981 wild
+specifications, both schema sweeps and the value sweep all build a chart, draw it once and compare
+what came out. Not one of them ever changes something and looks again.
+
+So half of what this engine does had never been compared with anything.
+`VegaChartController.setSignal` pins a value, cascades it through every signal sourced on it and
+compiles the specification again — a slider, a dropdown, a fired handler. `SignalInputTest` asserts
+by hand what that should produce. Nothing had asked upstream what it does.
+
+One chart per **thing a signal can reach**: a scale's domain, a mark's own property, an axis's tick
+count, a title's words, a transform's parameter, and a signal *derived* from the one written, which
+tests the cascade rather than the write. The values are deliberately not all sensible, for the
+reason the value sweep exists — a binding is a door a host writes through, and what arrives is
+whatever its control produced. **45 cases**, of which upstream refuses one: a tick count of `"four"`
+is answered with "Only time and utc scales accept interval strings."
+
+**28 of 43 agree.** That number is the second one this sweep produced, and the first was wrong in a
+way worth recording.
+
+**`enter` is not `update`, and the first run of this measured the difference between them.** An
+`enter` encode runs once, when an item is created, and a signal written afterwards never reaches
+it — probed directly: a `strokeWidth` in `enter` holds its first value however often the signal
+changes, while the same channel in `update` tracks it. The sweep's charts were written with `enter`,
+so upstream was being asked not to react and this engine reacted anyway. That reported 27
+differences at 37.2%, and about half of them were the sweep's own specifications. Rewritten with
+`update` — which runs on the first render too, so it is the whole encode — the tally is 65.1%.
+
+A new instrument's first number should be distrusted exactly this much.
+
+What the remaining 15 are, and they are not one thing:
+
+- **the incremental dataflow, 3 cases.** Upstream does not rebuild a chart when a filter's parameter
+  changes; it *adds and removes rows*. So a data-driven domain keeps the order the surviving rows
+  already had and appends the re-admitted ones — `[b, c, d, a]` where a fresh compile gives
+  `[a, b, c, d]`. This engine recompiles, so it always produces the fresh order. That is an
+  architectural difference rather than a defect to patch, and it is the one this sweep exists to
+  have written down.
+- **a domain a signal holds, 3 cases.** Written `[100, 0]`, upstream keeps the order and `zero`
+  reads the *ends* rather than the extremes, giving `[0, 0]` and flat bars; this engine sent a
+  signal-held domain down the extent path, which answers `min()..max()`, so it came back ascending.
+  An empty domain is a scale upstream still builds — it places nothing and answers `NaN` — where
+  this engine reports an error and builds none. A domain of `"not a domain"` is twelve entries
+  upstream, one per character, and two here.
+- **retention, 2 cases.** Writing `null` over a domain leaves upstream's scale as it was, so it
+  keeps `[0, 100]`; this engine recompiles and gets what a *fresh* compile with a null domain gets.
+  Which is the same thing upstream gets, checked rather than assumed: rendered from scratch with the
+  signal initialised to null, upstream's domain is `[0, 1]` and its surface is 231x10925 — within
+  ten pixels of this engine's. The first reading of this entry called that a robustness defect and a
+  layout blown up by a stray null. It is neither. It is the same architectural difference as the row
+  ordering above, and the only way to tell the two apart was to render fresh and compare.
+- **a non-numeric mark property, 2 cases.** Upstream puts `true` and `wide` on the item as written;
+  this engine drops the channel.
+- **a tick count that is not a whole number, and a two-line title**, the rest.
+
+Report-only, as every sweep here is: `scripts/signal-sweep.sh` runs it, `SignalSweepTest` compares,
+and each cause above is its own change. `-PsignalSweepCase=<substring>[,…]` prints every difference
+for the cases that match.
+
+### A domain a signal holds is the list it was given
+
+The first cause out of the signal sweep, and it needs no signal to see: a fresh compile shows it,
+so an ordinary fixture pins it.
+
+A scale domain written `{"signal": "dom"}` is the list that signal holds, in the order it holds it —
+upstream draws no distinction between that and a domain written out in the specification, because
+`scale.domain(_)` is handed whatever either produced. This engine recognised only the written-out
+form as a domain and sent the signal's through the **extent** path, which answers `min()..max()`.
+
+So a descending domain came back ascending, and everything derived from it was backwards. `[100, 0]`
+is legal and reverses a scale, and `zero` reads the domain's **ends** rather than its extremes: a
+positive first entry is pulled to zero and a last entry that is already zero is left alone, so
+upstream's domain is `[0, 0]` and every bar is flat. Sorted first it becomes `[0, 100]`, and the
+chart draws as though nothing odd had been asked for — which is the worst kind of wrong, because
+nothing about it looks wrong.
+
+`a-domain-a-signal-holds` pins it with a descending domain and the same shape the right way round,
+so the fixture also says what the rule costs an ordinary chart, which is nothing. Two mutants: the
+signal domain sent back down the extent path, and a literal domain sorted like one.
+
+**Observed and not reproduced: a domain of fewer than two values is still a scale.** Upstream builds
+it, places nothing through it and answers `NaN` — `[]` gives a domain of `[]` with no ticks, and
+`[5]` gives `[0]` with one. This engine reports `needs at least two domain values` and builds no
+scale at all, so every `scale()` naming it then fails too. Probed both; it is a separate rule from
+the ordering above and wants the scale classes to accept a short domain, which is why it is written
+down here rather than folded into a change that is finished.
+
+239 Vega differential fixtures.
+
+### A domain of fewer than two values is still a scale
+
+The second cause out of the signal sweep, and like the first it needs no signal: a fresh compile
+shows it.
+
+d3 builds a scale for `domain([])` and for `domain([5])`. Neither places anything — every value
+comes back `NaN` — but the scale **exists**, so a chart can name it and every `scale()` naming it
+answers `NaN`. This engine reported `needs at least two domain values` and built **no scale at all**,
+which cost far more than the scale: the expressions naming it then reported an undefined scale as
+well, so one refusal became four diagnostics and the chart lost its text to a complaint about
+something it had not got wrong.
+
+Three places had to agree that a short domain is legal, and each was found by the one after it:
+
+- `LinearScale` **refused to be constructed**. It now builds, and `unrounded` answers `NaN` when
+  fewer than two stops take part — which is where d3's `NaN` comes from too, out of arithmetic on an
+  `undefined` end rather than from a test.
+- `continuousDomain` **wrote to the domain's ends** to apply `zero`, `domainMin`, `domainMax` and
+  `domainMid`. On an empty list every one of those is an index out of bounds, which is how a legal
+  `"domain": []` reached the compiler's own catch and came back as a FATAL blaming this engine. It
+  was right to.
+- `GuideCaption` read the ends with `first()`. An axis still describes a scale that places nothing:
+  upstream says "with values from NaN to NaN", which is what reading an absent end as `undefined`
+  gives it.
+
+`a-short-domain-is-still-a-scale` pins all three, beside an ordinary two-value domain that says what
+the rule costs a chart which asked for nothing strange. Three mutants.
+
+**Observed and not reproduced, twice over, and the two are connected.**
+
+An **axis** over a single-valued domain is five pixels taller upstream — 145 against 140 — and the
+difference is in the axis's own extent rather than in anything drawn: upstream's tick and label for
+it sit at `y = NaN` with finite `x`, and every mark compares equal. The axis is therefore not in the
+fixture; the scale is.
+
+Which leaves a change that **was written and then taken out**. `RectD.union` uses `min` and `max`,
+and Kotlin's propagate `NaN`, so one item at an impossible position made the whole surface `NaN`.
+Upstream's `Bounds.union` is four bare comparisons — `if (b.x1 < this.x1) this.x1 = b.x1` — and a
+comparison against `NaN` is false, so such an item is simply never measured. Transcribing that fixed
+the `NaN` surface and left the five pixels. But with the axis out of the fixture nothing in the
+corpus places an item where `union` can see a `NaN` — a mutant putting `min`/`max` back **survives**
+— and a behaviour change nothing pins is not one this repository keeps. It goes back in with the
+axis, once the five pixels are understood.
+
+239 Vega differential fixtures.
+
+### Two more of the signal sweep's remainder: one settled, one sized
+
+**A non-numeric mark property is a divergence this engine keeps.** Written `strokeWidth: "wide"` or
+`strokeWidth: true`, upstream puts the value on the scene item exactly as given and emits it:
+`stroke-width="wide"` in the SVG. This engine reads the channel as a number, finds none, and leaves
+the attribute off.
+
+The pictures are the same. `stroke-width="wide"` is not a length, so a renderer falls back to the
+initial value of 1 — which is what omitting the attribute gives too. Probed both, and the item's
+**bounds agree**, so nothing downstream of the scene sees a difference either.
+
+What it would cost to match is a scene whose `strokeWidth` is `Any?` rather than a number, and an
+SVG writer that deliberately emits invalid attributes. That is a real cost for no change to what
+anyone sees, so this one is a decision rather than a queue entry: the scene record differs, and it
+differs on purpose. It is not in `known-divergences.json` because that file is for replays of
+upstream's own test vectors, asserted by signature; this is a sweep's finding and belongs here.
+
+**A tick count need not be a whole number, and this engine rounds it to one.** `tickCount` may be a
+signal, and a computed one is often fractional — `{"signal": "width/50"}` is the ordinary way to
+scale an axis to the space it has. d3 takes the count as a **number**: `(stop - start) / max(0,
+count)` gives a different step for 2.5 than for 2, and `Ticks.ticks` here already has the `Double`
+overload to match. What loses it is `NumberResolver.resolveInt`, which is `toInt()`, one step before
+the arithmetic that could have used it.
+
+Sized rather than fixed, because the `Int` is not local: six **public** `ticks` and `tickLabels`
+signatures across the scale classes carry it, along with `countWithMinStep`, the numeric labeller
+and the caption's own count. Widening them is an API change, so it moves the Kotlin ABI dumps and
+the surface exported to foreign hosts, and it wants its own change with its own fixture rather than
+a corner of one about something else.
+
+**Still open and not yet diagnosed:** a title given `["two", "lines"]` measures 172 tall upstream
+and 157 here. Fifteen pixels is about one line, but which line, and whether it is the title's own
+extent or the text's, has not been established — so it is written down as a number rather than as a
+cause.

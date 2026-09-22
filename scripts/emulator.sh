@@ -61,19 +61,39 @@ echo "==> Installing the demo"
 # its arguments back and leaves the home screen in front — so this script reported "Demo running"
 # three separate times while the demo was not running, and the next thing anyone did was debug an app
 # that had never started. Naming the activity is both more direct and checkable.
-"$ADB" shell am start -n dev.aster.vega.demo/.DemoActivity
+# **`-W`**, so this returns when the launch has *completed* rather than when the intent has been
+# dispatched. Without it the wait below is the only thing standing between `am start` and a verdict,
+# and on a cold first launch after a fresh boot that verdict was wrong: the demo started, the poll
+# gave up first, and the script printed "did not start" about an app that was on screen. `-W` also
+# prints `Status`, `LaunchState` and `TotalTime`, which say *how* slow a slow start was.
+"$ADB" shell am start -W -n dev.aster.vega.demo/.DemoActivity
 
 # Said only if it is true, which is the actual fix: a launch that fails silently is what went wrong.
 #
-# **Polled, not asked once.** `am start` returns when the intent is dispatched rather than when the
-# process is up, so a single `pidof` straight after it reports failure for an app that is starting
-# perfectly well — which is what the first version of this check did, and what testing caught.
-for _ in $(seq 1 20); do
-  "$ADB" shell pidof dev.aster.vega.demo > /dev/null 2>&1 && break
+# **The resumed activity, not the process.** `pidof` answers for a process that exists, which is a
+# weaker claim than the message makes — an app can be alive and not showing anything. `dumpsys`
+# names what is actually in front, so "Demo running" means the demo is what you are looking at.
+#
+# **Polled, and for long enough.** `am start -W` should make the first read succeed; the loop is
+# what covers the launch that is merely slow rather than failed. It was twenty seconds and that was
+# not enough for a cold start on a fresh boot — the failure this pair of comments now exists for,
+# found by running the script rather than by reasoning about it. Ninety, because the cost of waiting
+# is a slower message and the cost of not waiting is a false report.
+resumed() {
+  "$ADB" shell dumpsys activity activities 2>/dev/null |
+    grep -q "topResumedActivity.*dev\.aster\.vega\.demo/\.DemoActivity"
+}
+for _ in $(seq 1 90); do
+  resumed && break
   sleep 1
 done
-if "$ADB" shell pidof dev.aster.vega.demo > /dev/null 2>&1; then
+if resumed; then
   echo "Demo running on $AVD. Log: build/emulator.log"
+elif "$ADB" shell pidof dev.aster.vega.demo > /dev/null 2>&1; then
+  # Alive but not in front: a real state, and a different one from not starting at all. Saying which
+  # is the difference between looking at the app and looking at the launcher.
+  echo "The demo is running on $AVD but is not the activity in front. Log: build/emulator.log" >&2
+  exit 1
 else
   echo "The demo was installed on $AVD but did not start. Log: build/emulator.log" >&2
   exit 1
