@@ -153,9 +153,16 @@ internal class TitleBuilder(
         ?: TitleDefaults.color
 
     // A trellis header takes its words from the row it labels, so the text may be a signal.
+    //
+    // **`resolveLines`, not `resolveText`** — the rule an axis title and a legend title already
+    // follow, and the chart's own title was the one place that did not. A title given as an array
+    // is
+    // one line per element: `["two", "lines"]` is a heading two lines and 28 pixels tall, where
+    // stringifying it joins them with a comma on one line and leaves the whole drawing fifteen
+    // pixels short. Three titles, one rule, and it was written down twice.
     val text =
       text(spec, "title", "text")
-        ?: spec.textExpression?.let { numbers.resolveText(it, "title") }
+        ?: spec.textExpression?.let { numbers.resolveLines(it, "title") }
         ?: spec.text
     // `dx`/`dy` shift the title after the anchor has placed it, and they move the surface with it:
     // a heading nudged one unit left to line up with an axis makes the whole drawing one unit
@@ -228,7 +235,8 @@ internal class TitleBuilder(
     (if (!declaresSubtitle) null
       else
         text(spec, "subtitle", "text")
-          ?: spec.subtitleExpression?.let { numbers.resolveText(it, "title") }
+          // The subtitle is the fourth of them, and takes the same rule for the same reason.
+          ?: spec.subtitleExpression?.let { numbers.resolveLines(it, "title") }
           ?: spec.subtitle)
       ?.let { text ->
         // The subtitle is offset along whichever direction the title's own box grew in, which after

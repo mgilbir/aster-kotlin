@@ -115,6 +115,26 @@
   "caption": "Y-axis for a time scale with values from Thursday, 01 January 1970, 1:00:00 AM to , NaN  0NaN, 12:NaN:NaN AM"
  },
  {
+  "fixture": "a-title-given-a-list-is-two-lines",
+  "kind": "axis",
+  "caption": "Y-axis titled 'axis title' for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "a-title-given-a-list-is-two-lines",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'legend title' for fill color with 2 values: a, b"
+ },
+ {
+  "fixture": "a-title-given-a-list-is-two-lines",
+  "kind": "title",
+  "caption": "Title text 'two lines'"
+ },
+ {
+  "fixture": "a-title-given-a-list-is-two-lines",
+  "kind": "subtitle",
+  "caption": "Subtitle text 'a subtitle of three'"
+ },
+ {
   "fixture": "aggregate-ops-rest",
   "kind": "axis",
   "caption": "X-axis titled 'variance' for a linear scale with values from 0 to 14"
