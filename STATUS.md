@@ -8981,3 +8981,29 @@ inferred. Three mutants die: the key taking the caption's rule, the caption taki
 the key joining without its comma.
 
 237 Vega differential fixtures.
+
+### The value sweep hears what a chart says
+
+The sweep compared what 499 charts **draw** — marks, scales, surface — and nothing about what they
+**say**. A guide's caption is an `aria-label` attribute, so it is not in the scenegraph at all, and
+every field the reference carried came from the scenegraph.
+
+That is not a small omission, because a caption does not follow the geometry's rules. It is built
+from the **labels**, so it reads a value through the formatter; a scale's domain keys that same
+value by `String` of the whole array. One column of lists is captioned `a,null,c` and keyed `a,,c`
+— the split resolved in the change above — and only the keyed half was ever compared here. That
+defect was found by the fixture corpus, which does harvest captions, and the sweep with its 25
+columns of deliberately awkward values could not have found it.
+
+So the sweep now renders each case to SVG as well, reads the captions back with the same expression
+`scripts/oracle.sh` uses on the fixtures, and compares them sorted within a kind — the order two
+axes reach a screen reader in is the scene tree's, not the caption's.
+
+**324 of the 499 cases carry at least one caption**, and all 499 still agree: **499 of 499**.
+
+A widening that finds nothing is worth exactly as much as the confidence that it *could* have. So
+it was checked rather than assumed: a mutant that changes what a discrete caption says takes the
+tally from 499 matched to **224**, with 275 cases differing. The comparison is live over 275 cases
+and the engine passes it.
+
+No engine change. The instrument grew a sense it did not have.
