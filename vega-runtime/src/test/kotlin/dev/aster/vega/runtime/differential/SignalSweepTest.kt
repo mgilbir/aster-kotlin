@@ -32,6 +32,16 @@ import org.junit.jupiter.api.Test
  * drives `setSpec` then `setSignal` and reads the scene that recompile produced. Comparing the
  * first would be comparing what every other corpus already covers.
  *
+ * **A difference here is one of two entirely different things**, and the tally could not tell them
+ * apart until the reference started carrying `retains`. Either upstream draws the same chart from
+ * scratch — in which case this engine, which recompiles, is wrong — or upstream draws something a
+ * fresh render never produces, because it **kept** what it had: a domain overwritten with `null`, a
+ * data-driven domain whose surviving rows hold their order, an axis whose surviving ticks hold
+ * their place. None of those is reachable by compiling the specification again.
+ *
+ * Guessing which was which cost two wrong write-ups. So the split is reported rather than
+ * re-derived.
+ *
  * **A measurement, not a gate**, as the other sweeps are: it prints a tally and the differences
  * ranked by how many cases each affects. Skips when the sweep has not been built. Arm it with
  * `scripts/signal-sweep.sh`.
@@ -59,6 +69,7 @@ class SignalSweepTest {
     var matched = 0
     var differed = 0
     var oursRefused = 0
+    var retained = 0
     val causes = HashMap<String, MutableSet<String>>()
     val perCase = LinkedHashMap<String, Triple<String, Int, String>>()
 
@@ -70,6 +81,11 @@ class SignalSweepTest {
       val root = VegaJson.parse(referenceFile.readText()) as VegaValue.Obj
       val signal = (root.fields["signal"] as VegaValue.Str).value
       val value = root.fields["value"] ?: VegaValue.Null
+      // Whether upstream's own fresh render differs from its written one; see `freshRender` in
+      // `oracle-js/src/signal-sweep.js`. A difference on a case that **retains** is upstream
+      // keeping
+      // something a recompile cannot know about, not this engine getting something wrong.
+      val retains = (root.fields["retains"] as? VegaValue.Bool)?.value ?: false
 
       val differences =
         try {
@@ -103,7 +119,13 @@ class SignalSweepTest {
         continue
       }
       differed++
-      perCase[name] = Triple("differed", differences.size, differences.first().toString())
+      if (retains) retained++
+      perCase[name] =
+        Triple(
+          if (retains) "differed (upstream retains)" else "differed",
+          differences.size,
+          differences.first().toString(),
+        )
       if (focus.any { name.contains(it) }) {
         println("---- $name ----")
         differences.forEach { println("  ${it.where}: expected ${it.expected}, got ${it.actual}") }
@@ -137,6 +159,8 @@ class SignalSweepTest {
     println("compared          $compared")
     println(String.format(Locale.ROOT, "matched           %d (%.1f%%)", matched, rate))
     println("differed          $differed")
+    println("  of which upstream retains  $retained")
+    println("  a fresh render would show  ${differed - retained}")
     println("we produced none  $oursRefused")
     println()
     println("causes, by how many cases each affects:")

@@ -9163,10 +9163,16 @@ upstream's own test vectors, asserted by signature; this is a sweep's finding an
 
 **A tick count need not be a whole number, and this engine rounds it to one.** `tickCount` may be a
 signal, and a computed one is often fractional — `{"signal": "width/50"}` is the ordinary way to
-scale an axis to the space it has. d3 takes the count as a **number**: `(stop - start) / max(0,
-count)` gives a different step for 2.5 than for 2, and `Ticks.ticks` here already has the `Double`
-overload to match. What loses it is `NumberResolver.resolveInt`, which is `toInt()`, one step before
-the arithmetic that could have used it.
+scale an axis to the space it has. d3 takes the count as a **number**: `Ticks.ticks` here already has
+the `Double` overload to match, and what loses it is `NumberResolver.resolveInt`, which is `toInt()`,
+one step before the arithmetic that could have used it. `ticks(0, 100, 3.5)` is six values and
+`ticks(0, 100, 3)` is three, so the truncation is a real defect.
+
+**The sweep case cited for it is not evidence of it**, and the entry said it was. `tickCount: 2.5`
+over `[0, 100]` gives `[0, 50, 100]` both truncated and not — d3's factor lands on 5 either way — so
+a fresh render of that case agrees exactly. What the sweep sees there is **retention**: upstream
+started at 4 and its tick items hold their place. The defect is real, the evidence was not, and the
+two were only separated by rendering upstream fresh.
 
 Sized rather than fixed, because the `Int` is not local: six **public** `ticks` and `tickLabels`
 signatures across the scale classes carry it, along with `countWithMinStep`, the numeric labeller
@@ -9178,3 +9184,69 @@ a corner of one about something else.
 and 157 here. Fifteen pixels is about one line, but which line, and whether it is the title's own
 extent or the text's, has not been established — so it is written down as a number rather than as a
 cause.
+
+### The signal sweep tells retention from a defect
+
+A difference after a write is one of two entirely different things, and the tally could not tell
+them apart.
+
+Either upstream draws the same chart from scratch — in which case this engine, which recompiles, is
+simply wrong — or upstream draws something a fresh render never produces, because it **kept** what
+it had. A scale whose domain is overwritten with `null` keeps its old domain. A data-driven domain
+keeps the order its surviving rows were in and appends the re-admitted ones. An axis keeps the tick
+items whose values survived. None of those is reachable by compiling the specification again, and
+none is a defect to fix.
+
+**Guessing which was which cost two wrong write-ups**, both of which read as obvious at the time. A
+null domain was recorded here as a robustness defect — a surface 10935 pixels tall against upstream's
+140 — until a fresh render showed upstream at 10925. A fractional tick count was recorded as a
+truncation defect until a fresh render showed upstream drawing exactly what truncating produces.
+
+So the reference now carries the answer instead of leaving it to be re-derived. Each case is rendered
+a second time with the signal's *initial* value already set, and `retains` says whether upstream's own
+two renders disagree. The tally reports the split:
+
+```
+differed          13
+  of which upstream retains  8
+  a fresh render would show  5
+```
+
+Eight of the thirteen are architecture. Of the five left, two are the non-numeric mark property
+settled above, which leaves **three** open defects: a negative stroke width, whose bounds upstream
+shrinks and this engine leaves alone; a domain given a string, which upstream spreads into one entry
+per character; and a two-line title, fifteen pixels short.
+
+No engine change. The instrument stopped asking the reader to do its triage.
+
+### A domain given a string: tried, reverted, and why
+
+One of the three open defects the signal sweep names, attempted and put back. Writing down what the
+attempt established, because the next reader deserves the reason rather than the invitation.
+
+**The rule.** A scale domain given a string becomes **one entry per character**. Nobody wrote that;
+it is what two ordinary steps do when a string reaches them. Upstream's `configureDomain` begins
+`domain.slice(...)`, and a string has `slice` — a number, a boolean and an object do not, so those
+*throw* inside upstream and the scale keeps its default `[0, 1]`, which is already what this engine
+produces for them. A string survives, and d3's `domain(_)` is `Array.from(_, number)`, which iterates
+a string by character. So `"not a domain"` is a domain of **twelve** values, ten `NaN` and the two
+spaces as zeros — `+" "` is `0` — and `"ab"` is two. Probed against both vega and d3 directly.
+
+**What the attempt showed.** Spreading the string where the domain is resolved is ten lines and makes
+the twelve values. It does not make the twelve-value *domain*, because a linear scale's domain then
+goes through `literalNumbers`, which rejects a list containing `NaN` and hands it to the **extent**
+path — where twelve NaNs become `[NaN, NaN]`. The visible result was worse than before: the scale
+still reported two values and the axis gained a tick upstream does not draw.
+
+**Finishing it means removing that rejection, and the rejection is load-bearing.** A time scale
+whose domain is written out as date *strings* depends on exactly that fallthrough: `asDouble` of
+`"2024-01-01"` is `NaN`, and the extent path is what parses it. Making a literal domain keep its
+NaNs would send those down a path that answers `[NaN, NaN]` for a chart that works today.
+
+So the cost is a change to the coercion every continuous domain goes through, and the benefit is
+reproducing the length of a domain that draws nothing, for a specification that is wrong either way.
+The engine reports two values where upstream reports twelve, both of them unusable, and that is
+where this stays until something needs it.
+
+The sweep keeps the case, so the day the domain path is reworked for another reason, this says what
+"right" looks like.

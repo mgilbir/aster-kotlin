@@ -267,6 +267,56 @@ for (const chart of CHARTS) {
   });
 }
 
+/**
+ * The same chart rendered **fresh**, with the signal's *initial* value already set.
+ *
+ * A difference between this engine and upstream after a write is one of two entirely different
+ * things, and the tally could not tell them apart. Either upstream draws the same chart from scratch
+ * — in which case this engine, which recompiles, is simply wrong and the case is a defect — or
+ * upstream draws something a fresh render never produces, because it **kept** what it had. A scale
+ * whose domain is overwritten with `null` keeps its old domain; a data-driven domain keeps the order
+ * its surviving rows were in and appends the re-admitted ones; an axis keeps the tick items whose
+ * values survived. None of those is reachable by compiling the specification again, and none of them
+ * is a defect to fix.
+ *
+ * Guessing which was which cost two wrong write-ups before this existed. A null domain was recorded
+ * as a robustness defect — 10935 pixels against 140 — until a fresh render showed upstream at 10925.
+ * A fractional tick count was recorded as a truncation defect until a fresh render showed upstream
+ * drawing exactly what truncating produces. Both were retention, and both readings looked obvious.
+ *
+ * So the reference carries the answer rather than leaving it to be re-derived: `retains` is true when
+ * upstream's own two renders disagree.
+ */
+async function freshRender(one, scaleNames) {
+  const spec = JSON.parse(JSON.stringify(one.spec));
+  const signal = (spec.signals || []).find((s) => s.name === one.signal);
+  if (!signal) return null;
+  delete signal.update;
+  signal.value = one.value;
+  pinDeterminism();
+  try {
+    const view = new vega.View(vega.parse(spec), { renderer: 'none' });
+    let failed = false;
+    view.error = () => {
+      failed = true;
+    };
+    await view.runAsync();
+    if (failed) {
+      await view.finalize();
+      return null;
+    }
+    const out = {
+      size: surfaceSize(view, spec),
+      scales: normalizeScales(view, scaleNames),
+      ...normalizeScene(view.scenegraph().root),
+    };
+    await view.finalize();
+    return out;
+  } catch {
+    return null;
+  }
+}
+
 let rendered = 0;
 const refused = [];
 
@@ -300,6 +350,12 @@ for (const one of cases) {
   }
 
   const scaleNames = (one.spec.scales || []).map((s) => s.name);
+  const written = {
+    size: surfaceSize(view, one.spec),
+    scales: normalizeScales(view, scaleNames),
+    ...normalizeScene(view.scenegraph().root),
+  };
+  const fresh = await freshRender(one, scaleNames);
   writeFileSync(
     join(referenceDir, `${one.name}.reference.json`),
     canonicalJson({
@@ -307,9 +363,9 @@ for (const one of cases) {
       spec: `${one.name}.vg.json`,
       signal: one.signal,
       value: one.value === undefined ? null : one.value,
-      size: surfaceSize(view, one.spec),
-      scales: normalizeScales(view, scaleNames),
-      ...normalizeScene(view.scenegraph().root),
+      // **Whether upstream itself draws this differently fresh.** See [freshRender].
+      retains: fresh === null ? null : canonicalJson(fresh) !== canonicalJson(written),
+      ...written,
     }),
   );
   rendered++;
