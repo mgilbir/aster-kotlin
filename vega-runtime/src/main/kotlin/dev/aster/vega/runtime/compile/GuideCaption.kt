@@ -328,7 +328,7 @@ internal object GuideCaption {
         "time" -> timeZone ?: TimeZone.currentSystemDefault()
         "utc" -> TimeZone.UTC
         else ->
-          return if (format == null) value.asString()
+          return if (format == null) captionText(value)
           // Coerced, as d3 coerces it: a category that is not a number is read out as `NaN%`,
           // which is what the axis shows and so what the caption has to say.
           else NumberFormat.format(number, format, locale)
@@ -337,6 +337,24 @@ internal object GuideCaption {
     val pattern = format?.replace("%a", "%A")?.replace("%b", "%B") ?: datePattern(locale)
     return TimeFormat.format(instant, pattern, zone, locale)
   }
+
+  /**
+   * A discrete value as a **caption** says it, which is not how a domain **keys** it.
+   *
+   * The two part company over a list, and upstream draws both from the same column: the axis over
+   * `["a", null, "c"]` is captioned `a,null,c` and keys that category as `a,,c`. Neither is a
+   * mistake. A caption is built from the **labels**, and a label has already been through the
+   * formatter by the time it is read out — `String` applied to each element, under which a null is
+   * the four letters. A domain key is `String` applied to the **array**, which is
+   * `Array.prototype.join`, under which a null contributes nothing.
+   *
+   * So this formats per element and the key does not, and [dev.aster.vega.model.asString] is the
+   * key's rule. Making one function answer both was tried: the domain came right and the caption
+   * went wrong in the same run, which is what a genuinely two-sided rule looks like.
+   */
+  private fun captionText(value: VegaValue): String =
+    if (value !is VegaValue.Arr) value.asString()
+    else value.values.joinToString(",") { JsSemantics.toStringValue(it) }
 
   private fun continuous(
     low: Double,

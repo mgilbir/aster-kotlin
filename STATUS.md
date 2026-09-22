@@ -27,7 +27,7 @@ end to end — expressions, signals, all 51 of upstream's 51 documented data tra
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-236 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
+237 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -194,7 +194,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 236 Vega differential fixtures and 332 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 237 Vega differential fixtures and 332 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -226,7 +226,7 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests, and every renderer now exposes the tree: the Android View, the Swift one and Compose Multiplatform. Not verified on physical hardware or with a real user |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 236 Vega differential fixtures |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 237 Vega differential fixtures |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -8599,7 +8599,7 @@ joining an empty one gives the empty string, so no input can tell the branches a
 are one newline-joined string. They are gone, and the reason is written where they were, because the
 next reader will want to put them back.
 
-Found by the widened value sweep: four cases, second-largest cluster. 236 Vega differential
+Found by the widened value sweep: four cases, second-largest cluster. 237 Vega differential
 fixtures.
 
 ### A maximum compares as JavaScript does, not as arithmetic does
@@ -8643,7 +8643,7 @@ numbers, and an ordinary one — and writes `argmin`/`argmax` beside `min`/`max`
 their answer by a different route and genuinely disagree: the maximum of the nested column is `5`
 while the arg-maximum is the row holding `[3]`.
 
-Found by the widened value sweep. 236 Vega differential fixtures.
+Found by the widened value sweep. 237 Vega differential fixtures.
 
 ### A symlog is log1p of x over c
 
@@ -8695,7 +8695,7 @@ see it and there is none, so the arm is pinned by a unit test on the transform r
 unclaimed. The same test carries the two observable decisions as reference values read off `node`,
 which is what makes it a transcription check and not a restatement.
 
-Found by the widened value sweep. 236 Vega differential fixtures.
+Found by the widened value sweep. 237 Vega differential fixtures.
 
 ### A colour ramp does not clamp
 
@@ -8748,7 +8748,7 @@ it because the normalizer canonicalizes a mark's fill, and it shows only when an
 scale's answer into a label. It is a different question from clamping — how a colour is written,
 not which colour it is — and it is the next change.
 
-236 Vega differential fixtures.
+237 Vega differential fixtures.
 
 ### A null line is an empty line
 
@@ -8791,7 +8791,7 @@ The domain key is `String` of the **whole array**, where a null joins as nothing
 broke the second — a gate caught it immediately. Two transcriptions that genuinely differ is the
 opposite of the shape this week has been full of, and it is the next change rather than this one.
 
-236 Vega differential fixtures.
+237 Vega differential fixtures.
 
 ### A quantile cut that lands on a sample
 
@@ -8827,7 +8827,7 @@ so the fixture says what this costs an ordinary chart, which is nothing.
 algebra and not in floating point — but the only case that observes the difference here has `w = 0`
 and an infinite `value1`, where both forms reach NaN. d3's form is kept because it is d3's form.
 
-Found by the widened value sweep, which went 481 to 495 of 499 across this stack. 236 Vega
+Found by the widened value sweep, which went 481 to 495 of 499 across this stack. 237 Vega
 differential fixtures.
 
 ### A gradient over a column with no number, and the sweep reaches 100%
@@ -8867,7 +8867,7 @@ cost a chart with numbers in it, which is nothing. Three mutants die. A fourth �
 entries it chooses between are both `NaN`, with the same label and the same position.
 
 **The widened sweep is now 499 of 499.** It opened at 481 and cost nine changes, of which five were
-a rule transcribed twice and one was a rule transcribed three times. 236 Vega differential fixtures.
+a rule transcribed twice and one was a rule transcribed three times. 237 Vega differential fixtures.
 
 ### The iOS UI gate is red on Xcode 27, and what that is not
 
@@ -8944,3 +8944,40 @@ installed and is the best-odds single change. All three were available from
 
 **No retry flag.** `-retry-tests-on-failure` would turn this green, and would hide a real crash
 exactly as well as it hides this one. The gate is honestly red until the cause is known.
+
+### A list is keyed one way and captioned another, and both are upstream's
+
+Left open by the value-sweep work, and this is the resolution: the two readings that could not be
+made one function.
+
+A data-driven discrete domain **groups** by `'' + value`, which for an array is
+`Array.prototype.join` — a null element contributes **nothing**. A **caption** is built from the
+**labels**, and a label has been through the formatter by then, which for a discrete scale with no
+format is `String` applied to **each element** — under which a null is the four letters. Upstream's
+own output for one column of lists, harvested in the same run:
+
+```
+x domain: ["a,,c", "", "1,", "only"]
+caption:  X-axis for a discrete scale with 4 values: a,null,c, null, 1,null, only
+```
+
+Five rows, **four** bands: `[null]` and `[]` both key as the empty string and are one category.
+The caption of that same axis names a null out loud.
+
+This engine had `VegaValue.asString` joining an array with each element's own text — the caption's
+rule standing in the key's place — so the domain gained a fifth band upstream does not draw. The
+one-line fix to `asString` was written during the earlier change and **taken out again**, because
+it corrected the domain and broke the caption in the same run. That was the evidence that the rule
+is genuinely two-sided rather than transcribed twice: the six defects before it were one rule
+drifting into two copies, and this is the opposite shape — two rules that a single function had
+been asked to answer.
+
+So `asString` is now the **key's** rule, `Array.prototype.join`, and `GuideCaption.captionText` is
+the **caption's**, per element. Each says what the other is for.
+
+`a-list-keyed-and-a-list-captioned` puts both on one chart — a band axis and an ordinal legend over
+the column, and a text mark writing the raw cell — so the disagreement is visible rather than
+inferred. Three mutants die: the key taking the caption's rule, the caption taking the key's, and
+the key joining without its comma.
+
+237 Vega differential fixtures.

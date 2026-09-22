@@ -88,6 +88,38 @@
   "hidden": false
  },
  {
+  "fixture": "a-list-keyed-and-a-list-captioned",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-list-keyed-and-a-list-captioned",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-list-keyed-and-a-list-captioned",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-list-keyed-and-a-list-captioned",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "a-log-axis-labels-with-twelve-digits",
   "kind": "group",
   "role": "graphics-object",
