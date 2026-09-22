@@ -9007,3 +9007,63 @@ tally from 499 matched to **224**, with 275 cases differing. The comparison is l
 and the engine passes it.
 
 No engine change. The instrument grew a sense it did not have.
+
+### A signal sweep: what a chart becomes after something is written into it
+
+Every corpus here compares a chart **as first drawn**. The fixtures, the gallery, the 1981 wild
+specifications, both schema sweeps and the value sweep all build a chart, draw it once and compare
+what came out. Not one of them ever changes something and looks again.
+
+So half of what this engine does had never been compared with anything.
+`VegaChartController.setSignal` pins a value, cascades it through every signal sourced on it and
+compiles the specification again — a slider, a dropdown, a fired handler. `SignalInputTest` asserts
+by hand what that should produce. Nothing had asked upstream what it does.
+
+One chart per **thing a signal can reach**: a scale's domain, a mark's own property, an axis's tick
+count, a title's words, a transform's parameter, and a signal *derived* from the one written, which
+tests the cascade rather than the write. The values are deliberately not all sensible, for the
+reason the value sweep exists — a binding is a door a host writes through, and what arrives is
+whatever its control produced. **45 cases**, of which upstream refuses one: a tick count of `"four"`
+is answered with "Only time and utc scales accept interval strings."
+
+**28 of 43 agree.** That number is the second one this sweep produced, and the first was wrong in a
+way worth recording.
+
+**`enter` is not `update`, and the first run of this measured the difference between them.** An
+`enter` encode runs once, when an item is created, and a signal written afterwards never reaches
+it — probed directly: a `strokeWidth` in `enter` holds its first value however often the signal
+changes, while the same channel in `update` tracks it. The sweep's charts were written with `enter`,
+so upstream was being asked not to react and this engine reacted anyway. That reported 27
+differences at 37.2%, and about half of them were the sweep's own specifications. Rewritten with
+`update` — which runs on the first render too, so it is the whole encode — the tally is 65.1%.
+
+A new instrument's first number should be distrusted exactly this much.
+
+What the remaining 15 are, and they are not one thing:
+
+- **the incremental dataflow, 3 cases.** Upstream does not rebuild a chart when a filter's parameter
+  changes; it *adds and removes rows*. So a data-driven domain keeps the order the surviving rows
+  already had and appends the re-admitted ones — `[b, c, d, a]` where a fresh compile gives
+  `[a, b, c, d]`. This engine recompiles, so it always produces the fresh order. That is an
+  architectural difference rather than a defect to patch, and it is the one this sweep exists to
+  have written down.
+- **a domain a signal holds, 3 cases.** Written `[100, 0]`, upstream keeps the order and `zero`
+  reads the *ends* rather than the extremes, giving `[0, 0]` and flat bars; this engine sent a
+  signal-held domain down the extent path, which answers `min()..max()`, so it came back ascending.
+  An empty domain is a scale upstream still builds — it places nothing and answers `NaN` — where
+  this engine reports an error and builds none. A domain of `"not a domain"` is twelve entries
+  upstream, one per character, and two here.
+- **retention, 2 cases.** Writing `null` over a domain leaves upstream's scale as it was, so it
+  keeps `[0, 100]`; this engine recompiles and gets what a *fresh* compile with a null domain gets.
+  Which is the same thing upstream gets, checked rather than assumed: rendered from scratch with the
+  signal initialised to null, upstream's domain is `[0, 1]` and its surface is 231x10925 — within
+  ten pixels of this engine's. The first reading of this entry called that a robustness defect and a
+  layout blown up by a stray null. It is neither. It is the same architectural difference as the row
+  ordering above, and the only way to tell the two apart was to render fresh and compare.
+- **a non-numeric mark property, 2 cases.** Upstream puts `true` and `wide` on the item as written;
+  this engine drops the channel.
+- **a tick count that is not a whole number, and a two-line title**, the rest.
+
+Report-only, as every sweep here is: `scripts/signal-sweep.sh` runs it, `SignalSweepTest` compares,
+and each cause above is its own change. `-PsignalSweepCase=<substring>[,…]` prints every difference
+for the cases that match.

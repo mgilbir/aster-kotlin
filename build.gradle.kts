@@ -434,6 +434,8 @@ subprojects {
     // `-PvalueSweepCase=<substring>`: which value-sweep cases print every difference they found
     // rather than the first. Empty by default, which prints none of them.
     systemProperty("valueSweepCase", providers.gradleProperty("valueSweepCase").getOrElse(""))
+    // The same, for the signal sweep; see `SignalSweepTest`.
+    systemProperty("signalSweepCase", providers.gradleProperty("signalSweepCase").getOrElse(""))
     testLogging { showStandardStreams = false }
   }
 
