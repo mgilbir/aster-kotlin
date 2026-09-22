@@ -95,6 +95,11 @@
   "caption": "Y-axis for a linear scale with values from 0 to 20"
  },
  {
+  "fixture": "a-short-domain-is-still-a-scale",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from NaN to NaN"
+ },
+ {
   "fixture": "a-stack-propagates-what-it-cannot-add",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0 to 8"

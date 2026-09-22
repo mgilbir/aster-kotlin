@@ -126,8 +126,15 @@ class ScalesTest {
   }
 
   @Test
-  fun `too few domain or range values is rejected`() {
-    assertThrows<IllegalArgumentException> { LinearScale("s", listOf(1.0), listOf(0.0, 1.0)) }
+  fun `a short domain is a scale that places nothing, and a short range is not a scale`() {
+    // **The two ends are not symmetric**, and this test used to reject both. d3 builds a scale for
+    // `domain([])` and `domain([5])` — neither places anything, every value comes back `NaN`, but
+    // the scale exists for a chart to name. Refusing to build one made it *absent*, so every
+    // expression naming it reported an undefined scale too. Probed against upstream.
+    assertTrue(LinearScale("s", listOf(1.0), listOf(0.0, 1.0)).apply(1.0).isNaN())
+    assertTrue(LinearScale("s", emptyList(), listOf(0.0, 1.0)).apply(1.0).isNaN())
+    // A short *range* stays rejected: there is nowhere to place anything, which is a different
+    // thing from placing it nowhere, and no specification produces one.
     assertThrows<IllegalArgumentException> { LinearScale("s", listOf(0.0, 1.0), listOf(0.0)) }
   }
 

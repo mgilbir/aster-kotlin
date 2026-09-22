@@ -1,0 +1,124 @@
+{
+  "marks": [
+    {
+      "opacity": 1,
+      "role": "axis-domain",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": 0.5,
+      "y": 110.5,
+      "y2": 10.5
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "none NaN  one NaN  two 82",
+      "type": "text",
+      "x": 40,
+      "y": 36
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "none NaN  one NaN  two 18.999999999999996",
+      "type": "text",
+      "x": 40,
+      "y": 72
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 28,
+      "role": "mark",
+      "type": "rect",
+      "width": 12,
+      "x": 40,
+      "y": 82
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 91,
+      "role": "mark",
+      "type": "rect",
+      "width": 12,
+      "x": 40,
+      "y": 19
+    },
+    {
+      "fill": "#e45756",
+      "height": "NaN",
+      "role": "mark",
+      "type": "rect",
+      "width": 20,
+      "x": 120,
+      "y": "NaN"
+    },
+    {
+      "fill": "#e45756",
+      "height": "NaN",
+      "role": "mark",
+      "type": "rect",
+      "width": 20,
+      "x": 120,
+      "y": "NaN"
+    }
+  ],
+  "scales": {
+    "yNone": {
+      "domain": [],
+      "range": [
+        110,
+        10
+      ],
+      "ticks": []
+    },
+    "yOne": {
+      "domain": [
+        0
+      ],
+      "range": [
+        110,
+        10
+      ],
+      "ticks": [
+        0
+      ]
+    },
+    "yTwo": {
+      "domain": [
+        0,
+        100
+      ],
+      "range": [
+        110,
+        10
+      ],
+      "ticks": [
+        0,
+        10,
+        20,
+        30,
+        40,
+        50,
+        60,
+        70,
+        80,
+        90,
+        100
+      ]
+    }
+  },
+  "size": {
+    "height": 140,
+    "width": 345
+  },
+  "spec": "a-short-domain-is-still-a-scale.vg.json",
+  "vegaVersion": "6.3.1"
+}

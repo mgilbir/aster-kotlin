@@ -198,7 +198,16 @@ internal object GuideCaption {
             ?: scale.formatTick(v, CAPTION_TICK_COUNT, locale)
         }
       is LinearScale ->
-        continuous(scale.domain.first(), scale.domain.last(), locale) { v, _ ->
+        // **`firstOrNull`**, because a domain of fewer than two values is still a scale and still
+        // gets an axis to describe. Upstream says "with values from NaN to NaN" over an empty one,
+        // which is what reading an absent end as `undefined` gives it; `first()` threw, and the
+        // throw came back as a FATAL blaming this engine — correctly, but for the caption rather
+        // than for the scale everyone was looking at.
+        continuous(
+          scale.domain.firstOrNull() ?: Double.NaN,
+          scale.domain.lastOrNull() ?: Double.NaN,
+          locale,
+        ) { v, _ ->
           spokenInstant(v, format, formatType, locale, timeZone)
             ?: spelled(format, scale.domain, locale)?.invoke(v)
             ?: scale.formatTick(v, CAPTION_TICK_COUNT, locale)
