@@ -192,6 +192,38 @@
   "hidden": false
  },
  {
+  "fixture": "a-negative-stroke-width-still-measures",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-negative-stroke-width-still-measures",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-negative-stroke-width-still-measures",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-negative-stroke-width-still-measures",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "a-null-line-is-an-empty-line",
   "kind": "group",
   "role": "graphics-object",
