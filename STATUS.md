@@ -8868,3 +8868,79 @@ entries it chooses between are both `NaN`, with the same label and the same posi
 
 **The widened sweep is now 499 of 499.** It opened at 481 and cost nine changes, of which five were
 a rule transcribed twice and one was a rule transcribed three times. 236 Vega differential fixtures.
+
+### The iOS UI gate is red on Xcode 27, and what that is not
+
+`scripts/check.sh`'s `ios-ui` gate fails on this machine and passes on CI. The whole of what is
+known is written down here because the machine is about to be upgraded, and the upgrade destroys
+the evidence.
+
+**The signature.** Of the three `AccessibilityUITests`, the **second** one run —
+`testEveryBarIsItsOwnElementLabelledWithItsDatum` — is reported as
+`Test crashed with signal kill`. Every one of its assertions passes first: the log shows all eight
+bars found, `Jan: 28` through `Aug: 87`, then `Tear Down`, then
+`Restarting after unexpected exit, crash, or test timeout`. The runner restarts and the third test
+passes. Run **alone** it passes in 36.9 seconds.
+
+So nothing about that test is failing. What dies is the simulator underneath it.
+
+**What actually crashes.** `SpringBoard` — the simulator's home screen, not the demo — aborts with
+
+```
+Termination Reason: Namespace METAL, Code 102,
+Connection to SimMetalHost (version=L10/R10, profile=8) XPC service was lost:
+XPC_ERROR_CONNECTION_INTERRUPTED
+```
+
+on the queue that renders **home-screen app icons**, inside
+`-[MTLSimDevice newTextureWithDescriptor:]`. Beside it in `~/Library/Logs/DiagnosticReports` are
+`SimRenderServer` crashing with `EXC_BREAKPOINT` inside CoreSimulator's own code, plus `backboardd`
+and `testmanagerd`, all at the same timestamps. When the simulator's Metal host goes, every Metal
+client in that simulator goes with it, and the app under test is collateral — which is why the
+failure lands on whichever test happens to be running.
+
+**Four things it is not**, each checked rather than assumed:
+
+- **Not the engine.** CI ran the same three tests on the same commits and reported
+  `3 case(s), 0 failing`. And the gate fails identically on `f5ddae6f`, the commit before the
+  83-PR stack landed.
+- **Not a damaged simulator.** Both `AsterVega-*` devices were deleted and one recreated from
+  scratch by the gate. Identical failure, same position.
+- **Not `simslim`.** It is installed (`0.10.0`, Homebrew, the same day), and disabling simulator
+  daemons is exactly the shape of thing that could cause this — but no device in any set is
+  slimmed, the device has no `data/var/db/com.apple.xpc.launchd/` at all, and the shared runtime
+  has no modified launch daemon or agent. A device made after the deletion fails the same way.
+- **Not a universal simulator bug.** GitHub's runner runs the same script and passes.
+
+**What is left is the toolchain, and the seam is visible.** CI runs **Xcode 26.6** (`17F113`); this
+machine runs **Xcode 27.0** (`27A266a`) on **macOS 26.6.2** (`25G83`), with CoreSimulator
+**1171.7** and the **iOS 26.5** runtime (`23F77`).
+
+The part that matters is *where* CoreSimulator lives:
+
+```
+/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/Resources/
+    SimRenderingServices.simdeviceio/Contents/XPCServices/SimRenderServer.xpc
+    SimRenderingServices.simdeviceio/Contents/XPCServices/SimMetalHost.xpc
+```
+
+**Outside `Xcode.app`, machine-wide, one copy**, owned by the newest Xcode installed — `Xcode.app`
+bundles none of its own. So the two processes that crash are Xcode 27's, and installing an older
+Xcode beside it would not give them back: only removing the newer one would. Meanwhile Xcode 27.0
+declares `LSMinimumSystemVersion = 26.6` while being built against macOS 27 (`DTSDKName =
+macosx27.0.internal`, shipping `MacOSX27.0.sdk`). This machine is therefore at the exact floor of
+what that Xcode supports: its newest simulator host framework against a host Metal stack one major
+version older than the one it was developed against.
+
+That is a hypothesis with a mechanism, not a diagnosis. **CI differs in both toolchain and
+hardware**, so "Xcode 27's simulator" and "this particular Mac" are not separated, and there is no
+second Xcode or second iOS runtime installed here to separate them with.
+
+**What would settle it**, cheapest first: install an **older iOS runtime** beside 26.5 and point the
+gate at it — that splits the runtime from the host framework without touching anything else; then
+macOS **26.7**; then macOS **27 Golden Gate** (`26A428`), which aligns the OS with the Xcode already
+installed and is the best-odds single change. All three were available from
+`softwareupdate --list-full-installers` on 2026-09-22.
+
+**No retry flag.** `-retry-tests-on-failure` would turn this green, and would hide a real crash
+exactly as well as it hides this one. The gate is honestly red until the cause is known.
