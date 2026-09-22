@@ -9143,3 +9143,38 @@ corpus places an item where `union` can see a `NaN` — a mutant putting `min`/`
 axis, once the five pixels are understood.
 
 239 Vega differential fixtures.
+
+### Two more of the signal sweep's remainder: one settled, one sized
+
+**A non-numeric mark property is a divergence this engine keeps.** Written `strokeWidth: "wide"` or
+`strokeWidth: true`, upstream puts the value on the scene item exactly as given and emits it:
+`stroke-width="wide"` in the SVG. This engine reads the channel as a number, finds none, and leaves
+the attribute off.
+
+The pictures are the same. `stroke-width="wide"` is not a length, so a renderer falls back to the
+initial value of 1 — which is what omitting the attribute gives too. Probed both, and the item's
+**bounds agree**, so nothing downstream of the scene sees a difference either.
+
+What it would cost to match is a scene whose `strokeWidth` is `Any?` rather than a number, and an
+SVG writer that deliberately emits invalid attributes. That is a real cost for no change to what
+anyone sees, so this one is a decision rather than a queue entry: the scene record differs, and it
+differs on purpose. It is not in `known-divergences.json` because that file is for replays of
+upstream's own test vectors, asserted by signature; this is a sweep's finding and belongs here.
+
+**A tick count need not be a whole number, and this engine rounds it to one.** `tickCount` may be a
+signal, and a computed one is often fractional — `{"signal": "width/50"}` is the ordinary way to
+scale an axis to the space it has. d3 takes the count as a **number**: `(stop - start) / max(0,
+count)` gives a different step for 2.5 than for 2, and `Ticks.ticks` here already has the `Double`
+overload to match. What loses it is `NumberResolver.resolveInt`, which is `toInt()`, one step before
+the arithmetic that could have used it.
+
+Sized rather than fixed, because the `Int` is not local: six **public** `ticks` and `tickLabels`
+signatures across the scale classes carry it, along with `countWithMinStep`, the numeric labeller
+and the caption's own count. Widening them is an API change, so it moves the Kotlin ABI dumps and
+the surface exported to foreign hosts, and it wants its own change with its own fixture rather than
+a corner of one about something else.
+
+**Still open and not yet diagnosed:** a title given `["two", "lines"]` measures 172 tall upstream
+and 157 here. Fifteen pixels is about one line, but which line, and whether it is the title's own
+extent or the text's, has not been established — so it is written down as a number rather than as a
+cause.
