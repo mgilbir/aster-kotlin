@@ -27,7 +27,7 @@ end to end — expressions, signals, all 51 of upstream's 51 documented data tra
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-237 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
+238 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -194,7 +194,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 237 Vega differential fixtures and 332 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 238 Vega differential fixtures and 332 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -226,7 +226,7 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests, and every renderer now exposes the tree: the Android View, the Swift one and Compose Multiplatform. Not verified on physical hardware or with a real user |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 237 Vega differential fixtures |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 238 Vega differential fixtures |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -8599,7 +8599,7 @@ joining an empty one gives the empty string, so no input can tell the branches a
 are one newline-joined string. They are gone, and the reason is written where they were, because the
 next reader will want to put them back.
 
-Found by the widened value sweep: four cases, second-largest cluster. 237 Vega differential
+Found by the widened value sweep: four cases, second-largest cluster. 238 Vega differential
 fixtures.
 
 ### A maximum compares as JavaScript does, not as arithmetic does
@@ -8643,7 +8643,7 @@ numbers, and an ordinary one — and writes `argmin`/`argmax` beside `min`/`max`
 their answer by a different route and genuinely disagree: the maximum of the nested column is `5`
 while the arg-maximum is the row holding `[3]`.
 
-Found by the widened value sweep. 237 Vega differential fixtures.
+Found by the widened value sweep. 238 Vega differential fixtures.
 
 ### A symlog is log1p of x over c
 
@@ -8695,7 +8695,7 @@ see it and there is none, so the arm is pinned by a unit test on the transform r
 unclaimed. The same test carries the two observable decisions as reference values read off `node`,
 which is what makes it a transcription check and not a restatement.
 
-Found by the widened value sweep. 237 Vega differential fixtures.
+Found by the widened value sweep. 238 Vega differential fixtures.
 
 ### A colour ramp does not clamp
 
@@ -8748,7 +8748,7 @@ it because the normalizer canonicalizes a mark's fill, and it shows only when an
 scale's answer into a label. It is a different question from clamping — how a colour is written,
 not which colour it is — and it is the next change.
 
-237 Vega differential fixtures.
+238 Vega differential fixtures.
 
 ### A null line is an empty line
 
@@ -8791,7 +8791,7 @@ The domain key is `String` of the **whole array**, where a null joins as nothing
 broke the second — a gate caught it immediately. Two transcriptions that genuinely differ is the
 opposite of the shape this week has been full of, and it is the next change rather than this one.
 
-237 Vega differential fixtures.
+238 Vega differential fixtures.
 
 ### A quantile cut that lands on a sample
 
@@ -8827,7 +8827,7 @@ so the fixture says what this costs an ordinary chart, which is nothing.
 algebra and not in floating point — but the only case that observes the difference here has `w = 0`
 and an infinite `value1`, where both forms reach NaN. d3's form is kept because it is d3's form.
 
-Found by the widened value sweep, which went 481 to 495 of 499 across this stack. 237 Vega
+Found by the widened value sweep, which went 481 to 495 of 499 across this stack. 238 Vega
 differential fixtures.
 
 ### A gradient over a column with no number, and the sweep reaches 100%
@@ -8867,7 +8867,7 @@ cost a chart with numbers in it, which is nothing. Three mutants die. A fourth �
 entries it chooses between are both `NaN`, with the same label and the same position.
 
 **The widened sweep is now 499 of 499.** It opened at 481 and cost nine changes, of which five were
-a rule transcribed twice and one was a rule transcribed three times. 237 Vega differential fixtures.
+a rule transcribed twice and one was a rule transcribed three times. 238 Vega differential fixtures.
 
 ### The iOS UI gate is red on Xcode 27, and what that is not
 
@@ -8980,7 +8980,7 @@ the column, and a text mark writing the raw cell — so the disagreement is visi
 inferred. Three mutants die: the key taking the caption's rule, the caption taking the key's, and
 the key joining without its comma.
 
-237 Vega differential fixtures.
+238 Vega differential fixtures.
 
 ### The value sweep hears what a chart says
 
@@ -9067,3 +9067,33 @@ What the remaining 15 are, and they are not one thing:
 Report-only, as every sweep here is: `scripts/signal-sweep.sh` runs it, `SignalSweepTest` compares,
 and each cause above is its own change. `-PsignalSweepCase=<substring>[,…]` prints every difference
 for the cases that match.
+
+### A domain a signal holds is the list it was given
+
+The first cause out of the signal sweep, and it needs no signal to see: a fresh compile shows it,
+so an ordinary fixture pins it.
+
+A scale domain written `{"signal": "dom"}` is the list that signal holds, in the order it holds it —
+upstream draws no distinction between that and a domain written out in the specification, because
+`scale.domain(_)` is handed whatever either produced. This engine recognised only the written-out
+form as a domain and sent the signal's through the **extent** path, which answers `min()..max()`.
+
+So a descending domain came back ascending, and everything derived from it was backwards. `[100, 0]`
+is legal and reverses a scale, and `zero` reads the domain's **ends** rather than its extremes: a
+positive first entry is pulled to zero and a last entry that is already zero is left alone, so
+upstream's domain is `[0, 0]` and every bar is flat. Sorted first it becomes `[0, 100]`, and the
+chart draws as though nothing odd had been asked for — which is the worst kind of wrong, because
+nothing about it looks wrong.
+
+`a-domain-a-signal-holds` pins it with a descending domain and the same shape the right way round,
+so the fixture also says what the rule costs an ordinary chart, which is nothing. Two mutants: the
+signal domain sent back down the extent path, and a literal domain sorted like one.
+
+**Observed and not reproduced: a domain of fewer than two values is still a scale.** Upstream builds
+it, places nothing through it and answers `NaN` — `[]` gives a domain of `[]` with no ticks, and
+`[5]` gives `[0]` with one. This engine reports `needs at least two domain values` and builds no
+scale at all, so every `scale()` naming it then fails too. Probed both; it is a separate rule from
+the ordering above and wants the scale classes to accept a short domain, which is why it is written
+down here rather than folded into a change that is finished.
+
+238 Vega differential fixtures.

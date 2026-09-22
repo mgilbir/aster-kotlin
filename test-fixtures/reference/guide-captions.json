@@ -5,6 +5,16 @@
   "caption": "X-axis for a discrete scale with 5 values: 1, 2.5, 4, 0, 100"
  },
  {
+  "fixture": "a-domain-a-signal-holds",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0.000000 to 0.000000"
+ },
+ {
+  "fixture": "a-domain-a-signal-holds",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
   "fixture": "a-gradient-over-a-column-with-no-number",
   "kind": "legend",
   "caption": "Gradient legend titled 'no number' for fill color with values from NaN to NaN"

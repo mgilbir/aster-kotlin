@@ -683,7 +683,7 @@ public class ScaleResolver(
       val resolved = numbers.resolveList(raw.expression, spec.name)
       if (resolved == null || resolved.size < 2) return null
     }
-    return literalNumbers(raw)
+    return literalNumbers(raw, spec.name)
       ?: numericExtent(raw, spec.name)?.let {
         listOf(it.start, it.endInclusive)
       }
@@ -736,7 +736,7 @@ public class ScaleResolver(
         return it
       }
     val resolved =
-      literalNumbers(spec.domain)?.also {
+      literalNumbers(spec.domain, spec.name)?.also {
         if (it.size < 2) {
           diagnostics.error(
             DiagnosticCodes.SCALE_INVALID_DOMAIN,
@@ -1183,9 +1183,38 @@ public class ScaleResolver(
 
   // ---- domains --------------------------------------------------------------
 
-  private fun literalNumbers(domain: DomainSpec): List<Double>? {
-    val literal = domain as? DomainSpec.Literal ?: return null
-    val numbers = literal.values.map { it.asDouble() }
+  /**
+   * A domain that is **written down** rather than derived, kept in the order it was written.
+   *
+   * **A signal holding a list is written down too**, and that is the half this used to miss. Only a
+   * `DomainSpec.Literal` came through here; a `{"signal": "dom"}` domain fell past it to
+   * [numericExtent], which answers `min()..max()` — so a descending domain came back **ascending**
+   * and everything derived from it was backwards. `[100, 0]` is a legal domain that reverses a
+   * scale, and `zero` reads its *ends* rather than its extremes: upstream pulls a positive first
+   * entry to zero and leaves a last entry that is already zero alone, giving `[0, 0]` and a chart
+   * of flat bars. Sorted first it becomes `[0, 100]`, and the chart draws as though nothing odd had
+   * been asked for.
+   *
+   * Upstream draws no distinction between the two: `scale.domain(_)` is handed whatever the
+   * specification or the signal produced, and a signal is only a later way of saying the same
+   * thing.
+   *
+   * Null for a domain that is neither, and for one holding something that is not a number — those
+   * belong to the extent path, which is what `{"data": …}` and a union need.
+   */
+  private fun literalNumbers(domain: DomainSpec, scaleName: String? = null): List<Double>? {
+    val values =
+      when (domain) {
+        is DomainSpec.Literal -> domain.values
+        is DomainSpec.FromSignal -> {
+          // Asked *quietly*: the ordinary path reports a signal that resolves to nothing, and
+          // reporting it twice would put two diagnostics on one scale.
+          val name = scaleName ?: return null
+          numbers.resolveList(domain.expression, name) ?: return null
+        }
+        else -> return null
+      }
+    val numbers = values.map { it.asDouble() }
     return if (numbers.any { it.isNaN() }) null else numbers
   }
 

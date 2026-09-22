@@ -1,0 +1,226 @@
+{
+  "marks": [
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 60.5,
+      "y2": 60.5
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "0.000000",
+      "type": "text",
+      "x": -6.5,
+      "y": 60.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-domain",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": 0.5,
+      "y": 110.5,
+      "y2": 10.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 220.5,
+      "x2": 225.5,
+      "y": 110.5,
+      "y2": 110.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 220.5,
+      "x2": 225.5,
+      "y": 60.5,
+      "y2": 60.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 220.5,
+      "x2": 225.5,
+      "y": 10.5,
+      "y2": 10.5
+    },
+    {
+      "align": "left",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "0",
+      "type": "text",
+      "x": 227.5,
+      "y": 110.5
+    },
+    {
+      "align": "left",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "50",
+      "type": "text",
+      "x": 227.5,
+      "y": 60.5
+    },
+    {
+      "align": "left",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "100",
+      "type": "text",
+      "x": 227.5,
+      "y": 10.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-domain",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 220.5,
+      "x2": 220.5,
+      "y": 110.5,
+      "y2": 10.5
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 0,
+      "role": "mark",
+      "type": "rect",
+      "width": 14,
+      "x": 20,
+      "y": 60
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 0,
+      "role": "mark",
+      "type": "rect",
+      "width": 14,
+      "x": 120,
+      "y": 60
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "down 60  up 82",
+      "type": "text",
+      "x": 60,
+      "y": 54
+    },
+    {
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "down 60  up 18.999999999999996",
+      "type": "text",
+      "x": 60,
+      "y": 85.5
+    }
+  ],
+  "scales": {
+    "x": {
+      "bandwidth": 80,
+      "domain": [
+        "a",
+        "b"
+      ],
+      "range": [
+        0,
+        220
+      ],
+      "step": 100
+    },
+    "yDown": {
+      "domain": [
+        0,
+        0
+      ],
+      "range": [
+        110,
+        10
+      ],
+      "ticks": [
+        0
+      ]
+    },
+    "yUp": {
+      "domain": [
+        0,
+        100
+      ],
+      "range": [
+        110,
+        10
+      ],
+      "ticks": [
+        0,
+        10,
+        20,
+        30,
+        40,
+        50,
+        60,
+        70,
+        80,
+        90,
+        100
+      ]
+    }
+  },
+  "size": {
+    "height": 130,
+    "width": 357
+  },
+  "spec": "a-domain-a-signal-holds.vg.json",
+  "vegaVersion": "6.3.1"
+}
