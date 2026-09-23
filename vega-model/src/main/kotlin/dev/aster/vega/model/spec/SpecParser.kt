@@ -1115,8 +1115,12 @@ public class SpecParser {
 
     val spec =
       VegaSpec(
-        width = root.optionalNumber("width", "$.width"),
-        height = root.optionalNumber("height", "$.height"),
+        // A size written `{"signal": ...}` is an expression, not a number; see [sizeSignal].
+        width =
+          if (sizeSignal(root, "width") == null) root.optionalNumber("width", "$.width") else null,
+        height =
+          if (sizeSignal(root, "height") == null) root.optionalNumber("height", "$.height")
+          else null,
         // Each falls back to `config`, which is where a theme sets a chart's frame.
         padding =
           parsePadding(root.fields["padding"] ?: configScalar(root, "padding"), "$.padding"),
@@ -1126,7 +1130,11 @@ public class SpecParser {
           (root.fields["background"] ?: configScalar(root, "background"))
             ?.takeIf { it is VegaValue.Str }
             ?.asString(),
-        signals = parseArray(root, "signals") { value, path -> parseSignal(value, path) },
+        signals =
+          withSizeSignals(
+            root,
+            parseArray(root, "signals") { value, path -> parseSignal(value, path) },
+          ),
         data = parseArray(root, "data") { value, path -> parseData(value, path) },
         scales = parseArray(root, "scales") { value, path -> parseScale(value, path) },
         axes = parseArray(root, "axes") { value, path -> parseAxis(value, path) },
@@ -1277,6 +1285,59 @@ public class SpecParser {
   /** A chart-level value written in `config` rather than at the top level. */
   private fun configScalar(root: VegaValue.Obj, key: String): VegaValue? =
     (root.fields["config"] as? VegaValue.Obj)?.fields?.get(key)
+
+  /**
+   * The expression behind `"width": {"signal": ...}`, or null when the property is an ordinary
+   * number.
+   *
+   * A size written as a signal reference is an **expression, not a seed**. Upstream's
+   * `collectSignals` passes five top-level properties — `background`, `autosize`, `padding`,
+   * `width` and `height` — through `signalObject`, which is `value && value.signal ? {name, update:
+   * value.signal} : {name, value}`. So the reference does not set a number: it makes the **built-in
+   * signal derived**, and everything that reads the size follows the expression — a scale with
+   * `"range": "width"`, the axis along it, a mark positioned at it. A chart that writes `{"signal":
+   * "w"}` and one that declares `{"name": "width", "update": "w"}` are the same chart, which is the
+   * point of the rule.
+   *
+   * `width` and `height` are the two carried through here because their readers already take the
+   * live signal rather than the parsed property — see `SpecCompiler.plotSize`. The other three are
+   * read as literals throughout, so carrying them would publish a signal nothing consults.
+   */
+  private fun sizeSignal(root: VegaValue.Obj, key: String): String? =
+    (root.fields[key] as? VegaValue.Obj)?.fields?.get("signal")?.asString()
+
+  /**
+   * Folds a size written as a signal reference into the signal it actually declares.
+   *
+   * A specification may name the same signal itself, and upstream merges the two with
+   * `extend(pre[s.name], s)` — the declaration is copied **onto** the built-in, so whatever it
+   * carries wins key by key and the built-in's `update` survives what the declaration leaves out.
+   * Probed against upstream: `"width": {"signal": "w"}` beside `{"name": "width", "value": 333}`
+   * renders at `w` and never at 333, because the declaration contributes only an initial value;
+   * beside `{"name": "width", "update": "444"}` it renders at 444, because that key is overwritten.
+   *
+   * A reference that names no signal at all is upstream's `Unrecognized signal name`, which the
+   * expression resolver reports the same way for any other unknown name — it is not made an error
+   * here, so a chart says it in one voice.
+   */
+  private fun withSizeSignals(root: VegaValue.Obj, declared: List<SignalSpec>): List<SignalSpec> {
+    val references =
+      listOf("width", "height").mapNotNull { key -> sizeSignal(root, key)?.let { key to it } }
+    if (references.isEmpty()) return declared
+    val byName = references.toMap()
+    val merged = declared.map { signal ->
+      val update = byName[signal.name]
+      if (update == null || signal.update != null) signal else signal.copy(update = update)
+    }
+    // Upstream builds the five built-ins before the specification's own signals, so one the
+    // specification never names takes a built-in's place at the front. Nothing here depends on that
+    // — signals resolve by dependency, as upstream's dataflow does, and a reference may name a
+    // signal declared after it — but it is where upstream puts it.
+    val declaredNames = declared.mapTo(mutableSetOf()) { it.name }
+    return references
+      .filterNot { (name, _) -> name in declaredNames }
+      .map { (name, update) -> SignalSpec(name = name, update = update) } + merged
+  }
 
   /**
    * Every scale's type, gathered from the whole specification including group scopes.

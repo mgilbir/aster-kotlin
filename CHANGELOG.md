@@ -6,6 +6,27 @@ section here does not get released.
 
 ## Unreleased
 
+### Fixed
+
+- **A chart's size may be written as a signal reference, and that is an expression rather than a
+  seed.** `"width": {"signal": "w"}` did not set the width to anything at all: the parser read the
+  property with `optionalNumber`, an object is not a number, and the chart was left with no width —
+  warning that `'width' must be a number` about a form upstream accepts silently. A chart with a
+  responsive width rendered at its padding and nothing else, and every scale ranged on `"width"`
+  came out `[0, 0]` with it.
+
+  Upstream's `collectSignals` passes five top-level properties — `background`, `autosize`,
+  `padding`, `width` and `height` — through `signalObject`, which is
+  `value && value.signal ? {name, update: value.signal} : {name, value}`, so the reference makes the
+  **built-in signal derived**. `width` and `height` are carried through here, because their readers
+  already take the live signal rather than the parsed property; the other three still read the
+  literal and would publish a signal nothing consults.
+
+  The merge comes with it. A specification may name the same signal itself, and upstream folds the
+  two with `extend(pre[s.name], s)` — the declaration is copied *onto* the built-in, so one carrying
+  `update` overwrites the reference and one carrying only `value` leaves the reference standing and
+  contributes an initial value the first pulse throws away.
+
 ### Changed
 
 - **An extent that is not finite is no extent at all**, and `ExtentTransform.extentOf` is now public

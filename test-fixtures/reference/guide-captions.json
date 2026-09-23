@@ -5,6 +5,11 @@
   "caption": "X-axis for a discrete scale with 5 values: 1, 2.5, 4, 0, 100"
  },
  {
+  "fixture": "a-declared-size-outranks-the-reference",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 10"
+ },
+ {
   "fixture": "a-domain-a-signal-holds",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0.000000 to 0.000000"
@@ -98,6 +103,11 @@
   "fixture": "a-short-domain-is-still-a-scale",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from NaN to NaN"
+ },
+ {
+  "fixture": "a-size-written-as-a-signal",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0.0 to 1.0"
  },
  {
   "fixture": "a-stack-propagates-what-it-cannot-add",
