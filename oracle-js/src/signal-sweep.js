@@ -227,6 +227,143 @@ const CHARTS = [
       ],
     }),
   },
+  {
+    name: 'a-legend-title',
+    signal: 'legendTitle',
+    note: 'a signal that titles a legend, which is words inside a guide rather than beside the chart',
+    values: ['Series', ['two', 'lines'], '', null, 0, 1e21],
+    spec: base({
+      signals: [{ name: 'legendTitle', value: 'Series' }],
+      scales: [
+        { name: 'colour', type: 'ordinal', domain: { data: 't', field: 'k' }, range: 'category' },
+      ],
+      legends: [{ fill: 'colour', title: { signal: 'legendTitle' } }],
+      marks: [],
+    }),
+  },
+  {
+    name: 'a-view-size',
+    signal: 'w',
+    note: "the view's own width, which every scale ranged on it and the surface itself follow",
+    values: [200, 0, 40, -100, 1e5, null, 'wide'],
+    spec: base({
+      signals: [{ name: 'w', value: 200 }],
+      width: { signal: 'w' },
+      scales: [
+        { name: 'x', type: 'band', domain: { data: 't', field: 'k' }, range: 'width', padding: 0.1 },
+      ],
+      axes: [{ orient: 'bottom', scale: 'x' }],
+      marks: [
+        {
+          type: 'rect',
+          from: { data: 't' },
+          encode: {
+            update: {
+              x: { scale: 'x', field: 'k' },
+              width: { scale: 'x', band: 1 },
+              y: { value: 0 },
+              y2: { value: 60 },
+            },
+          },
+        },
+      ],
+    }),
+  },
+  {
+    name: 'a-format-specifier',
+    signal: 'fmt',
+    note: "an axis's number format, where the signal is a specifier rather than a quantity",
+    values: ['.2f', '', '%', 'not a format', '.99f', null, 42],
+    spec: base({
+      signals: [{ name: 'fmt', value: '.2f' }],
+      scales: [{ name: 'y', type: 'linear', domain: [0, 1], range: 'height' }],
+      axes: [{ orient: 'left', scale: 'y', tickCount: 3, format: { signal: 'fmt' } }],
+      marks: [],
+    }),
+  },
+  {
+    name: 'a-colour-scheme',
+    signal: 'scheme',
+    note: 'the name of a scheme, which is looked up rather than read as a value',
+    values: ['blues', 'BLUES', 'nosuchscheme', '', null, 7],
+    spec: base({
+      signals: [{ name: 'scheme', value: 'blues' }],
+      scales: [
+        { name: 'x', type: 'band', domain: { data: 't', field: 'k' }, range: 'width', padding: 0.1 },
+        { name: 'c', type: 'linear', domain: [0, 100], range: { scheme: { signal: 'scheme' } } },
+      ],
+      marks: [
+        {
+          type: 'rect',
+          from: { data: 't' },
+          encode: {
+            update: {
+              x: { scale: 'x', field: 'k' },
+              width: { scale: 'x', band: 1 },
+              y: { value: 0 },
+              y2: { value: 60 },
+              fill: { scale: 'c', field: 'v' },
+            },
+          },
+        },
+      ],
+    }),
+  },
+  {
+    name: 'a-mark-shape',
+    signal: 'shape',
+    note: 'a symbol shape, which is a name upstream resolves to a path and not a measurement',
+    values: ['circle', 'triangle', 'M0,0L8,8Z', 'nosuchshape', '', null],
+    spec: base({
+      signals: [{ name: 'shape', value: 'circle' }],
+      scales: [
+        { name: 'x', type: 'point', domain: { data: 't', field: 'k' }, range: 'width', padding: 0.5 },
+      ],
+      marks: [
+        {
+          type: 'symbol',
+          from: { data: 't' },
+          encode: {
+            update: {
+              x: { scale: 'x', field: 'k' },
+              y: { value: 60 },
+              size: { value: 200 },
+              shape: { signal: 'shape' },
+              fill: { value: '#4c78a8' },
+            },
+          },
+        },
+      ],
+    }),
+  },
+  {
+    name: 'a-scale-range',
+    signal: 'rng',
+    note: 'a scale range, the domain\'s opposite end, where a reversed one reverses the chart',
+    values: [[0, 100], [100, 0], [50, 50], [], null, 'height'],
+    spec: base({
+      signals: [{ name: 'rng', value: [0, 100] }],
+      scales: [
+        { name: 'x', type: 'band', domain: { data: 't', field: 'k' }, range: 'width', padding: 0.1 },
+        { name: 'y', type: 'linear', domain: [0, 100], range: { signal: 'rng' } },
+      ],
+      axes: [{ orient: 'left', scale: 'y', tickCount: 3 }],
+      marks: [
+        {
+          type: 'rect',
+          from: { data: 't' },
+          encode: {
+            update: {
+              x: { scale: 'x', field: 'k' },
+              width: { scale: 'x', band: 1 },
+              y: { scale: 'y', field: 'v' },
+              y2: { scale: 'y', value: 0 },
+            },
+          },
+        },
+      ],
+    }),
+  },
 ];
 
 const specDir = join(outDir, 'specs');

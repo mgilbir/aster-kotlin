@@ -9320,3 +9320,39 @@ version of the fixture had only symbols, and a mutant restoring the path's guard
 path row is there because of that, not because it was foreseen. Three mutants now.
 
 241 Vega differential fixtures.
+
+### The signal sweep reaches further: twelve charts, and a chart that collapses
+
+Six charts had given up everything they had — every defect they named is fixed, and what they still
+report is eight cases of upstream's retention and two settled decisions. So the sweep was widened
+the way the value sweep was when it saturated: six more **things a signal can reach**.
+
+A legend's title. The **view's own width**, which every scale ranged on it follows. An axis's number
+format, where the signal is a specifier rather than a quantity. The name of a colour scheme, which is
+looked up rather than read. A symbol's shape, which upstream resolves to a path. And a scale's
+**range**, the domain's opposite end.
+
+**83 cases, of which upstream refuses six** — and the refusals are worth reading, because each is
+upstream declining something this engine should decline too: `Only time and utc scales accept
+interval strings`, `invalid format: not a format`, `Unrecognized scheme name: nosuchscheme`, and
+three type errors from a scheme, a shape and a range given the wrong kind of thing entirely.
+
+**56 of 76 agree.** Nine of the twenty are retention; **eleven would show on a fresh render**, which
+is up from three.
+
+The largest is not subtle. **A view whose `width` is written `{"signal": "w"}` collapses**: upstream
+draws 210 across and this engine draws **18**, whatever the signal holds — and 18 is padding and
+nothing else. The parser reads `width` with `optionalNumber`, so an object is not a number and the
+property is dropped on the floor. The compiler already knows the other half of this rule, that a
+specification may declare `width` as a **named signal** instead, and handles that; what it never sees
+is a signal *reference* in the property. A chart written the first way works and a chart written the
+second way has no width at all.
+
+The rest, at the level they are so far understood: a colour scheme given `null` or `""` paints
+nothing here where upstream still paints; a `null` format specifier labels `0` where upstream labels
+`0.0`, so the fallback is to no format rather than to the scale's own; a `null` legend title leaves a
+surface eleven pixels wider here; and an empty scale range leaves one thirty-one pixels narrower.
+Those four are named rather than diagnosed — the pattern of this work is that a cause read off a
+number has been wrong more often than not.
+
+Report-only, as every sweep here is. The width is the next change.
