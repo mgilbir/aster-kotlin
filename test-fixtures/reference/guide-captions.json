@@ -80,6 +80,11 @@
   "caption": "Y-axis for a log scale with values from 1 to 19,683"
  },
  {
+  "fixture": "a-negative-size-is-no-size",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: a, b, c"
+ },
+ {
   "fixture": "a-null-line-is-an-empty-line",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 5 values: one, two, three, four, five"

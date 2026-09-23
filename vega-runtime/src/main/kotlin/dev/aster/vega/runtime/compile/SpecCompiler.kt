@@ -823,6 +823,15 @@ public class SpecCompiler(
             unbuiltScales,
             projectionsSoFar(spec, expressions, signalValues, resolved, scales),
           )
+          // A plotting area is never negative, whoever arrived at it — see [layoutSize]. Applied
+          // where the signal settles rather than where the size is read, because upstream writes
+          // the
+          // clamped number *back into the signal*: everything downstream, a dependent signal and a
+          // mark reading `{"signal": "width"}` included, sees the zero and not the number asked
+          // for.
+          if (operator.name == "width" || operator.name == "height") {
+            signalValues[operator.name] = layoutSize(signalValues[operator.name])
+          }
           unresolvedSignals.remove(operator.name)
         }
         is Operator.Data ->
@@ -1422,6 +1431,30 @@ public class SpecCompiler(
   /** A signal's value as a usable number, or null if it is not one. */
   private fun numberSignal(signals: Map<String, VegaValue>, name: String): Double? =
     signals[name]?.asNumberOrNull()?.takeIf { it.isFinite() }
+
+  /**
+   * `Math.max(0, group.width || 0)` — the size a group lays out at, whatever the signal says.
+   *
+   * Upstream writes it in `layoutGroup` and again in `viewSizeLayout`, and the second one hands the
+   * result to `resizeView`, which **writes it back into the signal**:
+   * ```js
+   * if (view.width() !== width) { view.signal(Width, width, Skip); ... }
+   * if (rerun) view.run('enter');
+   * ```
+   *
+   * So a `width` signal that resolves to -120 does not draw a chart 120 wide the other way round:
+   * it draws nothing, the signal itself reads 0 on the rerun, and every scale ranged on `"width"`
+   * gets `[0, 0]`. A signal reading `width / 2` reads 0 too, which is why this is applied where the
+   * signal settles rather than where the size is read.
+   *
+   * `|| 0` is the other half and is not the same test as the clamp: it is falsiness, so a `NaN` — a
+   * width of `0/0`, or a signal that never resolved — is zero rather than a size nothing can be
+   * laid out against. Probed: upstream renders a `NaN` width exactly as it renders a negative one.
+   */
+  private fun layoutSize(value: VegaValue?): VegaValue.Num {
+    val number = value?.asNumberOrNull() ?: 0.0
+    return VegaValue.Num(if (number.isFinite()) maxOf(0.0, number) else 0.0)
+  }
 
   public companion object {
     private val EMPTY_SIGNALS = SignalScope(emptyMap(), emptyMap())

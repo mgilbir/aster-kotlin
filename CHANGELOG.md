@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **A plotting area is never negative and never NaN, whatever arrived at it.** A `width` signal
+  that resolved negative was used as it stands: the band scale ranged on `"width"` divided up a
+  negative range, and the signal sweep's `-100` case drew a surface 207 across where upstream draws
+  18. A signal reading `width / 2` read the negative half with it. Upstream's `layoutGroup` opens `width = Math.max(0, group.width || 0)` and
+  `viewSizeLayout` repeats it and hands the result to `resizeView`, which writes the clamped number
+  **back into the signal** before rerunning the dataflow — so the signal itself reads 0 and
+  everything downstream of it does too.
+
+  Both halves of that expression are separate tests. The clamp takes a negative size; `|| 0` takes a
+  `NaN` one, since `Math.max(0, NaN)` is `NaN`. This engine had the clamp on the *seeded* size only,
+  so a size declared as an ordinary property was already right and the same size arriving through a
+  signal was not.
+
 - **A chart's size may be written as a signal reference, and that is an expression rather than a
   seed.** `"width": {"signal": "w"}` did not set the width to anything at all: the parser read the
   property with `optionalNumber`, an object is not a number, and the chart was left with no width —
