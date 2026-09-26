@@ -1044,7 +1044,15 @@ public object Differential {
     for (channel in ONE_SIDED_CHANNELS) {
       if (channel in ignored) continue
       if (channel !in expected.strings && channel in actual.strings) {
-        out.add(Difference("$where.$channel", "absent", actual.strings.getValue(channel)))
+        val invented = actual.strings.getValue(channel)
+        // An **empty** text is not a word on the chart. The reference writes no `text` key for an
+        // item whose text is null, and upstream's own renderer draws nothing for a null and nothing
+        // for an empty string alike — so the two agree on what is painted and only on how it is
+        // spelled. `donut-chart-labelled` has twenty-three of them and `nest-treemap` one;
+        // reporting
+        // those would be reporting a representation, not a difference.
+        if (channel == "text" && invented.isEmpty()) continue
+        out.add(Difference("$where.$channel", "absent", invented))
       }
     }
     // The same both ways for corner radii: rounding a corner the reference leaves square changes
@@ -1839,7 +1847,13 @@ public object Differential {
    * read as a difference against every reference, so it is not here.
    */
   private val ONE_SIDED_CHANNELS =
-    COLOUR_CHANNELS + setOf("blend", "strokeCap", "strokeJoin", "strokeDash")
+    // `text` for the same reason as the rest, and it took the longest to notice: a guide title this
+    // side writes and the reference does not is a **word on the chart** that should not be there,
+    // and iterating only the reference's channels never looked. The reference drops a null `text`
+    // entirely — upstream's title item carries one and its normalizer writes no key — so the
+    // difference showed up only as a surface a few pixels wide, and only because the title happened
+    // to be wide enough to move the bounds. A shorter one would have been silent.
+    COLOUR_CHANNELS + setOf("blend", "strokeCap", "strokeJoin", "strokeDash", "text")
 
   private val CORNER_CHANNELS =
     setOf(

@@ -195,6 +195,26 @@
   "caption": "Subtitle text 'a subtitle of three'"
  },
  {
+  "fixture": "a-title-nobody-gave-is-not-the-word-null",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 2 values: a, b"
+ },
+ {
+  "fixture": "a-title-nobody-gave-is-not-the-word-null",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 2 values: a, b"
+ },
+ {
+  "fixture": "a-title-nobody-gave-is-not-the-word-null",
+  "kind": "legend",
+  "caption": "Symbol legend for fill color with 2 values: a, b"
+ },
+ {
+  "fixture": "a-title-nobody-gave-is-not-the-word-null",
+  "kind": "title",
+  "caption": "Title text ''"
+ },
+ {
   "fixture": "aggregate-ops-rest",
   "kind": "axis",
   "caption": "X-axis titled 'variance' for a linear scale with values from 0 to 14"

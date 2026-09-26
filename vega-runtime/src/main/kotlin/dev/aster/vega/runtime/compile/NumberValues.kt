@@ -160,9 +160,27 @@ public class NumberResolver(
    * `['Local Density', '(Normalized)']` is a two-line title: upstream's `textLines` reads an array
    * as the lines and collapses a one-element array to its element. Stringifying it instead joins
    * the lines with a comma and draws them on one, which is a different chart and a wider legend.
+   *
+   * **A signal that supplies nothing supplies no title**, which is the same distinction
+   * [resolveSpecifier] draws one property over: `String(null)` is the four-letter word `null`, and
+   * a chart whose title comes from a control that has not answered yet drew that word across the
+   * top of a legend, along an axis, and over the chart. Upstream carries the null onto the title
+   * item, where it measures as nothing and paints as nothing. An **empty** title is a different
+   * written form and stays empty, and so does this one: the answer for a nullish signal is the
+   * **empty string**, not null. Null here would mean *no title was declared*, and those are
+   * different charts — a declared title that resolves to nothing still has an item and still
+   * reserves its row. Measured: the legend's symbols sit at y 22 with one and at y 6 without, and
+   * the surface is fifteen pixels shorter. Upstream carries the null itself onto the item; an empty
+   * string measures, paints and captions identically, and the reference writes no `text` key for
+   * either. Returning null here was the first attempt and it **deleted the title mark**, which the
+   * mark-count comparison caught.
+   *
+   * The accessibility surface is where it read worst: a screen reader announced `X-axis titled
+   * 'null'` and `Symbol legend titled 'null'`, because a caption is built from the same resolved
+   * text.
    */
   public fun resolveLines(expression: String, owner: String): String? =
-    resolveValue(expression, owner)?.let { asLines(it) }
+    resolveValue(expression, owner)?.let { if (it.isNullish) "" else asLines(it) }
 
   /** The raw value of a signal, for a property whose shape depends on what the signal holds. */
   public fun resolveValue(expression: String, owner: String): VegaValue? =

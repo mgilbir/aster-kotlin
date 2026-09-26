@@ -648,6 +648,30 @@
   "hidden": false
  },
  {
+  "fixture": "a-title-nobody-gave-is-not-the-word-null",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-title-nobody-gave-is-not-the-word-null",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-title-nobody-gave-is-not-the-word-null",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "aggregate-ops-rest",
   "kind": "group",
   "role": "graphics-object",

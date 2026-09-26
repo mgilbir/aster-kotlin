@@ -39,6 +39,35 @@ class DifferentialEquivalenceTest {
   }
 
   @Test
+  fun `a word this side invents is a difference`() {
+    // The reference writes no `text` key for an item whose text is null — upstream's guide titles
+    // carry one — so a title this side spells out was compared against nothing at all. It surfaced
+    // only when the invented word happened to be wide enough to move the surface bounds, and a
+    // shorter one would have been silent. `text` is one-sided-checked for the same reason paint and
+    // the stroke caps already were.
+    val upstream = text(mapOf("x" to 10.0), emptyMap())
+    val ours = text(mapOf("x" to 10.0), mapOf("text" to "null"))
+    assertEquals(
+      listOf("text/axis-label[0].text: expected absent, got null"),
+      Differential.compareMarks(listOf(upstream), listOf(ours)).map { it.toString() },
+    )
+  }
+
+  @Test
+  fun `an empty text this side invents is not`() {
+    // Upstream's renderer paints nothing for a null text and nothing for an empty one, so the two
+    // agree on what is drawn and differ only in how it is spelled. `donut-chart-labelled` holds
+    // twenty-three of these and `nest-treemap` one; reporting them would be reporting a
+    // representation rather than a difference.
+    val upstream = text(mapOf("x" to 10.0), emptyMap())
+    val ours = text(mapOf("x" to 10.0), mapOf("text" to ""))
+    assertEquals(
+      emptyList<Differential.Difference>(),
+      Differential.compareMarks(listOf(upstream), listOf(ours)),
+    )
+  }
+
+  @Test
   fun `a limit that truncates is still compared`() {
     val upstream = text(mapOf("x" to 10.0, "limit" to 30.0), mapOf("text" to "alpha"))
     val ours = text(mapOf("x" to 10.0), mapOf("text" to "alpha"))

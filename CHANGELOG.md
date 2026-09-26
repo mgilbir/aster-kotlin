@@ -8,6 +8,20 @@ section here does not get released.
 
 ### Fixed
 
+- **A title a signal does not supply is not the word `null`.** A guide's `title` may be computed, and
+  the result was read with the same function that *says* a value — `String(null)` is the four-letter
+  word — so a chart whose title comes from an unanswered control drew `null` across the top of a
+  legend, along an axis, and over the chart. A screen reader said it out loud, because a caption is
+  built from the same text: `X-axis titled 'null' for a discrete scale with 2 values: a, b`.
+
+  A declared title that resolves to nothing is an **empty** title, not an absent one: it still has
+  an item and still reserves its row, so the answer is the empty string. Returning null instead
+  deleted the title mark and took fifteen pixels of surface with it.
+
+  The mark comparison could not see any of this — it walks the reference's own channels, so a word
+  this side invents was compared against nothing. `text` is one-sided-checked now, as paint and the
+  stroke caps already were.
+
 - **A format specifier nobody gave is not an empty one.** `formatSpan` opens
   `specifier = formatSpecifier(specifier == null ? ',f' : specifier)` — a *loose* null check — so an
   absent specifier means comma-grouped fixed and an empty string does not: a linear axis over
