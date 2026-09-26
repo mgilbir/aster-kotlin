@@ -9251,6 +9251,18 @@ where this stays until something needs it.
 The sweep keeps the case, so the day the domain path is reworked for another reason, this says what
 "right" looks like.
 
+**Revisited once the rest of the sweep was closed, and the verdict stands — but the shape of the fix
+is clearer now.** The rejection is load-bearing *for time scales specifically*: `asDouble` of
+`"2024-01-01"` is `NaN`, and the fallthrough is what sends it to the path that parses it. A **linear**
+scale has no such need — d3 coerces its domain with `Array.from(domain, number)` and keeps the `NaN`
+— so the rejection is one scale family's rule sitting in the path every family shares. That is the
+same "two functions, one job" split this engine has been unpicking all through the entries above, and
+naming the two jobs is what a fix would start with rather than removing the check.
+
+Still not worth it today: the benefit is reproducing the length of a domain that places nothing, on a
+specification that is wrong either way, and the cost is the coercion every continuous domain goes
+through. Recorded so the next reader inherits a plan rather than a refusal.
+
 ### A title given a list is two lines, and the chart's own was the one that did not know
 
 The third of the signal sweep's open defects, and the shortest: one word in two places.
@@ -9857,5 +9869,39 @@ not a divergence.
 a fixture holding only a symbol with no `strokeWidth` channel, because an absent channel never
 reaches the coercion at all. `+null` is 0, so `{"value": null}` is the only shape that tells the two
 apart, and it is in the fixture now. Four mutants, all killed.
+
+252 Vega differential fixtures.
+
+
+### The signal sweep, closed out
+
+Where it finished, after the twelve changes above: **66 of 76**, up from 52 when this run of work
+started.
+
+```
+compared          76
+matched           66 (86.8%)
+differed          10
+  of which upstream retains  9
+  a fresh render would show  1
+we produced none  0
+```
+
+**Every fresh-render difference is gone but one**, and that one is
+`a-scale-domain--not-a-domain`, deferred above with its cost written down. The other nine are
+upstream's *incremental dataflow* — a second render adds and removes rows rather than rebuilding, so
+domains keep their surviving order and axes keep their surviving tick items — which is architectural
+and was never a defect list.
+
+What the sweep found, in the order the causes came apart: a size written as a signal reference, a
+negative and a NaN size, a scale with no range, a range too short to interpolate, a mark nobody can
+place, a format nobody gave, a title nobody gave, an empty subtitle, a fill that is not a colour, and
+a stroke width that is present. Ten rules, from twelve charts and one afternoon's worth of writes.
+
+Several of them only became findable in sequence: `a-view-size` alone produced the signal-reference
+rule, the clamp, the range default, the short range, the bounds model and the stroke-width coercion,
+each one uncovering the next. And the last of those is only *visible* because the bounds model landed
+first — before it, a `NaN` stroke width turned the whole surface into `NaN` rather than dropping one
+symbol out of it.
 
 252 Vega differential fixtures.
