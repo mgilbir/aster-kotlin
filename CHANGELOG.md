@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **A range too short to interpolate is still a range.** d3 pairs a scale's domain against its range
+  over `min(domain.length, range.length)` entries, so `[]` and `[5]` build a scale that answers
+  `undefined` rather than refusing to exist, and `[0, 50, 100]` over `[0, 100]` pairs the first two —
+  `scale(50)` is 25. This engine refused the range twice, once in `ScaleResolver` and once in a
+  `LinearScale` `require` left behind when the matching domain rule was fixed, and a refused scale
+  takes the axis and every encoding naming it down with it.
+
 - **An empty subtitle takes no room, and an empty title still takes its own.** `titleLayout` unions
   the subtitle's bounds into the heading only `if (subtitle && subtitle.text)`, and unions the
   title's unconditionally — so the title's row is reserved on declaration and the subtitle's on

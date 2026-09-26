@@ -158,16 +158,23 @@ public class LinearScale(
   override val bins: List<Double>? = null,
 ) : PositionScale, InvertibleScale {
 
-  init {
-    // **A domain of fewer than two values is still a scale**, which this used to refuse. d3 builds
-    // one, places nothing through it and answers `NaN`: `domain([])` scales 7 to `NaN`, and so does
-    // `domain([5])`. So upstream has a scale for a chart to name and every `scale()` naming it
-    // answers `NaN`, where refusing to build one made the scale **absent** — the expression then
-    // reported an undefined scale, and a chart lost its marks to a diagnostic about something it
-    // had
-    // not got wrong. The `NaN` itself comes from [unrounded].
-    require(range.size >= 2) { "A linear scale needs at least two range values, got $range" }
-  }
+  // **Fewer than two values is still a scale**, at either end, which this used to refuse at both.
+  // d3
+  // builds one, places nothing through it and answers `NaN`: `domain([])` scales 7 to `NaN`, and so
+  // does `domain([5])`, and a *range* of `[]` or `[5]` does the same — probed against vega, where
+  // both build, both answer `undefined` for every input, and both draw the same surface a working
+  // `[0, 100]` draws, because an axis takes its ticks from the domain and lays out its labels
+  // regardless.
+  //
+  // Refusing to build one made the scale **absent**, and an absent scale takes the axis that names
+  // it and every encoding that names it with it — a chart upstream draws became no chart and a
+  // fistful of diagnostics about something the document had not got wrong. The domain half was
+  // fixed first and left the range half behind, guarded by a `require` this comment had already
+  // stopped describing.
+  //
+  // No check is needed in its place: [stops] is `min(domain, range)` and [unrounded] answers `NaN`
+  // below two of them, so the short case falls out of the arithmetic rather than being
+  // special-cased.
 
   /**
    * How many stops actually take part: `min(domain, range)`, which is d3's rule.

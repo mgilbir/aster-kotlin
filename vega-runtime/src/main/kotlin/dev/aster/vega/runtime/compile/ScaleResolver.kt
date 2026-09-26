@@ -1770,19 +1770,24 @@ public class ScaleResolver(
         if (resolved is RangeSpec.Signal) null else numericRange(spec.copy(range = resolved))
       }
       is RangeSpec.Step -> stepRange(spec, numbers.resolve(range.step, spec.name) ?: 0.0)
-      is RangeSpec.Literal -> {
-        val numbers = range.values.map { it.asDouble() }
-        if (numbers.size < 2 || numbers.any { it.isNaN() }) {
-          diagnostics.error(
-            DiagnosticCodes.SCALE_INVALID_DOMAIN,
-            "Scale '${spec.name}' needs a numeric two-value range",
-            operator = spec.name,
-          )
-          null
-        } else {
-          numbers
-        }
-      }
+      // **A short range is not a reason to refuse the scale.** d3 pairs a continuous scale's domain
+      // against its range over `min(domain.length, range.length)` entries, so a range of one — or
+      // of
+      // none — leaves nothing to interpolate and `scale(x)` answers `undefined`. It does not throw
+      // and the scale still exists: probed, `[]` and `[5]` both build, both answer `undefined` for
+      // every input, and both draw the same 241-by-135 surface a working `[0, 100]` draws, because
+      // the axis generates its ticks from the *domain* and lays out its labels regardless. A third
+      // value is not a refusal either — `[0, 50, 100]` over `[0, 100]` pairs the first two, and
+      // `scale(50)` is 25 rather than 50.
+      //
+      // Refusing it took the axis and every encoding that named the scale with it, which is the
+      // same
+      // failure `RangeSpec.Unset` above used to have: a chart upstream draws became no chart and a
+      // fistful of errors. Answering `NaN` where upstream answers `undefined` is the scene
+      // convention already written down in `Differential` — a position upstream's renderer paints
+      // as
+      // zero, and this engine's scene stores as the zero directly.
+      is RangeSpec.Literal -> range.values.map { it.asDouble() }
       is RangeSpec.Scheme -> {
         diagnostics.error(
           DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
