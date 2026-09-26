@@ -9973,9 +9973,17 @@ declared-signal form it always had.
 
 **`padding` and `autosize` are still literals**, and they are the harder two: both are read *before*
 the signals resolve — `spec.padding` sizes the surface and `spec.autosize.type` chooses the fitting
-passes — so carrying them needs those readers moved onto the live signal first. Probed, both are live
-upstream: a `padding` signal of `7` makes a 154-by-64 surface where the same chart with no padding is
-140 by 50, and it accepts an object as readily as a scalar; an `autosize` signal of `"none"` keeps the
-declared size and lets the content overflow.
+passes — so carrying them needs those readers moved onto the live signal first, which reorders
+`compileOnce`. Probed, both are live upstream: a `padding` signal of `7` makes a 154-by-64 surface
+where the same chart with no padding is 140 by 50, and it accepts an object as readily as a scalar;
+an `autosize` signal of `"none"` keeps the declared size and lets the content overflow.
+
+**Counted before deciding, which is what separates this from the background.** `world-map` made the
+background worth doing on its own: a fixture in this corpus was silently wrong. Nothing is silently
+wrong here — **no specification anywhere declares a signal named `padding` or `autosize`, and none
+writes either as a reference**: not in the 253 fixtures, and not in the roughly 37,500 charts of the
+four sweeps. So the restructure buys a grammar feature that no chart in evidence uses, where the
+background bought a fixture that was already broken. Recorded with the numbers so the next reader
+weighs the same trade rather than re-deriving it.
 
 253 Vega differential fixtures.
