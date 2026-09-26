@@ -260,7 +260,16 @@ public object Differential {
         for ((key, value) in obj.fields) {
           if (key == "type" || key == "role") continue
           when (value) {
-            is VegaValue.Num -> numbers[key] = value.value
+            // A **colour channel holding a number** is the mirror of the rule below it, and the
+            // reference really does hold them: a scale whose `scheme` evaporated keeps d3's `[0,
+            // 1]`
+            // range and paints with `0.1`. A number is not a colour and never will be, so it
+            // belongs with the text, where the colour comparison can see it is unreadable and check
+            // that this side painted nothing with it. Left in `numbers` it was compared against a
+            // colour and reported as missing.
+            is VegaValue.Num ->
+              if (key in COLOUR_CHANNELS) strings[key] = value.asString()
+              else numbers[key] = value.value
             // A **number written as a string** is a number. Upstream's items are property bags and
             // it coerces at draw time, so a specification whose signal holds `"3"` rather than `3`
             // puts the string on the item and its renderer writes `stroke-width="3"`. This engine

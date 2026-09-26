@@ -1202,9 +1202,25 @@ public class MarkEncoder(
    * stated it.
    */
   private fun style(channels: EncodeEntry, datum: VegaValue, spec: MarkSpec): Style {
+    // `keepUnreadable` on **both**, because upstream draws no distinction between them: whatever
+    // the
+    // encode produced lands on the item and goes to the renderer as it stands. A value that is
+    // present and is not a colour is therefore not the same as no value at all, and this engine
+    // collapsed the two for `fill` while keeping them apart for `stroke`.
+    //
+    // Nothing visible turns on it for a fill, and that is worth saying rather than leaving implied.
+    // Upstream's SVG writes the unreadable value out — `fill="0.28"` — where an unparseable
+    // presentation attribute is treated as *not specified*, so the property takes its **inherited**
+    // value; and vega's root group is `<g fill="none" …>`, so the mark paints nothing. This engine
+    // writes `fill="none"` and paints nothing too. The drawings agree; what differed is that
+    // upstream's scene records a fill was asked for and this one recorded that none was.
+    //
+    // For a *stroke* the same treatment has a second consequence, which is why it was here first:
+    // `boundStroke` asks whether the item **has** a stroke rather than what colour it is, so
+    // dropping an unreadable one left every such mark a stroke-width narrower than upstream's.
     val fillColour =
       if (paintedNothing(channels["fill"], datum)) null
-      else paintOf(channels["fill"], datum, "fill", spec)
+      else paintOf(channels["fill"], datum, "fill", spec, keepUnreadable = true, keepEmpty = true)
     // `boundStroke` asks whether the item **has** a stroke, not whether that stroke is a colour, so
     // a mark whose stroke is a string nothing can parse is still measured as stroked. That is not a
     // hypothetical: a templated dashboard writes `{"name": "strokeColor", "value": "'#FFFFFF'"}`,
@@ -2167,13 +2183,17 @@ public class MarkEncoder(
     spec: MarkSpec,
     /** See [style]: whether a value that is present and is not a colour still counts as paint. */
     keepUnreadable: Boolean = false,
+    /** See [paint]: whether an **empty** one does too, which only a fill may say yes to. */
+    keepEmpty: Boolean = false,
   ): ScenePaint? {
     channelValue(channel, datum)?.let { value ->
       gradientPaint(value)?.let {
         return it
       }
     }
-    return paint(channel, datum, channelName, spec, keepUnreadable)?.let { ScenePaint.Solid(it) }
+    return paint(channel, datum, channelName, spec, keepUnreadable, keepEmpty)?.let {
+      ScenePaint.Solid(it)
+    }
   }
 
   /**
@@ -2225,6 +2245,7 @@ public class MarkEncoder(
     channelName: String,
     spec: MarkSpec,
     keepUnreadable: Boolean = false,
+    keepEmpty: Boolean = false,
   ): SceneColor? {
     val resolved =
       when (channel) {
@@ -2253,12 +2274,12 @@ public class MarkEncoder(
         is ChannelValue.Signal -> evaluateExpression(channel.expression, datum) ?: return null
         is ChannelValue.Conditional -> {
           val selected = selectRule(channel, datum) ?: return null
-          return paint(selected, datum, channelName, spec, keepUnreadable)
+          return paint(selected, datum, channelName, spec, keepUnreadable, keepEmpty)
         }
         // Arithmetic on a colour is arithmetic on a string, which upstream turns into NaN. The
         // adjustments are dropped rather than applied so at least the colour survives.
         is ChannelValue.Adjusted ->
-          return paint(channel.base, datum, channelName, spec, keepUnreadable)
+          return paint(channel.base, datum, channelName, spec, keepUnreadable, keepEmpty)
       }
     // A colour that resolves to **nothing** is no paint, not a bad colour. `{"value": null}` and a
     // field a row has not got both mean "leave this channel unset", which is how a specification
@@ -2282,7 +2303,15 @@ public class MarkEncoder(
       )
       // Present, and not a colour — which is **not** the same as absent, because a mark is measured
       // by whether it has a stroke rather than by what colour it is. See [style].
-      if (keepUnreadable && text.isNotEmpty()) return SceneColor.Transparent
+      //
+      // `isNotEmpty` is upstream's falsiness and is load-bearing, but only for a **stroke**:
+      // `boundStroke` opens `if (item.stroke && …)`, and `""` is falsy there, so an empty stroke
+      // does not widen a mark while `"not a colour"` does. Probed — two rects with `stroke: ""`
+      // and `stroke: "not a colour"` bound 20 wide and 22 wide respectively.
+      //
+      // Nothing measures a **fill**, so the same emptiness test there only loses the record that a
+      // fill was asked for. [keepEmpty] is what tells the two apart.
+      if (keepUnreadable && (keepEmpty || text.isNotEmpty())) return SceneColor.Transparent
     }
     return colour
   }

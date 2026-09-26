@@ -27,7 +27,7 @@ end to end — expressions, signals, all 51 of upstream's 51 documented data tra
 type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-250 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
+251 Vega differential fixtures and 332 Vega-Lite fixtures pass, every one of them matching upstream
 exactly on every mark and scale output. The complete list is generated rather than written down —
 `test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
 regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
@@ -194,7 +194,7 @@ covers the whole path from a specification to a drawn scene:
 | --- | --- |
 | Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend. Each is a **chart** rather than a drawing primitive: gestures, activation and a positioned accessibility tree on all three interactive ones |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 250 Vega differential fixtures and 332 Vega-Lite fixtures |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 251 Vega differential fixtures and 332 Vega-Lite fixtures |
 | Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
 | Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
 | Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
@@ -226,7 +226,7 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests, and every renderer now exposes the tree: the Android View, the Swift one and Compose Multiplatform. Not verified on physical hardware or with a real user |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 250 Vega differential fixtures |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 251 Vega differential fixtures |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -8599,7 +8599,7 @@ joining an empty one gives the empty string, so no input can tell the branches a
 are one newline-joined string. They are gone, and the reason is written where they were, because the
 next reader will want to put them back.
 
-Found by the widened value sweep: four cases, second-largest cluster. 250 Vega differential
+Found by the widened value sweep: four cases, second-largest cluster. 251 Vega differential
 fixtures.
 
 ### A maximum compares as JavaScript does, not as arithmetic does
@@ -8643,7 +8643,7 @@ numbers, and an ordinary one — and writes `argmin`/`argmax` beside `min`/`max`
 their answer by a different route and genuinely disagree: the maximum of the nested column is `5`
 while the arg-maximum is the row holding `[3]`.
 
-Found by the widened value sweep. 250 Vega differential fixtures.
+Found by the widened value sweep. 251 Vega differential fixtures.
 
 ### A symlog is log1p of x over c
 
@@ -8695,7 +8695,7 @@ see it and there is none, so the arm is pinned by a unit test on the transform r
 unclaimed. The same test carries the two observable decisions as reference values read off `node`,
 which is what makes it a transcription check and not a restatement.
 
-Found by the widened value sweep. 250 Vega differential fixtures.
+Found by the widened value sweep. 251 Vega differential fixtures.
 
 ### A colour ramp does not clamp
 
@@ -8748,7 +8748,7 @@ it because the normalizer canonicalizes a mark's fill, and it shows only when an
 scale's answer into a label. It is a different question from clamping — how a colour is written,
 not which colour it is — and it is the next change.
 
-250 Vega differential fixtures.
+251 Vega differential fixtures.
 
 ### A null line is an empty line
 
@@ -8791,7 +8791,7 @@ The domain key is `String` of the **whole array**, where a null joins as nothing
 broke the second — a gate caught it immediately. Two transcriptions that genuinely differ is the
 opposite of the shape this week has been full of, and it is the next change rather than this one.
 
-250 Vega differential fixtures.
+251 Vega differential fixtures.
 
 ### A quantile cut that lands on a sample
 
@@ -8827,7 +8827,7 @@ so the fixture says what this costs an ordinary chart, which is nothing.
 algebra and not in floating point — but the only case that observes the difference here has `w = 0`
 and an infinite `value1`, where both forms reach NaN. d3's form is kept because it is d3's form.
 
-Found by the widened value sweep, which went 481 to 495 of 499 across this stack. 250 Vega
+Found by the widened value sweep, which went 481 to 495 of 499 across this stack. 251 Vega
 differential fixtures.
 
 ### A gradient over a column with no number, and the sweep reaches 100%
@@ -8867,7 +8867,7 @@ cost a chart with numbers in it, which is nothing. Three mutants die. A fourth �
 entries it chooses between are both `NaN`, with the same label and the same position.
 
 **The widened sweep is now 499 of 499.** It opened at 481 and cost nine changes, of which five were
-a rule transcribed twice and one was a rule transcribed three times. 250 Vega differential fixtures.
+a rule transcribed twice and one was a rule transcribed three times. 251 Vega differential fixtures.
 
 ### The iOS UI gate is red on Xcode 27, and what that is not
 
@@ -8980,7 +8980,7 @@ the column, and a text mark writing the raw cell — so the disagreement is visi
 inferred. Three mutants die: the key taking the caption's rule, the caption taking the key's, and
 the key joining without its comma.
 
-250 Vega differential fixtures.
+251 Vega differential fixtures.
 
 ### The value sweep hears what a chart says
 
@@ -9096,7 +9096,7 @@ scale at all, so every `scale()` naming it then fails too. Probed both; it is a 
 the ordering above and wants the scale classes to accept a short domain, which is why it is written
 down here rather than folded into a change that is finished.
 
-250 Vega differential fixtures.
+251 Vega differential fixtures.
 
 ### A domain of fewer than two values is still a scale
 
@@ -9142,7 +9142,7 @@ corpus places an item where `union` can see a `NaN` — a mutant putting `min`/`
 — and a behaviour change nothing pins is not one this repository keeps. It goes back in with the
 axis, once the five pixels are understood.
 
-250 Vega differential fixtures.
+251 Vega differential fixtures.
 
 ### Two more of the signal sweep's remainder: one settled, one sized
 
@@ -9275,7 +9275,7 @@ The sweep found it because a signal is how such a title usually arrives: a trell
 words from the row it labels, and a control-driven heading from whatever the control produced.
 Nothing in the fixture corpus wrote a title that way.
 
-250 Vega differential fixtures.
+251 Vega differential fixtures.
 
 ### A negative stroke width draws nothing and still measures
 
@@ -9319,7 +9319,7 @@ that changes is the negative one.
 version of the fixture had only symbols, and a mutant restoring the path's guard **survived**; the
 path row is there because of that, not because it was foreseen. Three mutants now.
 
-250 Vega differential fixtures.
+251 Vega differential fixtures.
 
 ### The signal sweep reaches further: twelve charts, and a chart that collapses
 
@@ -9418,7 +9418,7 @@ it. This engine clamps the *seeded* size and not the live signal, so a `width` s
 negative is used as it stands. Reachable today without any of the above, by declaring
 `{"name": "width", "value": -100}`; the next change.
 
-250 Vega differential fixtures.
+251 Vega differential fixtures.
 
 ### A negative size is no size, and neither is a NaN one
 
@@ -9473,7 +9473,7 @@ keeps whatever its encode gave it. Probed: a group mark with `"width": {"value":
 the enclosing view's width rather than the group's. Why that scale reads the outer size was not
 chased, this engine was not compared against it, and there is no fixture for either.
 
-250 Vega differential fixtures.
+251 Vega differential fixtures.
 
 ### A scale with no range keeps the range d3 gives it
 
@@ -9540,7 +9540,7 @@ question and not what the item holds. Matching properly wants a paint that carri
 through the renderers and the exported surface, for a case where upstream's own SVG emits an invalid
 `fill="0.28"` and paints nothing either. Recorded rather than half-done.
 
-250 Vega differential fixtures.
+251 Vega differential fixtures.
 
 ### A format nobody gave is not an empty format
 
@@ -9584,7 +9584,7 @@ its labels stay `0`, `0.5`, `1` whatever the signal holds.
 
 The signal sweep goes 77.6% to **78.9%**, and its fresh-render differences from eight to seven.
 
-250 Vega differential fixtures.
+251 Vega differential fixtures.
 
 ### A title nobody gave is not the word for one
 
@@ -9631,7 +9631,7 @@ reserves its row. This engine reserves the subtitle's row on declaration, which 
 should not have; probed at 97 against 97 for an empty and a filled title, and 97 against 111 for an
 empty and a filled subtitle. A separate rule gets a separate fixture; it is the next change.
 
-250 Vega differential fixtures.
+251 Vega differential fixtures.
 
 ### An empty subtitle takes no room, and an empty title still takes its own
 
@@ -9679,7 +9679,7 @@ fourteen — `"Hi"` over `"S"` is 111 upstream and 112 here. That is a text-metr
 a layout-guard one, it is a different rule, and the fixture above deliberately holds no real subtitle
 so the two do not have to be untangled at once.
 
-250 Vega differential fixtures.
+251 Vega differential fixtures.
 
 ### A range too short to interpolate is still a range
 
@@ -9729,7 +9729,7 @@ is not there. Upstream's own answer is the line the fixture draws —
 So the sweep's `a-scale-range--empty-list` still differs on its surface, and the scale half of it no
 longer does.
 
-250 Vega differential fixtures.
+251 Vega differential fixtures.
 
 ### A mark nobody can place is bounded at the origin, and the corner that cannot be placed is lost
 
@@ -9772,4 +9772,51 @@ nothing reached the line, and once here, when the short-range change was scoped 
 axis with it. It needed the `|| 0` half to be worth anything, and a fixture that draws a guide over a
 scale that places nothing is what needs both. That is the third attempt and the first one pinned.
 
-250 Vega differential fixtures.
+251 Vega differential fixtures.
+
+### A fill that is not a colour is still a fill
+
+Upstream does no parsing: whatever the encode produced lands on the item and goes to the renderer as
+it stands, so `fill: 0.28` is written into the SVG as `fill="0.28"`. This engine parsed it, found no
+colour, and recorded that the mark had **no fill at all** — a different thing from having one that
+paints nothing, and upstream keeps the two apart. The way in is ordinary: a `{"scheme": {"signal":
+"…"}}` whose signal has not been answered leaves the scale with d3's `[0, 1]` default, so every mark
+keyed to it is filled with a **number**, and a palette picker starts there.
+
+**Nothing visible turns on it, and establishing that took two wrong turns worth recording.** The
+first reading was "representational only". The second overturned it: SVG's *initial* `fill` is
+`black`, so an invalid attribute should paint black where this engine's `fill="none"` paints nothing
+— a visible defect. The third fetched the actual markup:
+
+```html
+<g fill="none" stroke-miterlimit="4" transform="translate(5,5)">
+```
+
+`fill` is **inherited**, and an unparseable presentation attribute is treated as *not specified*, so
+it resolves to the inherited `none` rather than the initial `black`. Upstream paints nothing; so do
+we. The first reading was right, and reasoning about a CSS property from its initial value while
+ignoring what the document inherits is what made the second one plausible.
+
+So the change is the record rather than the drawing, and `MarkEncoder` already drew the distinction
+for `stroke` while collapsing it for `fill` — an asymmetry upstream does not have. Both keep it now.
+
+The harness needed the matching half: the reference holds `fill: 0.1` as a JSON **number**, which
+landed in the comparator's numeric bucket where the colour rule could not see it and was reported as
+missing. A colour channel is never a number, so a numeric value there now routes to the text — the
+mirror of the rule directly above it, which reads a number written as a string *as* a number.
+
+**`text.isNotEmpty()` turned out to be load-bearing, and only for one of the two channels.** It is
+upstream's falsiness: `boundStroke` opens `if (item.stroke && …)`, so `""` fails that test and
+`"not a colour"` passes it — probed, two otherwise identical rects bound **30** wide and **32**.
+Nothing measures a fill, so the same test there only discarded the record. `keepEmpty` names the
+difference. A mutant deleting the condition outright would have made every empty stroke widen its
+mark, and it survived until the pair existed to catch it.
+
+**Observed and not fixed.** Upstream's item for an empty *stroke* holds `stroke: ""` and
+`strokeWidth: 2` while refusing to measure it. This engine can do the refusing without the holding:
+a transparent stroke widens, because `Stroke` carries no note of the falsiness its source had, and
+giving it one is a new field on a public class for a difference nothing can see. The fixture
+therefore carries the fill cases and the measuring half lives in `UnreadablePaintTest`, which asserts
+the three probed widths directly.
+
+251 Vega differential fixtures.

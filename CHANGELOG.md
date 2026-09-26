@@ -8,6 +8,14 @@ section here does not get released.
 
 ### Fixed
 
+- **A fill that is not a colour is still a fill.** Upstream puts whatever the encode produced on the
+  item, so `fill: 0.28` reaches the scene and the SVG as it stands; this engine parsed it, found no
+  colour, and recorded that the mark had no fill — which is not the same as having one that paints
+  nothing, and `MarkEncoder` already kept them apart for `stroke`. Nothing visible changes: an
+  unparseable presentation attribute resolves to the *inherited* value, and vega's root group is
+  `<g fill="none">`, so both paint nothing. An empty value is kept too for a fill and still refused
+  for a stroke, where `boundStroke`'s falsiness test means an empty one must not widen the mark.
+
 - **A mark that cannot be placed no longer erases the surface.** Upstream bounds a segment with
   `x1 = item.x || 0` — a `NaN` is falsey, so the first corner anchors at the origin — keeps the
   second corner's `NaN` via `!= null`, and then loses it in `Bounds.union`, which is four bare
