@@ -88,6 +88,30 @@
   "hidden": false
  },
  {
+  "fixture": "a-format-nobody-gave-is-not-an-empty-format",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-format-nobody-gave-is-not-an-empty-format",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-format-nobody-gave-is-not-an-empty-format",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "a-gradient-over-a-column-with-no-number",
   "kind": "group",
   "role": "graphics-object",

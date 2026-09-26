@@ -231,7 +231,8 @@ internal class LegendBuilder(
         // labels
         // are formatted.
         format =
-          declared.format ?: declared.formatExpression?.let { numbers.resolveText(it, scaleName) },
+          declared.format
+            ?: declared.formatExpression?.let { numbers.resolveSpecifier(it, scaleName) },
         formatType =
           declared.formatType
             ?: declared.formatTypeExpression
@@ -1514,7 +1515,12 @@ internal class LegendBuilder(
         "utc" -> TimeZone.UTC
         else -> return null
       }
-    val specifier = spec.format ?: spec.formatExpression?.let { numbers.resolveText(it, scaleName) }
+    // `spec` is the **resolved** legend — `buildOne` substitutes a computed `format` into it once,
+    // before anything below reads one — so this is `spec.format` and nothing else. It used to
+    // resolve `formatExpression` a second time here, which could only ever fire when the first
+    // resolution had already answered null, and then answered null again; a second transcription of
+    // a rule is how this engine has drifted before, and an inert one is a place for it to.
+    val specifier = spec.format
     return { value ->
       // `Number(value)`, which is what d3 coerces with — so a null entry is epoch zero and not a
       // word that fails to parse. See the note in [GuideCaption.spoken].

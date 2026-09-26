@@ -8,6 +8,7 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.isNullish
 import dev.aster.vega.model.spec.ChannelValue
 import dev.aster.vega.model.spec.NumberValue
 
@@ -126,6 +127,32 @@ public class NumberResolver(
           null
         }
     }
+
+  /**
+   * A **format specifier** a signal supplies, where *absent* and *empty* are different answers.
+   *
+   * `formatSpan` opens with a loose null check and nothing else:
+   * ```js
+   * specifier = formatSpecifier(specifier == null ? ',f' : specifier);
+   * ```
+   *
+   * So a specifier of `null` or `undefined` means **comma-grouped fixed**, and the precision is
+   * then computed from the tick step — a linear axis over `[0, 1]` at three ticks reads `0.0`,
+   * `0.5`, `1.0`. An **empty string** is not that: it is a specifier in its own right,
+   * `formatSpecifier('')` has no type, and the same axis reads `0`, `0.5`, `1`. Probed against
+   * upstream, both ways.
+   *
+   * [resolveText] flattens the two together, because `String(null)` is the word `null` — which is
+   * not a format, so the reading fell back to whatever the empty specifier does and a chart bound
+   * to a granularity control lost a decimal place whenever its signal was not answered. Returning
+   * null here hands the caller the same "no specifier" an absent `format` property gives it, which
+   * is the only spelling that reaches `',f'`.
+   *
+   * `internal`, unlike [resolveText] beside it: nothing outside `vega-runtime` resolves a guide's
+   * format, and an exported symbol is a cost this repository counts.
+   */
+  internal fun resolveSpecifier(expression: String, owner: String): String? =
+    resolveValue(expression, owner)?.takeIf { !it.isNullish }?.let { JsSemantics.toStringValue(it) }
 
   /**
    * A guide's title, which upstream lets a signal supply as **lines** rather than as one string.

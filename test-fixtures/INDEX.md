@@ -6,7 +6,7 @@ Generated from the corpus by `FixtureIndexTest`, which fails when this file has 
 ./gradlew :vega-runtime:jvmTest -PupdateGoldens=true --rerun-tasks
 ```
 
-245 Vega differential fixtures and 332 Vega-Lite fixtures.
+246 Vega differential fixtures and 332 Vega-Lite fixtures.
 
 Every column is read off disk. A Vega fixture's mark count and mark types come from its
 **upstream** reference, so they are upstream's answer rather than this port's opinion of it.
@@ -18,6 +18,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `a-colour-ramp-does-not-clamp` | 31 | rect, rule, text | — | linear, point |
 | `a-declared-size-outranks-the-reference` | 9 | rect, rule, text | — | linear |
 | `a-domain-a-signal-holds` | 14 | rect, rule, text | — | band, linear |
+| `a-format-nobody-gave-is-not-an-empty-format` | 41 | rect, rule, symbol, text | — | linear, ordinal |
 | `a-gradient-over-a-column-with-no-number` | 13 | rect, text | — | band, linear |
 | `a-label-that-is-a-list-of-lines` | 25 | rect, rule, symbol, text | — | band, ordinal |
 | `a-list-keyed-and-a-list-captioned` | 27 | rect, rule, symbol, text | — | band, ordinal |

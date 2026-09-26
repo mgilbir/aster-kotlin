@@ -194,7 +194,7 @@ public class AxisBuilder(
     // The label specifier, resolved once: a specification may compute it rather than write it
     // down, and a chart bound to a granularity control does exactly that.
     val specifier =
-      spec.format ?: spec.formatExpression?.let { numbers.resolveText(it, spec.scale) }
+      spec.format ?: spec.formatExpression?.let { numbers.resolveSpecifier(it, spec.scale) }
     val ticks = ticksFor(scale, spec, specifier)?.let { withExtraTick(it, scale, spec) }
     if (ticks == null) {
       diagnostics.error(

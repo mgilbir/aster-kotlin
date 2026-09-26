@@ -8,6 +8,18 @@ section here does not get released.
 
 ### Fixed
 
+- **A format specifier nobody gave is not an empty one.** `formatSpan` opens
+  `specifier = formatSpecifier(specifier == null ? ',f' : specifier)` — a *loose* null check — so an
+  absent specifier means comma-grouped fixed and an empty string does not: a linear axis over
+  `[0, 1]` at three ticks reads `0.0`, `0.5`, `1.0` for the first and `0`, `0.5`, `1` for the second.
+  A `"format": {"signal": …}` whose signal held null was resolved with `String(value)`, producing the
+  word `null`, which is not a format — so the labels fell back to the empty specifier's reading and
+  lost a decimal place. A chart whose format comes from a granularity control is in that state until
+  the control is answered. Fixed at both sites that resolve one — the axis, and the legend, which
+  substitutes it once into a resolved copy of itself. A third apparent site in `discreteDateLabeller`
+  resolved the same expression a second time and could only ever answer what the first had; it is
+  removed.
+
 - **A scale with no range keeps the range d3 gives it**, rather than being refused. `configureRange`
   only calls `scale.range(…)` when there is a range to set, so a scale that declares none keeps d3's
   own default — `[0, 1]` for every continuous, discretizing and banded type, and `[]` for `ordinal`.
