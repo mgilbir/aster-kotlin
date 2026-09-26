@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **An empty subtitle takes no room, and an empty title still takes its own.** `titleLayout` unions
+  the subtitle's bounds into the heading only `if (subtitle && subtitle.text)`, and unions the
+  title's unconditionally — so the title's row is reserved on declaration and the subtitle's on
+  content. This engine reserved both on declaration, making a heading with a computed-but-unanswered
+  subtitle 112 tall where upstream draws 97. The subtitle's scene item is unaffected: whether it
+  exists is the property's decision, which was already right.
+
 - **A title a signal does not supply is not the word `null`.** A guide's `title` may be computed, and
   the result was read with the same function that *says* a value — `String(null)` is the four-letter
   word — so a chart whose title comes from an unanswered control drew `null` across the top of a

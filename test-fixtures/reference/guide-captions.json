@@ -260,6 +260,16 @@
   "caption": "Y-axis for a linear scale with values from 0 to 4"
  },
  {
+  "fixture": "an-empty-subtitle-takes-no-room",
+  "kind": "title",
+  "caption": "Title text 'Hi'"
+ },
+ {
+  "fixture": "an-empty-subtitle-takes-no-room",
+  "kind": "subtitle",
+  "caption": "Subtitle text ''"
+ },
+ {
   "fixture": "an-infinite-extent-is-no-extent",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from NaN to NaN"

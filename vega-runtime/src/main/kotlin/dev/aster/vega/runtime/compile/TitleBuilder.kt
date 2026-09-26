@@ -314,7 +314,31 @@ internal class TitleBuilder(
           )
       }
 
-    val box = children.fold(RectD.Empty) { acc, node -> acc.union(node.transformedBounds) }
+    // ```js
+    // if (subtitle && subtitle.text) {
+    //   ... tempBounds.clear().union(subtitle.bounds);
+    // } else {
+    //   tempBounds.clear();
+    // }
+    // tempBounds.union(title.bounds);
+    // ```
+    //
+    // **The heading's own row is reserved on declaration and its subtitle's on content**, and the
+    // two rules sit either side of that `if`. `tempBounds.union(title.bounds)` is unconditional, so
+    // a title of `""` still measures its font's height; the subtitle's bounds enter only when its
+    // text is *truthy*, so an empty one adds nothing. Probed across five shapes: no title is 80
+    // tall, a title of `""` is 97, `"Hi"` is 97, `"Hi"` with an empty subtitle is still 97, and
+    // only
+    // `"Hi"` with a real subtitle reaches 111.
+    //
+    // The subtitle **node stays** either way — whether it exists at all is the property's decision,
+    // settled above, and upstream's scene has the item with a null text. This is only about what it
+    // measures. Folding the two together the other way deleted the mark, which the mark counts
+    // caught.
+    val measured = children.filterNot {
+      it.metadata.role == "title-subtitle" && (it as? TextNode)?.text.isNullOrEmpty()
+    }
+    val box = measured.fold(RectD.Empty) { acc, node -> acc.union(node.transformedBounds) }
     // `frame` decides what the title is *anchored along* — the plotting area under `"group"`, the
     // whole drawing otherwise. It does **not** decide how far out the title sits: upstream's
     // `titleLayout` reads `frame` only for the anchor and always measures the gap from

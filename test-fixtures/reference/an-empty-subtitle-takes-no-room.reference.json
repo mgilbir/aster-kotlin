@@ -1,0 +1,44 @@
+{
+  "marks": [
+    {
+      "fill": "#333",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 40,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "opacity": 1,
+      "role": "title-text",
+      "text": "Hi",
+      "type": "text"
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 12,
+      "opacity": 1,
+      "role": "title-subtitle",
+      "type": "text"
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 97,
+    "width": 150
+  },
+  "spec": "an-empty-subtitle-takes-no-room.vg.json",
+  "vegaVersion": "6.3.1"
+}

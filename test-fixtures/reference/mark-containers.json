@@ -816,6 +816,22 @@
   "hidden": false
  },
  {
+  "fixture": "an-empty-subtitle-takes-no-room",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "an-empty-subtitle-takes-no-room",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "an-infinite-extent-is-no-extent",
   "kind": "group",
   "role": "graphics-object",
