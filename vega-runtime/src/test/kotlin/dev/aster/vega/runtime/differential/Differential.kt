@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.differential
 
+import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DEFAULT_DECIMAL_PRECISION
 import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.VegaJson
@@ -277,7 +278,19 @@ public object Differential {
             // and only the *reading* differed — a parallel-coordinates template reported twelve
             // widths as "3 vs absent", the width sitting in the other map.
             is VegaValue.Str ->
-              if (key in NUMERIC_CHANNELS && value.value.toDoubleOrNull() != null) {
+              // `toDoubleOrNull` was a *parse*, and upstream's rule is a **coercion**:
+              // `boundStroke`
+              // reads `item.strokeWidth != null ? +item.strokeWidth : 1`, so a width of `""` is 0
+              // and a width of `"wide"` is `NaN`, both of which this engine's node already holds
+              // because it coerces on the way in. Parsing instead left them in the text, where they
+              // read as a width this side had not got.
+              //
+              // The non-finite spellings stay in the text deliberately: `canonicalNumber`
+              // stringifies an upstream `NaN` or infinity on purpose so it stays visible, and the
+              // `GEOMETRY_CHANNELS` rule below is what reads them.
+              if (key in COERCED_CHANNELS && value.value !in NON_FINITE) {
+                numbers[key] = JsSemantics.toNumber(value)
+              } else if (key in NUMERIC_CHANNELS && value.value.toDoubleOrNull() != null) {
                 numbers[key] = value.value.toDouble()
               } else {
                 strings[key] = value.value
@@ -287,7 +300,12 @@ public object Differential {
               if (value.fields["gradient"] != null) gradients[key] = gradientReference(value)
             // A **boolean**, which is only ever `clip` in this corpus. This side records it as the
             // string "true", so reading it makes the two meet; they never did before.
-            is VegaValue.Bool -> strings[key] = value.value.toString()
+            // A **boolean**, which is `clip` in most of this corpus and a *number* wherever a
+            // numeric channel holds one: `+true` is 1, which is what upstream measures a
+            // `strokeWidth: true` with and what this engine's node holds.
+            is VegaValue.Bool ->
+              if (key in COERCED_CHANNELS) numbers[key] = JsSemantics.toNumber(value)
+              else strings[key] = value.value.toString()
             // A **null** needs nothing here, and checking it was the one idea in this change that
             // turned out to be redundant: upstream records `stroke: null` on 298 marks and
             // `fill: null` on 24, and those are the only nulls in the corpus — both covered
@@ -1899,6 +1917,24 @@ public object Differential {
    * is what lets them meet this engine's, which coerced on the way in. Colours are deliberately not
    * here: `"0"` is not a colour and never was.
    */
+  /**
+   * The channels upstream **coerces** rather than reads, which is a narrower set than the numeric
+   * ones and is exactly `boundStroke`'s two names:
+   * ```js
+   * const sw = item.strokeWidth != null ? +item.strokeWidth : 1;
+   * e = Math.max(e, (item.strokeMiterLimit != null ? +item.strokeMiterLimit : 4) * sw / 2);
+   * ```
+   *
+   * `+` answers 1 for `true`, 0 for `""` and `NaN` for a word, and this engine's node holds
+   * whatever that came to because it coerces on the way in. Parsing the reference's text instead
+   * left those three in the strings, where they read as a width this side had not got.
+   *
+   * Narrow on purpose. Applying it to every numeric channel broke five fixtures: `aspect` and
+   * `smooth` on an image mark are booleans spelled as text and belong in the strings, and a
+   * geometry channel has its own non-finite rule below.
+   */
+  private val COERCED_CHANNELS = setOf("strokeWidth", "strokeMiterLimit")
+
   private val NUMERIC_CHANNELS =
     GEOMETRY_CHANNELS +
       CORNER_CHANNELS +

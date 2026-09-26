@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **A stroke width that is present is coerced, and only an absent one takes the default.**
+  `boundStroke` reads `item.strokeWidth != null ? +item.strokeWidth : 1`, so `""` measures a mark at
+  **0** and `"wide"` at **NaN** — which drops it out of the surface — while this engine read the
+  channel and sent every non-number to the default 1. `strokeMiterLimit` takes the same rule from the
+  same two lines. Upstream's bounds for a symbol of size 200: 14.142 wide with `""`, 18.142 with
+  `true` or no width at all, NaN with `"wide"`.
+
 - **A fill that is not a colour is still a fill.** Upstream puts whatever the encode produced on the
   item, so `fill: 0.28` reaches the scene and the SVG as it stands; this engine parsed it, found no
   colour, and recorded that the mark had no fill — which is not the same as having one that paints

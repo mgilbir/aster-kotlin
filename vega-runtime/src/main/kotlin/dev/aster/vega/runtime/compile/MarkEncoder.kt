@@ -1232,13 +1232,30 @@ public class MarkEncoder(
       else paintOf(channels["stroke"], datum, "stroke", spec, keepUnreadable = true)
     val fillOpacity = number(channels["fillOpacity"], datum) ?: 1.0
     val strokeOpacity = number(channels["strokeOpacity"], datum) ?: 1.0
+    // ```js
+    // const sw = item.strokeWidth != null ? +item.strokeWidth : 1;
+    // ```
+    //
+    // **`!= null` is the only route to the default.** A width that is *present* and is not a number
+    // does not fall back — it goes through `+`, which is JavaScript's coercion, and whatever that
+    // produces is what the mark is measured with: `+true` is 1, `+"3"` is 3, `+""` is **0**, and
+    // `+"wide"` is **NaN**. Zero expands a mark by nothing; `NaN` expands it by `NaN`, which then
+    // loses the comparisons in `Bounds.union` and leaves the symbol out of the surface entirely.
+    //
+    // [number] is a *reading* — `asDouble`, then a `NaN` check that sends every non-number to the
+    // caller's fallback — so all four of those measured as though the specification had said 1.
+    // `true` agreed by accident, which is why only the others ever showed. Probed against upstream:
+    // a symbol of size 200 bounds 14.142 wide with `""`, 18.142 with `true` or no width at all, and
+    // `NaN` with `"wide"`.
     val strokeWidth =
-      number(channels["strokeWidth"], datum) ?: MarkDefaults.strokeWidthFor(spec.type)
+      coerced(channels["strokeWidth"], datum, MarkDefaults.strokeWidthFor(spec.type))
     val strokeDash = numberList(channels["strokeDash"], datum) ?: emptyList()
     val cap = strokeCap(string(channels["strokeCap"], datum), spec)
     val join = strokeJoin(string(channels["strokeJoin"], datum), spec)
     val dashOffset = number(channels["strokeDashOffset"], datum) ?: 0.0
-    val miterLimit = number(channels["strokeMiterLimit"], datum) ?: Stroke.DEFAULT_MITER_LIMIT
+    // `item.strokeMiterLimit != null ? +item.strokeMiterLimit : 4`, from the same two lines of
+    // `boundStroke` and read the same way.
+    val miterLimit = coerced(channels["strokeMiterLimit"], datum, Stroke.DEFAULT_MITER_LIMIT)
 
     return Style(
       fill = fillColour?.let { Fill(it, fillOpacity) },
@@ -2153,6 +2170,22 @@ public class MarkEncoder(
       ),
     )
     return null
+  }
+
+  /**
+   * Upstream's `item.x != null ? +item.x : fallback`: **present is coerced, absent takes the
+   * default**.
+   *
+   * The distinction [number] does not draw. That one *reads* a channel and answers null when there
+   * is no number in it, which sends a present-but-unreadable value to the caller's fallback. This
+   * one answers what JavaScript's `+` would, so an empty string is 0 and a word is `NaN`, and only
+   * a channel that is absent or null reaches the default at all.
+   *
+   * Two jobs, and naming only one of them is how this engine has drifted before.
+   */
+  private fun coerced(channel: ChannelValue?, datum: VegaValue, fallback: Double): Double {
+    val value = channelValue(channel, datum)
+    return if (value == null || value.isNullish) fallback else JsSemantics.toNumber(value)
   }
 
   private fun number(channel: ChannelValue?, datum: VegaValue): Double? =

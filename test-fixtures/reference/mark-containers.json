@@ -664,6 +664,70 @@
   "hidden": false
  },
  {
+  "fixture": "a-stroke-width-that-is-present-is-coerced",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-stroke-width-that-is-present-is-coerced",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-stroke-width-that-is-present-is-coerced",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-stroke-width-that-is-present-is-coerced",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-stroke-width-that-is-present-is-coerced",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-stroke-width-that-is-present-is-coerced",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-stroke-width-that-is-present-is-coerced",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-stroke-width-that-is-present-is-coerced",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "a-symlog-is-log1p-of-x-over-c",
   "kind": "group",
   "role": "graphics-object",
