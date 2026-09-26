@@ -2,8 +2,6 @@ package dev.aster.vega.scene
 
 import dev.aster.vega.model.normalizeZero
 import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.min
 
 public data class PointD(val x: Double, val y: Double) {
   public companion object {
@@ -60,16 +58,35 @@ public data class RectD(val left: Double, val top: Double, val right: Double, va
       top <= other.bottom &&
       other.top <= bottom
 
+  /**
+   * The union of two boxes, where **a `NaN` edge loses** rather than spreading.
+   *
+   * `Bounds.union` is four bare comparisons and no more:
+   * ```js
+   * if (b.x1 < this.x1) this.x1 = b.x1;
+   * if (b.y1 < this.y1) this.y1 = b.y1;
+   * if (b.x2 > this.x2) this.x2 = b.x2;
+   * if (b.y2 > this.y2) this.y2 = b.y2;
+   * ```
+   *
+   * Every comparison against a `NaN` is false, so a `NaN` edge never replaces the edge already
+   * there and the box comes through unchanged. `min` and `max` do the opposite — Kotlin's propagate
+   * — so one unplaceable mark turned a whole surface into `NaN`.
+   *
+   * A mark is unplaceable whenever the scale positioning it has nothing to say: a range with fewer
+   * than two stops, a log scale over a zero. Upstream draws those, bounds them by [ofSegment], and
+   * takes the surface from everything it *could* place.
+   */
   public fun union(other: RectD): RectD =
     when {
       other.isEmpty -> this
       isEmpty -> other
       else ->
         RectD(
-          min(left, other.left),
-          min(top, other.top),
-          max(right, other.right),
-          max(bottom, other.bottom),
+          if (other.left < left) other.left else left,
+          if (other.top < top) other.top else top,
+          if (other.right > right) other.right else right,
+          if (other.bottom > bottom) other.bottom else bottom,
         )
     }
 
@@ -129,6 +146,41 @@ public data class RectD(val left: Double, val top: Double, val right: Double, va
       val l = if (width >= 0) x else x + width
       val t = if (height >= 0) y else y + height
       return RectD(l, t, l + abs(width), t + abs(height))
+    }
+
+    /**
+     * The box of a two-cornered mark, the way upstream bounds one it **cannot place**.
+     *
+     * `rule.js` is the shape of it, and the asymmetry between the corners is deliberate:
+     * ```js
+     * bounds.set(
+     *   x1 = item.x || 0,
+     *   y1 = item.y || 0,
+     *   item.x2 != null ? item.x2 : x1,
+     *   item.y2 != null ? item.y2 : y1
+     * )
+     * ```
+     *
+     * The **first** corner goes through `||`, and a `NaN` is *falsey* in JavaScript, so a mark
+     * whose position could not be computed is anchored at the origin. The **second** goes through
+     * `!= null`, and a `NaN` is not `null`, so it keeps its `NaN` — which then loses the
+     * comparisons in [union] and leaves the enclosing box alone.
+     *
+     * Ordered by one comparison rather than by `min`/`max`, as `Bounds.set` is, so a `NaN` stays on
+     * the edge it arrived on instead of swallowing both.
+     *
+     * `internal`, unlike [fromSize] and [fromPoints] beside it: nothing outside `vega-scene` bounds
+     * a segment, and an exported symbol is a cost this repository counts.
+     */
+    internal fun ofSegment(x1: Double, y1: Double, x2: Double, y2: Double): RectD {
+      val ax = if (x1.isNaN()) 0.0 else x1
+      val ay = if (y1.isNaN()) 0.0 else y1
+      return RectD(
+        if (x2 < ax) x2 else ax,
+        if (y2 < ay) y2 else ay,
+        if (x2 < ax) ax else x2,
+        if (y2 < ay) ay else y2,
+      )
     }
 
     public fun fromPoints(points: Iterable<PointD>): RectD {

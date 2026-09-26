@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **A mark that cannot be placed no longer erases the surface.** Upstream bounds a segment with
+  `x1 = item.x || 0` — a `NaN` is falsey, so the first corner anchors at the origin — keeps the
+  second corner's `NaN` via `!= null`, and then loses it in `Bounds.union`, which is four bare
+  comparisons a `NaN` fails. This engine used `min`/`max` at both sites, which propagate, so a single
+  unplaceable mark turned the whole surface into `NaN`. A guide over a scale with an empty range is
+  full of them: upstream draws it 272 by 152, the same as with a working range.
+
 - **A range too short to interpolate is still a range.** d3 pairs a scale's domain against its range
   over `min(domain.length, range.length)` entries, so `[]` and `[5]` build a scale that answers
   `undefined` rather than refusing to exist, and `[0, 50, 100]` over `[0, 100]` pairs the first two —

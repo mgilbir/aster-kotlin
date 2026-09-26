@@ -587,7 +587,10 @@ public data class RuleNode(
 
   override val bounds: RectD by
     lazy(LazyThreadSafetyMode.NONE) {
-      RectD(minOf(x1, x2), minOf(y1, y2), maxOf(x1, x2), maxOf(y1, y2))
+      // Not `min`/`max` of the four: a rule the scale could not place carries a `NaN` corner, and
+      // upstream anchors the first at the origin and lets the second keep its `NaN`. See
+      // [RectD.ofSegment].
+      RectD.ofSegment(x1, y1, x2, y2)
         .expand(stroke.wideningAt(opacity)?.boundsExpansion() ?: 0.0)
         .normalized()
     }

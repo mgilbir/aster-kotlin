@@ -60,6 +60,21 @@
   "caption": "Gradient legend titled 'numbers' for fill color with values from 3 to 20"
  },
  {
+  "fixture": "a-guide-over-a-scale-that-places-nothing",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "a-guide-over-a-scale-that-places-nothing",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "a-guide-over-a-scale-that-places-nothing",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 100"
+ },
+ {
   "fixture": "a-label-that-is-a-list-of-lines",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 4 values: 1,2, 3, plain, a,b,c"
