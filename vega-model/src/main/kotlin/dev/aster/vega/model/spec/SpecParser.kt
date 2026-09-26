@@ -1115,11 +1115,12 @@ public class SpecParser {
 
     val spec =
       VegaSpec(
-        // A size written `{"signal": ...}` is an expression, not a number; see [sizeSignal].
+        // A size written `{"signal": ...}` is an expression, not a number; see [builtInSignal].
         width =
-          if (sizeSignal(root, "width") == null) root.optionalNumber("width", "$.width") else null,
+          if (builtInSignal(root, "width") == null) root.optionalNumber("width", "$.width")
+          else null,
         height =
-          if (sizeSignal(root, "height") == null) root.optionalNumber("height", "$.height")
+          if (builtInSignal(root, "height") == null) root.optionalNumber("height", "$.height")
           else null,
         // Each falls back to `config`, which is where a theme sets a chart's frame.
         padding =
@@ -1131,7 +1132,7 @@ public class SpecParser {
             ?.takeIf { it is VegaValue.Str }
             ?.asString(),
         signals =
-          withSizeSignals(
+          withBuiltInSignals(
             root,
             parseArray(root, "signals") { value, path -> parseSignal(value, path) },
           ),
@@ -1299,11 +1300,12 @@ public class SpecParser {
    * "w"}` and one that declares `{"name": "width", "update": "w"}` are the same chart, which is the
    * point of the rule.
    *
-   * `width` and `height` are the two carried through here because their readers already take the
-   * live signal rather than the parsed property — see `SpecCompiler.plotSize`. The other three are
-   * read as literals throughout, so carrying them would publish a signal nothing consults.
+   * Three of the five are carried through here — `width`, `height` and `background` — because their
+   * readers take the **live signal** rather than the parsed property. `padding` and `autosize` are
+   * still read as literals, and are needed before the signals resolve at that, so carrying them
+   * would publish a signal nothing consults; STATUS records what upstream does with those two.
    */
-  private fun sizeSignal(root: VegaValue.Obj, key: String): String? =
+  private fun builtInSignal(root: VegaValue.Obj, key: String): String? =
     (root.fields[key] as? VegaValue.Obj)?.fields?.get("signal")?.asString()
 
   /**
@@ -1320,9 +1322,14 @@ public class SpecParser {
    * expression resolver reports the same way for any other unknown name — it is not made an error
    * here, so a chart says it in one voice.
    */
-  private fun withSizeSignals(root: VegaValue.Obj, declared: List<SignalSpec>): List<SignalSpec> {
+  private fun withBuiltInSignals(
+    root: VegaValue.Obj,
+    declared: List<SignalSpec>,
+  ): List<SignalSpec> {
     val references =
-      listOf("width", "height").mapNotNull { key -> sizeSignal(root, key)?.let { key to it } }
+      listOf("width", "height", "background").mapNotNull { key ->
+        builtInSignal(root, key)?.let { key to it }
+      }
     if (references.isEmpty()) return declared
     val byName = references.toMap()
     val merged = declared.map { signal ->

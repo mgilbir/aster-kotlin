@@ -10,6 +10,7 @@ import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.runtime.compile.CompiledSpec
 import dev.aster.vega.runtime.compile.SpecCompiler
 import dev.aster.vega.scene.Scene
+import dev.aster.vega.scene.SceneColor
 import dev.aster.vega.scene.flatten
 import java.io.File
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -210,6 +211,24 @@ class FixtureDifferentialTest {
       if (curved(scene)) Differential.CURVE_EXTENT_TOLERANCE else Differential.GEOMETRY_TOLERANCE
     assertEquals(reference.width, scene.width, tolerance, "$name width")
     assertEquals(reference.height, scene.height, tolerance, "$name height")
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("fixtures")
+  fun `the surface is the colour upstream paints it`(name: String) {
+    // Compared late: the reference did not record a background until a `"background": {"signal":
+    // …}`
+    // needed checking, and 71 of these fixtures declare one. Colours compare by **value** rather
+    // than by spelling — `white` and `#ffffff` are one colour — the same way a mark's fill does.
+    val (reference, compiled) = compile(name)
+    val scene = requireNotNull(compiled.scene)
+    val wanted = reference.background?.let { SceneColor.parse(it) }
+    val got = scene.background
+    assertEquals(
+      wanted?.toCssHex(),
+      got?.toCssHex(),
+      "$name background (reference ${reference.background}, scene $got)",
+    )
   }
 
   @ParameterizedTest(name = "{0}")

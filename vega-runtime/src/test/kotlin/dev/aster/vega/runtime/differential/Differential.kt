@@ -132,6 +132,15 @@ public object Differential {
     val vegaVersion: String,
     val width: Double,
     val height: Double,
+    /**
+     * The surface's own colour, or null for the many charts that ask for none.
+     *
+     * Recorded late: nothing here compared a background until a `"background": {"signal": …}`
+     * needed checking and there was no way to check it. `view.background()` is upstream's resolved
+     * answer — the property, the `config.background` behind it, or the signal either of those
+     * named.
+     */
+    val background: String?,
     val scales: Map<String, ScaleReference>,
     /**
      * The scales a **named** group mark built for itself — a faceted one once per cell.
@@ -328,6 +337,7 @@ public object Differential {
       vegaVersion = root.fields["vegaVersion"]?.asString() ?: "unknown",
       width = (size.fields["width"] ?: VegaValue.Num(0.0)).asDouble(),
       height = (size.fields["height"] ?: VegaValue.Num(0.0)).asDouble(),
+      background = root.fields["background"]?.asString(),
       scales = scales,
       nestedScales =
         (root.fields["nestedScales"] as? VegaValue.Obj)?.fields?.mapValues { (_, group) ->

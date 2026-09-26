@@ -1,5 +1,21 @@
 [
  {
+  "fixture": "a-background-a-signal-paints",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-background-a-signal-paints",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "a-colour-ramp-does-not-clamp",
   "kind": "group",
   "role": "graphics-object",

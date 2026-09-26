@@ -706,6 +706,12 @@ public class SpecCompiler(
       mapOf(
         "width" to VegaValue.Num(width),
         "height" to VegaValue.Num(height),
+        // Seeded from the property and answered by the signal, the same way the two sizes are.
+        // `world-map` is why: it declares no `background` property at all and a **signal** named
+        // `background` bound to a colour picker, which `collectSignals` merges into the built-in —
+        // so upstream paints `#ffffff` and lets the reader change it, where this engine read only
+        // the property and painted nothing.
+        "background" to (spec.background?.let { VegaValue.Str(it) } ?: VegaValue.Null),
         "padding" to
           VegaValue.Obj(
             linkedMapOf(
@@ -998,7 +1004,19 @@ public class SpecCompiler(
 
     val content = frame(spec, scope.nodes, plot, root, ids, diagnostics, expressions)
 
-    val scene = layout(spec, scope.bounds, content, plot, ids, diagnostics, fit?.over)
+    val scene =
+      layout(
+        spec,
+        scope.bounds,
+        content,
+        plot,
+        ids,
+        diagnostics,
+        fit?.over,
+        // The **live** background, for the same reason `plotSize` reads the live size: the property
+        // is only the seed and a signal of the same name is the answer.
+        signalValues["background"]?.takeIf { it !is VegaValue.Null }?.asString(),
+      )
     // Reported after everything has been compiled, because an expression reading the container size
     // can be anywhere: a signal's `update`, an encode channel, a transform parameter.
     reportUnansweredContainerSize(
@@ -1247,13 +1265,15 @@ public class SpecCompiler(
     diagnostics: DiagnosticCollector,
     /** The first pass's overhang, for a `fit` chart. Null for every other type. */
     fit: Overflow?,
+    /** The `background` signal as it settled; see the call site. */
+    declaredBackground: String?,
   ): Scene {
     val padding = spec.padding
-    val background = spec.background?.let { SceneColor.parse(it) }
-    if (spec.background != null && background == null) {
+    val background = declaredBackground?.let { SceneColor.parse(it) }
+    if (declaredBackground != null && background == null) {
       diagnostics.warn(
         DiagnosticCodes.ENCODE_INVALID_VALUE,
-        "Could not parse background colour '${spec.background}'",
+        "Could not parse background colour '$declaredBackground'",
       )
     }
 

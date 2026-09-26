@@ -8,6 +8,13 @@ section here does not get released.
 
 ### Fixed
 
+- **A background a signal paints.** `background` is the third of the five top-level properties
+  `collectSignals` turns into a built-in signal, so both `"background": {"signal": "bg"}` and a
+  specification declaring a signal *named* `background` set the surface colour — the property is only
+  a seed. This engine read the property alone, which meant `world-map`, whose background is a signal
+  bound to a colour picker, painted nothing. The reference recorded no background at all until now;
+  71 fixtures declare one and none had been compared.
+
 - **A stroke width that is present is coerced, and only an absent one takes the default.**
   `boundStroke` reads `item.strokeWidth != null ? +item.strokeWidth : 1`, so `""` measures a mark at
   **0** and `"wide"` at **NaN** — which drops it out of the surface — while this engine read the
