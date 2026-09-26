@@ -9905,3 +9905,34 @@ first — before it, a `NaN` stroke width turned the whole surface into `NaN` ra
 symbol out of it.
 
 252 Vega differential fixtures.
+
+### The ungated corpora, re-run against the whole stack
+
+`check.sh` gates the fixture corpus, the gallery and both oracles. It does **not** run the four
+report-only sweeps, and this stack is exactly the shape that could move them without anything
+noticing: `RectD.union` and `RectD.ofSegment` changed how every mark's box is computed, the
+stroke-width coercion touches every stroked mark, `keepEmpty` every fill, and the range default every
+scale that declares none. So all four were re-run.
+
+| sweep | charts | result |
+| --- | --- | --- |
+| value sweep | 499 | **499 (100%)**, differed 0 |
+| Vega schema property sweep | 7510 | **7510 (100%)**, differed 0 |
+| Vega-Lite property sweep | 27513 | 27489 (99.9%), **differed 0** |
+| wild corpus | 1981 | **1981 (100%)**, differed 0 |
+
+Roughly **37,500 charts**, none of them moved.
+
+The Vega-Lite gap is the 24 **accepted divergences** already recorded against that sweep, not a
+regression: a reference naming `…_offsetted_rect_start` columns that no transform in the same
+specification produces, and a band position written into a *signal* with bare column names, which
+`vega.parse` then refuses outright — `Unrecognized signal name: "v_start"`. Matching either would
+emit a chart that does not load.
+
+The schema sweep is the one worth dwelling on. `union` changed from `min`/`max` to four bare
+comparisons, which is a rewrite of the arithmetic under **every mark in every chart**, and 7510
+charts across the whole Vega schema produce byte-identical scenes. That is what it should do — the
+two spellings differ only on `NaN` — but "should" and "does" are different claims and only one of
+them was checked before.
+
+252 Vega differential fixtures.
