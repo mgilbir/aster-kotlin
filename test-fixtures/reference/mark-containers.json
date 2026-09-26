@@ -432,6 +432,30 @@
   "hidden": false
  },
  {
+  "fixture": "a-scale-with-no-range-keeps-its-default",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-scale-with-no-range-keeps-its-default",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-scale-with-no-range-keeps-its-default",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "a-short-domain-is-still-a-scale",
   "kind": "group",
   "role": "graphics-object",

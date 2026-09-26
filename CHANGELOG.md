@@ -8,6 +8,19 @@ section here does not get released.
 
 ### Fixed
 
+- **A scale with no range keeps the range d3 gives it**, rather than being refused. `configureRange`
+  only calls `scale.range(…)` when there is a range to set, so a scale that declares none keeps d3's
+  own default — `[0, 1]` for every continuous, discretizing and banded type, and `[]` for `ordinal`.
+  This engine answered `Scale 'c' has no range` and refused the scale, which took every encoding that
+  named it with it.
+
+  The common way in is a colour scheme that evaporates. `configureRange` opens its scheme branch with
+  a bare `else if (_.scheme)` — a truthiness test on the resolved value — so
+  `{"scheme": {"signal": "theme"}}` whose signal holds `null` or `""` leaves the scale with no range
+  at all rather than with a failed lookup, and a palette picker whose signal has not been answered
+  yet is exactly that. A *literal* falsey scheme is not the same case: `parseScaleRange` matches it
+  against no branch and upstream refuses the specification outright.
+
 - **A plotting area is never negative and never NaN, whatever arrived at it.** A `width` signal
   that resolved negative was used as it stands: the band scale ranged on `"width"` divided up a
   negative range, and the signal sweep's `-100` case drew a surface 207 across where upstream draws
