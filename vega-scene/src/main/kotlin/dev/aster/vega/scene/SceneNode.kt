@@ -565,7 +565,12 @@ public data class RectNode(
 
   override val bounds: RectD by
     lazy(LazyThreadSafetyMode.NONE) {
-      val base = rect
+      // **[RectD.ofRect], not [rect].** The two agree for every rect that can be placed and part
+      // company for one that cannot: `boundRect` puts all four corners through `||`, so a NaN
+      // position anchors at the origin and a NaN far edge collapses onto it. [rect] is what a
+      // renderer draws, and upstream's renderer takes `item.x` raw — a NaN draws nothing — so the
+      // falsiness belongs here and not there.
+      val base = RectD.ofRect(x, y, width, height)
       (stroke.wideningAt(opacity)?.let { base.expand(it.boundsExpansion()) } ?: base).normalized()
     }
 }
@@ -947,6 +952,13 @@ private fun scalePath(path: PathData, factor: Double): PathData =
   )
 
 private fun buildSymbolPath(node: SymbolNode): PathData {
+  // **The anchor goes through `|| 0`.** `markItemPath`'s bound builds the shape at the origin
+  // and ends `.translate(item.x || 0, item.y || 0)`, and a NaN is falsey there — so a symbol
+  // whose position a scale could not give is measured **at the origin** rather than lost. It is
+  // the rule `a-mark-nobody-can-place` already records for a rule mark, owed to a symbol too:
+  // upstream's `shapeTop` for one whose `y` is NaN is `-r`, not an empty box.
+  val nodeX = if (node.x.isNaN()) 0.0 else node.x
+  val nodeY = if (node.y.isNaN()) 0.0 else node.y
   val r = node.reference
   // A **negative** size draws nothing at all, and is not the same as a size of zero. Upstream's
   // radius is `Math.sqrt(size) / 2`, so a negative one is NaN; the path commands are all NaN, the
@@ -958,7 +970,7 @@ private fun buildSymbolPath(node: SymbolNode): PathData {
   // anchor, not as an empty rectangle. The difference shows up when a size scale bottoms out — the
   // point still counts towards the chart's reach under `autosize: pad`, where an empty rectangle
   // would silently drop out of the measurement.
-  if (r <= 0.0) return PathData.build { moveTo(node.x, node.y) }
+  if (r <= 0.0) return PathData.build { moveTo(nodeX, nodeY) }
 
   // sin(60°) and tan(30°): the height of an equilateral triangle of half-width r, and the offset
   // between its centroid and the centre of its bounding box.
@@ -1064,9 +1076,9 @@ private fun buildSymbolPath(node: SymbolNode): PathData {
 
   val placement =
     if (node.angleDegrees == 0.0) {
-      Transform2D.translate(node.x, node.y)
+      Transform2D.translate(nodeX, nodeY)
     } else {
-      Transform2D.translate(node.x, node.y).concat(Transform2D.rotateDegrees(node.angleDegrees))
+      Transform2D.translate(nodeX, nodeY).concat(Transform2D.rotateDegrees(node.angleDegrees))
     }
   return local.transformedBy(placement)
 }

@@ -299,7 +299,19 @@ public object Differential {
               // `GEOMETRY_CHANNELS` rule below is what reads them.
               if (key in COERCED_CHANNELS && value.value !in NON_FINITE) {
                 numbers[key] = JsSemantics.toNumber(value)
-              } else if (key in NUMERIC_CHANNELS && value.value.toDoubleOrNull() != null) {
+                // **`!in NON_FINITE` here too, and it is the whole of the defect.** The branch
+                // above already keeps the non-finite spellings out of the numbers, and the comment
+                // on it says why — but `"NaN".toDoubleOrNull()` *parses*, to `Double.NaN`, so this
+                // branch swallowed every one of them straight back and the `GEOMETRY_CHANNELS`
+                // rule below never ran. Once in the numbers the comparison is
+                // `abs(wanted - got) > allowed`, and `abs(NaN - anything)` is NaN, which is never
+                // greater than a tolerance: a channel upstream recorded as `NaN` agreed with
+                // whatever this engine held, including a perfectly ordinary number.
+              } else if (
+                key in NUMERIC_CHANNELS &&
+                  value.value !in NON_FINITE &&
+                  value.value.toDoubleOrNull() != null
+              ) {
                 numbers[key] = value.value.toDouble()
               } else {
                 strings[key] = value.value

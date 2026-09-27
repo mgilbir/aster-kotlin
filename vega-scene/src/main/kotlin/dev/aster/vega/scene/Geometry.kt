@@ -195,6 +195,40 @@ public data class RectD(val left: Double, val top: Double, val right: Double, va
       )
     }
 
+    /**
+     * The box of a **rect**, the way upstream bounds one it cannot place.
+     *
+     * ```js
+     * boundStroke(bounds.set(
+     *   x = item.x || 0,
+     *   y = item.y || 0,
+     *   (x + item.width) || 0,
+     *   (y + item.height) || 0
+     * ), item)
+     * ```
+     *
+     * Four `||`s, and every one of them is JavaScript falsiness rather than a null test — so a
+     * `NaN` position anchors at the origin *and* a `NaN` far edge collapses back onto it. A rect
+     * whose `y` came from a scale that could not map it is bounded as a flat line at **y = 0**, not
+     * at wherever its `y2` happened to be. The sum going through `||` as well is what makes the
+     * second corner collapse rather than stay NaN, which is where this differs from [ofSegment]: a
+     * rule keeps its far corner, a rect does not.
+     *
+     * `internal`, as [ofSegment] is, and for the same reason.
+     */
+    internal fun ofRect(x: Double, y: Double, width: Double, height: Double): RectD {
+      val ax = if (x.isNaN()) 0.0 else x
+      val ay = if (y.isNaN()) 0.0 else y
+      val bx = (ax + width).let { if (it.isNaN()) 0.0 else it }
+      val by = (ay + height).let { if (it.isNaN()) 0.0 else it }
+      return RectD(
+        if (bx < ax) bx else ax,
+        if (by < ay) by else ay,
+        if (bx < ax) ax else bx,
+        if (by < ay) ay else by,
+      )
+    }
+
     public fun fromPoints(points: Iterable<PointD>): RectD {
       var result = Empty
       for (p in points) result = result.union(RectD(p.x, p.y, p.x, p.y))

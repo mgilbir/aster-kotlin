@@ -1056,7 +1056,27 @@ public class MarkEncoder(
    * what the `defined` channel is for, and [broken] handles that.
    */
   private fun point(channels: EncodeEntry, datum: VegaValue): PointD =
-    PointD(centred(channels, datum, "x", "xc") ?: 0.0, centred(channels, datum, "y", "yc") ?: 0.0)
+    PointD(
+      seriesCoordinate(centred(channels, datum, "x", "xc")),
+      seriesCoordinate(centred(channels, datum, "y", "yc")),
+    )
+
+  /**
+   * `item.x || 0` — every shape generator reads a series point through it:
+   * ```js
+   * const x = item => item.x || 0,
+   *       y = item => item.y || 0;
+   * ```
+   *
+   * Falsiness, so a coordinate a scale could not give is **zero here**, not a hole. A series is
+   * broken by `defined` and by nothing else; a NaN draws straight through the axis. Absent and NaN
+   * are the same answer at this one site, which is why the `?: 0.0` that used to stand here was
+   * right for as long as a NaN could not reach it — and stopped being right the moment
+   * `scaledPosition` began carrying one. A time scale over a domain of `[NaN, NaN]` is the case:
+   * upstream's line item holds `y: NaN` and its path is `M 26.8 0 L 75.6 0 …`.
+   */
+  private fun seriesCoordinate(value: Double?): Double =
+    if (value == null || value.isNaN()) 0.0 else value
 
   /** True when this datum's `defined` channel says the series should break here. */
   private fun broken(channels: EncodeEntry, datum: VegaValue): Boolean {
@@ -2103,7 +2123,11 @@ public class MarkEncoder(
 
     val input = scaledInput(channel, datum) ?: return null
     val base = scale.position(input)
-    if (base.isNaN()) return null
+    // **A miss and an unmappable value are different answers**, and `position` spells both NaN.
+    // A discrete scale that does not hold the value answers `undefined` — `scaleBand` is an index
+    // lookup with `.unknown(undefined)` — and an undefined channel is one the item does not carry.
+    // A continuous scale that cannot map answers a real NaN, which upstream puts **on the item**.
+    if (base.isNaN() && scale.scale(input) !is VegaValue.Num) return null
     val bandOffset = if (band != null) scale.bandwidth * band else 0.0
     return base + bandOffset
   }

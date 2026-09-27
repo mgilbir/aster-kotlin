@@ -10462,3 +10462,69 @@ that read alike; folding them together would have made the pattern tidy and two 
 wrong.
 
 260 Vega differential fixtures.
+
+### A position a scale cannot give, and the NaN the harness could not see
+
+The entry above recorded this as sequenced work with the blocker written down. It converged, so here
+it is: the differential's non-finite gap is **closed**, and with it three divergences it was hiding.
+
+**The gap.** A reference records an upstream NaN as the string `"NaN"`, deliberately, so it stays
+visible — and the branch that keeps the non-finite spellings out of the numbers says so in a
+comment. The branch *below* it then read `key in NUMERIC_CHANNELS && value.value.toDoubleOrNull()
+!= null`, and `"NaN".toDoubleOrNull()` **parses**, to `Double.NaN`. So every one of them went
+straight back into the numbers, where the comparison is `abs(wanted - got) > allowed` and
+`abs(NaN - anything)` is NaN, which is never greater than a tolerance. **A channel upstream
+recorded as NaN agreed with whatever this engine held, including an ordinary number.** The
+`GEOMETRY_CHANNELS && wanted in NON_FINITE` rule written for exactly this had never run.
+
+**Three things it was hiding**, two of them introduced earlier in this same stack:
+
+- **A rect's position, since the fixture was written.** `a-short-domain-is-still-a-scale` had two
+  rects at `y: 100` where upstream records `y: NaN`, and its own reference said so all along.
+  `scaledPosition` answered `null` for any NaN, conflating a *miss* with a value the scale could not
+  map — and the two take different branches of `adjustSpatial`: `o.y = o.y2 - (o.height || 0)`
+  against keeping `o.y` and computing the height from it. A **discrete** scale that lacks the value
+  really does answer `undefined` (`scaleBand` is an index lookup with `.unknown(undefined)`), so the
+  distinction is by what the scale returned, not by whether it is NaN.
+- **A symbol upstream still bounds.** `markItemPath`'s bound ends
+  `.translate(item.x || 0, item.y || 0)`, falsiness again, so a symbol whose `y` a scale could not
+  give is measured **at the origin** rather than lost: upstream's `shapeTop` is `-r`, not an empty
+  box. That is the rule `a-mark-nobody-can-place` records for a rule mark, owed to a symbol as well.
+- **A rect upstream bounds differently again.** `boundRect` puts all four corners through `||`, and
+  the *order* is the point: `y` becomes `0` first, so `(0 + height)` is an ordinary number and the
+  rect keeps its full extent anchored at the origin — it is **not** flattened. It flattens only when
+  the height is NaN too, which is what `y2` rather than `height` produces. Probed both:
+  `y NaN, height 40 -> bounds[10,0,40,40]` and `y NaN, y2 100 -> bounds[10,0,40,0]`.
+
+`RectD.ofRect` is the second of those, beside `ofSegment` — and a rect parts company with a rule
+exactly where the `||` and the `!= null` differ. `RectNode.rect` keeps `fromSize`, because a
+renderer draws from it and upstream's renderer takes `item.x` raw.
+
+**A fourth site had to move with them, and the *value sweep* is what said so.** Carrying a NaN out
+of `scaledPosition` put one into a place that had never seen one: a series point. Every shape
+generator upstream reads those through falsiness —
+
+```js
+const x = item => item.x || 0,
+      y = item => item.y || 0;
+```
+
+— so a coordinate a scale could not give is **zero** in a line's path, not a hole; a series is
+broken by `defined` and by nothing else. The `?: 0.0` standing at that site was right for exactly as
+long as a NaN could not reach it. A time scale whose domain comes out `[NaN, NaN]` is the case, and
+upstream's line item holds `y: NaN` while its path reads `M 26.8 0 L 75.6 0 …`.
+
+Worth recording how it was caught: `check.sh` stayed green throughout, because the value sweep is
+**report-only** and not one of its fifteen gates. Three of 499 cases had gone from matching to
+differing, and only running it found them. A change to how positions are carried reaches further
+than the gated corpora do.
+
+**Three of the four changes are caught by a fixture and the fourth is not**, which is recorded
+rather than smoothed over: reverted one at a time, `scaledPosition` fails
+`a-short-domain-is-still-a-scale`, the symbol anchor fails `a-time-value-past-the-calendar` and
+`an-infinite-extent-is-no-extent`, and the rect bounds fail **nothing** — the box lands inside the
+plotting area, so the surface does not move. It is correct, cited, and pinned by a unit test on the
+node rather than on the companion function, because a test of `ofRect` alone left the wiring free to
+be reverted with every gate green.
+
+260 Vega differential fixtures.

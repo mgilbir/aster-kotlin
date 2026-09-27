@@ -156,4 +156,63 @@ class GeometryTest {
     assertTrue(Transform2D.rotateDegrees(Double.NaN).mapBounds(unit).isEmpty)
     assertFalse(Transform2D.rotateDegrees(45.0).mapBounds(unit).isEmpty)
   }
+
+  /**
+   * `boundRect` puts **all four** corners through `||`, which is falsiness and not a null test:
+   * ```js
+   * boundStroke(bounds.set(x = item.x || 0, y = item.y || 0,
+   *                        (x + item.width) || 0, (y + item.height) || 0), item)
+   * ```
+   *
+   * The order is what makes it interesting. `y` is replaced by `0` **first**, so `(0 + height)` is
+   * an ordinary number and the rect keeps its full extent, anchored at the origin — it is *not*
+   * flattened. It flattens only when the height is a NaN as well, which is what a rect written with
+   * `y2` rather than `height` produces: `adjustSpatial` computes `o.height = o.y2 - o.y`, and that
+   * is NaN when `y` is. Both come out of the one rule, and reading either off the other gets the
+   * other wrong.
+   *
+   * Read off a live upstream view, both shapes:
+   * ```
+   * y NaN, height 40 -> bounds[10,0,40,40]
+   * y NaN, y2 100    -> bounds[10,0,40,0]
+   * ```
+   *
+   * Pinned here rather than in a fixture because no chart in the corpus can see it: the box lands
+   * inside the plotting area, so the surface does not move and the reverted form passes every gate.
+   * Correct, cited and unexercised is still worth keeping — it is a difference the moment such a
+   * rect sits near an edge.
+   */
+  @Test
+  fun `a rect that cannot be placed is anchored at the origin`() {
+    assertEquals(RectD(10.0, 20.0, 40.0, 60.0), RectD.ofRect(10.0, 20.0, 30.0, 40.0))
+
+    // Upstream: bounds[10,0,40,40] — the origin, and the height survives.
+    assertEquals(RectD(10.0, 0.0, 40.0, 40.0), RectD.ofRect(10.0, Double.NaN, 30.0, 40.0))
+
+    // Upstream: bounds[10,0,40,0] — a height that is also NaN collapses the far edge.
+    val flat = RectD.ofRect(10.0, Double.NaN, 30.0, Double.NaN)
+    assertEquals(RectD(10.0, 0.0, 40.0, 0.0), flat)
+    assertFalse(flat.isEmpty, "upstream bounds it, so it still counts towards the chart's reach")
+
+    // A negative extent still orders its corners, which `Bounds.set` does with one comparison.
+    assertEquals(RectD(-20.0, 20.0, 10.0, 60.0), RectD.ofRect(10.0, 20.0, -30.0, 40.0))
+  }
+
+  /**
+   * And the node is wired to it, which the test above does not say on its own.
+   *
+   * `RectNode.rect` stays [RectD.fromSize] — a renderer draws from it and upstream's renderer takes
+   * `item.x` raw, so a NaN draws nothing — while `bounds` goes through [RectD.ofRect]. Testing the
+   * companion function alone left the wiring free to be reverted with every gate still green.
+   */
+  @Test
+  fun `a rect node bounds itself through the falsiness and draws from the raw values`() {
+    val placed = RectNode(id = SceneNodeId(0), x = 10.0, y = 20.0, width = 30.0, height = 40.0)
+    assertEquals(RectD(10.0, 20.0, 40.0, 60.0), placed.bounds)
+
+    val unplaceable =
+      RectNode(id = SceneNodeId(1), x = 10.0, y = Double.NaN, width = 30.0, height = 40.0)
+    assertEquals(RectD(10.0, 0.0, 40.0, 40.0), unplaceable.bounds, "bounded at the origin")
+    assertTrue(unplaceable.rect.top.isNaN(), "and still drawn from the raw value, which is NaN")
+  }
 }
