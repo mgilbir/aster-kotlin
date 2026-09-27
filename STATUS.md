@@ -10033,3 +10033,54 @@ for that would be the worst of both. That is twice this move has been made and r
 correctly, which says the consumer should be proven before the shared machinery moves for it.
 
 254 Vega differential fixtures.
+
+### A legend's kind is chosen by falsiness, and the word it was given is said out loud
+
+Found while widening the sweep and set aside once, because the first fix was half of the rule. It
+needs no signal at all: `"type": "nonsense"` is a plain typo.
+
+```js
+spec.type || (isContinuous(scale) ? 'gradient' : 'symbol')
+```
+
+**Falsy infers, truthy decides.** An absent type, a `null` one and an empty one all fall through to
+the kind the *scale* implies — a colour ramp over a linear scale is a gradient — while any other
+value present decides, and only the exact word `gradient` decides for a gradient. Probed all five.
+This engine read the value as an enum, failed to parse an unrecognised word, and inferred, so a typo
+drew the gradient upstream refuses to draw.
+
+**Drawing and naming are two questions**, and the first attempt answered only one. Mapping the
+unknown word to `symbol` made the marks right and the caption wrong, and `GuideCaptionTest` refused
+it:
+
+```
+upstream: Nonsense legend for fill color with values from 0 to 10
+ours:     Symbol legend for fill color with values from 0 to 10
+```
+
+Upstream keeps the word as written and says it verbatim, so `LegendSpec.typeName` holds it beside the
+enum: [type] is what gets drawn and that is what gets said.
+
+**It is pinned by a unit test rather than a fixture, and upstream is the reason.** Probed:
+`type: "symbol"` places its swatches at `(6, 6)` inside each entry, and `type: "nonsense"` leaves
+every one of them at **`null`** — upstream builds the symbol marks for a kind it does not recognise
+and then never lays them out. A differential fixture over that shape would be asking this engine to
+reproduce a legend whose entries are nowhere. That is an **accepted divergence**, in the sense the
+Vega-Lite sweep already uses the term: upstream's answer is not one a reader can use, and matching it
+would draw nothing where this draws a legend. `LegendKindTest` checks the two things worth matching —
+which kind is built, and what it is called. Four mutants, all killed, including the empty-versus-
+unrecognised split and the drawing-versus-naming split that the first attempt collapsed.
+
+**`VegaValue.isTruthy` lands on its third attempt**, and this time the consumer ships. It is needed
+rather than convenient: `spec.type || …` is falsiness, so a type of `0` or `false` must infer, and
+any test on the value's *text* reads those as `"0"` and `"false"` — present. `JsSemantics.truthy`
+delegates to it, so there is one rule with two callers. **4929 exported symbols**, two more:
+`LegendSpec.typeName` and this.
+
+**Observed and not fixed.** The fixture that could not be, before it was withdrawn, showed an
+unanchored symbol legend six pixels off upstream's — `shapeLeft` 166 against 160, `shapeTop` 1 against
+−5, with rows 13 apart where upstream's are 12. It is the same NaN-placement corner: upstream's rows
+are unplaced and its bounds fall out of `item.x || 0`. Nothing in the corpus reaches it now that the
+fixture is gone, and reproducing it is reproducing upstream's broken state.
+
+254 Vega differential fixtures.

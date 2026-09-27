@@ -8,6 +8,15 @@ section here does not get released.
 
 ### Fixed
 
+- **A legend's kind is chosen by falsiness, and the word it was given is said out loud.**
+  `spec.type || (isContinuous(scale) ? 'gradient' : 'symbol')` — so absent, `null` and `""` infer the
+  kind from the scale while any other value present decides, and only `gradient` means gradient. This
+  engine failed to parse an unrecognised word and inferred, so `"type": "nonsense"` drew a gradient
+  where upstream draws symbols. Upstream also keeps the word verbatim for the accessibility
+  description — `Nonsense legend for fill color …` — which `LegendSpec.typeName` now holds beside the
+  enum. Adds `LegendSpec.typeName` and `VegaValue.isTruthy` (**4929** exported symbols, two more);
+  `JsSemantics.truthy` delegates to the latter so one rule has two callers.
+
 - **A guide's orientation may be computed.** *(Adds three model properties; see below.)*
   `{"signal": …}` is legal on every guide property, and
   the enum-valued ones refused it: an object stringifies to `[object Object]`, which parses as no

@@ -1834,12 +1834,17 @@ internal class LegendBuilder(
       )
     val scaleName = spec.scale ?: return null
     val scale = scales[scaleName] ?: return null
+    // **What is drawn and what is said are two questions.** Upstream keeps the `type` as it was
+    // written and reads it out verbatim — `Nonsense legend for fill color …` — while drawing the
+    // symbols any unrecognised kind draws. So the word comes from the specification when there is
+    // one and from the resolved kind when there is not.
     val kind =
-      when (resolveType(spec, scale)) {
-        LegendType.GRADIENT -> "gradient"
-        LegendType.DISCRETE -> "discrete"
-        else -> "symbol"
-      }
+      spec.typeName
+        ?: when (resolveType(spec, scale)) {
+          LegendType.GRADIENT -> "gradient"
+          LegendType.DISCRETE -> "discrete"
+          else -> "symbol"
+        }
     // A caption is spoken, not drawn, so a two-line title is read as one phrase: upstream's
     // `array(item.text).join(' ')`. The lines reach here already joined by the newline the text
     // node draws on, and turning them back into spaces is the same operation.

@@ -8,6 +8,7 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asBoolean
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.isTruthy
 import dev.aster.vega.model.time.TimeInterval
 
 /**
@@ -3263,7 +3264,25 @@ public class SpecParser {
         strokeWidthScale = own.fields["strokeWidth"]?.asString(),
         strokeDashScale = own.fields["strokeDash"]?.asString(),
         gridAlign = obj.fields["gridAlign"]?.asString(),
-        type = obj.enumOrNull("type", path, "legend type") { LegendType.fromName(it) },
+        // ```js
+        // spec.type || (isContinuous(scale) ? 'gradient' : 'symbol')
+        // ```
+        //
+        // **Falsy infers, truthy decides**, and only the exact word `gradient` decides for a
+        // gradient. An absent type, a null one and an empty one all fall through to the kind the
+        // *scale* implies — a colour ramp over a linear scale is a gradient — while any other value
+        // present builds a **symbol** legend, including one nothing recognises. Probed all five.
+        //
+        // Read as an enum alone, an unrecognised word failed to parse and the kind was inferred, so
+        // `"type": "nonsense"` — a plain typo, no signal involved — drew the gradient upstream
+        // refuses to draw. The word itself is kept in [LegendSpec.typeName] because upstream says
+        // it
+        // out loud; see there.
+        type =
+          obj.fields["type"]
+            ?.takeIf { it.isTruthy() }
+            ?.let { LegendType.fromName(it.asString()) ?: LegendType.SYMBOL },
+        typeName = obj.fields["type"]?.takeIf { it.isTruthy() }?.asString(),
         // Both may be **computed**, and reading one as text made `[object Object]` of it — which is
         // not an orientation, so the property was refused with a diagnostic and the legend took its
         // default corner. See [signalReference]; the axis's own `orient` had the same flaw and lost

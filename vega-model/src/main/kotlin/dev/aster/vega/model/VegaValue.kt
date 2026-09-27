@@ -204,6 +204,36 @@ public fun VegaValue.asDouble(): Double =
  * beside `JsSemantics.toNumber`: a *reading* and a *coercion* that agree on everything a chart
  * usually holds. Found by the value sweep, which is the corpus that holds the unusual ones.
  */
+/**
+ * JavaScript truthiness: `null`, `false`, `0`, `NaN` and `""` are falsey; everything else is not.
+ *
+ * Here rather than beside the rest of `JsSemantics` because the **grammar** is written in terms of
+ * it, a layer below any expression and with no signal scope to reach for. `parseLegend` chooses a
+ * legend's kind with `spec.type || (isContinuous(scale) ? 'gradient' : 'symbol')`, so an empty type
+ * infers and any other value present decides — and a `0` or a `false` written there is falsey,
+ * which a test on the *text* of the value gets wrong in both cases.
+ *
+ * `JsSemantics.truthy` is this function. One rule with two callers rather than two transcriptions
+ * of it: a second copy of a JavaScript rule has drifted every time this repository has allowed one.
+ */
+public fun VegaValue.isTruthy(): Boolean =
+  when (this) {
+    is VegaValue.Null,
+    is VegaValue.Undefined -> false
+    is VegaValue.Bool -> value
+    is VegaValue.Num -> value != 0.0 && !value.isNaN()
+    // A `Date` is an **object**, and every object is truthy — including the epoch and including an
+    // Invalid Date. Treating it as its number made `datetime(0)` falsey, so `if(datum.when, ...)`
+    // took the wrong branch for exactly one instant in history and for every date that failed to
+    // parse.
+    is VegaValue.Timestamp -> true
+    is VegaValue.Str -> value.isNotEmpty()
+    is VegaValue.Arr -> true
+    is VegaValue.Obj -> true
+    // An object, and every object is truthy.
+    is VegaValue.Pattern -> true
+  }
+
 public fun VegaValue.asString(): String =
   when (this) {
     is VegaValue.Str -> value

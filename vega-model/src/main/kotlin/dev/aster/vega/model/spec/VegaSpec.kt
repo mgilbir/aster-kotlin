@@ -1327,6 +1327,14 @@ public data class LegendSpec(
   val gridAlign: String? = null,
   /** `null` means "derive from the scale type", which is what a specification usually wants. */
   val type: LegendType? = null,
+  /**
+   * The `type` **as it was written**, which is not always a kind this engine knows.
+   *
+   * Upstream keeps the word and uses it verbatim where it describes the legend, so a `"nonsense"`
+   * type reads as `Nonsense legend for fill color …` to a screen reader while drawing the symbols
+   * any unrecognised kind draws. [type] is what gets drawn; this is what gets said.
+   */
+  val typeName: String? = null,
   val orient: LegendOrient = LegendOrient.RIGHT,
   /**
    * `orient: {"signal": "..."}` — which corner of the chart the legend sits in, chosen by a signal.

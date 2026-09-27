@@ -3,6 +3,7 @@ package dev.aster.vega.expression
 import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.isNullish
+import dev.aster.vega.model.isTruthy
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.time.TimeFormat
 import io.github.mgilbir.ecma262.number.toEcmaDouble
@@ -27,23 +28,7 @@ public object JsSemantics {
   /**
    * JavaScript truthiness: `null`, `false`, `0`, `NaN` and `""` are falsey; everything else is not.
    */
-  public fun truthy(value: VegaValue): Boolean =
-    when (value) {
-      is VegaValue.Null,
-      is VegaValue.Undefined -> false
-      is VegaValue.Bool -> value.value
-      is VegaValue.Num -> value.value != 0.0 && !value.value.isNaN()
-      // A `Date` is an **object**, and every object is truthy — including the epoch and including
-      // an Invalid Date. Treating it as its number made `datetime(0)` falsey, so
-      // `if(datum.when, ...)` took the wrong branch for exactly one instant in history and for
-      // every date that failed to parse.
-      is VegaValue.Timestamp -> true
-      is VegaValue.Str -> value.value.isNotEmpty()
-      is VegaValue.Arr -> true
-      is VegaValue.Obj -> true
-      // An object, and every object is truthy.
-      is VegaValue.Pattern -> true
-    }
+  public fun truthy(value: VegaValue): Boolean = value.isTruthy()
 
   // ---- number coercion ------------------------------------------------------
 
