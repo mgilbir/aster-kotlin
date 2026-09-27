@@ -10084,3 +10084,34 @@ are unplaced and its bounds fall out of `item.x || 0`. Nothing in the corpus rea
 fixture is gone, and reproducing it is reproducing upstream's broken state.
 
 254 Vega differential fixtures.
+
+### What the widened sweep has left, and why each one stays
+
+**117 cases, 100 matched.** The seventeen differences are nine of upstream's *retention* — a second
+render adds and removes rows rather than rebuilding, which is architectural — and eight fresh-render
+ones that fall into three groups, none of them open questions any more.
+
+**Five are the raw value on the item, and the drawing is identical.** Upstream's item carries
+whatever the encode produced and resolves it at paint time; this engine resolves on the way in, so
+its node holds the resolved answer and the reference holds the written one. Probed, rather than
+assumed: an `align` of `"middle"`, of `""` and of `7` each emit `text-anchor="start"` and bound at
+**x1 = 60**, exactly as `left` does — so a text mark aligned `middle` is drawn in the same place by
+both, and only the word recorded beside it differs. The same shape covers a `limit` of `"wide"`,
+where neither engine truncates.
+
+Three of that family were worth closing and are closed above — a fill that is not a colour, a stroke
+width that is present, and a legend's type — and each earned it for a reason this pair does not have:
+the fill changed what the scene *recorded about a mark that was drawn*, the stroke width changed the
+**bounds**, and the type changed the **caption a screen reader reads**. An `align` nothing recognises
+changes none of the three.
+
+**Two are `a-scale-domain--not-a-domain`** and its retention twin, deferred above with the cost
+written down.
+
+**One is the unanchored symbol legend**, recorded with the entry above it.
+
+So the sweep is not saturated in the sense of having nothing left; it is saturated in the sense that
+everything left is a decision already made and written down. The next thing it finds will come from
+widening it again, which is how the last six charts produced four rules.
+
+254 Vega differential fixtures.
