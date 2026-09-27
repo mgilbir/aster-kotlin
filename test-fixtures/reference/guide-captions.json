@@ -175,6 +175,21 @@
   "caption": "X-axis for a linear scale with values from 0 to 100"
  },
  {
+  "fixture": "a-reversed-span-still-has-a-step",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to −50"
+ },
+ {
+  "fixture": "a-reversed-span-still-has-a-step",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0.00 to −0.05"
+ },
+ {
+  "fixture": "a-reversed-span-still-has-a-step",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from −50 to 0"
+ },
+ {
   "fixture": "a-scale-coerces-what-it-is-given",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0 to 20"

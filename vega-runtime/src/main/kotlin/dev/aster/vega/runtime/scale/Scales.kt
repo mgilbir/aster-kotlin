@@ -122,7 +122,7 @@ public class IdentityScale(
     count: Int = LinearScale.DEFAULT_TICK_COUNT,
     locale: VegaLocale = VegaLocale.EnglishUS,
   ): String {
-    val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
+    val step = Ticks.spanStep(domain.first(), domain.last(), count)
     val precision = if (step.isFinite()) Ticks.precisionForStep(step) else 0
     return formatTickLabel(value, precision, locale)
   }
@@ -344,7 +344,7 @@ public class LinearScale(
     count: Int = DEFAULT_TICK_COUNT,
     locale: VegaLocale = VegaLocale.EnglishUS,
   ): String {
-    val step = Ticks.stepFrom(Ticks.tickIncrement(domainStart, domainEnd, count))
+    val step = Ticks.spanStep(domainStart, domainEnd, count)
     val precision = if (step.isFinite()) Ticks.precisionForStep(step) else DEGENERATE_PRECISION
     return formatTickLabel(value, precision, locale)
   }
@@ -757,7 +757,7 @@ public abstract class TransformedScale(
     count: Int = LinearScale.DEFAULT_TICK_COUNT,
     locale: VegaLocale = VegaLocale.EnglishUS,
   ): String {
-    val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
+    val step = Ticks.spanStep(domain.first(), domain.last(), count)
     return formatTickLabel(
       value,
       if (step.isFinite()) Ticks.precisionForStep(step) else DEGENERATE_PRECISION,
@@ -1655,7 +1655,7 @@ public class SequentialColorScale(
     count: Int = LinearScale.DEFAULT_TICK_COUNT,
     locale: VegaLocale = VegaLocale.EnglishUS,
   ): String {
-    val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
+    val step = Ticks.spanStep(domain.first(), domain.last(), count)
     return formatTickLabel(
       value,
       if (step.isFinite()) Ticks.precisionForStep(step) else DEGENERATE_PRECISION,
@@ -1667,7 +1667,7 @@ public class SequentialColorScale(
     count: Int = LinearScale.DEFAULT_TICK_COUNT,
     locale: VegaLocale = VegaLocale.EnglishUS,
   ): List<String> {
-    val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
+    val step = Ticks.spanStep(domain.first(), domain.last(), count)
     val precision = if (step.isFinite()) Ticks.precisionForStep(step) else DEGENERATE_PRECISION
     return ticks(count).map { formatTickLabel(it, precision, locale) }
   }

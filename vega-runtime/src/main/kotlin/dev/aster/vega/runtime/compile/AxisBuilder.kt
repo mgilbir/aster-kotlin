@@ -1680,7 +1680,7 @@ public class AxisBuilder(
       val labeller = Ticks.spanFormatter(specifier, low, high, count, locale)
       return { value -> labeller(value.asDouble()) }
     }
-    val step = Ticks.stepFrom(Ticks.tickIncrement(low, high, count))
+    val step = Ticks.spanStep(low, high, count)
     val precision = if (step.isFinite()) Ticks.precisionForStep(step) else 0
     return { value -> formatTickLabel(value.asDouble(), precision, locale) }
   }

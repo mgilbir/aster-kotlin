@@ -584,6 +584,14 @@
   "hidden": false
  },
  {
+  "fixture": "a-reversed-span-still-has-a-step",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "a-scale-coerces-what-it-is-given",
   "kind": "group",
   "role": "graphics-object",

@@ -284,7 +284,7 @@ internal object GuideCaption {
       // scale whose cut points are 19.333 and 48.667 is described as "19, 49" — a reader is being
       // told where the boundaries roughly are, and six decimals of a quantile is noise. Reading the
       // decimals off the values instead read them out in full.
-      val increment = Ticks.stepFrom(Ticks.tickIncrement(0.0, step, THRESHOLD_FORMAT_COUNT))
+      val increment = Ticks.spanStep(0.0, step, THRESHOLD_FORMAT_COUNT)
       val decimals = if (increment.isFinite()) Ticks.precisionForStep(increment) else 0
       return { value -> formatTickLabel(value, decimals, locale) }
     }
