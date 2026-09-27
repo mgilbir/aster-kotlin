@@ -8,6 +8,7 @@ import dev.aster.vega.expression.Evaluator
 import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.expression.ExpressionResult
 import dev.aster.vega.expression.Functions
+import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.expression.RandomStream
 import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
@@ -19,6 +20,7 @@ import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.isTruthy
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.spec.AutosizeType
 import dev.aster.vega.model.spec.ChannelValue
@@ -1448,9 +1450,19 @@ public class SpecCompiler(
       numberSignal(signals, "height") ?: declaredHeight,
     )
 
-  /** A signal's value as a usable number, or null if it is not one. */
+  /**
+   * A signal's value as a number, **non-finite ones included**.
+   *
+   * It used to end `?.takeIf { it.isFinite() }`, which reads like prudence and is a second clamp.
+   * [layoutSize] has already applied upstream's — `Math.max(0, w || 0)` — and what survives it is
+   * what upstream's own `width` signal holds: a NaN for a size written as a word, an infinity for
+   * `1/0`. Filtering here fell back on the *declared* size instead, so a scale ranged on `"width"`
+   * got `[0, 0]` where upstream gives `[0, NaN]` and places nothing through it.
+   *
+   * Two clamps for one rule, and the second quietly undid the first.
+   */
   private fun numberSignal(signals: Map<String, VegaValue>, name: String): Double? =
-    signals[name]?.asNumberOrNull()?.takeIf { it.isFinite() }
+    signals[name]?.asNumberOrNull()
 
   /**
    * `Math.max(0, group.width || 0)` — the size a group lays out at, whatever the signal says.
@@ -1467,13 +1479,30 @@ public class SpecCompiler(
    * gets `[0, 0]`. A signal reading `width / 2` reads 0 too, which is why this is applied where the
    * signal settles rather than where the size is read.
    *
-   * `|| 0` is the other half and is not the same test as the clamp: it is falsiness, so a `NaN` — a
-   * width of `0/0`, or a signal that never resolved — is zero rather than a size nothing can be
-   * laid out against. Probed: upstream renders a `NaN` width exactly as it renders a negative one.
+   * `|| 0` is the other half and is **not** the same test as the clamp: it is falsiness, applied to
+   * the raw value *before* the coercion. That ordering is the whole of it, and it makes a numeric
+   * `NaN` and a *word* land in different places:
+   * ```
+   * w = 0/0      -> `NaN || 0` is 0        -> Math.max(0, 0)        -> 0
+   * w = 'wide'   -> `'wide' || 0` is 'wide'-> Math.max(0, 'wide')   -> NaN
+   * ```
+   *
+   * Probed all eight shapes on a live view — `0/0`, `'wide'`, `''`, `null`, `-50`, `1/0`, `-1/0`
+   * and a plain number — and only `Math.max(0, w || 0)` reproduces every one. A width of `1/0` is
+   * **Infinity**, not zero, and a scale ranged on it gets `[0, Infinity]`.
+   *
+   * This engine read the value with `asNumberOrNull() ?: 0.0`, which loses a word before the
+   * falsiness can see it, and then guarded on `isFinite`, which zeroes the two cases upstream
+   * keeps. A `"width": {"signal": …}` holding a word therefore laid the chart out against `[0, 0]`
+   * where upstream ranges it against `[0, NaN]` and places nothing — nine axis rules at 0.5 rather
+   * than NaN. Invisible until the differential stopped agreeing with every NaN it was shown; see
+   * the entry on the box that cannot be placed.
    */
   private fun layoutSize(value: VegaValue?): VegaValue.Num {
-    val number = value?.asNumberOrNull() ?: 0.0
-    return VegaValue.Num(if (number.isFinite()) maxOf(0.0, number) else 0.0)
+    // `w || 0`, on the raw value.
+    val truthy = value?.takeIf { it.isTruthy() } ?: VegaValue.Num(0.0)
+    // then `Math.max(0, …)`, whose coercion is `+` and whose NaN propagates.
+    return VegaValue.Num(maxOf(0.0, JsSemantics.toNumber(truthy)))
   }
 
   public companion object {

@@ -10528,3 +10528,44 @@ node rather than on the companion function, because a test of `ofRect` alone lef
 be reverted with every gate green.
 
 260 Vega differential fixtures.
+
+### A size written as a word is a NaN, and a size written as a NaN is zero
+
+The first thing the un-blinded differential found, and it needed the un-blinding: every one of its
+nine differences was a channel upstream recorded as `NaN`, so the sweep had been reporting
+`a-view-size--wide` as a **match**.
+
+```js
+Math.max(0, w || 0)
+```
+
+Two operations, and the **order** is the whole rule. The falsiness runs on the raw value, before
+the coercion, so a numeric `NaN` is falsey and becomes `0` — while a *word* is truthy, survives into
+`Math.max`, and comes out `NaN` because that is what `+'wide'` is. The two land in different places
+from one line:
+
+```
+w = 0/0     -> `NaN || 0` is 0         -> Math.max(0, 0)       -> 0
+w = 'wide'  -> `'wide' || 0` is 'wide' -> Math.max(0, 'wide')  -> NaN
+```
+
+Probed on a live view at all eight shapes — `0/0`, `'wide'`, `''`, `null`, `-50`, `1/0`, `-1/0` and
+a plain number — and no other expression reproduces every one. `1/0` is the other surprise: a width
+of **Infinity** is not clamped, and a scale ranged on it gets `[0, Infinity]`.
+
+This engine got it wrong at **two** sites, and the second quietly undid the first. `layoutSize` read
+the value with `asNumberOrNull() ?: 0.0`, which loses a word before the falsiness can see it, and
+then guarded on `isFinite`, which zeroes the two cases upstream keeps. `numberSignal` — the reader
+the *scale ranges* go through — ended `?.takeIf { it.isFinite() }`, a second clamp on a value that
+had already been clamped, falling back to the **declared** size. So a chart whose width came from a
+control holding a word laid out against `[0, 0]` where upstream ranges it against `[0, NaN]`: nine
+axis rules at 0.5 rather than at NaN.
+
+The surface is unaffected either way, which is why nothing else moved — upstream draws the same
+8-wide box for a NaN width as for a negative one, and that much was already right. What was wrong
+was everything ranged on it.
+
+`LayoutSizeTest` carries all eight shapes as upstream answers them. Reverted, either site alone
+fails two of its cases.
+
+260 Vega differential fixtures.
