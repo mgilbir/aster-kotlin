@@ -559,7 +559,7 @@ public class MarkEncoder(
     // given one disappear, where upstream draws it untouched.
     val scaleX = number(channels["scaleX"], datum)?.takeIf { it != 0.0 && !it.isNaN() } ?: 1.0
     val scaleY = number(channels["scaleY"], datum)?.takeIf { it != 0.0 && !it.isNaN() } ?: 1.0
-    val angle = number(channels["angle"], datum) ?: 0.0
+    val angle = coerced(channels["angle"], datum, 0.0)
     val style = style(channels, datum, spec)
 
     var transform = Transform2D.translate(x, y)
@@ -633,7 +633,7 @@ public class MarkEncoder(
     // The path is built at the arc's own centre, so the turn is about that point rather than about
     // the origin: `translate(cx, cy) · rotate · translate(-cx, -cy)`, which is the same thing as
     // upstream's origin-centred shape rotated and then translated.
-    val angle = number(channels["angle"], datum) ?: 0.0
+    val angle = coerced(channels["angle"], datum, 0.0)
     val turn =
       if (angle == 0.0) Transform2D.Identity
       else
@@ -700,7 +700,7 @@ public class MarkEncoder(
       size = number(channels["size"], datum) ?: MarkDefaults.SYMBOL_SIZE,
       shape = shape ?: SymbolShape.CIRCLE,
       customPath = outline,
-      angleDegrees = number(channels["angle"], datum) ?: 0.0,
+      angleDegrees = coerced(channels["angle"], datum, 0.0),
       fill = style.fill,
       stroke = style.stroke,
       opacity = style.opacity,
