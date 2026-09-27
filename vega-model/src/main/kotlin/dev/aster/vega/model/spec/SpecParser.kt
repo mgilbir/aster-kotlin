@@ -2413,7 +2413,13 @@ public class SpecParser {
       )
       return null
     }
-    val orientName = own.fields["orient"]?.asString() ?: "bottom"
+    // An orientation may be **computed**, and reading one as text made `[object Object]` of it,
+    // which
+    // is not an orientation — so the whole axis was refused and a chart lost the side of itself it
+    // reserves room along. Upstream accepts the form on every guide property.
+    val orientValue = own.fields["orient"]
+    val orientExpression = signalReference(orientValue)
+    val orientName = if (orientExpression != null) "bottom" else orientValue?.asString() ?: "bottom"
     val orient = Orient.fromName(orientName)
     if (orient == null) {
       diagnostics.error(
@@ -2450,6 +2456,7 @@ public class SpecParser {
     return AxisSpec(
       scale = scale,
       orient = orient,
+      orientExpression = orientExpression,
       title = guideTitleText(obj.fields["title"]),
       titleExpression = (obj.fields["title"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
       titlePadding = obj.numberOrSignal("titlePadding", "$path.titlePadding"),
@@ -3257,11 +3264,17 @@ public class SpecParser {
         strokeDashScale = own.fields["strokeDash"]?.asString(),
         gridAlign = obj.fields["gridAlign"]?.asString(),
         type = obj.enumOrNull("type", path, "legend type") { LegendType.fromName(it) },
+        // Both may be **computed**, and reading one as text made `[object Object]` of it — which is
+        // not an orientation, so the property was refused with a diagnostic and the legend took its
+        // default corner. See [signalReference]; the axis's own `orient` had the same flaw and lost
+        // the whole guide rather than one property.
         orient =
           obj.enumOrNull("orient", path, "legend orientation") { LegendOrient.fromName(it) }
             ?: LegendOrient.RIGHT,
+        orientExpression = signalReference(obj.fields["orient"]),
         direction =
           obj.enumOrNull("direction", path, "legend direction") { Direction.fromName(it) },
+        directionExpression = signalReference(obj.fields["direction"]),
         title = guideTitleText(obj.fields["title"]),
         titleExpression =
           (obj.fields["title"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
@@ -3426,13 +3439,32 @@ public class SpecParser {
    * Returns `null` both for absent and for unrecognized, so the caller applies its own default; the
    * difference between the two is already in the diagnostics.
    */
+  /**
+   * The expression behind a `{"signal": "..."}`, or null for a value written out.
+   *
+   * Every guide property can be computed, and the enum-valued ones were the last to notice: an
+   * object is not a word, so reading one as text produced `[object Object]` and the parse of it
+   * failed. What happened next depended on the property — a legend's orientation fell back to its
+   * default with a diagnostic, and an **axis's** took the whole axis with it, so a chart lost the
+   * side of itself it reserves room along.
+   */
+  private fun signalReference(value: VegaValue?): String? =
+    (value as? VegaValue.Obj)?.fields?.get("signal")?.asString()
+
   private fun <T> VegaValue.Obj.enumOrNull(
     key: String,
     path: String,
     what: String,
     parse: (String) -> T?,
   ): T? {
-    val text = fields[key]?.asString() ?: return null
+    val value = fields[key] ?: return null
+    // A `{"signal": …}` is not a misspelled enum, it is a **computed** one, and the caller keeps
+    // the
+    // expression beside the default it falls back to. Reading it as text made `[object Object]` of
+    // it and reported that as an unknown value, which is a complaint about something the
+    // specification got right.
+    if (signalReference(value) != null) return null
+    val text = value.asString()
     val parsed = parse(text)
     if (parsed == null) {
       diagnostics.error(

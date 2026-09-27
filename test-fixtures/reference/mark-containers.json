@@ -208,6 +208,30 @@
   "hidden": false
  },
  {
+  "fixture": "a-guide-orientation-a-signal-chooses",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-guide-orientation-a-signal-chooses",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "a-guide-orientation-a-signal-chooses",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "a-guide-over-a-scale-that-places-nothing",
   "kind": "group",
   "role": "graphics-object",

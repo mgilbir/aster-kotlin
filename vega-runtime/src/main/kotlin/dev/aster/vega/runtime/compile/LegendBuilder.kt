@@ -227,6 +227,18 @@ internal class LegendBuilder(
     // nothing below has to know the difference.
     val spec =
       declared.copy(
+        // **Layout before style.** A legend's corner and its direction decide which edge of the
+        // drawing it reserves room along and whether its entries run down or across, so they are
+        // resolved with the rest but read by everything that measures. An unreadable one keeps the
+        // declared value rather than dropping the legend.
+        orient =
+          declared.orientExpression
+            ?.let { numbers.resolveText(it, scaleName) }
+            ?.let { LegendOrient.fromName(it) } ?: declared.orient,
+        direction =
+          declared.directionExpression
+            ?.let { numbers.resolveText(it, scaleName) }
+            ?.let { Direction.fromName(it) } ?: declared.direction,
         // As on an axis: a signal may choose the grammar, and it has to be resolved before the
         // labels
         // are formatted.

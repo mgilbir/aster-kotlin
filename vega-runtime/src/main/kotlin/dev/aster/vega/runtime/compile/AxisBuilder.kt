@@ -163,8 +163,19 @@ public class AxisBuilder(
     // plain constants: an axis whose label colour comes from a control is the ordinary case, and
     // the
     // alternative is resolving the same expression at each of a hundred reads.
+    // The **orientation** first, because it is not a style: it decides which edge of the plotting
+    // area the axis reserves room along, so every measurement below is taken against it. An
+    // unreadable one keeps the declared side rather than dropping the axis — upstream reserves the
+    // room either way, and losing the guide over an unrecognised word is the failure this whole
+    // file
+    // has been unlearning.
+    val orient =
+      declared.orientExpression
+        ?.let { numbers.resolveText(it, declared.scale) }
+        ?.let { Orient.fromName(it) } ?: declared.orient
     val spec =
       declared.copy(
+        orient = orient,
         // `formatType` may be chosen by a signal, and it has to be resolved before anything reads
         // it:
         // it decides which *grammar* the format string is written in, so a chart switching a column

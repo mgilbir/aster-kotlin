@@ -842,6 +842,16 @@ public data class LayoutOffset(
 public data class AxisSpec(
   val scale: String,
   val orient: Orient,
+  /**
+   * `orient: {"signal": "..."}` — which side the axis sits on, chosen by a signal.
+   *
+   * Not a styling detail: the orientation decides which edge of the plotting area the axis reserves
+   * room along, so a chart that moves its axis from left to right is a different **layout** and not
+   * a different colour. A dashboard offering "labels on the left or the right" writes exactly this.
+   *
+   * [orient] holds the default until this resolves, because the literal is unknown at parse time.
+   */
+  val orientExpression: String? = null,
   val title: String? = null,
   /**
    * `title: {"signal": "..."}` — the axis names itself from a signal.
@@ -1318,8 +1328,19 @@ public data class LegendSpec(
   /** `null` means "derive from the scale type", which is what a specification usually wants. */
   val type: LegendType? = null,
   val orient: LegendOrient = LegendOrient.RIGHT,
+  /**
+   * `orient: {"signal": "..."}` — which corner of the chart the legend sits in, chosen by a signal.
+   *
+   * The counterpart of [AxisSpec.orientExpression], and layout for the same reason: the corner
+   * decides which edge of the drawing the legend reserves room along.
+   */
+  val orientExpression: String? = null,
   /** `null` means the per-orient default: vertical at the sides, horizontal above and below. */
   val direction: Direction? = null,
+  /**
+   * `direction: {"signal": "..."}` — whether the entries run down or across, chosen by a signal.
+   */
+  val directionExpression: String? = null,
   val title: String? = null,
   /**
    * `title: {"signal": "..."}` — the legend names itself from a signal.

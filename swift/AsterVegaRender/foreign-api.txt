@@ -159,7 +159,7 @@ AxisSpec.aria
 AxisSpec.bandPosition
 AxisSpec.description()
 AxisSpec.description_
-AxisSpec.doCopy(scale:orient:title:titleExpression:titlePadding:titleFontSize:titleAnchor:titleLimit:position:translate:tickRound:tickBand:labelOffset:labelBound:aria:description:grid:ticks:labels:domainLine:tickCount:tickMinStep:tickInterval:tickStep:tickSize:labelPadding:labelFontSize:offset:offsetChannel:titleX:titleY:titleAngle:titleAlign:titleBaseline:zindex:values:labelOverlap:labelSeparation:labelAngle:labelAlign:labelBaseline:labelLimit:format:formatExpression:formatTypeExpression:formatType:bandPosition:tickOffset:tickExtra:gridScale:labelFlush:labelFlushOffset:minExtent:maxExtent:encode:labelStyle:tickStyle:gridStyle:domainStyle:titleStyle:)
+AxisSpec.doCopy(scale:orient:orientExpression:title:titleExpression:titlePadding:titleFontSize:titleAnchor:titleLimit:position:translate:tickRound:tickBand:labelOffset:labelBound:aria:description:grid:ticks:labels:domainLine:tickCount:tickMinStep:tickInterval:tickStep:tickSize:labelPadding:labelFontSize:offset:offsetChannel:titleX:titleY:titleAngle:titleAlign:titleBaseline:zindex:values:labelOverlap:labelSeparation:labelAngle:labelAlign:labelBaseline:labelLimit:format:formatExpression:formatTypeExpression:formatType:bandPosition:tickOffset:tickExtra:gridScale:labelFlush:labelFlushOffset:minExtent:maxExtent:encode:labelStyle:tickStyle:gridStyle:domainStyle:titleStyle:)
 AxisSpec.domainLine
 AxisSpec.domainStyle
 AxisSpec.encode
@@ -171,7 +171,7 @@ AxisSpec.grid
 AxisSpec.gridScale
 AxisSpec.gridStyle
 AxisSpec.hash()
-AxisSpec.init(scale:orient:title:titleExpression:titlePadding:titleFontSize:titleAnchor:titleLimit:position:translate:tickRound:tickBand:labelOffset:labelBound:aria:description:grid:ticks:labels:domainLine:tickCount:tickMinStep:tickInterval:tickStep:tickSize:labelPadding:labelFontSize:offset:offsetChannel:titleX:titleY:titleAngle:titleAlign:titleBaseline:zindex:values:labelOverlap:labelSeparation:labelAngle:labelAlign:labelBaseline:labelLimit:format:formatExpression:formatTypeExpression:formatType:bandPosition:tickOffset:tickExtra:gridScale:labelFlush:labelFlushOffset:minExtent:maxExtent:encode:labelStyle:tickStyle:gridStyle:domainStyle:titleStyle:)
+AxisSpec.init(scale:orient:orientExpression:title:titleExpression:titlePadding:titleFontSize:titleAnchor:titleLimit:position:translate:tickRound:tickBand:labelOffset:labelBound:aria:description:grid:ticks:labels:domainLine:tickCount:tickMinStep:tickInterval:tickStep:tickSize:labelPadding:labelFontSize:offset:offsetChannel:titleX:titleY:titleAngle:titleAlign:titleBaseline:zindex:values:labelOverlap:labelSeparation:labelAngle:labelAlign:labelBaseline:labelLimit:format:formatExpression:formatTypeExpression:formatType:bandPosition:tickOffset:tickExtra:gridScale:labelFlush:labelFlushOffset:minExtent:maxExtent:encode:labelStyle:tickStyle:gridStyle:domainStyle:titleStyle:)
 AxisSpec.isEqual(_:)
 AxisSpec.labelAlign
 AxisSpec.labelAngle
@@ -192,6 +192,7 @@ AxisSpec.minExtent
 AxisSpec.offset
 AxisSpec.offsetChannel
 AxisSpec.orient
+AxisSpec.orientExpression
 AxisSpec.position
 AxisSpec.scale
 AxisSpec.tickBand
@@ -2603,7 +2604,8 @@ LegendSpec.cornerRadius
 LegendSpec.description()
 LegendSpec.description_
 LegendSpec.direction
-LegendSpec.doCopy(fill:stroke:size:shape:opacity:strokeWidthScale:strokeDashScale:gridAlign:type:orient:direction:title:titleExpression:values:format:tickCount:tickInterval:tickStep:offset:padding:titlePadding:titleOrient:titleAnchor:titleLimit:titleFontSize:labelFontSize:labelOffset:symbolType:symbolSize:symbolStrokeWidth:clipHeight:gradientLength:gradientThickness:rowPadding:columnPadding:columns:legendX:legendY:fillColor:strokeColor:cornerRadius:symbolFillColor:symbolOffset:gradientStrokeColor:gradientStrokeWidth:gradientOpacity:symbolLimit:formatType:formatTypeExpression:formatExpression:tickMinStep:aria:description:backgroundStrokeWidth:backgroundStrokeDash:zindex:labelStyle:titleStyle:symbolStyle:labelOverlap:labelSeparation:labelLimit:encode:)
+LegendSpec.directionExpression
+LegendSpec.doCopy(fill:stroke:size:shape:opacity:strokeWidthScale:strokeDashScale:gridAlign:type:orient:orientExpression:direction:directionExpression:title:titleExpression:values:format:tickCount:tickInterval:tickStep:offset:padding:titlePadding:titleOrient:titleAnchor:titleLimit:titleFontSize:labelFontSize:labelOffset:symbolType:symbolSize:symbolStrokeWidth:clipHeight:gradientLength:gradientThickness:rowPadding:columnPadding:columns:legendX:legendY:fillColor:strokeColor:cornerRadius:symbolFillColor:symbolOffset:gradientStrokeColor:gradientStrokeWidth:gradientOpacity:symbolLimit:formatType:formatTypeExpression:formatExpression:tickMinStep:aria:description:backgroundStrokeWidth:backgroundStrokeDash:zindex:labelStyle:titleStyle:symbolStyle:labelOverlap:labelSeparation:labelLimit:encode:)
 LegendSpec.encode
 LegendSpec.fill
 LegendSpec.fillColor
@@ -2618,7 +2620,7 @@ LegendSpec.gradientStrokeWidth
 LegendSpec.gradientThickness
 LegendSpec.gridAlign
 LegendSpec.hash()
-LegendSpec.init(fill:stroke:size:shape:opacity:strokeWidthScale:strokeDashScale:gridAlign:type:orient:direction:title:titleExpression:values:format:tickCount:tickInterval:tickStep:offset:padding:titlePadding:titleOrient:titleAnchor:titleLimit:titleFontSize:labelFontSize:labelOffset:symbolType:symbolSize:symbolStrokeWidth:clipHeight:gradientLength:gradientThickness:rowPadding:columnPadding:columns:legendX:legendY:fillColor:strokeColor:cornerRadius:symbolFillColor:symbolOffset:gradientStrokeColor:gradientStrokeWidth:gradientOpacity:symbolLimit:formatType:formatTypeExpression:formatExpression:tickMinStep:aria:description:backgroundStrokeWidth:backgroundStrokeDash:zindex:labelStyle:titleStyle:symbolStyle:labelOverlap:labelSeparation:labelLimit:encode:)
+LegendSpec.init(fill:stroke:size:shape:opacity:strokeWidthScale:strokeDashScale:gridAlign:type:orient:orientExpression:direction:directionExpression:title:titleExpression:values:format:tickCount:tickInterval:tickStep:offset:padding:titlePadding:titleOrient:titleAnchor:titleLimit:titleFontSize:labelFontSize:labelOffset:symbolType:symbolSize:symbolStrokeWidth:clipHeight:gradientLength:gradientThickness:rowPadding:columnPadding:columns:legendX:legendY:fillColor:strokeColor:cornerRadius:symbolFillColor:symbolOffset:gradientStrokeColor:gradientStrokeWidth:gradientOpacity:symbolLimit:formatType:formatTypeExpression:formatExpression:tickMinStep:aria:description:backgroundStrokeWidth:backgroundStrokeDash:zindex:labelStyle:titleStyle:symbolStyle:labelOverlap:labelSeparation:labelLimit:encode:)
 LegendSpec.isEqual(_:)
 LegendSpec.labelFontSize
 LegendSpec.labelLimit
@@ -2631,6 +2633,7 @@ LegendSpec.legendY
 LegendSpec.offset
 LegendSpec.opacity
 LegendSpec.orient
+LegendSpec.orientExpression
 LegendSpec.padding
 LegendSpec.rowPadding
 LegendSpec.scale

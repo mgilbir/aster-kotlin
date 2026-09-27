@@ -60,6 +60,16 @@
   "caption": "Gradient legend titled 'numbers' for fill color with values from 3 to 20"
  },
  {
+  "fixture": "a-guide-orientation-a-signal-chooses",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "a-guide-orientation-a-signal-chooses",
+  "kind": "legend",
+  "caption": "Symbol legend for fill color with 2 values: a, b"
+ },
+ {
   "fixture": "a-guide-over-a-scale-that-places-nothing",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0 to 100"

@@ -364,6 +364,162 @@ const CHARTS = [
       ],
     }),
   },
+  {
+    name: 'an-axis-orientation',
+    signal: 'side',
+    note: "which side an axis sits on, which moves the plotting area rather than a mark",
+    values: ['left', 'right', 'top', 'bottom', '', null, 'sideways'],
+    spec: base({
+      signals: [{ name: 'side', value: 'left' }],
+      scales: [{ name: 'y', type: 'linear', domain: [0, 100], range: 'height' }],
+      axes: [{ orient: { signal: 'side' }, scale: 'y', tickCount: 3 }],
+      marks: [],
+    }),
+  },
+  {
+    name: 'a-label-limit',
+    signal: 'lim',
+    note: "how much room a label has before it is cut short, where the text itself changes",
+    values: [0, 12, 1, 1e6, -5, null, 'wide'],
+    spec: base({
+      signals: [{ name: 'lim', value: 0 }],
+      scales: [
+        { name: 'x', type: 'band', domain: { data: 't', field: 'k' }, range: 'width', padding: 0.1 },
+      ],
+      axes: [{ orient: 'bottom', scale: 'x', labelLimit: { signal: 'lim' } }],
+      marks: [
+        {
+          type: 'text',
+          encode: {
+            update: {
+              x: { value: 10 },
+              y: { value: 30 },
+              text: { value: 'a label long enough to be cut' },
+              limit: { signal: 'lim' },
+              fontSize: { value: 11 },
+            },
+          },
+        },
+      ],
+    }),
+  },
+  {
+    name: 'a-curve',
+    signal: 'curve',
+    note: "how a line joins its points, which changes the outline without moving one of them",
+    values: ['linear', 'step', 'monotone', 'basis', '', null, 'squiggle'],
+    spec: base({
+      signals: [{ name: 'curve', value: 'linear' }],
+      scales: [
+        { name: 'x', type: 'point', domain: { data: 't', field: 'k' }, range: 'width' },
+        { name: 'y', type: 'linear', domain: [0, 100], range: 'height' },
+      ],
+      marks: [
+        {
+          type: 'line',
+          from: { data: 't' },
+          encode: {
+            update: {
+              x: { scale: 'x', field: 'k' },
+              y: { scale: 'y', field: 'v' },
+              stroke: { value: '#4c78a8' },
+              interpolate: { signal: 'curve' },
+            },
+          },
+        },
+      ],
+    }),
+  },
+  {
+    name: 'a-corner-radius',
+    signal: 'radius',
+    note: "how far a rect's corners are rounded, which is geometry a bounds check cannot see",
+    values: [0, 6, 1e4, -4, 0.5, null, 'round'],
+    spec: base({
+      signals: [{ name: 'radius', value: 0 }],
+      scales: [
+        { name: 'x', type: 'band', domain: { data: 't', field: 'k' }, range: 'width', padding: 0.2 },
+      ],
+      marks: [
+        {
+          type: 'rect',
+          from: { data: 't' },
+          encode: {
+            update: {
+              x: { scale: 'x', field: 'k' },
+              width: { scale: 'x', band: 1 },
+              y: { value: 0 },
+              y2: { value: 60 },
+              fill: { value: '#4c78a8' },
+              cornerRadius: { signal: 'radius' },
+            },
+          },
+        },
+      ],
+    }),
+  },
+  {
+    name: 'a-clip-flag',
+    signal: 'clipped',
+    note: "whether a group hides what overflows it, which decides if marks are drawn at all",
+    values: [true, false, 1, 0, '', null, 'yes'],
+    spec: base({
+      signals: [{ name: 'clipped', value: true }],
+      marks: [
+        {
+          type: 'group',
+          clip: { signal: 'clipped' },
+          encode: {
+            update: {
+              x: { value: 0 },
+              y: { value: 0 },
+              width: { value: 60 },
+              height: { value: 40 },
+              stroke: { value: '#888' },
+            },
+          },
+          marks: [
+            {
+              type: 'rect',
+              encode: {
+                update: {
+                  x: { value: 10 },
+                  y: { value: 10 },
+                  width: { value: 120 },
+                  height: { value: 20 },
+                  fill: { value: '#4c78a8' },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    }),
+  },
+  {
+    name: 'a-text-anchor',
+    signal: 'anchor',
+    note: "which way a label hangs off its point, where the anchor moves and the point does not",
+    values: ['left', 'center', 'right', '', null, 'middle', 7],
+    spec: base({
+      signals: [{ name: 'anchor', value: 'left' }],
+      marks: [
+        {
+          type: 'text',
+          from: { data: 't' },
+          encode: {
+            update: {
+              x: { value: 100 },
+              y: { signal: '20 * datum.n' },
+              text: { field: 'k' },
+              align: { signal: 'anchor' },
+              fontSize: { value: 12 },
+            },
+          },
+        },
+      ],
+    }),
+  },
 ];
 
 const specDir = join(outDir, 'specs');

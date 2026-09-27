@@ -8,6 +8,21 @@ section here does not get released.
 
 ### Fixed
 
+- **A guide's orientation may be computed.** *(Adds three model properties; see below.)*
+  `{"signal": …}` is legal on every guide property, and
+  the enum-valued ones refused it: an object stringifies to `[object Object]`, which parses as no
+  orientation, so a legend fell back to its default corner with a spurious diagnostic and an **axis
+  was dropped entirely** — 210 wide where upstream draws 241. An axis's `orient`, a legend's `orient`
+  and a legend's `direction` now resolve, and a computed property is no longer reported as a
+  misspelled one.
+
+  Three properties are added to carry the expression until it resolves — `AxisSpec.orientExpression`,
+  `LegendSpec.orientExpression` and `LegendSpec.directionExpression` — alongside the
+  `titleExpression` and `formatExpression` that were already there for the same reason. **4927
+  exported symbols**, three more than before. Additive in Kotlin, where each has a default; a Swift
+  caller that constructs an `AxisSpec` or `LegendSpec` through the generated initialiser sees the
+  label list grow, which is the same shape of change as any previous property on those two.
+
 - **A background a signal paints.** `background` is the third of the five top-level properties
   `collectSignals` turns into a built-in signal, so both `"background": {"signal": "bg"}` and a
   specification declaring a signal *named* `background` set the surface colour — the property is only
