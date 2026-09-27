@@ -106,4 +106,54 @@ class GeometryTest {
     assertEquals(0.0, point.x, tolerance)
     assertEquals(1.0, point.y, tolerance)
   }
+
+  /**
+   * Upstream's `Bounds.union` is four bare comparisons and has **no** empty case:
+   * ```js
+   * union(b) { if (b.x1 < this.x1) this.x1 = b.x1; … }
+   * ```
+   *
+   * The two `isEmpty` short-circuits this engine opened with are equivalent to the comparisons for
+   * any box whose corners are numbers, which is why they survived — and wrong for a box whose
+   * corners are not. `isEmpty` is `right < left`, false against a NaN, so a NaN-cornered box is
+   * *not* empty and `isEmpty -> other` handed it back whole where every comparison rejects it.
+   *
+   * A mark upstream cannot place has **cleared** bounds, never NaN ones: `boundContext` builds a
+   * NaN matrix from a non-numeric angle, every point it adds fails all four comparisons, and the
+   * box stays as it was. This engine stored the NaN instead, and agreed about the chart's size
+   * anyway — the surface unions one level up, where the comparisons did run — so only the mark's
+   * own extent was wrong, which is the half the differential exists to check.
+   */
+  @Test
+  fun `a box whose corners are not numbers adds nothing`() {
+    val nan = RectD(Double.NaN, Double.NaN, Double.NaN, Double.NaN)
+    assertFalse(nan.isEmpty, "a NaN box is not empty, which is what made the shortcut wrong")
+
+    assertTrue(RectD.Empty.union(nan).isEmpty, "an unplaceable mark stays cleared")
+
+    val real = RectD(10.0, 20.0, 30.0, 40.0)
+    assertEquals(real, real.union(nan), "a NaN box never widens a real one")
+    // **Asymmetric, and upstream's is too.** `if (b.x1 < this.x1)` is false against a NaN
+    // *receiver* as well, so a box that has already gone NaN stays NaN. It never arises there
+    // because a box never becomes NaN in the first place — points that are not numbers are
+    // rejected on the way in, which is the property this test is really pinning.
+    assertTrue(nan.union(real).left.isNaN(), "a NaN receiver keeps its NaN, as upstream's does")
+
+    // The finite behaviour the shortcuts used to provide is unchanged.
+    assertEquals(real, RectD.Empty.union(real))
+    assertEquals(real, real.union(RectD.Empty))
+    assertEquals(RectD(0.0, 0.0, 30.0, 40.0), real.union(RectD(0.0, 0.0, 1.0, 1.0)))
+
+    // An **infinity** is a number upstream does add: `if (Inf > x2)` is true.
+    val far = RectD(0.0, 0.0, Double.POSITIVE_INFINITY, 1.0)
+    assertEquals(Double.POSITIVE_INFINITY, RectD.Empty.union(far).right)
+  }
+
+  /** A rotation by an angle that is not a number therefore maps a box to nothing, as upstream. */
+  @Test
+  fun `a rotation by no angle at all maps a box to nothing`() {
+    val unit = RectD(-1.0, -1.0, 1.0, 1.0)
+    assertTrue(Transform2D.rotateDegrees(Double.NaN).mapBounds(unit).isEmpty)
+    assertFalse(Transform2D.rotateDegrees(45.0).mapBounds(unit).isEmpty)
+  }
 }

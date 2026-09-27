@@ -796,14 +796,20 @@ public class MarkEncoder(
     // names — a label styled `{align: "left", baseline: "middle", dx: 3}` says nothing in its
     // encoding, and reading only the encoding left it centred on its anchor with no nudge at all.
     val nudge = PointD(number(channels["dx"], datum) ?: 0.0, number(channels["dy"], datum) ?: 0.0)
-    // **Only for an angle that is a number.** Upstream's `bound` never turns `dx`/`dy` at all —
-    // it sets the box with them unrotated and turns the whole box about the anchor afterwards —
-    // and rotating the nudge here is a stand-in for that, exact for a finite angle. For a NaN one
-    // it is not: it would poison the anchor itself, where upstream leaves `item.x` as encoded and
-    // loses only the bounds.
+    // **Through the rotation, whatever the angle is**, including one that is not a number.
+    //
+    // Upstream keeps `dx`/`dy` as render-time offsets and applies them *inside* the rotation —
+    // `translate(x, y) rotate(a) translate(dx, dy)` — so on rotated text an offset runs along the
+    // text rather than along the page. This engine folds them into the anchor, which draws the
+    // same, and the reference harvester folds them the same way for the same reason.
+    //
+    // A guard excluding a non-finite angle was tried here and is wrong. It reasoned from `bound`,
+    // which really does leave `dx`/`dy` unrotated and turn the assembled box instead — but the
+    // *anchor* follows `attr`, not `bound`, and `((item.angle || 0) * Math.PI) / 180` over a word
+    // is NaN. Upstream's item keeps `x: 195`, and the position it is actually drawn at, which is
+    // what a scene node here holds and what the reference records, is NaN.
     val offset =
-      if (angle == 0.0 || !angle.isFinite()) nudge
-      else Transform2D.rotateDegrees(angle).apply(nudge.x, nudge.y)
+      if (angle == 0.0) nudge else Transform2D.rotateDegrees(angle).apply(nudge.x, nudge.y)
     val style = style(channels, datum, spec)
 
     val textStyle =

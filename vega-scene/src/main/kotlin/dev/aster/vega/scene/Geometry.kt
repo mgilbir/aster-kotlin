@@ -77,18 +77,30 @@ public data class RectD(val left: Double, val top: Double, val right: Double, va
    * than two stops, a log scale over a zero. Upstream draws those, bounds them by [ofSegment], and
    * takes the surface from everything it *could* place.
    */
+  /**
+   * Upstream's `Bounds.union`, which is **four bare comparisons and nothing else**:
+   * ```js
+   * union(b) { if (b.x1 < this.x1) this.x1 = b.x1; if (b.y1 < this.y1) this.y1 = b.y1;
+   *            if (b.x2 > this.x2) this.x2 = b.x2; if (b.y2 > this.y2) this.y2 = b.y2; return this; }
+   * ```
+   *
+   * The two `isEmpty` short-circuits that used to open this are what a reader adds for speed, and
+   * they are equivalent to the comparisons for every box whose corners are numbers — which is why
+   * they survived. For a box whose corners are **not** numbers they are not: `isEmpty` is `right <
+   * left`, false against a NaN, so a NaN-cornered box is not empty, and `isEmpty -> other` handed
+   * it back **whole** where every comparison would have rejected it. An unplaceable mark therefore
+   * carried NaN bounds here and a *cleared* box upstream — and since the surface unions one level
+   * further up, where the comparisons did run, the two agreed about the chart's size and disagreed
+   * only about the mark's own extent. That is the half a differential harness is for, and it could
+   * not see it either; see the entry below.
+   */
   public fun union(other: RectD): RectD =
-    when {
-      other.isEmpty -> this
-      isEmpty -> other
-      else ->
-        RectD(
-          if (other.left < left) other.left else left,
-          if (other.top < top) other.top else top,
-          if (other.right > right) other.right else right,
-          if (other.bottom > bottom) other.bottom else bottom,
-        )
-    }
+    RectD(
+      if (other.left < left) other.left else left,
+      if (other.top < top) other.top else top,
+      if (other.right > right) other.right else right,
+      if (other.bottom > bottom) other.bottom else bottom,
+    )
 
   public fun expand(amount: Double): RectD =
     if (isEmpty) this else RectD(left - amount, top - amount, right + amount, bottom + amount)

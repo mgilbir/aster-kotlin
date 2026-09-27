@@ -10374,3 +10374,51 @@ reach, and the fixture would report a pass for two sites it had stopped testing 
 time, all three fail two gates each.
 
 259 Vega differential fixtures.
+
+### A box that cannot be placed adds nothing, and the harness could not see that it did
+
+Two corrections to the angle work above, and a finding about the differential itself that is larger
+than either.
+
+**`RectD.union` had two `isEmpty` short-circuits that upstream does not have.** `Bounds.union` there
+is four bare comparisons and no special case. The short-circuits are what a reader adds for speed
+and they are equivalent to the comparisons for every box whose corners are numbers — which is
+exactly why they survived. For a box whose corners are **not** numbers they are not equivalent:
+`isEmpty` is `right < left`, which is false against a NaN, so a NaN-cornered box is *not* empty and
+`isEmpty -> other` handed it back whole where all four comparisons reject it. Upstream never holds
+NaN bounds at all — `boundContext` builds a NaN matrix from a non-numeric angle, every point it adds
+fails all four comparisons, and the box stays **cleared**. This engine stored the NaN and still
+agreed about the chart's size, because the surface unions one level up where the comparisons did
+run. Only the mark's own extent was wrong, which is precisely the half a differential exists to
+check.
+
+**The text anchor was guarded and should not have been.** The angle commit above added a
+`!angle.isFinite()` guard to the `dx`/`dy` rotation, reasoning from `bound`, which really does leave
+them unrotated and turn the assembled box instead. But the *anchor* follows `attr`, not `bound` —
+`translate(x, y) rotate(a) translate(dx, dy)` — and the reference harvester folds them the same way,
+through `((item.angle || 0) * Math.PI) / 180`, which is NaN over a word. Upstream's item keeps
+`x: 195`; the place it is drawn, which is what a scene node holds here and what the reference
+records, is NaN. The guard is gone.
+
+**Neither of those was visible to the corpus, and that is the finding.** A reference records an
+upstream NaN as the *string* `"NaN"`, deliberately, so it stays visible. The parse then routed it
+by `key in NUMERIC_CHANNELS && value.value.toDoubleOrNull() != null` — and `"NaN".toDoubleOrNull()`
+**parses**, to `Double.NaN`. So every non-finite channel went into the numbers, where the comparison
+is `abs(wanted - got) > allowed` and `abs(NaN - anything)` is NaN, which is never greater than a
+tolerance. **A channel upstream recorded as NaN agreed with whatever this engine held, including an
+ordinary number.** The `GEOMETRY_CHANNELS && wanted in NON_FINITE` rule written to handle exactly
+this never ran; the branch above it already excludes the non-finite spellings and says why in a
+comment, and the branch below swallowed them back.
+
+Closing that gap is written and **not landed**, because it exposes a third divergence that is its
+own piece of work: `a-short-domain-is-still-a-scale` has had two rects at `y: 100` since it was
+written, where upstream records `y: NaN` and its own reference said so all along. The cause is
+`scaledPosition`'s `if (base.isNaN()) return null`, which conflates a *miss* with a value the scale
+could not map — the two take different branches of `adjustSpatial`, `o.y = o.y2 - (o.height || 0)`
+against keeping `o.y` and computing the height from it. Removing it wholesale breaks five other
+fixtures, because a symbol whose `x` is NaN is still bounded by upstream at the **origin**
+(`markItemPath`'s `bound` ends `.translate(item.x || 0, …)`, and a NaN is falsey), and this engine
+would make it empty instead. That is the `item.x || 0` rule `a-mark-nobody-can-place` already
+records, owed to symbol, arc and path. Sequenced rather than bundled, with the evidence above.
+
+259 Vega differential fixtures.
