@@ -205,6 +205,26 @@
   "caption": "Y-axis for a linear scale with values from 0 to 20"
  },
  {
+  "fixture": "a-scale-parameter-that-is-not-a-number",
+  "kind": "axis",
+  "caption": "X-axis for a log scale with values from 1 to 100"
+ },
+ {
+  "fixture": "a-scale-parameter-that-is-not-a-number",
+  "kind": "axis",
+  "caption": "X-axis for a log scale with values from 1 to 100"
+ },
+ {
+  "fixture": "a-scale-parameter-that-is-not-a-number",
+  "kind": "axis",
+  "caption": "X-axis for a pow scale with values from 0 to 100"
+ },
+ {
+  "fixture": "a-scale-parameter-that-is-not-a-number",
+  "kind": "axis",
+  "caption": "X-axis for a symlog scale with values from 1 to 100"
+ },
+ {
   "fixture": "a-scale-with-no-range-keeps-its-default",
   "kind": "axis",
   "caption": "X-axis for a linear scale with values from 0 to 100"

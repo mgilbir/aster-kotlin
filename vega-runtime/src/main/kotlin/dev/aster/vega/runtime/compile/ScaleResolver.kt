@@ -274,6 +274,15 @@ public class ScaleResolver(
       else -> false
     }
 
+  // **The three colour-ramp spaces keep `resolve`, which discards a NaN, and that is a decision.**
+  // A positional `pow` or `symlog` handed a parameter that is not a number answers NaN and leaves
+  // its marks unplaceable, which is reproducible and is reproduced — see `buildPow`/`buildSymlog`
+  // below. The *colour* versions are not: probed, upstream **throws** from inside d3-interpolate
+  // (`TypeError: I[i] is not a function`, in `piecewise`) and every mark comes out with a null
+  // fill. There is no upstream answer to be faithful to when upstream raises, so the default is
+  // kept rather than a NaN invented that matches nothing. A `log` ramp does not throw and its
+  // colours are identical with a NaN base or a real one, so nothing turns on that one either way.
+
   /** The space a `log` colour ramp is walked in; see [ScaleTransform]. */
   private fun logSpace(spec: ScaleSpec): ScaleTransform =
     ScaleTransform.Log(numbers.resolve(spec.base, spec.name) ?: 10.0)
@@ -618,7 +627,7 @@ public class ScaleResolver(
 
   private fun buildLog(spec: ScaleSpec): LogScale? {
     val range = numericRange(spec) ?: return null
-    val base = numbers.resolve(spec.base, spec.name) ?: 10.0
+    val base = numbers.resolveNumber(spec.base, spec.name) ?: 10.0
     // A log domain cannot include zero, and `zero: true` would force it to, so it never applies
     // here.
     var domain =
@@ -660,7 +669,7 @@ public class ScaleResolver(
     var domain =
       continuousDomain(spec, zeroDefault = spec.bins == null, fallback = listOf(0.0, 1.0))
         ?: return null
-    val exponent = numbers.resolve(spec.exponent, spec.name) ?: defaultExponent
+    val exponent = numbers.resolveNumber(spec.exponent, spec.name) ?: defaultExponent
     domain =
       padded(
         domain,
@@ -685,7 +694,7 @@ public class ScaleResolver(
     // Symlog is not in upstream's zero list: its domain reaches both signs happily.
     var domain =
       continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null
-    val constant = numbers.resolve(spec.constant, spec.name) ?: 1.0
+    val constant = numbers.resolveNumber(spec.constant, spec.name) ?: 1.0
     domain =
       padded(
         domain,
@@ -1319,6 +1328,13 @@ public class ScaleResolver(
     lift: (Double) -> Double = { it },
     ground: (Double) -> Double = { it },
   ): List<Double> {
+    // **`resolve`, deliberately, and not `resolveNumber`.** A continuous scale's pixel padding is
+    // guarded by `if (includePad(type) && _.padding && …)` — JavaScript **truthiness on the raw
+    // value**, which is a third rule again. A NaN is falsey there and skips the padding entirely,
+    // while a *word* is truthy and poisons the domain: probed, `padding: "wide"` leaves upstream's
+    // domain `[NaN, NaN]` and every value unplaceable. Telling those two apart needs the raw value
+    // rather than the number it coerces to, so this site keeps the reader that discards a NaN and
+    // the difference is recorded in STATUS rather than half-fixed here.
     val pad = numbers.resolve(spec.padding, spec.name) ?: return domain
     if (pad == 0.0 || domain.size < 2 || domain.first() == domain.last()) return domain
     val span = abs(range.last() - range.first())
