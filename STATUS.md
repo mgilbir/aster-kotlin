@@ -10115,3 +10115,25 @@ everything left is a decision already made and written down. The next thing it f
 widening it again, which is how the last six charts produced four rules.
 
 254 Vega differential fixtures.
+
+### The signal sweep widened a second time: six channels a signal moves the layout through
+
+**18 charts to 24, and the six were not picked for variety.** The entry above says what the last
+widening established: the differences worth closing are the ones that change *what is drawn*, the
+**bounds**, or the *caption a screen reader reads*, and a raw value sitting on an item that draws
+identically is not one of them. So the six new charts each drive a channel whose misreading has a
+**layout or ordering** consequence rather than a purely visual one — an axis label's angle, a text
+mark's font size, a mark's `zindex`, a band scale's padding, a scale's `domainMax`, and a stroke's
+dash pattern, which is the one channel here whose signal holds a **list** rather than a number.
+
+The values are the ones that have found defects before — `null`, `""`, a word where a number goes, a
+negative, a non-integer — plus one shape per channel that only that channel has: `360` for an angle,
+`0.999` for a padding, `[]` and `[0, 0]` for a dash, `1e6` for a z-index.
+
+**166 cases from 24 charts, 158 compared, 135 matched.** The widening added 41 cases and four
+differing ones, and `a-paint-order` and `a-dash-pattern` matched on every value they were given —
+which is worth recording rather than passing over, because a channel that survives a NaN, a null and
+a wrongly-typed list is a channel with nothing owed on it. The four are diagnosed in the entries
+below; three change bounds and one is the raw-value family already closed as a decision.
+
+254 Vega differential fixtures.

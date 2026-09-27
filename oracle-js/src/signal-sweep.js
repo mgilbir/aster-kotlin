@@ -520,6 +520,157 @@ const CHARTS = [
       ],
     }),
   },
+  {
+    name: 'a-label-angle',
+    signal: 'turn',
+    note: "how far an axis label is turned, which changes the room the axis needs",
+    values: [0, 45, -90, 360, 0.5, null, 'sideways'],
+    spec: base({
+      signals: [{ name: 'turn', value: 0 }],
+      scales: [
+        { name: 'x', type: 'band', domain: { data: 't', field: 'k' }, range: 'width', padding: 0.1 },
+      ],
+      axes: [{ orient: 'bottom', scale: 'x', labelAngle: { signal: 'turn' } }],
+      marks: [],
+    }),
+  },
+  {
+    name: 'a-font-size',
+    signal: 'pt',
+    note: 'how large a label is set, which every measurement of it follows',
+    values: [11, 24, 0, -4, 0.5, null, 'large'],
+    spec: base({
+      signals: [{ name: 'pt', value: 11 }],
+      marks: [
+        {
+          type: 'text',
+          encode: {
+            update: {
+              x: { value: 10 },
+              y: { value: 40 },
+              text: { value: 'measure me' },
+              fontSize: { signal: 'pt' },
+            },
+          },
+        },
+      ],
+    }),
+  },
+  {
+    name: 'a-paint-order',
+    signal: 'above',
+    note: "which of two overlapping marks is drawn on top, which is order and not position",
+    values: [0, 1, -1, 1e6, 0.5, null, 'top'],
+    spec: base({
+      signals: [{ name: 'above', value: 0 }],
+      marks: [
+        {
+          type: 'rect',
+          encode: {
+            update: {
+              x: { value: 0 },
+              y: { value: 0 },
+              width: { value: 60 },
+              height: { value: 40 },
+              fill: { value: '#4c78a8' },
+            },
+          },
+        },
+        {
+          type: 'rect',
+          zindex: { signal: 'above' },
+          encode: {
+            update: {
+              x: { value: 20 },
+              y: { value: 10 },
+              width: { value: 60 },
+              height: { value: 40 },
+              fill: { value: '#f58518' },
+            },
+          },
+        },
+      ],
+    }),
+  },
+  {
+    name: 'a-band-padding',
+    signal: 'gap',
+    note: "how much of a band is left empty, which moves every bar and the step between them",
+    values: [0.1, 0, 1, 0.999, -0.5, null, 'wide'],
+    spec: base({
+      signals: [{ name: 'gap', value: 0.1 }],
+      scales: [
+        {
+          name: 'x',
+          type: 'band',
+          domain: { data: 't', field: 'k' },
+          range: 'width',
+          padding: { signal: 'gap' },
+        },
+      ],
+      axes: [{ orient: 'bottom', scale: 'x' }],
+      marks: [
+        {
+          type: 'rect',
+          from: { data: 't' },
+          encode: {
+            update: {
+              x: { scale: 'x', field: 'k' },
+              width: { scale: 'x', band: 1 },
+              y: { value: 0 },
+              y2: { value: 60 },
+              fill: { value: '#4c78a8' },
+            },
+          },
+        },
+      ],
+    }),
+  },
+  {
+    name: 'a-domain-bound',
+    signal: 'top',
+    note: "one end of a domain pinned while the data decides the other",
+    values: [100, 0, -50, 1e6, null, 'high'],
+    spec: base({
+      signals: [{ name: 'top', value: 100 }],
+      scales: [
+        {
+          name: 'y',
+          type: 'linear',
+          domain: { data: 't', field: 'v' },
+          domainMax: { signal: 'top' },
+          range: 'height',
+        },
+      ],
+      axes: [{ orient: 'left', scale: 'y', tickCount: 3 }],
+      marks: [],
+    }),
+  },
+  {
+    name: 'a-dash-pattern',
+    signal: 'dash',
+    note: 'the on-and-off pattern of a stroke, where the signal holds a list rather than a number',
+    values: [[4, 2], [], [0, 0], [3], null, 'dashed', 6],
+    spec: base({
+      signals: [{ name: 'dash', value: [4, 2] }],
+      marks: [
+        {
+          type: 'rule',
+          encode: {
+            update: {
+              x: { value: 0 },
+              y: { value: 20 },
+              x2: { value: 180 },
+              y2: { value: 20 },
+              stroke: { value: '#333' },
+              strokeWidth: { value: 2 },
+              strokeDash: { signal: 'dash' },
+            },
+          },
+        },
+      ],
+    }),
+  },
 ];
 
 const specDir = join(outDir, 'specs');
