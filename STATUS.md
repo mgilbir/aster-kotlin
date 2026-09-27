@@ -10599,3 +10599,52 @@ matching. It is now, and one case that had been hidden has been fixed — see th
 written as a word.
 
 260 Vega differential fixtures.
+
+### A limit nobody asked for, and the second thing the harness could not see
+
+The differential iterated the **reference's** channels. Anything this engine invented and upstream
+did not was therefore unexamined — except colours, caps, joins, dashes, `text` and the corner radii,
+each added after something slipped through. Adding `text` found two fixtures when it went in. The
+numeric channels whose **absence means zero** had never been added, and adding them found three more
+defects. `abs(invented) > tolerance` is the whole guard: a zero this side records and upstream omits
+says the same thing twice.
+
+**A gradient legend's labels take no limit.** Two config keys, a few lines apart in the parser:
+
+```js
+limit: value(spec.labelLimit, config.gradientLabelLimit)   // legend-gradient-labels.js
+limit: _('labelLimit')                                     // legend-symbol-groups.js
+```
+
+`config.legend.labelLimit` is 160. `config.gradientLabelLimit` **is not defined at all**. So a
+symbol legend truncates its labels at 160 and a gradient legend — and a *discretizing* scale's,
+whose labels are built by the same file — carries no limit unless the specification writes one.
+This engine applied 160 to all of them. Probed: a symbol legend's labels come out `limit: 160`, a
+gradient's carry no `limit` key, and both honour an explicit `labelLimit: 80`.
+
+**And a gradient legend ignored an explicit one.** The `labelLimit` its builder resolved was
+declared and never used — dead since it was written — so `"labelLimit": 80` on a ramp did nothing.
+Two halves of one line, wrong in opposite directions.
+
+**A subtitle inherits the heading group's limit, not the heading's.** Both text marks read
+`limit: {signal: 'item.mark.group.limit'}`, and `addEncoders` then lays the specification's own
+`encode.title.update.limit` over the **title alone**. So a heading given a limit in its encode
+truncates at it while its subtitle carries none; inheriting the title's resolved value handed the
+subtitle a limit upstream never gave it.
+
+**Re-verified serially, after two process mistakes voided the first attempt.** `check.sh` was left
+running in the background while this change was being edited into the tree, and the sweeps were
+started on top of it — so its `oracle` and `vega-lite-oracle` gates failed against a half-applied
+source tree, and two sweep logs came back `MODULE_NOT_FOUND` from the shared `npm ci` that every
+oracle script opens with. None of those four results were evidence of anything. Re-run one after
+another with nothing else touching the repository: value sweep **499 of 499**, signal sweep **140 of
+158** unchanged, schema property sweep **7510 of 7510**, Deneb **54 of 54**, and every `check.sh`
+gate RAN but `ios-ui`, which is the simulator killing its own runner after the assertions pass.
+
+Four fixtures were failing the moment the check was widened — `county-unemployment`,
+`legend-discretizing`, `map-with-tooltip` and `title-encode` — and all 260 pass now. That is the
+**second** hole found in the instrument today: it could not see a channel upstream recorded as
+`NaN`, and it could not see one this engine invented. Both had been quietly inflating every green
+result, including ones recorded earlier in this stack.
+
+260 Vega differential fixtures.

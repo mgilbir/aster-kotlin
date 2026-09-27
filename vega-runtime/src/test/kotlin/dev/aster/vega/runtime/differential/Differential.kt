@@ -1104,6 +1104,21 @@ public object Differential {
         out.add(Difference("$where.$channel", "absent", invented))
       }
     }
+    // And the same for every other numeric channel whose **absence means zero**. A corner radius
+    // was the first of these to be checked both ways; it is not special. Upstream's normalizer
+    // writes a channel only when the item carries one, so a non-zero value here against nothing
+    // there is a mark turned, truncated or curved in a way upstream's is not — and iterating only
+    // the reference's channels never looked. `abs(invented) > tolerance` is the whole guard: a zero
+    // this side records and upstream omits says the same thing twice.
+    for (channel in ZERO_DEFAULT_CHANNELS) {
+      if (channel in ignored) continue
+      val invented = actual.numbers[channel] ?: continue
+      if (
+        channel !in expected.numbers && channel !in expected.strings && abs(invented) > tolerance
+      ) {
+        out.add(Difference("$where.$channel", "absent", fmt(invented)))
+      }
+    }
     // The same both ways for corner radii: rounding a corner the reference leaves square changes
     // the outline, and iterating only the reference's channels would never see it.
     for (channel in CORNER_CHANNELS) {
@@ -1903,6 +1918,27 @@ public object Differential {
     // difference showed up only as a surface a few pixels wide, and only because the title happened
     // to be wide enough to move the bounds. A shorter one would have been silent.
     COLOUR_CHANNELS + setOf("blend", "strokeCap", "strokeJoin", "strokeDash", "text")
+
+  /**
+   * Numeric channels whose **absence means zero**, checked in both directions.
+   *
+   * `CORNER_CHANNELS` below was the first set to be read this way and there is nothing special
+   * about a radius: upstream's normalizer writes a channel only when the item carries one, so any
+   * of these present here and absent there is something this engine did to a mark that upstream did
+   * not. An angle turns it, a limit truncates its text, a tension bends its curve.
+   */
+  private val ZERO_DEFAULT_CHANNELS =
+    setOf(
+      "angle",
+      "dx",
+      "dy",
+      "innerRadius",
+      "limit",
+      "padAngle",
+      "strokeDashOffset",
+      "tension",
+      "theta",
+    )
 
   private val CORNER_CHANNELS =
     setOf(

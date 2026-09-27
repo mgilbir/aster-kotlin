@@ -1127,7 +1127,19 @@ internal class LegendBuilder(
 
     val nodes = mutableListOf<SceneNode>(swatch)
     val labelStyle = GuideStyle.text(spec.labelStyle, labelFontSize, defaultWeight = 400)
-    val labelLimit = numbers.resolve(spec.labelLimit, scaleName) ?: LegendDefaults.LABEL_LIMIT
+    // ```js
+    // limit: value(spec.labelLimit, config.gradientLabelLimit)   // legend-gradient-labels.js
+    // limit: _('labelLimit')                                     // legend-symbol-groups.js
+    // ```
+    //
+    // **Two different config keys, and only one of them has a default.** A *symbol* legend's labels
+    // fall back on `config.legend.labelLimit`, which is 160; a *gradient* legend's — and a
+    // discretizing scale's, whose labels are built by the same file — fall back on
+    // `config.gradientLabelLimit`, which the config does not define. So a ramp's labels carry **no
+    // limit** unless the specification writes one, and are not truncated at 160 the way a
+    // category's are. Probed: a symbol legend's labels come out `limit: 160`, a gradient's carry no
+    // `limit` key at all, and both honour an explicit `labelLimit: 80`.
+    val labelLimit = numbers.resolve(spec.labelLimit, scaleName) ?: 0.0
     val labels = mutableListOf<TextNode>()
 
     for ((index, entry) in joinedByValue(gradientLabels(spec, scale, scaleName)).withIndex()) {
@@ -1139,6 +1151,7 @@ internal class LegendBuilder(
         TextRun(
           text = entryText(spec, "labels", "text", entry) ?: entry.label,
           style = labelStyle,
+          limit = labelLimit,
           align =
             if (vertical) TextAlign.LEFT
             else if (fraction <= 0.0) TextAlign.LEFT
@@ -1275,7 +1288,7 @@ internal class LegendBuilder(
             if (!vertical) TextBaseline.TOP
             else if (fraction <= 0.0) TextBaseline.BOTTOM
             else if (fraction >= 1.0) TextBaseline.TOP else TextBaseline.MIDDLE,
-          limit = numbers.resolve(spec.labelLimit, scaleName) ?: LegendDefaults.LABEL_LIMIT,
+          limit = numbers.resolve(spec.labelLimit, scaleName) ?: 0.0,
         )
       labels +=
         TextNode(

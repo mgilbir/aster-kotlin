@@ -142,7 +142,18 @@ internal class TitleBuilder(
         }
     val baseline =
       baselineOf(text(spec, "title", "baseline")) ?: baselineOf(spec.baseline) ?: TextBaseline.TOP
-    val limit = number(spec, "title", "limit") ?: numbers.resolve(spec.limit, "title") ?: 0.0
+    // ```js
+    // limit: _('limit'),                                 // the title *group*
+    // limit: {signal: 'item.mark.group.limit'},          // the title text, and the subtitle
+    // ```
+    //
+    // **The group's limit is what a subtitle inherits, not the title's.** Both text marks read
+    // `item.mark.group.limit`, and `addEncoders` then lays the specification's own
+    // `encode.title.update.limit` over the title alone — so a heading given a limit in its encode
+    // truncates at it while its subtitle carries **no** limit at all. Inheriting the title's
+    // resolved value instead handed the subtitle a limit upstream never gave it.
+    val groupLimit = numbers.resolve(spec.limit, "title") ?: 0.0
+    val limit = number(spec, "title", "limit") ?: groupLimit
     val colour =
       colour(spec, "title", "fill")
         ?: spec.color?.let { SceneColor.parse(it) }
@@ -289,7 +300,7 @@ internal class TitleBuilder(
                   text(spec, "subtitle", "font") ?: spec.subtitleFont,
                   number(spec, "subtitle", "lineHeight")
                     ?: numbers.resolve(spec.subtitleLineHeight, "title"),
-                  number(spec, "subtitle", "limit") ?: limit,
+                  number(spec, "subtitle", "limit") ?: groupLimit,
                 )
               ),
             angleDegrees = number(spec, "subtitle", "angle") ?: angle,
