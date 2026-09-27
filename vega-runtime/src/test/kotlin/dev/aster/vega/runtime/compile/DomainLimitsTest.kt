@@ -5,6 +5,7 @@ import dev.aster.vega.runtime.scale.PowScale
 import dev.aster.vega.runtime.scale.SymlogScale
 import dev.aster.vega.runtime.scale.TransformedScale
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
@@ -149,6 +150,55 @@ class DomainLimitsTest {
             .trimIndent()
         )
     assertEquals(listOf(0.0, 120.0), (compiled.scales["s"] as LinearScale).domain)
+  }
+
+  /**
+   * The three answers upstream's one-line gate keeps apart, and this engine folded into two.
+   *
+   * `if (_.domainMax != null) domain[n] = _.domainMax` is the whole rule. `null` fails the gate, so
+   * there is no override; a word **passes** it and is written into the domain, where d3's own
+   * setter coerces it with `+` and the end becomes NaN. Reading it as "use it when it is a number"
+   * gets *both* wrong in opposite directions — `Number(null)` is `0`, so an untouched control
+   * dragged the domain's top down to zero, and a word was discarded so the axis stayed fully ticked
+   * where upstream draws none.
+   */
+  private fun signalledLimit(value: String): List<Double> =
+    (SpecCompiler()
+        .compileJson(
+          """
+          {
+            "width": 100, "height": 100, "padding": 0,
+            "signals": [{"name": "cap", "value": $value}],
+            "data": [{"name": "t", "values": [{"v": 19}, {"v": 91}]}],
+            "scales": [{"name": "s", "type": "linear", "range": "width",
+              "domain": {"data": "t", "field": "v"}, "domainMax": {"signal": "cap"}}]
+          }
+          """
+            .trimIndent()
+        )
+        .scales["s"]
+        as LinearScale)
+      .domain
+
+  @Test
+  fun `a limit a signal does not supply is no limit at all`() {
+    // Upstream: `view.scale('s').domain()` is `[0, 91]` — the data's own end, untouched.
+    assertEquals(listOf(0.0, 91.0), signalledLimit("null"))
+    // A number still overrides, including one that would otherwise read as absent.
+    assertEquals(listOf(0.0, 0.0), signalledLimit("0"))
+  }
+
+  @Test
+  fun `a limit that is not a number is a limit of NaN, and an axis over it has no ticks`() {
+    val domain = signalledLimit("\"high\"")
+    assertEquals(0.0, domain[0])
+    assertTrue(domain[1].isNaN(), "upstream's domain is [0, NaN], not the data's own end: $domain")
+    // d3's `ticks` opens `if (!(i2 >= i1)) return []`, and every comparison against a NaN is false.
+    assertEquals(
+      emptyList<Double>(),
+      dev.aster.vega.runtime.scale.Ticks.ticks(domain[0], domain[1], 5),
+      "an axis over an unreadable bound draws no ticks",
+    )
   }
 
   /** A three-point domain for a diverging range; upstream inserts it before the last value. */

@@ -804,9 +804,13 @@ public class ScaleResolver(
       if (domain[0] > 0.0) domain[0] = 0.0
       if (domain[last] < 0.0) domain[last] = 0.0
     }
-    numbers.resolve(spec.domainMin, spec.name)?.let { domain[0] = it }
-    numbers.resolve(spec.domainMax, spec.name)?.let { domain[last] = it }
-    numbers.resolve(spec.domainMid, spec.name)?.let { mid ->
+    // **Not `numbers.resolve`.** All three of these gate on `!= null` upstream and then take the
+    // value as it stands, so a signal holding a null is no override at all and a signal holding a
+    // word is an override to NaN — see `NumberValues.resolveDomainLimit`, which is the only reader
+    // that keeps those two apart.
+    numbers.resolveDomainLimit(spec.domainMin, spec.name)?.let { domain[0] = it }
+    numbers.resolveDomainLimit(spec.domainMax, spec.name)?.let { domain[last] = it }
+    numbers.resolveDomainLimit(spec.domainMid, spec.name)?.let { mid ->
       // Upstream inserts before the last value, and warns rather than clamping when the midpoint
       // falls outside the domain it is meant to divide.
       val at =

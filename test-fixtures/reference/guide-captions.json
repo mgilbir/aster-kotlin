@@ -20,6 +20,21 @@
   "caption": "Y-axis for a linear scale with values from 0 to 100"
  },
  {
+  "fixture": "a-domain-bound-a-signal-does-not-supply",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 91"
+ },
+ {
+  "fixture": "a-domain-bound-a-signal-does-not-supply",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0.000000 to NaN"
+ },
+ {
+  "fixture": "a-domain-bound-a-signal-does-not-supply",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0.000000 to 0.000000"
+ },
+ {
   "fixture": "a-format-nobody-gave-is-not-an-empty-format",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0.0 to 1.0"

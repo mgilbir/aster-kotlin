@@ -53,20 +53,45 @@ public class NumberResolver(
           read(value.channel)
         }
       }
+      // [resolveValue] is the same compile-evaluate-report, and this branch used to be a second
+      // copy of it. Two transcriptions of one job have drifted here six times; the duplicate is
+      // gone rather than kept in step by hand.
       is NumberValue.Signal ->
-        when (val compiled = expressions.compile(value.expression)) {
-          is ExpressionResult.Failed -> {
-            diagnostics.add(compiled.diagnostic.copy(operator = owner))
-            null
+        resolveValue(value.expression, owner)
+          ?.let { JsSemantics.toNumber(it) }
+          ?.takeIf {
+            !it.isNaN()
           }
-          is ExpressionResult.Compiled ->
-            try {
-              JsSemantics.toNumber(compiled.expression.evaluate(scope)).takeIf { !it.isNaN() }
-            } catch (e: ExpressionEvaluationException) {
-              diagnostics.add(e.diagnostic.copy(operator = owner))
-              null
-            }
-        }
+    }
+
+  /**
+   * The same, for an override that **moves the end of a domain** — where absent, nullish and
+   * unreadable are three answers rather than one.
+   *
+   * [resolve] cannot tell them apart, and each of its two mistakes here shows on a chart. Upstream
+   * gates on `null` alone — `if (_.domainMin != null) domain[0] = _.domainMin`, in
+   * `vega-encode/src/Scale.js` — and then writes the value **as it stands**, leaving d3's own
+   * `domain` setter to coerce it with `+`. So:
+   * - A signal holding `null` is *no override*. `resolve` answers `JsSemantics.toNumber(null)`,
+   *   which is `0` exactly as JavaScript's `Number(null)` is, so a `domainMax` bound to a control
+   *   nobody has touched yet pulled the top of the domain down to zero and took the scale, its
+   *   ticks and its labels with it.
+   * - A signal holding a word is an override **to NaN**. `resolve` drops it, leaving the data's own
+   *   end in place and an axis fully ticked; upstream puts the NaN in the domain, where
+   *   `Ticks.ticks` finds `!(i2 >= i1)` and answers none. An axis over an unreadable bound draws no
+   *   ticks at all, which is the honest thing for it to say.
+   *
+   * Both halves come from the one line, and reading either off the other gets the other wrong.
+   */
+  internal fun resolveDomainLimit(value: NumberValue?, owner: String): Double? =
+    when (value) {
+      is NumberValue.Signal ->
+        resolveValue(value.expression, owner)
+          ?.takeIf { !it.isNullish }
+          ?.let {
+            JsSemantics.toNumber(it)
+          }
+      else -> resolve(value, owner)
     }
 
   /**
