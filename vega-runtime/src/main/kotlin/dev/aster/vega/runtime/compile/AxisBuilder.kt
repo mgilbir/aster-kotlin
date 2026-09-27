@@ -343,7 +343,15 @@ public class AxisBuilder(
     }
 
     if (spec.labels) {
-      val labelAngle = numbers.resolve(spec.labelAngle, spec.scale) ?: 0.0
+      // **`resolveNumber`, which keeps a NaN.** `boundText` opens its rotation with
+      // `if (item.angle && !mode) bounds.rotate(item.angle * DegToRad, x, y)`. The guard is
+      // JavaScript **truthiness** on the raw value and the multiplication happens after it, so a
+      // `labelAngle` of `"sideways"` passes — a non-empty string is truthy — and turns the label's
+      // box by NaN. `Bounds.union` is four bare comparisons, every one of them false against a
+      // NaN, so a label turned by nothing contributes **nothing to the axis's extent** and the
+      // axis comes out shorter. `resolve` discarded the NaN and left the label at zero degrees,
+      // measured in full, which made the axis 11.5 units taller than upstream's.
+      val labelAngle = numbers.resolveNumber(spec.labelAngle, spec.scale) ?: 0.0
       val labels = mutableListOf<TextNode>()
       for (tick in ticks) {
         // The label's own `encode` may replace the *text* as well as its position — read through a

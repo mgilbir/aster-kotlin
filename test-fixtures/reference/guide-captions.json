@@ -110,6 +110,16 @@
   "caption": "Symbol legend for fill color with 4 values: 1,2, 3, plain, a,b,c"
  },
  {
+  "fixture": "a-label-turned-by-nothing",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "a-label-turned-by-nothing",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
   "fixture": "a-list-keyed-and-a-list-captioned",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 4 values: a,null,c, null, 1,null, only"

@@ -783,7 +783,11 @@ public class MarkEncoder(
     // out
     // around the wrong rectangle. No fixture used an array here, which is why it went unnoticed.
     val textLines = arrayLines(channels["text"], datum)
-    val angle = number(channels["angle"], datum) ?: 0.0
+    // **Coerced, so a NaN survives**, for the reason the axis label's angle is — `boundText`
+    // tests `item.angle` for truthiness and multiplies afterwards, so a word turns the box by NaN
+    // and the mark drops out of every bound that unions it. Taking the default instead measured a
+    // mark upstream cannot place.
+    val angle = coerced(channels["angle"], datum, 0.0)
     // `dx` and `dy` shift the anchor without affecting alignment — but for rotated text upstream
     // applies them *after* the rotation, so an offset runs along the text rather than along the
     // page.
@@ -792,8 +796,14 @@ public class MarkEncoder(
     // names — a label styled `{align: "left", baseline: "middle", dx: 3}` says nothing in its
     // encoding, and reading only the encoding left it centred on its anchor with no nudge at all.
     val nudge = PointD(number(channels["dx"], datum) ?: 0.0, number(channels["dy"], datum) ?: 0.0)
+    // **Only for an angle that is a number.** Upstream's `bound` never turns `dx`/`dy` at all —
+    // it sets the box with them unrotated and turns the whole box about the anchor afterwards —
+    // and rotating the nudge here is a stand-in for that, exact for a finite angle. For a NaN one
+    // it is not: it would poison the anchor itself, where upstream leaves `item.x` as encoded and
+    // loses only the bounds.
     val offset =
-      if (angle == 0.0) nudge else Transform2D.rotateDegrees(angle).apply(nudge.x, nudge.y)
+      if (angle == 0.0 || !angle.isFinite()) nudge
+      else Transform2D.rotateDegrees(angle).apply(nudge.x, nudge.y)
     val style = style(channels, datum, spec)
 
     val textStyle =

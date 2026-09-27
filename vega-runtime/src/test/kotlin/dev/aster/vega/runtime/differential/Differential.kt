@@ -1942,8 +1942,15 @@ public object Differential {
    * Narrow on purpose. Applying it to every numeric channel broke five fixtures: `aspect` and
    * `smooth` on an image mark are booleans spelled as text and belong in the strings, and a
    * geometry channel has its own non-finite rule below.
+   *
+   * **`angle` joined them for the same reason and from a different function.** `boundText` reads it
+   * as `item.angle && bounds.rotate(item.angle * DegToRad, x, y)` — truthiness on the raw value,
+   * multiplication afterwards — so upstream's item carries the word and this engine's node carries
+   * the `NaN` the word coerces to. What the two must agree about is where the label ends up, and
+   * they do; comparing the written form against the coerced one reported a difference that is only
+   * this engine resolving earlier than upstream does.
    */
-  private val COERCED_CHANNELS = setOf("strokeWidth", "strokeMiterLimit")
+  private val COERCED_CHANNELS = setOf("strokeWidth", "strokeMiterLimit", "angle")
 
   private val NUMERIC_CHANNELS =
     GEOMETRY_CHANNELS +
