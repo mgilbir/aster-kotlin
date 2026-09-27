@@ -10295,3 +10295,44 @@ Found by the widened signal sweep as `a-label-angle--sideways`, the only value o
 differed.
 
 258 Vega differential fixtures.
+
+### The widened sweep, closed out
+
+**158 compared, 140 matched (88.6%), against 135 (85.4%) when the widening first ran.** The number
+that moved is the one that means anything: differences **a fresh render would show** went from 11 to
+**6**. Upstream's retention stayed at 12, exactly as it should — nothing here touched the
+incremental dataflow, and a fix that had moved that number would have been a fix doing something
+other than what it claimed.
+
+Every case of the four new charts that differed now matches: `a-domain-bound` at all six values,
+`a-band-padding` at all seven, `a-label-angle` at all seven. `a-paint-order` and `a-dash-pattern`
+matched from the start and still do.
+
+**One of those matches is half the harness's doing and should be read as such.**
+`a-label-angle--sideways` carried five differences: one surface and four records of the angle. The
+surface is closed by the engine — a NaN-turned label contributes nothing to the axis's extent, which
+is upstream's rule. The four records are no longer *compared*, because `angle` joined `strokeWidth`
+and `strokeMiterLimit` in the coerced channels: upstream's item holds the word, this engine's node
+holds the number it coerces to, and comparing the two spellings was reporting that this engine
+resolves earlier than upstream rather than that it resolves differently. That is the same mechanism
+already in place for a stroke width, and it is worth saying out loud rather than letting a tally
+improve quietly.
+
+**The six that remain are both previously-decided families, and neither moved.**
+
+Five are the **raw value on the item** with identical drawing: `a-font-size--large`,
+`a-label-limit--wide`, and `a-text-anchor` at `middle`, `""` and `7`. The criterion for closing one
+of that family is written in the entry above — the fill changed what the scene recorded about a
+*drawn* mark, the stroke width changed the **bounds**, the legend type changed the **caption a
+screen reader reads** — and these change none of the three. A text mark aligned `middle` emits
+`text-anchor="start"` and bounds at x1 = 60, exactly as `left` does. `align` is a string where
+`angle` is a number, which is why the coercion that settled one cannot settle the other.
+
+One is **`a-scale-domain--not-a-domain`**, the string-as-domain deferred with its cost recorded.
+
+So the sweep is where it was before, one widening later: everything left is a decision already made.
+What the second widening actually demonstrated is that the *channel* matters more than the value —
+the six charts were chosen for having a layout or ordering consequence, and four of the six paid out,
+where a seventh chart of visual-only channels would likely have paid nothing.
+
+258 Vega differential fixtures.
