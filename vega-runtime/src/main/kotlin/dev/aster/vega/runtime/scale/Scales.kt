@@ -482,8 +482,27 @@ public class BandScale(
     val n = domain.size
 
     val inner = paddingInner.coerceIn(0.0, 1.0)
-    val outer = paddingOuter.coerceAtLeast(0.0)
-    var computedStep = (hi - lo) / maxOf(1.0, n - inner + outer * 2.0)
+    val outer = paddingOuter.coerceIn(0.0, 1.0)
+    // ```js
+    // const space = count - paddingInner + paddingOuter * 2;   // bandSpace
+    // return count ? (space > 0 ? space : 1) : 0;
+    // step = (stop - start) / (space || 1);                    // rescale
+    // ```
+    //
+    // **`maxOf` is neither of upstream's two guards, and it disagrees with both.** The first asks
+    // `space > 0`, which is *false* for a NaN — so a padding nothing can read divides by **one**,
+    // the step becomes the whole range, and only the bandwidth and the positions go NaN with it.
+    // Kotlin's `maxOf` propagates the NaN and loses the step as well. They also part company with
+    // no NaN in sight, wherever the space falls **between zero and one**: a single band with half
+    // its width in inner padding has a space of `0.5`, which upstream divides by to reach a step of
+    // 400 over a 200-wide range and a band filling all of it, while `maxOf(1.0, 0.5)` rounds the
+    // divisor up to one and draws that band at half width. Probed at `paddingInner` of 0.5 and 0.8.
+    //
+    // The second guard is the `|| 1`, which catches the `0` that `bandSpace` answers for an empty
+    // domain; `maxOf` happened to cover that one.
+    val space = n - inner + outer * 2.0
+    val divisor = if (n == 0 || !(space > 0.0)) 1.0 else space
+    var computedStep = (hi - lo) / divisor
     if (round) computedStep = floor(computedStep)
 
     var computedStart = lo + (hi - lo - computedStep * (n - inner)) * align.coerceIn(0.0, 1.0)

@@ -6,6 +6,7 @@ import dev.aster.vega.model.asString
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.LinearScale
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
@@ -76,6 +77,62 @@ class BandPaddingTest {
             "paddingInner": 2}"""
       )
     assertEquals("0 bw=0.0", placed(built.getValue("s") as BandScale))
+  }
+
+  /**
+   * **A space between zero and one is divided by, not rounded up to one.**
+   *
+   * `bandSpace` is `count ? (space > 0 ? space : 1) : 0`, and the only thing it replaces is a space
+   * that is *not* above zero. A single band carrying half its width in inner padding has a space of
+   * `0.5`, which upstream divides a 200-wide range by to reach a step of 400 and a band that fills
+   * the range; `maxOf(1.0, space)` rounds the divisor up instead and draws it half as wide. Read
+   * off a live upstream view at both paddings below.
+   */
+  @Test
+  fun `a space below one still divides the range`() {
+    val half =
+      scales(
+        """{"name": "s", "type": "band", "domain": ["a"], "range": [0, 200],
+            "paddingInner": 0.5}"""
+      )
+    assertEquals("0 bw=200.0", placed(half.getValue("s") as BandScale))
+    assertEquals(400.0, (half.getValue("s") as BandScale).step, 1e-9)
+
+    val most =
+      scales(
+        """{"name": "s", "type": "band", "domain": ["a"], "range": [0, 200],
+            "paddingInner": 0.8}"""
+      )
+    assertEquals("0 bw=200.0", placed(most.getValue("s") as BandScale))
+    assertEquals(1000.0, (most.getValue("s") as BandScale).step, 1e-9)
+  }
+
+  /**
+   * **A padding nothing can read is NaN, and only the step survives it.**
+   *
+   * Upstream clamps with `Math.max(0, Math.min(1, _))`, which answers NaN for a word, and then
+   * `bandSpace`'s `space > 0` is false so the step divides by one and becomes the whole range.
+   * Bandwidth and every position go NaN. This engine discarded the NaN and drew an ordinary chart.
+   * Probed: `padding: "wide"` over four bands in a 200-wide range gives step 200, bandwidth NaN.
+   */
+  @Test
+  fun `a padding that is not a number leaves the bands unplaceable`() {
+    val built =
+      SpecCompiler(VegaHeadlessTextEngine())
+        .compileJson(
+          """
+          {"width": 200, "height": 20, "padding": 0, "autosize": "none",
+           "signals": [{"name": "gap", "value": "wide"}],
+           "scales": [{"name": "s", "type": "band", "domain": ["a", "b", "c", "d"],
+             "range": [0, 200], "padding": {"signal": "gap"}}]}
+          """
+            .trimIndent()
+        )
+        .scales
+    val scale = built.getValue("s") as BandScale
+    assertEquals(200.0, scale.step, 1e-9)
+    assertTrue(scale.bandwidth.isNaN(), "bandwidth should be NaN, was ${scale.bandwidth}")
+    assertEquals("undefined", scale.scale(VegaValue.Str("a")).asString())
   }
 
   /** `rangeStep` is the older spelling of `range: {step: …}`, and means the same thing. */

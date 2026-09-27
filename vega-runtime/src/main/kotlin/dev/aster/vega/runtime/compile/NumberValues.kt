@@ -65,6 +65,27 @@ public class NumberResolver(
     }
 
   /**
+   * The same, **keeping a NaN**: for a property upstream *coerces* rather than validates.
+   *
+   * A band scale's paddings and its alignment are the three of them. Upstream's scale transform
+   * walks its parameters and calls the setter for each — `scale[key](_[key])` — and the setter is
+   * `Math.max(0, Math.min(1, _))`, which clamps a number and answers **NaN** for anything that is
+   * not one. There is no validation step and nothing is discarded: `padding: "wide"` leaves the
+   * scale with a NaN padding, a bandwidth of NaN and every band unplaceable, while the step stays a
+   * number because `bandSpace` catches the NaN before the division.
+   *
+   * [resolve] drops a NaN, so this engine fell back on the default and drew a perfectly ordinary
+   * chart where upstream draws nothing placeable — the loudest possible disagreement about a value
+   * a binding can deliver by accident.
+   */
+  internal fun resolveNumber(value: NumberValue?, owner: String): Double? =
+    when (value) {
+      is NumberValue.Signal ->
+        resolveValue(value.expression, owner)?.let { JsSemantics.toNumber(it) }
+      else -> resolve(value, owner)
+    }
+
+  /**
    * The same, for an override that **moves the end of a domain** — where absent, nullish and
    * unreadable are three answers rather than one.
    *

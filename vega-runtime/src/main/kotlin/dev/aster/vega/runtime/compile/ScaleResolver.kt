@@ -924,7 +924,10 @@ public class ScaleResolver(
     val range = numericRange(spec) ?: return null
     val domain = discreteDomain(spec.domain, spec.name) ?: return null
     // `padding` is shorthand for both inner and outer; explicit values win.
-    val padding = numbers.resolve(spec.padding, spec.name)
+    // **`resolveNumber`, which keeps a NaN.** Upstream clamps these with
+    // `Math.max(0, Math.min(1, _))` and does not validate them, so a padding or an alignment
+    // nothing can read is NaN rather than the default — see `NumberValues.resolveNumber`.
+    val padding = numbers.resolveNumber(spec.padding, spec.name)
     // ```js
     // scale.paddingOuter = function(_) { paddingOuter = Math.max(0, Math.min(1, _)); … };
     // ```
@@ -939,10 +942,10 @@ public class ScaleResolver(
       domain = domain,
       range = oriented(range, reversed(spec)),
       paddingInner =
-        (numbers.resolve(spec.paddingInner, spec.name) ?: padding ?: 0.0).coerceIn(0.0, 1.0),
+        (numbers.resolveNumber(spec.paddingInner, spec.name) ?: padding ?: 0.0).coerceIn(0.0, 1.0),
       paddingOuter =
-        (numbers.resolve(spec.paddingOuter, spec.name) ?: padding ?: 0.0).coerceIn(0.0, 1.0),
-      align = (numbers.resolve(spec.align, spec.name) ?: 0.5).coerceIn(0.0, 1.0),
+        (numbers.resolveNumber(spec.paddingOuter, spec.name) ?: padding ?: 0.0).coerceIn(0.0, 1.0),
+      align = (numbers.resolveNumber(spec.align, spec.name) ?: 0.5).coerceIn(0.0, 1.0),
       round = spec.round,
     )
   }
@@ -957,11 +960,11 @@ public class ScaleResolver(
       // Clamped to `[0, 1]` as a band's is, a point scale being a band with all of its padding
       // outside; see [buildBand].
       padding =
-        (numbers.resolve(spec.paddingOuter, spec.name)
-            ?: numbers.resolve(spec.padding, spec.name)
+        (numbers.resolveNumber(spec.paddingOuter, spec.name)
+            ?: numbers.resolveNumber(spec.padding, spec.name)
             ?: 0.0)
           .coerceIn(0.0, 1.0),
-      align = (numbers.resolve(spec.align, spec.name) ?: 0.5).coerceIn(0.0, 1.0),
+      align = (numbers.resolveNumber(spec.align, spec.name) ?: 0.5).coerceIn(0.0, 1.0),
       round = spec.round,
     )
   }
