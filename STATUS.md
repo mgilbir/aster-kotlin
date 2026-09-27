@@ -10569,3 +10569,33 @@ was everything ranged on it.
 fails two of its cases.
 
 260 Vega differential fixtures.
+
+### The ungated corpora, re-run against the whole stack
+
+This stack changed how a **position** is carried — a NaN now survives out of `scaledPosition`,
+through bounds that anchor at the origin, into series points that read it as zero — and it changed
+what the differential can **see**. Both reach further than `check.sh`'s fifteen gates do, so every
+report-only corpus was re-run rather than assumed.
+
+| corpus | before | after |
+| --- | --- | --- |
+| value sweep | 499 of 499 | **499 of 499** |
+| schema property sweep | 7510 of 7510 | **7510 of 7510** |
+| Vega-Lite property sweep | 27489 of 27513 | **27489 of 27513** (24 accepted, 0 differed) |
+| Vega-Lite wild corpus | 1981 of 1981 | **1981 of 1981** |
+| Deneb corpus | 54 of 54 | **54 of 54** |
+| signal sweep | 140 of 158 | **140 of 158** |
+
+**One of them moved, and it is the reason this table exists.** The value sweep went to 496 of 499
+and `check.sh` stayed green on all fifteen gates, because the value sweep is not one of them. Three
+`time-line` cases: a NaN reaching a series point, where upstream's shape generators read
+`item.x || 0` and a coordinate a scale could not give is **zero** rather than a hole. Diagnosed,
+fixed at that site, and folded into the commit that caused it rather than stacked behind it as a
+self-correcting pair. Nothing else in ~37,500 charts moved.
+
+The signal sweep's 140 is the same number it held before the differential was un-blinded, and it is
+worth saying that it is **not** the same 140: `a-view-size--wide` was among the matches and was not
+matching. It is now, and one case that had been hidden has been fixed — see the entry on a size
+written as a word.
+
+260 Vega differential fixtures.
