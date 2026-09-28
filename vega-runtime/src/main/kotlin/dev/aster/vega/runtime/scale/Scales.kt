@@ -139,6 +139,53 @@ public class IdentityScale(
  * @param domain at least two values; more than two makes it piecewise.
  * @param clamp when true, out-of-domain inputs clamp to the range ends instead of extrapolating.
  */
+/**
+ * d3's `bimap` over a two-stop scale: **order the transformed ends first**, then interpolate the
+ * range ends in the matching order.
+ *
+ * ```js
+ * function bimap(domain, range, interpolate) {
+ *   var d0 = domain[0], d1 = domain[1], r0 = range[0], r1 = range[1];
+ *   if (d1 < d0) d0 = normalize(d1, d0), r0 = interpolate(r1, r0);
+ *   else        d0 = normalize(d0, d1), r0 = interpolate(r0, r1);
+ *   return function(x) { return r0(d0(x)); };
+ * }
+ * function normalize(a, b) {
+ *   return (b -= (a = +a)) ? function(x) { return (x - a) / b; }
+ *                          : constant(isNaN(b) ? NaN : 0.5);
+ * }
+ * ```
+ *
+ * The swap looks like tidiness and is arithmetic. For finite ends the two orders are the same
+ * number — `(x - d1) / (d0 - d1)` is `1 - (x - d0) / (d1 - d0)`, and swapping the range ends undoes
+ * the `1 -` — but they are **not** the same once an end is infinite, because the algebra that makes
+ * them equal divides infinity by infinity.
+ *
+ * A `pow` scale with a **negative** exponent is where it shows: `transformPow` is `x < 0 ? -pow(-x,
+ * e) : pow(x, e)`, so a domain starting at zero transforms to `pow(0, -4)` = `Infinity` and the
+ * transformed domain runs *downwards*. Ordered as d3 orders it, the span is `Infinity` and an
+ * ordinary value maps to 0; taken in the written order, the span is `-Infinity`, every value
+ * divides `-Infinity` by `-Infinity`, and the whole axis answers `NaN`. Probed against d3 at
+ * exponent −4 over `[0, 95]` ranged `[120, 0]`: `scale(8)` and `scale(95)` are **0**, and only
+ * `scale(0)` — whose own transform is the infinity — is `NaN`.
+ *
+ * `normalize`'s own guard is transcribed with it, and it is two answers rather than one: a span of
+ * zero is the midpoint, and a span that is **NaN** is NaN. Testing `d0 == d1` catches the first and
+ * silently takes the midpoint for the second, which is how two infinite ends became a real number.
+ */
+internal fun bimap(d0: Double, d1: Double, r0: Double, r1: Double, x: Double): Double {
+  val ascending = !(d1 < d0)
+  val a = if (ascending) d0 else d1
+  val b = if (ascending) d1 else d0
+  val lo = if (ascending) r0 else r1
+  val hi = if (ascending) r1 else r0
+  val span = b - a
+  if (span.isNaN()) return Double.NaN
+  if (span == 0.0) return (lo + hi) / 2.0
+  val u = (x - a) / span
+  return lo * (1.0 - u) + hi * u
+}
+
 public class LinearScale(
   override val name: String,
   public val domain: List<Double>,
@@ -243,7 +290,8 @@ public class LinearScale(
     // 0.
     val d0 = domain[0]
     val d1 = domain[stops - 1]
-    if (d0 == d1) return (range[0] + range[stops - 1]) / 2.0
+    // The midpoint for a zero span is [bimap]'s, along with the `NaN` for a span that is not a
+    // number; testing `d0 == d1` here caught only the first and took the midpoint for the second.
 
     val input = if (clamp) x.coerceIn(minOf(d0, d1), maxOf(d0, d1)) else x
     if (stops == 2) return interpolate(d0, d1, range[0], range[stops - 1], input)
@@ -283,11 +331,8 @@ public class LinearScale(
    * gridline. Found by a fixture whose explicit tick values happened to fall on the boundary; every
    * generated tick before it had landed clear of one.
    */
-  private fun interpolate(d0: Double, d1: Double, r0: Double, r1: Double, x: Double): Double {
-    if (d0 == d1) return (r0 + r1) / 2.0
-    val t = (x - d0) / (d1 - d0)
-    return r0 * (1.0 - t) + r1 * t
-  }
+  private fun interpolate(d0: Double, d1: Double, r0: Double, r1: Double, x: Double): Double =
+    bimap(d0, d1, r0, r1, x)
 
   /** The data value that maps to range position [y]. Only defined for a two-point domain. */
   override fun invert(position: Double): Double {
@@ -710,14 +755,23 @@ public abstract class TransformedScale(
     if (x.isNaN()) return Double.NaN
     val d0 = forward(domain[0])
     val dn = forward(domain[stops - 1])
-    if (!d0.isFinite() || !dn.isFinite()) return Double.NaN
-    if (d0 == dn) return (range[0] + range[stops - 1]) / 2.0
+    // **No guard on the transformed ends.** d3 has none: it hands whatever the transform produced
+    // to `normalize`, and an infinity there is a working scale rather than a broken one. A `pow`
+    // scale with a negative exponent is the case — `pow(0, -4)` is `Infinity`, so a domain starting
+    // at zero transforms to a *downward* one — and ordered as [bimap] orders it the span is
+    // `Infinity`, every ordinary value maps to an end of the range, and only the value whose own
+    // transform is the infinity answers `NaN`. Probed against d3: at exponent -4 over `[0, 95]`
+    // ranged `[120, 0]`, `scale(8)` and `scale(95)` are 0 and `scale(0)` is `NaN`.
+    //
+    // Refusing the whole scale instead turned every tick, label and symbol on that axis into a
+    // `NaN`, which the differential could not see until its comparison stopped agreeing with one.
+    // The `d0 == dn` midpoint is gone with it: `normalize` answers the midpoint for a span of zero
+    // and `NaN` for a span that is not a number, and two infinite ends are the second.
 
     val low = minOf(domain[0], domain[stops - 1])
     val high = maxOf(domain[0], domain[stops - 1])
     val input = if (clamp) x.coerceIn(low, high) else x
     val t = forward(input)
-    if (!t.isFinite()) return Double.NaN
     if (stops == 2) return mix(d0, dn, range[0], range[stops - 1], t)
 
     // **Piecewise, in the transformed space.** A log, power or symlog scale is upstream's
@@ -745,11 +799,8 @@ public abstract class TransformedScale(
   }
 
   /** d3's `interpolateNumber`, in d3's arithmetic — see `LinearScale`. */
-  private fun mix(d0: Double, d1: Double, r0: Double, r1: Double, t: Double): Double {
-    if (d0 == d1) return (r0 + r1) / 2.0
-    val u = (t - d0) / (d1 - d0)
-    return r0 * (1.0 - u) + r1 * u
-  }
+  private fun mix(d0: Double, d1: Double, r0: Double, r1: Double, t: Double): Double =
+    bimap(d0, d1, r0, r1, t)
 
   override fun invert(position: Double): Double {
     val r0 = range.first()

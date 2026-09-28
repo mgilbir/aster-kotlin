@@ -10783,3 +10783,54 @@ visible rather than caused: a `pow` scale with a **negative** exponent places it
 here where upstream places them at 0.5. It has its own entry below.
 
 260 Vega differential fixtures.
+
+### A scale that runs backwards in its own transform
+
+The entry above ends by naming the one case the schema property sweep still reported: a `pow` scale
+with a **negative** exponent placed every tick, label and symbol on its axis at `NaN`, where upstream
+places them. It was not caused by that change — it was made visible by it, the comparison having
+stopped agreeing with every `NaN` it was shown.
+
+It is **two** defects, and fixing the one that was diagnosable from the d3 source changed nothing
+measurable until the second came out. That is the argument for re-measuring after each change rather
+than after a batch: the sweep still reading 7509 is what sent the search back.
+
+**The first is an ordering.** `bimap` orders the *transformed* domain ends before normalizing and
+swaps the range ends to match:
+
+```js
+if (d1 < d0) d0 = normalize(d1, d0), r0 = interpolate(r1, r0);
+else        d0 = normalize(d0, d1), r0 = interpolate(r0, r1);
+```
+
+For finite ends the two orders are the same number — `(x - d1) / (d0 - d1)` is
+`1 - (x - d0) / (d1 - d0)`, and swapping the range undoes the `1 -`. They stop being the same the
+moment an end is infinite, because the algebra that makes them equal divides infinity by infinity.
+`transformPow` is `x < 0 ? -pow(-x, e) : pow(x, e)`, so `pow(0, -4)` is `Infinity` and a domain
+starting at zero transforms to a **downward** one: ordered, the span is `Infinity` and an ordinary
+value maps to an end of the range; as written, the span is `-Infinity` and every value answers
+`NaN`. It was transcribed twice — `LinearScale.interpolate` and `TransformedScale.mix` — so it is
+now one `bimap` both call, rather than the ninth duplicated rule in this file's history.
+
+**The second is a guard that never let the arithmetic run.**
+
+```kotlin
+if (!d0.isFinite() || !dn.isFinite()) return Double.NaN
+```
+
+d3 has none. It hands whatever the transform produced to `normalize`, and an infinite end is a
+working scale rather than a broken one — refusing it turned the whole axis into `NaN`s. Two more
+came out with it: a guard on the *input's* transform, and a `d0 == dn` midpoint. That last is the
+subtle one, because `normalize` answers **two** different things where this answered one — the
+midpoint for a span of zero, and `NaN` for a span that is not a number — so two infinite ends took
+the midpoint branch and produced a real number.
+
+Probed against d3 at `domain([0, 95]).range([120, 0])`: at exponent `-4`, `scale(8)` and `scale(95)`
+are **0** and only `scale(0)` is `NaN`; at `0.5`, `8` and `0` the answers are unchanged, which is
+what says the ordering costs nothing where it is not needed. `TransformedDomainOrderTest` carries
+all of them, and reverting the ordering, the `NaN` span or the finiteness guard each fails it.
+
+The schema property sweep is **7510 of 7510** again; value 499 of 499, signal 140 of 158, Deneb 54
+of 54 and both Vega-Lite corpora are unchanged.
+
+260 Vega differential fixtures.
