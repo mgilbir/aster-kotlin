@@ -1,4 +1,5 @@
 {
+  "background": "white",
   "marks": [
     {
       "opacity": 1,
@@ -658,6 +659,8 @@
       "shapeHeight": 10,
       "shapeLeft": 219,
       "shapeTop": 517,
+      "shapeTurnedHeight": 10,
+      "shapeTurnedWidth": 10,
       "shapeWidth": 10,
       "size": 100,
       "type": "symbol",
@@ -685,6 +688,8 @@
       "shapeHeight": 10,
       "shapeLeft": 219,
       "shapeTop": 530,
+      "shapeTurnedHeight": 10,
+      "shapeTurnedWidth": 10,
       "shapeWidth": 10,
       "size": 100,
       "type": "symbol",
@@ -712,6 +717,8 @@
       "shapeHeight": 10,
       "shapeLeft": 219,
       "shapeTop": 543,
+      "shapeTurnedHeight": 10,
+      "shapeTurnedWidth": 10,
       "shapeWidth": 10,
       "size": 100,
       "type": "symbol",
@@ -739,6 +746,8 @@
       "shapeHeight": 10,
       "shapeLeft": 219,
       "shapeTop": 556,
+      "shapeTurnedHeight": 10,
+      "shapeTurnedWidth": 10,
       "shapeWidth": 10,
       "size": 100,
       "type": "symbol",

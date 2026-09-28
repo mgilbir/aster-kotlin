@@ -227,11 +227,24 @@ internal class LegendBuilder(
     // nothing below has to know the difference.
     val spec =
       declared.copy(
+        // **Layout before style.** A legend's corner and its direction decide which edge of the
+        // drawing it reserves room along and whether its entries run down or across, so they are
+        // resolved with the rest but read by everything that measures. An unreadable one keeps the
+        // declared value rather than dropping the legend.
+        orient =
+          declared.orientExpression
+            ?.let { numbers.resolveText(it, scaleName) }
+            ?.let { LegendOrient.fromName(it) } ?: declared.orient,
+        direction =
+          declared.directionExpression
+            ?.let { numbers.resolveText(it, scaleName) }
+            ?.let { Direction.fromName(it) } ?: declared.direction,
         // As on an axis: a signal may choose the grammar, and it has to be resolved before the
         // labels
         // are formatted.
         format =
-          declared.format ?: declared.formatExpression?.let { numbers.resolveText(it, scaleName) },
+          declared.format
+            ?: declared.formatExpression?.let { numbers.resolveSpecifier(it, scaleName) },
         formatType =
           declared.formatType
             ?: declared.formatTypeExpression
@@ -1114,7 +1127,19 @@ internal class LegendBuilder(
 
     val nodes = mutableListOf<SceneNode>(swatch)
     val labelStyle = GuideStyle.text(spec.labelStyle, labelFontSize, defaultWeight = 400)
-    val labelLimit = numbers.resolve(spec.labelLimit, scaleName) ?: LegendDefaults.LABEL_LIMIT
+    // ```js
+    // limit: value(spec.labelLimit, config.gradientLabelLimit)   // legend-gradient-labels.js
+    // limit: _('labelLimit')                                     // legend-symbol-groups.js
+    // ```
+    //
+    // **Two different config keys, and only one of them has a default.** A *symbol* legend's labels
+    // fall back on `config.legend.labelLimit`, which is 160; a *gradient* legend's — and a
+    // discretizing scale's, whose labels are built by the same file — fall back on
+    // `config.gradientLabelLimit`, which the config does not define. So a ramp's labels carry **no
+    // limit** unless the specification writes one, and are not truncated at 160 the way a
+    // category's are. Probed: a symbol legend's labels come out `limit: 160`, a gradient's carry no
+    // `limit` key at all, and both honour an explicit `labelLimit: 80`.
+    val labelLimit = numbers.resolve(spec.labelLimit, scaleName) ?: 0.0
     val labels = mutableListOf<TextNode>()
 
     for ((index, entry) in joinedByValue(gradientLabels(spec, scale, scaleName)).withIndex()) {
@@ -1126,6 +1151,7 @@ internal class LegendBuilder(
         TextRun(
           text = entryText(spec, "labels", "text", entry) ?: entry.label,
           style = labelStyle,
+          limit = labelLimit,
           align =
             if (vertical) TextAlign.LEFT
             else if (fraction <= 0.0) TextAlign.LEFT
@@ -1262,7 +1288,7 @@ internal class LegendBuilder(
             if (!vertical) TextBaseline.TOP
             else if (fraction <= 0.0) TextBaseline.BOTTOM
             else if (fraction >= 1.0) TextBaseline.TOP else TextBaseline.MIDDLE,
-          limit = numbers.resolve(spec.labelLimit, scaleName) ?: LegendDefaults.LABEL_LIMIT,
+          limit = numbers.resolve(spec.labelLimit, scaleName) ?: 0.0,
         )
       labels +=
         TextNode(
@@ -1514,7 +1540,12 @@ internal class LegendBuilder(
         "utc" -> TimeZone.UTC
         else -> return null
       }
-    val specifier = spec.format ?: spec.formatExpression?.let { numbers.resolveText(it, scaleName) }
+    // `spec` is the **resolved** legend — `buildOne` substitutes a computed `format` into it once,
+    // before anything below reads one — so this is `spec.format` and nothing else. It used to
+    // resolve `formatExpression` a second time here, which could only ever fire when the first
+    // resolution had already answered null, and then answered null again; a second transcription of
+    // a rule is how this engine has drifted before, and an inert one is a place for it to.
+    val specifier = spec.format
     return { value ->
       // `Number(value)`, which is what d3 coerces with — so a null entry is epoch zero and not a
       // word that fails to parse. See the note in [GuideCaption.spoken].
@@ -1816,12 +1847,17 @@ internal class LegendBuilder(
       )
     val scaleName = spec.scale ?: return null
     val scale = scales[scaleName] ?: return null
+    // **What is drawn and what is said are two questions.** Upstream keeps the `type` as it was
+    // written and reads it out verbatim — `Nonsense legend for fill color …` — while drawing the
+    // symbols any unrecognised kind draws. So the word comes from the specification when there is
+    // one and from the resolved kind when there is not.
     val kind =
-      when (resolveType(spec, scale)) {
-        LegendType.GRADIENT -> "gradient"
-        LegendType.DISCRETE -> "discrete"
-        else -> "symbol"
-      }
+      spec.typeName
+        ?: when (resolveType(spec, scale)) {
+          LegendType.GRADIENT -> "gradient"
+          LegendType.DISCRETE -> "discrete"
+          else -> "symbol"
+        }
     // A caption is spoken, not drawn, so a two-line title is read as one phrase: upstream's
     // `array(item.text).join(' ')`. The lines reach here already joined by the newline the text
     // node draws on, and turning them back into spaces is the same operation.

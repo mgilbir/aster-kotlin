@@ -1,0 +1,21 @@
+{
+  "background": "#eef",
+  "marks": [
+    {
+      "fill": "#4c78a8",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 40,
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 60,
+    "width": 130
+  },
+  "spec": "a-background-a-signal-paints.vg.json",
+  "vegaVersion": "6.3.1"
+}

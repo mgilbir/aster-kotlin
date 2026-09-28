@@ -1,4 +1,5 @@
 {
+  "background": "white",
   "marks": [
     {
       "opacity": 1,
@@ -606,6 +607,8 @@
       "shapeHeight": 16,
       "shapeLeft": 268,
       "shapeTop": 14,
+      "shapeTurnedHeight": 10,
+      "shapeTurnedWidth": 10,
       "shapeWidth": 16,
       "size": 100,
       "stroke": "#333333",
@@ -636,6 +639,8 @@
       "shapeHeight": 16,
       "shapeLeft": 268,
       "shapeTop": 34,
+      "shapeTurnedHeight": 10,
+      "shapeTurnedWidth": 10,
       "shapeWidth": 16,
       "size": 100,
       "stroke": "#333333",
@@ -666,6 +671,8 @@
       "shapeHeight": 16,
       "shapeLeft": 268,
       "shapeTop": 54,
+      "shapeTurnedHeight": 10,
+      "shapeTurnedWidth": 10,
       "shapeWidth": 16,
       "size": 100,
       "stroke": "#333333",

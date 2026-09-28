@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.differential
 
+import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DEFAULT_DECIMAL_PRECISION
 import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.VegaJson
@@ -24,7 +25,10 @@ import dev.aster.vega.scene.FontStyle
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.ImageFit
 import dev.aster.vega.scene.ImageNode
+import dev.aster.vega.scene.PathCommand
+import dev.aster.vega.scene.PathData
 import dev.aster.vega.scene.PathNode
+import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.RuleNode
@@ -116,6 +120,25 @@ public object Differential {
     val strings: Map<String, String>,
     /** By channel — `fill` or `stroke` — for the few marks painted with one. */
     val gradients: Map<String, GradientReference> = emptyMap(),
+    /**
+     * The accumulated group translation this mark sits in, which is what an **absent** position
+     * channel in the reference means.
+     *
+     * `normalizeScene` skips a channel the item does not carry *before* it applies the offset:
+     * ```js
+     * let value = item[channel];
+     * if (value === undefined) { …; else continue; }
+     * entry[channel] = canonicalNumber(isExtent ? value : value + offset, precision);
+     * ```
+     *
+     * So an omitted `x` does not say the mark is at zero — it says the item had no `x` of its own,
+     * and every bound reads that as `item.x || 0`, which places it at the group's origin. A title's
+     * text is exactly this: upstream records `title {x: 0, y: -48}` for the group and **no** `x` or
+     * `y` at all for the text inside it. This engine's records are absolute, so they must be
+     * compared against the origin rather than against zero.
+     */
+    val originX: Double = 0.0,
+    val originY: Double = 0.0,
   ) {
     val key: String
       get() = "$type/${role ?: "-"}"
@@ -131,6 +154,15 @@ public object Differential {
     val vegaVersion: String,
     val width: Double,
     val height: Double,
+    /**
+     * The surface's own colour, or null for the many charts that ask for none.
+     *
+     * Recorded late: nothing here compared a background until a `"background": {"signal": …}`
+     * needed checking and there was no way to check it. `view.background()` is upstream's resolved
+     * answer — the property, the `config.background` behind it, or the signal either of those
+     * named.
+     */
+    val background: String?,
     val scales: Map<String, ScaleReference>,
     /**
      * The scales a **named** group mark built for itself — a faceted one once per cell.
@@ -260,7 +292,16 @@ public object Differential {
         for ((key, value) in obj.fields) {
           if (key == "type" || key == "role") continue
           when (value) {
-            is VegaValue.Num -> numbers[key] = value.value
+            // A **colour channel holding a number** is the mirror of the rule below it, and the
+            // reference really does hold them: a scale whose `scheme` evaporated keeps d3's `[0,
+            // 1]`
+            // range and paints with `0.1`. A number is not a colour and never will be, so it
+            // belongs with the text, where the colour comparison can see it is unreadable and check
+            // that this side painted nothing with it. Left in `numbers` it was compared against a
+            // colour and reported as missing.
+            is VegaValue.Num ->
+              if (key in COLOUR_CHANNELS) strings[key] = value.asString()
+              else numbers[key] = value.value
             // A **number written as a string** is a number. Upstream's items are property bags and
             // it coerces at draw time, so a specification whose signal holds `"3"` rather than `3`
             // puts the string on the item and its renderer writes `stroke-width="3"`. This engine
@@ -268,7 +309,31 @@ public object Differential {
             // and only the *reading* differed — a parallel-coordinates template reported twelve
             // widths as "3 vs absent", the width sitting in the other map.
             is VegaValue.Str ->
-              if (key in NUMERIC_CHANNELS && value.value.toDoubleOrNull() != null) {
+              // `toDoubleOrNull` was a *parse*, and upstream's rule is a **coercion**:
+              // `boundStroke`
+              // reads `item.strokeWidth != null ? +item.strokeWidth : 1`, so a width of `""` is 0
+              // and a width of `"wide"` is `NaN`, both of which this engine's node already holds
+              // because it coerces on the way in. Parsing instead left them in the text, where they
+              // read as a width this side had not got.
+              //
+              // The non-finite spellings stay in the text deliberately: `canonicalNumber`
+              // stringifies an upstream `NaN` or infinity on purpose so it stays visible, and the
+              // `GEOMETRY_CHANNELS` rule below is what reads them.
+              if (key in COERCED_CHANNELS && value.value !in NON_FINITE) {
+                numbers[key] = JsSemantics.toNumber(value)
+                // **`!in NON_FINITE` here too, and it is the whole of the defect.** The branch
+                // above already keeps the non-finite spellings out of the numbers, and the comment
+                // on it says why — but `"NaN".toDoubleOrNull()` *parses*, to `Double.NaN`, so this
+                // branch swallowed every one of them straight back and the `GEOMETRY_CHANNELS`
+                // rule below never ran. Once in the numbers the comparison is
+                // `abs(wanted - got) > allowed`, and `abs(NaN - anything)` is NaN, which is never
+                // greater than a tolerance: a channel upstream recorded as `NaN` agreed with
+                // whatever this engine held, including a perfectly ordinary number.
+              } else if (
+                key in NUMERIC_CHANNELS &&
+                  value.value !in NON_FINITE &&
+                  value.value.toDoubleOrNull() != null
+              ) {
                 numbers[key] = value.value.toDouble()
               } else {
                 strings[key] = value.value
@@ -278,7 +343,12 @@ public object Differential {
               if (value.fields["gradient"] != null) gradients[key] = gradientReference(value)
             // A **boolean**, which is only ever `clip` in this corpus. This side records it as the
             // string "true", so reading it makes the two meet; they never did before.
-            is VegaValue.Bool -> strings[key] = value.value.toString()
+            // A **boolean**, which is `clip` in most of this corpus and a *number* wherever a
+            // numeric channel holds one: `+true` is 1, which is what upstream measures a
+            // `strokeWidth: true` with and what this engine's node holds.
+            is VegaValue.Bool ->
+              if (key in COERCED_CHANNELS) numbers[key] = JsSemantics.toNumber(value)
+              else strings[key] = value.value.toString()
             // A **null** needs nothing here, and checking it was the one idea in this change that
             // turned out to be redundant: upstream records `stroke: null` on 298 marks and
             // `fill: null` on 24, and those are the only nulls in the corpus — both covered
@@ -301,6 +371,7 @@ public object Differential {
       vegaVersion = root.fields["vegaVersion"]?.asString() ?: "unknown",
       width = (size.fields["width"] ?: VegaValue.Num(0.0)).asDouble(),
       height = (size.fields["height"] ?: VegaValue.Num(0.0)).asDouble(),
+      background = root.fields["background"]?.asString(),
       scales = scales,
       nestedScales =
         (root.fields["nestedScales"] as? VegaValue.Obj)?.fields?.mapValues { (_, group) ->
@@ -335,6 +406,10 @@ public object Differential {
     return null
   }
 
+  /** Records the group origin a mark sits in; see [Mark.originX]. */
+  private fun at(world: Transform2D, mark: Mark): Mark =
+    mark.copy(originX = world.e, originY = world.f)
+
   private fun collect(node: SceneNode, parent: Transform2D, out: MutableList<Mark>) {
     if (!node.visible) return
     val world = parent.concat(node.transform)
@@ -342,17 +417,22 @@ public object Differential {
       is GroupNode -> {
         // Only a painted group is a visible mark; a layout group carries no pixels.
         if (node.fill != null || node.stroke != null) {
-          out.add(withGradients(node, groupMark(node, world)))
+          out.add(at(world, withGradients(node, groupMark(node, world))))
         }
         node.children.forEach { collect(it, world, out) }
       }
-      is RectNode -> out.add(withGradients(node, withOpacity(node, rectMark(node, world))))
-      is RuleNode -> out.add(withGradients(node, withOpacity(node, ruleMark(node, world))))
-      is TextNode -> out.add(withGradients(node, withOpacity(node, textMark(node, world))))
+      is RectNode ->
+        out.add(at(world, withGradients(node, withOpacity(node, rectMark(node, world)))))
+      is RuleNode ->
+        out.add(at(world, withGradients(node, withOpacity(node, ruleMark(node, world)))))
+      is TextNode ->
+        out.add(at(world, withGradients(node, withOpacity(node, textMark(node, world)))))
       is SymbolNode ->
-        out.add(withGradients(node, withOpacity(node, symbolMark(node, world, parent))))
-      is PathNode -> out.add(withGradients(node, withOpacity(node, pathMark(node, world, parent))))
-      is ImageNode -> out.add(withGradients(node, withOpacity(node, imageMark(node, world))))
+        out.add(at(world, withGradients(node, withOpacity(node, symbolMark(node, world, parent)))))
+      is PathNode ->
+        out.add(at(world, withGradients(node, withOpacity(node, pathMark(node, world, parent)))))
+      is ImageNode ->
+        out.add(at(world, withGradients(node, withOpacity(node, imageMark(node, world)))))
     }
   }
 
@@ -413,8 +493,33 @@ public object Differential {
    * reading the scene — for a tooltip, for hit testing, for an accessibility description — sees the
    * item's own numbers, not the box. Nothing changes for a rect written the usual way round.
    */
+  /**
+   * A mark's recorded anchor, offset **per axis** as upstream's harvester offsets it:
+   * ```js
+   * const offset = channel.startsWith('x') ? dx + textDx
+   *              : channel.startsWith('y') ? dy + textDy : 0;
+   * entry[channel] = value + offset;
+   * ```
+   *
+   * `world.apply` is a matrix multiply, and that is not the same operation: `c * y` is `NaN` when
+   * `y` is, **even where `c` is zero**, so a mark this engine could place in one axis and not the
+   * other lost *both*. Upstream's harvester accumulates a translation down the tree and adds it to
+   * one axis at a time, so its `x` cannot be touched by its `y`.
+   *
+   * The fallback is deliberate and, in this corpus, unreachable: upstream carries only `dx`/`dy`,
+   * so a group that scaled or rotated its children would already disagree with it about every
+   * recorded coordinate. That is a different divergence from this one and is not hidden here — if
+   * it ever occurs, the matrix answer is the one that was being compared before.
+   */
+  private fun placed(world: Transform2D, x: Double, y: Double): PointD =
+    if (world.a == 1.0 && world.b == 0.0 && world.c == 0.0 && world.d == 1.0) {
+      PointD(x + world.e, y + world.f)
+    } else {
+      world.apply(x, y)
+    }
+
   private fun rectMark(node: RectNode, world: Transform2D): Mark {
-    val origin = world.apply(node.x, node.y)
+    val origin = placed(world, node.x, node.y)
     val numbers =
       linkedMapOf(
         "x" to origin.x,
@@ -464,8 +569,8 @@ public object Differential {
   }
 
   private fun ruleMark(node: RuleNode, world: Transform2D): Mark {
-    val a = world.apply(node.x1, node.y1)
-    val b = world.apply(node.x2, node.y2)
+    val a = placed(world, node.x1, node.y1)
+    val b = placed(world, node.x2, node.y2)
     val numbers =
       linkedMapOf(
         "x" to a.x,
@@ -556,7 +661,7 @@ public object Differential {
       }
 
   private fun textMark(node: TextNode, world: Transform2D): Mark {
-    val anchor = world.apply(node.x, node.y)
+    val anchor = placed(world, node.x, node.y)
     val run = node.layout.run
     val numbers =
       linkedMapOf(
@@ -672,14 +777,57 @@ public object Differential {
       )
     }
 
+  /**
+   * The mark's extent with its outline turned an eighth of a turn — the measurement that tells a
+   * circle from a square.
+   *
+   * An axis-aligned box says almost nothing about an outline. A circle, a square and a cross of the
+   * same size have the **identical** one, and a third of this corpus — 14,089 marks of 38,712 — was
+   * compared on nothing else. Probed: drawing every circle symbol as a square of the same box was
+   * seen by *one* of 260 fixtures, and only because a circle's cubics miss the corner by a
+   * rounding. Turned 45 degrees they separate cleanly — 20 x 20 stays 20 x 20 for the circle,
+   * becomes 28.284 for the square and 19.799 for the cross.
+   *
+   * **Only the size is recorded, and that is what makes this cheap.** Turning a shape about a
+   * different centre moves the result without resizing it, so the two engines need not agree on
+   * what the anchor is — which for an arc is a centre this engine has already folded into its path.
+   * Upstream measures with its own `Marks[type].bound` by lending the item another 45 degrees, so
+   * its extrema logic does the work there; here the control points are mapped and [PathData.bounds]
+   * does it, which is the same cubic-extrema code the ordinary extent uses.
+   *
+   * Both sides measure the **bare** outline: upstream's item is lent a `strokeWidth` of 0 for the
+   * measurement, so `boundStroke` expands by nothing, and nothing is added here either. Matching
+   * the stroke allowance would have meant transcribing `boundStroke`'s miter rule a second time.
+   */
+  private fun turnedExtent(outline: PathData, world: Transform2D): Map<String, Double> {
+    if (outline.commands.isEmpty()) return emptyMap()
+    val mapped = Transform2D.rotateDegrees(SHAPE_TURN).concat(world)
+    val turned = PathData(outline.commands.map { turnedCommand(it, mapped) }).bounds
+    if (turned.isEmpty) return emptyMap()
+    return linkedMapOf("shapeTurnedWidth" to turned.width, "shapeTurnedHeight" to turned.height)
+  }
+
+  private fun turnedCommand(command: PathCommand, by: Transform2D): PathCommand =
+    when (command) {
+      is PathCommand.MoveTo -> by.apply(command.x, command.y).let { PathCommand.MoveTo(it.x, it.y) }
+      is PathCommand.LineTo -> by.apply(command.x, command.y).let { PathCommand.LineTo(it.x, it.y) }
+      is PathCommand.CubicTo -> {
+        val c1 = by.apply(command.x1, command.y1)
+        val c2 = by.apply(command.x2, command.y2)
+        val to = by.apply(command.x, command.y)
+        PathCommand.CubicTo(c1.x, c1.y, c2.x, c2.y, to.x, to.y)
+      }
+      else -> command
+    }
+
   private fun symbolMark(node: SymbolNode, world: Transform2D, parent: Transform2D): Mark {
-    val centre = world.apply(node.x, node.y)
+    val centre = placed(world, node.x, node.y)
     val numbers =
       linkedMapOf(
         "x" to centre.x,
         "y" to centre.y,
         "size" to node.size,
-      ) + extentOf(node, parent)
+      ) + extentOf(node, parent) + turnedExtent(node.outline, world)
     return Mark("symbol", node.metadata.role, numbers + paintNumbers(node), paintStrings(node))
   }
 
@@ -696,12 +844,30 @@ public object Differential {
       // An arc is compared by the wedge it drew rather than by a centre point, which says nothing
       // about its radii or its sweep.
       val numbers = LinkedHashMap(extentOf(node, parent))
+      // **Only the four types upstream measures**, which is `SHAPE_EXTENT_TYPES` in
+      // `normalize.js`: a `trail` is compared by the extent it covers and is not one of them, so
+      // recording a turned extent for one here would be inventing a channel the reference has no
+      // opinion about.
+      if (kind in TURNED_EXTENT_KINDS) {
+        // A **null path** is `bounds.set(0, 0, 0, 0)` upstream — `Marks.path.bound` returns exactly
+        // that when `item.path` is absent — so it is a zero extent rather than no extent at all.
+        numbers +=
+          if (kind == "path" && node.absent) {
+            linkedMapOf("shapeTurnedWidth" to 0.0, "shapeTurnedHeight" to 0.0)
+          } else {
+            turnedExtent(node.path, world)
+          }
+      }
       // A `path` mark also reports the anchor it was placed at, which upstream carries as the
       // item's own x and y — the outline itself is in the path string's coordinates.
       if (kind == "path") {
-        val anchor = world.apply(0.0, 0.0)
-        numbers["x"] = anchor.x
-        numbers["y"] = anchor.y
+        // **The transform's own translation, not `apply(0, 0)`.** They are the same number —
+        // `a*0 + c*0 + e` is `e` — right up until the matrix holds a `NaN`, because `NaN * 0` is
+        // `NaN` rather than 0. A rotation maps the origin to itself whatever its angle, so an
+        // anchor must not be lost to one this engine could not read; upstream records the item's
+        // encoded `x`/`y`, which its `angle` never touches.
+        numbers["x"] = world.e
+        numbers["y"] = world.f
       }
       return Mark(kind, node.metadata.role, numbers + paintNumbers(node), paintStrings(node))
     }
@@ -775,7 +941,7 @@ public object Differential {
    * interchangeable to anything that lays out again.
    */
   private fun imageMark(node: ImageNode, world: Transform2D): Mark {
-    val anchor = world.apply(node.x, node.y)
+    val anchor = placed(world, node.x, node.y)
     return Mark(
       "image",
       node.metadata.role,
@@ -818,9 +984,9 @@ public object Differential {
    * `x`/`y` and `width`/`height`.
    */
   private fun groupMark(node: GroupNode, world: Transform2D): Mark {
-    val origin = world.apply(0.0, 0.0)
+    // The transform's own translation; see the note in `pathMark`.
     val size = node.size
-    val numbers = linkedMapOf("x" to origin.x, "y" to origin.y)
+    val numbers = linkedMapOf("x" to world.e, "y" to world.f)
     if (size != null) {
       numbers["width"] = size.width
       numbers["height"] = size.height
@@ -1027,12 +1193,22 @@ public object Differential {
         // its outline may contain an SVG `A` command, which both engines approximate with cubics
         // and neither splits identically — a circle written as one arc measures 14.000002 upstream
         // and 14.0000001 here.
-        if (channel.startsWith("shape") && expected.type in CURVE_EXTENT_TYPES) {
+        if (
+          channel.startsWith("shapeTurned") ||
+            (channel.startsWith("shape") && expected.type in CURVE_EXTENT_TYPES)
+        ) {
+          // **A turned extent is a curve measurement whatever the mark is.** Taking a shape's
+          // extrema again in a rotated frame compounds the cubic approximation on both axes at
+          // once, where the axis-aligned box only ever feels it on one — so a `shape`, whose
+          // outline is polygonal enough to sit inside the tight tolerance upright, drifts past it
+          // turned. Measured across the schema property sweep: a projected land mass differs by
+          // 8.7e-5 between the two engines, four orders of magnitude inside this tolerance and four
+          // outside the other. A genuinely wrong shape differs by tens of units.
           CURVE_EXTENT_TOLERANCE
         } else {
           tolerance
         }
-      if (abs(wanted - got) > allowed) {
+      if (!agree(wanted, got, allowed)) {
         out.add(Difference("$where.$channel", fmt(wanted), fmt(got)))
       }
     }
@@ -1044,16 +1220,79 @@ public object Differential {
     for (channel in ONE_SIDED_CHANNELS) {
       if (channel in ignored) continue
       if (channel !in expected.strings && channel in actual.strings) {
-        out.add(Difference("$where.$channel", "absent", actual.strings.getValue(channel)))
+        val invented = actual.strings.getValue(channel)
+        // An **empty** text is not a word on the chart. The reference writes no `text` key for an
+        // item whose text is null, and upstream's own renderer draws nothing for a null and nothing
+        // for an empty string alike — so the two agree on what is painted and only on how it is
+        // spelled. `donut-chart-labelled` has twenty-three of them and `nest-treemap` one;
+        // reporting
+        // those would be reporting a representation, not a difference.
+        if (channel == "text" && invented.isEmpty()) continue
+        out.add(Difference("$where.$channel", "absent", invented))
       }
     }
-    // The same both ways for corner radii: rounding a corner the reference leaves square changes
-    // the outline, and iterating only the reference's channels would never see it.
-    for (channel in CORNER_CHANNELS) {
+    // **Every numeric channel this engine holds that the reference does not**, defaulting to
+    // *report* rather than to skip.
+    //
+    // This used to be two hand-kept lists — the corner radii, then a set of zero-default channels —
+    // and each was extended only after something had already slipped through: `text` when a guide
+    // title this side invented moved a surface, `angle` and `limit` when a legend label came out
+    // truncated at a limit upstream never set. A list you add to after each escape is a list that
+    // is wrong until the next one. Walking what this engine *holds* inverts the default: a channel
+    // nobody has thought about is loud, and every exception is written down with what it means.
+    //
+    // [absenceMeans] is that exception table. It says what upstream's **omission** stands for
+    // rather than waving the channel through: an omitted position is drawn at zero, because every
+    // bound and every shape generator reads `item.x || 0`, so holding a zero agrees with it and
+    // holding anything else is a mark placed where upstream placed nothing.
+    for ((channel, invented) in actual.numbers) {
       if (channel in ignored) continue
-      val invented = actual.numbers[channel] ?: continue
-      if (channel !in expected.numbers && abs(invented) > tolerance) {
+      if (channel in expected.numbers || channel in expected.strings) continue
+      // The same inert guards the reference's own channels get, read off *this* engine's mark: a
+      // stroke width on something nothing strokes paints no more here than it does there.
+      if (
+        unpaintedStroke(actual, channel) ||
+          unpaintedFill(actual, channel) ||
+          inertFill(actual, channel) ||
+          unreadByThisMark(actual, channel)
+      ) {
+        continue
+      }
+      // A position's absence means the group origin rather than zero — see [Mark.originX] — and on
+      // a **text** mark it means nothing at all.
+      //
+      // `normalizeScene` folds a text item's `dx`/`dy`, and its polar `radius`/`theta`, into the
+      // recorded coordinate; but it reaches the `continue` for an undefined channel *before* that,
+      // so a nudged title records no `x` and the nudge is never written anywhere. This engine folds
+      // the same offsets into its anchor, so its `x` is the drawn position and upstream's absence
+      // is silent about it: `title-nudge` puts a heading 9 across and 7 down from its group, and
+      // the reference has no coordinate that disagrees or agrees. Comparing them said the nudge was
+      // an invention.
+      //
+      // Every other mark type places from its anchor alone, so an omitted `x` there really does say
+      // the item sat at its group's origin.
+      if (channel in ABSENCE_UNCOMPARABLE) continue
+      val implied =
+        when {
+          channel !in POSITION_CHANNELS -> absenceMeans(channel)
+          actual.type == "text" -> continue
+          // **A far edge the reference omits is its near edge**, not the origin.
+          //
+          // `boundRule` reads `item.x2 != null ? item.x2 : x1`, so an item whose `x2` is null is a
+          // rule that ends where it starts — and the harvester drops a null, because `value = item.
+          // y2` does not take the `undefined` substitution and `typeof null !== 'number'` sends it
+          // to `continue`. An axis tick on a vertical axis is exactly that: upstream records
+          // `{x: 150.5, x2: 155.5, y: 80.5}` and no `y2` at all, and it draws the horizontal tick
+          // this engine draws with `y2` resolved to the same 80.5.
+          channel == "x2" -> actual.numbers["x"] ?: actual.originX
+          channel == "y2" -> actual.numbers["y"] ?: actual.originY
+          channel == "x" -> actual.originX
+          else -> actual.originY
+        }
+      if (implied == null) {
         out.add(Difference("$where.$channel", "absent", fmt(invented)))
+      } else if (!agree(implied, invented, tolerance)) {
+        out.add(Difference("$where.$channel", "absent, which means ${fmt(implied)}", fmt(invented)))
       }
     }
     for ((channel, wanted) in expected.strings) {
@@ -1206,7 +1445,7 @@ public object Differential {
         continue
       }
       theirs.stops.zip(ours.stops).forEachIndexed { index, (want, got) ->
-        if (abs(want.first - got.first) > GEOMETRY_TOLERANCE) {
+        if (!agree(want.first, got.first, GEOMETRY_TOLERANCE)) {
           out.add(
             Difference(
               "$where.$channel gradient stop[$index] offset",
@@ -1249,14 +1488,39 @@ public object Differential {
    */
   private val GRADIENT_STOP_TIES = setOf("rect/legend-gradient[0].fill gradient stop[19]")
 
+  /**
+   * Whether two numbers agree within [tolerance], **including when either of them is not finite**.
+   *
+   * `abs(wanted - got) <= tolerance` is not that test, and the way it fails is silent: `abs` of
+   * anything involving a `NaN` is `NaN`, and `NaN > tolerance` is **false**, so a channel this
+   * engine reports as `NaN` agreed with every number the reference held. Measured rather than
+   * reasoned about: reporting `opacity = NaN` for *every mark in the corpus* was seen by **none**
+   * of the 260 fixtures, against 10,231 recorded opacities.
+   *
+   * The mirror of it — a `NaN` on the reference's side — was closed by routing the non-finite
+   * spellings into the strings, where `GEOMETRY_CHANNELS` reads them. That fix was correct and
+   * incomplete: it made one direction safe by keeping `NaN` out of the numbers, which does nothing
+   * about a `NaN` arriving from this engine. Guarding the **comparison** closes both directions and
+   * does not depend on every future branch of the parse remembering to route correctly.
+   *
+   * An infinity compares exactly: upstream's empty bounds really are `±Infinity`, and a tolerance
+   * around an infinity would accept the other one.
+   */
+  internal fun agree(wanted: Double, got: Double, tolerance: Double): Boolean =
+    when {
+      wanted.isNaN() || got.isNaN() -> wanted.isNaN() && got.isNaN()
+      wanted.isInfinite() || got.isInfinite() -> wanted == got
+      else -> abs(wanted - got) <= tolerance
+    }
+
   /** Two colour spellings compared as colours; see [COLOR_TOLERANCE]. */
   private fun sameColour(expected: String, actual: String): Boolean {
     val wanted = SceneColor.parse(expected) ?: return expected == actual
     val got = SceneColor.parse(actual) ?: return expected == actual
-    return abs(wanted.red - got.red) <= COLOR_TOLERANCE &&
-      abs(wanted.green - got.green) <= COLOR_TOLERANCE &&
-      abs(wanted.blue - got.blue) <= COLOR_TOLERANCE &&
-      abs(wanted.alpha - got.alpha) <= COLOR_TOLERANCE
+    return agree(wanted.red, got.red, COLOR_TOLERANCE) &&
+      agree(wanted.green, got.green, COLOR_TOLERANCE) &&
+      agree(wanted.blue, got.blue, COLOR_TOLERANCE) &&
+      agree(wanted.alpha, got.alpha, COLOR_TOLERANCE)
   }
 
   /** Compares two whitespace-separated coordinate lists numerically. */
@@ -1264,7 +1528,7 @@ public object Differential {
     val wanted = expected.trim().split(Regex("\\s+")).mapNotNull { it.toDoubleOrNull() }
     val got = actual.trim().split(Regex("\\s+")).mapNotNull { it.toDoubleOrNull() }
     if (wanted.size != got.size) return false
-    return wanted.indices.all { abs(wanted[it] - got[it]) <= tolerance }
+    return wanted.indices.all { agree(wanted[it], got[it], tolerance) }
   }
 
   /** Channels Vega always emits that default to a known value on our side. */
@@ -1430,10 +1694,10 @@ public object Differential {
       val ours = SceneColor.parse(a)
       val same =
         if (theirs != null && ours != null) {
-          abs(theirs.red - ours.red) <= COLOR_TOLERANCE &&
-            abs(theirs.green - ours.green) <= COLOR_TOLERANCE &&
-            abs(theirs.blue - ours.blue) <= COLOR_TOLERANCE &&
-            abs(theirs.alpha - ours.alpha) <= COLOR_TOLERANCE
+          agree(theirs.red, ours.red, COLOR_TOLERANCE) &&
+            agree(theirs.green, ours.green, COLOR_TOLERANCE) &&
+            agree(theirs.blue, ours.blue, COLOR_TOLERANCE) &&
+            agree(theirs.alpha, ours.alpha, COLOR_TOLERANCE)
         } else {
           e == a
         }
@@ -1514,12 +1778,12 @@ public object Differential {
             differences,
           )
           reference.bandwidth?.let {
-            if (abs(it - scale.bandwidth) > tolerance) {
+            if (!agree(it, scale.bandwidth, tolerance)) {
               differences.add(Difference("scale $name bandwidth", fmt(it), fmt(scale.bandwidth)))
             }
           }
           reference.step?.let {
-            if (abs(it - scale.step) > tolerance) {
+            if (!agree(it, scale.step, tolerance)) {
               differences.add(Difference("scale $name step", fmt(it), fmt(scale.step)))
             }
           }
@@ -1758,7 +2022,7 @@ public object Differential {
       return
     }
     wanted.zip(actual).forEachIndexed { index, (e, a) ->
-      if (abs(e - a) > tolerance) out.add(Difference("$where[$index]", fmt(e), fmt(a)))
+      if (!agree(e, a, tolerance)) out.add(Difference("$where[$index]", fmt(e), fmt(a)))
     }
   }
 
@@ -1816,6 +2080,15 @@ public object Differential {
    * excluded *and* absent, so removing it from this set changed nothing until the channel was
    * published. Text bounds remain excluded, which is what the exception was for.
    */
+  /**
+   * How far a shape is turned for its second extent, in degrees; mirrors `SHAPE_TURN` in
+   * `oracle-js/src/normalize.js`.
+   */
+  private const val SHAPE_TURN: Double = 45.0
+
+  /** The mark kinds a turned extent is measured for; `SHAPE_EXTENT_TYPES` in `normalize.js`. */
+  private val TURNED_EXTENT_KINDS = setOf("arc", "path", "shape")
+
   public val DEFAULT_IGNORED_CHANNELS: Set<String> = emptySet()
 
   /**
@@ -1839,7 +2112,98 @@ public object Differential {
    * read as a difference against every reference, so it is not here.
    */
   private val ONE_SIDED_CHANNELS =
-    COLOUR_CHANNELS + setOf("blend", "strokeCap", "strokeJoin", "strokeDash")
+    // `text` for the same reason as the rest, and it took the longest to notice: a guide title this
+    // side writes and the reference does not is a **word on the chart** that should not be there,
+    // and iterating only the reference's channels never looked. The reference drops a null `text`
+    // entirely — upstream's title item carries one and its normalizer writes no key — so the
+    // difference showed up only as a surface a few pixels wide, and only because the title happened
+    // to be wide enough to move the bounds. A shorter one would have been silent.
+    COLOUR_CHANNELS + setOf("blend", "strokeCap", "strokeJoin", "strokeDash", "text")
+
+  /**
+   * Channels whose **absence says nothing this comparison can check**, each with its reason.
+   *
+   * The loop above defaults to reporting an invented channel, and that default is only honest where
+   * the omission has a meaning. These two do not have one *value*: they have a table.
+   *
+   * - **`fontSize`** is 10 on an axis label, 11 on a text mark, and whatever a `config` block says
+   *   for either — so an omitted one stands for a different number depending on the mark's role and
+   *   the chart's configuration. Found by the signal sweep: `a-font-size--null` writes a null
+   *   through a signal, upstream drops the channel from the item, and this engine holds the 11 its
+   *   renderer will use. Both draw the same label.
+   * - **`size`** is the same shape: a symbol's default comes from `config.symbol.size`, a legend
+   *   swatch's from `config.legend.symbolSize`. Found by the Deneb corpus on three templates.
+   *
+   * Duplicating either table here is how a default goes stale — the comparison would start
+   * asserting a number the engine no longer uses. The channels are still compared wherever the
+   * reference *records* one, which is the overwhelming majority: `fontSize` appears 5,359 times in
+   * the fixture references and `size` 5,597.
+   */
+  private val ABSENCE_UNCOMPARABLE =
+    setOf(
+      "fontSize",
+      "size",
+      // **A turned extent the reference does not carry says nothing about this one.** The harvester
+      // records it only where upstream's own figure really is a rotation — it drops the ones where
+      // `boundContext` turned a shape's `moveTo` and left an off-centre `context.arc` where it was,
+      // which a rounded arc corner and a geoshape point feature both produce. This engine turns its
+      // outline honestly and so always has a figure to offer; an omission there is upstream
+      // declining to measure, not a shape drawn differently. Where it *is* recorded, it is
+      // compared.
+      "shapeTurnedWidth",
+      "shapeTurnedHeight",
+    )
+
+  /** The channels upstream offsets by the accumulated group translation; see [Mark.originX]. */
+  private val POSITION_CHANNELS = setOf("x", "y", "x2", "y2")
+
+  /**
+   * What the reference's **omission** of a numeric channel stands for, or `null` where it stands
+   * for nothing this comparison may assume.
+   *
+   * Upstream's normalizer writes a channel only when the scene item carries one, so an absence is
+   * not "no opinion": it is whatever the renderer does with an item that has no such property, and
+   * for most of them that is a citable value. Comparing against it, rather than skipping, is what
+   * makes defaulting to *report* safe in the loop above.
+   *
+   * - **A position or an extent is drawn at zero.** Every bound and every shape generator reads it
+   *   through falsiness — `item.x || 0`, `(x + item.width) || 0`, `const x = item => item.x || 0`.
+   * - **An opacity is 1**, which is what [defaultFor] already assumes in the other direction.
+   * - **A radius, an angle, an offset, a tension is zero**: a square corner, an unturned label, an
+   *   untruncated string, an unbent curve.
+   *
+   * `size` and `fontSize` have no entry on purpose: each is a *config* default this comparison
+   * would have to duplicate to assume, and a duplicated default is one that goes stale. A width and
+   * a weight are not config defaults — they are what the renderer does with an item that has
+   * neither — so they are written down here with the line that decides them.
+   */
+  private fun absenceMeans(channel: String): Double? =
+    when (channel) {
+      "width",
+      "height",
+      "angle",
+      "dx",
+      "dy",
+      "innerRadius",
+      "limit",
+      "padAngle",
+      "strokeDashOffset",
+      "tension",
+      "theta" -> 0.0
+      "opacity",
+      "fillOpacity",
+      "strokeOpacity" -> 1.0
+      // `boundStroke` opens `item.strokeWidth != null ? +item.strokeWidth : 1`, so an omitted width
+      // is measured as **one**, and holding a 1 here says exactly that. Note this is the opposite
+      // reading from [defaultFor]'s, and deliberately: there the *reference* carries a width and
+      // this engine does not, which means no stroke at all rather than a default one.
+      "strokeWidth" -> 1.0
+      // CSS normal weight. Upstream writes `fontWeight` only where it is not normal — 29 times in
+      // the whole corpus — so an omission is 400 and not "no opinion".
+      "fontWeight" -> 400.0
+      in CORNER_CHANNELS -> 0.0
+      else -> null
+    }
 
   private val CORNER_CHANNELS =
     setOf(
@@ -1876,6 +2240,31 @@ public object Differential {
    * is what lets them meet this engine's, which coerced on the way in. Colours are deliberately not
    * here: `"0"` is not a colour and never was.
    */
+  /**
+   * The channels upstream **coerces** rather than reads, which is a narrower set than the numeric
+   * ones and is exactly `boundStroke`'s two names:
+   * ```js
+   * const sw = item.strokeWidth != null ? +item.strokeWidth : 1;
+   * e = Math.max(e, (item.strokeMiterLimit != null ? +item.strokeMiterLimit : 4) * sw / 2);
+   * ```
+   *
+   * `+` answers 1 for `true`, 0 for `""` and `NaN` for a word, and this engine's node holds
+   * whatever that came to because it coerces on the way in. Parsing the reference's text instead
+   * left those three in the strings, where they read as a width this side had not got.
+   *
+   * Narrow on purpose. Applying it to every numeric channel broke five fixtures: `aspect` and
+   * `smooth` on an image mark are booleans spelled as text and belong in the strings, and a
+   * geometry channel has its own non-finite rule below.
+   *
+   * **`angle` joined them for the same reason and from a different function.** `boundText` reads it
+   * as `item.angle && bounds.rotate(item.angle * DegToRad, x, y)` — truthiness on the raw value,
+   * multiplication afterwards — so upstream's item carries the word and this engine's node carries
+   * the `NaN` the word coerces to. What the two must agree about is where the label ends up, and
+   * they do; comparing the written form against the coerced one reported a difference that is only
+   * this engine resolving earlier than upstream does.
+   */
+  private val COERCED_CHANNELS = setOf("strokeWidth", "strokeMiterLimit", "angle")
+
   private val NUMERIC_CHANNELS =
     GEOMETRY_CHANNELS +
       CORNER_CHANNELS +

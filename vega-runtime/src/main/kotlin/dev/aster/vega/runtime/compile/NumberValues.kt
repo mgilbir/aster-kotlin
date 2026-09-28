@@ -8,6 +8,7 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.isNullish
 import dev.aster.vega.model.spec.ChannelValue
 import dev.aster.vega.model.spec.NumberValue
 
@@ -52,20 +53,66 @@ public class NumberResolver(
           read(value.channel)
         }
       }
+      // [resolveValue] is the same compile-evaluate-report, and this branch used to be a second
+      // copy of it. Two transcriptions of one job have drifted here six times; the duplicate is
+      // gone rather than kept in step by hand.
       is NumberValue.Signal ->
-        when (val compiled = expressions.compile(value.expression)) {
-          is ExpressionResult.Failed -> {
-            diagnostics.add(compiled.diagnostic.copy(operator = owner))
-            null
+        resolveValue(value.expression, owner)
+          ?.let { JsSemantics.toNumber(it) }
+          ?.takeIf {
+            !it.isNaN()
           }
-          is ExpressionResult.Compiled ->
-            try {
-              JsSemantics.toNumber(compiled.expression.evaluate(scope)).takeIf { !it.isNaN() }
-            } catch (e: ExpressionEvaluationException) {
-              diagnostics.add(e.diagnostic.copy(operator = owner))
-              null
-            }
-        }
+    }
+
+  /**
+   * The same, **keeping a NaN**: for a property upstream *coerces* rather than validates.
+   *
+   * A band scale's paddings and its alignment are the three of them. Upstream's scale transform
+   * walks its parameters and calls the setter for each — `scale[key](_[key])` — and the setter is
+   * `Math.max(0, Math.min(1, _))`, which clamps a number and answers **NaN** for anything that is
+   * not one. There is no validation step and nothing is discarded: `padding: "wide"` leaves the
+   * scale with a NaN padding, a bandwidth of NaN and every band unplaceable, while the step stays a
+   * number because `bandSpace` catches the NaN before the division.
+   *
+   * [resolve] drops a NaN, so this engine fell back on the default and drew a perfectly ordinary
+   * chart where upstream draws nothing placeable — the loudest possible disagreement about a value
+   * a binding can deliver by accident.
+   */
+  internal fun resolveNumber(value: NumberValue?, owner: String): Double? =
+    when (value) {
+      is NumberValue.Signal ->
+        resolveValue(value.expression, owner)?.let { JsSemantics.toNumber(it) }
+      else -> resolve(value, owner)
+    }
+
+  /**
+   * The same, for an override that **moves the end of a domain** — where absent, nullish and
+   * unreadable are three answers rather than one.
+   *
+   * [resolve] cannot tell them apart, and each of its two mistakes here shows on a chart. Upstream
+   * gates on `null` alone — `if (_.domainMin != null) domain[0] = _.domainMin`, in
+   * `vega-encode/src/Scale.js` — and then writes the value **as it stands**, leaving d3's own
+   * `domain` setter to coerce it with `+`. So:
+   * - A signal holding `null` is *no override*. `resolve` answers `JsSemantics.toNumber(null)`,
+   *   which is `0` exactly as JavaScript's `Number(null)` is, so a `domainMax` bound to a control
+   *   nobody has touched yet pulled the top of the domain down to zero and took the scale, its
+   *   ticks and its labels with it.
+   * - A signal holding a word is an override **to NaN**. `resolve` drops it, leaving the data's own
+   *   end in place and an axis fully ticked; upstream puts the NaN in the domain, where
+   *   `Ticks.ticks` finds `!(i2 >= i1)` and answers none. An axis over an unreadable bound draws no
+   *   ticks at all, which is the honest thing for it to say.
+   *
+   * Both halves come from the one line, and reading either off the other gets the other wrong.
+   */
+  internal fun resolveDomainLimit(value: NumberValue?, owner: String): Double? =
+    when (value) {
+      is NumberValue.Signal ->
+        resolveValue(value.expression, owner)
+          ?.takeIf { !it.isNullish }
+          ?.let {
+            JsSemantics.toNumber(it)
+          }
+      else -> resolve(value, owner)
     }
 
   /**
@@ -128,14 +175,58 @@ public class NumberResolver(
     }
 
   /**
+   * A **format specifier** a signal supplies, where *absent* and *empty* are different answers.
+   *
+   * `formatSpan` opens with a loose null check and nothing else:
+   * ```js
+   * specifier = formatSpecifier(specifier == null ? ',f' : specifier);
+   * ```
+   *
+   * So a specifier of `null` or `undefined` means **comma-grouped fixed**, and the precision is
+   * then computed from the tick step — a linear axis over `[0, 1]` at three ticks reads `0.0`,
+   * `0.5`, `1.0`. An **empty string** is not that: it is a specifier in its own right,
+   * `formatSpecifier('')` has no type, and the same axis reads `0`, `0.5`, `1`. Probed against
+   * upstream, both ways.
+   *
+   * [resolveText] flattens the two together, because `String(null)` is the word `null` — which is
+   * not a format, so the reading fell back to whatever the empty specifier does and a chart bound
+   * to a granularity control lost a decimal place whenever its signal was not answered. Returning
+   * null here hands the caller the same "no specifier" an absent `format` property gives it, which
+   * is the only spelling that reaches `',f'`.
+   *
+   * `internal`, unlike [resolveText] beside it: nothing outside `vega-runtime` resolves a guide's
+   * format, and an exported symbol is a cost this repository counts.
+   */
+  internal fun resolveSpecifier(expression: String, owner: String): String? =
+    resolveValue(expression, owner)?.takeIf { !it.isNullish }?.let { JsSemantics.toStringValue(it) }
+
+  /**
    * A guide's title, which upstream lets a signal supply as **lines** rather than as one string.
    *
    * `['Local Density', '(Normalized)']` is a two-line title: upstream's `textLines` reads an array
    * as the lines and collapses a one-element array to its element. Stringifying it instead joins
    * the lines with a comma and draws them on one, which is a different chart and a wider legend.
+   *
+   * **A signal that supplies nothing supplies no title**, which is the same distinction
+   * [resolveSpecifier] draws one property over: `String(null)` is the four-letter word `null`, and
+   * a chart whose title comes from a control that has not answered yet drew that word across the
+   * top of a legend, along an axis, and over the chart. Upstream carries the null onto the title
+   * item, where it measures as nothing and paints as nothing. An **empty** title is a different
+   * written form and stays empty, and so does this one: the answer for a nullish signal is the
+   * **empty string**, not null. Null here would mean *no title was declared*, and those are
+   * different charts — a declared title that resolves to nothing still has an item and still
+   * reserves its row. Measured: the legend's symbols sit at y 22 with one and at y 6 without, and
+   * the surface is fifteen pixels shorter. Upstream carries the null itself onto the item; an empty
+   * string measures, paints and captions identically, and the reference writes no `text` key for
+   * either. Returning null here was the first attempt and it **deleted the title mark**, which the
+   * mark-count comparison caught.
+   *
+   * The accessibility surface is where it read worst: a screen reader announced `X-axis titled
+   * 'null'` and `Symbol legend titled 'null'`, because a caption is built from the same resolved
+   * text.
    */
   public fun resolveLines(expression: String, owner: String): String? =
-    resolveValue(expression, owner)?.let { asLines(it) }
+    resolveValue(expression, owner)?.let { if (it.isNullish) "" else asLines(it) }
 
   /** The raw value of a signal, for a property whose shape depends on what the signal holds. */
   public fun resolveValue(expression: String, owner: String): VegaValue? =

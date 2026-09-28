@@ -74,7 +74,7 @@ internal object GuideFormat {
     val span = ((hi - lo) / minStep).let { if (it.isFinite()) kotlin.math.floor(it) else 0.0 }
     var reduced = minOf(count, (if (span == 0.0) 1.0 else span).toInt() + 1)
     if (linear && lo < hi) {
-      while (reduced > 1 && Ticks.stepFrom(Ticks.tickIncrement(lo, hi, reduced)) < minStep) {
+      while (reduced > 1 && Ticks.step(lo, hi, reduced.toDouble()) < minStep) {
         reduced--
       }
     }

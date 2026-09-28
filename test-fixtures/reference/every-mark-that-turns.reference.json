@@ -1,0 +1,82 @@
+{
+  "marks": [
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": "-Infinity",
+      "shapeLeft": 1.7976931348623157e+308,
+      "shapeTop": 1.7976931348623157e+308,
+      "shapeWidth": "-Infinity",
+      "size": 2000,
+      "type": "symbol",
+      "x": 95,
+      "y": 30
+    },
+    {
+      "fill": "#f58518",
+      "role": "mark",
+      "shapeHeight": "-Infinity",
+      "shapeLeft": 1.7976931348623157e+308,
+      "shapeTop": 1.7976931348623157e+308,
+      "shapeWidth": "-Infinity",
+      "type": "path",
+      "x": 95,
+      "y": 8
+    },
+    {
+      "fill": "#54a24b",
+      "role": "mark",
+      "shapeHeight": "-Infinity",
+      "shapeLeft": 1.7976931348623157e+308,
+      "shapeTop": 1.7976931348623157e+308,
+      "shapeWidth": "-Infinity",
+      "type": "arc"
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 14.142136,
+      "shapeLeft": 12.928932,
+      "shapeTop": 12.928932,
+      "shapeTurnedHeight": 14.142136,
+      "shapeTurnedWidth": 14.142136,
+      "shapeWidth": 14.142136,
+      "size": 200,
+      "type": "symbol",
+      "x": 20,
+      "y": 20
+    },
+    {
+      "fill": "#b279a2",
+      "role": "mark",
+      "shapeHeight": 14.142136,
+      "shapeLeft": 37.928932,
+      "shapeTop": 12.928932,
+      "shapeTurnedHeight": 14.142136,
+      "shapeTurnedWidth": 14.142136,
+      "shapeWidth": 14.142136,
+      "size": 200,
+      "type": "symbol",
+      "x": 45,
+      "y": 20
+    },
+    {
+      "fill": "#9d755d",
+      "role": "mark",
+      "shapeHeight": 13.624235,
+      "shapeLeft": 30,
+      "shapeTop": 37.928932,
+      "shapeTurnedHeight": 9.97495,
+      "shapeTurnedWidth": 10,
+      "shapeWidth": 10,
+      "type": "arc"
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 70,
+    "width": 110
+  },
+  "spec": "every-mark-that-turns.vg.json",
+  "vegaVersion": "6.3.1"
+}

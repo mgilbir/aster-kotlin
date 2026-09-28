@@ -293,7 +293,10 @@ private fun tracedBounds(path: PathData, node: SceneNode, transform: Transform2D
   val traced = path.transformedBy(transform).bounds
   if (traced.isEmpty) return transform.mapBounds(node.bounds)
   val expansion = stroke?.wideningAt(node.opacity)?.boundsExpansion(miter = true) ?: 0.0
-  return (if (expansion > 0.0) traced.expand(expansion) else traced).normalized()
+  // **Unconditionally**, as upstream expands: `boundStroke` ends `bounds.expand(e)` with no
+  // test on the sign. A negative allowance shrinks, which is the whole of what a negative
+  // stroke width does to a measurement; guarding on `> 0` left it out. Zero is unaffected.
+  return traced.expand(expansion).normalized()
 }
 
 /** Stable lowercase type name used in snapshots, diagnostics and debug output. */
@@ -460,8 +463,28 @@ public data class GroupNode(
  * `opacity: 0`, and counting their two-unit stroke made the whole surface a unit taller than
  * upstream's.
  */
+/**
+ * The stroke that takes part in **measuring**, which is not the stroke that takes part in drawing.
+ *
+ * Upstream's `boundStroke` opens `if (item.stroke && item.opacity !== 0 && item.strokeOpacity !==
+ * 0)` — a colour and two opacities, and **no test on the width**. This asked [Stroke.isVisible],
+ * which is `width > 0`, so a stroke of negative width was left out of the measurement entirely.
+ *
+ * It does not leave upstream out. A negative width flows into the allowance and *shrinks* the
+ * bounds: `e = max(sw/2, miterLimit * sw / 2)` picks the **larger** of two negatives, so the miter
+ * term that doubles a positive width loses to the plain half-width, and a symbol of size 80 with a
+ * stroke of `-5` measures 3.94 tall where the same symbol unstroked measures 8.94. Both the 4x on
+ * the way up and the 1x on the way down fall out of that one `max`.
+ *
+ * Width **zero** is unaffected either way — the allowance is zero — so the only behaviour this
+ * changes is the negative one, which is the case upstream and this engine disagreed about.
+ *
+ * Two questions, one predicate, and they part company exactly where a width goes below zero:
+ * [Stroke.isVisible] answers *does this draw*, and the answer is no. This answers *does this
+ * measure*, and the answer is yes.
+ */
 internal fun Stroke?.wideningAt(opacity: Double): Stroke? =
-  if (this != null && isVisible && opacity != 0.0) this else null
+  if (this != null && opacity != 0.0 && this.opacity != 0.0) this else null
 
 private fun intersect(a: RectD, b: RectD): RectD {
   if (a.isEmpty || b.isEmpty) return RectD.Empty
@@ -542,7 +565,12 @@ public data class RectNode(
 
   override val bounds: RectD by
     lazy(LazyThreadSafetyMode.NONE) {
-      val base = rect
+      // **[RectD.ofRect], not [rect].** The two agree for every rect that can be placed and part
+      // company for one that cannot: `boundRect` puts all four corners through `||`, so a NaN
+      // position anchors at the origin and a NaN far edge collapses onto it. [rect] is what a
+      // renderer draws, and upstream's renderer takes `item.x` raw — a NaN draws nothing — so the
+      // falsiness belongs here and not there.
+      val base = RectD.ofRect(x, y, width, height)
       (stroke.wideningAt(opacity)?.let { base.expand(it.boundsExpansion()) } ?: base).normalized()
     }
 }
@@ -564,7 +592,10 @@ public data class RuleNode(
 
   override val bounds: RectD by
     lazy(LazyThreadSafetyMode.NONE) {
-      RectD(minOf(x1, x2), minOf(y1, y2), maxOf(x1, x2), maxOf(y1, y2))
+      // Not `min`/`max` of the four: a rule the scale could not place carries a `NaN` corner, and
+      // upstream anchors the first at the origin and lets the second keep its `NaN`. See
+      // [RectD.ofSegment].
+      RectD.ofSegment(x1, y1, x2, y2)
         .expand(stroke.wideningAt(opacity)?.boundsExpansion() ?: 0.0)
         .normalized()
     }
@@ -706,7 +737,10 @@ public data class SymbolNode(
       // a
       // circle, which is over-generous; reproducing it keeps our bounds comparable with upstream's.
       val expansion = stroke.wideningAt(opacity)?.boundsExpansion(miter = true) ?: 0.0
-      (if (expansion > 0.0) base.expand(expansion) else base).normalized()
+      // **Unconditionally**, as upstream expands: `boundStroke` ends `bounds.expand(e)` with no
+      // test on the sign. A negative allowance shrinks, which is the whole of what a negative
+      // stroke width does to a measurement; guarding on `> 0` left it out. Zero is unaffected.
+      base.expand(expansion).normalized()
     }
 }
 
@@ -918,6 +952,13 @@ private fun scalePath(path: PathData, factor: Double): PathData =
   )
 
 private fun buildSymbolPath(node: SymbolNode): PathData {
+  // **The anchor goes through `|| 0`.** `markItemPath`'s bound builds the shape at the origin
+  // and ends `.translate(item.x || 0, item.y || 0)`, and a NaN is falsey there — so a symbol
+  // whose position a scale could not give is measured **at the origin** rather than lost. It is
+  // the rule `a-mark-nobody-can-place` already records for a rule mark, owed to a symbol too:
+  // upstream's `shapeTop` for one whose `y` is NaN is `-r`, not an empty box.
+  val nodeX = if (node.x.isNaN()) 0.0 else node.x
+  val nodeY = if (node.y.isNaN()) 0.0 else node.y
   val r = node.reference
   // A **negative** size draws nothing at all, and is not the same as a size of zero. Upstream's
   // radius is `Math.sqrt(size) / 2`, so a negative one is NaN; the path commands are all NaN, the
@@ -929,7 +970,7 @@ private fun buildSymbolPath(node: SymbolNode): PathData {
   // anchor, not as an empty rectangle. The difference shows up when a size scale bottoms out — the
   // point still counts towards the chart's reach under `autosize: pad`, where an empty rectangle
   // would silently drop out of the measurement.
-  if (r <= 0.0) return PathData.build { moveTo(node.x, node.y) }
+  if (r <= 0.0) return PathData.build { moveTo(nodeX, nodeY) }
 
   // sin(60°) and tan(30°): the height of an equilateral triangle of half-width r, and the offset
   // between its centroid and the centre of its bounding box.
@@ -1035,9 +1076,9 @@ private fun buildSymbolPath(node: SymbolNode): PathData {
 
   val placement =
     if (node.angleDegrees == 0.0) {
-      Transform2D.translate(node.x, node.y)
+      Transform2D.translate(nodeX, nodeY)
     } else {
-      Transform2D.translate(node.x, node.y).concat(Transform2D.rotateDegrees(node.angleDegrees))
+      Transform2D.translate(nodeX, nodeY).concat(Transform2D.rotateDegrees(node.angleDegrees))
     }
   return local.transformedBy(placement)
 }

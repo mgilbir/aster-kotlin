@@ -8,6 +8,7 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asBoolean
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.isTruthy
 import dev.aster.vega.model.time.TimeInterval
 
 /**
@@ -1115,8 +1116,13 @@ public class SpecParser {
 
     val spec =
       VegaSpec(
-        width = root.optionalNumber("width", "$.width"),
-        height = root.optionalNumber("height", "$.height"),
+        // A size written `{"signal": ...}` is an expression, not a number; see [builtInSignal].
+        width =
+          if (builtInSignal(root, "width") == null) root.optionalNumber("width", "$.width")
+          else null,
+        height =
+          if (builtInSignal(root, "height") == null) root.optionalNumber("height", "$.height")
+          else null,
         // Each falls back to `config`, which is where a theme sets a chart's frame.
         padding =
           parsePadding(root.fields["padding"] ?: configScalar(root, "padding"), "$.padding"),
@@ -1126,7 +1132,11 @@ public class SpecParser {
           (root.fields["background"] ?: configScalar(root, "background"))
             ?.takeIf { it is VegaValue.Str }
             ?.asString(),
-        signals = parseArray(root, "signals") { value, path -> parseSignal(value, path) },
+        signals =
+          withBuiltInSignals(
+            root,
+            parseArray(root, "signals") { value, path -> parseSignal(value, path) },
+          ),
         data = parseArray(root, "data") { value, path -> parseData(value, path) },
         scales = parseArray(root, "scales") { value, path -> parseScale(value, path) },
         axes = parseArray(root, "axes") { value, path -> parseAxis(value, path) },
@@ -1277,6 +1287,65 @@ public class SpecParser {
   /** A chart-level value written in `config` rather than at the top level. */
   private fun configScalar(root: VegaValue.Obj, key: String): VegaValue? =
     (root.fields["config"] as? VegaValue.Obj)?.fields?.get(key)
+
+  /**
+   * The expression behind `"width": {"signal": ...}`, or null when the property is an ordinary
+   * number.
+   *
+   * A size written as a signal reference is an **expression, not a seed**. Upstream's
+   * `collectSignals` passes five top-level properties — `background`, `autosize`, `padding`,
+   * `width` and `height` — through `signalObject`, which is `value && value.signal ? {name, update:
+   * value.signal} : {name, value}`. So the reference does not set a number: it makes the **built-in
+   * signal derived**, and everything that reads the size follows the expression — a scale with
+   * `"range": "width"`, the axis along it, a mark positioned at it. A chart that writes `{"signal":
+   * "w"}` and one that declares `{"name": "width", "update": "w"}` are the same chart, which is the
+   * point of the rule.
+   *
+   * Three of the five are carried through here — `width`, `height` and `background` — because their
+   * readers take the **live signal** rather than the parsed property. `padding` and `autosize` are
+   * still read as literals, and are needed before the signals resolve at that, so carrying them
+   * would publish a signal nothing consults; STATUS records what upstream does with those two.
+   */
+  private fun builtInSignal(root: VegaValue.Obj, key: String): String? =
+    (root.fields[key] as? VegaValue.Obj)?.fields?.get("signal")?.asString()
+
+  /**
+   * Folds a size written as a signal reference into the signal it actually declares.
+   *
+   * A specification may name the same signal itself, and upstream merges the two with
+   * `extend(pre[s.name], s)` — the declaration is copied **onto** the built-in, so whatever it
+   * carries wins key by key and the built-in's `update` survives what the declaration leaves out.
+   * Probed against upstream: `"width": {"signal": "w"}` beside `{"name": "width", "value": 333}`
+   * renders at `w` and never at 333, because the declaration contributes only an initial value;
+   * beside `{"name": "width", "update": "444"}` it renders at 444, because that key is overwritten.
+   *
+   * A reference that names no signal at all is upstream's `Unrecognized signal name`, which the
+   * expression resolver reports the same way for any other unknown name — it is not made an error
+   * here, so a chart says it in one voice.
+   */
+  private fun withBuiltInSignals(
+    root: VegaValue.Obj,
+    declared: List<SignalSpec>,
+  ): List<SignalSpec> {
+    val references =
+      listOf("width", "height", "background").mapNotNull { key ->
+        builtInSignal(root, key)?.let { key to it }
+      }
+    if (references.isEmpty()) return declared
+    val byName = references.toMap()
+    val merged = declared.map { signal ->
+      val update = byName[signal.name]
+      if (update == null || signal.update != null) signal else signal.copy(update = update)
+    }
+    // Upstream builds the five built-ins before the specification's own signals, so one the
+    // specification never names takes a built-in's place at the front. Nothing here depends on that
+    // — signals resolve by dependency, as upstream's dataflow does, and a reference may name a
+    // signal declared after it — but it is where upstream puts it.
+    val declaredNames = declared.mapTo(mutableSetOf()) { it.name }
+    return references
+      .filterNot { (name, _) -> name in declaredNames }
+      .map { (name, update) -> SignalSpec(name = name, update = update) } + merged
+  }
 
   /**
    * Every scale's type, gathered from the whole specification including group scopes.
@@ -2345,7 +2414,13 @@ public class SpecParser {
       )
       return null
     }
-    val orientName = own.fields["orient"]?.asString() ?: "bottom"
+    // An orientation may be **computed**, and reading one as text made `[object Object]` of it,
+    // which
+    // is not an orientation — so the whole axis was refused and a chart lost the side of itself it
+    // reserves room along. Upstream accepts the form on every guide property.
+    val orientValue = own.fields["orient"]
+    val orientExpression = signalReference(orientValue)
+    val orientName = if (orientExpression != null) "bottom" else orientValue?.asString() ?: "bottom"
     val orient = Orient.fromName(orientName)
     if (orient == null) {
       diagnostics.error(
@@ -2382,6 +2457,7 @@ public class SpecParser {
     return AxisSpec(
       scale = scale,
       orient = orient,
+      orientExpression = orientExpression,
       title = guideTitleText(obj.fields["title"]),
       titleExpression = (obj.fields["title"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
       titlePadding = obj.numberOrSignal("titlePadding", "$path.titlePadding"),
@@ -3188,12 +3264,36 @@ public class SpecParser {
         strokeWidthScale = own.fields["strokeWidth"]?.asString(),
         strokeDashScale = own.fields["strokeDash"]?.asString(),
         gridAlign = obj.fields["gridAlign"]?.asString(),
-        type = obj.enumOrNull("type", path, "legend type") { LegendType.fromName(it) },
+        // ```js
+        // spec.type || (isContinuous(scale) ? 'gradient' : 'symbol')
+        // ```
+        //
+        // **Falsy infers, truthy decides**, and only the exact word `gradient` decides for a
+        // gradient. An absent type, a null one and an empty one all fall through to the kind the
+        // *scale* implies — a colour ramp over a linear scale is a gradient — while any other value
+        // present builds a **symbol** legend, including one nothing recognises. Probed all five.
+        //
+        // Read as an enum alone, an unrecognised word failed to parse and the kind was inferred, so
+        // `"type": "nonsense"` — a plain typo, no signal involved — drew the gradient upstream
+        // refuses to draw. The word itself is kept in [LegendSpec.typeName] because upstream says
+        // it
+        // out loud; see there.
+        type =
+          obj.fields["type"]
+            ?.takeIf { it.isTruthy() }
+            ?.let { LegendType.fromName(it.asString()) ?: LegendType.SYMBOL },
+        typeName = obj.fields["type"]?.takeIf { it.isTruthy() }?.asString(),
+        // Both may be **computed**, and reading one as text made `[object Object]` of it — which is
+        // not an orientation, so the property was refused with a diagnostic and the legend took its
+        // default corner. See [signalReference]; the axis's own `orient` had the same flaw and lost
+        // the whole guide rather than one property.
         orient =
           obj.enumOrNull("orient", path, "legend orientation") { LegendOrient.fromName(it) }
             ?: LegendOrient.RIGHT,
+        orientExpression = signalReference(obj.fields["orient"]),
         direction =
           obj.enumOrNull("direction", path, "legend direction") { Direction.fromName(it) },
+        directionExpression = signalReference(obj.fields["direction"]),
         title = guideTitleText(obj.fields["title"]),
         titleExpression =
           (obj.fields["title"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
@@ -3358,13 +3458,32 @@ public class SpecParser {
    * Returns `null` both for absent and for unrecognized, so the caller applies its own default; the
    * difference between the two is already in the diagnostics.
    */
+  /**
+   * The expression behind a `{"signal": "..."}`, or null for a value written out.
+   *
+   * Every guide property can be computed, and the enum-valued ones were the last to notice: an
+   * object is not a word, so reading one as text produced `[object Object]` and the parse of it
+   * failed. What happened next depended on the property — a legend's orientation fell back to its
+   * default with a diagnostic, and an **axis's** took the whole axis with it, so a chart lost the
+   * side of itself it reserves room along.
+   */
+  private fun signalReference(value: VegaValue?): String? =
+    (value as? VegaValue.Obj)?.fields?.get("signal")?.asString()
+
   private fun <T> VegaValue.Obj.enumOrNull(
     key: String,
     path: String,
     what: String,
     parse: (String) -> T?,
   ): T? {
-    val text = fields[key]?.asString() ?: return null
+    val value = fields[key] ?: return null
+    // A `{"signal": …}` is not a misspelled enum, it is a **computed** one, and the caller keeps
+    // the
+    // expression beside the default it falls back to. Reading it as text made `[object Object]` of
+    // it and reported that as an unknown value, which is a complaint about something the
+    // specification got right.
+    if (signalReference(value) != null) return null
+    val text = value.asString()
     val parsed = parse(text)
     if (parsed == null) {
       diagnostics.error(

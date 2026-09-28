@@ -1,4 +1,5 @@
 {
+  "background": "white",
   "marks": [
     {
       "fill": "#c7e9c0",
@@ -6,6 +7,8 @@
       "shapeHeight": 124,
       "shapeLeft": 57.25637,
       "shapeTop": 38,
+      "shapeTurnedHeight": 172.346278,
+      "shapeTurnedWidth": 172.346278,
       "shapeWidth": 185.487261,
       "stroke": "#31a354",
       "type": "shape"
@@ -16,6 +19,8 @@
       "shapeHeight": 124,
       "shapeLeft": 57.25637,
       "shapeTop": 38,
+      "shapeTurnedHeight": 172.346278,
+      "shapeTurnedWidth": 172.346278,
       "shapeWidth": 185.487261,
       "stroke": "#31a354",
       "type": "shape"
@@ -37,6 +42,8 @@
       "shapeHeight": 7.043163,
       "shapeLeft": 146.478418,
       "shapeTop": 21.478418,
+      "shapeTurnedHeight": 3.043163,
+      "shapeTurnedWidth": 3.043163,
       "shapeWidth": 7.043163,
       "size": 9.260841,
       "stroke": "#3182bd",

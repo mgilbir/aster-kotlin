@@ -142,7 +142,18 @@ internal class TitleBuilder(
         }
     val baseline =
       baselineOf(text(spec, "title", "baseline")) ?: baselineOf(spec.baseline) ?: TextBaseline.TOP
-    val limit = number(spec, "title", "limit") ?: numbers.resolve(spec.limit, "title") ?: 0.0
+    // ```js
+    // limit: _('limit'),                                 // the title *group*
+    // limit: {signal: 'item.mark.group.limit'},          // the title text, and the subtitle
+    // ```
+    //
+    // **The group's limit is what a subtitle inherits, not the title's.** Both text marks read
+    // `item.mark.group.limit`, and `addEncoders` then lays the specification's own
+    // `encode.title.update.limit` over the title alone — so a heading given a limit in its encode
+    // truncates at it while its subtitle carries **no** limit at all. Inheriting the title's
+    // resolved value instead handed the subtitle a limit upstream never gave it.
+    val groupLimit = numbers.resolve(spec.limit, "title") ?: 0.0
+    val limit = number(spec, "title", "limit") ?: groupLimit
     val colour =
       colour(spec, "title", "fill")
         ?: spec.color?.let { SceneColor.parse(it) }
@@ -153,9 +164,16 @@ internal class TitleBuilder(
         ?: TitleDefaults.color
 
     // A trellis header takes its words from the row it labels, so the text may be a signal.
+    //
+    // **`resolveLines`, not `resolveText`** — the rule an axis title and a legend title already
+    // follow, and the chart's own title was the one place that did not. A title given as an array
+    // is
+    // one line per element: `["two", "lines"]` is a heading two lines and 28 pixels tall, where
+    // stringifying it joins them with a comma on one line and leaves the whole drawing fifteen
+    // pixels short. Three titles, one rule, and it was written down twice.
     val text =
       text(spec, "title", "text")
-        ?: spec.textExpression?.let { numbers.resolveText(it, "title") }
+        ?: spec.textExpression?.let { numbers.resolveLines(it, "title") }
         ?: spec.text
     // `dx`/`dy` shift the title after the anchor has placed it, and they move the surface with it:
     // a heading nudged one unit left to line up with an axis makes the whole drawing one unit
@@ -228,7 +246,8 @@ internal class TitleBuilder(
     (if (!declaresSubtitle) null
       else
         text(spec, "subtitle", "text")
-          ?: spec.subtitleExpression?.let { numbers.resolveText(it, "title") }
+          // The subtitle is the fourth of them, and takes the same rule for the same reason.
+          ?: spec.subtitleExpression?.let { numbers.resolveLines(it, "title") }
           ?: spec.subtitle)
       ?.let { text ->
         // The subtitle is offset along whichever direction the title's own box grew in, which after
@@ -281,7 +300,7 @@ internal class TitleBuilder(
                   text(spec, "subtitle", "font") ?: spec.subtitleFont,
                   number(spec, "subtitle", "lineHeight")
                     ?: numbers.resolve(spec.subtitleLineHeight, "title"),
-                  number(spec, "subtitle", "limit") ?: limit,
+                  number(spec, "subtitle", "limit") ?: groupLimit,
                 )
               ),
             angleDegrees = number(spec, "subtitle", "angle") ?: angle,
@@ -306,7 +325,31 @@ internal class TitleBuilder(
           )
       }
 
-    val box = children.fold(RectD.Empty) { acc, node -> acc.union(node.transformedBounds) }
+    // ```js
+    // if (subtitle && subtitle.text) {
+    //   ... tempBounds.clear().union(subtitle.bounds);
+    // } else {
+    //   tempBounds.clear();
+    // }
+    // tempBounds.union(title.bounds);
+    // ```
+    //
+    // **The heading's own row is reserved on declaration and its subtitle's on content**, and the
+    // two rules sit either side of that `if`. `tempBounds.union(title.bounds)` is unconditional, so
+    // a title of `""` still measures its font's height; the subtitle's bounds enter only when its
+    // text is *truthy*, so an empty one adds nothing. Probed across five shapes: no title is 80
+    // tall, a title of `""` is 97, `"Hi"` is 97, `"Hi"` with an empty subtitle is still 97, and
+    // only
+    // `"Hi"` with a real subtitle reaches 111.
+    //
+    // The subtitle **node stays** either way — whether it exists at all is the property's decision,
+    // settled above, and upstream's scene has the item with a null text. This is only about what it
+    // measures. Folding the two together the other way deleted the mark, which the mark counts
+    // caught.
+    val measured = children.filterNot {
+      it.metadata.role == "title-subtitle" && (it as? TextNode)?.text.isNullOrEmpty()
+    }
+    val box = measured.fold(RectD.Empty) { acc, node -> acc.union(node.transformedBounds) }
     // `frame` decides what the title is *anchored along* — the plotting area under `"group"`, the
     // whole drawing otherwise. It does **not** decide how far out the title sits: upstream's
     // `titleLayout` reads `frame` only for the anchor and always measures the gap from

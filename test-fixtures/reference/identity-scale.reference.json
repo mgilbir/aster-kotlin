@@ -1,4 +1,5 @@
 {
+  "background": "white",
   "marks": [
     {
       "fill": "#4c78a8",
@@ -6,6 +7,8 @@
       "shapeHeight": 14.142136,
       "shapeLeft": 12.928932,
       "shapeTop": 12.928932,
+      "shapeTurnedHeight": 14.142136,
+      "shapeTurnedWidth": 14.142136,
       "shapeWidth": 14.142136,
       "size": 200,
       "type": "symbol",
@@ -18,6 +21,8 @@
       "shapeHeight": 14.142136,
       "shapeLeft": 82.928932,
       "shapeTop": 52.928932,
+      "shapeTurnedHeight": 14.142136,
+      "shapeTurnedWidth": 14.142136,
       "shapeWidth": 14.142136,
       "size": 200,
       "type": "symbol",
@@ -30,6 +35,8 @@
       "shapeHeight": 14.142136,
       "shapeLeft": 152.928932,
       "shapeTop": 27.928932,
+      "shapeTurnedHeight": 14.142136,
+      "shapeTurnedWidth": 14.142136,
       "shapeWidth": 14.142136,
       "size": 200,
       "type": "symbol",

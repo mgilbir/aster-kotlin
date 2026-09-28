@@ -8,6 +8,7 @@ import dev.aster.vega.expression.Evaluator
 import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.expression.ExpressionResult
 import dev.aster.vega.expression.Functions
+import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.expression.RandomStream
 import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
@@ -19,6 +20,7 @@ import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.isTruthy
 import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.spec.AutosizeType
 import dev.aster.vega.model.spec.ChannelValue
@@ -706,6 +708,12 @@ public class SpecCompiler(
       mapOf(
         "width" to VegaValue.Num(width),
         "height" to VegaValue.Num(height),
+        // Seeded from the property and answered by the signal, the same way the two sizes are.
+        // `world-map` is why: it declares no `background` property at all and a **signal** named
+        // `background` bound to a colour picker, which `collectSignals` merges into the built-in —
+        // so upstream paints `#ffffff` and lets the reader change it, where this engine read only
+        // the property and painted nothing.
+        "background" to (spec.background?.let { VegaValue.Str(it) } ?: VegaValue.Null),
         "padding" to
           VegaValue.Obj(
             linkedMapOf(
@@ -823,6 +831,15 @@ public class SpecCompiler(
             unbuiltScales,
             projectionsSoFar(spec, expressions, signalValues, resolved, scales),
           )
+          // A plotting area is never negative, whoever arrived at it — see [layoutSize]. Applied
+          // where the signal settles rather than where the size is read, because upstream writes
+          // the
+          // clamped number *back into the signal*: everything downstream, a dependent signal and a
+          // mark reading `{"signal": "width"}` included, sees the zero and not the number asked
+          // for.
+          if (operator.name == "width" || operator.name == "height") {
+            signalValues[operator.name] = layoutSize(signalValues[operator.name])
+          }
           unresolvedSignals.remove(operator.name)
         }
         is Operator.Data ->
@@ -989,7 +1006,19 @@ public class SpecCompiler(
 
     val content = frame(spec, scope.nodes, plot, root, ids, diagnostics, expressions)
 
-    val scene = layout(spec, scope.bounds, content, plot, ids, diagnostics, fit?.over)
+    val scene =
+      layout(
+        spec,
+        scope.bounds,
+        content,
+        plot,
+        ids,
+        diagnostics,
+        fit?.over,
+        // The **live** background, for the same reason `plotSize` reads the live size: the property
+        // is only the seed and a signal of the same name is the answer.
+        signalValues["background"]?.takeIf { it !is VegaValue.Null }?.asString(),
+      )
     // Reported after everything has been compiled, because an expression reading the container size
     // can be anywhere: a signal's `update`, an encode channel, a transform parameter.
     reportUnansweredContainerSize(
@@ -1238,13 +1267,15 @@ public class SpecCompiler(
     diagnostics: DiagnosticCollector,
     /** The first pass's overhang, for a `fit` chart. Null for every other type. */
     fit: Overflow?,
+    /** The `background` signal as it settled; see the call site. */
+    declaredBackground: String?,
   ): Scene {
     val padding = spec.padding
-    val background = spec.background?.let { SceneColor.parse(it) }
-    if (spec.background != null && background == null) {
+    val background = declaredBackground?.let { SceneColor.parse(it) }
+    if (declaredBackground != null && background == null) {
       diagnostics.warn(
         DiagnosticCodes.ENCODE_INVALID_VALUE,
-        "Could not parse background colour '${spec.background}'",
+        "Could not parse background colour '$declaredBackground'",
       )
     }
 
@@ -1419,9 +1450,60 @@ public class SpecCompiler(
       numberSignal(signals, "height") ?: declaredHeight,
     )
 
-  /** A signal's value as a usable number, or null if it is not one. */
+  /**
+   * A signal's value as a number, **non-finite ones included**.
+   *
+   * It used to end `?.takeIf { it.isFinite() }`, which reads like prudence and is a second clamp.
+   * [layoutSize] has already applied upstream's — `Math.max(0, w || 0)` — and what survives it is
+   * what upstream's own `width` signal holds: a NaN for a size written as a word, an infinity for
+   * `1/0`. Filtering here fell back on the *declared* size instead, so a scale ranged on `"width"`
+   * got `[0, 0]` where upstream gives `[0, NaN]` and places nothing through it.
+   *
+   * Two clamps for one rule, and the second quietly undid the first.
+   */
   private fun numberSignal(signals: Map<String, VegaValue>, name: String): Double? =
-    signals[name]?.asNumberOrNull()?.takeIf { it.isFinite() }
+    signals[name]?.asNumberOrNull()
+
+  /**
+   * `Math.max(0, group.width || 0)` — the size a group lays out at, whatever the signal says.
+   *
+   * Upstream writes it in `layoutGroup` and again in `viewSizeLayout`, and the second one hands the
+   * result to `resizeView`, which **writes it back into the signal**:
+   * ```js
+   * if (view.width() !== width) { view.signal(Width, width, Skip); ... }
+   * if (rerun) view.run('enter');
+   * ```
+   *
+   * So a `width` signal that resolves to -120 does not draw a chart 120 wide the other way round:
+   * it draws nothing, the signal itself reads 0 on the rerun, and every scale ranged on `"width"`
+   * gets `[0, 0]`. A signal reading `width / 2` reads 0 too, which is why this is applied where the
+   * signal settles rather than where the size is read.
+   *
+   * `|| 0` is the other half and is **not** the same test as the clamp: it is falsiness, applied to
+   * the raw value *before* the coercion. That ordering is the whole of it, and it makes a numeric
+   * `NaN` and a *word* land in different places:
+   * ```
+   * w = 0/0      -> `NaN || 0` is 0        -> Math.max(0, 0)        -> 0
+   * w = 'wide'   -> `'wide' || 0` is 'wide'-> Math.max(0, 'wide')   -> NaN
+   * ```
+   *
+   * Probed all eight shapes on a live view — `0/0`, `'wide'`, `''`, `null`, `-50`, `1/0`, `-1/0`
+   * and a plain number — and only `Math.max(0, w || 0)` reproduces every one. A width of `1/0` is
+   * **Infinity**, not zero, and a scale ranged on it gets `[0, Infinity]`.
+   *
+   * This engine read the value with `asNumberOrNull() ?: 0.0`, which loses a word before the
+   * falsiness can see it, and then guarded on `isFinite`, which zeroes the two cases upstream
+   * keeps. A `"width": {"signal": …}` holding a word therefore laid the chart out against `[0, 0]`
+   * where upstream ranges it against `[0, NaN]` and places nothing — nine axis rules at 0.5 rather
+   * than NaN. Invisible until the differential stopped agreeing with every NaN it was shown; see
+   * the entry on the box that cannot be placed.
+   */
+  private fun layoutSize(value: VegaValue?): VegaValue.Num {
+    // `w || 0`, on the raw value.
+    val truthy = value?.takeIf { it.isTruthy() } ?: VegaValue.Num(0.0)
+    // then `Math.max(0, …)`, whose coercion is `+` and whose NaN propagates.
+    return VegaValue.Num(maxOf(0.0, JsSemantics.toNumber(truthy)))
+  }
 
   public companion object {
     private val EMPTY_SIGNALS = SignalScope(emptyMap(), emptyMap())

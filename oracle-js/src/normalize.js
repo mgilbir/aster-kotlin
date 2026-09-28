@@ -19,7 +19,7 @@ import { curveLinear, line } from 'd3-shape';
 // stiffness, a Catmull-Rom exponent or a bundle blend depending on the family — each with its own
 // default. A copy of that table in this file could be wrong in the same way the port is.
 import curves from '../node_modules/vega-scenegraph/src/path/curves.js';
-import { sceneVisit } from 'vega-scenegraph';
+import { sceneVisit, Marks, Bounds } from 'vega-scenegraph';
 
 /** Channels compared per mark type. Anything not listed here is ignored on both sides. */
 // A rectangle's corner radii are geometry, not style: they change the outline, and comparing only
@@ -215,6 +215,17 @@ const EXTENT_ONLY_SERIES = new Set(['trail']);
 
 /** Mark types whose whole geometry is an outline, so the drawn extent is what there is to compare. */
 const SHAPE_EXTENT_TYPES = new Set(['symbol', 'arc', 'path', 'shape']);
+
+/**
+ * How far a shape is turned for its second extent, in degrees.
+ *
+ * An eighth of a turn, because it is the angle at which the shapes an axis-aligned box confuses
+ * separate furthest: a square's extent grows by root two and a circle's does not move at all.
+ */
+const SHAPE_TURN = 45;
+
+/** How far past its own diagonal a turned extent may sit before it is not a rotation at all. */
+const TURN_SLACK = 1e-6;
 
 /** A marktype node: `{marktype, role, items: [...]}`. */
 function walkMarktype(marktype, dx, dy, out, precision) {
@@ -574,6 +585,69 @@ function record(type, role, item, dx, dy, precision) {
     entry.shapeTop = canonicalNumber(item.bounds.y1 + dy, precision);
     entry.shapeWidth = canonicalNumber(item.bounds.x2 - item.bounds.x1, precision);
     entry.shapeHeight = canonicalNumber(item.bounds.y2 - item.bounds.y1, precision);
+    // **The same extent again, with the mark turned an eighth of a turn.**
+    //
+    // A box says almost nothing about an outline. A circle, a square and a cross of the same size
+    // have the *identical* axis-aligned extent, and a third of this corpus — 14,089 marks of 38,712
+    // — was compared on nothing else: probed, drawing every circle symbol as a square of the same
+    // box was seen by **one** of 260 fixtures, and only because a circle's cubics miss the corner
+    // by a rounding. Turned 45 degrees the three separate cleanly: 20 x 20 stays 20 x 20 for the
+    // circle, becomes 28.284 for the square and 19.799 for the cross.
+    //
+    // Measured with upstream's own code rather than a second geometry: `markItemPath.bound` feeds
+    // `item.angle` straight into `boundContext`, so lending the item another 45 degrees re-bounds
+    // the real shape through the real extrema logic — cubic handling, stroke allowance and all.
+    // Nothing here knows what a symbol looks like, which is the point: a reimplementation would be
+    // a second transcription, and those have drifted eight times in this repository.
+    const turned = Marks[type] && Marks[type].bound ? new Bounds() : null;
+    if (turned) {
+      const heldAngle = item.angle;
+      const heldWidth = item.strokeWidth;
+      item.angle = (heldAngle || 0) + SHAPE_TURN;
+      // The **bare** outline: `boundStroke` expands only `if (item.stroke && …)` and by
+      // `miterLimit * sw / 2`, so a width of zero leaves the box alone. Matching that allowance on
+      // the other side would have meant transcribing the miter rule a second time, and those have
+      // drifted eight times here; measuring without it on both sides costs nothing, because a
+      // stroke widens a circle and a square by the same amount and this measurement exists to tell
+      // them apart.
+      item.strokeWidth = 0;
+      try {
+        Marks[type].bound(turned, item);
+      } finally {
+        item.angle = heldAngle;
+        item.strokeWidth = heldWidth;
+      }
+      // **Recorded only where the figure really is a rotation**, and the test is a property no
+      // rotation can break: turning a shape cannot push its extent past the **diagonal** of its own
+      // box, because every point stays the same distance from the centre.
+      //
+      // `boundContext` breaks it in one specific way. Its `arc` adds the rotation to the *angles*
+      // and leaves the **centre** alone, while `moveTo` and `lineTo` beside it are rotated — so an
+      // outline drawn with an off-centre `context.arc` comes out as a union of turned and unturned
+      // pieces. Two shapes do that: an arc's **rounded corner**, and a geoshape **point** feature,
+      // which d3-geo draws as `moveTo(x + r, y)` then `arc(x, y, r, …)`. Probed: a padded, rounded
+      // wedge measures 69.6604 wide at 0 degrees *and* at 45; a projected point whose box is 12 by
+      // 12 measures 85 by 54 turned, which is five times its own diagonal.
+      //
+      // Naming the affected mark types was the first attempt and it was wrong twice over — it lost
+      // every well-behaved arc, and it kept the geoshapes that are not. The property catches both
+      // and nothing else.
+      const width = turned.x2 - turned.x1;
+      const height = turned.y2 - turned.y1;
+      const diagonal = Math.hypot(item.bounds.x2 - item.bounds.x1, item.bounds.y2 - item.bounds.y1);
+      const rotated = width <= diagonal + TURN_SLACK && height <= diagonal + TURN_SLACK;
+      // The diagonal catches a hybrid that grows past what a rotation can reach, and a **rounded
+      // arc corner** does not always grow that far — a corner circle sitting inside the wedge can
+      // leave the figure under the diagonal and still not be a rotation of anything. The corner is
+      // the thing that puts an off-centre `context.arc` in the outline, so an arc that has one is
+      // not measured at all. Every other arc — a plain or padded wedge, drawn with lines and arcs
+      // centred on the origin — is turned honestly and is measured.
+      const rounded = type === 'arc' && item.cornerRadius;
+      if (!turned.empty() && rotated && !rounded) {
+        entry.shapeTurnedWidth = canonicalNumber(width, precision);
+        entry.shapeTurnedHeight = canonicalNumber(height, precision);
+      }
+    }
   }
   if (type === 'text') {
     for (const channel of TEXT_CHANNELS) {

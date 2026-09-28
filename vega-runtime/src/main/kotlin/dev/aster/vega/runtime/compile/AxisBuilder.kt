@@ -163,8 +163,19 @@ public class AxisBuilder(
     // plain constants: an axis whose label colour comes from a control is the ordinary case, and
     // the
     // alternative is resolving the same expression at each of a hundred reads.
+    // The **orientation** first, because it is not a style: it decides which edge of the plotting
+    // area the axis reserves room along, so every measurement below is taken against it. An
+    // unreadable one keeps the declared side rather than dropping the axis — upstream reserves the
+    // room either way, and losing the guide over an unrecognised word is the failure this whole
+    // file
+    // has been unlearning.
+    val orient =
+      declared.orientExpression
+        ?.let { numbers.resolveText(it, declared.scale) }
+        ?.let { Orient.fromName(it) } ?: declared.orient
     val spec =
       declared.copy(
+        orient = orient,
         // `formatType` may be chosen by a signal, and it has to be resolved before anything reads
         // it:
         // it decides which *grammar* the format string is written in, so a chart switching a column
@@ -194,7 +205,7 @@ public class AxisBuilder(
     // The label specifier, resolved once: a specification may compute it rather than write it
     // down, and a chart bound to a granularity control does exactly that.
     val specifier =
-      spec.format ?: spec.formatExpression?.let { numbers.resolveText(it, spec.scale) }
+      spec.format ?: spec.formatExpression?.let { numbers.resolveSpecifier(it, spec.scale) }
     val ticks = ticksFor(scale, spec, specifier)?.let { withExtraTick(it, scale, spec) }
     if (ticks == null) {
       diagnostics.error(
@@ -332,7 +343,15 @@ public class AxisBuilder(
     }
 
     if (spec.labels) {
-      val labelAngle = numbers.resolve(spec.labelAngle, spec.scale) ?: 0.0
+      // **`resolveNumber`, which keeps a NaN.** `boundText` opens its rotation with
+      // `if (item.angle && !mode) bounds.rotate(item.angle * DegToRad, x, y)`. The guard is
+      // JavaScript **truthiness** on the raw value and the multiplication happens after it, so a
+      // `labelAngle` of `"sideways"` passes — a non-empty string is truthy — and turns the label's
+      // box by NaN. `Bounds.union` is four bare comparisons, every one of them false against a
+      // NaN, so a label turned by nothing contributes **nothing to the axis's extent** and the
+      // axis comes out shorter. `resolve` discarded the NaN and left the label at zero degrees,
+      // measured in full, which made the axis 11.5 units taller than upstream's.
+      val labelAngle = numbers.resolveNumber(spec.labelAngle, spec.scale) ?: 0.0
       val labels = mutableListOf<TextNode>()
       for (tick in ticks) {
         // The label's own `encode` may replace the *text* as well as its position — read through a
@@ -499,8 +518,24 @@ public class AxisBuilder(
       // Upstream encodes the domain line's endpoints as range positions 0 and 1 of the axis scale,
       // so a scale that does not span the whole plotting area gets a correspondingly short line.
       val span = rangeEnds(scale)
+      // **A range that exists and has no ends is not a missing range**, and the two fallbacks are
+      // not the same. Upstream encodes the line's endpoints as value references into the scale —
+      // `{scale: …, range: 0}` and `{scale: …, range: 1}` — so with an empty range both resolve to
+      // `undefined`, the item carries neither coordinate, and `item.x || 0` draws the spine as a
+      // **point** at the origin. Probed: an axis over a scale ranged `[]` records
+      // `{x: 0.5, x2: 0.5}` and no `y` or `y2` at all.
+      //
+      // The plot-sized fallback belongs to the other case — a scale type `rangeEnds` cannot read,
+      // where there is no range information rather than no range — and reaching for it here drew a
+      // full-height spine across a chart upstream leaves unmarked. The asymmetry was the tell: the
+      // near end already fell back to zero and only the far end grew.
       val from = span?.firstOrNull() ?: 0.0
-      val to = span?.lastOrNull() ?: if (spec.orient.isVertical) extent.height else extent.width
+      val to =
+        if (span != null) {
+          span.lastOrNull() ?: 0.0
+        } else {
+          if (spec.orient.isVertical) extent.height else extent.width
+        }
       val domainNode =
         when (spec.orient) {
           Orient.BOTTOM,
@@ -1669,7 +1704,7 @@ public class AxisBuilder(
       val labeller = Ticks.spanFormatter(specifier, low, high, count, locale)
       return { value -> labeller(value.asDouble()) }
     }
-    val step = Ticks.stepFrom(Ticks.tickIncrement(low, high, count))
+    val step = Ticks.spanStep(low, high, count)
     val precision = if (step.isFinite()) Ticks.precisionForStep(step) else 0
     return { value -> formatTickLabel(value.asDouble(), precision, locale) }
   }

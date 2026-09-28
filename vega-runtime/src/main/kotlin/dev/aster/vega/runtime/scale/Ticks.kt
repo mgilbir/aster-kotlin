@@ -193,6 +193,11 @@ public object Ticks {
    *
    * [tickIncrement] returns `-k` to mean a step of `1/k`, so callers that want the step itself —
    * label formatting, for instance — have to undo that convention rather than using the raw value.
+   *
+   * **Not the function to reach for given a span.** `stepFrom(tickIncrement(start, stop, count))`
+   * is not d3's `tickStep` and differs from it over a reversed one; it read as though it were, and
+   * stood in for it at eight call sites. [step] is that function, and [spanStep] is the magnitude a
+   * label formatter wants. This one converts an increment somebody already has.
    */
   public fun stepFrom(increment: Double): Double =
     when {
@@ -205,10 +210,32 @@ public object Ticks {
   /**
    * Decimal places needed to distinguish ticks [step] apart, for default label formatting.
    *
-   * Takes an actual step, not a [tickIncrement] result; pass the latter through [stepFrom] first.
+   * Takes an actual step, not a [tickIncrement] result; pass a span through [spanStep] instead.
    */
   public fun precisionForStep(step: Double): Int =
     if (step <= 0.0) 0 else NumberFormat.precisionFixed(step)
+
+  /**
+   * **How far apart a span's ticks are**, as every label formatter here needs it: a magnitude, or
+   * `NaN` when the span implies no step at all.
+   *
+   * There were six copies of this line, every one of them written `stepFrom(tickIncrement(…))`, and
+   * every one of them wrong over a **reversed** span — one whose `domainMax` sits below its
+   * minimum, which `configureDomain` leaves backwards rather than correcting. `tickIncrement`
+   * divides by a negative span and takes `log10` of it, so it answers NaN; d3's `tickStep`, which
+   * is what upstream's `tickFormat` actually calls, reverses the pair *first* and answers a
+   * negative step. The NaN fell through to "no precision", `,f` kept d3's default of six decimals,
+   * and an axis read `−20.000000`.
+   *
+   * A magnitude because d3's three precision functions all open with `Math.abs(step)`, and because
+   * it is `precisionFixed` returning NaN — for a zero step or a NaN one, never for a negative one —
+   * that makes upstream leave the precision unset. [step] itself keeps the sign, for the callers
+   * that want the step rather than the decimals it implies.
+   */
+  internal fun spanStep(start: Double, stop: Double, count: Int): Double {
+    val size = abs(step(start, stop, count.toDouble()))
+    return if (size.isFinite() && size > 0.0) size else Double.NaN
+  }
 
   /**
    * A format specifier with the precision the span implies, when the specification left it out.
@@ -228,18 +255,28 @@ public object Ticks {
     // `s` is resolved by [spanFormatter] instead: one SI prefix is fixed for the whole span, which
     // no specifier string can say. `d` has no case in upstream's switch.
     if (type == 's' || type == 'd') return specifier
-    val step = stepFrom(tickIncrement(start, stop, count))
-    if (!step.isFinite() || step <= 0.0) return specifier
+    // **[step], not `stepFrom(tickIncrement(...))`.** Upstream's `tickFormat` opens with
+    // `tickStep(start, stop, count)`, and the two are not the same function over a **reversed**
+    // span: `tickIncrement(10, −50, 5)` is NaN, because the span it divides by is negative and
+    // `log10` of a negative is NaN, while `tickStep` reverses the pair first and answers −10.
+    // A NaN here fell through to "leave the specifier alone", so `,f` kept d3's default of six
+    // decimals and an axis whose `domainMax` sat below its minimum read `−20.000000`.
+    val step = step(start, stop, count.toDouble())
+    // The **magnitude**, because every one of d3's precision functions opens with `Math.abs(step)`
+    // and it is only `precisionFixed` returning NaN that makes upstream skip the precision — which
+    // it does for a step of zero or a NaN one, and not for a negative one.
+    val stepSize = abs(step)
+    if (!stepSize.isFinite() || stepSize == 0.0) return specifier
     val magnitude = maxOf(abs(start), abs(stop))
     val precision =
       when (type) {
         'f',
-        '%' -> precisionForStep(step) - (if (type == '%') 2 else 0)
-        'e' -> precisionForRound(step, magnitude) - 1
+        '%' -> precisionForStep(stepSize) - (if (type == '%') 2 else 0)
+        'e' -> precisionForRound(stepSize, magnitude) - 1
         null,
         'g',
         'p',
-        'r' -> precisionForRound(step, magnitude)
+        'r' -> precisionForRound(stepSize, magnitude)
         else -> return specifier
       }
     // d3's `FormatSpecifier` clamps a precision into `[0, 20]` as it stores it, so a percent
@@ -268,10 +305,12 @@ public object Ticks {
   ): (Double) -> String {
     val parsed = NumberFormat.parse(specifier)
     if (parsed != null && parsed.type == 's' && parsed.precision == null) {
-      val step = stepFrom(tickIncrement(start, stop, count))
+      // The same substitution [spanSpecifier] makes, and for the same reason: `precisionPrefix`
+      // opens with `Math.abs(step)` too, so a reversed span has a prefix like any other.
+      val stepSize = abs(step(start, stop, count.toDouble()))
       val magnitude = maxOf(abs(start), abs(stop))
-      if (step.isFinite() && step > 0.0) {
-        val precision = NumberFormat.precisionPrefix(step, magnitude).coerceIn(0, 20)
+      if (stepSize.isFinite() && stepSize > 0.0) {
+        val precision = NumberFormat.precisionPrefix(stepSize, magnitude).coerceIn(0, 20)
         val prefixed = NumberFormat.prefixed(parsed.copy(precision = precision), magnitude, locale)
         return { value -> prefixed(value) }
       }

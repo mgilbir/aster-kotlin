@@ -6,6 +6,8 @@
       "shapeHeight": 50,
       "shapeLeft": 60,
       "shapeTop": 10,
+      "shapeTurnedHeight": 35.355339,
+      "shapeTurnedWidth": 50,
       "shapeWidth": 35.355339,
       "type": "arc"
     },
@@ -15,6 +17,8 @@
       "shapeHeight": 35.355339,
       "shapeLeft": 60,
       "shapeTop": 24.644661,
+      "shapeTurnedHeight": 0,
+      "shapeTurnedWidth": 50,
       "shapeWidth": 35.355339,
       "type": "arc"
     },
@@ -24,6 +28,8 @@
       "shapeHeight": 35.355339,
       "shapeLeft": 60,
       "shapeTop": 24.644661,
+      "shapeTurnedHeight": 0,
+      "shapeTurnedWidth": 50,
       "shapeWidth": 35.355339,
       "type": "arc"
     },
@@ -33,6 +39,8 @@
       "shapeHeight": 35.355339,
       "shapeLeft": 60,
       "shapeTop": 24.644661,
+      "shapeTurnedHeight": 0,
+      "shapeTurnedWidth": 50,
       "shapeWidth": 35.355339,
       "type": "arc"
     },
@@ -42,6 +50,8 @@
       "shapeHeight": 85.355339,
       "shapeLeft": 60,
       "shapeTop": 24.644661,
+      "shapeTurnedHeight": 50,
+      "shapeTurnedWidth": 85.355339,
       "shapeWidth": 50,
       "type": "arc"
     },
@@ -51,6 +61,8 @@
       "shapeHeight": 100,
       "shapeLeft": 10,
       "shapeTop": 10,
+      "shapeTurnedHeight": 85.355339,
+      "shapeTurnedWidth": 85.355339,
       "shapeWidth": 50,
       "type": "arc"
     },

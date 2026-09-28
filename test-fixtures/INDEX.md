@@ -6,7 +6,7 @@ Generated from the corpus by `FixtureIndexTest`, which fails when this file has 
 ./gradlew :vega-runtime:jvmTest -PupdateGoldens=true --rerun-tasks
 ```
 
-239 Vega differential fixtures and 332 Vega-Lite fixtures.
+260 Vega differential fixtures and 332 Vega-Lite fixtures.
 
 Every column is read off disk. A Vega fixture's mark count and mark types come from its
 **upstream** reference, so they are upstream's answer rather than this port's opinion of it.
@@ -15,29 +15,49 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 
 | Fixture | Marks | Mark types | Transforms | Scales |
 | --- | --- | --- | --- | --- |
+| `a-background-a-signal-paints` | 1 | rect | — | — |
+| `a-band-space-nothing-can-read` | 10 | rect, symbol | — | band, point |
 | `a-colour-ramp-does-not-clamp` | 31 | rect, rule, text | — | linear, point |
+| `a-declared-size-outranks-the-reference` | 9 | rect, rule, text | — | linear |
 | `a-domain-a-signal-holds` | 14 | rect, rule, text | — | band, linear |
+| `a-domain-bound-a-signal-does-not-supply` | 17 | rect, rule, text | — | linear |
+| `a-fill-that-is-not-a-colour-is-still-a-fill` | 9 | rect | — | band, linear |
+| `a-format-nobody-gave-is-not-an-empty-format` | 41 | rect, rule, symbol, text | — | linear, ordinal |
 | `a-gradient-over-a-column-with-no-number` | 13 | rect, text | — | band, linear |
+| `a-guide-orientation-a-signal-chooses` | 13 | rect, rule, symbol, text | — | linear, ordinal |
+| `a-guide-over-a-scale-that-places-nothing` | 23 | rect, rule, text | — | linear |
 | `a-label-that-is-a-list-of-lines` | 25 | rect, rule, symbol, text | — | band, ordinal |
+| `a-label-turned-by-nothing` | 17 | rect, rule, text | — | band |
 | `a-list-keyed-and-a-list-captioned` | 27 | rect, rule, symbol, text | — | band, ordinal |
 | `a-log-axis-labels-with-twelve-digits` | 113 | rule, text | — | log |
 | `a-logarithm-has-a-base` | 33 | rule, text | — | log |
 | `a-maximum-compares-as-javascript-does` | 6 | text | aggregate, collect | — |
+| `a-negative-size-is-no-size` | 11 | rect, rule, text | — | band, linear |
+| `a-negative-stroke-width-still-measures` | 9 | path, symbol, text | — | point |
 | `a-null-line-is-an-empty-line` | 21 | rect, rule, text | — | band |
 | `a-number-written-as-text` | 31 | rule, symbol, text | — | band, ordinal |
 | `a-pie-multiplies-what-it-was-given` | 15 | arc, text | pie | — |
 | `a-quantile-cut-that-lands-on-a-sample` | 12 | symbol, text | — | quantile |
 | `a-quantile-with-no-samples` | 8 | rect, text | — | quantile |
+| `a-range-too-short-is-still-a-range` | 8 | rule, text | — | linear |
+| `a-reversed-span-still-has-a-step` | 21 | rule, text | — | linear |
 | `a-scale-coerces-what-it-is-given` | 37 | rule, symbol, text | — | band, linear, log, ordinal, quantile, quantize, threshold |
+| `a-scale-parameter-that-is-not-a-number` | 45 | rect, rule, text | — | log, pow, symlog |
+| `a-scale-with-no-range-keeps-its-default` | 25 | rect, rule, text | — | band, linear, point |
 | `a-short-domain-is-still-a-scale` | 7 | rect, rule, text | — | linear |
+| `a-size-written-as-a-signal` | 12 | rect, rule, symbol, text | — | linear |
 | `a-stack-propagates-what-it-cannot-add` | 26 | rect, rule, text | stack | band, linear |
+| `a-stroke-width-that-is-present-is-coerced` | 7 | symbol | — | — |
 | `a-symlog-is-log1p-of-x-over-c` | 12 | symbol, text | — | symlog |
 | `a-time-value-past-the-calendar` | 9 | rule, symbol, text | formula | linear, time |
+| `a-title-given-a-list-is-two-lines` | 17 | rect, rule, symbol, text | — | band, linear, ordinal |
+| `a-title-nobody-gave-is-not-the-word-null` | 20 | rect, rule, symbol, text | — | band, ordinal |
 | `aggregate-ops-rest` | 14 | rect, rule, text | aggregate | band, linear |
 | `aggregate-ops-tail` | 43 | rect, rule, symbol, text | aggregate, fold | band, linear, ordinal |
 | `airport-connections` | 650 | path, symbol, text | aggregate, collect, filter, geopath, geopoint, linkpath, lookup, voronoi | linear |
 | `an-axis-joins-its-ticks-by-value` | 20 | rule, symbol, text | — | band, ordinal |
 | `an-axis-keys-a-date-by-its-second` | 26 | rule, text | — | linear, time |
+| `an-empty-subtitle-takes-no-room` | 3 | rect, text | — | — |
 | `an-infinite-extent-is-no-extent` | 21 | rule, symbol, text | extent, formula | linear |
 | `arc-padding` | 10 | arc | pie | ordinal |
 | `arc-radii-inverted` | 5 | arc | — | ordinal |
@@ -106,6 +126,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `encode-channels-tail` | 15 | group, image, line, path, rect, rule, symbol, text | — | — |
 | `encode-channels` | 16 | area, group, line, rect, rule, text | — | band, linear |
 | `error-bars` | 61 | rect, rule, symbol, text | aggregate, formula | band, linear |
+| `every-mark-that-turns` | 6 | arc, path, symbol | — | — |
 | `expressions` | 26 | rect, rule, text | extent, filter, formula | band, linear |
 | `facet-trellis` | 55 | group, rect, rule, text | — | band, linear |
 | `filter-by-pattern` | 35 | rect, rule, text | filter, formula | band, linear |

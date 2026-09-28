@@ -5,6 +5,11 @@
   "caption": "X-axis for a discrete scale with 5 values: 1, 2.5, 4, 0, 100"
  },
  {
+  "fixture": "a-declared-size-outranks-the-reference",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 10"
+ },
+ {
   "fixture": "a-domain-a-signal-holds",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0.000000 to 0.000000"
@@ -13,6 +18,51 @@
   "fixture": "a-domain-a-signal-holds",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "a-domain-bound-a-signal-does-not-supply",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 91"
+ },
+ {
+  "fixture": "a-domain-bound-a-signal-does-not-supply",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0.000000 to NaN"
+ },
+ {
+  "fixture": "a-domain-bound-a-signal-does-not-supply",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0.000000 to 0.000000"
+ },
+ {
+  "fixture": "a-format-nobody-gave-is-not-an-empty-format",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0.0 to 1.0"
+ },
+ {
+  "fixture": "a-format-nobody-gave-is-not-an-empty-format",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0.0 to 1.0"
+ },
+ {
+  "fixture": "a-format-nobody-gave-is-not-an-empty-format",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 1"
+ },
+ {
+  "fixture": "a-format-nobody-gave-is-not-an-empty-format",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 1"
+ },
+ {
+  "fixture": "a-format-nobody-gave-is-not-an-empty-format",
+  "kind": "legend",
+  "caption": "Gradient legend for fill color with values from 0.0 to 1.0"
+ },
+ {
+  "fixture": "a-format-nobody-gave-is-not-an-empty-format",
+  "kind": "legend",
+  "caption": "Symbol legend for fill color with 3 values: 0, 0.5, 1"
  },
  {
   "fixture": "a-gradient-over-a-column-with-no-number",
@@ -25,6 +75,31 @@
   "caption": "Gradient legend titled 'numbers' for fill color with values from 3 to 20"
  },
  {
+  "fixture": "a-guide-orientation-a-signal-chooses",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "a-guide-orientation-a-signal-chooses",
+  "kind": "legend",
+  "caption": "Symbol legend for fill color with 2 values: a, b"
+ },
+ {
+  "fixture": "a-guide-over-a-scale-that-places-nothing",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "a-guide-over-a-scale-that-places-nothing",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "a-guide-over-a-scale-that-places-nothing",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 100"
+ },
+ {
   "fixture": "a-label-that-is-a-list-of-lines",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 4 values: 1,2, 3, plain, a,b,c"
@@ -33,6 +108,16 @@
   "fixture": "a-label-that-is-a-list-of-lines",
   "kind": "legend",
   "caption": "Symbol legend for fill color with 4 values: 1,2, 3, plain, a,b,c"
+ },
+ {
+  "fixture": "a-label-turned-by-nothing",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "a-label-turned-by-nothing",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: alpha, beta, gamma"
  },
  {
   "fixture": "a-list-keyed-and-a-list-captioned",
@@ -75,6 +160,11 @@
   "caption": "Y-axis for a log scale with values from 1 to 19,683"
  },
  {
+  "fixture": "a-negative-size-is-no-size",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: a, b, c"
+ },
+ {
   "fixture": "a-null-line-is-an-empty-line",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 5 values: one, two, three, four, five"
@@ -90,14 +180,74 @@
   "caption": "Symbol legend for fill color with 6 values: 1e-7, 0.000001, 100000000000000000000, 1e+21, 0.1, 5e-324"
  },
  {
+  "fixture": "a-range-too-short-is-still-a-range",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "a-reversed-span-still-has-a-step",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to −50"
+ },
+ {
+  "fixture": "a-reversed-span-still-has-a-step",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0.00 to −0.05"
+ },
+ {
+  "fixture": "a-reversed-span-still-has-a-step",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from −50 to 0"
+ },
+ {
   "fixture": "a-scale-coerces-what-it-is-given",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0 to 20"
  },
  {
+  "fixture": "a-scale-parameter-that-is-not-a-number",
+  "kind": "axis",
+  "caption": "X-axis for a log scale with values from 1 to 100"
+ },
+ {
+  "fixture": "a-scale-parameter-that-is-not-a-number",
+  "kind": "axis",
+  "caption": "X-axis for a log scale with values from 1 to 100"
+ },
+ {
+  "fixture": "a-scale-parameter-that-is-not-a-number",
+  "kind": "axis",
+  "caption": "X-axis for a pow scale with values from 0 to 100"
+ },
+ {
+  "fixture": "a-scale-parameter-that-is-not-a-number",
+  "kind": "axis",
+  "caption": "X-axis for a symlog scale with values from 1 to 100"
+ },
+ {
+  "fixture": "a-scale-with-no-range-keeps-its-default",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "a-scale-with-no-range-keeps-its-default",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: a, b, c"
+ },
+ {
+  "fixture": "a-scale-with-no-range-keeps-its-default",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: a, b, c"
+ },
+ {
   "fixture": "a-short-domain-is-still-a-scale",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from NaN to NaN"
+ },
+ {
+  "fixture": "a-size-written-as-a-signal",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0.0 to 1.0"
  },
  {
   "fixture": "a-stack-propagates-what-it-cannot-add",
@@ -113,6 +263,46 @@
   "fixture": "a-time-value-past-the-calendar",
   "kind": "axis",
   "caption": "Y-axis for a time scale with values from Thursday, 01 January 1970, 1:00:00 AM to , NaN  0NaN, 12:NaN:NaN AM"
+ },
+ {
+  "fixture": "a-title-given-a-list-is-two-lines",
+  "kind": "axis",
+  "caption": "Y-axis titled 'axis title' for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "a-title-given-a-list-is-two-lines",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'legend title' for fill color with 2 values: a, b"
+ },
+ {
+  "fixture": "a-title-given-a-list-is-two-lines",
+  "kind": "title",
+  "caption": "Title text 'two lines'"
+ },
+ {
+  "fixture": "a-title-given-a-list-is-two-lines",
+  "kind": "subtitle",
+  "caption": "Subtitle text 'a subtitle of three'"
+ },
+ {
+  "fixture": "a-title-nobody-gave-is-not-the-word-null",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 2 values: a, b"
+ },
+ {
+  "fixture": "a-title-nobody-gave-is-not-the-word-null",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 2 values: a, b"
+ },
+ {
+  "fixture": "a-title-nobody-gave-is-not-the-word-null",
+  "kind": "legend",
+  "caption": "Symbol legend for fill color with 2 values: a, b"
+ },
+ {
+  "fixture": "a-title-nobody-gave-is-not-the-word-null",
+  "kind": "title",
+  "caption": "Title text ''"
  },
  {
   "fixture": "aggregate-ops-rest",
@@ -158,6 +348,16 @@
   "fixture": "an-axis-keys-a-date-by-its-second",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0 to 4"
+ },
+ {
+  "fixture": "an-empty-subtitle-takes-no-room",
+  "kind": "title",
+  "caption": "Title text 'Hi'"
+ },
+ {
+  "fixture": "an-empty-subtitle-takes-no-room",
+  "kind": "subtitle",
+  "caption": "Subtitle text ''"
  },
  {
   "fixture": "an-infinite-extent-is-no-extent",

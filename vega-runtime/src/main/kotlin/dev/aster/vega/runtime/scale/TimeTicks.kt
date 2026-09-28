@@ -57,18 +57,16 @@ public object TimeTicks {
     if (index < 0) {
       // Coarser than a year: fall back to the numeric tick step, in years.
       val years =
-        Ticks.stepFrom(
-          Ticks.tickIncrement(
-            start / TimeInterval.YEAR.approximateMillis,
-            stop / TimeInterval.YEAR.approximateMillis,
-            count,
-          )
+        Ticks.step(
+          start / TimeInterval.YEAR.approximateMillis,
+          stop / TimeInterval.YEAR.approximateMillis,
+          count.toDouble(),
         )
       return TimeStepper(TimeInterval.YEAR, atLeastOne(years), zone)
     }
     if (index == 0) {
       // Finer than a second: step in raw milliseconds.
-      val step = Ticks.stepFrom(Ticks.tickIncrement(start, stop, count))
+      val step = Ticks.step(start, stop, count.toDouble())
       return TimeStepper(TimeInterval.MILLISECOND, atLeastOne(step), zone)
     }
 

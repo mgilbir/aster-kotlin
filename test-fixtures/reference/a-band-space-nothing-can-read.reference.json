@@ -1,0 +1,157 @@
+{
+  "marks": [
+    {
+      "fill": "#4c78a8",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": "NaN",
+      "x": "NaN",
+      "y": 0
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": "NaN",
+      "x": "NaN",
+      "y": 0
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": "NaN",
+      "x": "NaN",
+      "y": 0
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": "NaN",
+      "x": "NaN",
+      "y": 0
+    },
+    {
+      "fill": "#f58518",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 200,
+      "x": 0,
+      "y": 30
+    },
+    {
+      "fill": "#54a24b",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 43.902439,
+      "x": 4.878049,
+      "y": 60
+    },
+    {
+      "fill": "#54a24b",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 43.902439,
+      "x": 53.658537,
+      "y": 60
+    },
+    {
+      "fill": "#54a24b",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 43.902439,
+      "x": 102.439024,
+      "y": 60
+    },
+    {
+      "fill": "#54a24b",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 43.902439,
+      "x": 151.219512,
+      "y": 60
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 10,
+      "shapeLeft": 95,
+      "shapeTop": 90,
+      "shapeTurnedHeight": 10,
+      "shapeTurnedWidth": 10,
+      "shapeWidth": 10,
+      "size": 100,
+      "type": "symbol",
+      "x": 100,
+      "y": 95
+    }
+  ],
+  "scales": {
+    "narrow": {
+      "bandwidth": 200,
+      "domain": [
+        "a"
+      ],
+      "range": [
+        0,
+        200
+      ],
+      "step": 400
+    },
+    "ordinary": {
+      "bandwidth": 43.902439,
+      "domain": [
+        "a",
+        "b",
+        "c",
+        "d"
+      ],
+      "range": [
+        0,
+        200
+      ],
+      "step": 48.780488
+    },
+    "point": {
+      "bandwidth": 0,
+      "domain": [
+        "a"
+      ],
+      "range": [
+        0,
+        200
+      ],
+      "step": 200
+    },
+    "unreadable": {
+      "bandwidth": "NaN",
+      "domain": [
+        "a",
+        "b",
+        "c",
+        "d"
+      ],
+      "range": [
+        0,
+        200
+      ],
+      "step": 200
+    }
+  },
+  "size": {
+    "height": 130,
+    "width": 210
+  },
+  "spec": "a-band-space-nothing-can-read.vg.json",
+  "vegaVersion": "6.3.1"
+}

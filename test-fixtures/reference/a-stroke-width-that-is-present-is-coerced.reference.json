@@ -1,0 +1,113 @@
+{
+  "marks": [
+    {
+      "role": "mark",
+      "shapeHeight": 54.142136,
+      "shapeLeft": -7.071068,
+      "shapeTop": 2.928932,
+      "shapeTurnedHeight": 14.142136,
+      "shapeTurnedWidth": 14.142136,
+      "shapeWidth": 54.142136,
+      "size": 200,
+      "stroke": "#333",
+      "strokeWidth": 10,
+      "type": "symbol",
+      "x": 20,
+      "y": 30
+    },
+    {
+      "role": "mark",
+      "shapeHeight": 26.142136,
+      "shapeLeft": 76.928932,
+      "shapeTop": 16.928932,
+      "shapeTurnedHeight": 14.142136,
+      "shapeTurnedWidth": 14.142136,
+      "shapeWidth": 26.142136,
+      "size": 200,
+      "stroke": "#333",
+      "strokeWidth": "3",
+      "type": "symbol",
+      "x": 90,
+      "y": 30
+    },
+    {
+      "role": "mark",
+      "shapeHeight": 18.142136,
+      "shapeLeft": 130.928932,
+      "shapeTop": 20.928932,
+      "shapeTurnedHeight": 14.142136,
+      "shapeTurnedWidth": 14.142136,
+      "shapeWidth": 18.142136,
+      "size": 200,
+      "stroke": "#333",
+      "strokeWidth": true,
+      "type": "symbol",
+      "x": 140,
+      "y": 30
+    },
+    {
+      "role": "mark",
+      "shapeHeight": 14.142136,
+      "shapeLeft": 182.928932,
+      "shapeTop": 22.928932,
+      "shapeTurnedHeight": 14.142136,
+      "shapeTurnedWidth": 14.142136,
+      "shapeWidth": 14.142136,
+      "size": 200,
+      "stroke": "#333",
+      "strokeWidth": "",
+      "type": "symbol",
+      "x": 190,
+      "y": 30
+    },
+    {
+      "role": "mark",
+      "shapeHeight": "NaN",
+      "shapeLeft": "NaN",
+      "shapeTop": "NaN",
+      "shapeWidth": "NaN",
+      "size": 200,
+      "stroke": "#333",
+      "strokeWidth": "wide",
+      "type": "symbol",
+      "x": 240,
+      "y": 30
+    },
+    {
+      "role": "mark",
+      "shapeHeight": 18.142136,
+      "shapeLeft": 280.928932,
+      "shapeTop": 20.928932,
+      "shapeTurnedHeight": 14.142136,
+      "shapeTurnedWidth": 14.142136,
+      "shapeWidth": 18.142136,
+      "size": 200,
+      "stroke": "#333",
+      "type": "symbol",
+      "x": 290,
+      "y": 30
+    },
+    {
+      "role": "mark",
+      "shapeHeight": 18.142136,
+      "shapeLeft": 330.928932,
+      "shapeTop": 20.928932,
+      "shapeTurnedHeight": 14.142136,
+      "shapeTurnedWidth": 14.142136,
+      "shapeWidth": 18.142136,
+      "size": 200,
+      "stroke": "#333",
+      "strokeWidth": null,
+      "type": "symbol",
+      "x": 340,
+      "y": 30
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 60,
+    "width": 407.071068
+  },
+  "spec": "a-stroke-width-that-is-present-is-coerced.vg.json",
+  "vegaVersion": "6.3.1"
+}

@@ -1,4 +1,5 @@
 {
+  "background": "white",
   "marks": [
     {
       "role": "mark",
@@ -39,6 +40,8 @@
       "shapeHeight": 20,
       "shapeLeft": 240,
       "shapeTop": 30,
+      "shapeTurnedHeight": 28.284271,
+      "shapeTurnedWidth": 28.284271,
       "shapeWidth": 20,
       "type": "path",
       "x": 250,
@@ -50,6 +53,8 @@
       "shapeHeight": 10,
       "shapeLeft": 230,
       "shapeTop": 35,
+      "shapeTurnedHeight": 35.355339,
+      "shapeTurnedWidth": 35.355339,
       "shapeWidth": 40,
       "type": "path",
       "x": 250,
@@ -61,6 +66,8 @@
       "shapeHeight": 20,
       "shapeLeft": 320,
       "shapeTop": 30,
+      "shapeTurnedHeight": 28.284271,
+      "shapeTurnedWidth": 28.284271,
       "shapeWidth": 20,
       "size": 400,
       "type": "symbol",

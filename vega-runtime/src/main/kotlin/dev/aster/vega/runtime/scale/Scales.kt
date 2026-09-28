@@ -122,7 +122,7 @@ public class IdentityScale(
     count: Int = LinearScale.DEFAULT_TICK_COUNT,
     locale: VegaLocale = VegaLocale.EnglishUS,
   ): String {
-    val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
+    val step = Ticks.spanStep(domain.first(), domain.last(), count)
     val precision = if (step.isFinite()) Ticks.precisionForStep(step) else 0
     return formatTickLabel(value, precision, locale)
   }
@@ -139,6 +139,53 @@ public class IdentityScale(
  * @param domain at least two values; more than two makes it piecewise.
  * @param clamp when true, out-of-domain inputs clamp to the range ends instead of extrapolating.
  */
+/**
+ * d3's `bimap` over a two-stop scale: **order the transformed ends first**, then interpolate the
+ * range ends in the matching order.
+ *
+ * ```js
+ * function bimap(domain, range, interpolate) {
+ *   var d0 = domain[0], d1 = domain[1], r0 = range[0], r1 = range[1];
+ *   if (d1 < d0) d0 = normalize(d1, d0), r0 = interpolate(r1, r0);
+ *   else        d0 = normalize(d0, d1), r0 = interpolate(r0, r1);
+ *   return function(x) { return r0(d0(x)); };
+ * }
+ * function normalize(a, b) {
+ *   return (b -= (a = +a)) ? function(x) { return (x - a) / b; }
+ *                          : constant(isNaN(b) ? NaN : 0.5);
+ * }
+ * ```
+ *
+ * The swap looks like tidiness and is arithmetic. For finite ends the two orders are the same
+ * number — `(x - d1) / (d0 - d1)` is `1 - (x - d0) / (d1 - d0)`, and swapping the range ends undoes
+ * the `1 -` — but they are **not** the same once an end is infinite, because the algebra that makes
+ * them equal divides infinity by infinity.
+ *
+ * A `pow` scale with a **negative** exponent is where it shows: `transformPow` is `x < 0 ? -pow(-x,
+ * e) : pow(x, e)`, so a domain starting at zero transforms to `pow(0, -4)` = `Infinity` and the
+ * transformed domain runs *downwards*. Ordered as d3 orders it, the span is `Infinity` and an
+ * ordinary value maps to 0; taken in the written order, the span is `-Infinity`, every value
+ * divides `-Infinity` by `-Infinity`, and the whole axis answers `NaN`. Probed against d3 at
+ * exponent −4 over `[0, 95]` ranged `[120, 0]`: `scale(8)` and `scale(95)` are **0**, and only
+ * `scale(0)` — whose own transform is the infinity — is `NaN`.
+ *
+ * `normalize`'s own guard is transcribed with it, and it is two answers rather than one: a span of
+ * zero is the midpoint, and a span that is **NaN** is NaN. Testing `d0 == d1` catches the first and
+ * silently takes the midpoint for the second, which is how two infinite ends became a real number.
+ */
+internal fun bimap(d0: Double, d1: Double, r0: Double, r1: Double, x: Double): Double {
+  val ascending = !(d1 < d0)
+  val a = if (ascending) d0 else d1
+  val b = if (ascending) d1 else d0
+  val lo = if (ascending) r0 else r1
+  val hi = if (ascending) r1 else r0
+  val span = b - a
+  if (span.isNaN()) return Double.NaN
+  if (span == 0.0) return (lo + hi) / 2.0
+  val u = (x - a) / span
+  return lo * (1.0 - u) + hi * u
+}
+
 public class LinearScale(
   override val name: String,
   public val domain: List<Double>,
@@ -158,16 +205,23 @@ public class LinearScale(
   override val bins: List<Double>? = null,
 ) : PositionScale, InvertibleScale {
 
-  init {
-    // **A domain of fewer than two values is still a scale**, which this used to refuse. d3 builds
-    // one, places nothing through it and answers `NaN`: `domain([])` scales 7 to `NaN`, and so does
-    // `domain([5])`. So upstream has a scale for a chart to name and every `scale()` naming it
-    // answers `NaN`, where refusing to build one made the scale **absent** — the expression then
-    // reported an undefined scale, and a chart lost its marks to a diagnostic about something it
-    // had
-    // not got wrong. The `NaN` itself comes from [unrounded].
-    require(range.size >= 2) { "A linear scale needs at least two range values, got $range" }
-  }
+  // **Fewer than two values is still a scale**, at either end, which this used to refuse at both.
+  // d3
+  // builds one, places nothing through it and answers `NaN`: `domain([])` scales 7 to `NaN`, and so
+  // does `domain([5])`, and a *range* of `[]` or `[5]` does the same — probed against vega, where
+  // both build, both answer `undefined` for every input, and both draw the same surface a working
+  // `[0, 100]` draws, because an axis takes its ticks from the domain and lays out its labels
+  // regardless.
+  //
+  // Refusing to build one made the scale **absent**, and an absent scale takes the axis that names
+  // it and every encoding that names it with it — a chart upstream draws became no chart and a
+  // fistful of diagnostics about something the document had not got wrong. The domain half was
+  // fixed first and left the range half behind, guarded by a `require` this comment had already
+  // stopped describing.
+  //
+  // No check is needed in its place: [stops] is `min(domain, range)` and [unrounded] answers `NaN`
+  // below two of them, so the short case falls out of the arithmetic rather than being
+  // special-cased.
 
   /**
    * How many stops actually take part: `min(domain, range)`, which is d3's rule.
@@ -201,7 +255,26 @@ public class LinearScale(
     //
     // `""` separates them: it coerces to `0`, passes the guard, and its logarithm is `NaN`. Probed.
     val x = scaleNumber(value)
-    return if (x.isNaN()) VegaValue.Undefined else VegaValue.Num(apply(x))
+    if (x.isNaN()) return VegaValue.Undefined
+    // **A short RANGE answers `undefined`; a short DOMAIN answers `NaN`.** The two are not the
+    // same degenerate scale, and `min(domain.length, range.length)` cannot tell them apart.
+    //
+    // `bimap` builds two halves. The domain half is `normalize(d0, d1)`, which answers
+    // `constant(NaN)` when an end is missing; the range half is `interpolate(r0, r1)`, and over two
+    // `undefined` endpoints that is a constant function returning `undefined`. So the *range*
+    // decides: with fewer than two stops every input maps to `undefined`, whatever the domain,
+    // while a short domain over a real range runs a real interpolator on a `NaN` and yields `NaN`.
+    //
+    // Probed against d3, all six shapes: `range: []` and `range: [5]` answer `undefined`;
+    // `domain: []` and `domain: [5]` over `[110, 10]` answer `NaN`; both empty answers `undefined`;
+    // an ordinary pair answers the number.
+    //
+    // The distinction is the one `scaledPosition` reads to tell a channel the item does **not
+    // carry** from one carrying a `NaN`, and upstream's own record shows both at once: an axis over
+    // an empty range gives a rect `height: "NaN"` — `y2 - y` over two undefined ends — and **no**
+    // `y` at all. Answering `NaN` for the value too gave the rect a position upstream had not.
+    if (range.size < 2) return VegaValue.Undefined
+    return VegaValue.Num(apply(x))
   }
 
   public fun apply(x: Double): Double = if (round) roundHalfUp(unrounded(x)) else unrounded(x)
@@ -217,7 +290,8 @@ public class LinearScale(
     // 0.
     val d0 = domain[0]
     val d1 = domain[stops - 1]
-    if (d0 == d1) return (range[0] + range[stops - 1]) / 2.0
+    // The midpoint for a zero span is [bimap]'s, along with the `NaN` for a span that is not a
+    // number; testing `d0 == d1` here caught only the first and took the midpoint for the second.
 
     val input = if (clamp) x.coerceIn(minOf(d0, d1), maxOf(d0, d1)) else x
     if (stops == 2) return interpolate(d0, d1, range[0], range[stops - 1], input)
@@ -257,11 +331,8 @@ public class LinearScale(
    * gridline. Found by a fixture whose explicit tick values happened to fall on the boundary; every
    * generated tick before it had landed clear of one.
    */
-  private fun interpolate(d0: Double, d1: Double, r0: Double, r1: Double, x: Double): Double {
-    if (d0 == d1) return (r0 + r1) / 2.0
-    val t = (x - d0) / (d1 - d0)
-    return r0 * (1.0 - t) + r1 * t
-  }
+  private fun interpolate(d0: Double, d1: Double, r0: Double, r1: Double, x: Double): Double =
+    bimap(d0, d1, r0, r1, x)
 
   /** The data value that maps to range position [y]. Only defined for a two-point domain. */
   override fun invert(position: Double): Double {
@@ -337,7 +408,7 @@ public class LinearScale(
     count: Int = DEFAULT_TICK_COUNT,
     locale: VegaLocale = VegaLocale.EnglishUS,
   ): String {
-    val step = Ticks.stepFrom(Ticks.tickIncrement(domainStart, domainEnd, count))
+    val step = Ticks.spanStep(domainStart, domainEnd, count)
     val precision = if (step.isFinite()) Ticks.precisionForStep(step) else DEGENERATE_PRECISION
     return formatTickLabel(value, precision, locale)
   }
@@ -475,8 +546,27 @@ public class BandScale(
     val n = domain.size
 
     val inner = paddingInner.coerceIn(0.0, 1.0)
-    val outer = paddingOuter.coerceAtLeast(0.0)
-    var computedStep = (hi - lo) / maxOf(1.0, n - inner + outer * 2.0)
+    val outer = paddingOuter.coerceIn(0.0, 1.0)
+    // ```js
+    // const space = count - paddingInner + paddingOuter * 2;   // bandSpace
+    // return count ? (space > 0 ? space : 1) : 0;
+    // step = (stop - start) / (space || 1);                    // rescale
+    // ```
+    //
+    // **`maxOf` is neither of upstream's two guards, and it disagrees with both.** The first asks
+    // `space > 0`, which is *false* for a NaN — so a padding nothing can read divides by **one**,
+    // the step becomes the whole range, and only the bandwidth and the positions go NaN with it.
+    // Kotlin's `maxOf` propagates the NaN and loses the step as well. They also part company with
+    // no NaN in sight, wherever the space falls **between zero and one**: a single band with half
+    // its width in inner padding has a space of `0.5`, which upstream divides by to reach a step of
+    // 400 over a 200-wide range and a band filling all of it, while `maxOf(1.0, 0.5)` rounds the
+    // divisor up to one and draws that band at half width. Probed at `paddingInner` of 0.5 and 0.8.
+    //
+    // The second guard is the `|| 1`, which catches the `0` that `bandSpace` answers for an empty
+    // domain; `maxOf` happened to cover that one.
+    val space = n - inner + outer * 2.0
+    val divisor = if (n == 0 || !(space > 0.0)) 1.0 else space
+    var computedStep = (hi - lo) / divisor
     if (round) computedStep = floor(computedStep)
 
     var computedStart = lo + (hi - lo - computedStep * (n - inner)) * align.coerceIn(0.0, 1.0)
@@ -665,14 +755,23 @@ public abstract class TransformedScale(
     if (x.isNaN()) return Double.NaN
     val d0 = forward(domain[0])
     val dn = forward(domain[stops - 1])
-    if (!d0.isFinite() || !dn.isFinite()) return Double.NaN
-    if (d0 == dn) return (range[0] + range[stops - 1]) / 2.0
+    // **No guard on the transformed ends.** d3 has none: it hands whatever the transform produced
+    // to `normalize`, and an infinity there is a working scale rather than a broken one. A `pow`
+    // scale with a negative exponent is the case — `pow(0, -4)` is `Infinity`, so a domain starting
+    // at zero transforms to a *downward* one — and ordered as [bimap] orders it the span is
+    // `Infinity`, every ordinary value maps to an end of the range, and only the value whose own
+    // transform is the infinity answers `NaN`. Probed against d3: at exponent -4 over `[0, 95]`
+    // ranged `[120, 0]`, `scale(8)` and `scale(95)` are 0 and `scale(0)` is `NaN`.
+    //
+    // Refusing the whole scale instead turned every tick, label and symbol on that axis into a
+    // `NaN`, which the differential could not see until its comparison stopped agreeing with one.
+    // The `d0 == dn` midpoint is gone with it: `normalize` answers the midpoint for a span of zero
+    // and `NaN` for a span that is not a number, and two infinite ends are the second.
 
     val low = minOf(domain[0], domain[stops - 1])
     val high = maxOf(domain[0], domain[stops - 1])
     val input = if (clamp) x.coerceIn(low, high) else x
     val t = forward(input)
-    if (!t.isFinite()) return Double.NaN
     if (stops == 2) return mix(d0, dn, range[0], range[stops - 1], t)
 
     // **Piecewise, in the transformed space.** A log, power or symlog scale is upstream's
@@ -700,11 +799,8 @@ public abstract class TransformedScale(
   }
 
   /** d3's `interpolateNumber`, in d3's arithmetic — see `LinearScale`. */
-  private fun mix(d0: Double, d1: Double, r0: Double, r1: Double, t: Double): Double {
-    if (d0 == d1) return (r0 + r1) / 2.0
-    val u = (t - d0) / (d1 - d0)
-    return r0 * (1.0 - u) + r1 * u
-  }
+  private fun mix(d0: Double, d1: Double, r0: Double, r1: Double, t: Double): Double =
+    bimap(d0, d1, r0, r1, t)
 
   override fun invert(position: Double): Double {
     val r0 = range.first()
@@ -750,7 +846,7 @@ public abstract class TransformedScale(
     count: Int = LinearScale.DEFAULT_TICK_COUNT,
     locale: VegaLocale = VegaLocale.EnglishUS,
   ): String {
-    val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
+    val step = Ticks.spanStep(domain.first(), domain.last(), count)
     return formatTickLabel(
       value,
       if (step.isFinite()) Ticks.precisionForStep(step) else DEGENERATE_PRECISION,
@@ -1634,8 +1730,20 @@ public class SequentialColorScale(
     // This answered 0 and put the one label a constant column earns at the *start* of the ramp
     // rather than beside its middle — two readings of the same degenerate domain in one class, of
     // which only [position] was upstream's.
-    if (lo == hi) return 0.5
-    return ((x - lo) / (hi - lo)).coerceIn(0.0, 1.0)
+    //
+    // **The test is on the span, not on the ends**, and that is upstream's:
+    //
+    //     const delta = max - min;
+    //     if (!delta || !Number.isFinite(delta)) return constant(0.5);
+    //
+    // `!delta` is falsiness, so it is true for a span of zero *and for a `NaN` one*, and the
+    // `isFinite` beside it catches an infinite span as well. Testing `lo == hi` instead covers only
+    // the first: `NaN == NaN` is false, so a ramp over a column that holds no numbers placed its
+    // one label at `NaN` where upstream places it at the middle, and a domain spanning an infinity
+    // placed labels at 0. The whole of the difference is which value the comparison is made on.
+    val span = hi - lo
+    if (!span.isFinite() || span == 0.0) return 0.5
+    return ((x - lo) / span).coerceIn(0.0, 1.0)
   }
 
   /** Tick values across the domain, as a linear scale over the same domain would produce. */
@@ -1648,7 +1756,7 @@ public class SequentialColorScale(
     count: Int = LinearScale.DEFAULT_TICK_COUNT,
     locale: VegaLocale = VegaLocale.EnglishUS,
   ): String {
-    val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
+    val step = Ticks.spanStep(domain.first(), domain.last(), count)
     return formatTickLabel(
       value,
       if (step.isFinite()) Ticks.precisionForStep(step) else DEGENERATE_PRECISION,
@@ -1660,7 +1768,7 @@ public class SequentialColorScale(
     count: Int = LinearScale.DEFAULT_TICK_COUNT,
     locale: VegaLocale = VegaLocale.EnglishUS,
   ): List<String> {
-    val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
+    val step = Ticks.spanStep(domain.first(), domain.last(), count)
     val precision = if (step.isFinite()) Ticks.precisionForStep(step) else DEGENERATE_PRECISION
     return ticks(count).map { formatTickLabel(it, precision, locale) }
   }

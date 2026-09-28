@@ -62,6 +62,12 @@ const reference = {
   // The rendered surface size, which under Vega's default `autosize: pad` is the content bounds plus
   // padding — not width/height plus padding, because axis labels hang outside the plotting area.
   size: surfaceSize(view, spec),
+  // The surface's own colour, which nothing here recorded until a `"background": {"signal": …}`
+  // needed checking and there was no way to check it. `view.background()` is the resolved answer —
+  // the property, the `config.background` behind it, or the signal either of those named — and it is
+  // null for the many charts that ask for none, which is why the key is only written when there is
+  // one.
+  ...(view.background() != null ? { background: view.background() } : {}),
   scales: normalizeScales(view, scaleNames),
   // Only when there is something to record, so the 199 committed references do not all gain an
   // empty key. Most charts declare no scale inside a group.

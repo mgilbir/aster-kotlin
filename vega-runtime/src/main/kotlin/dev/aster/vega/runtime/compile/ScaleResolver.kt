@@ -274,6 +274,15 @@ public class ScaleResolver(
       else -> false
     }
 
+  // **The three colour-ramp spaces keep `resolve`, which discards a NaN, and that is a decision.**
+  // A positional `pow` or `symlog` handed a parameter that is not a number answers NaN and leaves
+  // its marks unplaceable, which is reproducible and is reproduced — see `buildPow`/`buildSymlog`
+  // below. The *colour* versions are not: probed, upstream **throws** from inside d3-interpolate
+  // (`TypeError: I[i] is not a function`, in `piecewise`) and every mark comes out with a null
+  // fill. There is no upstream answer to be faithful to when upstream raises, so the default is
+  // kept rather than a NaN invented that matches nothing. A `log` ramp does not throw and its
+  // colours are identical with a NaN base or a real one, so nothing turns on that one either way.
+
   /** The space a `log` colour ramp is walked in; see [ScaleTransform]. */
   private fun logSpace(spec: ScaleSpec): ScaleTransform =
     ScaleTransform.Log(numbers.resolve(spec.base, spec.name) ?: 10.0)
@@ -412,7 +421,51 @@ public class ScaleResolver(
       // is how a chart reverses an axis whose extent is computed. Each element resolves on its own,
       // because the array as a whole is not a reference and only part of it may be one.
       is RangeSpec.Literal -> RangeSpec.Literal(range.values.map { resolveRangeElement(spec, it) })
+      // A scheme that is **falsey** is no scheme at all; see [schemeIsAsked].
+      is RangeSpec.Scheme -> if (schemeIsAsked(spec, range)) range else RangeSpec.Unset
       else -> range
+    }
+
+  /**
+   * Whether a `scheme` range asks for a scheme, which is a question of **truthiness**.
+   *
+   * `configureRange` reaches the scheme branch through a plain `else if (_.scheme)`:
+   * ```js
+   * // else if a range scheme is defined, use that
+   * else if (_.scheme) {
+   * ```
+   *
+   * So a scheme of `null`, `""`, `0` or `false` does not fail and does not fall back to a default
+   * palette — the branch is never entered, and the scale keeps **the range it would have had with
+   * no `range` property at all**. Probed: a linear scale then ranges `[0, 1]` and paints numbers
+   * rather than colours, and an ordinal one ranges `[]` and paints nulls. Both are what the same
+   * scale written with no range does, which is the point: an unresolved theme signal leaves a chart
+   * drawing a default, not a chart with a hole in it.
+   *
+   * This engine reported `Scheme signal produced no scheme name` and dropped the range, so every
+   * mark keyed to that scale lost its fill. A palette picker whose signal has not been answered yet
+   * is exactly the case, and it is the common one.
+   *
+   * A scheme written out as **stops** is an array, and every array is truthy — including the empty
+   * one — so it is asked for however little it holds.
+   *
+   * The `?: false` is the one branch here no fixture pins, and deliberately: a Kotlin null from
+   * `resolveValue` means the expression did not evaluate at all, which is already a diagnostic of
+   * its own, and upstream in that position has thrown `Unrecognized signal name` and has no chart
+   * to compare against. Treating it as no scheme leaves the scale with d3's default rather than
+   * with nothing, which is the same answer the resolvable falsey cases get.
+   */
+  private fun schemeIsAsked(spec: ScaleSpec, range: RangeSpec.Scheme): Boolean =
+    when (val scheme = range.scheme) {
+      // A literal is not weighed here and must not be: `parseScaleRange` tests it while parsing,
+      // and a falsey one does not fall through to a default there — it matches no branch at all and
+      // upstream **refuses the specification**, `Unsupported range type: {"scheme":null}`. Only the
+      // signal form survives parsing, because `{"signal": …}` is an object and every object is
+      // truthy; it is weighed again once it resolves, which is this test.
+      is SchemeRef.Colors,
+      is SchemeRef.Named -> true
+      is SchemeRef.Signal ->
+        numbers.resolveValue(scheme.expression, spec.name)?.let { JsSemantics.truthy(it) } ?: false
     }
 
   /**
@@ -574,7 +627,7 @@ public class ScaleResolver(
 
   private fun buildLog(spec: ScaleSpec): LogScale? {
     val range = numericRange(spec) ?: return null
-    val base = numbers.resolve(spec.base, spec.name) ?: 10.0
+    val base = numbers.resolveNumber(spec.base, spec.name) ?: 10.0
     // A log domain cannot include zero, and `zero: true` would force it to, so it never applies
     // here.
     var domain =
@@ -616,7 +669,7 @@ public class ScaleResolver(
     var domain =
       continuousDomain(spec, zeroDefault = spec.bins == null, fallback = listOf(0.0, 1.0))
         ?: return null
-    val exponent = numbers.resolve(spec.exponent, spec.name) ?: defaultExponent
+    val exponent = numbers.resolveNumber(spec.exponent, spec.name) ?: defaultExponent
     domain =
       padded(
         domain,
@@ -641,7 +694,7 @@ public class ScaleResolver(
     // Symlog is not in upstream's zero list: its domain reaches both signs happily.
     var domain =
       continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null
-    val constant = numbers.resolve(spec.constant, spec.name) ?: 1.0
+    val constant = numbers.resolveNumber(spec.constant, spec.name) ?: 1.0
     domain =
       padded(
         domain,
@@ -760,9 +813,13 @@ public class ScaleResolver(
       if (domain[0] > 0.0) domain[0] = 0.0
       if (domain[last] < 0.0) domain[last] = 0.0
     }
-    numbers.resolve(spec.domainMin, spec.name)?.let { domain[0] = it }
-    numbers.resolve(spec.domainMax, spec.name)?.let { domain[last] = it }
-    numbers.resolve(spec.domainMid, spec.name)?.let { mid ->
+    // **Not `numbers.resolve`.** All three of these gate on `!= null` upstream and then take the
+    // value as it stands, so a signal holding a null is no override at all and a signal holding a
+    // word is an override to NaN — see `NumberValues.resolveDomainLimit`, which is the only reader
+    // that keeps those two apart.
+    numbers.resolveDomainLimit(spec.domainMin, spec.name)?.let { domain[0] = it }
+    numbers.resolveDomainLimit(spec.domainMax, spec.name)?.let { domain[last] = it }
+    numbers.resolveDomainLimit(spec.domainMid, spec.name)?.let { mid ->
       // Upstream inserts before the last value, and warns rather than clamping when the midpoint
       // falls outside the domain it is meant to divide.
       val at =
@@ -876,7 +933,10 @@ public class ScaleResolver(
     val range = numericRange(spec) ?: return null
     val domain = discreteDomain(spec.domain, spec.name) ?: return null
     // `padding` is shorthand for both inner and outer; explicit values win.
-    val padding = numbers.resolve(spec.padding, spec.name)
+    // **`resolveNumber`, which keeps a NaN.** Upstream clamps these with
+    // `Math.max(0, Math.min(1, _))` and does not validate them, so a padding or an alignment
+    // nothing can read is NaN rather than the default — see `NumberValues.resolveNumber`.
+    val padding = numbers.resolveNumber(spec.padding, spec.name)
     // ```js
     // scale.paddingOuter = function(_) { paddingOuter = Math.max(0, Math.min(1, _)); … };
     // ```
@@ -891,10 +951,10 @@ public class ScaleResolver(
       domain = domain,
       range = oriented(range, reversed(spec)),
       paddingInner =
-        (numbers.resolve(spec.paddingInner, spec.name) ?: padding ?: 0.0).coerceIn(0.0, 1.0),
+        (numbers.resolveNumber(spec.paddingInner, spec.name) ?: padding ?: 0.0).coerceIn(0.0, 1.0),
       paddingOuter =
-        (numbers.resolve(spec.paddingOuter, spec.name) ?: padding ?: 0.0).coerceIn(0.0, 1.0),
-      align = (numbers.resolve(spec.align, spec.name) ?: 0.5).coerceIn(0.0, 1.0),
+        (numbers.resolveNumber(spec.paddingOuter, spec.name) ?: padding ?: 0.0).coerceIn(0.0, 1.0),
+      align = (numbers.resolveNumber(spec.align, spec.name) ?: 0.5).coerceIn(0.0, 1.0),
       round = spec.round,
     )
   }
@@ -909,11 +969,11 @@ public class ScaleResolver(
       // Clamped to `[0, 1]` as a band's is, a point scale being a band with all of its padding
       // outside; see [buildBand].
       padding =
-        (numbers.resolve(spec.paddingOuter, spec.name)
-            ?: numbers.resolve(spec.padding, spec.name)
+        (numbers.resolveNumber(spec.paddingOuter, spec.name)
+            ?: numbers.resolveNumber(spec.padding, spec.name)
             ?: 0.0)
           .coerceIn(0.0, 1.0),
-      align = (numbers.resolve(spec.align, spec.name) ?: 0.5).coerceIn(0.0, 1.0),
+      align = (numbers.resolveNumber(spec.align, spec.name) ?: 0.5).coerceIn(0.0, 1.0),
       round = spec.round,
     )
   }
@@ -1268,6 +1328,13 @@ public class ScaleResolver(
     lift: (Double) -> Double = { it },
     ground: (Double) -> Double = { it },
   ): List<Double> {
+    // **`resolve`, deliberately, and not `resolveNumber`.** A continuous scale's pixel padding is
+    // guarded by `if (includePad(type) && _.padding && …)` — JavaScript **truthiness on the raw
+    // value**, which is a third rule again. A NaN is falsey there and skips the padding entirely,
+    // while a *word* is truthy and poisons the domain: probed, `padding: "wide"` leaves upstream's
+    // domain `[NaN, NaN]` and every value unplaceable. Telling those two apart needs the raw value
+    // rather than the number it coerces to, so this site keeps the reader that discards a NaN and
+    // the difference is recorded in STATUS rather than half-fixed here.
     val pad = numbers.resolve(spec.padding, spec.name) ?: return domain
     if (pad == 0.0 || domain.size < 2 || domain.first() == domain.last()) return domain
     val span = abs(range.last() - range.first())
@@ -1726,19 +1793,24 @@ public class ScaleResolver(
         if (resolved is RangeSpec.Signal) null else numericRange(spec.copy(range = resolved))
       }
       is RangeSpec.Step -> stepRange(spec, numbers.resolve(range.step, spec.name) ?: 0.0)
-      is RangeSpec.Literal -> {
-        val numbers = range.values.map { it.asDouble() }
-        if (numbers.size < 2 || numbers.any { it.isNaN() }) {
-          diagnostics.error(
-            DiagnosticCodes.SCALE_INVALID_DOMAIN,
-            "Scale '${spec.name}' needs a numeric two-value range",
-            operator = spec.name,
-          )
-          null
-        } else {
-          numbers
-        }
-      }
+      // **A short range is not a reason to refuse the scale.** d3 pairs a continuous scale's domain
+      // against its range over `min(domain.length, range.length)` entries, so a range of one — or
+      // of
+      // none — leaves nothing to interpolate and `scale(x)` answers `undefined`. It does not throw
+      // and the scale still exists: probed, `[]` and `[5]` both build, both answer `undefined` for
+      // every input, and both draw the same 241-by-135 surface a working `[0, 100]` draws, because
+      // the axis generates its ticks from the *domain* and lays out its labels regardless. A third
+      // value is not a refusal either — `[0, 50, 100]` over `[0, 100]` pairs the first two, and
+      // `scale(50)` is 25 rather than 50.
+      //
+      // Refusing it took the axis and every encoding that named the scale with it, which is the
+      // same
+      // failure `RangeSpec.Unset` above used to have: a chart upstream draws became no chart and a
+      // fistful of errors. Answering `NaN` where upstream answers `undefined` is the scene
+      // convention already written down in `Differential` — a position upstream's renderer paints
+      // as
+      // zero, and this engine's scene stores as the zero directly.
+      is RangeSpec.Literal -> range.values.map { it.asDouble() }
       is RangeSpec.Scheme -> {
         diagnostics.error(
           DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
@@ -1764,14 +1836,21 @@ public class ScaleResolver(
           numbers
         }
       }
-      RangeSpec.Unset -> {
-        diagnostics.error(
-          DiagnosticCodes.SCALE_INVALID_DOMAIN,
-          "Scale '${spec.name}' has no range",
-          operator = spec.name,
-        )
-        null
-      }
+      // **A scale with no range is not an error.** `configureRange` only ever calls
+      // `scale.range(…)`
+      // when there is a range to set, so a scale that declares none keeps d3's own default — and
+      // d3's default for every continuous, discretizing and banded scale is `[0, 1]`. Probed across
+      // nine types: `linear`, `log`, `sqrt`, `time`, `quantize`, `threshold`, `band` and `point`
+      // all
+      // range `[0, 1]`, and only `ordinal` differs, ranging `[]` (handled where a discrete range is
+      // built, not here).
+      //
+      // Refusing it took the whole scale with it, and then every encoding that named the scale, so
+      // a
+      // chart upstream draws became no chart and a fistful of errors. That is not hypothetical: a
+      // `{"scheme": {"signal": "theme"}}` whose signal has not been answered yet is a range-less
+      // scale by upstream's rules — see [schemeIsAsked] — and a palette picker starts there.
+      RangeSpec.Unset -> listOf(0.0, 1.0)
     }
 
   private companion object {

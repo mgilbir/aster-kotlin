@@ -2,8 +2,6 @@ package dev.aster.vega.scene
 
 import dev.aster.vega.model.normalizeZero
 import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.min
 
 public data class PointD(val x: Double, val y: Double) {
   public companion object {
@@ -60,18 +58,49 @@ public data class RectD(val left: Double, val top: Double, val right: Double, va
       top <= other.bottom &&
       other.top <= bottom
 
+  /**
+   * The union of two boxes, where **a `NaN` edge loses** rather than spreading.
+   *
+   * `Bounds.union` is four bare comparisons and no more:
+   * ```js
+   * if (b.x1 < this.x1) this.x1 = b.x1;
+   * if (b.y1 < this.y1) this.y1 = b.y1;
+   * if (b.x2 > this.x2) this.x2 = b.x2;
+   * if (b.y2 > this.y2) this.y2 = b.y2;
+   * ```
+   *
+   * Every comparison against a `NaN` is false, so a `NaN` edge never replaces the edge already
+   * there and the box comes through unchanged. `min` and `max` do the opposite — Kotlin's propagate
+   * — so one unplaceable mark turned a whole surface into `NaN`.
+   *
+   * A mark is unplaceable whenever the scale positioning it has nothing to say: a range with fewer
+   * than two stops, a log scale over a zero. Upstream draws those, bounds them by [ofSegment], and
+   * takes the surface from everything it *could* place.
+   */
+  /**
+   * Upstream's `Bounds.union`, which is **four bare comparisons and nothing else**:
+   * ```js
+   * union(b) { if (b.x1 < this.x1) this.x1 = b.x1; if (b.y1 < this.y1) this.y1 = b.y1;
+   *            if (b.x2 > this.x2) this.x2 = b.x2; if (b.y2 > this.y2) this.y2 = b.y2; return this; }
+   * ```
+   *
+   * The two `isEmpty` short-circuits that used to open this are what a reader adds for speed, and
+   * they are equivalent to the comparisons for every box whose corners are numbers — which is why
+   * they survived. For a box whose corners are **not** numbers they are not: `isEmpty` is `right <
+   * left`, false against a NaN, so a NaN-cornered box is not empty, and `isEmpty -> other` handed
+   * it back **whole** where every comparison would have rejected it. An unplaceable mark therefore
+   * carried NaN bounds here and a *cleared* box upstream — and since the surface unions one level
+   * further up, where the comparisons did run, the two agreed about the chart's size and disagreed
+   * only about the mark's own extent. That is the half a differential harness is for, and it could
+   * not see it either; see the entry below.
+   */
   public fun union(other: RectD): RectD =
-    when {
-      other.isEmpty -> this
-      isEmpty -> other
-      else ->
-        RectD(
-          min(left, other.left),
-          min(top, other.top),
-          max(right, other.right),
-          max(bottom, other.bottom),
-        )
-    }
+    RectD(
+      if (other.left < left) other.left else left,
+      if (other.top < top) other.top else top,
+      if (other.right > right) other.right else right,
+      if (other.bottom > bottom) other.bottom else bottom,
+    )
 
   public fun expand(amount: Double): RectD =
     if (isEmpty) this else RectD(left - amount, top - amount, right + amount, bottom + amount)
@@ -129,6 +158,75 @@ public data class RectD(val left: Double, val top: Double, val right: Double, va
       val l = if (width >= 0) x else x + width
       val t = if (height >= 0) y else y + height
       return RectD(l, t, l + abs(width), t + abs(height))
+    }
+
+    /**
+     * The box of a two-cornered mark, the way upstream bounds one it **cannot place**.
+     *
+     * `rule.js` is the shape of it, and the asymmetry between the corners is deliberate:
+     * ```js
+     * bounds.set(
+     *   x1 = item.x || 0,
+     *   y1 = item.y || 0,
+     *   item.x2 != null ? item.x2 : x1,
+     *   item.y2 != null ? item.y2 : y1
+     * )
+     * ```
+     *
+     * The **first** corner goes through `||`, and a `NaN` is *falsey* in JavaScript, so a mark
+     * whose position could not be computed is anchored at the origin. The **second** goes through
+     * `!= null`, and a `NaN` is not `null`, so it keeps its `NaN` — which then loses the
+     * comparisons in [union] and leaves the enclosing box alone.
+     *
+     * Ordered by one comparison rather than by `min`/`max`, as `Bounds.set` is, so a `NaN` stays on
+     * the edge it arrived on instead of swallowing both.
+     *
+     * `internal`, unlike [fromSize] and [fromPoints] beside it: nothing outside `vega-scene` bounds
+     * a segment, and an exported symbol is a cost this repository counts.
+     */
+    internal fun ofSegment(x1: Double, y1: Double, x2: Double, y2: Double): RectD {
+      val ax = if (x1.isNaN()) 0.0 else x1
+      val ay = if (y1.isNaN()) 0.0 else y1
+      return RectD(
+        if (x2 < ax) x2 else ax,
+        if (y2 < ay) y2 else ay,
+        if (x2 < ax) ax else x2,
+        if (y2 < ay) ay else y2,
+      )
+    }
+
+    /**
+     * The box of a **rect**, the way upstream bounds one it cannot place.
+     *
+     * ```js
+     * boundStroke(bounds.set(
+     *   x = item.x || 0,
+     *   y = item.y || 0,
+     *   (x + item.width) || 0,
+     *   (y + item.height) || 0
+     * ), item)
+     * ```
+     *
+     * Four `||`s, and every one of them is JavaScript falsiness rather than a null test — so a
+     * `NaN` position anchors at the origin *and* a `NaN` far edge collapses back onto it. A rect
+     * whose `y` came from a scale that could not map it is bounded as a flat line at **y = 0**, not
+     * at wherever its `y2` happened to be. The sum going through `||` as well is what makes the
+     * second corner collapse rather than stay NaN, which is where this differs from [ofSegment]: a
+     * rule keeps its far corner, a rect does not.
+     *
+     * `internal`, as [ofSegment] is, and for the same reason.
+     */
+    internal fun ofRect(x: Double, y: Double, width: Double, height: Double): RectD {
+      val ax = if (x.isNaN()) 0.0 else x
+      val ay = if (y.isNaN()) 0.0 else y
+      val bx = (ax + width).let { if (it.isNaN()) 0.0 else it }
+      val by = (ay + height).let { if (it.isNaN()) 0.0 else it }
+      return RectD(
+        if (bx < ax) bx else ax,
+        if (by < ay) by else ay,
+        if (bx < ax) ax else bx,
+        if (by < ay) ay else by,
+      )
     }
 
     public fun fromPoints(points: Iterable<PointD>): RectD {

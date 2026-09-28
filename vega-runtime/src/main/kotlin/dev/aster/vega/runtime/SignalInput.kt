@@ -85,7 +85,7 @@ public data class SignalInput(
       val max = bind.max ?: maxOf(100.0, stated ?: 0.0)
       val min =
         bind.min?.takeIf { it != 0.0 } ?: minOf(0.0, max, stated ?: 0.0).takeIf { it != 0.0 } ?: 0.0
-      val step = bind.step ?: Ticks.stepFrom(Ticks.tickIncrement(min, max, RANGE_DIVISIONS))
+      val step = bind.step ?: Ticks.step(min, max, RANGE_DIVISIONS.toDouble())
       return bind.copy(min = min, max = max, step = step.takeIf { it.isFinite() && it > 0.0 })
     }
 

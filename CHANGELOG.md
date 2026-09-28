@@ -6,6 +6,146 @@ section here does not get released.
 
 ## Unreleased
 
+### Fixed
+
+- **A legend's kind is chosen by falsiness, and the word it was given is said out loud.**
+  `spec.type || (isContinuous(scale) ? 'gradient' : 'symbol')` — so absent, `null` and `""` infer the
+  kind from the scale while any other value present decides, and only `gradient` means gradient. This
+  engine failed to parse an unrecognised word and inferred, so `"type": "nonsense"` drew a gradient
+  where upstream draws symbols. Upstream also keeps the word verbatim for the accessibility
+  description — `Nonsense legend for fill color …` — which `LegendSpec.typeName` now holds beside the
+  enum. Adds `LegendSpec.typeName` and `VegaValue.isTruthy` (**4929** exported symbols, two more);
+  `JsSemantics.truthy` delegates to the latter so one rule has two callers.
+
+- **A guide's orientation may be computed.** *(Adds three model properties; see below.)*
+  `{"signal": …}` is legal on every guide property, and
+  the enum-valued ones refused it: an object stringifies to `[object Object]`, which parses as no
+  orientation, so a legend fell back to its default corner with a spurious diagnostic and an **axis
+  was dropped entirely** — 210 wide where upstream draws 241. An axis's `orient`, a legend's `orient`
+  and a legend's `direction` now resolve, and a computed property is no longer reported as a
+  misspelled one.
+
+  Three properties are added to carry the expression until it resolves — `AxisSpec.orientExpression`,
+  `LegendSpec.orientExpression` and `LegendSpec.directionExpression` — alongside the
+  `titleExpression` and `formatExpression` that were already there for the same reason. **4927
+  exported symbols**, three more than before. Additive in Kotlin, where each has a default; a Swift
+  caller that constructs an `AxisSpec` or `LegendSpec` through the generated initialiser sees the
+  label list grow, which is the same shape of change as any previous property on those two.
+
+- **A background a signal paints.** `background` is the third of the five top-level properties
+  `collectSignals` turns into a built-in signal, so both `"background": {"signal": "bg"}` and a
+  specification declaring a signal *named* `background` set the surface colour — the property is only
+  a seed. This engine read the property alone, which meant `world-map`, whose background is a signal
+  bound to a colour picker, painted nothing. The reference recorded no background at all until now;
+  71 fixtures declare one and none had been compared.
+
+- **A stroke width that is present is coerced, and only an absent one takes the default.**
+  `boundStroke` reads `item.strokeWidth != null ? +item.strokeWidth : 1`, so `""` measures a mark at
+  **0** and `"wide"` at **NaN** — which drops it out of the surface — while this engine read the
+  channel and sent every non-number to the default 1. `strokeMiterLimit` takes the same rule from the
+  same two lines. Upstream's bounds for a symbol of size 200: 14.142 wide with `""`, 18.142 with
+  `true` or no width at all, NaN with `"wide"`.
+
+- **A fill that is not a colour is still a fill.** Upstream puts whatever the encode produced on the
+  item, so `fill: 0.28` reaches the scene and the SVG as it stands; this engine parsed it, found no
+  colour, and recorded that the mark had no fill — which is not the same as having one that paints
+  nothing, and `MarkEncoder` already kept them apart for `stroke`. Nothing visible changes: an
+  unparseable presentation attribute resolves to the *inherited* value, and vega's root group is
+  `<g fill="none">`, so both paint nothing. An empty value is kept too for a fill and still refused
+  for a stroke, where `boundStroke`'s falsiness test means an empty one must not widen the mark.
+
+- **A mark that cannot be placed no longer erases the surface.** Upstream bounds a segment with
+  `x1 = item.x || 0` — a `NaN` is falsey, so the first corner anchors at the origin — keeps the
+  second corner's `NaN` via `!= null`, and then loses it in `Bounds.union`, which is four bare
+  comparisons a `NaN` fails. This engine used `min`/`max` at both sites, which propagate, so a single
+  unplaceable mark turned the whole surface into `NaN`. A guide over a scale with an empty range is
+  full of them: upstream draws it 272 by 152, the same as with a working range.
+
+- **A range too short to interpolate is still a range.** d3 pairs a scale's domain against its range
+  over `min(domain.length, range.length)` entries, so `[]` and `[5]` build a scale that answers
+  `undefined` rather than refusing to exist, and `[0, 50, 100]` over `[0, 100]` pairs the first two —
+  `scale(50)` is 25. This engine refused the range twice, once in `ScaleResolver` and once in a
+  `LinearScale` `require` left behind when the matching domain rule was fixed, and a refused scale
+  takes the axis and every encoding naming it down with it.
+
+- **An empty subtitle takes no room, and an empty title still takes its own.** `titleLayout` unions
+  the subtitle's bounds into the heading only `if (subtitle && subtitle.text)`, and unions the
+  title's unconditionally — so the title's row is reserved on declaration and the subtitle's on
+  content. This engine reserved both on declaration, making a heading with a computed-but-unanswered
+  subtitle 112 tall where upstream draws 97. The subtitle's scene item is unaffected: whether it
+  exists is the property's decision, which was already right.
+
+- **A title a signal does not supply is not the word `null`.** A guide's `title` may be computed, and
+  the result was read with the same function that *says* a value — `String(null)` is the four-letter
+  word — so a chart whose title comes from an unanswered control drew `null` across the top of a
+  legend, along an axis, and over the chart. A screen reader said it out loud, because a caption is
+  built from the same text: `X-axis titled 'null' for a discrete scale with 2 values: a, b`.
+
+  A declared title that resolves to nothing is an **empty** title, not an absent one: it still has
+  an item and still reserves its row, so the answer is the empty string. Returning null instead
+  deleted the title mark and took fifteen pixels of surface with it.
+
+  The mark comparison could not see any of this — it walks the reference's own channels, so a word
+  this side invents was compared against nothing. `text` is one-sided-checked now, as paint and the
+  stroke caps already were.
+
+- **A format specifier nobody gave is not an empty one.** `formatSpan` opens
+  `specifier = formatSpecifier(specifier == null ? ',f' : specifier)` — a *loose* null check — so an
+  absent specifier means comma-grouped fixed and an empty string does not: a linear axis over
+  `[0, 1]` at three ticks reads `0.0`, `0.5`, `1.0` for the first and `0`, `0.5`, `1` for the second.
+  A `"format": {"signal": …}` whose signal held null was resolved with `String(value)`, producing the
+  word `null`, which is not a format — so the labels fell back to the empty specifier's reading and
+  lost a decimal place. A chart whose format comes from a granularity control is in that state until
+  the control is answered. Fixed at both sites that resolve one — the axis, and the legend, which
+  substitutes it once into a resolved copy of itself. A third apparent site in `discreteDateLabeller`
+  resolved the same expression a second time and could only ever answer what the first had; it is
+  removed.
+
+- **A scale with no range keeps the range d3 gives it**, rather than being refused. `configureRange`
+  only calls `scale.range(…)` when there is a range to set, so a scale that declares none keeps d3's
+  own default — `[0, 1]` for every continuous, discretizing and banded type, and `[]` for `ordinal`.
+  This engine answered `Scale 'c' has no range` and refused the scale, which took every encoding that
+  named it with it.
+
+  The common way in is a colour scheme that evaporates. `configureRange` opens its scheme branch with
+  a bare `else if (_.scheme)` — a truthiness test on the resolved value — so
+  `{"scheme": {"signal": "theme"}}` whose signal holds `null` or `""` leaves the scale with no range
+  at all rather than with a failed lookup, and a palette picker whose signal has not been answered
+  yet is exactly that. A *literal* falsey scheme is not the same case: `parseScaleRange` matches it
+  against no branch and upstream refuses the specification outright.
+
+- **A plotting area is never negative and never NaN, whatever arrived at it.** A `width` signal
+  that resolved negative was used as it stands: the band scale ranged on `"width"` divided up a
+  negative range, and the signal sweep's `-100` case drew a surface 207 across where upstream draws
+  18. A signal reading `width / 2` read the negative half with it. Upstream's `layoutGroup` opens `width = Math.max(0, group.width || 0)` and
+  `viewSizeLayout` repeats it and hands the result to `resizeView`, which writes the clamped number
+  **back into the signal** before rerunning the dataflow — so the signal itself reads 0 and
+  everything downstream of it does too.
+
+  Both halves of that expression are separate tests. The clamp takes a negative size; `|| 0` takes a
+  `NaN` one, since `Math.max(0, NaN)` is `NaN`. This engine had the clamp on the *seeded* size only,
+  so a size declared as an ordinary property was already right and the same size arriving through a
+  signal was not.
+
+- **A chart's size may be written as a signal reference, and that is an expression rather than a
+  seed.** `"width": {"signal": "w"}` did not set the width to anything at all: the parser read the
+  property with `optionalNumber`, an object is not a number, and the chart was left with no width —
+  warning that `'width' must be a number` about a form upstream accepts silently. A chart with a
+  responsive width rendered at its padding and nothing else, and every scale ranged on `"width"`
+  came out `[0, 0]` with it.
+
+  Upstream's `collectSignals` passes five top-level properties — `background`, `autosize`,
+  `padding`, `width` and `height` — through `signalObject`, which is
+  `value && value.signal ? {name, update: value.signal} : {name, value}`, so the reference makes the
+  **built-in signal derived**. `width` and `height` are carried through here, because their readers
+  already take the live signal rather than the parsed property; the other three still read the
+  literal and would publish a signal nothing consults.
+
+  The merge comes with it. A specification may name the same signal itself, and upstream folds the
+  two with `extend(pre[s.name], s)` — the declaration is copied *onto* the built-in, so one carrying
+  `update` overwrites the reference and one carrying only `value` leaves the reference standing and
+  contributes an initial value the first pulse throws away.
+
 ### Changed
 
 - **An extent that is not finite is no extent at all**, and `ExtentTransform.extentOf` is now public

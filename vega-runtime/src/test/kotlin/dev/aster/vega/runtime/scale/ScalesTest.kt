@@ -4,7 +4,6 @@ import dev.aster.vega.model.VegaValue
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 
 /**
  * Expected values come from the pinned d3-scale and from upstream Vega running
@@ -126,16 +125,24 @@ class ScalesTest {
   }
 
   @Test
-  fun `a short domain is a scale that places nothing, and a short range is not a scale`() {
-    // **The two ends are not symmetric**, and this test used to reject both. d3 builds a scale for
-    // `domain([])` and `domain([5])` — neither places anything, every value comes back `NaN`, but
-    // the scale exists for a chart to name. Refusing to build one made it *absent*, so every
-    // expression naming it reported an undefined scale too. Probed against upstream.
+  fun `a scale short at either end places nothing and still exists`() {
+    // d3 builds a scale for `domain([])` and `domain([5])` — neither places anything, every value
+    // comes back `NaN`, but the scale exists for a chart to name. Refusing to build one made it
+    // *absent*, so every expression naming it reported an undefined scale too.
     assertTrue(LinearScale("s", listOf(1.0), listOf(0.0, 1.0)).apply(1.0).isNaN())
     assertTrue(LinearScale("s", emptyList(), listOf(0.0, 1.0)).apply(1.0).isNaN())
-    // A short *range* stays rejected: there is nowhere to place anything, which is a different
-    // thing from placing it nowhere, and no specification produces one.
-    assertThrows<IllegalArgumentException> { LinearScale("s", listOf(0.0, 1.0), listOf(0.0)) }
+    // **The range end reads the same way, and this test used to say it did not.** It asserted a
+    // throw, on the reasoning that there being nowhere to place anything is a different thing from
+    // placing it nowhere — and that "no specification produces one". The second half was simply
+    // untrue: `"range": {"signal": "rng"}` with the signal unanswered produces one, `"range": [5]`
+    // produces one written out, and the signal sweep found both. Upstream builds a scale for each
+    // and answers `undefined` for every input; probed.
+    assertTrue(LinearScale("s", listOf(0.0, 1.0), listOf(0.0)).apply(1.0).isNaN())
+    assertTrue(LinearScale("s", listOf(0.0, 1.0), emptyList()).apply(1.0).isNaN())
+    // The stop count is `min(domain, range)` and the pairing is by position, so a domain longer
+    // than its range extrapolates off the pairs it *does* have rather than reaching for a stop that
+    // is not there: `[0, 50, 100]` against `[0, 100]` places 75 at 150.
+    assertEquals(150.0, LinearScale("s", listOf(0.0, 50.0, 100.0), listOf(0.0, 100.0)).apply(75.0))
   }
 
   @Test

@@ -154,4 +154,45 @@ class TicksTest {
     assertTrue(Ticks.stepFrom(Double.NEGATIVE_INFINITY).isNaN())
     assertTrue(Ticks.stepFrom(0.0).isNaN())
   }
+
+  /**
+   * The two are the same over an ascending span and different over a reversed one, which is the
+   * whole reason `spanStep` exists: eight call sites asked for d3's `tickStep` and were handed
+   * `stepFrom(tickIncrement(…))`, which answers NaN wherever the span it divides by is negative.
+   *
+   * Every vector here is d3-array 3.2.4's own answer, read out of the pinned package.
+   */
+  @Test
+  fun `a reversed span has a step where the increment has none`() {
+    assertTrue(Ticks.tickIncrement(10.0, -50.0, 5).isNaN(), "the increment gives up on a reversal")
+    assertEquals(-10.0, Ticks.step(10.0, -50.0, 5.0), 1e-12)
+    assertEquals(-20.0, Ticks.step(0.0, -50.0, 3.0), 1e-12)
+    assertEquals(-0.02, Ticks.step(0.0, -0.05, 3.0), 1e-12)
+    // Ascending spans are untouched: the two agree everywhere d3 does.
+    assertEquals(50.0, Ticks.step(0.0, 100.0, 3.0), 1e-12)
+    assertEquals(20.0, Ticks.step(-50.0, 0.0, 3.0), 1e-12)
+
+    // The magnitude, because d3's precision functions open with `Math.abs(step)`.
+    assertEquals(20.0, Ticks.spanStep(0.0, -50.0, 3), 1e-12)
+    assertTrue(Ticks.spanStep(5.0, 5.0, 3).isNaN(), "a span of nothing implies no step")
+    assertTrue(Ticks.spanStep(0.0, Double.NaN, 3).isNaN())
+  }
+
+  /**
+   * The label an axis whose `domainMax` sits below its minimum actually reads.
+   *
+   * Upstream: `tickFormat(0, −50, 3)` applied to −25 is `−25`. This engine printed `−25.000000`,
+   * because the NaN increment fell through to "leave the specifier alone" and `,f` kept d3's
+   * default of six decimals.
+   */
+  @Test
+  fun `a reversed span keeps the decimals its step implies`() {
+    assertEquals(",.0f", Ticks.spanSpecifier(",f", 0.0, -50.0, 3))
+    assertEquals(",.0f", Ticks.spanSpecifier(",f", 0.0, 100.0, 3))
+    assertEquals(",.2f", Ticks.spanSpecifier(",f", 0.0, -0.05, 3))
+    // A percent takes two fewer, from the same magnitude, reversed or not.
+    assertEquals(",.0%", Ticks.spanSpecifier(",%", 0.0, -0.05, 3))
+    // A span of nothing still keeps no precision, so d3's default of six applies.
+    assertEquals(",f", Ticks.spanSpecifier(",f", 5.0, 5.0, 3))
+  }
 }
