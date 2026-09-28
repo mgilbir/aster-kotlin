@@ -118,6 +118,25 @@ public object Differential {
     val strings: Map<String, String>,
     /** By channel — `fill` or `stroke` — for the few marks painted with one. */
     val gradients: Map<String, GradientReference> = emptyMap(),
+    /**
+     * The accumulated group translation this mark sits in, which is what an **absent** position
+     * channel in the reference means.
+     *
+     * `normalizeScene` skips a channel the item does not carry *before* it applies the offset:
+     * ```js
+     * let value = item[channel];
+     * if (value === undefined) { …; else continue; }
+     * entry[channel] = canonicalNumber(isExtent ? value : value + offset, precision);
+     * ```
+     *
+     * So an omitted `x` does not say the mark is at zero — it says the item had no `x` of its own,
+     * and every bound reads that as `item.x || 0`, which places it at the group's origin. A title's
+     * text is exactly this: upstream records `title {x: 0, y: -48}` for the group and **no** `x` or
+     * `y` at all for the text inside it. This engine's records are absolute, so they must be
+     * compared against the origin rather than against zero.
+     */
+    val originX: Double = 0.0,
+    val originY: Double = 0.0,
   ) {
     val key: String
       get() = "$type/${role ?: "-"}"
@@ -385,6 +404,10 @@ public object Differential {
     return null
   }
 
+  /** Records the group origin a mark sits in; see [Mark.originX]. */
+  private fun at(world: Transform2D, mark: Mark): Mark =
+    mark.copy(originX = world.e, originY = world.f)
+
   private fun collect(node: SceneNode, parent: Transform2D, out: MutableList<Mark>) {
     if (!node.visible) return
     val world = parent.concat(node.transform)
@@ -392,17 +415,22 @@ public object Differential {
       is GroupNode -> {
         // Only a painted group is a visible mark; a layout group carries no pixels.
         if (node.fill != null || node.stroke != null) {
-          out.add(withGradients(node, groupMark(node, world)))
+          out.add(at(world, withGradients(node, groupMark(node, world))))
         }
         node.children.forEach { collect(it, world, out) }
       }
-      is RectNode -> out.add(withGradients(node, withOpacity(node, rectMark(node, world))))
-      is RuleNode -> out.add(withGradients(node, withOpacity(node, ruleMark(node, world))))
-      is TextNode -> out.add(withGradients(node, withOpacity(node, textMark(node, world))))
+      is RectNode ->
+        out.add(at(world, withGradients(node, withOpacity(node, rectMark(node, world)))))
+      is RuleNode ->
+        out.add(at(world, withGradients(node, withOpacity(node, ruleMark(node, world)))))
+      is TextNode ->
+        out.add(at(world, withGradients(node, withOpacity(node, textMark(node, world)))))
       is SymbolNode ->
-        out.add(withGradients(node, withOpacity(node, symbolMark(node, world, parent))))
-      is PathNode -> out.add(withGradients(node, withOpacity(node, pathMark(node, world, parent))))
-      is ImageNode -> out.add(withGradients(node, withOpacity(node, imageMark(node, world))))
+        out.add(at(world, withGradients(node, withOpacity(node, symbolMark(node, world, parent)))))
+      is PathNode ->
+        out.add(at(world, withGradients(node, withOpacity(node, pathMark(node, world, parent)))))
+      is ImageNode ->
+        out.add(at(world, withGradients(node, withOpacity(node, imageMark(node, world)))))
     }
   }
 
@@ -1134,30 +1162,68 @@ public object Differential {
         out.add(Difference("$where.$channel", "absent", invented))
       }
     }
-    // And the same for every other numeric channel whose **absence means zero**. A corner radius
-    // was the first of these to be checked both ways; it is not special. Upstream's normalizer
-    // writes a channel only when the item carries one, so a non-zero value here against nothing
-    // there is a mark turned, truncated or curved in a way upstream's is not — and iterating only
-    // the reference's channels never looked. `abs(invented) > tolerance` is the whole guard: a zero
-    // this side records and upstream omits says the same thing twice.
-    for (channel in ZERO_DEFAULT_CHANNELS) {
+    // **Every numeric channel this engine holds that the reference does not**, defaulting to
+    // *report* rather than to skip.
+    //
+    // This used to be two hand-kept lists — the corner radii, then a set of zero-default channels —
+    // and each was extended only after something had already slipped through: `text` when a guide
+    // title this side invented moved a surface, `angle` and `limit` when a legend label came out
+    // truncated at a limit upstream never set. A list you add to after each escape is a list that
+    // is wrong until the next one. Walking what this engine *holds* inverts the default: a channel
+    // nobody has thought about is loud, and every exception is written down with what it means.
+    //
+    // [absenceMeans] is that exception table. It says what upstream's **omission** stands for
+    // rather than waving the channel through: an omitted position is drawn at zero, because every
+    // bound and every shape generator reads `item.x || 0`, so holding a zero agrees with it and
+    // holding anything else is a mark placed where upstream placed nothing.
+    for ((channel, invented) in actual.numbers) {
       if (channel in ignored) continue
-      val invented = actual.numbers[channel] ?: continue
+      if (channel in expected.numbers || channel in expected.strings) continue
+      // The same inert guards the reference's own channels get, read off *this* engine's mark: a
+      // stroke width on something nothing strokes paints no more here than it does there.
       if (
-        channel !in expected.numbers &&
-          channel !in expected.strings &&
-          !agree(0.0, invented, tolerance)
+        unpaintedStroke(actual, channel) ||
+          unpaintedFill(actual, channel) ||
+          inertFill(actual, channel) ||
+          unreadByThisMark(actual, channel)
       ) {
-        out.add(Difference("$where.$channel", "absent", fmt(invented)))
+        continue
       }
-    }
-    // The same both ways for corner radii: rounding a corner the reference leaves square changes
-    // the outline, and iterating only the reference's channels would never see it.
-    for (channel in CORNER_CHANNELS) {
-      if (channel in ignored) continue
-      val invented = actual.numbers[channel] ?: continue
-      if (channel !in expected.numbers && !agree(0.0, invented, tolerance)) {
+      // A position's absence means the group origin rather than zero — see [Mark.originX] — and on
+      // a **text** mark it means nothing at all.
+      //
+      // `normalizeScene` folds a text item's `dx`/`dy`, and its polar `radius`/`theta`, into the
+      // recorded coordinate; but it reaches the `continue` for an undefined channel *before* that,
+      // so a nudged title records no `x` and the nudge is never written anywhere. This engine folds
+      // the same offsets into its anchor, so its `x` is the drawn position and upstream's absence
+      // is silent about it: `title-nudge` puts a heading 9 across and 7 down from its group, and
+      // the reference has no coordinate that disagrees or agrees. Comparing them said the nudge was
+      // an invention.
+      //
+      // Every other mark type places from its anchor alone, so an omitted `x` there really does say
+      // the item sat at its group's origin.
+      if (channel in ABSENCE_UNCOMPARABLE) continue
+      val implied =
+        when {
+          channel !in POSITION_CHANNELS -> absenceMeans(channel)
+          actual.type == "text" -> continue
+          // **A far edge the reference omits is its near edge**, not the origin.
+          //
+          // `boundRule` reads `item.x2 != null ? item.x2 : x1`, so an item whose `x2` is null is a
+          // rule that ends where it starts — and the harvester drops a null, because `value = item.
+          // y2` does not take the `undefined` substitution and `typeof null !== 'number'` sends it
+          // to `continue`. An axis tick on a vertical axis is exactly that: upstream records
+          // `{x: 150.5, x2: 155.5, y: 80.5}` and no `y2` at all, and it draws the horizontal tick
+          // this engine draws with `y2` resolved to the same 80.5.
+          channel == "x2" -> actual.numbers["x"] ?: actual.originX
+          channel == "y2" -> actual.numbers["y"] ?: actual.originY
+          channel == "x" -> actual.originX
+          else -> actual.originY
+        }
+      if (implied == null) {
         out.add(Difference("$where.$channel", "absent", fmt(invented)))
+      } else if (!agree(implied, invented, tolerance)) {
+        out.add(Difference("$where.$channel", "absent, which means ${fmt(implied)}", fmt(invented)))
       }
     }
     for ((channel, wanted) in expected.strings) {
@@ -1977,15 +2043,53 @@ public object Differential {
     COLOUR_CHANNELS + setOf("blend", "strokeCap", "strokeJoin", "strokeDash", "text")
 
   /**
-   * Numeric channels whose **absence means zero**, checked in both directions.
+   * Channels whose **absence says nothing this comparison can check**, each with its reason.
    *
-   * `CORNER_CHANNELS` below was the first set to be read this way and there is nothing special
-   * about a radius: upstream's normalizer writes a channel only when the item carries one, so any
-   * of these present here and absent there is something this engine did to a mark that upstream did
-   * not. An angle turns it, a limit truncates its text, a tension bends its curve.
+   * The loop above defaults to reporting an invented channel, and that default is only honest where
+   * the omission has a meaning. These two do not have one *value*: they have a table.
+   *
+   * - **`fontSize`** is 10 on an axis label, 11 on a text mark, and whatever a `config` block says
+   *   for either — so an omitted one stands for a different number depending on the mark's role and
+   *   the chart's configuration. Found by the signal sweep: `a-font-size--null` writes a null
+   *   through a signal, upstream drops the channel from the item, and this engine holds the 11 its
+   *   renderer will use. Both draw the same label.
+   * - **`size`** is the same shape: a symbol's default comes from `config.symbol.size`, a legend
+   *   swatch's from `config.legend.symbolSize`. Found by the Deneb corpus on three templates.
+   *
+   * Duplicating either table here is how a default goes stale — the comparison would start
+   * asserting a number the engine no longer uses. The channels are still compared wherever the
+   * reference *records* one, which is the overwhelming majority: `fontSize` appears 5,359 times in
+   * the fixture references and `size` 5,597.
    */
-  private val ZERO_DEFAULT_CHANNELS =
-    setOf(
+  private val ABSENCE_UNCOMPARABLE = setOf("fontSize", "size")
+
+  /** The channels upstream offsets by the accumulated group translation; see [Mark.originX]. */
+  private val POSITION_CHANNELS = setOf("x", "y", "x2", "y2")
+
+  /**
+   * What the reference's **omission** of a numeric channel stands for, or `null` where it stands
+   * for nothing this comparison may assume.
+   *
+   * Upstream's normalizer writes a channel only when the scene item carries one, so an absence is
+   * not "no opinion": it is whatever the renderer does with an item that has no such property, and
+   * for most of them that is a citable value. Comparing against it, rather than skipping, is what
+   * makes defaulting to *report* safe in the loop above.
+   *
+   * - **A position or an extent is drawn at zero.** Every bound and every shape generator reads it
+   *   through falsiness — `item.x || 0`, `(x + item.width) || 0`, `const x = item => item.x || 0`.
+   * - **An opacity is 1**, which is what [defaultFor] already assumes in the other direction.
+   * - **A radius, an angle, an offset, a tension is zero**: a square corner, an unturned label, an
+   *   untruncated string, an unbent curve.
+   *
+   * `size` and `fontSize` have no entry on purpose: each is a *config* default this comparison
+   * would have to duplicate to assume, and a duplicated default is one that goes stale. A width and
+   * a weight are not config defaults — they are what the renderer does with an item that has
+   * neither — so they are written down here with the line that decides them.
+   */
+  private fun absenceMeans(channel: String): Double? =
+    when (channel) {
+      "width",
+      "height",
       "angle",
       "dx",
       "dy",
@@ -1994,8 +2098,21 @@ public object Differential {
       "padAngle",
       "strokeDashOffset",
       "tension",
-      "theta",
-    )
+      "theta" -> 0.0
+      "opacity",
+      "fillOpacity",
+      "strokeOpacity" -> 1.0
+      // `boundStroke` opens `item.strokeWidth != null ? +item.strokeWidth : 1`, so an omitted width
+      // is measured as **one**, and holding a 1 here says exactly that. Note this is the opposite
+      // reading from [defaultFor]'s, and deliberately: there the *reference* carries a width and
+      // this engine does not, which means no stroke at all rather than a default one.
+      "strokeWidth" -> 1.0
+      // CSS normal weight. Upstream writes `fontWeight` only where it is not normal — 29 times in
+      // the whole corpus — so an omission is 400 and not "no opinion".
+      "fontWeight" -> 400.0
+      in CORNER_CHANNELS -> 0.0
+      else -> null
+    }
 
   private val CORNER_CHANNELS =
     setOf(

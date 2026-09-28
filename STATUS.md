@@ -10709,3 +10709,77 @@ Reverted one at a time: the comparison guard is caught by 196 fixtures, the per-
 the path origin by 1, and the fraction guard by 1.
 
 260 Vega differential fixtures.
+
+### Comparing what this engine invents, by default
+
+The entry above closed a comparison that could not fail. This one closes the other half of the same
+question: the differential walked the **reference's** channels, so anything this engine held and
+upstream did not was never looked at.
+
+It was not unlooked-at everywhere — there were three hand-kept lists, the corner radii, a set of
+zero-default channels, and the colours with a few strings. Each had been extended only *after*
+something escaped: `text` when a guide title this side invented moved a surface, `angle` and `limit`
+when a legend label came out truncated at a limit upstream never set. A list you add to after each
+escape is a list that is wrong until the next escape. The loop now walks what this engine **holds**,
+and the default is to report.
+
+Defaulting to report is only honest if an omission has a meaning, so there are three answers rather
+than two:
+
+- **[absenceMeans] — the omission stands for a value, and the value is compared.** A position is
+  drawn at zero, because every bound and every shape generator reads `item.x || 0`. An opacity is 1.
+  A radius, an angle, an offset, a tension is zero. A `strokeWidth` is **one**, from `boundStroke`'s
+  `item.strokeWidth != null ? +item.strokeWidth : 1`, which is the opposite reading from
+  [defaultFor]'s in the other direction and deliberately so. A `fontWeight` is 400.
+- **[ABSENCE_UNCOMPARABLE] — the omission stands for a *table*, so nothing is asserted.** A
+  `fontSize` is 10 on an axis label, 11 on a text mark, and whatever a `config` block says for
+  either; a `size` comes from `config.symbol.size` or `config.legend.symbolSize`. Duplicating either
+  table here is how a default goes stale. Both are still compared wherever the reference records one
+  — 5,359 and 5,597 times in the fixture references alone.
+- **No entry — reported.**
+
+**Three of the rules had to be got right before the corpus would go quiet**, and each was a reading
+of the harvester rather than a guess:
+
+`normalizeScene` reaches its `continue` for an undefined channel **before** it applies the group
+offset, so an omitted `x` does not say "at zero" — it says the item had no `x`, and the mark sits at
+its group's origin. Upstream records `title {x: 0, y: -48}` for a heading's group and **no** `x` or
+`y` at all for the text inside it. `Mark.originX` carries that origin so the two can be compared.
+
+On a **text** mark the omission says nothing at all, because the harvester folds `dx`/`dy` and the
+polar `radius`/`theta` into a *recorded* channel and never reaches them for an absent one.
+`title-nudge` puts a heading 9 across and 7 down from its group; the reference has no coordinate
+that either agrees or disagrees, and comparing them called the nudge an invention.
+
+A **far edge** the reference omits is its near edge, not the origin: `boundRule` reads
+`item.x2 != null ? item.x2 : x1`, and the harvester drops a null `y2` because `typeof null !==
+'number'`. An axis tick records `{x: 150.5, x2: 155.5, y: 80.5}` and no `y2`, and draws the
+horizontal tick this engine draws with `y2` resolved to that same 80.5.
+
+**Two engine defects fell out of it**, both about a scale that can place nothing:
+
+A range with fewer than two stops answers **`undefined`**; a domain with fewer than two answers
+**`NaN`**. They are not the same degenerate scale and `min(domain.length, range.length)` cannot tell
+them apart. `bimap` builds a domain half — `normalize(d0, d1)`, which is `constant(NaN)` when an end
+is missing — and a range half — `interpolate(r0, r1)`, which over two `undefined` endpoints is a
+constant function returning `undefined`. So the *range* decides. Probed against d3 at all six
+shapes. Upstream's own record shows both at once: an axis over an empty range gives a rect
+`height: "NaN"` and **no** `y`, and this engine gave the rect a position upstream had not.
+
+And an axis's domain line took a plot-sized fallback where it should have taken zero. Upstream
+encodes its endpoints as `{scale: …, range: 0}` and `{scale: …, range: 1}`, so an empty range leaves
+both `undefined` and the spine is drawn as a **point**. The asymmetry was the tell: the near end
+already fell back to zero and only the far end grew to the plotting area.
+
+Reverted one at a time: the origin threading is caught by 4 fixtures, the far-edge rule by 1, the
+scale's `undefined` by 1, the axis fallback by 1, and an invented `cornerRadius` on every rect by
+**155**. Disabling the loop itself is caught by none, and that is not a surviving mutant — removing
+a check cannot cause a failure. Only injecting something for it to find tests it.
+
+The ungated corpora were re-run because two of these are engine changes: value 499 of 499, signal
+140 of 158, Deneb 54 of 54, Vega-Lite wild 1981 of 1981, Vega-Lite property sweep 27489 of 27513.
+The schema property sweep is **7509 of 7510**, and the one is a genuine difference this change made
+visible rather than caused: a `pow` scale with a **negative** exponent places its ticks at `NaN`
+here where upstream places them at 0.5. It has its own entry below.
+
+260 Vega differential fixtures.

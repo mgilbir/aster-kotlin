@@ -208,7 +208,26 @@ public class LinearScale(
     //
     // `""` separates them: it coerces to `0`, passes the guard, and its logarithm is `NaN`. Probed.
     val x = scaleNumber(value)
-    return if (x.isNaN()) VegaValue.Undefined else VegaValue.Num(apply(x))
+    if (x.isNaN()) return VegaValue.Undefined
+    // **A short RANGE answers `undefined`; a short DOMAIN answers `NaN`.** The two are not the
+    // same degenerate scale, and `min(domain.length, range.length)` cannot tell them apart.
+    //
+    // `bimap` builds two halves. The domain half is `normalize(d0, d1)`, which answers
+    // `constant(NaN)` when an end is missing; the range half is `interpolate(r0, r1)`, and over two
+    // `undefined` endpoints that is a constant function returning `undefined`. So the *range*
+    // decides: with fewer than two stops every input maps to `undefined`, whatever the domain,
+    // while a short domain over a real range runs a real interpolator on a `NaN` and yields `NaN`.
+    //
+    // Probed against d3, all six shapes: `range: []` and `range: [5]` answer `undefined`;
+    // `domain: []` and `domain: [5]` over `[110, 10]` answer `NaN`; both empty answers `undefined`;
+    // an ordinary pair answers the number.
+    //
+    // The distinction is the one `scaledPosition` reads to tell a channel the item does **not
+    // carry** from one carrying a `NaN`, and upstream's own record shows both at once: an axis over
+    // an empty range gives a rect `height: "NaN"` — `y2 - y` over two undefined ends — and **no**
+    // `y` at all. Answering `NaN` for the value too gave the rect a position upstream had not.
+    if (range.size < 2) return VegaValue.Undefined
+    return VegaValue.Num(apply(x))
   }
 
   public fun apply(x: Double): Double = if (round) roundHalfUp(unrounded(x)) else unrounded(x)

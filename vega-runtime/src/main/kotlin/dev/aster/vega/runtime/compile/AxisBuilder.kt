@@ -518,8 +518,24 @@ public class AxisBuilder(
       // Upstream encodes the domain line's endpoints as range positions 0 and 1 of the axis scale,
       // so a scale that does not span the whole plotting area gets a correspondingly short line.
       val span = rangeEnds(scale)
+      // **A range that exists and has no ends is not a missing range**, and the two fallbacks are
+      // not the same. Upstream encodes the line's endpoints as value references into the scale —
+      // `{scale: …, range: 0}` and `{scale: …, range: 1}` — so with an empty range both resolve to
+      // `undefined`, the item carries neither coordinate, and `item.x || 0` draws the spine as a
+      // **point** at the origin. Probed: an axis over a scale ranged `[]` records
+      // `{x: 0.5, x2: 0.5}` and no `y` or `y2` at all.
+      //
+      // The plot-sized fallback belongs to the other case — a scale type `rangeEnds` cannot read,
+      // where there is no range information rather than no range — and reaching for it here drew a
+      // full-height spine across a chart upstream leaves unmarked. The asymmetry was the tell: the
+      // near end already fell back to zero and only the far end grew.
       val from = span?.firstOrNull() ?: 0.0
-      val to = span?.lastOrNull() ?: if (spec.orient.isVertical) extent.height else extent.width
+      val to =
+        if (span != null) {
+          span.lastOrNull() ?: 0.0
+        } else {
+          if (spec.orient.isVertical) extent.height else extent.width
+        }
       val domainNode =
         when (spec.orient) {
           Orient.BOTTOM,
