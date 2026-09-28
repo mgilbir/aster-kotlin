@@ -8,6 +8,102 @@ section here does not get released.
 
 ### Fixed
 
+- **A `pow` scale with a negative exponent places its ticks.** `transformPow(0)` is `Infinity` at an
+  exponent below zero, so a domain starting at zero transforms to a downward one with an infinite
+  end. d3's `bimap` orders the transformed ends before normalising and hands the infinite span to
+  `normalize` with no finiteness guard, and an ordinary value maps to an end of the range. This
+  engine normalised the ends in the order written and refused a non-finite one outright, so every
+  tick, label and symbol on the axis was placed at `NaN`. At `domain([0, 95]).range([120, 0])` and
+  an exponent of `-4`, upstream's `scale(8)` and `scale(95)` are **0** and only `scale(0)` is `NaN`.
+  The ordering was written out twice, in `LinearScale` and `TransformedScale`; it is one `bimap` now.
+
+- **A range of fewer than two stops answers nothing, and an axis over one draws its spine as a
+  point.** d3 treats a short *range* and a short *domain* differently: over a range with fewer than
+  two stops `scale(x)` is `undefined`, over a domain with fewer than two it is `NaN`, and the two
+  take different branches wherever a mark is placed. This engine gave both `NaN`, so a rect on an
+  axis over an empty range got a position upstream does not give it. The axis's domain line is
+  encoded as `{range: 0}` to `{range: 1}`, both undefined over an empty range, so upstream draws it
+  as a point; this engine fell back to zero at the near end and to the size of the plotting area at
+  the far one.
+
+- **A gradient legend over a span that is not a number puts its label in the middle.**
+  `scaleFraction` returns the constant `0.5` when `!delta || !isFinite(delta)`, and `!delta` holds
+  for a `NaN` span as well as a zero one. This engine tested `lo == hi`, which a `NaN` never
+  satisfies, so a ramp over a column with no numbers in it placed its one label at `NaN`, and a
+  domain reaching an infinity placed its labels at 0.
+
+- **A gradient legend's labels have no length limit unless the specification sets one.** Upstream
+  reads `value(spec.labelLimit, config.gradientLabelLimit)` for a gradient and `labelLimit` from
+  `config.legend` for a symbol legend. The second defaults to 160; `config.gradientLabelLimit` does
+  not exist, so a gradient legend, and a discretizing scale's legend built by the same file, does not
+  truncate at all. This engine applied 160 to every kind, and it also ignored an explicit
+  `labelLimit` on a gradient legend, because the resolved value was never used.
+
+- **A subtitle does not inherit a limit given to its title's encode.** Both heading texts read
+  `limit` from their group, and `encode.title.update.limit` is then laid over the **title** alone.
+  This engine gave the subtitle the title's resolved limit, truncating it where upstream does not.
+
+- **A view size written as a word is `NaN`, and one written as `NaN` is zero.** Upstream sizes the
+  view with `Math.max(0, w || 0)`, and the falsiness test runs before the coercion: a numeric `NaN`
+  is falsey and becomes 0, while `"wide"` is truthy and reaches `Math.max` as `NaN`. An `Infinity`
+  is not clamped at all. This engine lost the word before the falsiness could see it, then clamped a
+  second time in the reader the scale ranges use and fell back on the declared size. The surface was
+  already right — upstream draws the same 8-wide box for a `NaN` width as for a negative one — but
+  every scale ranged on the width was not: `[0, 0]` here against upstream's `[0, NaN]`.
+
+- **A position a scale cannot give stays `NaN`, and the mark is still measured where upstream
+  measures it.** A continuous scale that answers `NaN` is not the same as a discrete scale that
+  lacks a value and answers `undefined`, and `adjustSpatial` takes different branches for the two.
+  This engine treated every `NaN` as a miss, which placed rects at `y: 100` where upstream records
+  `y: NaN`. Carrying the `NaN` through also meant matching the three ways upstream bounds it: a
+  symbol is translated by `item.y || 0` and so measured **at the origin**; a rect puts each corner
+  through `||` in turn, so `y: NaN, height: 40` keeps its full 40 anchored at zero while `y: NaN,
+  y2: 100` flattens to nothing; and a line or area reads its points as `item.y || 0`, so the path
+  runs along zero rather than breaking — only `defined` breaks a series.
+
+- **A scale's `base`, `exponent` and `constant` are coerced, not validated.** They reach d3 through
+  setters that are `+_`, so a word becomes `NaN` and stays on the scale. This engine discarded the
+  `NaN` and used the default, drawing a chart upstream cannot draw. A `NaN` exponent on a `pow` scale
+  or constant on a `symlog` scale makes every mapped value `NaN`. A `NaN` base on a `log` scale leaves
+  the mapping alone — d3 normalises `log(x)` — and produces **no ticks at all**. For a scale with a
+  colour range the old behaviour is kept on purpose: upstream throws from inside d3-interpolate there
+  and every mark comes out with a null fill, so there is nothing to match.
+
+- **An angle that is not a number turns a mark by `NaN`, and the mark adds nothing to the chart's
+  size.** Upstream guards a rotation on the raw value's truthiness and multiplies after: `""` is
+  falsey and not rotated, `"0"` is truthy and rotated by zero, and `"sideways"` is truthy and rotated
+  by `NaN`. The box that produces fails every comparison in `Bounds.union`, so the mark is left
+  **cleared** and does not widen the surface. This engine discarded the `NaN` and measured the mark
+  unrotated. It applies to an axis's `labelAngle` and to the `angle` channel of a text, symbol, arc
+  and path; an image has no rotation upstream and is unchanged. Two related fixes: `RectD.union` had
+  two `isEmpty` shortcuts upstream does not, which let a `NaN`-cornered box through whole, and a text
+  mark's anchor is now placed at `NaN` rather than left unrotated, as upstream's renderer draws it.
+
+- **A band scale's padding that is not a number, or a band space below one, is divided by as
+  upstream divides.** Vega's band scale computes `space = count - paddingInner + paddingOuter * 2`,
+  uses it when it is above zero, and divides the range by `space || 1`. This engine wrote the pair as
+  `maxOf(1.0, space)`, which differs from both guards. A single band with `paddingInner: 0.5` has a
+  space of 0.5, and upstream divides a 200-wide range by it to reach a step of 400 and a band filling
+  the range; this engine drew it at half width, centred. A padding given as a word is `NaN` through
+  the setter's clamp, so upstream's step becomes the whole range and every position is `NaN`, where
+  this engine used the default padding and drew an ordinary chart. `align: null` still differs: it
+  is 0 upstream and 0.5 here.
+
+- **An axis over a reversed domain formats its labels with the right precision.** Given a reversed
+  span, `tickIncrement` answers `NaN` and `tickStep` answers the negative step, and upstream's
+  `tickFormat` takes its precision from `tickStep`. This engine used the first at eight call sites,
+  so `,f` kept d3's default of six decimals and an axis whose `domainMax` sits below its minimum read
+  `−20.000000`. The call sites are the continuous scales' tick formats, the axis labeller, legend
+  threshold captions, `GuideFormat`, `TimeTicks` and the slider step in `SignalInput`. Both the
+  step and its magnitude matter: a step of −0.02 needs the magnitude to read `−0.02` rather than `0`.
+
+- **A domain bound a signal leaves `null` is no bound, and one it cannot read is `NaN`.**
+  `configureDomain` writes `domainMin`, `domainMax` and `domainMid` only when they are `!= null`, and
+  d3 coerces what it writes with `+`. This engine read the override as a number, so an unmoved
+  control's `null` became **0** and pulled the domain's end to zero, which is the state a templated
+  chart starts in. A word was discarded and the data's own end kept, where upstream puts the `NaN` in
+  the domain and the axis draws no ticks.
+
 - **A legend's kind is chosen by falsiness, and the word it was given is said out loud.**
   `spec.type || (isContinuous(scale) ? 'gradient' : 'symbol')` — so absent, `null` and `""` infer the
   kind from the scale while any other value present decides, and only `gradient` means gradient. This
@@ -2199,6 +2295,25 @@ section here does not get released.
   disagreement still at the top of that list.
 
 ### Internal
+
+- **The differential could not fail in three ways, and each is closed.** A channel upstream recorded
+  as `NaN` agreed with any number: the comparison was `abs(wanted - got) > allowed`, which is false
+  whenever either side is `NaN`, and a routing branch sent the reference's `"NaN"` spellings back
+  into that comparison. `agree` is the guard now and replaces ten hand-written comparisons;
+  reporting `opacity = NaN` for every mark was caught by none of 260 fixtures before it and by 196
+  after. The comparison also walked only the **reference's** channels, so a value this engine
+  invented was never examined; it walks this engine's now and reports by default, with an explicit
+  table of what an omitted channel means. The harness's own placement arithmetic had to change with
+  it — a world transform is applied per axis, as upstream's harvester does, so a `NaN` in `y` no
+  longer costs a mark its `x`.
+
+  `ChannelObservabilityTest` checks the result mechanically: for each of the **152** `(mark type,
+  channel)` pairs the references carry, it perturbs this engine's value, both to another number and
+  to `NaN`, and asserts the comparison reports it. And `symbol`, `arc`, `path` and `shape` — 36.4% of
+  the corpus's marks — were compared by an axis-aligned box, which a circle and a square of the same
+  size share. A second extent measured at 45 degrees is recorded on both sides; drawing every circle
+  as a square was caught by one fixture before and by 109 after. Coverage is 13,177 of 14,089 such
+  marks.
 
 - **A blend mode, a cap and a join on the marks whose records left them out.** The comparison built
   a rect's, a symbol's and a path's record from a shared paint table and hand-wrote the other four,
