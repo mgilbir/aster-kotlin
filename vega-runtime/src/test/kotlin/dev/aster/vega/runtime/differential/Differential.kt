@@ -26,6 +26,7 @@ import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.ImageFit
 import dev.aster.vega.scene.ImageNode
 import dev.aster.vega.scene.PathNode
+import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.RuleNode
@@ -462,8 +463,33 @@ public object Differential {
    * reading the scene — for a tooltip, for hit testing, for an accessibility description — sees the
    * item's own numbers, not the box. Nothing changes for a rect written the usual way round.
    */
+  /**
+   * A mark's recorded anchor, offset **per axis** as upstream's harvester offsets it:
+   * ```js
+   * const offset = channel.startsWith('x') ? dx + textDx
+   *              : channel.startsWith('y') ? dy + textDy : 0;
+   * entry[channel] = value + offset;
+   * ```
+   *
+   * `world.apply` is a matrix multiply, and that is not the same operation: `c * y` is `NaN` when
+   * `y` is, **even where `c` is zero**, so a mark this engine could place in one axis and not the
+   * other lost *both*. Upstream's harvester accumulates a translation down the tree and adds it to
+   * one axis at a time, so its `x` cannot be touched by its `y`.
+   *
+   * The fallback is deliberate and, in this corpus, unreachable: upstream carries only `dx`/`dy`,
+   * so a group that scaled or rotated its children would already disagree with it about every
+   * recorded coordinate. That is a different divergence from this one and is not hidden here — if
+   * it ever occurs, the matrix answer is the one that was being compared before.
+   */
+  private fun placed(world: Transform2D, x: Double, y: Double): PointD =
+    if (world.a == 1.0 && world.b == 0.0 && world.c == 0.0 && world.d == 1.0) {
+      PointD(x + world.e, y + world.f)
+    } else {
+      world.apply(x, y)
+    }
+
   private fun rectMark(node: RectNode, world: Transform2D): Mark {
-    val origin = world.apply(node.x, node.y)
+    val origin = placed(world, node.x, node.y)
     val numbers =
       linkedMapOf(
         "x" to origin.x,
@@ -513,8 +539,8 @@ public object Differential {
   }
 
   private fun ruleMark(node: RuleNode, world: Transform2D): Mark {
-    val a = world.apply(node.x1, node.y1)
-    val b = world.apply(node.x2, node.y2)
+    val a = placed(world, node.x1, node.y1)
+    val b = placed(world, node.x2, node.y2)
     val numbers =
       linkedMapOf(
         "x" to a.x,
@@ -605,7 +631,7 @@ public object Differential {
       }
 
   private fun textMark(node: TextNode, world: Transform2D): Mark {
-    val anchor = world.apply(node.x, node.y)
+    val anchor = placed(world, node.x, node.y)
     val run = node.layout.run
     val numbers =
       linkedMapOf(
@@ -722,7 +748,7 @@ public object Differential {
     }
 
   private fun symbolMark(node: SymbolNode, world: Transform2D, parent: Transform2D): Mark {
-    val centre = world.apply(node.x, node.y)
+    val centre = placed(world, node.x, node.y)
     val numbers =
       linkedMapOf(
         "x" to centre.x,
@@ -748,9 +774,13 @@ public object Differential {
       // A `path` mark also reports the anchor it was placed at, which upstream carries as the
       // item's own x and y — the outline itself is in the path string's coordinates.
       if (kind == "path") {
-        val anchor = world.apply(0.0, 0.0)
-        numbers["x"] = anchor.x
-        numbers["y"] = anchor.y
+        // **The transform's own translation, not `apply(0, 0)`.** They are the same number —
+        // `a*0 + c*0 + e` is `e` — right up until the matrix holds a `NaN`, because `NaN * 0` is
+        // `NaN` rather than 0. A rotation maps the origin to itself whatever its angle, so an
+        // anchor must not be lost to one this engine could not read; upstream records the item's
+        // encoded `x`/`y`, which its `angle` never touches.
+        numbers["x"] = world.e
+        numbers["y"] = world.f
       }
       return Mark(kind, node.metadata.role, numbers + paintNumbers(node), paintStrings(node))
     }
@@ -824,7 +854,7 @@ public object Differential {
    * interchangeable to anything that lays out again.
    */
   private fun imageMark(node: ImageNode, world: Transform2D): Mark {
-    val anchor = world.apply(node.x, node.y)
+    val anchor = placed(world, node.x, node.y)
     return Mark(
       "image",
       node.metadata.role,
@@ -867,9 +897,9 @@ public object Differential {
    * `x`/`y` and `width`/`height`.
    */
   private fun groupMark(node: GroupNode, world: Transform2D): Mark {
-    val origin = world.apply(0.0, 0.0)
+    // The transform's own translation; see the note in `pathMark`.
     val size = node.size
-    val numbers = linkedMapOf("x" to origin.x, "y" to origin.y)
+    val numbers = linkedMapOf("x" to world.e, "y" to world.f)
     if (size != null) {
       numbers["width"] = size.width
       numbers["height"] = size.height
@@ -1081,7 +1111,7 @@ public object Differential {
         } else {
           tolerance
         }
-      if (abs(wanted - got) > allowed) {
+      if (!agree(wanted, got, allowed)) {
         out.add(Difference("$where.$channel", fmt(wanted), fmt(got)))
       }
     }
@@ -1114,7 +1144,9 @@ public object Differential {
       if (channel in ignored) continue
       val invented = actual.numbers[channel] ?: continue
       if (
-        channel !in expected.numbers && channel !in expected.strings && abs(invented) > tolerance
+        channel !in expected.numbers &&
+          channel !in expected.strings &&
+          !agree(0.0, invented, tolerance)
       ) {
         out.add(Difference("$where.$channel", "absent", fmt(invented)))
       }
@@ -1124,7 +1156,7 @@ public object Differential {
     for (channel in CORNER_CHANNELS) {
       if (channel in ignored) continue
       val invented = actual.numbers[channel] ?: continue
-      if (channel !in expected.numbers && abs(invented) > tolerance) {
+      if (channel !in expected.numbers && !agree(0.0, invented, tolerance)) {
         out.add(Difference("$where.$channel", "absent", fmt(invented)))
       }
     }
@@ -1278,7 +1310,7 @@ public object Differential {
         continue
       }
       theirs.stops.zip(ours.stops).forEachIndexed { index, (want, got) ->
-        if (abs(want.first - got.first) > GEOMETRY_TOLERANCE) {
+        if (!agree(want.first, got.first, GEOMETRY_TOLERANCE)) {
           out.add(
             Difference(
               "$where.$channel gradient stop[$index] offset",
@@ -1321,14 +1353,39 @@ public object Differential {
    */
   private val GRADIENT_STOP_TIES = setOf("rect/legend-gradient[0].fill gradient stop[19]")
 
+  /**
+   * Whether two numbers agree within [tolerance], **including when either of them is not finite**.
+   *
+   * `abs(wanted - got) <= tolerance` is not that test, and the way it fails is silent: `abs` of
+   * anything involving a `NaN` is `NaN`, and `NaN > tolerance` is **false**, so a channel this
+   * engine reports as `NaN` agreed with every number the reference held. Measured rather than
+   * reasoned about: reporting `opacity = NaN` for *every mark in the corpus* was seen by **none**
+   * of the 260 fixtures, against 10,231 recorded opacities.
+   *
+   * The mirror of it — a `NaN` on the reference's side — was closed by routing the non-finite
+   * spellings into the strings, where `GEOMETRY_CHANNELS` reads them. That fix was correct and
+   * incomplete: it made one direction safe by keeping `NaN` out of the numbers, which does nothing
+   * about a `NaN` arriving from this engine. Guarding the **comparison** closes both directions and
+   * does not depend on every future branch of the parse remembering to route correctly.
+   *
+   * An infinity compares exactly: upstream's empty bounds really are `±Infinity`, and a tolerance
+   * around an infinity would accept the other one.
+   */
+  internal fun agree(wanted: Double, got: Double, tolerance: Double): Boolean =
+    when {
+      wanted.isNaN() || got.isNaN() -> wanted.isNaN() && got.isNaN()
+      wanted.isInfinite() || got.isInfinite() -> wanted == got
+      else -> abs(wanted - got) <= tolerance
+    }
+
   /** Two colour spellings compared as colours; see [COLOR_TOLERANCE]. */
   private fun sameColour(expected: String, actual: String): Boolean {
     val wanted = SceneColor.parse(expected) ?: return expected == actual
     val got = SceneColor.parse(actual) ?: return expected == actual
-    return abs(wanted.red - got.red) <= COLOR_TOLERANCE &&
-      abs(wanted.green - got.green) <= COLOR_TOLERANCE &&
-      abs(wanted.blue - got.blue) <= COLOR_TOLERANCE &&
-      abs(wanted.alpha - got.alpha) <= COLOR_TOLERANCE
+    return agree(wanted.red, got.red, COLOR_TOLERANCE) &&
+      agree(wanted.green, got.green, COLOR_TOLERANCE) &&
+      agree(wanted.blue, got.blue, COLOR_TOLERANCE) &&
+      agree(wanted.alpha, got.alpha, COLOR_TOLERANCE)
   }
 
   /** Compares two whitespace-separated coordinate lists numerically. */
@@ -1336,7 +1393,7 @@ public object Differential {
     val wanted = expected.trim().split(Regex("\\s+")).mapNotNull { it.toDoubleOrNull() }
     val got = actual.trim().split(Regex("\\s+")).mapNotNull { it.toDoubleOrNull() }
     if (wanted.size != got.size) return false
-    return wanted.indices.all { abs(wanted[it] - got[it]) <= tolerance }
+    return wanted.indices.all { agree(wanted[it], got[it], tolerance) }
   }
 
   /** Channels Vega always emits that default to a known value on our side. */
@@ -1502,10 +1559,10 @@ public object Differential {
       val ours = SceneColor.parse(a)
       val same =
         if (theirs != null && ours != null) {
-          abs(theirs.red - ours.red) <= COLOR_TOLERANCE &&
-            abs(theirs.green - ours.green) <= COLOR_TOLERANCE &&
-            abs(theirs.blue - ours.blue) <= COLOR_TOLERANCE &&
-            abs(theirs.alpha - ours.alpha) <= COLOR_TOLERANCE
+          agree(theirs.red, ours.red, COLOR_TOLERANCE) &&
+            agree(theirs.green, ours.green, COLOR_TOLERANCE) &&
+            agree(theirs.blue, ours.blue, COLOR_TOLERANCE) &&
+            agree(theirs.alpha, ours.alpha, COLOR_TOLERANCE)
         } else {
           e == a
         }
@@ -1586,12 +1643,12 @@ public object Differential {
             differences,
           )
           reference.bandwidth?.let {
-            if (abs(it - scale.bandwidth) > tolerance) {
+            if (!agree(it, scale.bandwidth, tolerance)) {
               differences.add(Difference("scale $name bandwidth", fmt(it), fmt(scale.bandwidth)))
             }
           }
           reference.step?.let {
-            if (abs(it - scale.step) > tolerance) {
+            if (!agree(it, scale.step, tolerance)) {
               differences.add(Difference("scale $name step", fmt(it), fmt(scale.step)))
             }
           }
@@ -1830,7 +1887,7 @@ public object Differential {
       return
     }
     wanted.zip(actual).forEachIndexed { index, (e, a) ->
-      if (abs(e - a) > tolerance) out.add(Difference("$where[$index]", fmt(e), fmt(a)))
+      if (!agree(e, a, tolerance)) out.add(Difference("$where[$index]", fmt(e), fmt(a)))
     }
   }
 

@@ -10648,3 +10648,64 @@ Four fixtures were failing the moment the check was widened — `county-unemploy
 result, including ones recorded earlier in this stack.
 
 260 Vega differential fixtures.
+
+### A comparison that cannot fail, from the other side
+
+Yesterday's entry closed a `NaN` the differential could not see, by routing the non-finite spellings
+out of the numbers and into the strings where `GEOMETRY_CHANNELS` reads them. That was correct and
+it was **half of the rule**: it made the *reference's* direction safe and did nothing about a `NaN`
+arriving from this engine.
+
+```kotlin
+if (abs(wanted - got) > allowed) { … }
+```
+
+`abs` of anything involving a `NaN` is `NaN`, and `NaN > allowed` is **false**. Measured rather than
+reasoned about: reporting `opacity = NaN` for **every mark in the corpus** — against 10,231 recorded
+opacities — was seen by **none** of the 260 fixtures. With the guard on the comparison it is seen by
+**196**.
+
+`agree(wanted, got, tolerance)` is that guard, and it replaced **ten** hand-rolled comparisons:
+mark channels, both one-sided loops, gradient stop offsets, colour twice, coordinate lists, a
+scale's bandwidth and step, and a numeric list. Guarding the comparison rather than the parse closes
+both directions and does not depend on every future branch of the routing remembering to be
+careful — which is the mistake the first fix made.
+
+**Two of the three things it then found were the harness's own arithmetic.**
+
+`world.apply(x, y)` is a matrix multiply, and upstream's harvester is not:
+
+```js
+const offset = channel.startsWith('x') ? dx + textDx : channel.startsWith('y') ? dy + textDy : 0;
+entry[channel] = value + offset;
+```
+
+Per axis, one at a time, so an `x` cannot be touched by a `y`. A multiply computes `a*x + c*y + e`,
+and `c * y` is `NaN` when `y` is **even where `c` is zero** — so a mark this engine could place in
+one axis and not the other lost *both*. Eight fixtures were reporting a real coordinate against a
+`NaN` that the old comparison could not see. `placed` adds the world **translation** per axis; the
+matrix fallback is kept for a transform that is not one, which upstream could not have recorded
+faithfully anyway.
+
+The same arithmetic, once more, at the two sites that asked for the origin: `apply(0, 0)` is `e` and
+`f` — until the matrix holds a `NaN`, because `NaN * 0` is `NaN` rather than zero. A rotation maps
+the origin to itself at any angle, so a path's anchor must not be lost to one this engine could not
+read. Those two read the translation directly.
+
+**The third was an engine defect**, and the rule is the falsiness family again:
+
+```js
+const delta = max - min;
+if (!delta || !Number.isFinite(delta)) return constant(0.5);
+```
+
+`scaleFraction` tests the **span**, and `!delta` is true for a span of zero *and for a `NaN` one*.
+This engine tested `lo == hi`, which covers only the first — `NaN == NaN` is false — so a gradient
+legend over a column holding no numbers placed its one label at `NaN` where upstream places it at
+the **middle** of the ramp, and a domain spanning an infinity placed labels at 0. Probed: upstream's
+label datum is `{index: 1, value: null, perc: 0.5}`.
+
+Reverted one at a time: the comparison guard is caught by 196 fixtures, the per-axis anchor by 4,
+the path origin by 1, and the fraction guard by 1.
+
+260 Vega differential fixtures.

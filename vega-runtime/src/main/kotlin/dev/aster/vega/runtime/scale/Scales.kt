@@ -1660,8 +1660,20 @@ public class SequentialColorScale(
     // This answered 0 and put the one label a constant column earns at the *start* of the ramp
     // rather than beside its middle — two readings of the same degenerate domain in one class, of
     // which only [position] was upstream's.
-    if (lo == hi) return 0.5
-    return ((x - lo) / (hi - lo)).coerceIn(0.0, 1.0)
+    //
+    // **The test is on the span, not on the ends**, and that is upstream's:
+    //
+    //     const delta = max - min;
+    //     if (!delta || !Number.isFinite(delta)) return constant(0.5);
+    //
+    // `!delta` is falsiness, so it is true for a span of zero *and for a `NaN` one*, and the
+    // `isFinite` beside it catches an infinite span as well. Testing `lo == hi` instead covers only
+    // the first: `NaN == NaN` is false, so a ramp over a column that holds no numbers placed its
+    // one label at `NaN` where upstream places it at the middle, and a domain spanning an infinity
+    // placed labels at 0. The whole of the difference is which value the comparison is made on.
+    val span = hi - lo
+    if (!span.isFinite() || span == 0.0) return 0.5
+    return ((x - lo) / span).coerceIn(0.0, 1.0)
   }
 
   /** Tick values across the domain, as a linear scale over the same domain would produce. */
