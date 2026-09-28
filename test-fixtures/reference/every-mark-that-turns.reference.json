@@ -38,6 +38,8 @@
       "shapeHeight": 14.142136,
       "shapeLeft": 12.928932,
       "shapeTop": 12.928932,
+      "shapeTurnedHeight": 14.142136,
+      "shapeTurnedWidth": 14.142136,
       "shapeWidth": 14.142136,
       "size": 200,
       "type": "symbol",
@@ -50,6 +52,8 @@
       "shapeHeight": 14.142136,
       "shapeLeft": 37.928932,
       "shapeTop": 12.928932,
+      "shapeTurnedHeight": 14.142136,
+      "shapeTurnedWidth": 14.142136,
       "shapeWidth": 14.142136,
       "size": 200,
       "type": "symbol",
@@ -62,6 +66,8 @@
       "shapeHeight": 13.624235,
       "shapeLeft": 30,
       "shapeTop": 37.928932,
+      "shapeTurnedHeight": 9.97495,
+      "shapeTurnedWidth": 10,
       "shapeWidth": 10,
       "type": "arc"
     }

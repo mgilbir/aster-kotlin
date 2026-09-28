@@ -25,6 +25,8 @@ import dev.aster.vega.scene.FontStyle
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.ImageFit
 import dev.aster.vega.scene.ImageNode
+import dev.aster.vega.scene.PathCommand
+import dev.aster.vega.scene.PathData
 import dev.aster.vega.scene.PathNode
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.RectD
@@ -775,6 +777,49 @@ public object Differential {
       )
     }
 
+  /**
+   * The mark's extent with its outline turned an eighth of a turn — the measurement that tells a
+   * circle from a square.
+   *
+   * An axis-aligned box says almost nothing about an outline. A circle, a square and a cross of the
+   * same size have the **identical** one, and a third of this corpus — 14,089 marks of 38,712 — was
+   * compared on nothing else. Probed: drawing every circle symbol as a square of the same box was
+   * seen by *one* of 260 fixtures, and only because a circle's cubics miss the corner by a
+   * rounding. Turned 45 degrees they separate cleanly — 20 x 20 stays 20 x 20 for the circle,
+   * becomes 28.284 for the square and 19.799 for the cross.
+   *
+   * **Only the size is recorded, and that is what makes this cheap.** Turning a shape about a
+   * different centre moves the result without resizing it, so the two engines need not agree on
+   * what the anchor is — which for an arc is a centre this engine has already folded into its path.
+   * Upstream measures with its own `Marks[type].bound` by lending the item another 45 degrees, so
+   * its extrema logic does the work there; here the control points are mapped and [PathData.bounds]
+   * does it, which is the same cubic-extrema code the ordinary extent uses.
+   *
+   * Both sides measure the **bare** outline: upstream's item is lent a `strokeWidth` of 0 for the
+   * measurement, so `boundStroke` expands by nothing, and nothing is added here either. Matching
+   * the stroke allowance would have meant transcribing `boundStroke`'s miter rule a second time.
+   */
+  private fun turnedExtent(outline: PathData, world: Transform2D): Map<String, Double> {
+    if (outline.commands.isEmpty()) return emptyMap()
+    val mapped = Transform2D.rotateDegrees(SHAPE_TURN).concat(world)
+    val turned = PathData(outline.commands.map { turnedCommand(it, mapped) }).bounds
+    if (turned.isEmpty) return emptyMap()
+    return linkedMapOf("shapeTurnedWidth" to turned.width, "shapeTurnedHeight" to turned.height)
+  }
+
+  private fun turnedCommand(command: PathCommand, by: Transform2D): PathCommand =
+    when (command) {
+      is PathCommand.MoveTo -> by.apply(command.x, command.y).let { PathCommand.MoveTo(it.x, it.y) }
+      is PathCommand.LineTo -> by.apply(command.x, command.y).let { PathCommand.LineTo(it.x, it.y) }
+      is PathCommand.CubicTo -> {
+        val c1 = by.apply(command.x1, command.y1)
+        val c2 = by.apply(command.x2, command.y2)
+        val to = by.apply(command.x, command.y)
+        PathCommand.CubicTo(c1.x, c1.y, c2.x, c2.y, to.x, to.y)
+      }
+      else -> command
+    }
+
   private fun symbolMark(node: SymbolNode, world: Transform2D, parent: Transform2D): Mark {
     val centre = placed(world, node.x, node.y)
     val numbers =
@@ -782,7 +827,7 @@ public object Differential {
         "x" to centre.x,
         "y" to centre.y,
         "size" to node.size,
-      ) + extentOf(node, parent)
+      ) + extentOf(node, parent) + turnedExtent(node.outline, world)
     return Mark("symbol", node.metadata.role, numbers + paintNumbers(node), paintStrings(node))
   }
 
@@ -799,6 +844,20 @@ public object Differential {
       // An arc is compared by the wedge it drew rather than by a centre point, which says nothing
       // about its radii or its sweep.
       val numbers = LinkedHashMap(extentOf(node, parent))
+      // **Only the four types upstream measures**, which is `SHAPE_EXTENT_TYPES` in
+      // `normalize.js`: a `trail` is compared by the extent it covers and is not one of them, so
+      // recording a turned extent for one here would be inventing a channel the reference has no
+      // opinion about.
+      if (kind in TURNED_EXTENT_KINDS) {
+        // A **null path** is `bounds.set(0, 0, 0, 0)` upstream — `Marks.path.bound` returns exactly
+        // that when `item.path` is absent — so it is a zero extent rather than no extent at all.
+        numbers +=
+          if (kind == "path" && node.absent) {
+            linkedMapOf("shapeTurnedWidth" to 0.0, "shapeTurnedHeight" to 0.0)
+          } else {
+            turnedExtent(node.path, world)
+          }
+      }
       // A `path` mark also reports the anchor it was placed at, which upstream carries as the
       // item's own x and y — the outline itself is in the path string's coordinates.
       if (kind == "path") {
@@ -1134,7 +1193,17 @@ public object Differential {
         // its outline may contain an SVG `A` command, which both engines approximate with cubics
         // and neither splits identically — a circle written as one arc measures 14.000002 upstream
         // and 14.0000001 here.
-        if (channel.startsWith("shape") && expected.type in CURVE_EXTENT_TYPES) {
+        if (
+          channel.startsWith("shapeTurned") ||
+            (channel.startsWith("shape") && expected.type in CURVE_EXTENT_TYPES)
+        ) {
+          // **A turned extent is a curve measurement whatever the mark is.** Taking a shape's
+          // extrema again in a rotated frame compounds the cubic approximation on both axes at
+          // once, where the axis-aligned box only ever feels it on one — so a `shape`, whose
+          // outline is polygonal enough to sit inside the tight tolerance upright, drifts past it
+          // turned. Measured across the schema property sweep: a projected land mass differs by
+          // 8.7e-5 between the two engines, four orders of magnitude inside this tolerance and four
+          // outside the other. A genuinely wrong shape differs by tens of units.
           CURVE_EXTENT_TOLERANCE
         } else {
           tolerance
@@ -2011,6 +2080,15 @@ public object Differential {
    * excluded *and* absent, so removing it from this set changed nothing until the channel was
    * published. Text bounds remain excluded, which is what the exception was for.
    */
+  /**
+   * How far a shape is turned for its second extent, in degrees; mirrors `SHAPE_TURN` in
+   * `oracle-js/src/normalize.js`.
+   */
+  private const val SHAPE_TURN: Double = 45.0
+
+  /** The mark kinds a turned extent is measured for; `SHAPE_EXTENT_TYPES` in `normalize.js`. */
+  private val TURNED_EXTENT_KINDS = setOf("arc", "path", "shape")
+
   public val DEFAULT_IGNORED_CHANNELS: Set<String> = emptySet()
 
   /**
@@ -2061,7 +2139,20 @@ public object Differential {
    * reference *records* one, which is the overwhelming majority: `fontSize` appears 5,359 times in
    * the fixture references and `size` 5,597.
    */
-  private val ABSENCE_UNCOMPARABLE = setOf("fontSize", "size")
+  private val ABSENCE_UNCOMPARABLE =
+    setOf(
+      "fontSize",
+      "size",
+      // **A turned extent the reference does not carry says nothing about this one.** The harvester
+      // records it only where upstream's own figure really is a rotation — it drops the ones where
+      // `boundContext` turned a shape's `moveTo` and left an off-centre `context.arc` where it was,
+      // which a rounded arc corner and a geoshape point feature both produce. This engine turns its
+      // outline honestly and so always has a figure to offer; an omission there is upstream
+      // declining to measure, not a shape drawn differently. Where it *is* recorded, it is
+      // compared.
+      "shapeTurnedWidth",
+      "shapeTurnedHeight",
+    )
 
   /** The channels upstream offsets by the accumulated group translation; see [Mark.originX]. */
   private val POSITION_CHANNELS = setOf("x", "y", "x2", "y2")

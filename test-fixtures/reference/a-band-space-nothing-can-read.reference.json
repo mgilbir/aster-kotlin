@@ -87,6 +87,8 @@
       "shapeHeight": 10,
       "shapeLeft": 95,
       "shapeTop": 90,
+      "shapeTurnedHeight": 10,
+      "shapeTurnedWidth": 10,
       "shapeWidth": 10,
       "size": 100,
       "type": "symbol",

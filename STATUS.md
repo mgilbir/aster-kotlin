@@ -10880,3 +10880,62 @@ assertion is vacuous if the corpus stops recording channels, and a harvester tha
 half of them would pass in silence.
 
 260 Vega differential fixtures.
+
+### A square is not a circle, and for a third of the corpus nothing said so
+
+`symbol`, `arc`, `path` and `shape` were compared by an **axis-aligned box** and nothing else —
+14,089 marks of 38,712, 36.4% of the corpus. A circle, a square and a cross of the same size have
+the identical one. Measured rather than argued: drawing every circle symbol as a square of the same
+box was caught by **one** of 260 fixtures, and only because a circle's cubics miss the corner by a
+rounding. With a second extent recorded at 45 degrees it is caught by **109**.
+
+The shapes separate cleanly there — 20 by 20 stays 20 by 20 for a circle, becomes 28.284 for a
+square and 19.799 for a cross — and real differences are tens of units against approximation noise
+of 1e-4, four orders of magnitude apart.
+
+**Neither side got new geometry.** Upstream re-bounds through its own `Marks[type].bound` by lending
+the item another 45 degrees, so `boundContext`'s extrema logic does the work there; here the control
+points are mapped and `PathData.bounds` does it, which is the same cubic-extrema code the ordinary
+extent already used. Three decisions kept it that way, and each was a chance to transcribe a rule
+twice:
+
+- **Only the size is recorded.** Turning a shape about a different centre moves the result without
+  resizing it, so the two engines need not agree on what the anchor is — which for an arc is a
+  centre this engine has already folded into its path.
+- **Both sides measure the bare outline**, the item being lent a `strokeWidth` of 0 for the
+  measurement so `boundStroke` expands by nothing. Matching the miter allowance would have meant
+  transcribing it; a stroke widens a circle and a square alike and says nothing about which is which.
+- **The reference decides whether there is anything to compare.** Where upstream declines to measure,
+  this engine's own figure is not reported as an invention.
+
+**Upstream's turned figure is not always a rotation, and finding the test for that took three
+tries.** `boundContext.arc` adds the rotation to the *angles* and leaves the **centre** where it is,
+while the `moveTo` beside it is rotated — so an outline drawn with an off-centre `context.arc` comes
+out as a union of turned and unturned pieces. Naming the affected mark types was wrong twice over: it
+lost every well-behaved arc and kept the geoshapes that misbehave. What separates them is a property
+no rotation can break — **a turned extent cannot exceed the diagonal of its own box**, every point
+staying the same distance from the centre. A projected point feature, drawn `moveTo(x + r, y)` then
+`arc(x, y, r, …)`, has a 12 by 12 box and a turned figure of 85 by 54: five times its own diagonal.
+
+A **rounded arc corner** is the one case the diagonal does not catch, because a corner circle inside
+the wedge can leave the figure under it and still not be a rotation of anything. That one is excluded
+by its cause rather than its symptom: an arc with a `cornerRadius` is not measured, and every other
+arc is.
+
+Coverage is **13,177 of 14,089** shape-extent marks, 93.5%: symbol 99.8%, path 97.4%, shape 88.4%,
+arc 75.0%.
+
+**The tolerance is the curve one, for every mark type that carries a turned extent.** Taking a
+shape's extrema again in a rotated frame compounds the cubic approximation on *both* axes at once,
+where the axis-aligned box only ever feels it on one — so a `shape`, polygonal enough to sit inside
+the tight `1e-6` upright, drifts past it turned. The schema property sweep is what found that: 116
+of its 7,510 charts, every one a projected land mass differing by **8.7e-5**, which is four orders
+of magnitude inside the curve tolerance and four outside the tight one. It weakens nothing that
+existed, and the headroom is unchanged — a wrong shape differs by tens of units, not hundredths. The
+circle-as-square mutant is caught by the same 109 fixtures with the wider tolerance as without it.
+
+**It is a derived measurement and not the outline**, which is worth saying plainly: two genuinely
+different outlines that agree at 0 degrees *and* at 45 would still agree here. What it ends is the
+state where a third of the corpus was checked on a rectangle.
+
+260 Vega differential fixtures.

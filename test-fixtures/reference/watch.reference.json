@@ -6,6 +6,8 @@
       "shapeHeight": 384,
       "shapeLeft": 8,
       "shapeTop": 8,
+      "shapeTurnedHeight": 380,
+      "shapeTurnedWidth": 380,
       "shapeWidth": 384,
       "stroke": "black",
       "type": "arc"
@@ -933,6 +935,8 @@
       "shapeHeight": 23,
       "shapeLeft": 188.5,
       "shapeTop": 188.5,
+      "shapeTurnedHeight": 19,
+      "shapeTurnedWidth": 19,
       "shapeWidth": 23,
       "stroke": "goldenrod",
       "type": "arc"
