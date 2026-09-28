@@ -10834,3 +10834,49 @@ The schema property sweep is **7510 of 7510** again; value 499 of 499, signal 14
 of 54 and both Vega-Lite corpora are unchanged.
 
 260 Vega differential fixtures.
+
+### Every channel the corpus records can be made to fail
+
+Three blind spots were found by hand in two days, and all three were the same shape: a channel no
+disagreement could disturb, with every corpus passing regardless. A comparison reading
+`abs(wanted - got) > tolerance`, which is false whenever either side is `NaN`. A loop walking only
+the reference's channels, so anything this engine invented was never looked at. A routing branch
+that swallowed the non-finite spellings back into the numbers, leaving the rule written for them
+unreachable.
+
+`ChannelObservabilityTest` is the mechanical version of that search. For every `(mark type, channel)`
+pair the references carry — **152** of them — it perturbs this engine's value and asserts the
+comparison reports it. The property is the weakest one worth having: it does not say the comparison
+is *right*, it says the comparison is **connected**.
+
+Three things had to be got right before it meant anything, and each was found by the test being
+wrong first.
+
+**A channel is tried against several marks, because a guard may rightly silence it on one.** A
+`strokeWidth` on a mark with no stroke paints nothing and `unpaintedStroke` says so. Silence
+everywhere is the failure; silence somewhere is a rule.
+
+**A perturbation a channel is right to ignore proves nothing.** The first version accused four
+channels and three were its own fault: appending a space to a coordinate list is not a change —
+`pointsMatch` splits on whitespace and compares numerically — and `"bold "` is the same font weight
+as `"bold"`. Both comparisons were doing exactly the right thing.
+
+**And the kinds have to be separated.** Asking whether *some* perturbation is reported is too weak,
+which the test proved by passing against the very bug it was written for: moving a number to another
+number is seen perfectly well by `abs(wanted - got) > tolerance`. The hole was never a channel being
+unreachable — it was one **kind** of disagreement being unreachable, and `NaN` was the kind. A
+number now has two kinds and both must be reported somewhere; the strings keep one, because their
+candidates are alternatives rather than requirements.
+
+Reverting `agree` to the expression it replaced puts `arc.opacity [NaN]` and its neighbours straight
+back on the failure list. Worth recording that the *polarity* is half the fix on its own: `x > t` and
+`!(x <= t)` are the same test for every real number and opposite ones for a `NaN`, so writing the
+comparison as `!agree(…)` closes the hole before the explicit `NaN` branch is reached. A first
+mutant that flipped only the inside of `agree` did **not** reproduce the bug, and reading why is
+what found this.
+
+The pair count is floored at 152 for the reason `scripts/test-counts.py` floors the test counts: the
+assertion is vacuous if the corpus stops recording channels, and a harvester that quietly dropped
+half of them would pass in silence.
+
+260 Vega differential fixtures.
