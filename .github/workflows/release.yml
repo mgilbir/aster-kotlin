@@ -445,6 +445,22 @@ jobs:
           # Notes come from the changelog, so the release page and the file in the repository cannot
           # drift apart.
           ./.github/scripts/changelog-section.sh "$version" > notes.md
+
+          # **A release body is capped at 125,000 characters**, and 0.7.0's section was 336,638. The
+          # tag had already been pushed when `gh release create` answered 422, so the page and the
+          # XCFramework it carries were missing — and `Package.swift` at the tag named a download that
+          # did not exist. Over the cap, the page keeps what precedes the first `###` (the summary a
+          # long section opens with) and links to the whole section at the tag. The margin is for the
+          # "Using it" block appended below.
+          if [ "$(wc -c < notes.md)" -gt 120000 ]; then
+            echo "::notice::The $version section is $(wc -c < notes.md) characters; the page carries its summary and links the rest."
+            awk '/^### /{exit} {print}' notes.md > summary.md
+            {
+              echo ""
+              echo "The full list of changes is the \`## $version\` section of [\`CHANGELOG.md\` at \`v$version\`](https://github.com/${GITHUB_REPOSITORY}/blob/v$version/CHANGELOG.md#${version//./}). It is too long for a release page."
+            } >> summary.md
+            mv summary.md notes.md
+          fi
           {
             echo ""
             echo "## Using it"
