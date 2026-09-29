@@ -4,147 +4,36 @@ Notable changes, newest first. The release workflow reads the section for the
 version it is publishing and uses it as the release notes, so a version without a
 section here does not get released.
 
-## Unreleased
+## 0.7.0
 
-### Fixed
+Almost all of this release is about agreeing with upstream Vega and Vega-Lite in places nothing
+compared before. Most of the changes are in what a specification may legally write and ordinary
+charts rarely do: a value that isn't a number, a size or domain bound set by a signal nobody has
+moved yet, a degenerate scale, a theme property that reaches further than it looked. The Vega differential grew from 198 fixtures to 260 and Vega-Lite from 283
+to 332. Every one of them matches upstream. These gated fixtures are backed by report-only sweeps:
+Vega-Lite's schema, compared by the Vega it compiles into; Vega's schema, compared by scene; 1,981
+Vega-Lite specifications written by hand; the Deneb templates; and two sweeps that vary a
+column's values or write into a chart's signals.
 
-- **A legend's kind is chosen by falsiness, and the word it was given is said out loud.**
-  `spec.type || (isContinuous(scale) ? 'gradient' : 'symbol')` — so absent, `null` and `""` infer the
-  kind from the scale while any other value present decides, and only `gradient` means gradient. This
-  engine failed to parse an unrecognised word and inferred, so `"type": "nonsense"` drew a gradient
-  where upstream draws symbols. Upstream also keeps the word verbatim for the accessibility
-  description — `Nonsense legend for fill color …` — which `LegendSpec.typeName` now holds beside the
-  enum. Adds `LegendSpec.typeName` and `VegaValue.isTruthy` (**4929** exported symbols, two more);
-  `JsSemantics.truthy` delegates to the latter so one rule has two callers.
+**This is a breaking release.** From Kotlin, these are source-incompatible (each is described in
+its entry below):
 
-- **A guide's orientation may be computed.** *(Adds three model properties; see below.)*
-  `{"signal": …}` is legal on every guide property, and
-  the enum-valued ones refused it: an object stringifies to `[object Object]`, which parses as no
-  orientation, so a legend fell back to its default corner with a spurious diagnostic and an **axis
-  was dropped entirely** — 210 wide where upstream draws 241. An axis's `orient`, a legend's `orient`
-  and a legend's `direction` now resolve, and a computed property is no longer reported as a
-  misspelled one.
+- `BandScale.domain`, `PointScale.domain` and `OrdinalScale.domain` are `List<VegaValue>`, where
+  they were `List<String>`. `BandScale.invert`, `BandScale.invertRange` and `PointScale.invert`
+  answer `VegaValue`.
+- `zindex` is a `Double` on `MarkSpec`, `AxisSpec`, `LegendSpec` and `TitleSpec`, where it was an
+  `Int`.
+- `MarkSpec.clip` is a `MarkClip` (`None`, `Rect`, `Signal` or `Shape`), where it was a `Boolean`.
+  `MarkSpec.configAboveDefaults` and `configBelowDefaults` are gone.
+- `ProjectionSpec.angle` and `ProjectionDefinition.angle` are gone.
+- `GuideConfig.markDefaults` takes the mark type alone and answers a `VegaValue.Obj`.
 
-  Three properties are added to carry the expression until it resolves — `AxisSpec.orientExpression`,
-  `LegendSpec.orientExpression` and `LegendSpec.directionExpression` — alongside the
-  `titleExpression` and `formatExpression` that were already there for the same reason. **4927
-  exported symbols**, three more than before. Additive in Kotlin, where each has a default; a Swift
-  caller that constructs an `AxisSpec` or `LegendSpec` through the generated initialiser sees the
-  label list grow, which is the same shape of change as any previous property on those two.
-
-- **A background a signal paints.** `background` is the third of the five top-level properties
-  `collectSignals` turns into a built-in signal, so both `"background": {"signal": "bg"}` and a
-  specification declaring a signal *named* `background` set the surface colour — the property is only
-  a seed. This engine read the property alone, which meant `world-map`, whose background is a signal
-  bound to a colour picker, painted nothing. The reference recorded no background at all until now;
-  71 fixtures declare one and none had been compared.
-
-- **A stroke width that is present is coerced, and only an absent one takes the default.**
-  `boundStroke` reads `item.strokeWidth != null ? +item.strokeWidth : 1`, so `""` measures a mark at
-  **0** and `"wide"` at **NaN** — which drops it out of the surface — while this engine read the
-  channel and sent every non-number to the default 1. `strokeMiterLimit` takes the same rule from the
-  same two lines. Upstream's bounds for a symbol of size 200: 14.142 wide with `""`, 18.142 with
-  `true` or no width at all, NaN with `"wide"`.
-
-- **A fill that is not a colour is still a fill.** Upstream puts whatever the encode produced on the
-  item, so `fill: 0.28` reaches the scene and the SVG as it stands; this engine parsed it, found no
-  colour, and recorded that the mark had no fill — which is not the same as having one that paints
-  nothing, and `MarkEncoder` already kept them apart for `stroke`. Nothing visible changes: an
-  unparseable presentation attribute resolves to the *inherited* value, and vega's root group is
-  `<g fill="none">`, so both paint nothing. An empty value is kept too for a fill and still refused
-  for a stroke, where `boundStroke`'s falsiness test means an empty one must not widen the mark.
-
-- **A mark that cannot be placed no longer erases the surface.** Upstream bounds a segment with
-  `x1 = item.x || 0` — a `NaN` is falsey, so the first corner anchors at the origin — keeps the
-  second corner's `NaN` via `!= null`, and then loses it in `Bounds.union`, which is four bare
-  comparisons a `NaN` fails. This engine used `min`/`max` at both sites, which propagate, so a single
-  unplaceable mark turned the whole surface into `NaN`. A guide over a scale with an empty range is
-  full of them: upstream draws it 272 by 152, the same as with a working range.
-
-- **A range too short to interpolate is still a range.** d3 pairs a scale's domain against its range
-  over `min(domain.length, range.length)` entries, so `[]` and `[5]` build a scale that answers
-  `undefined` rather than refusing to exist, and `[0, 50, 100]` over `[0, 100]` pairs the first two —
-  `scale(50)` is 25. This engine refused the range twice, once in `ScaleResolver` and once in a
-  `LinearScale` `require` left behind when the matching domain rule was fixed, and a refused scale
-  takes the axis and every encoding naming it down with it.
-
-- **An empty subtitle takes no room, and an empty title still takes its own.** `titleLayout` unions
-  the subtitle's bounds into the heading only `if (subtitle && subtitle.text)`, and unions the
-  title's unconditionally — so the title's row is reserved on declaration and the subtitle's on
-  content. This engine reserved both on declaration, making a heading with a computed-but-unanswered
-  subtitle 112 tall where upstream draws 97. The subtitle's scene item is unaffected: whether it
-  exists is the property's decision, which was already right.
-
-- **A title a signal does not supply is not the word `null`.** A guide's `title` may be computed, and
-  the result was read with the same function that *says* a value — `String(null)` is the four-letter
-  word — so a chart whose title comes from an unanswered control drew `null` across the top of a
-  legend, along an axis, and over the chart. A screen reader said it out loud, because a caption is
-  built from the same text: `X-axis titled 'null' for a discrete scale with 2 values: a, b`.
-
-  A declared title that resolves to nothing is an **empty** title, not an absent one: it still has
-  an item and still reserves its row, so the answer is the empty string. Returning null instead
-  deleted the title mark and took fifteen pixels of surface with it.
-
-  The mark comparison could not see any of this — it walks the reference's own channels, so a word
-  this side invents was compared against nothing. `text` is one-sided-checked now, as paint and the
-  stroke caps already were.
-
-- **A format specifier nobody gave is not an empty one.** `formatSpan` opens
-  `specifier = formatSpecifier(specifier == null ? ',f' : specifier)` — a *loose* null check — so an
-  absent specifier means comma-grouped fixed and an empty string does not: a linear axis over
-  `[0, 1]` at three ticks reads `0.0`, `0.5`, `1.0` for the first and `0`, `0.5`, `1` for the second.
-  A `"format": {"signal": …}` whose signal held null was resolved with `String(value)`, producing the
-  word `null`, which is not a format — so the labels fell back to the empty specifier's reading and
-  lost a decimal place. A chart whose format comes from a granularity control is in that state until
-  the control is answered. Fixed at both sites that resolve one — the axis, and the legend, which
-  substitutes it once into a resolved copy of itself. A third apparent site in `discreteDateLabeller`
-  resolved the same expression a second time and could only ever answer what the first had; it is
-  removed.
-
-- **A scale with no range keeps the range d3 gives it**, rather than being refused. `configureRange`
-  only calls `scale.range(…)` when there is a range to set, so a scale that declares none keeps d3's
-  own default — `[0, 1]` for every continuous, discretizing and banded type, and `[]` for `ordinal`.
-  This engine answered `Scale 'c' has no range` and refused the scale, which took every encoding that
-  named it with it.
-
-  The common way in is a colour scheme that evaporates. `configureRange` opens its scheme branch with
-  a bare `else if (_.scheme)` — a truthiness test on the resolved value — so
-  `{"scheme": {"signal": "theme"}}` whose signal holds `null` or `""` leaves the scale with no range
-  at all rather than with a failed lookup, and a palette picker whose signal has not been answered
-  yet is exactly that. A *literal* falsey scheme is not the same case: `parseScaleRange` matches it
-  against no branch and upstream refuses the specification outright.
-
-- **A plotting area is never negative and never NaN, whatever arrived at it.** A `width` signal
-  that resolved negative was used as it stands: the band scale ranged on `"width"` divided up a
-  negative range, and the signal sweep's `-100` case drew a surface 207 across where upstream draws
-  18. A signal reading `width / 2` read the negative half with it. Upstream's `layoutGroup` opens `width = Math.max(0, group.width || 0)` and
-  `viewSizeLayout` repeats it and hands the result to `resizeView`, which writes the clamped number
-  **back into the signal** before rerunning the dataflow — so the signal itself reads 0 and
-  everything downstream of it does too.
-
-  Both halves of that expression are separate tests. The clamp takes a negative size; `|| 0` takes a
-  `NaN` one, since `Math.max(0, NaN)` is `NaN`. This engine had the clamp on the *seeded* size only,
-  so a size declared as an ordinary property was already right and the same size arriving through a
-  signal was not.
-
-- **A chart's size may be written as a signal reference, and that is an expression rather than a
-  seed.** `"width": {"signal": "w"}` did not set the width to anything at all: the parser read the
-  property with `optionalNumber`, an object is not a number, and the chart was left with no width —
-  warning that `'width' must be a number` about a form upstream accepts silently. A chart with a
-  responsive width rendered at its padding and nothing else, and every scale ranged on `"width"`
-  came out `[0, 0]` with it.
-
-  Upstream's `collectSignals` passes five top-level properties — `background`, `autosize`,
-  `padding`, `width` and `height` — through `signalObject`, which is
-  `value && value.signal ? {name, update: value.signal} : {name, value}`, so the reference makes the
-  **built-in signal derived**. `width` and `height` are carried through here, because their readers
-  already take the live signal rather than the parsed property; the other three still read the
-  literal and would publish a signal nothing consults.
-
-  The merge comes with it. A specification may name the same signal itself, and upstream folds the
-  two with `extend(pre[s.name], s)` — the declaration is copied *onto* the built-in, so one carrying
-  `update` overwrites the reference and one carrying only `value` leaves the reference standing and
-  contributes an initial value the first pulse throws away.
+Several model classes gained properties with defaults, which keeps Kotlin callers compiling. From
+Swift, those initialisers' label lists change, since Objective-C has no default arguments:
+`AxisSpec`, `LegendSpec`, `MarkSpec`, `TitleSpec`, `ProjectionSpec`, `ProjectionDefinition`,
+`RangeSpecScheme`, `GroupKey`, `IdentityScale` and `SequentialColorScale`, plus
+`SignalResolver.session`, `BinTransform.binSettings` and the `aggregateOver`, `groupKey` and
+`groupTuples` functions. The exported Swift surface is 4,929 symbols.
 
 ### Changed
 
@@ -401,8 +290,6 @@ section here does not get released.
   Recorded rather than fixed in this change: the sweep is a measurement, and each of those is its own
   defect with its own fix.
 
-### Changed
-
 - **A gradient legend over a scale that carries no colours is reported rather than matched.** This is
   a deliberate divergence, recorded with its evidence rather than left to be rediscovered.
 
@@ -421,55 +308,6 @@ section here does not get released.
   Reachable from Vega-Lite by `{"legend": {"type": "gradient"}}` on a size or shape channel, which is
   why it is a diagnostic rather than a silent skip. Found when the Vega-Lite compiler began honouring
   a stated legend type and its fixture could not draw the half it now emitted correctly.
-
-### Fixed
-
-- **A guide's `formatType` reaches further than its own labels, and a header's `labelExpr` comes
-  from the theme too.** `getFormatMixins` reads the *guide's* pair for anything that is not a plain
-  string definition — `getGuide(fieldDef)` — so an `axis` block settles two rules for the whole
-  channel.
-
-  `addLineBreaksToTooltip` uses the array-aware form only for a discrete field with no time unit and
-  `!getFormatMixins(channelDef).format && !getFormatMixins(channelDef).formatType`. This checked the
-  format and not the type, and read a category out as a joined list where upstream reads a word.
-
-  `isFieldOrDatumDefForTimeFormat` is
-  `formatType === 'time' || (!formatType && isTemporalFieldDef(fieldOrDatumDef))`, and it decides
-  **both** whether a column is parsed into dates and whether it is spoken as one. A temporal field
-  whose axis says `number` is therefore not parsed at all: upstream emits the source rows untouched,
-  with no formula and no dataset derived from one, and leaves a time scale standing over raw strings.
-  The same predicate now governs both sites here, where each had its own half of it.
-
-  And `assembleLabelTitle` asks `getHeaderProperties([…, 'labelExpr'], facetFieldDef.header, config, channel)`
-  — the header block and then the theme. Read from the header alone, a `config.header.labelExpr` was
-  dropped and a theme that captions every cell of every trellis captioned none of them.
-
-  `a-heading-a-theme-wrote-itself` is new. The format-type rules are held by `GuideFormatTypeTest`
-  rather than by a fixture, and deliberately: every chart they need is degenerate — a number format
-  over a category, a time scale over unparsed text — and upstream's rendering of those lays out eight
-  pixels differently from this runtime's. That difference is real, unexplained, and **not** what these
-  rules are about; a fixture carrying it would fail the scene comparison for an unrelated reason. Four
-  mutants, all killed.
-
-  **This closes the string sweep: 27489 of 27513, and nothing differs.**
-
-
-- **Three places can say a mark links somewhere, and this read one.**
-  `cursor(markDef, encoding, config)` asks
-  `encoding.href || markDef.href || getMarkPropOrConfig('href', markDef, config)`, so a theme giving
-  every bar the same link makes every bar clickable. This read only the channel, so a themed link
-  drew no pointer and the reader had nothing to tell them the mark could be followed.
-
-  Both guards run through the chain too —
-  `const specifiedCursor = getMarkPropOrConfig('cursor', markDef, config); if (specifiedCursor === undefined) { … }`
-  — so a `cursor` a *theme* settles suppresses the pointer exactly as one on the mark does.
-
-  Three fixtures, because a configuration is chart-level and the cases contradict: a themed link, a
-  chart with no link at all that must have no cursor, and a theme that settles both. Four mutants,
-  all killed; two of them needed the third fixture, a mark-stated cursor being unable to tell a
-  chain-wide guard from a mark-only one.
-
-### Changed
 
 - **The sweep reads a stated string.** `declaredValues` handled enums, booleans, numbers, colours and
   number arrays, and skipped every property whose schema says only "string" — 77 of them across the
@@ -548,8 +386,6 @@ section here does not get released.
 
   **444 of the guide sweep's 516 differences close with this** — one rule, appearing once per CSS
   colour name the schema declares, times three properties. 27196 of 27251 agree.
-
-### Changed
 
 - **The sweep reads a channel's own guides.** Eight families more, one per (guide, channel) pair —
   `{"encoding": {"x": {"axis": {…}}}}` and its kin — over the four tables the encoding families had
@@ -2198,97 +2034,286 @@ section here does not get released.
   remains of the heading is where the subtitle is *placed*, which follows the `autosize: "fit"`
   disagreement still at the top of that list.
 
-### Internal
-
-- **A blend mode, a cap and a join on the marks whose records left them out.** The comparison built
-  a rect's, a symbol's and a path's record from a shared paint table and hand-wrote the other four,
-  so a **blend** was compared on three mark types and not on a rule, a text, a line, an area or a
-  group — and the reference's own record for a line or an area carried neither the blend nor the
-  cap, the join or the mitre limit. A blended gridline agreed with a reference that says it is
-  blended and drew as though it were not. Both sides record them now, and the comparison is
-  **two-sided** for them: a blend this engine has and upstream does not is reported as loudly as the
-  other way round, which is the asymmetry that hid this for as long as it existed. Two real
-  differences fell out at once — a line's `strokeCap`, `strokeJoin` and `strokeMiterLimit` were
-  dropped from this side's record entirely.
-
-- **The schema sweep reaches a mark's own properties and its sixty encode channels.** It swept four
-  guide families; it now sweeps six, and the widest of the two new ones is the channel table —
-  `strokeCap`, `blend`, `aria`, `smooth`, `padAngle`, `cornerRadiusTopLeft` and the rest, most of
-  which no chart in any corpus sets. Reaching them meant following the schema's *encoder value*
-  shape, where a channel's enumeration hides behind `{"value": {"enum": […]}}` because a channel may
-  equally be a field, a scale lookup or a signal; and keying the skip table by family, since a
-  legend's `fill` names a scale while a mark's is a colour. 789 cases now, 771 of them rendered by
-  upstream, and **all 771 agree**.
-
-- **A stroke's details are inert on a mark with no stroke.** `addEncoders` puts every property a
-  specification names on the item whether or not anything uses it, so a legend symbol given a
-  `symbolDash` carries a `strokeDash` even where the legend maps a fill and has no stroke colour —
-  and upstream's renderer strokes nothing with it. The harness read that as a difference; it now
-  reads the detail channels as inert *without* the colour, which is still reported.
-
-- **Two spellings the differential harness now reads as one value.** A `limit` of **zero** is
-  upstream's own way of saying "do not truncate" — `item.limit > 0 && text.length ? truncate(…) :
-  text` — and a `TextRun` here holds the same zero while the harness omits it, so `labelLimit: 0`
-  was reported as a difference in four sweep cases and is a difference in no drawing. And `bolder`
-  and `lighter` are **relative** weights: upstream writes them on the `<text>` element with none on
-  any ancestor, so a browser resolves them against the initial `normal`, which is the 700 and 100
-  this engine resolves them to at compile time. Both equivalences are asserted in both directions by
-  `DifferentialEquivalenceTest` — the pair that means the same thing agrees, and a weight resolved
-  to the wrong number still fails.
-
-- **A sweep of the surface Vega's schema declares, rather than of the charts people draw.** The four
-  corpora here — the 200 fixtures, Vega-Lite's 627 examples, 1981 specifications from GitHub, 63
-  Deneb templates — all agree with upstream on everything they cover, which is the point at which a
-  corpus of *used* features stops finding anything. None of them reaches a property nobody happened
-  to set, or a value of it nobody happened to choose.
-
-  `vega/build/vega-schema.json` is the list of those, and it is machine-readable.
-  `scripts/property-sweep.sh` walks it and writes one small bar chart per (property, value) pair
-  across `axis`, `legend`, `title` and `scale` — the same chart every time with one property changed,
-  so a difference names its own cause — renders each with upstream, and `PropertySweepTest` reports
-  the tally and the causes ranked by how many cases each affects. A property whose schema says too
-  little to choose a value honestly is skipped **and counted**, with the reason, in the manifest.
-
-  605 cases, 587 of them rendered by upstream, and **540 agree** on the first run. The 47 that do not
-  are what the sweep is for: seven specifications this engine refuses outright where upstream draws
-  one, and forty differences across `fontWeight`, `labelLimit`, `zindex`, `clipHeight`, `columns`,
-  `symbolLimit`, `symbolDash`, the title's `dx`/`dy`/`orient` and the two `line-…` baselines. A
-  measurement and not a gate, the same course the gallery and Deneb sweeps took.
-
-- **A sweep of Vega specifications other people wrote.** `scripts/oracle.sh` renders the 198
-  fixtures under `test-fixtures/specs`, and those are this repository's own: written to pin down a
-  reading of Vega's semantics, one behaviour at a time, by the person implementing it.
-  `scripts/deneb.sh` adds a different distribution — the 63 `avatorl/Deneb-Vega-Templates`, MIT
-  licensed and pinned to a commit — where features combine in ways no fixture combines them and a
-  layout depends on three transforms agreeing.
-
-  They are Deneb templates rather than plain Vega, so four things are undone before either engine
-  sees them, each in the open in `oracle-js/src/deneb-prepare.js`: rows are synthesised from the
-  column declaration each template carries, since Power BI injects the table at run time;
-  `pbiColor(n)` is replaced by the literal colour it returns, Deneb defining it and upstream Vega
-  not; one template is JSON with comments; and `width`/`height`, computed from `containerSize()`,
-  fall back to the size the template itself declares, there being no container headless.
-
-  Seven templates are **not comparable** and are recorded as such rather than fudged. One needs a
-  second Deneb function this corpus will not invent. Six use `vega-label`, which places labels by
-  rasterising the marks and so needs a real canvas the oracle deliberately does not have — adding
-  one would switch upstream's text measurement and move every reference in the repository. Worth
-  saying plainly: `label` is the one transform here that no fixture uses, and it is the one that
-  cannot be referenced, so this corpus adds combinations rather than transform types.
-
-  **A measurement, not a gate**, which is the shape both Vega-Lite sweeps had until they earned the
-  promotion. `check.sh` does not call this and the test skips when the corpus is absent.
-
-  The first reading is **0 of 56**. The two largest causes are one root, confirmed against a
-  minimal specification rather than inferred: a title property written as a **signal** is not
-  resolved, so the colour falls back to the default — 54 templates — and a signal-valued `subtitle`
-  produces no subtitle mark at all, the same 54. Written as literals both work. After that,
-  `"reverse": true` on a scale, which this engine does not read at all, and a disagreement about
-  `autosize: "fit"` that moves 37 scale ranges and the geometry under them. One template,
-  `part-to-whole__voronoi`, this engine declines to draw and says nothing about why, which is its
-  own bug.
-
 ### Fixed
+
+- **A `pow` scale with a negative exponent places its ticks.** `transformPow(0)` is `Infinity` at an
+  exponent below zero, so a domain starting at zero transforms to a downward one with an infinite
+  end. d3's `bimap` orders the transformed ends before normalising and hands the infinite span to
+  `normalize` with no finiteness guard, and an ordinary value maps to an end of the range. This
+  engine normalised the ends in the order written and refused a non-finite one outright, so every
+  tick, label and symbol on the axis was placed at `NaN`. At `domain([0, 95]).range([120, 0])` and
+  an exponent of `-4`, upstream's `scale(8)` and `scale(95)` are **0** and only `scale(0)` is `NaN`.
+  The ordering was written out twice, in `LinearScale` and `TransformedScale`; it is one `bimap` now.
+
+- **A range of fewer than two stops answers nothing, and an axis over one draws its spine as a
+  point.** d3 treats a short *range* and a short *domain* differently: over a range with fewer than
+  two stops `scale(x)` is `undefined`, over a domain with fewer than two it is `NaN`, and the two
+  take different branches wherever a mark is placed. This engine gave both `NaN`, so a rect on an
+  axis over an empty range got a position upstream does not give it. The axis's domain line is
+  encoded as `{range: 0}` to `{range: 1}`, both undefined over an empty range, so upstream draws it
+  as a point; this engine fell back to zero at the near end and to the size of the plotting area at
+  the far one.
+
+- **A gradient legend over a span that is not a number puts its label in the middle.**
+  `scaleFraction` returns the constant `0.5` when `!delta || !isFinite(delta)`, and `!delta` holds
+  for a `NaN` span as well as a zero one. This engine tested `lo == hi`, which a `NaN` never
+  satisfies, so a ramp over a column with no numbers in it placed its one label at `NaN`, and a
+  domain reaching an infinity placed its labels at 0.
+
+- **A gradient legend's labels have no length limit unless the specification sets one.** Upstream
+  reads `value(spec.labelLimit, config.gradientLabelLimit)` for a gradient and `labelLimit` from
+  `config.legend` for a symbol legend. The second defaults to 160; `config.gradientLabelLimit` does
+  not exist, so a gradient legend, and a discretizing scale's legend built by the same file, does not
+  truncate at all. This engine applied 160 to every kind, and it also ignored an explicit
+  `labelLimit` on a gradient legend, because the resolved value was never used.
+
+- **A subtitle does not inherit a limit given to its title's encode.** Both heading texts read
+  `limit` from their group, and `encode.title.update.limit` is then laid over the **title** alone.
+  This engine gave the subtitle the title's resolved limit, truncating it where upstream does not.
+
+- **A view size written as a word is `NaN`, and one written as `NaN` is zero.** Upstream sizes the
+  view with `Math.max(0, w || 0)`, and the falsiness test runs before the coercion: a numeric `NaN`
+  is falsey and becomes 0, while `"wide"` is truthy and reaches `Math.max` as `NaN`. An `Infinity`
+  is not clamped at all. This engine lost the word before the falsiness could see it, then clamped a
+  second time in the reader the scale ranges use and fell back on the declared size. The surface was
+  already right — upstream draws the same 8-wide box for a `NaN` width as for a negative one — but
+  every scale ranged on the width was not: `[0, 0]` here against upstream's `[0, NaN]`.
+
+- **A position a scale cannot give stays `NaN`, and the mark is still measured where upstream
+  measures it.** A continuous scale that answers `NaN` is not the same as a discrete scale that
+  lacks a value and answers `undefined`, and `adjustSpatial` takes different branches for the two.
+  This engine treated every `NaN` as a miss, which placed rects at `y: 100` where upstream records
+  `y: NaN`. Carrying the `NaN` through also meant matching the three ways upstream bounds it: a
+  symbol is translated by `item.y || 0` and so measured **at the origin**; a rect puts each corner
+  through `||` in turn, so `y: NaN, height: 40` keeps its full 40 anchored at zero while `y: NaN,
+  y2: 100` flattens to nothing; and a line or area reads its points as `item.y || 0`, so the path
+  runs along zero rather than breaking — only `defined` breaks a series.
+
+- **A scale's `base`, `exponent` and `constant` are coerced, not validated.** They reach d3 through
+  setters that are `+_`, so a word becomes `NaN` and stays on the scale. This engine discarded the
+  `NaN` and used the default, drawing a chart upstream cannot draw. A `NaN` exponent on a `pow` scale
+  or constant on a `symlog` scale makes every mapped value `NaN`. A `NaN` base on a `log` scale leaves
+  the mapping alone — d3 normalises `log(x)` — and produces **no ticks at all**. For a scale with a
+  colour range the old behaviour is kept on purpose: upstream throws from inside d3-interpolate there
+  and every mark comes out with a null fill, so there is nothing to match.
+
+- **An angle that is not a number turns a mark by `NaN`, and the mark adds nothing to the chart's
+  size.** Upstream guards a rotation on the raw value's truthiness and multiplies after: `""` is
+  falsey and not rotated, `"0"` is truthy and rotated by zero, and `"sideways"` is truthy and rotated
+  by `NaN`. The box that produces fails every comparison in `Bounds.union`, so the mark is left
+  **cleared** and does not widen the surface. This engine discarded the `NaN` and measured the mark
+  unrotated. It applies to an axis's `labelAngle` and to the `angle` channel of a text, symbol, arc
+  and path; an image has no rotation upstream and is unchanged. Two related fixes: `RectD.union` had
+  two `isEmpty` shortcuts upstream does not, which let a `NaN`-cornered box through whole, and a text
+  mark's anchor is now placed at `NaN` rather than left unrotated, as upstream's renderer draws it.
+
+- **A band scale's padding that is not a number, or a band space below one, is divided by as
+  upstream divides.** Vega's band scale computes `space = count - paddingInner + paddingOuter * 2`,
+  uses it when it is above zero, and divides the range by `space || 1`. This engine wrote the pair as
+  `maxOf(1.0, space)`, which differs from both guards. A single band with `paddingInner: 0.5` has a
+  space of 0.5, and upstream divides a 200-wide range by it to reach a step of 400 and a band filling
+  the range; this engine drew it at half width, centred. A padding given as a word is `NaN` through
+  the setter's clamp, so upstream's step becomes the whole range and every position is `NaN`, where
+  this engine used the default padding and drew an ordinary chart. `align: null` still differs: it
+  is 0 upstream and 0.5 here.
+
+- **An axis over a reversed domain formats its labels with the right precision.** Given a reversed
+  span, `tickIncrement` answers `NaN` and `tickStep` answers the negative step, and upstream's
+  `tickFormat` takes its precision from `tickStep`. This engine used the first at eight call sites,
+  so `,f` kept d3's default of six decimals and an axis whose `domainMax` sits below its minimum read
+  `−20.000000`. The call sites are the continuous scales' tick formats, the axis labeller, legend
+  threshold captions, `GuideFormat`, `TimeTicks` and the slider step in `SignalInput`. Both the
+  step and its magnitude matter: a step of −0.02 needs the magnitude to read `−0.02` rather than `0`.
+
+- **A domain bound a signal leaves `null` is no bound, and one it cannot read is `NaN`.**
+  `configureDomain` writes `domainMin`, `domainMax` and `domainMid` only when they are `!= null`, and
+  d3 coerces what it writes with `+`. This engine read the override as a number, so an unmoved
+  control's `null` became **0** and pulled the domain's end to zero, which is the state a templated
+  chart starts in. A word was discarded and the data's own end kept, where upstream puts the `NaN` in
+  the domain and the axis draws no ticks.
+
+- **A legend's kind is chosen by falsiness, and the word it was given is said out loud.**
+  `spec.type || (isContinuous(scale) ? 'gradient' : 'symbol')` — so absent, `null` and `""` infer the
+  kind from the scale while any other value present decides, and only `gradient` means gradient. This
+  engine failed to parse an unrecognised word and inferred, so `"type": "nonsense"` drew a gradient
+  where upstream draws symbols. Upstream also keeps the word verbatim for the accessibility
+  description — `Nonsense legend for fill color …` — which `LegendSpec.typeName` now holds beside the
+  enum. Adds `LegendSpec.typeName` and `VegaValue.isTruthy` (**4929** exported symbols, two more);
+  `JsSemantics.truthy` delegates to the latter so one rule has two callers.
+
+- **A guide's orientation may be computed.** *(Adds three model properties; see below.)*
+  `{"signal": …}` is legal on every guide property, and
+  the enum-valued ones refused it: an object stringifies to `[object Object]`, which parses as no
+  orientation, so a legend fell back to its default corner with a spurious diagnostic and an **axis
+  was dropped entirely** — 210 wide where upstream draws 241. An axis's `orient`, a legend's `orient`
+  and a legend's `direction` now resolve, and a computed property is no longer reported as a
+  misspelled one.
+
+  Three properties are added to carry the expression until it resolves — `AxisSpec.orientExpression`,
+  `LegendSpec.orientExpression` and `LegendSpec.directionExpression` — alongside the
+  `titleExpression` and `formatExpression` that were already there for the same reason. **4927
+  exported symbols**, three more than before. Additive in Kotlin, where each has a default; a Swift
+  caller that constructs an `AxisSpec` or `LegendSpec` through the generated initialiser sees the
+  label list grow, which is the same shape of change as any previous property on those two.
+
+- **A background a signal paints.** `background` is the third of the five top-level properties
+  `collectSignals` turns into a built-in signal, so both `"background": {"signal": "bg"}` and a
+  specification declaring a signal *named* `background` set the surface colour — the property is only
+  a seed. This engine read the property alone, which meant `world-map`, whose background is a signal
+  bound to a colour picker, painted nothing. The reference recorded no background at all until now;
+  71 fixtures declare one and none had been compared.
+
+- **A stroke width that is present is coerced, and only an absent one takes the default.**
+  `boundStroke` reads `item.strokeWidth != null ? +item.strokeWidth : 1`, so `""` measures a mark at
+  **0** and `"wide"` at **NaN** — which drops it out of the surface — while this engine read the
+  channel and sent every non-number to the default 1. `strokeMiterLimit` takes the same rule from the
+  same two lines. Upstream's bounds for a symbol of size 200: 14.142 wide with `""`, 18.142 with
+  `true` or no width at all, NaN with `"wide"`.
+
+- **A fill that is not a colour is still a fill.** Upstream puts whatever the encode produced on the
+  item, so `fill: 0.28` reaches the scene and the SVG as it stands; this engine parsed it, found no
+  colour, and recorded that the mark had no fill — which is not the same as having one that paints
+  nothing, and `MarkEncoder` already kept them apart for `stroke`. Nothing visible changes: an
+  unparseable presentation attribute resolves to the *inherited* value, and vega's root group is
+  `<g fill="none">`, so both paint nothing. An empty value is kept too for a fill and still refused
+  for a stroke, where `boundStroke`'s falsiness test means an empty one must not widen the mark.
+
+- **A mark that cannot be placed no longer erases the surface.** Upstream bounds a segment with
+  `x1 = item.x || 0` — a `NaN` is falsey, so the first corner anchors at the origin — keeps the
+  second corner's `NaN` via `!= null`, and then loses it in `Bounds.union`, which is four bare
+  comparisons a `NaN` fails. This engine used `min`/`max` at both sites, which propagate, so a single
+  unplaceable mark turned the whole surface into `NaN`. A guide over a scale with an empty range is
+  full of them: upstream draws it 272 by 152, the same as with a working range.
+
+- **A range too short to interpolate is still a range.** d3 pairs a scale's domain against its range
+  over `min(domain.length, range.length)` entries, so `[]` and `[5]` build a scale that answers
+  `undefined` rather than refusing to exist, and `[0, 50, 100]` over `[0, 100]` pairs the first two —
+  `scale(50)` is 25. This engine refused the range twice, once in `ScaleResolver` and once in a
+  `LinearScale` `require` left behind when the matching domain rule was fixed, and a refused scale
+  takes the axis and every encoding naming it down with it.
+
+- **An empty subtitle takes no room, and an empty title still takes its own.** `titleLayout` unions
+  the subtitle's bounds into the heading only `if (subtitle && subtitle.text)`, and unions the
+  title's unconditionally — so the title's row is reserved on declaration and the subtitle's on
+  content. This engine reserved both on declaration, making a heading with a computed-but-unanswered
+  subtitle 112 tall where upstream draws 97. The subtitle's scene item is unaffected: whether it
+  exists is the property's decision, which was already right.
+
+- **A title a signal does not supply is not the word `null`.** A guide's `title` may be computed, and
+  the result was read with the same function that *says* a value — `String(null)` is the four-letter
+  word — so a chart whose title comes from an unanswered control drew `null` across the top of a
+  legend, along an axis, and over the chart. A screen reader said it out loud, because a caption is
+  built from the same text: `X-axis titled 'null' for a discrete scale with 2 values: a, b`.
+
+  A declared title that resolves to nothing is an **empty** title, not an absent one: it still has
+  an item and still reserves its row, so the answer is the empty string. Returning null instead
+  deleted the title mark and took fifteen pixels of surface with it.
+
+  The mark comparison could not see any of this — it walks the reference's own channels, so a word
+  this side invents was compared against nothing. `text` is one-sided-checked now, as paint and the
+  stroke caps already were.
+
+- **A format specifier nobody gave is not an empty one.** `formatSpan` opens
+  `specifier = formatSpecifier(specifier == null ? ',f' : specifier)` — a *loose* null check — so an
+  absent specifier means comma-grouped fixed and an empty string does not: a linear axis over
+  `[0, 1]` at three ticks reads `0.0`, `0.5`, `1.0` for the first and `0`, `0.5`, `1` for the second.
+  A `"format": {"signal": …}` whose signal held null was resolved with `String(value)`, producing the
+  word `null`, which is not a format — so the labels fell back to the empty specifier's reading and
+  lost a decimal place. A chart whose format comes from a granularity control is in that state until
+  the control is answered. Fixed at both sites that resolve one — the axis, and the legend, which
+  substitutes it once into a resolved copy of itself. A third apparent site in `discreteDateLabeller`
+  resolved the same expression a second time and could only ever answer what the first had; it is
+  removed.
+
+- **A scale with no range keeps the range d3 gives it**, rather than being refused. `configureRange`
+  only calls `scale.range(…)` when there is a range to set, so a scale that declares none keeps d3's
+  own default — `[0, 1]` for every continuous, discretizing and banded type, and `[]` for `ordinal`.
+  This engine answered `Scale 'c' has no range` and refused the scale, which took every encoding that
+  named it with it.
+
+  The common way in is a colour scheme that evaporates. `configureRange` opens its scheme branch with
+  a bare `else if (_.scheme)` — a truthiness test on the resolved value — so
+  `{"scheme": {"signal": "theme"}}` whose signal holds `null` or `""` leaves the scale with no range
+  at all rather than with a failed lookup, and a palette picker whose signal has not been answered
+  yet is exactly that. A *literal* falsey scheme is not the same case: `parseScaleRange` matches it
+  against no branch and upstream refuses the specification outright.
+
+- **A plotting area is never negative and never NaN, whatever arrived at it.** A `width` signal
+  that resolved negative was used as it stands: the band scale ranged on `"width"` divided up a
+  negative range, and the signal sweep's `-100` case drew a surface 207 across where upstream draws
+  18. A signal reading `width / 2` read the negative half with it. Upstream's `layoutGroup` opens `width = Math.max(0, group.width || 0)` and
+  `viewSizeLayout` repeats it and hands the result to `resizeView`, which writes the clamped number
+  **back into the signal** before rerunning the dataflow — so the signal itself reads 0 and
+  everything downstream of it does too.
+
+  Both halves of that expression are separate tests. The clamp takes a negative size; `|| 0` takes a
+  `NaN` one, since `Math.max(0, NaN)` is `NaN`. This engine had the clamp on the *seeded* size only,
+  so a size declared as an ordinary property was already right and the same size arriving through a
+  signal was not.
+
+- **A chart's size may be written as a signal reference, and that is an expression rather than a
+  seed.** `"width": {"signal": "w"}` did not set the width to anything at all: the parser read the
+  property with `optionalNumber`, an object is not a number, and the chart was left with no width —
+  warning that `'width' must be a number` about a form upstream accepts silently. A chart with a
+  responsive width rendered at its padding and nothing else, and every scale ranged on `"width"`
+  came out `[0, 0]` with it.
+
+  Upstream's `collectSignals` passes five top-level properties — `background`, `autosize`,
+  `padding`, `width` and `height` — through `signalObject`, which is
+  `value && value.signal ? {name, update: value.signal} : {name, value}`, so the reference makes the
+  **built-in signal derived**. `width` and `height` are carried through here, because their readers
+  already take the live signal rather than the parsed property; the other three still read the
+  literal and would publish a signal nothing consults.
+
+  The merge comes with it. A specification may name the same signal itself, and upstream folds the
+  two with `extend(pre[s.name], s)` — the declaration is copied *onto* the built-in, so one carrying
+  `update` overwrites the reference and one carrying only `value` leaves the reference standing and
+  contributes an initial value the first pulse throws away.
+
+- **A guide's `formatType` reaches further than its own labels, and a header's `labelExpr` comes
+  from the theme too.** `getFormatMixins` reads the *guide's* pair for anything that is not a plain
+  string definition — `getGuide(fieldDef)` — so an `axis` block settles two rules for the whole
+  channel.
+
+  `addLineBreaksToTooltip` uses the array-aware form only for a discrete field with no time unit and
+  `!getFormatMixins(channelDef).format && !getFormatMixins(channelDef).formatType`. This checked the
+  format and not the type, and read a category out as a joined list where upstream reads a word.
+
+  `isFieldOrDatumDefForTimeFormat` is
+  `formatType === 'time' || (!formatType && isTemporalFieldDef(fieldOrDatumDef))`, and it decides
+  **both** whether a column is parsed into dates and whether it is spoken as one. A temporal field
+  whose axis says `number` is therefore not parsed at all: upstream emits the source rows untouched,
+  with no formula and no dataset derived from one, and leaves a time scale standing over raw strings.
+  The same predicate now governs both sites here, where each had its own half of it.
+
+  And `assembleLabelTitle` asks `getHeaderProperties([…, 'labelExpr'], facetFieldDef.header, config, channel)`
+  — the header block and then the theme. Read from the header alone, a `config.header.labelExpr` was
+  dropped and a theme that captions every cell of every trellis captioned none of them.
+
+  `a-heading-a-theme-wrote-itself` is new. The format-type rules are held by `GuideFormatTypeTest`
+  rather than by a fixture, and deliberately: every chart they need is degenerate — a number format
+  over a category, a time scale over unparsed text — and upstream's rendering of those lays out eight
+  pixels differently from this runtime's. That difference is real, unexplained, and **not** what these
+  rules are about; a fixture carrying it would fail the scene comparison for an unrelated reason. Four
+  mutants, all killed.
+
+  **This closes the string sweep: 27489 of 27513, and nothing differs.**
+
+
+- **Three places can say a mark links somewhere, and this read one.**
+  `cursor(markDef, encoding, config)` asks
+  `encoding.href || markDef.href || getMarkPropOrConfig('href', markDef, config)`, so a theme giving
+  every bar the same link makes every bar clickable. This read only the channel, so a themed link
+  drew no pointer and the reader had nothing to tell them the mark could be followed.
+
+  Both guards run through the chain too —
+  `const specifiedCursor = getMarkPropOrConfig('cursor', markDef, config); if (specifiedCursor === undefined) { … }`
+  — so a `cursor` a *theme* settles suppresses the pointer exactly as one on the mark does.
+
+  Three fixtures, because a configuration is chart-level and the cases contradict: a themed link, a
+  chart with no link at all that must have no cursor, and a theme that settles both. Four mutants,
+  all killed; two of them needed the third fixture, a mark-stated cursor being unable to tell a
+  chain-wide guard from a mark-only one.
 
 - **A parse climbs in the order `MoveParseUp` climbs it, and the branches are numbered in that
   order.** Two things decide the shape it leaves behind. The node depths are measured *once*, before
@@ -4132,6 +4157,113 @@ section here does not get released.
   works on an immutable tree.
 
 ### Internal
+
+- **The differential could not fail in three ways, and each is closed.** A channel upstream recorded
+  as `NaN` agreed with any number: the comparison was `abs(wanted - got) > allowed`, which is false
+  whenever either side is `NaN`, and a routing branch sent the reference's `"NaN"` spellings back
+  into that comparison. `agree` is the guard now and replaces ten hand-written comparisons;
+  reporting `opacity = NaN` for every mark was caught by none of 260 fixtures before it and by 196
+  after. The comparison also walked only the **reference's** channels, so a value this engine
+  invented was never examined; it walks this engine's now and reports by default, with an explicit
+  table of what an omitted channel means. The harness's own placement arithmetic had to change with
+  it — a world transform is applied per axis, as upstream's harvester does, so a `NaN` in `y` no
+  longer costs a mark its `x`.
+
+  `ChannelObservabilityTest` checks the result mechanically: for each of the **152** `(mark type,
+  channel)` pairs the references carry, it perturbs this engine's value, both to another number and
+  to `NaN`, and asserts the comparison reports it. And `symbol`, `arc`, `path` and `shape` — 36.4% of
+  the corpus's marks — were compared by an axis-aligned box, which a circle and a square of the same
+  size share. A second extent measured at 45 degrees is recorded on both sides; drawing every circle
+  as a square was caught by one fixture before and by 109 after. Coverage is 13,177 of 14,089 such
+  marks.
+
+- **A blend mode, a cap and a join on the marks whose records left them out.** The comparison built
+  a rect's, a symbol's and a path's record from a shared paint table and hand-wrote the other four,
+  so a **blend** was compared on three mark types and not on a rule, a text, a line, an area or a
+  group — and the reference's own record for a line or an area carried neither the blend nor the
+  cap, the join or the mitre limit. A blended gridline agreed with a reference that says it is
+  blended and drew as though it were not. Both sides record them now, and the comparison is
+  **two-sided** for them: a blend this engine has and upstream does not is reported as loudly as the
+  other way round, which is the asymmetry that hid this for as long as it existed. Two real
+  differences fell out at once — a line's `strokeCap`, `strokeJoin` and `strokeMiterLimit` were
+  dropped from this side's record entirely.
+
+- **The schema sweep reaches a mark's own properties and its sixty encode channels.** It swept four
+  guide families; it now sweeps six, and the widest of the two new ones is the channel table —
+  `strokeCap`, `blend`, `aria`, `smooth`, `padAngle`, `cornerRadiusTopLeft` and the rest, most of
+  which no chart in any corpus sets. Reaching them meant following the schema's *encoder value*
+  shape, where a channel's enumeration hides behind `{"value": {"enum": […]}}` because a channel may
+  equally be a field, a scale lookup or a signal; and keying the skip table by family, since a
+  legend's `fill` names a scale while a mark's is a colour. 789 cases now, 771 of them rendered by
+  upstream, and **all 771 agree**.
+
+- **A stroke's details are inert on a mark with no stroke.** `addEncoders` puts every property a
+  specification names on the item whether or not anything uses it, so a legend symbol given a
+  `symbolDash` carries a `strokeDash` even where the legend maps a fill and has no stroke colour —
+  and upstream's renderer strokes nothing with it. The harness read that as a difference; it now
+  reads the detail channels as inert *without* the colour, which is still reported.
+
+- **Two spellings the differential harness now reads as one value.** A `limit` of **zero** is
+  upstream's own way of saying "do not truncate" — `item.limit > 0 && text.length ? truncate(…) :
+  text` — and a `TextRun` here holds the same zero while the harness omits it, so `labelLimit: 0`
+  was reported as a difference in four sweep cases and is a difference in no drawing. And `bolder`
+  and `lighter` are **relative** weights: upstream writes them on the `<text>` element with none on
+  any ancestor, so a browser resolves them against the initial `normal`, which is the 700 and 100
+  this engine resolves them to at compile time. Both equivalences are asserted in both directions by
+  `DifferentialEquivalenceTest` — the pair that means the same thing agrees, and a weight resolved
+  to the wrong number still fails.
+
+- **A sweep of the surface Vega's schema declares, rather than of the charts people draw.** The four
+  corpora here — the 200 fixtures, Vega-Lite's 627 examples, 1981 specifications from GitHub, 63
+  Deneb templates — all agree with upstream on everything they cover, which is the point at which a
+  corpus of *used* features stops finding anything. None of them reaches a property nobody happened
+  to set, or a value of it nobody happened to choose.
+
+  `vega/build/vega-schema.json` is the list of those, and it is machine-readable.
+  `scripts/property-sweep.sh` walks it and writes one small bar chart per (property, value) pair
+  across `axis`, `legend`, `title` and `scale` — the same chart every time with one property changed,
+  so a difference names its own cause — renders each with upstream, and `PropertySweepTest` reports
+  the tally and the causes ranked by how many cases each affects. A property whose schema says too
+  little to choose a value honestly is skipped **and counted**, with the reason, in the manifest.
+
+  605 cases, 587 of them rendered by upstream, and **540 agree** on the first run. The 47 that do not
+  are what the sweep is for: seven specifications this engine refuses outright where upstream draws
+  one, and forty differences across `fontWeight`, `labelLimit`, `zindex`, `clipHeight`, `columns`,
+  `symbolLimit`, `symbolDash`, the title's `dx`/`dy`/`orient` and the two `line-…` baselines. A
+  measurement and not a gate, the same course the gallery and Deneb sweeps took.
+
+- **A sweep of Vega specifications other people wrote.** `scripts/oracle.sh` renders the 198
+  fixtures under `test-fixtures/specs`, and those are this repository's own: written to pin down a
+  reading of Vega's semantics, one behaviour at a time, by the person implementing it.
+  `scripts/deneb.sh` adds a different distribution — the 63 `avatorl/Deneb-Vega-Templates`, MIT
+  licensed and pinned to a commit — where features combine in ways no fixture combines them and a
+  layout depends on three transforms agreeing.
+
+  They are Deneb templates rather than plain Vega, so four things are undone before either engine
+  sees them, each in the open in `oracle-js/src/deneb-prepare.js`: rows are synthesised from the
+  column declaration each template carries, since Power BI injects the table at run time;
+  `pbiColor(n)` is replaced by the literal colour it returns, Deneb defining it and upstream Vega
+  not; one template is JSON with comments; and `width`/`height`, computed from `containerSize()`,
+  fall back to the size the template itself declares, there being no container headless.
+
+  Seven templates are **not comparable** and are recorded as such rather than fudged. One needs a
+  second Deneb function this corpus will not invent. Six use `vega-label`, which places labels by
+  rasterising the marks and so needs a real canvas the oracle deliberately does not have — adding
+  one would switch upstream's text measurement and move every reference in the repository. Worth
+  saying plainly: `label` is the one transform here that no fixture uses, and it is the one that
+  cannot be referenced, so this corpus adds combinations rather than transform types.
+
+  **A measurement, not a gate**, which is the shape both Vega-Lite sweeps had until they earned the
+  promotion. `check.sh` does not call this and the test skips when the corpus is absent.
+
+  The first reading is **0 of 56**. The two largest causes are one root, confirmed against a
+  minimal specification rather than inferred: a title property written as a **signal** is not
+  resolved, so the colour falls back to the default — 54 templates — and a signal-valued `subtitle`
+  produces no subtitle mark at all, the same 54. Written as literals both work. After that,
+  `"reverse": true` on a scale, which this engine does not read at all, and a disagreement about
+  `autosize: "fit"` that moves 37 scale ranges and the geometry under them. One template,
+  `part-to-whole__voronoi`, this engine declines to draw and says nothing about why, which is its
+  own bug.
 
 - **A sweep of Vega-Lite specifications other people wrote.** The gallery sweep compiles the 627
   examples Vega-Lite ships, and those are upstream's own: written to demonstrate features, by the
