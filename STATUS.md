@@ -10963,11 +10963,15 @@ Four defects came out of the work, all older than 6.4.0, and none of them was a 
   closure, so it is now fired from `ChartInputEvent.Resized`, which both hosts dispatch from their
   own thread. The JVM tests could not see this; only `swift-test.sh` could.
 
-**One ulp that is not the easing curves'.** `easeSinInOut(1.1)` is `(1 - cos(1.1 pi)) / 2`, and the
-JVM's `Math.cos` intrinsic rounds it one ulp away from V8, whose fdlibm port `StrictMath` matches.
-d3-ease's own 362 vectors replay exactly, so the transcription is right; the `easing-curves` fixture
-prints the sine family to fifteen digits for this reason. Every `sin` and `cos` in the engine shares
-the behaviour, and matching V8's last bit would need a pure-Kotlin fdlibm, which is a separate change.
+**Last-bit differences that are the platform's, not the easing curves'.** `pow`, `sin` and `cos`
+are not correctly rounded: V8 uses a port of fdlibm, and the JVM's `Math` intrinsics land a unit in
+the last place away on some inputs, and **differently per architecture**. On an ARM Mac,
+`easeSinInOut(1.1)` was one ulp off (`StrictMath`, which is fdlibm, matches V8) and d3-ease's
+vectors replayed exactly. On CI's x86 Linux, `easeSinIn(0.7)` and `easeExpIn(0.25)` were one ulp off
+as well. So `UpstreamEaseVectorsTest` is exact for the arithmetic and `sqrt` curves and allows four
+ulps for poly, sin, exp and elastic, and the `easing-curves` fixture prints those four families to
+fifteen digits. Every `sin`, `cos` and `pow` in the engine shares the behaviour; matching V8's last
+bit on every host needs a pure-Kotlin fdlibm, which is a separate change.
 
 The ungated corpora, re-run on the whole branch:
 

@@ -3,6 +3,8 @@ package dev.aster.vega.expression
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asNumberOrNull
 import java.io.File
+import kotlin.math.abs
+import kotlin.math.ulp
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -19,9 +21,18 @@ import org.junit.jupiter.api.Test
 /**
  * **d3-ease's** own tests, replayed against the `ease*` expression functions Vega 6.4.0 added.
  *
- * Compared **exactly**, not to a tolerance: [Ease] is transcribed operation for operation so that
- * it can be, and a curve that is right to twelve digits and wrong in the last bit is a curve whose
- * operations were reordered.
+ * Compared **exactly** wherever the curve is arithmetic and `sqrt` — quad, cubic, circle, bounce,
+ * back, linear — because those are correctly rounded on every platform, [Ease] is transcribed
+ * operation for operation so that they can be, and a curve right to twelve digits and wrong in the
+ * last bit is one whose operations were reordered.
+ *
+ * The four families built on `pow`, `sin` and `cos` — poly, sin, exp, elastic — are compared to
+ * [TRANSCENDENTAL_ULPS] units in the last place instead, and the reason is the platform, not the
+ * port. Those functions are not correctly rounded: V8 uses a port of fdlibm, and the JVM's `Math`
+ * intrinsics round differently **and differently per architecture**. Every one of these replayed
+ * exactly on an ARM Mac, and on x86 Linux `easeSinIn(0.7)` came out one ulp off. Matching V8's last
+ * bit everywhere needs a pure-Kotlin fdlibm, which would move every `sin` and `cos` in the engine
+ * and is its own change.
  *
  * What is not replayed is named: the parametric builders — `easePolyIn.exponent(2)`,
  * `easeElasticIn.amplitude(1.5)` — which upstream does not expose to expressions, and an argument
@@ -90,14 +101,29 @@ class UpstreamEaseVectorsTest {
       }
       val actual = function.invoke(listOf(t)).asNumberOrNull()
       replayed++
-      if (actual == null || !actual.equals(expected)) {
-        failures.add("$fn($t): expected $expected, got $actual")
-      }
+      val close =
+        actual != null &&
+          (actual.equals(expected) ||
+            (TRANSCENDENTAL.any { fn.startsWith(it) } &&
+              abs(actual - expected) <= TRANSCENDENTAL_ULPS * expected.ulp))
+      if (!close) failures.add("$fn($t): expected $expected, got $actual")
     }
     println("replayed $replayed of ${vectors.size} d3-ease vectors")
     unmapped.forEach { (fn, n) -> println("  unmapped $fn: $n") }
     assertEquals(emptyList<String>(), failures, "d3-ease disagrees with this implementation")
     assertTrue(replayed >= 360, "only $replayed vectors replayed; the harness must not shrink")
+  }
+
+  private companion object {
+    /**
+     * The families whose curves go through `pow`, `sin` or `cos`, and so through a platform libm.
+     */
+    val TRANSCENDENTAL = listOf("easePoly", "easeSin", "easeExp", "easeElastic")
+
+    /**
+     * How far a platform's rounding of those may land from V8's. One has been seen; four is slack.
+     */
+    const val TRANSCENDENTAL_ULPS = 4
   }
 
   @Test

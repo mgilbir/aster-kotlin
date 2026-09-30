@@ -6,11 +6,15 @@ section here does not get released.
 
 ## Unreleased
 
-Vega 6.4.0, and everything it added. From Kotlin, two changes are source- or binary-incompatible:
+Vega 6.4.0, and everything it added. Four changes are source- or binary-incompatible, taken from
+the API dumps against v0.7.0:
 
 - `TimeInterval` has a new entry, `ISOWEEK`, so an exhaustive `when` over it no longer compiles.
 - `EventConfig` has a new last property, `container`. Kotlin callers keep compiling, since it has a
-  default; a JVM caller of the full constructor or of `copy` needs recompiling.
+  default; a JVM caller of the full constructor or of `copy` needs recompiling. From Swift, which has
+  no default arguments, `EventConfig.init(...)` and `doCopy(...)` gain a `container:` label.
+- `ExpressionScope` has a new method, `geoTranslate`, with a default. A Kotlin implementation is
+  unaffected; a Swift type conforming to the protocol has to add it.
 
 ### Added
 
@@ -23,7 +27,10 @@ Vega 6.4.0, and everything it added. From Kotlin, two changes are source- or bin
   one implementation, `TimeUnits.isoWeek`, and `TimeInterval.ISOWEEK` steps Monday to Monday.
 - **The 37 easing curves** (vega/vega#4316), `easeLinear` through `easeElasticInOut`, under d3's
   names and at d3's default parameters. They are transcribed from `d3-ease` operation for operation,
-  and `UpstreamEaseVectorsTest` replays 362 of d3-ease's own test vectors against them exactly.
+  and `UpstreamEaseVectorsTest` replays 362 of d3-ease's own test vectors against them: exactly
+  for the curves that are arithmetic and `sqrt`, and to four ulps for the poly, sin, exp and elastic
+  families. Those go through `pow`, `sin` and `cos`, which the JVM rounds differently from V8, and
+  differently again on x86 and on ARM.
   `d3-ease` is now one of the d3 packages `scripts/record-upstream-vectors.sh` records.
 - **`interpolateLinear(values, frac)`** (vega/vega#4316): an array read as evenly spaced control
   points, where `lerp` uses only its ends.
