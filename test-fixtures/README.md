@@ -11,7 +11,7 @@ The licences are in `../THIRD-PARTY-NOTICES.md`.
 | --- | --- | --- |
 | `specs/` | Vega specifications under test | Written for this project |
 | `vega-lite/` | Vega-Lite specifications under test | Written for this project |
-| `reference/` | The scene upstream Vega renders from each `specs/` entry | **Generated** by `scripts/oracle.sh` from Vega 6.3.1 |
+| `reference/` | The scene upstream Vega renders from each `specs/` entry | **Generated** by `scripts/oracle.sh` from Vega 6.4.0 |
 | `vega-lite-reference/` | The Vega upstream Vega-Lite compiles each `vega-lite/` entry into, and the scene rendered from it | **Generated** by `scripts/vega-lite-oracle.sh` from Vega-Lite 6.4.3 |
 | `upstream-vectors/` | Recorded test vectors from the d3 and `vega-*` test suites | **Recorded** by `oracle-js/src/record-upstream-tests.mjs`; gitignored apart from `known-divergences.json` |
 | `data/` | Datasets the specifications read | `vega-datasets`, vendored so both engines read the same bytes |

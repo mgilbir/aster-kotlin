@@ -380,8 +380,26 @@ public object GeoMeasure {
     return sink.result()
   }
 
+  /**
+   * An `albersUsa` answers too, with the scale it was given or fitted to. Only [Projection] used
+   * to, so `geoScale` on the one composite came back null where upstream reads 1070.
+   */
   public fun scaleOf(definition: ProjectionDefinition): Double? =
-    (definition.build() as? Projection)?.scale
+    when (val built = definition.build()) {
+      is Projection -> built.scale
+      is AlbersUsa -> built.scale
+      else -> null
+    }
+
+  /**
+   * A projection's translation, `geoTranslate('name')`, which a fitted one only knows once fitted.
+   */
+  public fun translateOf(definition: ProjectionDefinition): List<Double>? =
+    when (val built = definition.build()) {
+      is Projection -> built.translation
+      is AlbersUsa -> built.translation
+      else -> null
+    }
 }
 
 /**

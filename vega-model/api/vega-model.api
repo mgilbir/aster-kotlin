@@ -945,8 +945,8 @@ public final class dev/aster/vega/model/spec/EncodeSpec {
 
 public final class dev/aster/vega/model/spec/EventConfig {
 	public fun <init> ()V
-	public fun <init> (Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;ZZ)V
-	public synthetic fun <init> (Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;ZZLdev/aster/vega/model/spec/EventPermit;)V
+	public synthetic fun <init> (Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;ZZLdev/aster/vega/model/spec/EventPermit;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ldev/aster/vega/model/spec/EventPermit;
 	public final fun component2 ()Ldev/aster/vega/model/spec/EventPermit;
 	public final fun component3 ()Ldev/aster/vega/model/spec/EventPermit;
@@ -955,11 +955,13 @@ public final class dev/aster/vega/model/spec/EventConfig {
 	public final fun component6 ()Ldev/aster/vega/model/spec/EventPermit;
 	public final fun component7 ()Z
 	public final fun component8 ()Z
-	public final fun copy (Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;ZZ)Ldev/aster/vega/model/spec/EventConfig;
-	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/EventConfig;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;ZZILjava/lang/Object;)Ldev/aster/vega/model/spec/EventConfig;
+	public final fun component9 ()Ldev/aster/vega/model/spec/EventPermit;
+	public final fun copy (Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;ZZLdev/aster/vega/model/spec/EventPermit;)Ldev/aster/vega/model/spec/EventConfig;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/EventConfig;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;ZZLdev/aster/vega/model/spec/EventPermit;ILjava/lang/Object;)Ldev/aster/vega/model/spec/EventConfig;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAllowDefault ()Ldev/aster/vega/model/spec/EventPermit;
 	public final fun getBind ()Z
+	public final fun getContainer ()Ldev/aster/vega/model/spec/EventPermit;
 	public final fun getGlobalCursor ()Z
 	public final fun getPreventDefault ()Ldev/aster/vega/model/spec/EventPermit;
 	public final fun getSelector ()Ldev/aster/vega/model/spec/EventPermit;
@@ -1021,6 +1023,7 @@ public final class dev/aster/vega/model/spec/EventSelectorException : java/lang/
 
 public final class dev/aster/vega/model/spec/EventStream {
 	public static final field Companion Ldev/aster/vega/model/spec/EventStream$Companion;
+	public static final field SOURCE_CONTAINER Ljava/lang/String;
 	public static final field SOURCE_SCOPE Ljava/lang/String;
 	public static final field SOURCE_TIMER Ljava/lang/String;
 	public static final field SOURCE_VIEW Ljava/lang/String;
@@ -2347,6 +2350,7 @@ public final class dev/aster/vega/model/time/TimeInterval : java/lang/Enum {
 	public static final field Companion Ldev/aster/vega/model/time/TimeInterval$Companion;
 	public static final field DAY Ldev/aster/vega/model/time/TimeInterval;
 	public static final field HOUR Ldev/aster/vega/model/time/TimeInterval;
+	public static final field ISOWEEK Ldev/aster/vega/model/time/TimeInterval;
 	public static final field MILLISECOND Ldev/aster/vega/model/time/TimeInterval;
 	public static final field MINUTE Ldev/aster/vega/model/time/TimeInterval;
 	public static final field MONTH Ldev/aster/vega/model/time/TimeInterval;
@@ -2386,6 +2390,9 @@ public final class dev/aster/vega/model/time/TimeUnits {
 	public static final field INSTANCE Ldev/aster/vega/model/time/TimeUnits;
 	public final fun detect (Ljava/util/List;Lkotlinx/datetime/TimeZone;)Lkotlin/Pair;
 	public final fun getALL ()Ljava/util/List;
+	public final fun isoWeek (Lkotlinx/datetime/LocalDate;)I
+	public final fun isoWeekOneDate (I)I
+	public final fun isoWeekYear (Lkotlinx/datetime/LocalDate;)I
 	public final fun specifier (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/model/locale/VegaLocale;)Ljava/lang/String;
 	public static synthetic fun specifier$default (Ldev/aster/vega/model/time/TimeUnits;Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/model/locale/VegaLocale;ILjava/lang/Object;)Ljava/lang/String;
 }

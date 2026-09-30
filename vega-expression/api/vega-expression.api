@@ -96,6 +96,7 @@ public abstract interface class dev/aster/vega/expression/ExpressionScope {
 	public fun geoCentroid (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
 	public fun geoScale (Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
 	public fun geoShape (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public fun geoTranslate (Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
 	public abstract fun getDatum ()Ldev/aster/vega/model/VegaValue;
 	public fun getRandom ()Ldev/aster/vega/expression/RandomStream;
 	public fun gradient (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
@@ -126,6 +127,7 @@ public final class dev/aster/vega/expression/ExpressionScope$DefaultImpls {
 	public static fun geoCentroid (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
 	public static fun geoScale (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
 	public static fun geoShape (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public static fun geoTranslate (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
 	public static fun getRandom (Ldev/aster/vega/expression/ExpressionScope;)Ldev/aster/vega/expression/RandomStream;
 	public static fun gradient (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
 	public static fun inScope (Ldev/aster/vega/expression/ExpressionScope;Ldev/aster/vega/model/VegaValue;)Z

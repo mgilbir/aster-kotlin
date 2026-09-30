@@ -524,6 +524,10 @@ public class Evaluator(
       val projection = evaluate(node.arguments[0], scope)
       return scope.geoScale(if (projection is VegaValue.Null) null else projection.asString())
     }
+    if (name == "geoTranslate" && node.arguments.isNotEmpty()) {
+      val projection = evaluate(node.arguments[0], scope)
+      return scope.geoTranslate(if (projection is VegaValue.Null) null else projection.asString())
+    }
 
     val function = functions[name]
     if (function == null) {

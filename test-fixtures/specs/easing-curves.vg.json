@@ -1,0 +1,200 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Vega 6.4.0's easing functions and interpolateLinear (vega/vega#4316), as a chart uses them: a normalized time mapped to a position. Every one of d3-ease's 37 names is evaluated at eleven times, a string and a time past each end included, and printed in full so a difference in the last digit shows; three are also drawn, and interpolateLinear reads a custom curve. The four families built on pow, sin and cos (poly, sin, exp, elastic) are printed to fifteen significant digits: those functions are not correctly rounded, the JVM's Math intrinsics land a unit in the last place away from V8's fdlibm on some inputs and differently on x86 and ARM, and easeSinInOut(1.1) and easeExpIn(0.25) are two such inputs. Every other curve is arithmetic and sqrt, correctly rounded everywhere, and is printed in full.",
+  "width": 300,
+  "height": 200,
+  "padding": 5,
+  "data": [
+    {
+      "name": "times",
+      "values": [
+        {
+          "t": -0.1
+        },
+        {
+          "t": 0
+        },
+        {
+          "t": 0.1
+        },
+        {
+          "t": 0.25
+        },
+        {
+          "t": "0.4"
+        },
+        {
+          "t": 0.5
+        },
+        {
+          "t": 0.6
+        },
+        {
+          "t": 0.75
+        },
+        {
+          "t": 0.9
+        },
+        {
+          "t": 1
+        },
+        {
+          "t": 1.1
+        }
+      ],
+      "transform": [
+        {
+          "type": "formula",
+          "as": "curve",
+          "expr": "interpolateLinear([0, 0.8, 0.2, 1], datum.t)"
+        },
+        {
+          "type": "window",
+          "ops": [
+            "row_number"
+          ],
+          "as": [
+            "row"
+          ]
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": [
+        -0.1,
+        1.1
+      ],
+      "range": "width"
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": [
+        -0.5,
+        1.5
+      ],
+      "range": "height"
+    }
+  ],
+  "marks": [
+    {
+      "type": "symbol",
+      "from": {
+        "data": "times"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "t"
+          },
+          "y": {
+            "scale": "y",
+            "signal": "easeElastic(datum.t)"
+          },
+          "size": {
+            "value": 20
+          },
+          "fill": {
+            "value": "#4c78a8"
+          }
+        }
+      }
+    },
+    {
+      "type": "symbol",
+      "from": {
+        "data": "times"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "t"
+          },
+          "y": {
+            "scale": "y",
+            "signal": "easeBounceInOut(datum.t)"
+          },
+          "size": {
+            "value": 20
+          },
+          "fill": {
+            "value": "#f58518"
+          }
+        }
+      }
+    },
+    {
+      "type": "symbol",
+      "from": {
+        "data": "times"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "t"
+          },
+          "y": {
+            "scale": "y",
+            "signal": "easeBack(datum.t)"
+          },
+          "size": {
+            "value": 20
+          },
+          "fill": {
+            "value": "#54a24b"
+          }
+        }
+      }
+    },
+    {
+      "type": "line",
+      "from": {
+        "data": "times"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "t"
+          },
+          "y": {
+            "scale": "y",
+            "field": "curve"
+          },
+          "stroke": {
+            "value": "#e45756"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {
+        "data": "times"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "value": 0
+          },
+          "y": {
+            "signal": "datum.row * 12"
+          },
+          "fontSize": {
+            "value": 4
+          },
+          "text": {
+            "signal": "datum.curve + ' ' + interpolateLinear([0, 10, 20], datum.t) + ' | ' + easeLinear(datum.t) + ' ' + easeQuad(datum.t) + ' ' + easeQuadIn(datum.t) + ' ' + easeQuadOut(datum.t) + ' ' + easeQuadInOut(datum.t) + ' ' + easeCubic(datum.t) + ' ' + easeCubicIn(datum.t) + ' ' + easeCubicOut(datum.t) + ' ' + easeCubicInOut(datum.t) + ' ' + format(easePoly(datum.t), '.15') + ' ' + format(easePolyIn(datum.t), '.15') + ' ' + format(easePolyOut(datum.t), '.15') + ' ' + format(easePolyInOut(datum.t), '.15') + ' ' + format(easeSin(datum.t), '.15') + ' ' + format(easeSinIn(datum.t), '.15') + ' ' + format(easeSinOut(datum.t), '.15') + ' ' + format(easeSinInOut(datum.t), '.15') + ' ' + format(easeExp(datum.t), '.15') + ' ' + format(easeExpIn(datum.t), '.15') + ' ' + format(easeExpOut(datum.t), '.15') + ' ' + format(easeExpInOut(datum.t), '.15') + ' ' + easeCircle(datum.t) + ' ' + easeCircleIn(datum.t) + ' ' + easeCircleOut(datum.t) + ' ' + easeCircleInOut(datum.t) + ' ' + easeBounce(datum.t) + ' ' + easeBounceIn(datum.t) + ' ' + easeBounceOut(datum.t) + ' ' + easeBounceInOut(datum.t) + ' ' + easeBack(datum.t) + ' ' + easeBackIn(datum.t) + ' ' + easeBackOut(datum.t) + ' ' + easeBackInOut(datum.t) + ' ' + format(easeElastic(datum.t), '.15') + ' ' + format(easeElasticIn(datum.t), '.15') + ' ' + format(easeElasticOut(datum.t), '.15') + ' ' + format(easeElasticInOut(datum.t), '.15')"
+          }
+        }
+      }
+    }
+  ]
+}

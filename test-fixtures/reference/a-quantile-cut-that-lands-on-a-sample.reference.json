@@ -204,5 +204,5 @@
     "width": 282.1833
   },
   "spec": "a-quantile-cut-that-lands-on-a-sample.vg.json",
-  "vegaVersion": "6.3.1"
+  "vegaVersion": "6.4.0"
 }

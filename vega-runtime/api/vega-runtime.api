@@ -740,6 +740,7 @@ public final class dev/aster/vega/runtime/compile/SignalScope : dev/aster/vega/e
 	public fun geoCentroid (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
 	public fun geoScale (Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
 	public fun geoShape (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public fun geoTranslate (Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
 	public final fun get (Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
 	public fun getDatum ()Ldev/aster/vega/model/VegaValue;
 	public final fun getNames ()Ljava/util/Set;

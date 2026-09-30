@@ -1145,6 +1145,10 @@ public data class EventConfig(
    * `config.events.globalCursor` — whether a cursor is set on the document rather than the view.
    */
   val globalCursor: Boolean = false,
+  /**
+   * `container:resize` streams, Vega 6.4.0's. Last so that adding it moved no positional argument.
+   */
+  val container: EventPermit = EventPermit.Unrestricted,
 )
 
 /**

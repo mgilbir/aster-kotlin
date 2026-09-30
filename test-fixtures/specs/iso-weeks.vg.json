@@ -1,0 +1,66 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Vega 6.4.0's isoweek time unit (vega/vega#4320). Dates either side of two year boundaries whose ISO weeks straddle them: 29 December 2014 is week 1 of 2015, and 3 January 2021 is week 53 of 2020. Bucketed with and without a year, with a weekday, at a step of two, and in UTC, then labelled through timeUnitSpecifier (%G W%V) and read back with isoweek().",
+  "width": 520,
+  "height": 260,
+  "padding": 5,
+  "data": [
+    {
+      "name": "days",
+      "values": [
+        {"at": "2014-12-28T12:00:00"},
+        {"at": "2014-12-29T12:00:00"},
+        {"at": "2015-01-04T12:00:00"},
+        {"at": "2015-01-05T12:00:00"},
+        {"at": "2020-12-31T12:00:00"},
+        {"at": "2021-01-03T12:00:00"},
+        {"at": "2021-01-04T12:00:00"},
+        {"at": "2021-01-13T12:00:00"}
+      ],
+      "format": {"parse": {"at": "date"}},
+      "transform": [
+        {"type": "timeunit", "field": "at", "units": ["year", "isoweek"], "as": ["yw0", "yw1"], "signal": "tbin"},
+        {"type": "timeunit", "field": "at", "units": ["isoweek"], "as": ["w0", "w1"]},
+        {"type": "timeunit", "field": "at", "units": ["isoweek", "day"], "as": ["wd0", "wd1"]},
+        {"type": "timeunit", "field": "at", "units": ["year", "isoweek"], "step": 2, "as": ["two0", "two1"]},
+        {"type": "timeunit", "field": "at", "units": ["year", "isoweek", "day"], "timezone": "utc", "as": ["u0", "u1"]},
+        {"type": "window", "ops": ["row_number"], "as": ["row"]}
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "y",
+      "type": "band",
+      "domain": {"data": "days", "field": "row"},
+      "range": "height"
+    }
+  ],
+  "marks": [
+    {
+      "type": "text",
+      "from": {"data": "days"},
+      "encode": {
+        "enter": {
+          "x": {"value": 0},
+          "y": {"scale": "y", "field": "row"},
+          "fontSize": {"value": 8},
+          "text": {
+            "signal": "timeFormat(datum.at, '%Y-%m-%d %a') + ' | ' + timeFormat(datum.yw0, timeUnitSpecifier(['year', 'isoweek'])) + ' ' + (+datum.yw0) + '-' + (+datum.yw1) + ' | ' + timeFormat(datum.w0, timeUnitSpecifier(['isoweek'])) + ' ' + (+datum.w0) + ' | ' + timeFormat(datum.wd0, timeUnitSpecifier(['isoweek', 'day'])) + ' ' + (+datum.wd0) + ' | ' + (+datum.two0) + '-' + (+datum.two1) + ' | ' + utcFormat(datum.u0, timeUnitSpecifier(['year', 'isoweek', 'day'])) + ' ' + (+datum.u0) + ' | ' + isoweek(datum.at) + ' ' + utcisoweek(datum.at)"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "encode": {
+        "enter": {
+          "x": {"value": 0},
+          "y": {"signal": "height"},
+          "fontSize": {"value": 8},
+          "text": {"signal": "tbin.unit + ' ' + tbin.units + ' ' + tbin.step + ' ' + (+tbin.start) + ' ' + (+tbin.stop) + ' | ' + (+timeOffset('isoweek', datetime(2021, 0, 4), 2)) + ' ' + length(timeSequence('isoweek', datetime(2020, 11, 31), datetime(2021, 0, 20))) + ' ' + (+timeSequence('isoweek', datetime(2020, 11, 31), datetime(2021, 0, 20))[0]) + ' ' + (+utcOffset('isoweek', utc(2021, 0, 6), -1))"}
+        }
+      }
+    }
+  ]
+}

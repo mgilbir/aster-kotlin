@@ -334,6 +334,17 @@ public class EventDispatcher(
           consume = chain.any { it.consume },
         )
       }
+    // A container has one event, `resize`, and upstream warns about any other before it asks the
+    // policy anything — so an unknown type is reported whatever `config.events.container` says.
+    if (stream.source == EventStream.SOURCE_CONTAINER && stream.type != "resize") {
+      diagnostics.warn(
+        DiagnosticCodes.INTERACTION_UNSUPPORTED,
+        "Unsupported container event type: ${stream.type}; signal '${binding.signalName}' will not " +
+          "update from it",
+        operator = binding.signalName,
+      )
+      return
+    }
     if (!permitted(stream, binding)) return
     // `keyup` and `keypress` are events upstream's handler binds and this engine cannot produce: a
     // host reports one `ChartInputEvent.Key` per press, with no phase, so there is nothing to tell
@@ -484,6 +495,7 @@ public class EventDispatcher(
         EventStream.SOURCE_WINDOW -> events.window
         EventStream.SOURCE_VIEW -> events.view
         EventStream.SOURCE_TIMER -> events.timer
+        EventStream.SOURCE_CONTAINER -> events.container
         else -> events.selector
       }
     val type = stream.type ?: return true
@@ -504,7 +516,7 @@ public class EventDispatcher(
   }
 
   /**
-   * Which of the four policy keys a source is governed by.
+   * Which of the five policy keys a source is governed by.
    *
    * A `scope` stream listens on the view and filters down to one group, so it is a `view` listener
    * as far as the policy is concerned — upstream's `eventSource` rewrites it to `view` before the
@@ -516,6 +528,7 @@ public class EventDispatcher(
     when (source) {
       EventStream.SOURCE_WINDOW -> EventStream.SOURCE_WINDOW
       EventStream.SOURCE_TIMER -> EventStream.SOURCE_TIMER
+      EventStream.SOURCE_CONTAINER -> EventStream.SOURCE_CONTAINER
       EventStream.SOURCE_SCOPE -> EventStream.SOURCE_VIEW
       EventStream.SOURCE_VIEW -> EventStream.SOURCE_VIEW
       // Anything left is a CSS selector naming an element outside the chart. A mark selector never

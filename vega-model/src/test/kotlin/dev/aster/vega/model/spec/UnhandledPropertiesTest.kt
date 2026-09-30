@@ -393,6 +393,33 @@ class UnhandledPropertiesTest {
   }
 
   /**
+   * Except an event handler, since Vega 6.4.0: upstream's generator warns and skips any property
+   * matching `/^on/i` rather than setting it on the element, so a binding cannot put script on the
+   * page. A host here would have been handed it as an attribute; it is dropped the same way, and by
+   * the same pattern, so `once` goes with `onfocus` exactly as it does upstream.
+   */
+  @Test
+  fun `a text binding drops an event-handler attribute and says so`() {
+    val parsed =
+      SpecParser()
+        .parseJson(
+          spec(
+            """"signals": [{"name": "q", "value": "",
+                 "bind": {"input": "text", "placeholder": "x", "onfocus": "alert(1)",
+                          "OnInput": "y", "once": 1}}]"""
+          )
+        )
+    val bind = parsed.spec!!.signals.single().bind as SignalBind.Field
+    assertEquals(mapOf("placeholder" to VegaValue.Str("x")), bind.attributes)
+    assertEquals(
+      listOf("onfocus", "OnInput", "once").map {
+        "Ignoring unsupported signal binding property \"$it\" for signal \"q\"."
+      },
+      parsed.diagnostics.map { it.message },
+    )
+  }
+
+  /**
    * Neither a scale-sourced handler nor a signal-sourced one is warned about.
    *
    * The scale form used to be reported as untracked, on the argument that a recompile rebuilds

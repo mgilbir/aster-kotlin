@@ -179,6 +179,7 @@ public class ParsedExpression(
         "geoCentroid",
         "geoShape",
         "geoScale",
+        "geoTranslate",
       )
   }
 }

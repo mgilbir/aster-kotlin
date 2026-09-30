@@ -140,5 +140,5 @@
     "width": 196
   },
   "spec": "a-declared-size-outranks-the-reference.vg.json",
-  "vegaVersion": "6.3.1"
+  "vegaVersion": "6.4.0"
 }

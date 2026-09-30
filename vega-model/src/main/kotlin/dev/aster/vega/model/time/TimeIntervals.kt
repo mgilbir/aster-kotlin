@@ -34,6 +34,11 @@ public enum class TimeInterval {
   DAY,
   /** Weeks start on Sunday, as d3's default `timeWeek` does. */
   WEEK,
+  /**
+   * Weeks start on Monday — d3's `timeMonday`, which is what upstream's `isoweek` unit steps by
+   * since Vega 6.4.0.
+   */
+  ISOWEEK,
   MONTH,
   YEAR;
 
@@ -57,6 +62,7 @@ public enum class TimeInterval {
         "quarter" -> MONTH to 3
         "month" -> MONTH to 1
         "week" -> WEEK to 1
+        "isoweek" -> ISOWEEK to 1
         "date",
         "day",
         "dayofyear" -> DAY to 1
@@ -77,7 +83,8 @@ public enum class TimeInterval {
         MINUTE -> 60_000.0
         HOUR -> 3_600_000.0
         DAY -> 86_400_000.0
-        WEEK -> 604_800_000.0
+        WEEK,
+        ISOWEEK -> 604_800_000.0
         MONTH -> 2_592_000_000.0
         YEAR -> 31_536_000_000.0
       }
@@ -154,6 +161,10 @@ public class TimeStepper(
         val back = at.date.dayOfWeek.isoDayNumber % 7
         millis(at.date.minusDays(back).atStartOfDayIn(zone))
       }
+      TimeInterval.ISOWEEK -> {
+        val back = at.date.dayOfWeek.isoDayNumber - 1
+        millis(at.date.minusDays(back).atStartOfDayIn(zone))
+      }
       TimeInterval.MONTH -> {
         val month = at.date.month.number - 1
         millis(LocalDate(at.date.year, month - month % step + 1, 1).atStartOfDayIn(zone))
@@ -193,7 +204,8 @@ public class TimeStepper(
       TimeInterval.DAY ->
         if (step == 1) millis(at.plus(amount, DateTimeUnit.DAY, zone))
         else steppedDays(millis, count)
-      TimeInterval.WEEK -> millis(at.plus(amount, DateTimeUnit.WEEK, zone))
+      TimeInterval.WEEK,
+      TimeInterval.ISOWEEK -> millis(at.plus(amount, DateTimeUnit.WEEK, zone))
       TimeInterval.MONTH -> overflowing(millis, monthsFrom = amount, yearsFrom = 0L)
       TimeInterval.YEAR -> overflowing(millis, monthsFrom = 0L, yearsFrom = amount)
     }
@@ -258,7 +270,8 @@ public class TimeStepper(
         TimeInterval.MINUTE -> elapsed / 60_000.0
         TimeInterval.HOUR -> elapsed / 3_600_000.0
         TimeInterval.DAY -> (elapsed + shift) / 86_400_000.0
-        TimeInterval.WEEK -> (elapsed + shift) / 604_800_000.0
+        TimeInterval.WEEK,
+        TimeInterval.ISOWEEK -> (elapsed + shift) / 604_800_000.0
         TimeInterval.MONTH -> {
           val a = local(from)
           val b = local(to)

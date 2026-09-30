@@ -94,7 +94,7 @@ private val BIND_KEYS_RANGE = BIND_KEYS + setOf("min", "max", "step")
 private val BIND_KEYS_CHOICE = BIND_KEYS + setOf("options", "labels")
 
 private val EVENT_CONFIG_CONSUMED =
-  setOf("view", "window", "selector", "timer", "defaults", "bind", "globalCursor")
+  setOf("view", "window", "selector", "timer", "defaults", "bind", "globalCursor", "container")
 
 /** Everything the object form of an event stream may say. */
 private val EVENT_STREAM_CONSUMED =
@@ -1281,6 +1281,7 @@ public class SpecParser {
       allowDefault = EventPermit.of(defaults?.fields?.get("allow")),
       bind = (obj.fields["bind"] as? VegaValue.Bool)?.value ?: true,
       globalCursor = (obj.fields["globalCursor"] as? VegaValue.Bool)?.value ?: false,
+      container = EventPermit.of(obj.fields["container"]),
     )
   }
 
@@ -1514,13 +1515,33 @@ public class SpecParser {
       // browser: `text`, `number`, `color`, `date`, and whatever is added next — and with it every
       // remaining property, which upstream sets as an attribute on the element and its schema
       // explicitly allows. Nothing to report: a host takes what it can use.
-      else ->
+      //
+      // Except an **event handler**. Since Vega 6.4.0 upstream drops any property matching `/^on/i`
+      // with a warning rather than setting it — `{"input": "text", "onfocus": "…"}` put script on
+      // the page. A host here would have been handed the same string as an attribute, so it is
+      // dropped the same way, by the same pattern: `once` and `online` go with it upstream too.
+      else -> {
+        val (handlers, attributes) =
+          obj.fields
+            .filterKeys { it !in BIND_KEYS }
+            .entries
+            .partition {
+              it.key.startsWith("on", ignoreCase = true)
+            }
+        for ((key, _) in handlers) {
+          diagnostics.warn(
+            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            "Ignoring unsupported signal binding property \"$key\" for signal \"$signal\".",
+            jsonPath = "$path.$key",
+          )
+        }
         SignalBind.Field(
           input = input,
-          attributes = obj.fields.filterKeys { it !in BIND_KEYS },
+          attributes = attributes.associate { it.key to it.value },
           name = name,
           debounceMillis = debounce,
         )
+      }
     }
   }
 

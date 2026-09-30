@@ -315,6 +315,11 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
 
   private var translateX = 480.0
   private var translateY = 250.0
+
+  /** `projection.translate()`, what `geoTranslate` answers: where the centre lands on the page. */
+  val translation: List<Double>
+    get() = listOf(translateX, translateY)
+
   private var centreLambda = 0.0
   private var centrePhi = 0.0
   private var deltaLambda = 0.0
@@ -931,7 +936,11 @@ internal object Projections {
 
   fun byName(name: String): Projection? =
     when (name.lowercase()) {
-      "mercator" -> Projection(RawProjections.mercator).apply { clipsToOneTurn = true }
+      // d3's `geoMercator` is `mercatorProjection(mercatorRaw).scale(961 / tau)`, and the scale was
+      // missing: an unfitted, unscaled mercator drew at 150, and `geoScale` said so where upstream
+      // says 152.9479. Every other family here states its default; this one had been left out.
+      "mercator" ->
+        Projection(RawProjections.mercator).apply { clipsToOneTurn = true }.scale(961 / TAU)
       "equirectangular" -> Projection(RawProjections.equirectangular).scale(152.63)
       // `geoIdentity`: no globe at all. The coordinates are already on the page and only the scale,
       // the translation and a reflection touch them, which is what a chart drawing a map it has
@@ -1046,6 +1055,14 @@ internal class AlbersUsa : GeoProjector {
   private var k = 1070.0
   private var tx = 480.0
   private var ty = 250.0
+
+  /** The composite's own scale, the lower 48's: `geoScale` on an `albersUsa` reads this. */
+  val scale: Double
+    get() = k
+
+  /** The composite's own translation, which each of its three pieces is offset from. */
+  val translation: List<Double>
+    get() = listOf(tx, ty)
 
   init {
     scale(1070.0)

@@ -6,7 +6,7 @@ Generated from the corpus by `FixtureIndexTest`, which fails when this file has 
 ./gradlew :vega-runtime:jvmTest -PupdateGoldens=true --rerun-tasks
 ```
 
-260 Vega differential fixtures and 332 Vega-Lite fixtures.
+264 Vega differential fixtures and 332 Vega-Lite fixtures.
 
 Every column is read off disk. A Vega fixture's mark count and mark types come from its
 **upstream** reference, so they are upstream's answer rather than this port's opinion of it.
@@ -37,6 +37,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `a-null-line-is-an-empty-line` | 21 | rect, rule, text | — | band |
 | `a-number-written-as-text` | 31 | rule, symbol, text | — | band, ordinal |
 | `a-pie-multiplies-what-it-was-given` | 15 | arc, text | pie | — |
+| `a-projection-says-where-it-moved` | 4 | symbol, text | geojson | — |
 | `a-quantile-cut-that-lands-on-a-sample` | 12 | symbol, text | — | quantile |
 | `a-quantile-with-no-samples` | 8 | rect, text | — | quantile |
 | `a-range-too-short-is-still-a-range` | 8 | rule, text | — | linear |
@@ -59,6 +60,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `an-axis-keys-a-date-by-its-second` | 26 | rule, text | — | linear, time |
 | `an-empty-subtitle-takes-no-room` | 3 | rect, text | — | — |
 | `an-infinite-extent-is-no-extent` | 21 | rule, symbol, text | extent, formula | linear |
+| `an-ordinal-ramp-takes-its-count` | 39 | rect, rule, text | — | band, linear, ordinal |
 | `arc-padding` | 10 | arc | pie | ordinal |
 | `arc-radii-inverted` | 5 | arc | — | ordinal |
 | `area-gaps` | 22 | area, line, rule, text | — | linear |
@@ -121,6 +123,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `dorling-cartogram` | 113 | symbol, text | filter, force, formula, lookup | linear |
 | `dot-plot-wilkinson` | 120 | rule, symbol, text | bin, dotbin, extent, stack | linear |
 | `dot-plot` | 28 | rule, symbol, text | — | linear, point |
+| `easing-curves` | 45 | line, symbol, text | formula, window | linear |
 | `ecma-trim` | 19 | rule, text | formula | band |
 | `edge-bundling` | 989 | line, symbol, text | filter, formula, stratify, tree | ordinal |
 | `encode-channels-tail` | 15 | group, image, line, path, rect, rule, symbol, text | — | — |
@@ -157,6 +160,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `indata-membership` | 25 | rect, rule, text | — | band, linear |
 | `interactive-legend` | 454 | rect, rule, symbol, text | filter | linear, ordinal |
 | `invert-buckets` | 19 | rule, text | — | band, quantile, quantize, threshold |
+| `iso-weeks` | 9 | text | timeunit, window | band |
 | `item-zindex` | 5 | rect, rule, text | — | — |
 | `label-limit` | 33 | rect, rule, symbol, text | — | band, linear, ordinal |
 | `label-overlap` | 90 | rect, rule, text | — | band, linear |

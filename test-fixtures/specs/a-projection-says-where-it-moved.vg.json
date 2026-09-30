@@ -1,0 +1,51 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Vega 6.4.0's geoTranslate (vega/vega#4313): a projection's translation, which is what pan and zoom on a fitted map start from. Asked of a projection fitted to data, one given its translate, an identity, a composite albersUsa and an unfitted mercator, then used to place a mark. geoScale is asked of the albersUsa too, which this engine answered with null until geoTranslate needed the same lookup.",
+  "width": 300,
+  "height": 200,
+  "padding": 5,
+  "data": [
+    {
+      "name": "points",
+      "values": [
+        {"lon": -10, "lat": 40},
+        {"lon": 25, "lat": 60},
+        {"lon": 5, "lat": 48}
+      ],
+      "transform": [
+        {"type": "geojson", "fields": ["lon", "lat"], "signal": "cloud"}
+      ]
+    }
+  ],
+  "projections": [
+    {"name": "fitted", "type": "mercator", "fit": {"signal": "cloud"}, "size": {"signal": "[width, height]"}},
+    {"name": "declared", "type": "equalEarth", "translate": [120, 80], "scale": 60},
+    {"name": "flat", "type": "identity"},
+    {"name": "states", "type": "albersUsa"},
+    {"name": "plain", "type": "mercator"}
+  ],
+  "marks": [
+    {
+      "type": "symbol",
+      "from": {"data": "points"},
+      "encode": {
+        "enter": {
+          "x": {"signal": "geoTranslate('fitted')[0]"},
+          "y": {"signal": "geoTranslate('fitted')[1]"},
+          "size": {"value": 30}
+        }
+      }
+    },
+    {
+      "type": "text",
+      "encode": {
+        "enter": {
+          "x": {"value": 0},
+          "y": {"value": 10},
+          "fontSize": {"value": 6},
+          "text": {"signal": "geoTranslate('fitted') + ' | ' + geoTranslate('declared') + ' | ' + geoTranslate('flat') + ' | ' + geoTranslate('states') + ' ' + geoScale('states') + ' | ' + geoTranslate('plain') + ' ' + geoScale('plain') + ' | ' + geoScale('fitted')"}
+        }
+      }
+    }
+  ]
+}

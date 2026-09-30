@@ -4,7 +4,7 @@
 // anyone has produced for this grammar. Transcribing their *expectations* into Kotlin would be a
 // large, error-prone copy — and would inherit assertions that are deliberately loose (`t.ok(x > 0)`)
 // where an exact value is what a differential port needs. So this does not read their assertions at
-// all. It runs their test files against the **installed** Vega — the same 6.3.1 every reference in
+// all. It runs their test files against the **installed** Vega — the same 6.4.0 every reference in
 // this repository is generated from — with two pieces of scaffolding:
 //
 //   1. a `tape` shim, so a test body runs without the real runner and without its assertions
@@ -231,7 +231,7 @@ async function runTestFile(file, packageName, calls, skipped, checkout) {
   // Written to a real file inside `oracle-js` rather than imported from a `data:` URL. A data URL
   // has no resolution base, so every bare specifier a test reaches for — `vega-util`,
   // `vega-datasets`, `d3-array` — fails to resolve; from here they resolve against
-  // `oracle-js/node_modules`, which is the installed 6.3.1 the whole repository compares against.
+  // `oracle-js/node_modules`, which is the installed 6.4.0 the whole repository compares against.
   const scratch = join(here, '..', '.recorder-scratch');
   mkdirSync(scratch, {recursive: true});
   // Named after the test file and nothing else. A timestamp here reached the *recorded* text —
@@ -263,7 +263,7 @@ async function runTestFile(file, packageName, calls, skipped, checkout) {
  * - a relative helper (`./util.js`) is resolved to an absolute URL, since the rewritten source runs
  *   from a data URL and has no directory of its own;
  * - a bare import (`fs`, `d3-array`) is left alone, to resolve from `oracle-js/node_modules` —
- *   which is the same installed 6.3.1 every reference in this repository comes from.
+ *   which is the same installed 6.4.0 every reference in this repository comes from.
  */
 function rewriteImports(source, file) {
   const ast = parse(source, {ecmaVersion: 'latest', sourceType: 'module'});

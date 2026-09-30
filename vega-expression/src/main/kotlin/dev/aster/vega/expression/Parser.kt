@@ -216,6 +216,15 @@ public class Parser(private val source: String) {
           }
           else -> throw ExpressionSyntaxException("Expected an object key", keyToken.start, source)
         }
+      // Upstream's codegen refuses a key that would shadow `Object.prototype`, and since Vega 6.4.0
+      // a **quoted** one too (vega/vega#4317) — `{"toString": 1}` had been a way round it — and
+      // `then`, which makes any object a thenable (vega/vega#4331). Nothing here can reach a
+      // prototype, so the check protects nothing in this engine; it is kept because a
+      // specification upstream refuses is one this engine should not quietly draw.
+      val name = (key.value as VegaValue.Str).value
+      if (name in DISALLOWED_OBJECT_PROPERTIES) {
+        throw ExpressionSyntaxException("Illegal property: $name", keyToken.start, source)
+      }
       expectPunctuation(":")
       entries.add(key to parseExpression())
       if (matchPunctuation(",")) continue
@@ -314,6 +323,27 @@ public class Parser(private val source: String) {
   }
 
   private companion object {
+    /**
+     * Upstream's `DisallowedObjectProperties`, as Node builds it: the function-valued members of
+     * `Object.prototype`, then `__proto__` and `then`.
+     */
+    val DISALLOWED_OBJECT_PROPERTIES =
+      setOf(
+        "constructor",
+        "__defineGetter__",
+        "__defineSetter__",
+        "hasOwnProperty",
+        "__lookupGetter__",
+        "__lookupSetter__",
+        "isPrototypeOf",
+        "propertyIsEnumerable",
+        "toString",
+        "valueOf",
+        "toLocaleString",
+        "__proto__",
+        "then",
+      )
+
     val UNARY_OPERATORS = setOf("+", "-", "!", "~")
 
     /**

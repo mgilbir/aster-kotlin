@@ -48,12 +48,23 @@ public object TimeUnitTransform : Transform {
   /** Upstream's reference year for a bucketing that does not include one. */
   private const val CYCLE_YEAR = 2012
 
+  /**
+   * The reference year when the units include `isoweek` and no year — upstream's
+   * `ISOWEEK_REFERENCE_YEAR`.
+   *
+   * 2015 because it is a **long** ISO year: its week 1 starts on 29 December 2014 and it has a week
+   * 53, so every week number a date can have maps onto a real week that formats back to the same
+   * number. 2012 has only 52.
+   */
+  private const val ISOWEEK_CYCLE_YEAR = 2015
+
   private val KNOWN =
     listOf(
       "year",
       "quarter",
       "month",
       "week",
+      "isoweek",
       "date",
       "day",
       "dayofyear",
@@ -159,14 +170,15 @@ public object TimeUnitTransform : Transform {
       return input
     }
     // Upstream's own validity rule: a bucket cannot be both a week and a month, or either and a
-    // day-of-year, because they slice the year three incompatible ways.
+    // day-of-year, because they slice the year three incompatible ways. Nor can it be both kinds of
+    // week, which start on different days.
     val families =
       listOf(
-        units.any { it == "week" || it == "day" },
+        units.any { it == "week" || it == "isoweek" || it == "day" },
         units.any { it == "quarter" || it == "month" || it == "date" },
         units.contains("dayofyear"),
       )
-    if (families.count { it } > 1) {
+    if (families.count { it } > 1 || ("week" in units && "isoweek" in units)) {
       context.diagnostics.error(
         DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
         "timeunit units ${units.joinToString(", ")} slice the year in incompatible ways",
@@ -344,16 +356,34 @@ public object TimeUnitTransform : Transform {
     return phase + step * kotlin.math.floor((value - phase).toDouble() / step).toInt()
   }
 
-  private fun floor(instant: Double, units: Set<String>, zone: TimeZone, step: Int = 1): Double {
+  internal fun floor(instant: Double, units: Set<String>, zone: TimeZone, step: Int = 1): Double {
     val at = TimeFormat.at(instant, zone)
     val finest = KNOWN.last { it in units }
     fun stepOf(unit: String) = if (unit == finest) step else 1
-    val year = if ("year" in units) stepped(at.year, stepOf("year"), phase = 0) else CYCLE_YEAR
+    val iso = "isoweek" in units
+    // With `isoweek` the year is the **week-numbering** year, upstream's `YEAR + ISOWEEK` getter:
+    // 29 December 2014 is in week 1 of 2015, and bucketing it under 2014 would put it 51 weeks
+    // away from the week it belongs to.
+    val year =
+      when {
+        "year" in units ->
+          stepped(
+            if (iso) TimeUnits.isoWeekYear(at.date) else at.year,
+            stepOf("year"),
+            phase = 0,
+          )
+        iso -> ISOWEEK_CYCLE_YEAR
+        else -> CYCLE_YEAR
+      }
     val month =
       when {
         "month" in units -> stepped(at.month.number, stepOf("month"), phase = 1)
-        // A quarter is the first month of the three it covers.
-        "quarter" in units -> (at.month.number - 1) / 3 * 3 + 1
+        // A quarter is the first month of the three it covers, and a step counts quarters —
+        // upstream
+        // steps the quarter (`inv: q => 3 * q`) rather than the month, so `["year", "quarter"]` at
+        // step 2 is a half year.
+        "quarter" in units ->
+          stepped((at.month.number - 1) / 3, stepOf("quarter"), phase = 0) * 3 + 1
         else -> 1
       }
     // A week-based unit gives a **day of the year** rather than a day of the month, and the date is
@@ -364,13 +394,35 @@ public object TimeUnitTransform : Transform {
     // `day` alone the week is 1, so a Monday in a year beginning on a Sunday lands on the 2nd; with
     // `week` alone the day is 0, so every date in a week lands on that week's first day.
     val firstDay = LocalDate(year, 1, 1).dayOfWeek.isoDayNumber % 7
+    // The ISO forms are upstream's `isoWeekday(weekOneDate, week, day)`, the day of the year a week
+    // number and a Monday-based weekday name, counted from the day week 1 begins — which may be in
+    // the December before, and is then zero or less. Stepped like any other unit when finest, which
+    // `getUnit` does for these as for the rest: `isoweek` at step 2 pairs weeks 1 and 2, 3 and 4.
+    val weekOne = if (iso) TimeUnits.isoWeekOneDate(year) else 0
     val dayOfYear =
       when {
+        iso && "day" in units ->
+          stepped(
+            weekOne + (TimeUnits.isoWeek(at.date) - 1) * 7 + (at.dayOfWeek.isoDayNumber - 1),
+            stepOf("day"),
+            phase = 1,
+          )
+        iso -> weekOne + (stepped(TimeUnits.isoWeek(at.date), stepOf("isoweek"), phase = 1) - 1) * 7
+        // The Sunday-based forms step the same way, which they did not until upstream's own
+        // `["year", "week"]` vectors at steps 2 to 4 were replayed: a two-week bucket came out one
+        // week wide. Upstream's `getUnit` steps the **week number** where `week` is finest and the
+        // resulting day of the year where `day` is.
         "week" in units && "day" in units ->
-          weekday(weekNumber(at, zone), at.dayOfWeek.isoDayNumber % 7, firstDay)
-        "week" in units -> weekday(weekNumber(at, zone), 0, firstDay)
-        "day" in units -> weekday(1, at.dayOfWeek.isoDayNumber % 7, firstDay)
-        "dayofyear" in units -> at.dayOfYear
+          stepped(
+            weekday(weekNumber(at, zone), at.dayOfWeek.isoDayNumber % 7, firstDay),
+            stepOf("day"),
+            phase = 1,
+          )
+        "week" in units ->
+          weekday(stepped(weekNumber(at, zone), stepOf("week"), phase = 1), 0, firstDay)
+        "day" in units ->
+          stepped(weekday(1, at.dayOfWeek.isoDayNumber % 7, firstDay), stepOf("day"), phase = 1)
+        "dayofyear" in units -> stepped(at.dayOfYear, stepOf("dayofyear"), phase = 1)
         else -> null
       }
     if (dayOfYear != null) {
@@ -454,6 +506,7 @@ public object TimeUnitTransform : Transform {
       "day" in units -> TimeStepper(TimeInterval.DAY, 1, zone)
       "dayofyear" in units -> TimeStepper(TimeInterval.DAY, 1, zone)
       "week" in units -> TimeStepper(TimeInterval.WEEK, 1, zone)
+      "isoweek" in units -> TimeStepper(TimeInterval.ISOWEEK, 1, zone)
       "month" in units -> TimeStepper(TimeInterval.MONTH, 1, zone)
       "quarter" in units -> TimeStepper(TimeInterval.MONTH, 3, zone)
       else -> TimeStepper(TimeInterval.YEAR, 1, zone)

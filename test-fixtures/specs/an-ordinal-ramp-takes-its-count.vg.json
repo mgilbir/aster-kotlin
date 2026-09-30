@@ -1,0 +1,85 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v5.json",
+  "description": "Vega 6.4.0 (vega/vega#4270): an ordinal scale over a continuous scheme quantizes the ramp into `count` colours and cycles them, rather than one colour per domain value. And (vega/vega#4325) a signal inside a literal part of a domain union is resolved rather than ingested as an object.",
+  "width": 300,
+  "height": 150,
+  "padding": 5,
+
+  "signals": [
+    {"name": "ceiling", "value": 12}
+  ],
+
+  "data": [
+    {
+      "name": "cells",
+      "values": [
+        {"k": "a", "v": 1},
+        {"k": "b", "v": 3},
+        {"k": "c", "v": 4},
+        {"k": "d", "v": 7},
+        {"k": "e", "v": 2},
+        {"k": "f", "v": 5}
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {"data": "cells", "field": "k"},
+      "range": "width"
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {"fields": [{"data": "cells", "field": "v"}, [0, {"signal": "ceiling"}]]},
+      "range": "height"
+    },
+    {
+      "name": "counted",
+      "type": "ordinal",
+      "range": {"scheme": "blues", "count": 3},
+      "domain": {"data": "cells", "field": "k"}
+    },
+    {
+      "name": "uncounted",
+      "type": "ordinal",
+      "range": {"scheme": "reds"},
+      "domain": {"data": "cells", "field": "k"}
+    }
+  ],
+
+  "axes": [
+    {"orient": "left", "scale": "y"}
+  ],
+
+  "marks": [
+    {
+      "type": "rect",
+      "from": {"data": "cells"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "x", "field": "k"},
+          "width": {"scale": "x", "band": 0.5},
+          "y": {"scale": "y", "field": "v"},
+          "y2": {"scale": "y", "value": 0},
+          "fill": {"scale": "counted", "field": "k"}
+        }
+      }
+    },
+    {
+      "type": "rect",
+      "from": {"data": "cells"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "x", "field": "k", "offset": 25},
+          "width": {"scale": "x", "band": 0.5},
+          "y": {"scale": "y", "field": "v"},
+          "y2": {"scale": "y", "value": 0},
+          "fill": {"scale": "uncounted", "field": "k"}
+        }
+      }
+    }
+  ]
+}

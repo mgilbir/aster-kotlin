@@ -1007,9 +1007,20 @@ public class ScaleResolver(
         // one is not: it is a function, and upstream samples it once per domain value rather than
         // cycling its stops — which is the difference between sixteen shades of blue and the same
         // eleven twice over.
+        //
+        // How many samples is `+_.schemeCount || count || DEFAULT_COUNT` since Vega 6.4.0
+        // (vega/vega#4270): the range's own `count` first, then the domain's cardinality, then five
+        // for a domain that is still empty. Before that `count` was ignored here, so
+        // `{"scheme": "blues", "count": 3}` over six values gave six blues rather than three
+        // cycled.
         is RangeSpec.Scheme ->
-          (rampFor(spec, r)?.let { quantizeRamp(it, domain.size, rampSlice(spec, r)) }
-              ?: colorRange(spec))
+          (rampFor(spec, r)?.let { ramp ->
+              val count =
+                schemeCount(spec, r)?.takeIf { it != 0 }
+                  ?: domain.size.takeIf { it != 0 }
+                  ?: DEFAULT_SCHEME_COUNT
+              quantizeRamp(ramp, count, rampSlice(spec, r))
+            } ?: colorRange(spec))
             ?.map {
               VegaValue.Str(it.toCssHex())
             } ?: return null

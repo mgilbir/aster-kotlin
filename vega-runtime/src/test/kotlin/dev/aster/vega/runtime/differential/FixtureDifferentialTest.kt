@@ -252,7 +252,7 @@ class FixtureDifferentialTest {
   fun `every reference was generated from the pinned upstream version`() {
     // A silently upgraded oracle would make every comparison above suspect.
     for (name in fixtures()) {
-      assertEquals("6.3.1", compile(name).first.vegaVersion, name)
+      assertEquals("6.4.0", compile(name).first.vegaVersion, name)
     }
   }
 

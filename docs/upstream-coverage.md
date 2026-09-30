@@ -66,8 +66,8 @@ a word upstream has and this engine does not would simply be absent.
 
 | Kind | Accepted | Upstream | Inventory from | Refused |
 | --- | --- | --- | --- | --- |
-| Expression function | 118 | 118 | `vega-functions`' `functionContext` and its `expressionFunction` calls | — |
+| Expression function | 159 | 159 | `vega-functions`' `functionContext` and its `expressionFunction` calls | — |
 | Projection type | 17 | 17 | `vega-projection`'s own table | — |
-| Time unit | 11 | 11 | the schema's `timeunitTransform` enum | — |
+| Time unit | 12 | 12 | the schema's `timeunitTransform` enum | — |
 
-**146 of 146** names accepted.
+**188 of 188** names accepted.

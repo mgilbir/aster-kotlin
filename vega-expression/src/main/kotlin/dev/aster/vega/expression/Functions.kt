@@ -143,6 +143,7 @@ public object Functions {
       "day",
       "date" -> TimeInterval.DAY
       "week" -> TimeInterval.WEEK
+      "isoweek" -> TimeInterval.ISOWEEK
       "month" -> TimeInterval.MONTH
       "year" -> TimeInterval.YEAR
       else -> null
@@ -235,6 +236,46 @@ public object Functions {
         }
       )
     }
+
+    /**
+     * `interpolateLinear(values, frac)` — a piecewise-linear read of an array at a position in `[0,
+     * 1]`, Vega 6.4.0's (vega/vega#4316).
+     *
+     * Where `lerp` interpolates between the first and last entries only, this treats the array as
+     * evenly spaced control points and interpolates within the segment `frac` falls in, which is
+     * how a specification writes a custom easing curve.
+     *
+     * The ends and the control points themselves come back **as they are**, not coerced: upstream
+     * answers `values[0]` for any `frac` that is not above 0, NaN included, and `peek(values)` for
+     * one at or past 1. Between points it is JavaScript's `values[i] + t * (values[i+1] -
+     * values[i])`, so a string point concatenates rather than failing.
+     */
+    map["interpolateLinear"] = ExpressionFunction { args ->
+      val values =
+        (args.at(0) as? VegaValue.Arr)?.values ?: return@ExpressionFunction VegaValue.Null
+      if (values.isEmpty()) return@ExpressionFunction VegaValue.Null
+      val f = args.number(1)
+      when {
+        values.size == 1 || !(f > 0) -> values.first()
+        f >= 1 -> values.last()
+        else -> {
+          val position = f * (values.size - 1)
+          val i = floor(position).toInt()
+          val t = position - i
+          if (t == 0.0) values[i]
+          else
+            JsSemantics.add(
+              values[i],
+              VegaValue.Num(
+                t * (JsSemantics.toNumber(values[i + 1]) - JsSemantics.toNumber(values[i]))
+              ),
+            )
+        }
+      }
+    }
+
+    // d3-ease's easing curves, under their d3 names (vega/vega#4316). See [Ease].
+    for ((name, ease) in Ease.functions) map.unary(name, ease)
 
     /**
      * `sequence([start,] stop[, step])` — the numbers a range covers, `stop` exclusive.
@@ -1058,6 +1099,9 @@ public object Functions {
     // ms, d)`, so the days before the first Sunday are week 0 and a year beginning on a Sunday has
     // its first day in week 1. Reading it as an ISO week number puts the turn of the year one out.
     dateField(map, "week", { localZone() }) { sundaysBefore(it) }
+    // `isoweek` is the other week, Vega 6.4.0's (vega/vega#4320): Monday-based, numbered so week 1
+    // holds the year's first Thursday — the number `%V` prints, through the same helper.
+    dateField(map, "isoweek", { localZone() }) { TimeUnits.isoWeek(it.date).toDouble() }
 
     // The month and weekday **names**, which upstream produces by formatting a date it builds for
     // the purpose: `monthFormat(m)` is `%B` of 1 January 2000 with the month set to `m`, and

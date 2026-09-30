@@ -150,6 +150,12 @@ public interface ExpressionScope {
   public fun geoScale(projection: String?): VegaValue = VegaValue.Null
 
   /**
+   * `geoTranslate(projection)` — the projection's translation, `[tx, ty]`, Vega 6.4.0's
+   * (vega/vega#4313). What pan and zoom on a fitted map need, since the fit chose it.
+   */
+  public fun geoTranslate(projection: String?): VegaValue = VegaValue.Null
+
+  /**
    * `gradient(scale, p0, p1[, count])` — a colour scale as a gradient a mark can be filled with.
    *
    * Answers the same object a specification can write by hand — `{"gradient": "linear", "x1": …,

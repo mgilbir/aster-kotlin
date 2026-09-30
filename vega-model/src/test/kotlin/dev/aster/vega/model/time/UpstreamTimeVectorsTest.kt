@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test
  * Vega's **own** `vega-time` tests, replayed against this implementation.
  *
  * Not a transcription. `oracle-js/src/record-upstream-tests.mjs` runs upstream's test files against
- * the installed Vega 6.3.1 with the package's exports wrapped, and writes every call it makes —
+ * the installed Vega 6.4.0 with the package's exports wrapped, and writes every call it makes —
  * with upstream's actual answer — to `test-fixtures/upstream-vectors/vega-time.json`. So the inputs
  * are the ones Vega's authors chose, and the expectations are what Vega really returns rather than
  * what its assertions happen to check: several of those are deliberately loose where an exact value
@@ -127,6 +127,14 @@ class UpstreamTimeVectorsTest {
             val from = date(args[1]) ?: continue
             stepper(unit, 1, utc)?.floor(from)
           }
+          // Vega 6.4.0's ISO week numbers, read through the same helper `%V` and the `isoweek` unit
+          // use — so these vectors hold all three to upstream at once.
+          "isoweek",
+          "utcisoweek" -> {
+            val at = date(args[0]) ?: number(args[0]) ?: continue
+            val zone = if (utc) TimeZone.UTC else TimeZone.of(TEST_ZONE)
+            TimeUnits.isoWeek(TimeFormat.at(at, zone).date).toDouble()
+          }
           "timeSequence",
           "utcSequence" -> {
             val unit = text(args[0]) ?: continue
@@ -162,12 +170,13 @@ class UpstreamTimeVectorsTest {
       failures.take(12),
       "upstream disagrees with this implementation",
     )
-    // The floor is what stops this becoming a test that passes by skipping: 281 of upstream's 460
+    // The floor is what stops this becoming a test that passes by skipping: 334 of upstream's 663
     // recorded calls are replayed today, and the rest are named above rather than forgotten —
     // `detectTimeUnits`, `timeBin`, `timeUnits`, `week`, `dayofyear`, and the curried forms whose
-    // result is a *function*. Raise this as those are mapped; never lower it to make a change
-    // green.
-    assertTrue(replayed >= 281, "only $replayed vectors replayed; the harness must not shrink")
+    // result is a *function*. The 90 `timeFloor()` and `utcFloor()` calls among those are the
+    // `timeunit` transform's floor, and `UpstreamTimeFloorVectorsTest` in `vega-dataflow` replays
+    // them there. Raise this as the rest are mapped; never lower it to make a change green.
+    assertTrue(replayed >= 334, "only $replayed vectors replayed; the harness must not shrink")
   }
 
   /** A stable rendering for comparison: dates and numbers both become their millisecond value. */
