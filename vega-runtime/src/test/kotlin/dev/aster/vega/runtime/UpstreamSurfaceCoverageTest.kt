@@ -168,8 +168,8 @@ class UpstreamSurfaceCoverageTest {
    * helper, reachable from its generated code and not from a specification.
    *
    * Checked against what upstream's own registry answers at runtime, and the two agree exactly in
-   * both directions: 118 names, nothing scraped that is not registered and nothing registered that
-   * is not scraped.
+   * both directions: 159 names as of Vega 6.4.0 (118 before it), nothing scraped that is not
+   * registered and nothing registered that is not scraped.
    */
   private fun upstreamFunctions(): List<String> {
     val source = pinned("vega-functions/src/codegen.js").readText()
@@ -179,7 +179,33 @@ class UpstreamSurfaceCoverageTest {
         .map { it.groupValues[1] }
     val registered =
       Regex("""expressionFunction\(\s*['"](\w+)['"]""").findAll(source).map { it.groupValues[1] }
-    return (literal + registered).filterNot { it.startsWith("_") }.distinct().sorted().toList()
+    // And a **third** way, since Vega 6.4.0: `...easeFunctions` spreads a table imported from
+    // another file into the literal, and a pattern for identifiers at two-space indent sees neither
+    // the spread nor what it holds — the 36 easing functions would have been missing and this test
+    // green. So each spread is followed to the file its name is imported from and that table's keys
+    // are read too; a spread whose source cannot be found fails rather than being skipped.
+    val spread =
+      Regex("""^ {2}\.\.\.(\w+)""", RegexOption.MULTILINE)
+        .findAll(source.substringAfter("export const functionContext = {").substringBefore("\n};"))
+        .flatMap { match ->
+          val table = match.groupValues[1]
+          val from =
+            Regex("""import\s*\{[^}]*\b$table\b[^}]*\}\s*from\s*'\./([^']+)'""")
+              .find(source)
+              ?.groupValues
+              ?.get(1) ?: error("functionContext spreads '$table' and nothing imports it")
+          val body =
+            pinned("vega-functions/src/$from")
+              .readText()
+              .substringAfter("export const $table = {")
+              .substringBefore("\n};")
+          Regex("""^ {2}(\w+)\s*:""", RegexOption.MULTILINE).findAll(body).map { it.groupValues[1] }
+        }
+    return (literal + registered + spread)
+      .filterNot { it.startsWith("_") }
+      .distinct()
+      .sorted()
+      .toList()
   }
 
   private val nothing =
@@ -230,7 +256,7 @@ class UpstreamSurfaceCoverageTest {
   fun `every expression function upstream registers is implemented`() {
     val all = upstreamFunctions()
     assertTrue(
-      all.size >= 110,
+      all.size >= 155,
       "only ${all.size} functions scraped from upstream's functionContext; the literal's shape " +
         "changed and this measures nothing",
     )

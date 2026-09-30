@@ -6,6 +6,8 @@ package dev.aster.vega.runtime
 // gesture the host reports, the other is the Vega event a selector matches.
 import dev.aster.vega.expression.CachingExpressionCompiler
 import dev.aster.vega.expression.Evaluator
+import dev.aster.vega.expression.ExpressionCompiler
+import dev.aster.vega.expression.ExpressionResult
 import dev.aster.vega.expression.Functions
 import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
@@ -338,6 +340,7 @@ public class VegaChartController(
     if (container == value) return null
     container = value
     compiler = newCompiler(value, hostData)
+    handlerExpressions = handlerCompilerFor(value)
     val json = loadedSpecJson ?: return null
     if (lastCompiled?.readsContainerSize == false) return null
     return SizeRecompile(json, compiler)
@@ -392,6 +395,47 @@ public class VegaChartController(
       return compiled
     }
     return publish(compiled)
+  }
+
+  /**
+   * The surface size the last [ChartInputEvent.Resized] reported, which a `container:resize` stream
+   * fires on a change from. Null until the first, which is the baseline and fires nothing.
+   */
+  private var surfaceSize: SizeD? = null
+
+  /**
+   * Delivers `container:resize` to the streams listening for it — Vega 6.4.0's event source
+   * (vega/vega#4318), for a chart that reacts to its container the way it reacts to a window.
+   *
+   * The container is the surface the chart is drawn in, which a host reports with
+   * [ChartInputEvent.Resized] — both hosts send one on every layout, from their own thread, which
+   * is where a handler has to run: the host's clock and scheduler may be bound to it. That is
+   * upstream's `ResizeObserver` on the container element, and so are the three rules: the size the
+   * observer starts with is a baseline that fires nothing, a size that has not changed fires
+   * nothing, and a container collapsed to nothing in both directions fires nothing.
+   *
+   * A handler reading `containerSize()` reads what the host last set through [containerSize], which
+   * a host that sizes charts to their container sets on the same layout change.
+   */
+  private fun fireContainerResize(size: SizeD) {
+    if (size.width <= 0.0 && size.height <= 0.0) return
+    val previous = surfaceSize
+    if (size == previous) return
+    surfaceSize = size
+    if (previous == null) return
+    val dispatcher = vegaEvents ?: return
+    val compiled = lastCompiled ?: return
+    val fired =
+      dispatcher.dispatch(
+        VegaEvent(type = "resize", timestampMillis = clock(), source = EventStream.SOURCE_CONTAINER)
+      )
+    val (deferred, immediate) = fired.partition { it.deferByMillis != null }
+    for (entry in deferred) defer(entry)
+    val changed = LinkedHashSet<String>()
+    if (immediate.isNotEmpty()) {
+      changed += signals.apply(immediate, compiled.signals, compiled.groupScopes)
+    }
+    applyFired(changed, compiled)
   }
 
   /** The debounced handlers waiting, by the signal and delay that identify them. */
@@ -703,10 +747,32 @@ public class VegaChartController(
 
   // The same locale-bound function table the compiler uses, so a handler's own `timeFormat` writes
   // the same month name the axis does.
-  private val expressions =
+  //
+  // And the same **container size**. This table was built without it, so `containerSize()` in a
+  // handler answered `[null, null]` whatever the host had said — which is the expression Vega-Lite
+  // writes for `width: "container"` on `window:resize`, and the one a `container:resize` handler
+  // exists to read. Rebuilt when the size changes, because the answer is bound into the table;
+  // [expressions] forwards to whichever is current so [signals] can keep holding one compiler.
+  private var handlerExpressions: ExpressionCompiler = handlerCompilerFor(containerSize)
+
+  private fun handlerCompilerFor(size: SizeD?): ExpressionCompiler =
     CachingExpressionCompiler(
-      VegaExpressionCompiler(Evaluator(Functions.functionsFor(locale, timeZone = timeZone)))
+      VegaExpressionCompiler(
+        Evaluator(
+          Functions.functionsFor(
+            locale,
+            containerWidth = size?.width?.takeIf { it > 0.0 },
+            containerHeight = size?.height?.takeIf { it > 0.0 },
+            timeZone = timeZone,
+          )
+        )
+      )
     )
+
+  private val expressions =
+    object : ExpressionCompiler {
+      override fun compile(source: String): ExpressionResult = handlerExpressions.compile(source)
+    }
 
   /**
    * What a handler's own evaluation reported — an expression that could not be read, a function
@@ -1056,8 +1122,11 @@ public class VegaChartController(
       is ChartInputEvent.Zoom -> handleZoom(event)
       is ChartInputEvent.Key -> handleKey(event.key, event.modifiers)
       is ChartInputEvent.PointerDown,
-      is ChartInputEvent.PointerUp,
-      is ChartInputEvent.Resized -> Unit // No built-in behaviour; a signal handler may still fire.
+      is ChartInputEvent.PointerUp ->
+        Unit // No built-in behaviour; a signal handler may still fire.
+      // No built-in behaviour either, and a `container:resize` stream is what a handler reads it
+      // as.
+      is ChartInputEvent.Resized -> fireContainerResize(SizeD(event.width, event.height))
     }
     fireSignalHandlers(event)
   }

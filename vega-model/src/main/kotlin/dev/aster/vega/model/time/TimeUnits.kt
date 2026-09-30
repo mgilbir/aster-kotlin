@@ -2,10 +2,14 @@ package dev.aster.vega.model.time
 
 import dev.aster.vega.model.locale.VegaLocale
 import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.minus
 import kotlinx.datetime.number
+import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 
 /**
@@ -29,6 +33,8 @@ public object TimeUnits {
       "quarter",
       "month",
       "week",
+      // ISO 8601's Monday-based week, beside the Sunday-based one. Vega 6.4.0 (vega/vega#4320).
+      "isoweek",
       "date",
       "day",
       "dayofyear",
@@ -52,12 +58,16 @@ public object TimeUnits {
       "month" to "%b ",
       "date" to "%d ",
       "week" to "W%U ",
+      "isoweek" to "W%V ",
       "day" to "%a ",
       "dayofyear" to "%j ",
       "hours" to "%H:00",
       "minutes" to "00:%M",
       "seconds" to ":%S",
       "milliseconds" to ".%L",
+      // `%G`, not `%Y`: the year an ISO week belongs to is the one holding its Thursday, so 29
+      // December 2014 is week 1 of 2015 and has to be labelled so.
+      "year-isoweek" to "%G W%V ",
       "year-month" to "%Y-%m ",
       "year-month-date" to "%Y-%m-%d ",
       "hours-minutes" to "%H:%M",
@@ -187,5 +197,38 @@ public object TimeUnits {
       start = if (end > start) end else start + 1
     }
     return out.toString().trim()
+  }
+
+  /**
+   * The ISO 8601 week [date] falls in: weeks start on Monday, and week 1 is the one holding the
+   * year's first Thursday.
+   *
+   * One implementation for every place that asks — `%V`, the `isoweek` time unit and the
+   * `isoweek()` expression function — because upstream's three are one rule, and two spellings of a
+   * calendar rule drift. Upstream counts Mondays from the Monday of week 1 (`localISOWeekNum`);
+   * counting from the week's Thursday instead is the same number without a DST-sensitive count.
+   */
+  public fun isoWeek(date: LocalDate): Int {
+    val thursday = date.plus(4 - date.dayOfWeek.isoDayNumber, DateTimeUnit.DAY)
+    return (thursday.dayOfYear - 1) / 7 + 1
+  }
+
+  /** The year an ISO week belongs to, `%G`: the year of that week's Thursday. */
+  public fun isoWeekYear(date: LocalDate): Int =
+    date.plus(4 - date.dayOfWeek.isoDayNumber, DateTimeUnit.DAY).year
+
+  /**
+   * The day of January on which week 1 of the ISO week-numbering [year] begins — upstream's
+   * `localISOWeekOneDate`.
+   *
+   * Zero or less names a day of the December before: 2015's week 1 begins on 29 December 2014, so
+   * this answers -2, and a date rebuilt as "January the 1st plus that many days, less one" lands on
+   * it. Upstream relies on `Date` rolling the day over; this answers the same number for the same
+   * reason.
+   */
+  public fun isoWeekOneDate(year: Int): Int {
+    val fourth = LocalDate(year, 1, 4)
+    val monday = fourth.minus(fourth.dayOfWeek.isoDayNumber - 1, DateTimeUnit.DAY)
+    return if (monday.year < year) monday.day - 31 else monday.day
   }
 }

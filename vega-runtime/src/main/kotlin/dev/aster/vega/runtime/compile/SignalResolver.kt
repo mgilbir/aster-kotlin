@@ -601,6 +601,17 @@ public class SignalScope(
   }
 
   /**
+   * `geoTranslate('name')` — the projection's translation, the pair a fit chose, which is what a
+   * chart panning a fitted map starts from.
+   */
+  override fun geoTranslate(projection: String?): VegaValue {
+    val definition = projectionFor(projection, "geoTranslate")?.orNull() ?: return VegaValue.Null
+    return GeoMeasure.translateOf(definition)?.let { pair ->
+      VegaValue.Arr(pair.map { VegaValue.Num(it) })
+    } ?: VegaValue.Null
+  }
+
+  /**
    * Looks up a named projection, reporting one this scope does not define.
    *
    * The outer null means "reported, give up"; an inner null means the caller passed no name at all,

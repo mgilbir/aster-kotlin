@@ -1065,11 +1065,12 @@ Evaluator.init(functions:constants:)
 EventConfig
 EventConfig.allowDefault
 EventConfig.bind
+EventConfig.container
 EventConfig.description()
-EventConfig.doCopy(view:window:selector:timer:preventDefault:allowDefault:bind:globalCursor:)
+EventConfig.doCopy(view:window:selector:timer:preventDefault:allowDefault:bind:globalCursor:container:)
 EventConfig.globalCursor
 EventConfig.hash()
-EventConfig.init(view:window:selector:timer:preventDefault:allowDefault:bind:globalCursor:)
+EventConfig.init(view:window:selector:timer:preventDefault:allowDefault:bind:globalCursor:container:)
 EventConfig.isEqual(_:)
 EventConfig.preventDefault
 EventConfig.selector
@@ -1117,6 +1118,7 @@ EventSelectorException.init(message:)
 EventSelectorException.init(message:cause:)
 EventStream
 EventStream.Companion
+EventStream.Companion.SOURCE_CONTAINER
 EventStream.Companion.SOURCE_SCOPE
 EventStream.Companion.SOURCE_TIMER
 EventStream.Companion.SOURCE_VIEW
@@ -1191,6 +1193,7 @@ ExpressionScope.geoBounds(projection:geojson:)
 ExpressionScope.geoCentroid(projection:geojson:)
 ExpressionScope.geoScale(projection:)
 ExpressionScope.geoShape(projection:geojson:)
+ExpressionScope.geoTranslate(projection:)
 ExpressionScope.gradient(scale:from:to:count:)
 ExpressionScope.inScope(item:)
 ExpressionScope.indata(name:field:value:)
@@ -1479,6 +1482,7 @@ GeoMeasure.project(definition:longitude:latitude:)
 GeoMeasure.scaleOf(definition:)
 GeoMeasure.shape(definition:geojson:)
 GeoMeasure.shared
+GeoMeasure.translateOf(definition:)
 GeoPathTransform
 GeoPathTransform.apply(input:params:context:)
 GeoPathTransform.init()
@@ -3949,6 +3953,7 @@ SignalScope.geoBounds(projection:geojson:)
 SignalScope.geoCentroid(projection:geojson:)
 SignalScope.geoScale(projection:)
 SignalScope.geoShape(projection:geojson:)
+SignalScope.geoTranslate(projection:)
 SignalScope.get(name:)
 SignalScope.gradient(scale:from:to:count:)
 SignalScope.indata(name:field:value:)
@@ -4375,6 +4380,7 @@ TimeInterval.day
 TimeInterval.entries
 TimeInterval.hour
 TimeInterval.init(name:ordinal:)
+TimeInterval.isoweek
 TimeInterval.millisecond
 TimeInterval.minute
 TimeInterval.month
@@ -4431,6 +4437,9 @@ TimeUnits
 TimeUnits.ALL
 TimeUnits.detect(instants:zone:)
 TimeUnits.init()
+TimeUnits.isoWeek(date:)
+TimeUnits.isoWeekOneDate(year:)
+TimeUnits.isoWeekYear(date:)
 TimeUnits.shared
 TimeUnits.specifier(units:overrides:locale:)
 TitleDefaults

@@ -100,6 +100,7 @@ class UpstreamVectorShapeTest {
         "d3-array.json",
         "d3-color.json",
         "d3-dsv.json",
+        "d3-ease.json",
         "d3-format.json",
         "d3-geo.json",
         "d3-interpolate.json",

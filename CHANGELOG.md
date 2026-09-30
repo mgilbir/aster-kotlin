@@ -6,20 +6,78 @@ section here does not get released.
 
 ## Unreleased
 
+Vega 6.4.0, and everything it added. From Kotlin, two changes are source- or binary-incompatible:
+
+- `TimeInterval` has a new entry, `ISOWEEK`, so an exhaustive `when` over it no longer compiles.
+- `EventConfig` has a new last property, `container`. Kotlin callers keep compiling, since it has a
+  default; a JVM caller of the full constructor or of `copy` needs recompiling.
+
+### Added
+
+- **`isoweek`, the ISO 8601 week** (vega/vega#4320), everywhere upstream has it: as a `timeunit`
+  unit, as the `isoweek()` and `utcisoweek()` expression functions, and as a unit for `timeOffset`,
+  `timeSequence` and their UTC forms. Weeks start on Monday and week 1 holds the year's first
+  Thursday, so 29 December 2014 is in 2015's week 1. With a `year`, the year is the ISO
+  week-numbering year; without one it is 2015, a long ISO year whose week 53 exists, as upstream
+  chose. `timeUnitSpecifier` labels them `W%V` and `%G W%V`. `%V`, the unit and the function share
+  one implementation, `TimeUnits.isoWeek`, and `TimeInterval.ISOWEEK` steps Monday to Monday.
+- **The 37 easing curves** (vega/vega#4316), `easeLinear` through `easeElasticInOut`, under d3's
+  names and at d3's default parameters. They are transcribed from `d3-ease` operation for operation,
+  and `UpstreamEaseVectorsTest` replays 362 of d3-ease's own test vectors against them exactly.
+  `d3-ease` is now one of the d3 packages `scripts/record-upstream-vectors.sh` records.
+- **`interpolateLinear(values, frac)`** (vega/vega#4316): an array read as evenly spaced control
+  points, where `lerp` uses only its ends.
+- **`geoTranslate(projection)`** (vega/vega#4313): a projection's translation, which a fitted map's
+  pan and zoom start from.
+- **The `container:resize` event source** (vega/vega#4318). The container is the surface the chart
+  is drawn in, so a stream fires on the `ChartInputEvent.Resized` both hosts already send, by
+  upstream's `ResizeObserver` rules: the first size is a baseline, and an unchanged or empty one fires
+  nothing. `config.events.container` governs it like the other four keys, and a container event other
+  than `resize` is reported as upstream reports it.
+
 ### Changed
 
 - **The oracle is Vega 6.4.0**, up from 6.3.1; Vega-Lite stays at 6.4.3. Every reference in the
   corpus was regenerated from it, and none of the 260 Vega references moved except for its version
   stamp: nothing an existing fixture draws changed between the two releases.
 
+- **An expression may not write an object key that shadows `Object.prototype`**, quoted or not, nor
+  `then` (vega/vega#4317, #4331). `{"toString": 1}` and `{then: 1}` are refused with upstream's
+  `Illegal property`. Nothing here can reach a prototype; a specification upstream refuses should
+  not quietly draw.
+- **A text binding drops event-handler properties.** A generic `bind` input passes its properties
+  through as attributes, and since Vega 6.4.0 upstream drops any matching `/^on/i` with a warning
+  rather than setting it. So does this, with the same warning and the same pattern.
+
 ### Fixed
 
+- **A signal handler reading `containerSize()` sees the host's size.** Handlers were evaluated
+  against a function table built without it, so `containerSize()` answered `[null, null]` in every
+  handler whatever the host had said. That includes the `window:resize` handler Vega-Lite writes for
+  `width: "container"`. The table is rebuilt when the size changes.
+- **A `timeunit` `step` applies to `week`, `day`, `dayofyear` and `quarter`**, as it always did to
+  the other units and as upstream's `getUnit` does. `["year", "week"]` at step 2 drew one-week
+  buckets. Found by replaying vega-time's own `timeFloor` and `utcFloor` vectors against the
+  transform's floor: all 90 of them, which `UpstreamTimeFloorVectorsTest` now does and nothing did
+  before.
+- **An unfitted `mercator` has d3's default scale**, `961 / tau`, rather than 150. `geoScale` on
+  an `albersUsa` answers its scale rather than null.
 - **An ordinal scale over a continuous scheme honours `count`**, as upstream has since 6.4.0
   (vega/vega#4270). `{"scheme": "blues", "count": 3}` over six values now reads three blues off the
   ramp and cycles them, where it used to sample one blue per value. With no `count` the domain's
   size is used as before, and a domain that is still empty gets five colours rather than none. The
   new fixture `an-ordinal-ramp-takes-its-count` also covers a signal inside a literal part of a
   domain union (vega/vega#4325), which this engine already resolved and upstream now does too.
+
+### Internal
+
+- **Two coverage gates were blind to the new functions and are widened.** `UpstreamSurfaceCoverageTest`
+  scraped upstream's `functionContext` for literal entries and so could not see
+  `...easeFunctions`; it now follows a spread to its source, and counts 159 of upstream's names where
+  it counted 118. `scripts/capabilities.py` found registered functions by three spellings and missed
+  two: a table like `Ease.functions`, and `dateField(map, "week", ...)`, which registers `utcweek`
+  too. Widening that one found thirteen date functions already shipped and named nowhere in
+  `SUPPORTED_FEATURES.md`: `hours`, `month`, and eleven of the `utc` twins.
 
 ## 0.7.0
 

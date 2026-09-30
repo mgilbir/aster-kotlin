@@ -296,6 +296,7 @@ public final class dev/aster/vega/dataflow/transform/GeoMeasure {
 	public final fun project (Ldev/aster/vega/dataflow/transform/ProjectionDefinition;DD)[D
 	public final fun scaleOf (Ldev/aster/vega/dataflow/transform/ProjectionDefinition;)Ljava/lang/Double;
 	public final fun shape (Ldev/aster/vega/dataflow/transform/ProjectionDefinition;Ldev/aster/vega/model/VegaValue;)Ljava/lang/String;
+	public final fun translateOf (Ldev/aster/vega/dataflow/transform/ProjectionDefinition;)Ljava/util/List;
 }
 
 public final class dev/aster/vega/dataflow/transform/GeoPathTransform : dev/aster/vega/dataflow/transform/Transform {

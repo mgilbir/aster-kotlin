@@ -471,6 +471,7 @@ final object dev.aster.vega.dataflow.transform/GeoMeasure { // dev.aster.vega.da
     final fun project(dev.aster.vega.dataflow.transform/ProjectionDefinition, kotlin/Double, kotlin/Double): kotlin/DoubleArray? // dev.aster.vega.dataflow.transform/GeoMeasure.project|project(dev.aster.vega.dataflow.transform.ProjectionDefinition;kotlin.Double;kotlin.Double){}[0]
     final fun scaleOf(dev.aster.vega.dataflow.transform/ProjectionDefinition): kotlin/Double? // dev.aster.vega.dataflow.transform/GeoMeasure.scaleOf|scaleOf(dev.aster.vega.dataflow.transform.ProjectionDefinition){}[0]
     final fun shape(dev.aster.vega.dataflow.transform/ProjectionDefinition?, dev.aster.vega.model/VegaValue): kotlin/String? // dev.aster.vega.dataflow.transform/GeoMeasure.shape|shape(dev.aster.vega.dataflow.transform.ProjectionDefinition?;dev.aster.vega.model.VegaValue){}[0]
+    final fun translateOf(dev.aster.vega.dataflow.transform/ProjectionDefinition): kotlin.collections/List<kotlin/Double>? // dev.aster.vega.dataflow.transform/GeoMeasure.translateOf|translateOf(dev.aster.vega.dataflow.transform.ProjectionDefinition){}[0]
 }
 
 final object dev.aster.vega.dataflow.transform/GeoPathTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/GeoPathTransform|null[0]

@@ -366,17 +366,10 @@ public object TimeFormat {
   }
 
   /** `%V`: the ISO week, where a week belongs to the year holding its Thursday. */
-  private fun isoWeek(at: LocalDateTime): Int {
-    val thursday = at.date.plus(4 - at.date.dayOfWeek.isoDayNumber, DateTimeUnit.DAY)
-    // The week is the Thursday's day of the year divided by seven, and nothing else: this used to
-    // add `if (firstOfYear.dayOfWeek > 4) 0 else 0`, which is zero either way and read as though a
-    // correction were being applied.
-    return ((thursday.dayOfYear - 1) / 7) + 1
-  }
+  private fun isoWeek(at: LocalDateTime): Int = TimeUnits.isoWeek(at.date)
 
   /** `%G`: the year that ISO week belongs to, which is not always the calendar year. */
-  private fun isoWeekYear(at: LocalDateTime): Int =
-    at.date.plus(4 - at.date.dayOfWeek.isoDayNumber, DateTimeUnit.DAY).year
+  private fun isoWeekYear(at: LocalDateTime): Int = TimeUnits.isoWeekYear(at.date)
 
   /** `%W`: weeks counted from the first Monday, as `%U` counts from the first Sunday. */
   private fun mondayWeek(at: LocalDateTime): Int {

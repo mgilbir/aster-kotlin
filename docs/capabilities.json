@@ -1729,8 +1729,8 @@
         "FixtureDifferentialTest",
         "ScalesTest"
       ],
-      "tests_text": "`ScalesTest`, `FixtureDifferentialTest` (`scheme-forms`, `packed-bubble`)",
-      "notes": "An explicit range array, a column of the data, or a scheme. A **categorical** scheme is the range and cycles when the domain outruns it; a **continuous** one is a function, and upstream samples it once per domain value instead — sixteen categories over `blues` give sixteen shades, not the same eleven and then five again. An axis over one is ticked and labelled: an ordinal axis with its domain values at their range positions, `tickCount` not thinning them, and an identity axis like a linear one — d3 makes it `linearish` — with each tick at the value itself. The domain line spans the scale's first and last range entries, which for an ordinal scale is not its widest extent",
+      "tests_text": "`ScalesTest`, `FixtureDifferentialTest` (`scheme-forms`, `packed-bubble`, `an-ordinal-ramp-takes-its-count`)",
+      "notes": "An explicit range array, a column of the data, or a scheme. A **categorical** scheme is the range and cycles when the domain outruns it; a **continuous** one is a function, and upstream samples it once per domain value instead — sixteen categories over `blues` give sixteen shades, not the same eleven and then five again. An axis over one is ticked and labelled: an ordinal axis with its domain values at their range positions, `tickCount` not thinning them, and an identity axis like a linear one — d3 makes it `linearish` — with each tick at the value itself. The domain line spans the scale's first and last range entries, which for an ordinal scale is not its widest extent Since Vega 6.4.0 an ordinal scale over a **continuous** scheme honours `count` (vega/vega#4270): `+schemeCount || domain size || 5` colours are read off the ramp and cycled, so `{\"scheme\": \"blues\", \"count\": 3}` over six values is three blues twice, and an empty domain gets five rather than none.",
       "milestone": "3"
     },
     {
@@ -1823,6 +1823,18 @@
     {
       "line": 185,
       "section": "Scales",
+      "feature": "`geoTranslate`",
+      "status": "**Supported**",
+      "tests": [
+        "FixtureDifferentialTest"
+      ],
+      "tests_text": "`FixtureDifferentialTest` (`a-projection-says-where-it-moved`)",
+      "notes": "Vega 6.4.0's (vega/vega#4313): a projection's translation, `[tx, ty]`, which is what pan and zoom on a fitted map start from. An `albersUsa` answers too, and so does `geoScale` on one, which answered null here until this needed the same lookup; and an unfitted `mercator` has d3's default scale of `961 / tau` rather than 150.",
+      "milestone": "6"
+    },
+    {
+      "line": 186,
+      "section": "Scales",
       "feature": "`lab` and `hcl` colour helpers",
       "status": "**Supported**",
       "tests": [
@@ -1833,7 +1845,7 @@
       "milestone": "6"
     },
     {
-      "line": 186,
+      "line": 187,
       "section": "Scales",
       "feature": "`config.range`",
       "status": "**Supported**",
@@ -1845,7 +1857,7 @@
       "milestone": "4"
     },
     {
-      "line": 187,
+      "line": 188,
       "section": "Scales",
       "feature": "Aggregate operations",
       "status": "**Supported**",
@@ -1858,7 +1870,7 @@
       "milestone": "6"
     },
     {
-      "line": 188,
+      "line": 189,
       "section": "Scales",
       "feature": "Colour interpolation spaces",
       "status": "**Supported**",
@@ -1871,7 +1883,7 @@
       "milestone": "5"
     },
     {
-      "line": 189,
+      "line": 190,
       "section": "Scales",
       "feature": "Quantize",
       "status": "**Supported**",
@@ -1884,7 +1896,7 @@
       "milestone": "6"
     },
     {
-      "line": 190,
+      "line": 191,
       "section": "Scales",
       "feature": "Quantile",
       "status": "**Supported**",
@@ -1897,7 +1909,7 @@
       "milestone": "6"
     },
     {
-      "line": 191,
+      "line": 192,
       "section": "Scales",
       "feature": "Threshold",
       "status": "**Supported**",
@@ -1910,7 +1922,7 @@
       "milestone": "6"
     },
     {
-      "line": 192,
+      "line": 193,
       "section": "Scales",
       "feature": "Bin-ordinal",
       "status": "**Supported**",
@@ -1923,7 +1935,7 @@
       "milestone": "6"
     },
     {
-      "line": 193,
+      "line": 194,
       "section": "Scales",
       "feature": "Where a boundary value lands",
       "status": "**Supported**",
@@ -1935,7 +1947,7 @@
       "milestone": "6"
     },
     {
-      "line": 194,
+      "line": 195,
       "section": "Scales",
       "feature": "`domainMin`, `domainMax`, `domainMid`",
       "status": "**Supported**",
@@ -1948,7 +1960,7 @@
       "milestone": "6"
     },
     {
-      "line": 195,
+      "line": 196,
       "section": "Scales",
       "feature": "A continuous scale over **no** data",
       "status": "**Supported**",
@@ -1960,7 +1972,7 @@
       "milestone": "6"
     },
     {
-      "line": 196,
+      "line": 197,
       "section": "Scales",
       "feature": "A label's decimals when the step says nothing",
       "status": "**Supported**",
@@ -1972,7 +1984,7 @@
       "milestone": "6"
     },
     {
-      "line": 197,
+      "line": 198,
       "section": "Scales",
       "feature": "`zero`",
       "status": "**Supported**",
@@ -1984,7 +1996,7 @@
       "milestone": "3"
     },
     {
-      "line": 198,
+      "line": 199,
       "section": "Scales",
       "feature": "`domainRaw`, `domainImplicit`, `bins`",
       "status": "**Supported**",
@@ -1996,7 +2008,7 @@
       "milestone": "6"
     },
     {
-      "line": 207,
+      "line": 208,
       "section": "Data transforms",
       "feature": "`filter`",
       "status": "**Supported**",
@@ -2008,7 +2020,7 @@
       "milestone": "4"
     },
     {
-      "line": 208,
+      "line": 209,
       "section": "Data transforms",
       "feature": "`formula`",
       "status": "**Supported**",
@@ -2020,7 +2032,7 @@
       "milestone": "4"
     },
     {
-      "line": 209,
+      "line": 210,
       "section": "Data transforms",
       "feature": "`collect`",
       "status": "**Supported**",
@@ -2032,7 +2044,7 @@
       "milestone": "4"
     },
     {
-      "line": 210,
+      "line": 211,
       "section": "Data transforms",
       "feature": "`project`",
       "status": "**Supported**",
@@ -2044,7 +2056,7 @@
       "milestone": "4"
     },
     {
-      "line": 211,
+      "line": 212,
       "section": "Data transforms",
       "feature": "`identifier`",
       "status": "**Supported**",
@@ -2056,7 +2068,7 @@
       "milestone": "4"
     },
     {
-      "line": 212,
+      "line": 213,
       "section": "Data transforms",
       "feature": "`extent`",
       "status": "**Supported**",
@@ -2068,7 +2080,7 @@
       "milestone": "4"
     },
     {
-      "line": 213,
+      "line": 214,
       "section": "Data transforms",
       "feature": "`aggregate`",
       "status": "**Supported**",
@@ -2080,7 +2092,7 @@
       "milestone": "4"
     },
     {
-      "line": 214,
+      "line": 215,
       "section": "Data transforms",
       "feature": "`joinaggregate`",
       "status": "**Supported**",
@@ -2092,7 +2104,7 @@
       "milestone": "4"
     },
     {
-      "line": 215,
+      "line": 216,
       "section": "Data transforms",
       "feature": "`bin`",
       "status": "**Supported**",
@@ -2105,7 +2117,7 @@
       "milestone": "4"
     },
     {
-      "line": 216,
+      "line": 217,
       "section": "Data transforms",
       "feature": "`stack`",
       "status": "**Supported**",
@@ -2117,7 +2129,7 @@
       "milestone": "4"
     },
     {
-      "line": 217,
+      "line": 218,
       "section": "Data transforms",
       "feature": "`fold`",
       "status": "**Supported**",
@@ -2129,7 +2141,7 @@
       "milestone": "4"
     },
     {
-      "line": 218,
+      "line": 219,
       "section": "Data transforms",
       "feature": "`flatten`",
       "status": "**Supported**",
@@ -2141,20 +2153,21 @@
       "milestone": "4"
     },
     {
-      "line": 219,
+      "line": 220,
       "section": "Data transforms",
       "feature": "`timeunit`",
       "status": "**Supported**",
       "tests": [
         "FixtureDifferentialTest",
-        "TimeUnitTransformTest"
+        "TimeUnitTransformTest",
+        "UpstreamTimeFloorVectorsTest"
       ],
-      "tests_text": "`TimeUnitTransformTest` (upstream vectors), `FixtureDifferentialTest` (`timeunit`)",
-      "notes": "Buckets a date into the calendar period the listed units describe, emitting the bucket start and the next one. The floor is *built* from the units present, so omitting the year deliberately collapses every January onto one bucket — a seasonal profile rather than a timeline. `week`, `day` and `dayofyear` need week numbering and are reported; so is inferring the units from the data",
+      "tests_text": "`TimeUnitTransformTest` (upstream vectors), `FixtureDifferentialTest` (`timeunit`), `UpstreamTimeFloorVectorsTest` (all 90 of vega-time's `timeFloor` and `utcFloor` vectors), `FixtureDifferentialTest` (`iso-weeks`)",
+      "notes": "Buckets a date into the calendar period the listed units describe, emitting the bucket start and the next one. The floor is *built* from the units present, so omitting the year deliberately collapses every January onto one bucket — a seasonal profile rather than a timeline. `week`, `day` and `dayofyear` need week numbering and are reported; so is inferring the units from the data **`isoweek`** since Vega 6.4.0: Monday-based ISO 8601 weeks, with `year` meaning the ISO week-numbering year and 2015 — a long ISO year — as the reference year when there is none, so 29 December 2014 buckets into 2015's week 1. `week` and `isoweek` together are refused as upstream refuses them. A `step` now applies to `week`, `day`, `dayofyear` and `quarter` as it always did to the rest: upstream's own `[\"year\", \"week\"]` vectors at steps 2 to 4 found a two-week bucket being drawn one week wide.",
       "milestone": "6"
     },
     {
-      "line": 220,
+      "line": 221,
       "section": "Data transforms",
       "feature": "`pie`",
       "status": "**Supported**",
@@ -2166,7 +2179,7 @@
       "milestone": "5"
     },
     {
-      "line": 221,
+      "line": 222,
       "section": "Data transforms",
       "feature": "`window`",
       "status": "**Supported**",
@@ -2179,7 +2192,7 @@
       "milestone": "6"
     },
     {
-      "line": 222,
+      "line": 223,
       "section": "Data transforms",
       "feature": "`sequence`",
       "status": "**Supported**",
@@ -2192,7 +2205,7 @@
       "milestone": "6"
     },
     {
-      "line": 223,
+      "line": 224,
       "section": "Data transforms",
       "feature": "`lookup`",
       "status": "**Supported**",
@@ -2205,7 +2218,7 @@
       "milestone": "6"
     },
     {
-      "line": 224,
+      "line": 225,
       "section": "Data transforms",
       "feature": "`impute`",
       "status": "**Supported**",
@@ -2217,7 +2230,7 @@
       "milestone": "6"
     },
     {
-      "line": 225,
+      "line": 226,
       "section": "Data transforms",
       "feature": "`cross`",
       "status": "**Supported**",
@@ -2230,7 +2243,7 @@
       "milestone": "6"
     },
     {
-      "line": 226,
+      "line": 227,
       "section": "Data transforms",
       "feature": "`pivot`",
       "status": "**Supported**",
@@ -2242,7 +2255,7 @@
       "milestone": "6"
     },
     {
-      "line": 227,
+      "line": 228,
       "section": "Data transforms",
       "feature": "`countpattern`",
       "status": "**Supported**",
@@ -2255,7 +2268,7 @@
       "milestone": "6"
     },
     {
-      "line": 228,
+      "line": 229,
       "section": "Data transforms",
       "feature": "`quantile`",
       "status": "**Supported**",
@@ -2268,7 +2281,7 @@
       "milestone": "6"
     },
     {
-      "line": 229,
+      "line": 230,
       "section": "Data transforms",
       "feature": "`regression`",
       "status": "**Supported**",
@@ -2281,7 +2294,7 @@
       "milestone": "6"
     },
     {
-      "line": 230,
+      "line": 231,
       "section": "Data transforms",
       "feature": "`loess`",
       "status": "**Supported**",
@@ -2294,7 +2307,7 @@
       "milestone": "6"
     },
     {
-      "line": 231,
+      "line": 232,
       "section": "Data transforms",
       "feature": "`kde`",
       "status": "**Supported**",
@@ -2307,7 +2320,7 @@
       "milestone": "6"
     },
     {
-      "line": 232,
+      "line": 233,
       "section": "Data transforms",
       "feature": "`density`",
       "status": "**Supported**",
@@ -2320,7 +2333,7 @@
       "milestone": "6"
     },
     {
-      "line": 233,
+      "line": 234,
       "section": "Data transforms",
       "feature": "`dotbin`",
       "status": "**Supported**",
@@ -2333,7 +2346,7 @@
       "milestone": "6"
     },
     {
-      "line": 234,
+      "line": 235,
       "section": "Data transforms",
       "feature": "`stratify`",
       "status": "**Supported**",
@@ -2346,7 +2359,7 @@
       "milestone": "6"
     },
     {
-      "line": 235,
+      "line": 236,
       "section": "Data transforms",
       "feature": "`nest`",
       "status": "**Supported**",
@@ -2358,7 +2371,7 @@
       "milestone": "6"
     },
     {
-      "line": 236,
+      "line": 237,
       "section": "Data transforms",
       "feature": "`treemap`",
       "status": "**Supported**",
@@ -2371,7 +2384,7 @@
       "milestone": "6"
     },
     {
-      "line": 237,
+      "line": 238,
       "section": "Data transforms",
       "feature": "`partition`",
       "status": "**Supported**",
@@ -2384,7 +2397,7 @@
       "milestone": "6"
     },
     {
-      "line": 238,
+      "line": 239,
       "section": "Data transforms",
       "feature": "`pack`",
       "status": "**Supported**",
@@ -2397,7 +2410,7 @@
       "milestone": "6"
     },
     {
-      "line": 239,
+      "line": 240,
       "section": "Data transforms",
       "feature": "`tree`",
       "status": "**Supported**",
@@ -2410,7 +2423,7 @@
       "milestone": "6"
     },
     {
-      "line": 240,
+      "line": 241,
       "section": "Data transforms",
       "feature": "`treelinks`",
       "status": "**Supported**",
@@ -2423,7 +2436,7 @@
       "milestone": "6"
     },
     {
-      "line": 241,
+      "line": 242,
       "section": "Data transforms",
       "feature": "`linkpath`",
       "status": "**Supported**",
@@ -2436,7 +2449,7 @@
       "milestone": "6"
     },
     {
-      "line": 242,
+      "line": 243,
       "section": "Data transforms",
       "feature": "`wordcloud`",
       "status": "**Supported**, with a looser collision test",
@@ -2450,7 +2463,7 @@
       "milestone": "4+"
     },
     {
-      "line": 243,
+      "line": 244,
       "section": "Data transforms",
       "feature": "Tuple identity, change sets",
       "status": "Supported",
@@ -2462,7 +2475,7 @@
       "milestone": "0"
     },
     {
-      "line": 244,
+      "line": 245,
       "section": "Data transforms",
       "feature": "Deterministic operator scheduling",
       "status": "Supported",
@@ -2474,7 +2487,7 @@
       "milestone": "0"
     },
     {
-      "line": 245,
+      "line": 246,
       "section": "Data transforms",
       "feature": "Pulse propagation / incremental evaluation",
       "status": "Deliberate difference",
@@ -2492,7 +2505,7 @@
       }
     },
     {
-      "line": 246,
+      "line": 247,
       "section": "Data transforms",
       "feature": "Geo transforms, force layout",
       "status": "**Supported**",
@@ -2505,7 +2518,7 @@
       "milestone": "—"
     },
     {
-      "line": 256,
+      "line": 257,
       "section": "Expressions",
       "feature": "Lexer, parser, evaluator",
       "status": "**Supported**",
@@ -2518,7 +2531,7 @@
       "milestone": "4"
     },
     {
-      "line": 257,
+      "line": 258,
       "section": "Expressions",
       "feature": "JavaScript coercion semantics",
       "status": "**Supported**",
@@ -2531,7 +2544,7 @@
       "milestone": "4"
     },
     {
-      "line": 258,
+      "line": 259,
       "section": "Expressions",
       "feature": "`null` versus `undefined`",
       "status": "**Supported**",
@@ -2545,7 +2558,7 @@
       "milestone": "5"
     },
     {
-      "line": 259,
+      "line": 260,
       "section": "Expressions",
       "feature": "Math, string, array, predicate and coercion functions",
       "status": "**Supported**",
@@ -2557,7 +2570,7 @@
       "milestone": "4"
     },
     {
-      "line": 260,
+      "line": 261,
       "section": "Expressions",
       "feature": "`String(date)`",
       "status": "Known difference",
@@ -2575,7 +2588,7 @@
       }
     },
     {
-      "line": 261,
+      "line": 262,
       "section": "Expressions",
       "feature": "Date functions",
       "status": "**Supported**",
@@ -2587,31 +2600,82 @@
       "milestone": "6"
     },
     {
-      "line": 262,
-      "section": "Expressions",
-      "feature": "`hypot`",
-      "status": "**Supported**",
-      "tests": [
-        "ExpressionReferenceTest"
-      ],
-      "tests_text": "`ExpressionReferenceTest` (upstream vectors)",
-      "notes": "Variadic, not the two-argument function its name suggests, and zero with no arguments at all",
-      "milestone": "6"
-    },
-    {
       "line": 263,
       "section": "Expressions",
-      "feature": "`hypot`",
+      "feature": "`isoweek`, `utcisoweek`, and the date fields",
       "status": "**Supported**",
       "tests": [
-        "ExpressionReferenceTest"
+        "UpstreamTimeVectorsTest",
+        "VegaSixFourFunctionsTest"
       ],
-      "tests_text": "`ExpressionReferenceTest` (upstream vectors)",
-      "notes": "Variadic, not the two-argument function its name suggests, and zero with no arguments at all",
+      "tests_text": "`VegaSixFourFunctionsTest`, `UpstreamTimeVectorsTest` (vega-time's own `isoweek` vectors), `FixtureDifferentialTest` (`iso-weeks`)",
+      "notes": "`year`, `quarter`, `month`, `date`, `day`, `dayofyear`, `week`, `isoweek`, `hours`, `minutes`, `seconds` and `milliseconds`, each with its UTC twin — `utcyear`, `utcquarter`, `utcmonth`, `utcdate`, `utcday`, `utcdayofyear`, `utcweek`, `utcisoweek`, `utchours`, `utcminutes`, `utcseconds`, `utcmilliseconds`. `isoweek` is Vega 6.4.0's (vega/vega#4320): the ISO 8601 week, Monday-based and numbered so week 1 holds the year's first Thursday, through the same helper `%V` and the `isoweek` time unit use. `timeOffset`, `timeSequence` and their UTC forms take `isoweek` as a unit, stepping Monday to Monday.",
       "milestone": "6"
     },
     {
       "line": 264,
+      "section": "Expressions",
+      "feature": "The easing curves (`easeLinear`, `easeCubic`, …)",
+      "status": "**Supported**",
+      "tests": [
+        "FixtureDifferentialTest",
+        "UpstreamEaseVectorsTest"
+      ],
+      "tests_text": "`UpstreamEaseVectorsTest` (362 of d3-ease's own vectors, compared exactly), `FixtureDifferentialTest` (`easing-curves`)",
+      "notes": "All 37 of d3-ease's curves, as Vega 6.4.0 exposes them (vega/vega#4316): `easeLinear`; `easeQuad`, `easeQuadIn`, `easeQuadOut`, `easeQuadInOut`; `easeCubic`, `easeCubicIn`, `easeCubicOut`, `easeCubicInOut`; `easePoly`, `easePolyIn`, `easePolyOut`, `easePolyInOut`; `easeSin`, `easeSinIn`, `easeSinOut`, `easeSinInOut`; `easeExp`, `easeExpIn`, `easeExpOut`, `easeExpInOut`; `easeCircle`, `easeCircleIn`, `easeCircleOut`, `easeCircleInOut`; `easeBounce`, `easeBounceIn`, `easeBounceOut`, `easeBounceInOut`; `easeBack`, `easeBackIn`, `easeBackOut`, `easeBackInOut`; `easeElastic`, `easeElasticIn`, `easeElasticOut`, `easeElasticInOut`. The parametric families are at their default parameters, as upstream's are. Transcribed operation for operation so the answers match to the last bit; the one place they can still differ by one is a `sin` or `cos` whose platform rounding differs from V8's — the JVM's `Math.cos` intrinsic does so for `easeSinInOut(1.1)` — which is why the fixture prints the sine family to fifteen digits.",
+      "milestone": "6"
+    },
+    {
+      "line": 265,
+      "section": "Expressions",
+      "feature": "`interpolateLinear`",
+      "status": "**Supported**",
+      "tests": [
+        "FixtureDifferentialTest",
+        "VegaSixFourFunctionsTest"
+      ],
+      "tests_text": "`VegaSixFourFunctionsTest` (vega-functions' own cases), `FixtureDifferentialTest` (`easing-curves`)",
+      "notes": "Vega 6.4.0's (vega/vega#4316): an array read as evenly spaced control points at a position in `[0, 1]`, where `lerp` uses only the ends. The ends come back as they are, uncoerced, and between points it is JavaScript's `+`, so a string point concatenates as upstream's does.",
+      "milestone": "6"
+    },
+    {
+      "line": 266,
+      "section": "Expressions",
+      "feature": "Object keys that shadow the prototype",
+      "status": "**Supported**",
+      "tests": [
+        "VegaSixFourFunctionsTest"
+      ],
+      "tests_text": "`VegaSixFourFunctionsTest`",
+      "notes": "`{toString: 1}`, `{\"toString\": 1}` and `{then: 1}` are refused with upstream's `Illegal property`, as Vega 6.4.0 refuses them (vega/vega#4317, #4331): a quoted key had been a way round the check, and `then` makes an object a thenable. Nothing in this engine can reach a prototype, so this protects nothing here; it is kept because a specification upstream refuses should not quietly draw.",
+      "milestone": "6"
+    },
+    {
+      "line": 267,
+      "section": "Expressions",
+      "feature": "`hypot`",
+      "status": "**Supported**",
+      "tests": [
+        "ExpressionReferenceTest"
+      ],
+      "tests_text": "`ExpressionReferenceTest` (upstream vectors)",
+      "notes": "Variadic, not the two-argument function its name suggests, and zero with no arguments at all",
+      "milestone": "6"
+    },
+    {
+      "line": 268,
+      "section": "Expressions",
+      "feature": "`hypot`",
+      "status": "**Supported**",
+      "tests": [
+        "ExpressionReferenceTest"
+      ],
+      "tests_text": "`ExpressionReferenceTest` (upstream vectors)",
+      "notes": "Variadic, not the two-argument function its name suggests, and zero with no arguments at all",
+      "milestone": "6"
+    },
+    {
+      "line": 269,
       "section": "Expressions",
       "feature": "`timeOffset`'s default step",
       "status": "**Supported**",
@@ -2624,7 +2688,7 @@
       "milestone": "6"
     },
     {
-      "line": 265,
+      "line": 270,
       "section": "Expressions",
       "feature": "`timeUnitSpecifier`",
       "status": "**Supported**",
@@ -2637,7 +2701,7 @@
       "milestone": "6"
     },
     {
-      "line": 266,
+      "line": 271,
       "section": "Expressions",
       "feature": "`%q` and `%U`",
       "status": "**Supported**",
@@ -2649,7 +2713,7 @@
       "milestone": "6"
     },
     {
-      "line": 267,
+      "line": 272,
       "section": "Expressions",
       "feature": "`timeParse`, `utcParse`",
       "status": "**Supported**",
@@ -2661,7 +2725,7 @@
       "milestone": "6"
     },
     {
-      "line": 268,
+      "line": 273,
       "section": "Expressions",
       "feature": "`format`",
       "status": "**Supported**",
@@ -2673,7 +2737,7 @@
       "milestone": "5"
     },
     {
-      "line": 269,
+      "line": 274,
       "section": "Expressions",
       "feature": "Date and time functions",
       "status": "**Supported**",
@@ -2683,7 +2747,7 @@
       "milestone": "5"
     },
     {
-      "line": 270,
+      "line": 275,
       "section": "Expressions",
       "feature": "`scale`, `invert`, `gradient`",
       "status": "**Supported**",
@@ -2693,7 +2757,7 @@
       "milestone": "6"
     },
     {
-      "line": 271,
+      "line": 276,
       "section": "Expressions",
       "feature": "`random`, `now` and the `sample*` family",
       "status": "**Supported**",
@@ -2706,7 +2770,7 @@
       "milestone": "6"
     },
     {
-      "line": 272,
+      "line": 277,
       "section": "Expressions",
       "feature": "The distribution functions",
       "status": "**Supported**",
@@ -2718,7 +2782,7 @@
       "milestone": "6"
     },
     {
-      "line": 273,
+      "line": 278,
       "section": "Expressions",
       "feature": "`bin` on a boundary value",
       "status": "**Supported**",
@@ -2731,7 +2795,7 @@
       "milestone": "6"
     },
     {
-      "line": 274,
+      "line": 279,
       "section": "Expressions",
       "feature": "`isocontour`",
       "status": "**Supported**",
@@ -2743,7 +2807,7 @@
       "milestone": "6"
     },
     {
-      "line": 275,
+      "line": 280,
       "section": "Expressions",
       "feature": "`geopath`",
       "status": "**Supported**",
@@ -2756,7 +2820,7 @@
       "milestone": "6"
     },
     {
-      "line": 276,
+      "line": 281,
       "section": "Expressions",
       "feature": "Mark-level `transform`",
       "status": "**Supported**",
@@ -2768,7 +2832,7 @@
       "milestone": "6"
     },
     {
-      "line": 277,
+      "line": 282,
       "section": "Expressions",
       "feature": "`kde2d`",
       "status": "**Supported**",
@@ -2780,7 +2844,7 @@
       "milestone": "6"
     },
     {
-      "line": 278,
+      "line": 283,
       "section": "Expressions",
       "feature": "`heatmap`",
       "status": "**Supported**",
@@ -2792,7 +2856,7 @@
       "milestone": "6"
     },
     {
-      "line": 279,
+      "line": 284,
       "section": "Expressions",
       "feature": "PNG encoding",
       "status": "**Supported**",
@@ -2805,7 +2869,7 @@
       "milestone": "6"
     },
     {
-      "line": 280,
+      "line": 285,
       "section": "Expressions",
       "feature": "`crossfilter`, `resolvefilter`",
       "status": "**Supported**",
@@ -2818,7 +2882,7 @@
       "milestone": "6"
     },
     {
-      "line": 281,
+      "line": 286,
       "section": "Expressions",
       "feature": "`force`",
       "status": "**Supported**",
@@ -2830,7 +2894,7 @@
       "milestone": "6"
     },
     {
-      "line": 282,
+      "line": 287,
       "section": "Expressions",
       "feature": "TopoJSON",
       "status": "**Supported**",
@@ -2842,7 +2906,7 @@
       "milestone": "6"
     },
     {
-      "line": 283,
+      "line": 288,
       "section": "Expressions",
       "feature": "Projections",
       "status": "**Supported**",
@@ -2856,7 +2920,7 @@
       "milestone": "6"
     },
     {
-      "line": 284,
+      "line": 289,
       "section": "Expressions",
       "feature": "`label`",
       "status": "**Supported**, with one measured divergence",
@@ -2873,7 +2937,7 @@
       }
     },
     {
-      "line": 285,
+      "line": 290,
       "section": "Expressions",
       "feature": "A mark's `hover` encode block",
       "status": "**Supported**",
@@ -2885,7 +2949,7 @@
       "milestone": "5"
     },
     {
-      "line": 286,
+      "line": 291,
       "section": "Expressions",
       "feature": "Per-item `zindex`",
       "status": "**Supported**",
@@ -2897,7 +2961,7 @@
       "milestone": "5"
     },
     {
-      "line": 287,
+      "line": 292,
       "section": "Expressions",
       "feature": "`cursor`",
       "status": "**Supported**",
@@ -2909,7 +2973,7 @@
       "milestone": "5"
     },
     {
-      "line": 288,
+      "line": 293,
       "section": "Expressions",
       "feature": "Projection `fit`, `extent` and `size`",
       "status": "**Supported**",
@@ -2921,7 +2985,7 @@
       "milestone": "6"
     },
     {
-      "line": 289,
+      "line": 294,
       "section": "Expressions",
       "feature": "Projection `clipAngle` and `parallels`",
       "status": "**Supported**",
@@ -2934,7 +2998,7 @@
       "milestone": "6"
     },
     {
-      "line": 290,
+      "line": 295,
       "section": "Expressions",
       "feature": "Projection `pointRadius`",
       "status": "**Supported**",
@@ -2946,7 +3010,7 @@
       "milestone": "6"
     },
     {
-      "line": 291,
+      "line": 296,
       "section": "Expressions",
       "feature": "A mercator's automatic clip",
       "status": "**Supported**",
@@ -2958,7 +3022,7 @@
       "milestone": "6"
     },
     {
-      "line": 292,
+      "line": 297,
       "section": "Expressions",
       "feature": "Inline `values` as a document",
       "status": "**Supported**",
@@ -2970,7 +3034,7 @@
       "milestone": "6"
     },
     {
-      "line": 293,
+      "line": 298,
       "section": "Expressions",
       "feature": "A `shape` mark's drawn extent",
       "status": "**Supported**",
@@ -2982,7 +3046,7 @@
       "milestone": "6"
     },
     {
-      "line": 294,
+      "line": 299,
       "section": "Expressions",
       "feature": "`strokeDashOffset`",
       "status": "**Supported**",
@@ -2994,7 +3058,7 @@
       "milestone": "3"
     },
     {
-      "line": 295,
+      "line": 300,
       "section": "Expressions",
       "feature": "`strokeMiterLimit`",
       "status": "**Supported**",
@@ -3004,7 +3068,7 @@
       "milestone": "3"
     },
     {
-      "line": 296,
+      "line": 301,
       "section": "Expressions",
       "feature": "`scaleX` and `scaleY`",
       "status": "**Supported**",
@@ -3016,7 +3080,7 @@
       "milestone": "3"
     },
     {
-      "line": 297,
+      "line": 302,
       "section": "Expressions",
       "feature": "`lineBreak` and `lineHeight` on a text mark",
       "status": "**Supported**",
@@ -3028,7 +3092,7 @@
       "milestone": "3"
     },
     {
-      "line": 298,
+      "line": 303,
       "section": "Expressions",
       "feature": "`dir` on a text mark",
       "status": "**Supported**",
@@ -3040,7 +3104,7 @@
       "milestone": "3"
     },
     {
-      "line": 299,
+      "line": 304,
       "section": "Expressions",
       "feature": "`aspect` and `smooth` on an image",
       "status": "**Supported**",
@@ -3052,7 +3116,7 @@
       "milestone": "3"
     },
     {
-      "line": 300,
+      "line": 305,
       "section": "Expressions",
       "feature": "`strokeOffset` and `strokeForeground` on a group",
       "status": "**Supported**",
@@ -3062,7 +3126,7 @@
       "milestone": "3"
     },
     {
-      "line": 301,
+      "line": 306,
       "section": "Expressions",
       "feature": "A rotated **and** scaled `path` mark's bounds",
       "status": "Deliberate difference",
@@ -3078,7 +3142,7 @@
       }
     },
     {
-      "line": 302,
+      "line": 307,
       "section": "Expressions",
       "feature": "Per-corner radii (`cornerRadiusTopLeft` …)",
       "status": "**Supported**",
@@ -3091,7 +3155,7 @@
       "milestone": "3"
     },
     {
-      "line": 303,
+      "line": 308,
       "section": "Expressions",
       "feature": "`tension`",
       "status": "**Supported**",
@@ -3104,7 +3168,7 @@
       "milestone": "3"
     },
     {
-      "line": 304,
+      "line": 309,
       "section": "Expressions",
       "feature": "`radius` and `theta` on a text mark",
       "status": "**Supported**",
@@ -3116,7 +3180,7 @@
       "milestone": "3"
     },
     {
-      "line": 305,
+      "line": 310,
       "section": "Expressions",
       "feature": "`limit` and `ellipsis` on a text mark",
       "status": "**Supported**",
@@ -3128,7 +3192,7 @@
       "milestone": "3"
     },
     {
-      "line": 306,
+      "line": 311,
       "section": "Expressions",
       "feature": "`blend`",
       "status": "**Supported**",
@@ -3140,7 +3204,7 @@
       "milestone": "3"
     },
     {
-      "line": 307,
+      "line": 312,
       "section": "Expressions",
       "feature": "`clip` as an encode channel",
       "status": "**Supported**",
@@ -3152,7 +3216,7 @@
       "milestone": "3"
     },
     {
-      "line": 308,
+      "line": 313,
       "section": "Expressions",
       "feature": "`tooltip` encode channel",
       "status": "**Supported**",
@@ -3164,7 +3228,7 @@
       "milestone": "5"
     },
     {
-      "line": 309,
+      "line": 314,
       "section": "Expressions",
       "feature": "Tooltips",
       "status": "**Supported**",
@@ -3176,7 +3240,7 @@
       "milestone": "5"
     },
     {
-      "line": 310,
+      "line": 315,
       "section": "Expressions",
       "feature": "`voronoi`",
       "status": "**Supported**",
@@ -3188,7 +3252,7 @@
       "milestone": "6"
     },
     {
-      "line": 311,
+      "line": 316,
       "section": "Expressions",
       "feature": "A `strokeWidth` with no stroke colour",
       "status": "Deliberate difference",
@@ -3206,7 +3270,7 @@
       }
     },
     {
-      "line": 312,
+      "line": 317,
       "section": "Expressions",
       "feature": "`clipHeight` on a legend",
       "status": "**Supported**",
@@ -3218,7 +3282,7 @@
       "milestone": "6"
     },
     {
-      "line": 313,
+      "line": 318,
       "section": "Expressions",
       "feature": "A legend's canonical scale",
       "status": "**Supported**",
@@ -3231,7 +3295,7 @@
       "milestone": "6"
     },
     {
-      "line": 314,
+      "line": 319,
       "section": "Expressions",
       "feature": "Banded legends",
       "status": "**Supported**",
@@ -3244,7 +3308,7 @@
       "milestone": "6"
     },
     {
-      "line": 315,
+      "line": 320,
       "section": "Expressions",
       "feature": "`geoCentroid`, `geoArea`, `geopoint`, `invert` on a projection",
       "status": "**Supported**",
@@ -3256,7 +3320,7 @@
       "milestone": "6"
     },
     {
-      "line": 316,
+      "line": 321,
       "section": "Expressions",
       "feature": "`geoshape`, `geopath`, `graticule`",
       "status": "**Supported**",
@@ -3268,7 +3332,7 @@
       "milestone": "6"
     },
     {
-      "line": 317,
+      "line": 322,
       "section": "Expressions",
       "feature": "`shape` mark",
       "status": "**Supported**",
@@ -3280,7 +3344,7 @@
       "milestone": "6"
     },
     {
-      "line": 318,
+      "line": 323,
       "section": "Expressions",
       "feature": "`dotbin`",
       "status": "**Supported**",
@@ -3292,7 +3356,7 @@
       "milestone": "6"
     },
     {
-      "line": 319,
+      "line": 324,
       "section": "Expressions",
       "feature": "`ci0`, `ci1`",
       "status": "**Supported**",
@@ -3304,7 +3368,7 @@
       "milestone": "6"
     },
     {
-      "line": 320,
+      "line": 325,
       "section": "Expressions",
       "feature": "`argmin`, `argmax`, `stderr`",
       "status": "**Supported**",
@@ -3317,7 +3381,7 @@
       "milestone": "6"
     },
     {
-      "line": 321,
+      "line": 326,
       "section": "Expressions",
       "feature": "A projection fitted from **two** datasets",
       "status": "**Supported**",
@@ -3327,7 +3391,7 @@
       "milestone": "6"
     },
     {
-      "line": 322,
+      "line": 327,
       "section": "Expressions",
       "feature": "A lookup or group key across types",
       "status": "**Supported**",
@@ -3337,7 +3401,7 @@
       "milestone": "6"
     },
     {
-      "line": 323,
+      "line": 328,
       "section": "Expressions",
       "feature": "Fitting a **composite** projection",
       "status": "**Supported**",
@@ -3347,7 +3411,7 @@
       "milestone": "6"
     },
     {
-      "line": 324,
+      "line": 329,
       "section": "Expressions",
       "feature": "Mark-versus-box intersection",
       "status": "**Supported**",
@@ -3359,7 +3423,7 @@
       "milestone": "6"
     },
     {
-      "line": 325,
+      "line": 330,
       "section": "Expressions",
       "feature": "Unicode field names in expressions",
       "status": "**Supported**",
@@ -3371,7 +3435,7 @@
       "milestone": "6"
     },
     {
-      "line": 326,
+      "line": 331,
       "section": "Expressions",
       "feature": "`trim`, `parseFloat`, `parseInt` whitespace",
       "status": "**Supported**",
@@ -3381,7 +3445,7 @@
       "milestone": "6"
     },
     {
-      "line": 327,
+      "line": 332,
       "section": "Expressions",
       "feature": "A grey's hue in Lab and HCL",
       "status": "**Supported**",
@@ -3393,7 +3457,7 @@
       "milestone": "6"
     },
     {
-      "line": 328,
+      "line": 333,
       "section": "Expressions",
       "feature": "Fading to `transparent`; title/subtitle font",
       "status": "**Supported**",
@@ -3403,7 +3467,7 @@
       "milestone": "6"
     },
     {
-      "line": 329,
+      "line": 334,
       "section": "Expressions",
       "feature": "A colour ramp over a constant column",
       "status": "**Supported**",
@@ -3416,7 +3480,7 @@
       "milestone": "6"
     },
     {
-      "line": 330,
+      "line": 335,
       "section": "Expressions",
       "feature": "Log-axis label suppression",
       "status": "**Supported**",
@@ -3426,7 +3490,7 @@
       "milestone": "6"
     },
     {
-      "line": 331,
+      "line": 336,
       "section": "Expressions",
       "feature": "`invert()` on a scale with buckets",
       "status": "**Supported**",
@@ -3438,7 +3502,7 @@
       "milestone": "6"
     },
     {
-      "line": 332,
+      "line": 337,
       "section": "Expressions",
       "feature": "Diverging colour scales",
       "status": "**Supported**",
@@ -3448,7 +3512,7 @@
       "milestone": "6"
     },
     {
-      "line": 333,
+      "line": 338,
       "section": "Expressions",
       "feature": "Stroke bounds: the square-cap allowance",
       "status": "**Supported**",
@@ -3460,7 +3524,7 @@
       "milestone": "6"
     },
     {
-      "line": 334,
+      "line": 339,
       "section": "Expressions",
       "feature": "`luminance()` and `contrast()` on a string d3 refuses",
       "status": "**Supported**",
@@ -3472,7 +3536,7 @@
       "milestone": "6"
     },
     {
-      "line": 335,
+      "line": 340,
       "section": "Expressions",
       "feature": "The seeded generator and the distribution functions",
       "status": "**Supported**",
@@ -3484,7 +3548,7 @@
       "milestone": "6"
     },
     {
-      "line": 336,
+      "line": 341,
       "section": "Expressions",
       "feature": "`bisectLeft` and `bisectRight`",
       "status": "**Supported**",
@@ -3496,7 +3560,7 @@
       "milestone": "6"
     },
     {
-      "line": 337,
+      "line": 342,
       "section": "Expressions",
       "feature": "Time interval `ceil`, `round` and `count`; stepped-day tick grids",
       "status": "**Supported**",
@@ -3509,7 +3573,7 @@
       "milestone": "6"
     },
     {
-      "line": 338,
+      "line": 343,
       "section": "Expressions",
       "feature": "Polylinear domains on log, power and symlog scales",
       "status": "**Supported**",
@@ -3521,7 +3585,7 @@
       "milestone": "6"
     },
     {
-      "line": 339,
+      "line": 344,
       "section": "Expressions",
       "feature": "`geoArea`, `geoBounds`, `geoCentroid` measured on the globe",
       "status": "**Supported**",
@@ -3533,7 +3597,7 @@
       "milestone": "6"
     },
     {
-      "line": 340,
+      "line": 345,
       "section": "Expressions",
       "feature": "Scale references from a non-string literal",
       "status": "**Supported**",
@@ -3543,7 +3607,7 @@
       "milestone": "6"
     },
     {
-      "line": 341,
+      "line": 346,
       "section": "Expressions",
       "feature": "Delimited text against d3-dsv's own corpus",
       "status": "**Supported**",
@@ -3555,7 +3619,7 @@
       "milestone": "6"
     },
     {
-      "line": 342,
+      "line": 347,
       "section": "Expressions",
       "feature": "`formatSpan`: an axis format resolved against its span",
       "status": "**Supported**",
@@ -3567,7 +3631,7 @@
       "milestone": "6"
     },
     {
-      "line": 343,
+      "line": 348,
       "section": "Expressions",
       "feature": "`String(x)` — the shortest decimal that names a double",
       "status": "**Supported**",
@@ -3579,7 +3643,7 @@
       "milestone": "6"
     },
     {
-      "line": 344,
+      "line": 349,
       "section": "Expressions",
       "feature": "Locales",
       "status": "**Supported**",
@@ -3593,7 +3657,7 @@
       "milestone": "6"
     },
     {
-      "line": 345,
+      "line": 350,
       "section": "Expressions",
       "feature": "Time zones",
       "status": "**Supported**",
@@ -3607,7 +3671,7 @@
       "milestone": "6"
     },
     {
-      "line": 346,
+      "line": 351,
       "section": "Expressions",
       "feature": "A table the host supplies",
       "status": "**Supported**",
@@ -3621,7 +3685,7 @@
       "milestone": "6"
     },
     {
-      "line": 347,
+      "line": 352,
       "section": "Expressions",
       "feature": "The host's own font, and the reader's text size",
       "status": "**Supported**",
@@ -3635,7 +3699,7 @@
       "milestone": "8"
     },
     {
-      "line": 348,
+      "line": 353,
       "section": "Expressions",
       "feature": "Time formatting against d3-time-format's own corpus",
       "status": "**Supported**",
@@ -3647,7 +3711,7 @@
       "milestone": "6"
     },
     {
-      "line": 349,
+      "line": 354,
       "section": "Expressions",
       "feature": "Number formatting against d3-format's own corpus",
       "status": "**Supported**",
@@ -3659,7 +3723,7 @@
       "milestone": "6"
     },
     {
-      "line": 350,
+      "line": 355,
       "section": "Expressions",
       "feature": "`clamp` on a scale's `invert`",
       "status": "**Supported**",
@@ -3671,7 +3735,7 @@
       "milestone": "6"
     },
     {
-      "line": 351,
+      "line": 356,
       "section": "Expressions",
       "feature": "The five transform bugs the harness found",
       "status": "**Supported**",
@@ -3683,7 +3747,7 @@
       "milestone": "6"
     },
     {
-      "line": 352,
+      "line": 357,
       "section": "Expressions",
       "feature": "Vega's and d3's own test suites as a harness",
       "status": "**Partial**",
@@ -3699,7 +3763,7 @@
       }
     },
     {
-      "line": 353,
+      "line": 358,
       "section": "Expressions",
       "feature": "CSS colour parsing, against d3-color's own corpus",
       "status": "**Supported**, a deliberate superset",
@@ -3711,7 +3775,7 @@
       "milestone": "6"
     },
     {
-      "line": 354,
+      "line": 359,
       "section": "Expressions",
       "feature": "d3-array 3.2's tick algorithm, including the retry",
       "status": "**Supported**",
@@ -3724,7 +3788,7 @@
       "milestone": "6"
     },
     {
-      "line": 355,
+      "line": 360,
       "section": "Expressions",
       "feature": "Flooring an hour across a daylight-saving fall-back",
       "status": "**Supported**",
@@ -3736,7 +3800,7 @@
       "milestone": "6"
     },
     {
-      "line": 356,
+      "line": 361,
       "section": "Expressions",
       "feature": "An arc whose radii are inverted, zero or negative",
       "status": "**Supported**",
@@ -3748,7 +3812,7 @@
       "milestone": "6"
     },
     {
-      "line": 358,
+      "line": 363,
       "section": "Expressions",
       "feature": "Tests that **run** on Kotlin/Native",
       "status": "**Supported**",
@@ -3764,7 +3828,7 @@
       "milestone": "6"
     },
     {
-      "line": 359,
+      "line": 364,
       "section": "Expressions",
       "feature": "The core, actually compiled for Kotlin Multiplatform",
       "status": "**Supported**",
@@ -3774,7 +3838,7 @@
       "milestone": "6"
     },
     {
-      "line": 360,
+      "line": 365,
       "section": "Expressions",
       "feature": "Exact decimal formatting, with no platform seam",
       "status": "**Supported**",
@@ -3787,7 +3851,7 @@
       "milestone": "6"
     },
     {
-      "line": 361,
+      "line": 366,
       "section": "Expressions",
       "feature": "`format`'s currency symbol",
       "status": "**Supported**",
@@ -3799,7 +3863,7 @@
       "milestone": "5"
     },
     {
-      "line": 362,
+      "line": 367,
       "section": "Expressions",
       "feature": "`luminance`",
       "status": "**Supported**",
@@ -3812,7 +3876,7 @@
       "milestone": "6"
     },
     {
-      "line": 363,
+      "line": 368,
       "section": "Expressions",
       "feature": "`indata`",
       "status": "**Supported**",
@@ -3825,7 +3889,7 @@
       "milestone": "6"
     },
     {
-      "line": 364,
+      "line": 369,
       "section": "Expressions",
       "feature": "`containerSize`",
       "status": "**Supported**",
@@ -3838,7 +3902,7 @@
       "milestone": "6"
     },
     {
-      "line": 365,
+      "line": 370,
       "section": "Expressions",
       "feature": "`contrast`",
       "status": "**Supported**",
@@ -3851,7 +3915,7 @@
       "milestone": "6"
     },
     {
-      "line": 366,
+      "line": 371,
       "section": "Expressions",
       "feature": "The colour constructors, and the geo and selection helpers",
       "status": "**Supported**",
@@ -3863,7 +3927,7 @@
       "milestone": "—"
     },
     {
-      "line": 367,
+      "line": 372,
       "section": "Expressions",
       "feature": "Signals",
       "status": "**Supported**",
@@ -3875,7 +3939,7 @@
       "milestone": "4"
     },
     {
-      "line": 368,
+      "line": 373,
       "section": "Expressions",
       "feature": "Signal event handlers (`on`)",
       "status": "Superseded",
@@ -3885,7 +3949,7 @@
       "milestone": "6"
     },
     {
-      "line": 369,
+      "line": 374,
       "section": "Expressions",
       "feature": "Signal bindings (`bind`)",
       "status": "Superseded",
@@ -3895,7 +3959,7 @@
       "milestone": "—"
     },
     {
-      "line": 370,
+      "line": 375,
       "section": "Expressions",
       "feature": "A transform's **expression** parameter as a dependency",
       "status": "**Supported**",
@@ -3907,7 +3971,7 @@
       "milestone": "5"
     },
     {
-      "line": 371,
+      "line": 376,
       "section": "Expressions",
       "feature": "A scale's `reverse` from a signal",
       "status": "**Supported**",
@@ -3919,7 +3983,7 @@
       "milestone": "5"
     },
     {
-      "line": 372,
+      "line": 377,
       "section": "Expressions",
       "feature": "A stroked text mark",
       "status": "**Supported**",
@@ -3931,7 +3995,7 @@
       "milestone": "6"
     },
     {
-      "line": 373,
+      "line": 378,
       "section": "Expressions",
       "feature": "Signal-valued transform parameters",
       "status": "**Supported**",
@@ -3943,7 +4007,7 @@
       "milestone": "5"
     },
     {
-      "line": 374,
+      "line": 379,
       "section": "Expressions",
       "feature": "Signal-valued scale and axis properties",
       "status": "**Supported**",
@@ -3955,7 +4019,7 @@
       "milestone": "4"
     },
     {
-      "line": 375,
+      "line": 380,
       "section": "Expressions",
       "feature": "Indirect scale references (`\"scale\": {\"signal\"|\"parent\"|\"datum\"|\"group\"}`)",
       "status": "**Supported**",
@@ -3967,7 +4031,7 @@
       "milestone": "5"
     },
     {
-      "line": 376,
+      "line": 381,
       "section": "Expressions",
       "feature": "Mark `sort`",
       "status": "**Supported**",
@@ -3979,7 +4043,7 @@
       "milestone": "5"
     },
     {
-      "line": 377,
+      "line": 382,
       "section": "Expressions",
       "feature": "Spatial channels (`x2`, `xc`, `width`, and their `y` counterparts)",
       "status": "**Supported**",
@@ -3991,7 +4055,7 @@
       "milestone": "5"
     },
     {
-      "line": 378,
+      "line": 383,
       "section": "Expressions",
       "feature": "Conditional encode rules",
       "status": "**Supported**",
@@ -4003,7 +4067,7 @@
       "milestone": "4"
     },
     {
-      "line": 379,
+      "line": 384,
       "section": "Expressions",
       "feature": "`eval` / JavaScript execution",
       "status": "Not planned",
@@ -4019,7 +4083,7 @@
       }
     },
     {
-      "line": 381,
+      "line": 386,
       "section": "Expressions",
       "feature": "Vega-Lite selection helpers (`vlSelectionTest`, `vlSelectionIdTest`, `vlSelectionTuples`)",
       "status": "**Supported**",
@@ -4032,7 +4096,7 @@
       "milestone": "5"
     },
     {
-      "line": 382,
+      "line": 387,
       "section": "Expressions",
       "feature": "Gesture helpers (`lassoAppend`, `lassoPath`, `pinchDistance`, `pinchAngle`)",
       "status": "**Supported**",
@@ -4044,7 +4108,7 @@
       "milestone": "5"
     },
     {
-      "line": 387,
+      "line": 392,
       "section": "Layout",
       "feature": "Width, height, viewport",
       "status": "Supported",
@@ -4056,7 +4120,7 @@
       "milestone": "1"
     },
     {
-      "line": 388,
+      "line": 393,
       "section": "Layout",
       "feature": "Group transforms",
       "status": "Supported",
@@ -4068,7 +4132,7 @@
       "milestone": "1"
     },
     {
-      "line": 389,
+      "line": 394,
       "section": "Layout",
       "feature": "`layout.align` and `layout.bounds`",
       "status": "**Supported**",
@@ -4080,7 +4144,7 @@
       "milestone": "6"
     },
     {
-      "line": 390,
+      "line": 395,
       "section": "Layout",
       "feature": "Upstream's built-in `config.style` blocks",
       "status": "**Supported**",
@@ -4092,7 +4156,7 @@
       "milestone": "6"
     },
     {
-      "line": 391,
+      "line": 396,
       "section": "Layout",
       "feature": "`{\"field\": {\"group\":...}}`",
       "status": "**Supported**",
@@ -4104,7 +4168,7 @@
       "milestone": "5"
     },
     {
-      "line": 392,
+      "line": 397,
       "section": "Layout",
       "feature": "Clip rectangles and clip paths",
       "status": "Supported",
@@ -4117,7 +4181,7 @@
       "milestone": "1"
     },
     {
-      "line": 393,
+      "line": 398,
       "section": "Layout",
       "feature": "Axes",
       "status": "**Supported**",
@@ -4130,7 +4194,7 @@
       "milestone": "5"
     },
     {
-      "line": 394,
+      "line": 399,
       "section": "Layout",
       "feature": "Axis appearance",
       "status": "**Supported**",
@@ -4143,7 +4207,7 @@
       "milestone": "5"
     },
     {
-      "line": 395,
+      "line": 400,
       "section": "Layout",
       "feature": "Axis label angle",
       "status": "**Supported**",
@@ -4155,7 +4219,7 @@
       "milestone": "6"
     },
     {
-      "line": 396,
+      "line": 401,
       "section": "Layout",
       "feature": "Axis `values`",
       "status": "**Supported**",
@@ -4168,7 +4232,7 @@
       "milestone": "6"
     },
     {
-      "line": 397,
+      "line": 402,
       "section": "Layout",
       "feature": "Other axis properties",
       "status": "**Supported**",
@@ -4181,7 +4245,7 @@
       "milestone": "6"
     },
     {
-      "line": 398,
+      "line": 403,
       "section": "Layout",
       "feature": "Axis `gridScale`",
       "status": "**Supported**",
@@ -4193,7 +4257,7 @@
       "milestone": "6"
     },
     {
-      "line": 399,
+      "line": 404,
       "section": "Layout",
       "feature": "Axis `labelFlush`",
       "status": "**Supported**",
@@ -4205,7 +4269,7 @@
       "milestone": "6"
     },
     {
-      "line": 400,
+      "line": 405,
       "section": "Layout",
       "feature": "Axis `minExtent`, `maxExtent`",
       "status": "**Supported**",
@@ -4217,7 +4281,7 @@
       "milestone": "6"
     },
     {
-      "line": 401,
+      "line": 406,
       "section": "Layout",
       "feature": "Axis `tickOffset` and `tickExtra`",
       "status": "**Supported**",
@@ -4229,7 +4293,7 @@
       "milestone": "6"
     },
     {
-      "line": 402,
+      "line": 407,
       "section": "Layout",
       "feature": "A band axis's label position",
       "status": "**Supported**",
@@ -4241,7 +4305,7 @@
       "milestone": "6"
     },
     {
-      "line": 403,
+      "line": 408,
       "section": "Layout",
       "feature": "Axis `bandPosition`",
       "status": "**Supported**",
@@ -4253,7 +4317,7 @@
       "milestone": "5"
     },
     {
-      "line": 404,
+      "line": 409,
       "section": "Layout",
       "feature": "A scaled channel taking its value from a signal",
       "status": "**Supported**",
@@ -4265,7 +4329,7 @@
       "milestone": "3"
     },
     {
-      "line": 405,
+      "line": 410,
       "section": "Layout",
       "feature": "Axis label `encode` opacity",
       "status": "**Supported**",
@@ -4277,7 +4341,7 @@
       "milestone": "5"
     },
     {
-      "line": 406,
+      "line": 411,
       "section": "Layout",
       "feature": "Legend `titleOrient: \"left\"`",
       "status": "**Supported**",
@@ -4289,7 +4353,7 @@
       "milestone": "5"
     },
     {
-      "line": 407,
+      "line": 412,
       "section": "Layout",
       "feature": "A legend's own bounds",
       "status": "**Supported**",
@@ -4301,7 +4365,7 @@
       "milestone": "6"
     },
     {
-      "line": 408,
+      "line": 413,
       "section": "Layout",
       "feature": "Axis `formatType`",
       "status": "**Supported**",
@@ -4313,7 +4377,7 @@
       "milestone": "5"
     },
     {
-      "line": 409,
+      "line": 414,
       "section": "Layout",
       "feature": "A property computed by a parameter",
       "status": "**Supported**",
@@ -4325,7 +4389,7 @@
       "milestone": "—"
     },
     {
-      "line": 410,
+      "line": 415,
       "section": "Layout",
       "feature": "A signal-valued axis `format`",
       "status": "**Supported**",
@@ -4337,7 +4401,7 @@
       "milestone": "5"
     },
     {
-      "line": 411,
+      "line": 416,
       "section": "Layout",
       "feature": "A format specifier's implied precision",
       "status": "**Supported**",
@@ -4349,7 +4413,7 @@
       "milestone": "5"
     },
     {
-      "line": 412,
+      "line": 417,
       "section": "Layout",
       "feature": "Axis label `format`",
       "status": "**Supported**",
@@ -4361,7 +4425,7 @@
       "milestone": "5"
     },
     {
-      "line": 413,
+      "line": 418,
       "section": "Layout",
       "feature": "Axis titles",
       "status": "**Supported**",
@@ -4374,7 +4438,7 @@
       "milestone": "5"
     },
     {
-      "line": 414,
+      "line": 419,
       "section": "Layout",
       "feature": "Symbol legends",
       "status": "**Supported**",
@@ -4387,7 +4451,7 @@
       "milestone": "5"
     },
     {
-      "line": 415,
+      "line": 420,
       "section": "Layout",
       "feature": "Gradient legends",
       "status": "**Supported**",
@@ -4400,7 +4464,7 @@
       "milestone": "5"
     },
     {
-      "line": 416,
+      "line": 421,
       "section": "Layout",
       "feature": "Legend placement",
       "status": "**Supported**",
@@ -4412,7 +4476,7 @@
       "milestone": "5"
     },
     {
-      "line": 417,
+      "line": 422,
       "section": "Layout",
       "feature": "Legend entry layout",
       "status": "**Supported**",
@@ -4425,7 +4489,7 @@
       "milestone": "5"
     },
     {
-      "line": 418,
+      "line": 423,
       "section": "Layout",
       "feature": "Discrete (banded) legends",
       "status": "**Supported**",
@@ -4438,7 +4502,7 @@
       "milestone": "6"
     },
     {
-      "line": 419,
+      "line": 424,
       "section": "Layout",
       "feature": "Scale `domainImplicit`",
       "status": "**Supported**",
@@ -4450,7 +4514,7 @@
       "milestone": "4"
     },
     {
-      "line": 420,
+      "line": 425,
       "section": "Layout",
       "feature": "Scale `domainRaw`",
       "status": "**Supported**",
@@ -4462,7 +4526,7 @@
       "milestone": "4"
     },
     {
-      "line": 421,
+      "line": 426,
       "section": "Layout",
       "feature": "Legend `formatType` and `tickMinStep`",
       "status": "**Supported**",
@@ -4475,7 +4539,7 @@
       "milestone": "5"
     },
     {
-      "line": 422,
+      "line": 427,
       "section": "Layout",
       "feature": "Legend `clipHeight`",
       "status": "**Supported**",
@@ -4487,7 +4551,7 @@
       "milestone": "5"
     },
     {
-      "line": 423,
+      "line": 428,
       "section": "Layout",
       "feature": "Legend `symbolLimit`",
       "status": "**Supported**",
@@ -4499,7 +4563,7 @@
       "milestone": "5"
     },
     {
-      "line": 424,
+      "line": 429,
       "section": "Layout",
       "feature": "`href`, on marks and on guides",
       "status": "**Supported**",
@@ -4511,7 +4575,7 @@
       "milestone": "5"
     },
     {
-      "line": 425,
+      "line": 430,
       "section": "Layout",
       "feature": "The five guide item channels",
       "status": "**Supported**",
@@ -4523,7 +4587,7 @@
       "milestone": "5"
     },
     {
-      "line": 426,
+      "line": 431,
       "section": "Layout",
       "feature": "A mark's `key`",
       "status": "**Supported**",
@@ -4535,7 +4599,7 @@
       "milestone": "5"
     },
     {
-      "line": 427,
+      "line": 432,
       "section": "Layout",
       "feature": "A mark's `description`, and the container it is announced on",
       "status": "**Supported**",
@@ -4547,7 +4611,7 @@
       "milestone": "5"
     },
     {
-      "line": 428,
+      "line": 433,
       "section": "Layout",
       "feature": "`zindex` paint order",
       "status": "**Supported**",
@@ -4559,7 +4623,7 @@
       "milestone": "5"
     },
     {
-      "line": 429,
+      "line": 434,
       "section": "Layout",
       "feature": "Seven channels the harness could not see",
       "status": "**Verified**",
@@ -4571,7 +4635,7 @@
       "milestone": "5"
     },
     {
-      "line": 430,
+      "line": 435,
       "section": "Layout",
       "feature": "Guide `encode` channels with no property, and what \"not implemented\" should mean",
       "status": "**Supported**",
@@ -4583,7 +4647,7 @@
       "milestone": "6"
     },
     {
-      "line": 431,
+      "line": 436,
       "section": "Layout",
       "feature": "`config.group` and `config.projection`, and the four config **values**",
       "status": "**Supported**",
@@ -4596,7 +4660,7 @@
       "milestone": "5"
     },
     {
-      "line": 432,
+      "line": 437,
       "section": "Layout",
       "feature": "`sort` on a hierarchy layout",
       "status": "**Supported**",
@@ -4608,7 +4672,7 @@
       "milestone": "5"
     },
     {
-      "line": 433,
+      "line": 438,
       "section": "Layout",
       "feature": "A domain `sort` whose direction is a signal",
       "status": "**Supported**",
@@ -4620,7 +4684,7 @@
       "milestone": "5"
     },
     {
-      "line": 434,
+      "line": 439,
       "section": "Layout",
       "feature": "A chart loaded asynchronously answering anything",
       "status": "**Supported**",
@@ -4632,7 +4696,7 @@
       "milestone": "6"
     },
     {
-      "line": 435,
+      "line": 440,
       "section": "Layout",
       "feature": "A guide `encode` block moving the geometry",
       "status": "**Supported**",
@@ -4644,7 +4708,7 @@
       "milestone": "5"
     },
     {
-      "line": 436,
+      "line": 441,
       "section": "Layout",
       "feature": "A guide stroke channel that reads `datum`",
       "status": "**Supported**",
@@ -4656,7 +4720,7 @@
       "milestone": "5"
     },
     {
-      "line": 437,
+      "line": 442,
       "section": "Layout",
       "feature": "`parse` with a stated date format",
       "status": "**Supported**",
@@ -4668,7 +4732,7 @@
       "milestone": "5"
     },
     {
-      "line": 438,
+      "line": 443,
       "section": "Layout",
       "feature": "A guide number that goes through a scale",
       "status": "**Supported**",
@@ -4680,7 +4744,7 @@
       "milestone": "5"
     },
     {
-      "line": 439,
+      "line": 444,
       "section": "Layout",
       "feature": "A colour that resolves to nothing",
       "status": "**Supported**",
@@ -4692,7 +4756,7 @@
       "milestone": "5"
     },
     {
-      "line": 440,
+      "line": 445,
       "section": "Layout",
       "feature": "The twelve unexercised projections",
       "status": "**Verified**",
@@ -4704,7 +4768,7 @@
       "milestone": "5"
     },
     {
-      "line": 441,
+      "line": 446,
       "section": "Layout",
       "feature": "The unexercised shapes, curves and time units",
       "status": "**Verified**",
@@ -4716,7 +4780,7 @@
       "milestone": "5"
     },
     {
-      "line": 442,
+      "line": 447,
       "section": "Layout",
       "feature": "The ten unexercised window operations",
       "status": "**Verified**",
@@ -4728,7 +4792,7 @@
       "milestone": "5"
     },
     {
-      "line": 443,
+      "line": 448,
       "section": "Layout",
       "feature": "`distinct`, and the six other unexercised aggregates",
       "status": "**Supported**",
@@ -4740,7 +4804,7 @@
       "milestone": "5"
     },
     {
-      "line": 444,
+      "line": 449,
       "section": "Layout",
       "feature": "The `values` aggregate operation",
       "status": "**Supported**",
@@ -4752,7 +4816,7 @@
       "milestone": "5"
     },
     {
-      "line": 445,
+      "line": 450,
       "section": "Layout",
       "feature": "The smoothing and text transforms' own options",
       "status": "**Verified**",
@@ -4764,7 +4828,7 @@
       "milestone": "5"
     },
     {
-      "line": 446,
+      "line": 451,
       "section": "Layout",
       "feature": "The hierarchy layouts' own options",
       "status": "**Verified**",
@@ -4776,7 +4840,7 @@
       "milestone": "5"
     },
     {
-      "line": 447,
+      "line": 452,
       "section": "Layout",
       "feature": "`impute`, `pivot`, `nest`",
       "status": "**Supported**",
@@ -4788,7 +4852,7 @@
       "milestone": "5"
     },
     {
-      "line": 448,
+      "line": 453,
       "section": "Layout",
       "feature": "A legend for a discretizing scale",
       "status": "**Supported**",
@@ -4800,7 +4864,7 @@
       "milestone": "5"
     },
     {
-      "line": 449,
+      "line": 454,
       "section": "Layout",
       "feature": "An axis on a **discretizing** scale",
       "status": "**Supported**",
@@ -4812,7 +4876,7 @@
       "milestone": "5"
     },
     {
-      "line": 450,
+      "line": 455,
       "section": "Layout",
       "feature": "`tickCount` as a time **interval**",
       "status": "**Supported**",
@@ -4824,7 +4888,7 @@
       "milestone": "5"
     },
     {
-      "line": 451,
+      "line": 456,
       "section": "Layout",
       "feature": "A `bin-ordinal` domain taken from a field",
       "status": "**Supported**",
@@ -4836,7 +4900,7 @@
       "milestone": "5"
     },
     {
-      "line": 452,
+      "line": 457,
       "section": "Layout",
       "feature": "Scale `nice` as a time interval, and a time axis's own format",
       "status": "**Supported**",
@@ -4848,7 +4912,7 @@
       "milestone": "6"
     },
     {
-      "line": 453,
+      "line": 458,
       "section": "Layout",
       "feature": "A custom `symbolType`, and `format`/`formatType` from a signal",
       "status": "**Supported**",
@@ -4860,7 +4924,7 @@
       "milestone": "5"
     },
     {
-      "line": 454,
+      "line": 459,
       "section": "Layout",
       "feature": "`identity` projection",
       "status": "**Supported**",
@@ -4872,7 +4936,7 @@
       "milestone": "5"
     },
     {
-      "line": 455,
+      "line": 460,
       "section": "Layout",
       "feature": "`identity` scale",
       "status": "**Supported**",
@@ -4885,7 +4949,7 @@
       "milestone": "4"
     },
     {
-      "line": 456,
+      "line": 461,
       "section": "Layout",
       "feature": "`knownUnsupported` is empty",
       "status": "**Supported**",
@@ -4899,7 +4963,7 @@
       "milestone": "5"
     },
     {
-      "line": 457,
+      "line": 462,
       "section": "Layout",
       "feature": "The `vlSelection*` family",
       "status": "**Supported**",
@@ -4911,7 +4975,7 @@
       "milestone": "6"
     },
     {
-      "line": 458,
+      "line": 463,
       "section": "Layout",
       "feature": "`modify`, and seven more functions off the excuse list",
       "status": "**Supported**",
@@ -4925,7 +4989,7 @@
       "milestone": "6"
     },
     {
-      "line": 459,
+      "line": 464,
       "section": "Layout",
       "feature": "Gradient fills, written out or computed",
       "status": "**Supported**",
@@ -4937,7 +5001,7 @@
       "milestone": "5"
     },
     {
-      "line": 460,
+      "line": 465,
       "section": "Layout",
       "feature": "A signal in a guide's styling",
       "status": "**Supported**",
@@ -4950,7 +5014,7 @@
       "milestone": "5"
     },
     {
-      "line": 461,
+      "line": 466,
       "section": "Layout",
       "feature": "Every expression function accounted for",
       "status": "**Supported**",
@@ -4962,7 +5026,7 @@
       "milestone": "4"
     },
     {
-      "line": 462,
+      "line": 467,
       "section": "Layout",
       "feature": "Sixteen more expression functions, and two time bugs behind them",
       "status": "**Supported**",
@@ -4974,7 +5038,7 @@
       "milestone": "6"
     },
     {
-      "line": 463,
+      "line": 468,
       "section": "Layout",
       "feature": "`sample` transform",
       "status": "**Supported**",
@@ -4987,7 +5051,7 @@
       "milestone": "5"
     },
     {
-      "line": 464,
+      "line": 469,
       "section": "Layout",
       "feature": "`geojson` transform, and the ordering a fitted projection needs",
       "status": "**Supported**",
@@ -5000,7 +5064,7 @@
       "milestone": "6"
     },
     {
-      "line": 465,
+      "line": 470,
       "section": "Layout",
       "feature": "Guide `encode` channels, and a legend title's overhang",
       "status": "**Supported**",
@@ -5012,7 +5076,7 @@
       "milestone": "5"
     },
     {
-      "line": 466,
+      "line": 471,
       "section": "Layout",
       "feature": "Title `encode`",
       "status": "**Supported**",
@@ -5024,7 +5088,7 @@
       "milestone": "5"
     },
     {
-      "line": 467,
+      "line": 472,
       "section": "Layout",
       "feature": "Title `style`",
       "status": "**Supported**",
@@ -5036,7 +5100,7 @@
       "milestone": "5"
     },
     {
-      "line": 468,
+      "line": 473,
       "section": "Layout",
       "feature": "Legend `strokeDash` and `strokeWidth` channels",
       "status": "**Supported**",
@@ -5048,7 +5112,7 @@
       "milestone": "5"
     },
     {
-      "line": 469,
+      "line": 474,
       "section": "Layout",
       "feature": "Legend `gridAlign`, and the entry grid's row centring",
       "status": "**Supported**",
@@ -5060,7 +5124,7 @@
       "milestone": "5"
     },
     {
-      "line": 470,
+      "line": 475,
       "section": "Layout",
       "feature": "Axis `labelFlushOffset`, and a scaled `strokeDash`",
       "status": "**Supported**",
@@ -5072,7 +5136,7 @@
       "milestone": "5"
     },
     {
-      "line": 471,
+      "line": 476,
       "section": "Layout",
       "feature": "Legend `titleAnchor` and all four `titleOrient`s, and array-valued guide titles",
       "status": "**Supported**",
@@ -5084,7 +5148,7 @@
       "milestone": "5"
     },
     {
-      "line": 472,
+      "line": 477,
       "section": "Layout",
       "feature": "Trellis footers, bands, anchors and offsets",
       "status": "**Supported**",
@@ -5096,7 +5160,7 @@
       "milestone": "5"
     },
     {
-      "line": 473,
+      "line": 478,
       "section": "Layout",
       "feature": "Layout `center`",
       "status": "**Supported**",
@@ -5108,7 +5172,7 @@
       "milestone": "5"
     },
     {
-      "line": 474,
+      "line": 479,
       "section": "Layout",
       "feature": "`timeunit` unit inference and `step`",
       "status": "**Supported**",
@@ -5121,7 +5185,7 @@
       "milestone": "6"
     },
     {
-      "line": 475,
+      "line": 480,
       "section": "Layout",
       "feature": "An explicit `format` on a time axis",
       "status": "**Supported**",
@@ -5133,7 +5197,7 @@
       "milestone": "5"
     },
     {
-      "line": 476,
+      "line": 481,
       "section": "Layout",
       "feature": "Axis `labelBound`",
       "status": "Consumed, deliberately inert",
@@ -5151,7 +5215,7 @@
       }
     },
     {
-      "line": 477,
+      "line": 482,
       "section": "Layout",
       "feature": "Interpolation `gamma`",
       "status": "**Supported**",
@@ -5163,7 +5227,7 @@
       "milestone": "5"
     },
     {
-      "line": 478,
+      "line": 483,
       "section": "Layout",
       "feature": "Axis `tickMinStep`",
       "status": "**Supported**",
@@ -5175,7 +5239,7 @@
       "milestone": "5"
     },
     {
-      "line": 479,
+      "line": 484,
       "section": "Layout",
       "feature": "Axis `labelOffset`",
       "status": "**Supported**",
@@ -5187,7 +5251,7 @@
       "milestone": "5"
     },
     {
-      "line": 480,
+      "line": 485,
       "section": "Layout",
       "feature": "Guide `aria` and `description`",
       "status": "**Supported**",
@@ -5199,7 +5263,7 @@
       "milestone": "5"
     },
     {
-      "line": 481,
+      "line": 486,
       "section": "Layout",
       "feature": "Axis `tickBand`, `tickRound`, `position` and `translate`",
       "status": "**Supported**",
@@ -5211,7 +5275,7 @@
       "milestone": "5"
     },
     {
-      "line": 482,
+      "line": 487,
       "section": "Layout",
       "feature": "Guide line caps and dash offsets",
       "status": "**Supported**",
@@ -5223,7 +5287,7 @@
       "milestone": "5"
     },
     {
-      "line": 483,
+      "line": 488,
       "section": "Layout",
       "feature": "Legend `symbolOffset`, `symbolFillColor` and the gradient's outline",
       "status": "**Supported**",
@@ -5235,7 +5299,7 @@
       "milestone": "5"
     },
     {
-      "line": 484,
+      "line": 489,
       "section": "Layout",
       "feature": "Axis `titleLimit`",
       "status": "**Supported**",
@@ -5247,7 +5311,7 @@
       "milestone": "5"
     },
     {
-      "line": 485,
+      "line": 490,
       "section": "Layout",
       "feature": "Title `aria`, `name` and `interactive`",
       "status": "**Supported**",
@@ -5259,7 +5323,7 @@
       "milestone": "5"
     },
     {
-      "line": 486,
+      "line": 491,
       "section": "Layout",
       "feature": "Title styling",
       "status": "**Supported**",
@@ -5272,7 +5336,7 @@
       "milestone": "5"
     },
     {
-      "line": 487,
+      "line": 492,
       "section": "Layout",
       "feature": "A title written as an array of lines",
       "status": "**Supported**",
@@ -5284,7 +5348,7 @@
       "milestone": "5"
     },
     {
-      "line": 488,
+      "line": 493,
       "section": "Layout",
       "feature": "A legend's own background",
       "status": "**Supported**",
@@ -5296,7 +5360,7 @@
       "milestone": "5"
     },
     {
-      "line": 489,
+      "line": 494,
       "section": "Layout",
       "feature": "Legend appearance",
       "status": "**Supported**",
@@ -5308,7 +5372,7 @@
       "milestone": "5"
     },
     {
-      "line": 490,
+      "line": 495,
       "section": "Layout",
       "feature": "A discretizing scale's legend",
       "status": "**Supported**",
@@ -5321,7 +5385,7 @@
       "milestone": "6"
     },
     {
-      "line": 491,
+      "line": 496,
       "section": "Layout",
       "feature": "Legend entry columns",
       "status": "**Supported**",
@@ -5334,7 +5398,7 @@
       "milestone": "6"
     },
     {
-      "line": 492,
+      "line": 497,
       "section": "Layout",
       "feature": "Legend entry limits",
       "status": "**Supported**",
@@ -5346,7 +5410,7 @@
       "milestone": "6"
     },
     {
-      "line": 493,
+      "line": 498,
       "section": "Layout",
       "feature": "Trellis headers and titles",
       "status": "**Supported**",
@@ -5358,7 +5422,7 @@
       "milestone": "5"
     },
     {
-      "line": 494,
+      "line": 499,
       "section": "Layout",
       "feature": "Group titles",
       "status": "**Supported**",
@@ -5370,7 +5434,7 @@
       "milestone": "5"
     },
     {
-      "line": 495,
+      "line": 500,
       "section": "Layout",
       "feature": "Chart title and subtitle",
       "status": "**Supported**",
@@ -5383,7 +5447,7 @@
       "milestone": "5"
     },
     {
-      "line": 496,
+      "line": 501,
       "section": "Layout",
       "feature": "Numeric label text",
       "status": "**Supported**",
@@ -5396,7 +5460,7 @@
       "milestone": "5"
     },
     {
-      "line": 497,
+      "line": 502,
       "section": "Layout",
       "feature": "Label truncation",
       "status": "**Supported**",
@@ -5408,7 +5472,7 @@
       "milestone": "6"
     },
     {
-      "line": 498,
+      "line": 503,
       "section": "Layout",
       "feature": "Label collision handling",
       "status": "**Supported**",
@@ -5421,7 +5485,7 @@
       "milestone": "5"
     },
     {
-      "line": 499,
+      "line": 504,
       "section": "Layout",
       "feature": "A signal calling `scale()` at the top level",
       "status": "**Supported**",
@@ -5435,7 +5499,7 @@
       "milestone": "4"
     },
     {
-      "line": 500,
+      "line": 505,
       "section": "Layout",
       "feature": "A dataset with several sources",
       "status": "**Supported**",
@@ -5447,7 +5511,7 @@
       "milestone": "4"
     },
     {
-      "line": 501,
+      "line": 506,
       "section": "Layout",
       "feature": "A dataset of bare values",
       "status": "**Supported**",
@@ -5457,7 +5521,7 @@
       "milestone": "4"
     },
     {
-      "line": 502,
+      "line": 507,
       "section": "Layout",
       "feature": "A signal a transform publishes",
       "status": "**Supported**",
@@ -5470,7 +5534,7 @@
       "milestone": "4"
     },
     {
-      "line": 503,
+      "line": 508,
       "section": "Layout",
       "feature": "Datasets, scales and signals ordered by dependency",
       "status": "**Supported**",
@@ -5484,7 +5548,7 @@
       "milestone": "4"
     },
     {
-      "line": 504,
+      "line": 509,
       "section": "Layout",
       "feature": "A signal read through a transform expression",
       "status": "**Supported**",
@@ -5497,7 +5561,7 @@
       "milestone": "5"
     },
     {
-      "line": 505,
+      "line": 510,
       "section": "Layout",
       "feature": "An aggregate over no rows",
       "status": "**Supported**",
@@ -5509,7 +5573,7 @@
       "milestone": "6"
     },
     {
-      "line": 506,
+      "line": 511,
       "section": "Layout",
       "feature": "A chart sized by a signal",
       "status": "**Supported**",
@@ -5522,7 +5586,7 @@
       "milestone": "3"
     },
     {
-      "line": 507,
+      "line": 512,
       "section": "Layout",
       "feature": "Padding and `autosize`",
       "status": "**Supported**",
@@ -5535,7 +5599,7 @@
       "milestone": "3"
     },
     {
-      "line": 508,
+      "line": 513,
       "section": "Layout",
       "feature": "Top-level `encode`",
       "status": "**Supported**",
@@ -5547,7 +5611,7 @@
       "milestone": "3"
     },
     {
-      "line": 514,
+      "line": 519,
       "section": "Interaction",
       "feature": "Hit testing (linear and grid)",
       "status": "Supported",
@@ -5560,7 +5624,7 @@
       "milestone": "1"
     },
     {
-      "line": 515,
+      "line": 520,
       "section": "Interaction",
       "feature": "Touch vs mouse tolerance",
       "status": "Supported",
@@ -5572,7 +5636,7 @@
       "milestone": "1"
     },
     {
-      "line": 516,
+      "line": 521,
       "section": "Interaction",
       "feature": "Tap, hover, long press",
       "status": "Supported",
@@ -5585,7 +5649,7 @@
       "milestone": "1"
     },
     {
-      "line": 517,
+      "line": 522,
       "section": "Interaction",
       "feature": "Tooltip content and anchor",
       "status": "Superseded",
@@ -5597,7 +5661,7 @@
       "milestone": "6"
     },
     {
-      "line": 518,
+      "line": 523,
       "section": "Interaction",
       "feature": "Point selection",
       "status": "Supported",
@@ -5609,7 +5673,7 @@
       "milestone": "1"
     },
     {
-      "line": 519,
+      "line": 524,
       "section": "Interaction",
       "feature": "Interval selection",
       "status": "**Supported**",
@@ -5621,7 +5685,7 @@
       "milestone": "6"
     },
     {
-      "line": 520,
+      "line": 525,
       "section": "Interaction",
       "feature": "Tooltips",
       "status": "**Supported**",
@@ -5634,7 +5698,7 @@
       "milestone": "6"
     },
     {
-      "line": 521,
+      "line": 526,
       "section": "Interaction",
       "feature": "Pan",
       "status": "Supported",
@@ -5648,7 +5712,7 @@
       "milestone": "1"
     },
     {
-      "line": 522,
+      "line": 527,
       "section": "Interaction",
       "feature": "Pinch and wheel zoom",
       "status": "Supported",
@@ -5661,7 +5725,7 @@
       "milestone": "1"
     },
     {
-      "line": 523,
+      "line": 528,
       "section": "Interaction",
       "feature": "Event-selector language",
       "status": "**Supported**",
@@ -5673,7 +5737,7 @@
       "milestone": "6"
     },
     {
-      "line": 524,
+      "line": 529,
       "section": "Interaction",
       "feature": "Signal `bind` — the controls a chart asks for",
       "status": "**Supported**",
@@ -5682,11 +5746,11 @@
         "UnhandledPropertiesTest"
       ],
       "tests_text": "`SignalInputTest`, `UnhandledPropertiesTest`, the demo's \"Spec: controls\" entry",
-      "notes": "**149** of the diagnostics Vega's own examples produced said bindings had no equivalent here, which was half true and the wrong conclusion: upstream's binding is a *description* of a control bolted to a DOM implementation of it, and only the second half is a browser's. The description is grammar, so it is parsed like grammar — `SignalBind` names the five shapes `bind.js` generates — and the runtime turns it into `controller.inputs`, a list of controls with the value each currently holds, republished on every compile so a signal moved by a tap or a timer moves the control that shows it. `controller.setSignal` is the way back, and it is the same path a fired handler takes: pin, cascade, recompile. So a slider bound to `size` reaches a signal derived from it and a scale built on that. A slider's unstated bounds are filled in as upstream fills them — `max` the larger of 100 and the value, `min` the smaller of 0 and that, `step` the tick step for a hundred divisions — because a slider whose bounds differ puts the same gesture at a different value. Nothing about widgets is in the engine: the demo draws Material controls from that list in 170 lines, and a host with other widgets writes its own. A generic input carries **every** remaining property in `Field.attributes` rather than reporting it, which is upstream twice over: its generic generator copies all of them onto the element as attributes, and its schema marks that one variant of the five `additionalProperties: true`. So `job-voyager`'s `placeholder` is grammar, and the demo shows it as the hint in its empty field; `autocomplete` is carried and deliberately ignored, because it offers a value a browser saved from a form and there is no form here. The four structured kinds went the other way and are now checked **per shape** — upstream closes each with `additionalProperties: false` and builds a fixed control — so `{\"input\": \"checkbox\", \"min\": 0}` is reported as the mistake it is rather than as something unimplemented. Across the 93 examples that is two fewer false gaps and no new ones",
+      "notes": "**149** of the diagnostics Vega's own examples produced said bindings had no equivalent here, which was half true and the wrong conclusion: upstream's binding is a *description* of a control bolted to a DOM implementation of it, and only the second half is a browser's. The description is grammar, so it is parsed like grammar — `SignalBind` names the five shapes `bind.js` generates — and the runtime turns it into `controller.inputs`, a list of controls with the value each currently holds, republished on every compile so a signal moved by a tap or a timer moves the control that shows it. `controller.setSignal` is the way back, and it is the same path a fired handler takes: pin, cascade, recompile. So a slider bound to `size` reaches a signal derived from it and a scale built on that. A slider's unstated bounds are filled in as upstream fills them — `max` the larger of 100 and the value, `min` the smaller of 0 and that, `step` the tick step for a hundred divisions — because a slider whose bounds differ puts the same gesture at a different value. Nothing about widgets is in the engine: the demo draws Material controls from that list in 170 lines, and a host with other widgets writes its own. A generic input carries **every** remaining property in `Field.attributes` rather than reporting it, which is upstream twice over: its generic generator copies all of them onto the element as attributes, and its schema marks that one variant of the five `additionalProperties: true`. So `job-voyager`'s `placeholder` is grammar, and the demo shows it as the hint in its empty field; `autocomplete` is carried and deliberately ignored, because it offers a value a browser saved from a form and there is no form here. The four structured kinds went the other way and are now checked **per shape** — upstream closes each with `additionalProperties: false` and builds a fixed control — so `{\"input\": \"checkbox\", \"min\": 0}` is reported as the mistake it is rather than as something unimplemented. Across the 93 examples that is two fewer false gaps and no new ones An event-handler property on a generic input — anything matching `/^on/i`, `onfocus` and `once` alike — is dropped with upstream's own warning rather than handed to the host as an attribute, as Vega 6.4.0 does (vega/vega#4318).",
       "milestone": "6"
     },
     {
-      "line": 525,
+      "line": 530,
       "section": "Interaction",
       "feature": "Signal `on` handlers",
       "status": "**Supported**",
@@ -5701,7 +5765,7 @@
       "milestone": "6"
     },
     {
-      "line": 526,
+      "line": 531,
       "section": "Interaction",
       "feature": "A handler sourced on another **signal**",
       "status": "**Supported**",
@@ -5713,7 +5777,7 @@
       "milestone": "6"
     },
     {
-      "line": 527,
+      "line": 532,
       "section": "Interaction",
       "feature": "A handler sourced on a **scale**",
       "status": "**Supported**",
@@ -5725,7 +5789,7 @@
       "milestone": "6"
     },
     {
-      "line": 528,
+      "line": 533,
       "section": "Interaction",
       "feature": "Matching an event to its handlers",
       "status": "**Supported**",
@@ -5740,7 +5804,7 @@
       "milestone": "6"
     },
     {
-      "line": 529,
+      "line": 534,
       "section": "Interaction",
       "feature": "Throttle",
       "status": "**Supported**",
@@ -5752,7 +5816,7 @@
       "milestone": "6"
     },
     {
-      "line": 530,
+      "line": 535,
       "section": "Interaction",
       "feature": "`config.events` — the embedder's listener policy",
       "status": "**Supported**",
@@ -5761,11 +5825,23 @@
         "EventDispatcherTest"
       ],
       "tests_text": "`ConfigTest`, `EventDispatcherTest`",
-      "notes": "The last config block that was reported rather than read, and the only one that is not a drawing instruction: it decides which listeners a view may attach. A specification asking for `window:mousemove` is asking to watch the pointer across the whole page, and `{\"events\": {\"window\": false}}` is how a host that embeds a chart it did not write says no — so a block that was parsed and dropped meant the refusal was silently ignored, which is the opposite of what a policy is for. Enforced where the listeners are **made** rather than where events arrive, which is upstream's `permit`: the stream never registers, a warning names it, and the rest of the chart still draws. Four keys govern four sources, and a `scope` stream is a view listener as far as the policy goes because upstream rewrites it to one before testing. A list is an **allow-list** — `{\"window\": [\"mousemove\"]}` blocks every other window event — and an object naming types is the same list written out, with a key set to `false` a refusal. `timer` is the one key upstream leaves un-unpacked, so an array there matches nothing and permits nothing; that is carried through rather than corrected, because a host copying a theme should behave as upstream does with it. `defaults.prevent`/`allow`, `bind` and `globalCursor` are read and carried for the host, which is what lets it obey the specification instead of guessing. Enforcing it also fixed a hole beside it: the dispatcher had always reported as it registered — a blocked stream, a debounce nothing can schedule — into a collector `VegaChartController` threw away, so a host reading the diagnostics saw only the compiler's. A policy whose enforcement is invisible is indistinguishable from one that was ignored",
+      "notes": "The last config block that was reported rather than read, and the only one that is not a drawing instruction: it decides which listeners a view may attach. A specification asking for `window:mousemove` is asking to watch the pointer across the whole page, and `{\"events\": {\"window\": false}}` is how a host that embeds a chart it did not write says no — so a block that was parsed and dropped meant the refusal was silently ignored, which is the opposite of what a policy is for. Enforced where the listeners are **made** rather than where events arrive, which is upstream's `permit`: the stream never registers, a warning names it, and the rest of the chart still draws. Four keys govern four sources, and a `scope` stream is a view listener as far as the policy goes because upstream rewrites it to one before testing. A list is an **allow-list** — `{\"window\": [\"mousemove\"]}` blocks every other window event — and an object naming types is the same list written out, with a key set to `false` a refusal. `timer` is the one key upstream leaves un-unpacked, so an array there matches nothing and permits nothing; that is carried through rather than corrected, because a host copying a theme should behave as upstream does with it. `defaults.prevent`/`allow`, `bind` and `globalCursor` are read and carried for the host, which is what lets it obey the specification instead of guessing. Enforcing it also fixed a hole beside it: the dispatcher had always reported as it registered — a blocked stream, a debounce nothing can schedule — into a collector `VegaChartController` threw away, so a host reading the diagnostics saw only the compiler's. A policy whose enforcement is invisible is indistinguishable from one that was ignored `container` is the fifth key, for `container:resize` streams.",
       "milestone": "5"
     },
     {
-      "line": 531,
+      "line": 536,
+      "section": "Interaction",
+      "feature": "`container:resize`",
+      "status": "**Supported**",
+      "tests": [
+        "ContainerResizeEventTest"
+      ],
+      "tests_text": "`ContainerResizeEventTest`",
+      "notes": "Vega 6.4.0's event source (vega/vega#4318), for a chart that reacts to its container the way it reacts to a window. The container is the surface the chart is drawn in, which a host reports with `ChartInputEvent.Resized` — both hosts send one on every layout, from their own thread. The rules are upstream's `ResizeObserver`'s: the first size is a baseline that fires nothing, an unchanged size fires nothing, and one collapsed to nothing in both directions fires nothing. `resize` is a container's only event type and anything else is reported as upstream reports it. Not fired from the `containerSize` setters: `setContainerSizeAsync` finishes on whatever thread its compile resumed on, and a handler reads the host's clock, which the iOS host binds to the main actor — the Swift suite trapped on exactly that. A handler reading `containerSize()` had always read `[null, null]` here — on `window:resize` as well, which is what Vega-Lite writes for `width: \"container\"` — because handlers were evaluated against a function table built without the size; it is rebuilt when the size changes.",
+      "milestone": "6"
+    },
+    {
+      "line": 537,
       "section": "Interaction",
       "feature": "Timer streams",
       "status": "**Supported**, with a scheduler",
@@ -5778,7 +5854,7 @@
       "milestone": "6"
     },
     {
-      "line": 532,
+      "line": 538,
       "section": "Interaction",
       "feature": "A timer standing in for a `for` loop",
       "status": "**Supported**, with a scheduler",
@@ -5790,7 +5866,7 @@
       "milestone": "6"
     },
     {
-      "line": 533,
+      "line": 539,
       "section": "Interaction",
       "feature": "A timer stream's two spellings",
       "status": "**Supported**",
@@ -5803,7 +5879,7 @@
       "milestone": "6"
     },
     {
-      "line": 534,
+      "line": 540,
       "section": "Interaction",
       "feature": "Debounce",
       "status": "**Supported**, with a scheduler",
@@ -5815,7 +5891,7 @@
       "milestone": "6"
     },
     {
-      "line": 535,
+      "line": 541,
       "section": "Interaction",
       "feature": "Applying a fired handler's update",
       "status": "**Supported**",
@@ -5827,7 +5903,7 @@
       "milestone": "6"
     },
     {
-      "line": 536,
+      "line": 542,
       "section": "Interaction",
       "feature": "Re-rendering after a signal changes",
       "status": "**Supported**",
@@ -5839,7 +5915,7 @@
       "milestone": "6"
     },
     {
-      "line": 537,
+      "line": 543,
       "section": "Interaction",
       "feature": "The event functions: `item()`, `x()`, `y()`, `xy()`",
       "status": "**Supported**",
@@ -5851,7 +5927,7 @@
       "milestone": "6"
     },
     {
-      "line": 538,
+      "line": 544,
       "section": "Interaction",
       "feature": "`encode` handlers",
       "status": "**Supported**",
@@ -5864,7 +5940,7 @@
       "milestone": "6"
     },
     {
-      "line": 539,
+      "line": 545,
       "section": "Interaction",
       "feature": "Binding a host gesture to a stream",
       "status": "**Supported**",
@@ -5879,7 +5955,7 @@
       "milestone": "6"
     },
     {
-      "line": 540,
+      "line": 546,
       "section": "Interaction",
       "feature": "Keyboard focus navigation",
       "status": "**Supported**",
@@ -5896,7 +5972,7 @@
       "milestone": "7"
     },
     {
-      "line": 546,
+      "line": 552,
       "section": "Outputs",
       "feature": "Android Canvas",
       "status": "Supported",
@@ -5908,7 +5984,7 @@
       "milestone": "1"
     },
     {
-      "line": 547,
+      "line": 553,
       "section": "Outputs",
       "feature": "SVG",
       "status": "Supported",
@@ -5920,7 +5996,7 @@
       "milestone": "2"
     },
     {
-      "line": 548,
+      "line": 554,
       "section": "Outputs",
       "feature": "Bitmap",
       "status": "Supported",
@@ -5932,7 +6008,7 @@
       "milestone": "1"
     },
     {
-      "line": 549,
+      "line": 555,
       "section": "Outputs",
       "feature": "PNG",
       "status": "Supported",
@@ -5944,7 +6020,7 @@
       "milestone": "1"
     },
     {
-      "line": 550,
+      "line": 556,
       "section": "Outputs",
       "feature": "PDF",
       "status": "Supported",
@@ -5956,7 +6032,7 @@
       "milestone": "1"
     },
     {
-      "line": 551,
+      "line": 557,
       "section": "Outputs",
       "feature": "Canonical scene snapshot",
       "status": "Supported",
@@ -5968,7 +6044,7 @@
       "milestone": "1"
     },
     {
-      "line": 557,
+      "line": 563,
       "section": "Differential testing against upstream Vega",
       "feature": "Comparison harness",
       "status": "Supported",
@@ -5978,7 +6054,7 @@
       "milestone": "3"
     },
     {
-      "line": 558,
+      "line": 564,
       "section": "Differential testing against upstream Vega",
       "feature": "Reference generation",
       "status": "Supported",
@@ -5988,7 +6064,7 @@
       "milestone": "3"
     },
     {
-      "line": 559,
+      "line": 565,
       "section": "Differential testing against upstream Vega",
       "feature": "Fixtures passing",
       "status": "**188**, past the target of 100",
@@ -6000,7 +6076,7 @@
       "milestone": "3"
     },
     {
-      "line": 560,
+      "line": 566,
       "section": "Differential testing against upstream Vega",
       "feature": "Fixture discovery",
       "status": "Supported",
@@ -6012,7 +6088,7 @@
       "milestone": "3"
     },
     {
-      "line": 561,
+      "line": 567,
       "section": "Differential testing against upstream Vega",
       "feature": "Surface size",
       "status": "**Exact**",
@@ -6024,7 +6100,7 @@
       "milestone": "3"
     },
     {
-      "line": 562,
+      "line": 568,
       "section": "Differential testing against upstream Vega",
       "feature": "Curved mark extents",
       "status": "Known difference",
@@ -6043,7 +6119,7 @@
       }
     },
     {
-      "line": 563,
+      "line": 569,
       "section": "Differential testing against upstream Vega",
       "feature": "Symbol extents compared",
       "status": "Supported",
@@ -6053,7 +6129,7 @@
       "milestone": "3"
     },
     {
-      "line": 564,
+      "line": 570,
       "section": "Differential testing against upstream Vega",
       "feature": "Path outlines compared",
       "status": "Supported",
@@ -6063,7 +6139,7 @@
       "milestone": "6"
     },
     {
-      "line": 565,
+      "line": 571,
       "section": "Differential testing against upstream Vega",
       "feature": "Paint opacity dropped with its paint",
       "status": "Supported",
@@ -6073,7 +6149,7 @@
       "milestone": "6"
     },
     {
-      "line": 566,
+      "line": 572,
       "section": "Differential testing against upstream Vega",
       "feature": "Dash patterns compared",
       "status": "Supported",
@@ -6083,7 +6159,7 @@
       "milestone": "5"
     },
     {
-      "line": 567,
+      "line": 573,
       "section": "Differential testing against upstream Vega",
       "feature": "Spurious paint detected",
       "status": "Supported",
@@ -6093,7 +6169,7 @@
       "milestone": "3"
     },
     {
-      "line": 568,
+      "line": 574,
       "section": "Differential testing against upstream Vega",
       "feature": "Fixture SVG side by side",
       "status": "Supported",
@@ -6105,7 +6181,7 @@
       "milestone": "3"
     },
     {
-      "line": 569,
+      "line": 575,
       "section": "Differential testing against upstream Vega",
       "feature": "Nested scale outputs",
       "status": "**Compared** for every group but one shape",
@@ -6122,7 +6198,7 @@
       "milestone": "5"
     },
     {
-      "line": 570,
+      "line": 576,
       "section": "Differential testing against upstream Vega",
       "feature": "Series normalization",
       "status": "Supported",
@@ -6132,7 +6208,7 @@
       "milestone": "3"
     },
     {
-      "line": 571,
+      "line": 577,
       "section": "Differential testing against upstream Vega",
       "feature": "Paint order",
       "status": "Supported",
@@ -6142,7 +6218,7 @@
       "milestone": "3"
     },
     {
-      "line": 572,
+      "line": 578,
       "section": "Differential testing against upstream Vega",
       "feature": "Axis measurement",
       "status": "**Supported**",
@@ -6155,7 +6231,7 @@
       "milestone": "3"
     },
     {
-      "line": 573,
+      "line": 579,
       "section": "Differential testing against upstream Vega",
       "feature": "Miter allowance in bounds",
       "status": "**Supported**",
@@ -6167,7 +6243,7 @@
       "milestone": "3"
     },
     {
-      "line": 574,
+      "line": 580,
       "section": "Differential testing against upstream Vega",
       "feature": "Text bounds in comparisons",
       "status": "**Supported**",
@@ -6177,7 +6253,7 @@
       "milestone": "3"
     },
     {
-      "line": 575,
+      "line": 581,
       "section": "Differential testing against upstream Vega",
       "feature": "Text baseline placement",
       "status": "Known difference",
@@ -6196,7 +6272,7 @@
       }
     },
     {
-      "line": 576,
+      "line": 582,
       "section": "Differential testing against upstream Vega",
       "feature": "Text content compared as text",
       "status": "Supported",
@@ -6206,7 +6282,7 @@
       "milestone": "3"
     },
     {
-      "line": 577,
+      "line": 583,
       "section": "Differential testing against upstream Vega",
       "feature": "Text `dx`/`dy` under rotation",
       "status": "**Supported**",
@@ -6218,7 +6294,7 @@
       "milestone": "3"
     },
     {
-      "line": 578,
+      "line": 584,
       "section": "Differential testing against upstream Vega",
       "feature": "Text metrics in comparisons",
       "status": "Supported",
@@ -6228,7 +6304,7 @@
       "milestone": "3"
     },
     {
-      "line": 584,
+      "line": 590,
       "section": "Rendering details",
       "feature": "Solid fill and stroke",
       "status": "Supported",
@@ -6240,7 +6316,7 @@
       "milestone": "1"
     },
     {
-      "line": 585,
+      "line": 591,
       "section": "Rendering details",
       "feature": "Reading a CSS colour",
       "status": "**Supported**",
@@ -6253,7 +6329,7 @@
       "milestone": "1"
     },
     {
-      "line": 586,
+      "line": 592,
       "section": "Rendering details",
       "feature": "Stroke caps, joins, miter limit",
       "status": "Supported",
@@ -6265,7 +6341,7 @@
       "milestone": "1"
     },
     {
-      "line": 587,
+      "line": 593,
       "section": "Rendering details",
       "feature": "Dash arrays",
       "status": "Supported",
@@ -6277,7 +6353,7 @@
       "milestone": "1"
     },
     {
-      "line": 588,
+      "line": 594,
       "section": "Rendering details",
       "feature": "Opacity",
       "status": "Supported",
@@ -6289,7 +6365,7 @@
       "milestone": "1"
     },
     {
-      "line": 589,
+      "line": 595,
       "section": "Rendering details",
       "feature": "Linear and radial gradients",
       "status": "Supported",
@@ -6301,7 +6377,7 @@
       "milestone": "1"
     },
     {
-      "line": 590,
+      "line": 596,
       "section": "Rendering details",
       "feature": "Blend modes",
       "status": "Partial",
@@ -6320,7 +6396,7 @@
       }
     },
     {
-      "line": 591,
+      "line": 597,
       "section": "Rendering details",
       "feature": "Nested transforms",
       "status": "Supported",
@@ -6333,7 +6409,7 @@
       "milestone": "1"
     },
     {
-      "line": 592,
+      "line": 598,
       "section": "Rendering details",
       "feature": "A rotated text mark's bounds",
       "status": "**Supported**",
@@ -6345,7 +6421,7 @@
       "milestone": "6"
     },
     {
-      "line": 593,
+      "line": 599,
       "section": "Rendering details",
       "feature": "Multiline text",
       "status": "Supported",
@@ -6358,7 +6434,7 @@
       "milestone": "1"
     },
     {
-      "line": 594,
+      "line": 600,
       "section": "Rendering details",
       "feature": "Text wrapping",
       "status": "Supported",
@@ -6371,7 +6447,7 @@
       "milestone": "1"
     },
     {
-      "line": 595,
+      "line": 601,
       "section": "Rendering details",
       "feature": "Font fallback",
       "status": "Supported",
@@ -6384,7 +6460,7 @@
       "milestone": "1"
     },
     {
-      "line": 596,
+      "line": 602,
       "section": "Rendering details",
       "feature": "Text measured by the font that draws it",
       "status": "**Supported**",
@@ -6398,7 +6474,7 @@
       "milestone": "8"
     },
     {
-      "line": 597,
+      "line": 603,
       "section": "Rendering details",
       "feature": "The reader's text scale",
       "status": "**Supported**",
@@ -6412,7 +6488,7 @@
       "milestone": "8"
     },
     {
-      "line": 598,
+      "line": 604,
       "section": "Rendering details",
       "feature": "Where a Compose chart's size comes from",
       "status": "**Supported**",
@@ -6424,7 +6500,7 @@
       "milestone": "8"
     },
     {
-      "line": 599,
+      "line": 605,
       "section": "Rendering details",
       "feature": "Drawing at a display density",
       "status": "**Supported**",
@@ -6436,7 +6512,7 @@
       "milestone": "8"
     },
     {
-      "line": 600,
+      "line": 606,
       "section": "Rendering details",
       "feature": "HTML labels, CSS parsing",
       "status": "Not planned",
@@ -6454,7 +6530,7 @@
       }
     },
     {
-      "line": 606,
+      "line": 612,
       "section": "Accessibility",
       "feature": "Virtual accessibility descendants",
       "status": "Supported",
@@ -6466,7 +6542,7 @@
       "milestone": "1"
     },
     {
-      "line": 607,
+      "line": 613,
       "section": "Accessibility",
       "feature": "The two walks emit the same calls",
       "status": "**Supported**",
@@ -6479,7 +6555,7 @@
       "milestone": "8"
     },
     {
-      "line": 608,
+      "line": 614,
       "section": "Accessibility",
       "feature": "Accessibility on every renderer",
       "status": "**Supported**",
@@ -6493,7 +6569,7 @@
       "milestone": "8"
     },
     {
-      "line": 609,
+      "line": 615,
       "section": "Accessibility",
       "feature": "What kind of thing an element is",
       "status": "**Supported**",
@@ -6506,7 +6582,7 @@
       "milestone": "7"
     },
     {
-      "line": 610,
+      "line": 616,
       "section": "Accessibility",
       "feature": "`regexp()`, `test()` and `isRegExp()`",
       "status": "**Supported**",
@@ -6519,7 +6595,7 @@
       "milestone": "4"
     },
     {
-      "line": 611,
+      "line": 617,
       "section": "Accessibility",
       "feature": "`description`, `aria`, `ariaRole`, `ariaRoleDescription` channels",
       "status": "**Supported**",
@@ -6532,7 +6608,7 @@
       "milestone": "7"
     },
     {
-      "line": 612,
+      "line": 618,
       "section": "Accessibility",
       "feature": "Mark labels with value",
       "status": "**Supported**",
@@ -6545,7 +6621,7 @@
       "milestone": "1"
     },
     {
-      "line": 613,
+      "line": 619,
       "section": "Accessibility",
       "feature": "Chart-level description",
       "status": "**Supported**",
@@ -6557,7 +6633,7 @@
       "milestone": "7"
     },
     {
-      "line": 614,
+      "line": 620,
       "section": "Accessibility",
       "feature": "Activation action",
       "status": "Supported",
@@ -6569,7 +6645,7 @@
       "milestone": "1"
     },
     {
-      "line": 615,
+      "line": 621,
       "section": "Accessibility",
       "feature": "Selected state",
       "status": "Supported",
@@ -6581,7 +6657,7 @@
       "milestone": "1"
     },
     {
-      "line": 616,
+      "line": 622,
       "section": "Accessibility",
       "feature": "Dense-chart summary",
       "status": "**Supported**",
@@ -6595,7 +6671,7 @@
       "milestone": "7"
     },
     {
-      "line": 617,
+      "line": 623,
       "section": "Accessibility",
       "feature": "Light and dark palettes",
       "status": "Supported",
@@ -6607,7 +6683,7 @@
       "milestone": "1"
     },
     {
-      "line": 618,
+      "line": 624,
       "section": "Accessibility",
       "feature": "Axis, legend and title descriptions",
       "status": "**Supported**",
@@ -6619,7 +6695,7 @@
       "milestone": "7"
     },
     {
-      "line": 619,
+      "line": 625,
       "section": "Accessibility",
       "feature": "Verified with TalkBack",
       "status": "**Yes**",
@@ -6629,7 +6705,7 @@
       "milestone": "7"
     },
     {
-      "line": 620,
+      "line": 626,
       "section": "Accessibility",
       "feature": "Zoom actions, and an adjustable axis",
       "status": "**Supported**",
@@ -6647,7 +6723,7 @@
       "limit": null
     },
     {
-      "line": 626,
+      "line": 632,
       "section": "Platform",
       "feature": "View API",
       "status": "Supported",
@@ -6659,7 +6735,7 @@
       "milestone": "1"
     },
     {
-      "line": 627,
+      "line": 633,
       "section": "Platform",
       "feature": "Compose API",
       "status": "Supported",
@@ -6672,7 +6748,7 @@
       "milestone": "8"
     },
     {
-      "line": 628,
+      "line": 634,
       "section": "Platform",
       "feature": "No Android types in the core",
       "status": "Supported",
@@ -6684,7 +6760,7 @@
       "milestone": "0"
     },
     {
-      "line": 629,
+      "line": 635,
       "section": "Platform",
       "feature": "Core portable to Kotlin Multiplatform",
       "status": "Supported",
@@ -6696,7 +6772,7 @@
       "milestone": "—"
     },
     {
-      "line": 630,
+      "line": 636,
       "section": "Platform",
       "feature": "`minSdk`",
       "status": "26",
@@ -6706,7 +6782,7 @@
       "milestone": "—"
     },
     {
-      "line": 631,
+      "line": 637,
       "section": "Platform",
       "feature": "A SwiftUI chart view",
       "status": "**Supported**",
@@ -6721,7 +6797,7 @@
       "milestone": "8"
     },
     {
-      "line": 632,
+      "line": 638,
       "section": "Platform",
       "feature": "WebView, JavaScript, NDK, GPU backends",
       "status": "Not planned",

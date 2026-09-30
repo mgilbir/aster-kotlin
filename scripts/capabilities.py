@@ -292,12 +292,22 @@ def render_with(status_for) -> str:
 FUNCTION_SOURCES = [
     ROOT / "vega-expression/src/main/kotlin/dev/aster/vega/expression/Functions.kt",
     ROOT / "vega-expression/src/main/kotlin/dev/aster/vega/expression/Evaluator.kt",
+    # The easing curves are a table registered in a loop, so their names are only in here.
+    ROOT / "vega-expression/src/main/kotlin/dev/aster/vega/expression/Ease.kt",
 ]
+# Four spellings of "this name is a function". The last two were blind spots until Vega 6.4.0 added
+# functions registered through them: `dateField(map, "week", ...)` registers `week` **and**
+# `utcweek`, and `Ease.functions` is a table of `"easeCubic" to ::cubicInOut` entries.
 REGISTRATION = re.compile(
     r'map\.predicate\("([a-zA-Z_][a-zA-Z0-9_]*)"\)'
     r'|map\["([a-zA-Z_][a-zA-Z0-9_]*)"\]'
     r'|name == "([a-zA-Z_][a-zA-Z0-9_]*)"'
+    r'|dateField\(map, "([a-zA-Z_][a-zA-Z0-9_]*)"'
+    r'|^\s+"(ease[A-Za-z]*)" to '
+    , re.MULTILINE
 )
+# A `dateField` registration names its UTC twin as well; the group it matched in says which.
+DATE_FIELD_GROUP = 4
 
 
 def undocumented_functions(text: str) -> list[str]:
@@ -318,6 +328,8 @@ def undocumented_functions(text: str) -> list[str]:
             raise SystemExit(f"::error::{source.relative_to(ROOT)} is gone; this gate reads it")
         for match in REGISTRATION.finditer(source.read_text()):
             registered.add(next(group for group in match.groups() if group))
+            if match.group(DATE_FIELD_GROUP):
+                registered.add("utc" + match.group(DATE_FIELD_GROUP))
     return sorted(name for name in registered if not re.search(rf"`{re.escape(name)}[(`]", text))
 
 

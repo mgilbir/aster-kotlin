@@ -29,6 +29,13 @@ public data class EventStream(
     public const val SOURCE_VIEW: String = "view"
     public const val SOURCE_WINDOW: String = "window"
 
+    /**
+     * The element the chart is embedded in, whose only event is `resize` — Vega 6.4.0's
+     * `container:resize` (vega/vega#4318). Here the container is whatever the host reports through
+     * `VegaChartController.containerSize`.
+     */
+    public const val SOURCE_CONTAINER: String = "container"
+
     /** A stream reaching only into the group it was declared in, rather than the whole view. */
     public const val SOURCE_SCOPE: String = "scope"
 

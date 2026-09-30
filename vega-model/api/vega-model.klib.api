@@ -203,6 +203,7 @@ final enum class dev.aster.vega.model.spec/ScaleType : kotlin/Enum<dev.aster.veg
 final enum class dev.aster.vega.model.time/TimeInterval : kotlin/Enum<dev.aster.vega.model.time/TimeInterval> { // dev.aster.vega.model.time/TimeInterval|null[0]
     enum entry DAY // dev.aster.vega.model.time/TimeInterval.DAY|null[0]
     enum entry HOUR // dev.aster.vega.model.time/TimeInterval.HOUR|null[0]
+    enum entry ISOWEEK // dev.aster.vega.model.time/TimeInterval.ISOWEEK|null[0]
     enum entry MILLISECOND // dev.aster.vega.model.time/TimeInterval.MILLISECOND|null[0]
     enum entry MINUTE // dev.aster.vega.model.time/TimeInterval.MINUTE|null[0]
     enum entry MONTH // dev.aster.vega.model.time/TimeInterval.MONTH|null[0]
@@ -1580,12 +1581,14 @@ final class dev.aster.vega.model.spec/EncodeSpec { // dev.aster.vega.model.spec/
 }
 
 final class dev.aster.vega.model.spec/EventConfig { // dev.aster.vega.model.spec/EventConfig|null[0]
-    constructor <init>(dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // dev.aster.vega.model.spec/EventConfig.<init>|<init>(dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;kotlin.Boolean;kotlin.Boolean){}[0]
+    constructor <init>(dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., dev.aster.vega.model.spec/EventPermit = ...) // dev.aster.vega.model.spec/EventConfig.<init>|<init>(dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;kotlin.Boolean;kotlin.Boolean;dev.aster.vega.model.spec.EventPermit){}[0]
 
     final val allowDefault // dev.aster.vega.model.spec/EventConfig.allowDefault|{}allowDefault[0]
         final fun <get-allowDefault>(): dev.aster.vega.model.spec/EventPermit // dev.aster.vega.model.spec/EventConfig.allowDefault.<get-allowDefault>|<get-allowDefault>(){}[0]
     final val bind // dev.aster.vega.model.spec/EventConfig.bind|{}bind[0]
         final fun <get-bind>(): kotlin/Boolean // dev.aster.vega.model.spec/EventConfig.bind.<get-bind>|<get-bind>(){}[0]
+    final val container // dev.aster.vega.model.spec/EventConfig.container|{}container[0]
+        final fun <get-container>(): dev.aster.vega.model.spec/EventPermit // dev.aster.vega.model.spec/EventConfig.container.<get-container>|<get-container>(){}[0]
     final val globalCursor // dev.aster.vega.model.spec/EventConfig.globalCursor|{}globalCursor[0]
         final fun <get-globalCursor>(): kotlin/Boolean // dev.aster.vega.model.spec/EventConfig.globalCursor.<get-globalCursor>|<get-globalCursor>(){}[0]
     final val preventDefault // dev.aster.vega.model.spec/EventConfig.preventDefault|{}preventDefault[0]
@@ -1607,7 +1610,8 @@ final class dev.aster.vega.model.spec/EventConfig { // dev.aster.vega.model.spec
     final fun component6(): dev.aster.vega.model.spec/EventPermit // dev.aster.vega.model.spec/EventConfig.component6|component6(){}[0]
     final fun component7(): kotlin/Boolean // dev.aster.vega.model.spec/EventConfig.component7|component7(){}[0]
     final fun component8(): kotlin/Boolean // dev.aster.vega.model.spec/EventConfig.component8|component8(){}[0]
-    final fun copy(dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): dev.aster.vega.model.spec/EventConfig // dev.aster.vega.model.spec/EventConfig.copy|copy(dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;kotlin.Boolean;kotlin.Boolean){}[0]
+    final fun component9(): dev.aster.vega.model.spec/EventPermit // dev.aster.vega.model.spec/EventConfig.component9|component9(){}[0]
+    final fun copy(dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., dev.aster.vega.model.spec/EventPermit = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., dev.aster.vega.model.spec/EventPermit = ...): dev.aster.vega.model.spec/EventConfig // dev.aster.vega.model.spec/EventConfig.copy|copy(dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;dev.aster.vega.model.spec.EventPermit;kotlin.Boolean;kotlin.Boolean;dev.aster.vega.model.spec.EventPermit){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.model.spec/EventConfig.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.aster.vega.model.spec/EventConfig.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.aster.vega.model.spec/EventConfig.toString|toString(){}[0]
@@ -1657,6 +1661,8 @@ final class dev.aster.vega.model.spec/EventStream { // dev.aster.vega.model.spec
     final fun toString(): kotlin/String // dev.aster.vega.model.spec/EventStream.toString|toString(){}[0]
 
     final object Companion { // dev.aster.vega.model.spec/EventStream.Companion|null[0]
+        final const val SOURCE_CONTAINER // dev.aster.vega.model.spec/EventStream.Companion.SOURCE_CONTAINER|{}SOURCE_CONTAINER[0]
+            final fun <get-SOURCE_CONTAINER>(): kotlin/String // dev.aster.vega.model.spec/EventStream.Companion.SOURCE_CONTAINER.<get-SOURCE_CONTAINER>|<get-SOURCE_CONTAINER>(){}[0]
         final const val SOURCE_SCOPE // dev.aster.vega.model.spec/EventStream.Companion.SOURCE_SCOPE|{}SOURCE_SCOPE[0]
             final fun <get-SOURCE_SCOPE>(): kotlin/String // dev.aster.vega.model.spec/EventStream.Companion.SOURCE_SCOPE.<get-SOURCE_SCOPE>|<get-SOURCE_SCOPE>(){}[0]
         final const val SOURCE_TIMER // dev.aster.vega.model.spec/EventStream.Companion.SOURCE_TIMER|{}SOURCE_TIMER[0]
@@ -2762,6 +2768,9 @@ final object dev.aster.vega.model.time/TimeUnits { // dev.aster.vega.model.time/
         final fun <get-ALL>(): kotlin.collections/List<kotlin/String> // dev.aster.vega.model.time/TimeUnits.ALL.<get-ALL>|<get-ALL>(){}[0]
 
     final fun detect(kotlin.collections/List<kotlin/Double>, kotlinx.datetime/TimeZone): kotlin/Pair<kotlin.collections/List<kotlin/String>, kotlin/Int> // dev.aster.vega.model.time/TimeUnits.detect|detect(kotlin.collections.List<kotlin.Double>;kotlinx.datetime.TimeZone){}[0]
+    final fun isoWeek(kotlinx.datetime/LocalDate): kotlin/Int // dev.aster.vega.model.time/TimeUnits.isoWeek|isoWeek(kotlinx.datetime.LocalDate){}[0]
+    final fun isoWeekOneDate(kotlin/Int): kotlin/Int // dev.aster.vega.model.time/TimeUnits.isoWeekOneDate|isoWeekOneDate(kotlin.Int){}[0]
+    final fun isoWeekYear(kotlinx.datetime/LocalDate): kotlin/Int // dev.aster.vega.model.time/TimeUnits.isoWeekYear|isoWeekYear(kotlinx.datetime.LocalDate){}[0]
     final fun specifier(kotlin.collections/List<kotlin/String>, kotlin.collections/Map<kotlin/String, kotlin/String?> = ..., dev.aster.vega.model.locale/VegaLocale? = ...): kotlin/String // dev.aster.vega.model.time/TimeUnits.specifier|specifier(kotlin.collections.List<kotlin.String>;kotlin.collections.Map<kotlin.String,kotlin.String?>;dev.aster.vega.model.locale.VegaLocale?){}[0]
 }
 

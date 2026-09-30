@@ -119,6 +119,9 @@ D3_PACKAGES=(
   d3-interpolate
   d3-path
   d3-hierarchy
+  # Vega 6.4.0 exposes every easing curve to the expression language, so the package's own suite is
+  # the reference for them — replayed by UpstreamEaseVectorsTest.
+  d3-ease
 )
 
 echo "==> d3"
