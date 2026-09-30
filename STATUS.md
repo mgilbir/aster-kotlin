@@ -10939,3 +10939,45 @@ different outlines that agree at 0 degrees *and* at 45 would still agree here. W
 state where a third of the corpus was checked on a rectangle.
 
 264 Vega differential fixtures.
+
+### Vega 6.4.0
+
+The oracle is Vega 6.4.0, up from 6.3.1; Vega-Lite stays at 6.4.3. None of the 260 existing Vega
+references moved beyond its version stamp. Everything 6.4.0 added is implemented: the `isoweek`
+time unit and functions, the 37 easing curves, `interpolateLinear`, `geoTranslate`,
+`container:resize`, the prototype-key refusal and the `on*` binding drop. Upstream's documented
+surface is now **188 of 188** in `docs/upstream-coverage.md`: 159 expression functions (118 before),
+12 time units (11 before).
+
+Four defects came out of the work, all older than 6.4.0, and none of them was a new feature's:
+
+- **Replaying vega-time's own `timeFloor` vectors against the `timeunit` floor**, which nothing did,
+  found `step` ignored for `week`, `day`, `dayofyear` and `quarter`. `UpstreamTimeFloorVectorsTest`
+  replays all 90 now.
+- **The `geoTranslate` fixture** found an unfitted `mercator` at scale 150 rather than d3's `961 /
+  tau`, and `geoScale` answering null for `albersUsa`.
+- **The `container:resize` test** found every signal handler reading `containerSize()` as `[null,
+  null]`, because handlers were evaluated against a function table built without the size.
+- **Firing `container:resize` from `setContainerSizeAsync` trapped the Swift suite.** The async
+  setter finishes on the thread its compile resumed on, and the iOS host's clock is a main-actor
+  closure, so it is now fired from `ChartInputEvent.Resized`, which both hosts dispatch from their
+  own thread. The JVM tests could not see this; only `swift-test.sh` could.
+
+**One ulp that is not the easing curves'.** `easeSinInOut(1.1)` is `(1 - cos(1.1 pi)) / 2`, and the
+JVM's `Math.cos` intrinsic rounds it one ulp away from V8, whose fdlibm port `StrictMath` matches.
+d3-ease's own 362 vectors replay exactly, so the transcription is right; the `easing-curves` fixture
+prints the sine family to fifteen digits for this reason. Every `sin` and `cos` in the engine shares
+the behaviour, and matching V8's last bit would need a pure-Kotlin fdlibm, which is a separate change.
+
+The ungated corpora, re-run on the whole branch:
+
+| corpus | before | after |
+| --- | --- | --- |
+| value sweep | 499 of 499 | **499 of 499** |
+| schema property sweep | 7509 of 7510 | **7510 of 7510** |
+| Vega-Lite property sweep | 27489 of 27513 | **27489 of 27513** (24 accepted, 0 differed) |
+| Vega-Lite wild corpus | 1981 of 1981 | **1981 of 1981** |
+| Deneb corpus | 54 of 54 | **54 of 54** |
+| signal sweep | 140 of 158 | **140 of 158** |
+
+264 Vega differential fixtures.
