@@ -1,0 +1,36 @@
+name: Set up the toolchain
+description: JDK 21, optionally node 20, and Gradle, pinned the same way for every job that builds.
+
+# One definition, because five jobs had a copy: the two gate legs, the two instrumented legs, and
+# the release's publish job. Copies drift, and a toolchain that differs between the gate and the
+# publish is a release built by something the gate never ran.
+
+inputs:
+  node:
+    description: >-
+      Whether to install node. The oracles and the upstream-vector recorder need it: what they
+      record is the reference the JVM replays against, so it is pinned here rather than taken from
+      whatever the runner image ships. The instrumented suites do not.
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up JDK 21
+      uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+      with:
+        distribution: temurin
+        java-version: "21"
+
+    - name: Set up node
+      if: inputs.node == 'true'
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      with:
+        node-version: "20"
+
+    - name: Set up Gradle
+      # v5, not the current v6, and deliberately: v6 moved the caching component out of the
+      # open-source action into a separate library under Gradle's Terms of Use, which upgrading
+      # accepts on the project's behalf. v5 is what clears the Node 20 deprecation without taking
+      # that on. Revisit as a licensing decision, not a version bump.
+      uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5

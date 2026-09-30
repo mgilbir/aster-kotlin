@@ -13,12 +13,13 @@ name: Release
 # commits that, and only then tags the commit it wrote. One tag, correct for both ecosystems, and the
 # release page hangs off it.
 #
-# Four jobs, because the work has four homes:
+# Five jobs, because the work has five homes:
 #
-#   verify   Linux **and** macOS. It was Linux alone, and that skipped every Apple gate: `swift` is
-#            macOS-only and `ios-ui` needs a simulator, so a release shipped the Swift package having
-#            run none of its tests. The oracles and the release preconditions stay on the Linux leg —
-#            asked once per release, not once per host.
+#   preconditions
+#            Linux, seconds. The version is untagged and the changelog has its section.
+#   verify   Linux **and** macOS: `.github/workflows/gate.yml`, the same gate `ci.yml` runs. It
+#            was Linux alone once, and that skipped every Apple gate, so a release shipped the Swift
+#            package having run none of its tests. The oracles run on the Linux leg only.
 #   instrumented
 #            Linux, with an emulator. The Android suites, which `check.sh` inside `verify` skips
 #            because a release runner has no device — so until this job existed, every release
@@ -35,44 +36,16 @@ permissions:
   contents: read
 
 jobs:
-  verify:
-    name: Verify (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-
-    # **Both hosts, because a release publishes both halves.** This job was Linux-only, and
-    # `check.sh` on Linux skips the two gates that cover everything Apple: `swift` is macOS-only and
-    # `ios-ui` needs a simulator runtime. `publish` below builds the XCFramework and writes
-    # `Package.swift`, so a release was shipping the Swift package having run none of its 158 tests
-    # and none of the three UI tests that are the only end-to-end check of VoiceOver. 0.5.0 went out
-    # that way.
-    #
-    # The same hole as the instrumented suites, which `verify` also skipped for want of a device and
-    # which now have their own job. The oracles and the release-specific preconditions stay on Linux;
-    # everything else runs on both, which is what `ci.yml` already does.
+  # What only a release has to ask, once and on Linux: that its version is new, and that the
+  # changelog has the section its page is made from. Cheap, so it fails in seconds rather than after
+  # the gate's hour, and before anything immutable exists.
+  preconditions:
+    name: Preconditions
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      - name: Set up node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with:
-          node-version: "20"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
-
       - name: Check this version has not been released
-        # Linux only: asked once per release, not once per host.
-        if: matrix.os == 'ubuntu-latest'
         # The version in the build file is the one thing that names a release, so the guard is that
         # its tag does not exist yet. Re-running for a version already tagged would publish nothing
         # to Central — a version there is immutable — and would leave a second tag pointing at a
@@ -91,8 +64,6 @@ jobs:
           echo "Releasing $version; v$version does not exist yet."
 
       - name: Check the changelog has a section for this version
-        # Linux only: asked once per release, not once per host.
-        if: matrix.os == 'ubuntu-latest'
         # Fails here rather than after publishing, when the release notes are the only thing left and
         # the artifacts are already immutable.
         run: |
@@ -101,52 +72,13 @@ jobs:
           ./.github/scripts/changelog-section.sh "$version" > /dev/null
           echo "CHANGELOG.md has a section for $version."
 
-      - name: Record upstream's test vectors
-        # **This step is the protection, not a convenience.** Each replay guards its own vector file
-        # with an assumption, so a missing file *skips* the whole test — the `replayed >= N` floor
-        # below it never runs, because a skipped test runs nothing. (The floor catches a set that is
-        # partly there, which is a different failure.) The comment here used to claim the opposite,
-        # which mattered: it read as though forgetting this step would fail loudly, and forgetting it
-        # would in fact have published green with eleven replays silently skipped.
-        #
-        # The vectors are gitignored by design, being derived from the pinned upstream packages.
-        run: ./scripts/record-upstream-vectors.sh
-
-      - name: Render upstream's Vega-Lite scenes
-        # **This arms a gate that runs inside `check.sh`.** `VegaLiteFixtureDifferentialTest` is
-        # 1126 cases and the one that catches a specification matching upstream property for property
-        # while still drawing the wrong chart; it answers a missing reference with an *assumption*,
-        # and the references are gitignored, being derived. `ci.yml` has rendered them since the
-        # commit that added them; this file was never updated, so **every release since has published
-        # with that gate skipped in full** — while the publish job's own comment below said verify
-        # "has already run that comparison in full".
-        #
-        # Before `check.sh`, not after: the gate runs in its Gradle step, so references written
-        # afterwards arm it for a run that has already finished.
-        run: ./scripts/vega-lite-oracle.sh --references-only
-
-      - name: Check
-        # A release is never published from a red build. This is the gate the repository uses, which
-        # compiles every target and runs the JVM and native suites.
-        #
-        # `--fast` because the two oracles are their own steps below. `check.sh` grew the ability to
-        # run them itself, and this file was not updated with `ci.yml` when it did — so every release
-        # since has regenerated upstream's scenes twice and compared them twice, for about four
-        # minutes of nothing. Keeping them separate is deliberate rather than incidental: they are
-        # named steps in the log, and a differential failure should say which grammar it was.
-        run: ./scripts/check.sh --fast
-
-      - name: Differential tests against upstream Vega
-        # Linux only; the macOS leg runs `check.sh --fast`, which leaves the oracles to this host.
-        if: matrix.os == 'ubuntu-latest'
-        # Regenerates upstream's own scenes with the pinned Vega and compares. The point of the
-        # project, so it gates the release.
-        run: ./scripts/oracle.sh
-
-      - name: Differential tests against upstream Vega-Lite
-        # Linux only; the macOS leg runs `check.sh --fast`, which leaves the oracles to this host.
-        if: matrix.os == 'ubuntu-latest'
-        run: ./scripts/vega-lite-oracle.sh
+  # The gate, **on both hosts, because a release publishes both halves**: `check.sh` on Linux skips
+  # `swift`, which is macOS-only, and 0.5.0 shipped the Swift package having run none of its tests.
+  # The same definition `ci.yml` runs, in `.github/workflows/gate.yml`; it was a copy here, and the
+  # copy had drifted — no test counts, no reports, and a comment contradicting the original's.
+  verify:
+    name: Verify
+    uses: ./.github/workflows/gate.yml
 
   # The Android suites, on a real device, before anything is published.
   #
@@ -164,9 +96,9 @@ jobs:
 
   publish:
     name: Build and publish (macOS)
-    # **Both preconditions, not just the Linux one.** A `needs` that named only `verify` would let a
-    # red Android run publish, which is the state this job was added to end.
-    needs: [verify, instrumented]
+    # **Every precondition, not just the gate.** A `needs` that named only `verify` would let a red
+    # Android run publish, which is the state this job was added to end.
+    needs: [preconditions, verify, instrumented]
     runs-on: macos-latest
     outputs:
       # **Whether the Gradle modules actually reached Maven Central.**
@@ -182,22 +114,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      - name: Set up node
-        # The recorder below is a Node script that reads the pinned packages and clones upstream's own
-        # test files. Pinned here as in the verify job rather than taken from whatever the runner image
-        # ships, because what it records is the reference the JVM replays against.
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with:
-          node-version: "20"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
+      - name: Set up the toolchain
+        # With node: the recorder below is a Node script that reads the pinned packages and clones
+        # upstream's own test files.
+        uses: ./.github/actions/setup
 
       - name: Record upstream's test vectors
         # **The gate needs its inputs on this host too.** `build` below runs every test, and the
