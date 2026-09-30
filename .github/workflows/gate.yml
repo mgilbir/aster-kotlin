@@ -1,0 +1,168 @@
+name: Gate
+
+# The gate, on both hosts: everything `scripts/check.sh` runs, the two differential oracles, and the
+# publication checks. Defined once and called by `ci.yml`, on every push to `main`, and by
+# `release.yml`, before anything is published.
+#
+# It was two copies, the `check` job here and the release's `verify` job, and they drifted in both
+# directions. The release's copy stopped counting how many tests ran and uploaded no reports; its
+# comment on the vectors step said the opposite of this one about what a missing file does; and each
+# fix to one reached the other a release or two later, if at all. This repository's CI header records
+# three occasions on which something reached `main` or a release because a gate existed and was not
+# the one people ran. Two copies of the gate is that shape waiting to happen, so there is one, as
+# there already was for the instrumented suites.
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux builds the JVM and linuxX64 targets and runs the differential oracles, which need
+          # node and the pinned upstream packages.
+          - name: Check (Linux, JVM + linuxX64)
+            os: ubuntu-latest
+            oracles: "true"
+          # macOS is the only host that compiles the Apple targets, and the only one that can run the
+          # Swift renderer's own suite.
+          - name: Check (macOS, every target + Swift)
+            os: macos-latest
+            oracles: "false"
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Record the Apple toolchain
+        # **Which Swift produced a diagnostic**, written into the log rather than reconstructed later.
+        #
+        # Thirty main-actor warnings appeared here and on no developer machine, and establishing why
+        # cost a forced rebuild of the Swift package, a re-run of both iOS type-check slices and a
+        # grep of every local gate log — all to find that the runner's Swift and a local Swift simply
+        # disagree about a concurrency rule. Two lines answer that next time.
+        #
+        # Recording rather than **pinning**, deliberately. Pinning is the better fix and it is a
+        # decision rather than a version bump: this workflow pins every action by commit, so adding
+        # `setup-xcode` takes on a third-party dependency, and `xcode-select` needs a version known to
+        # be installed on the image. The listing is what lets that be chosen on evidence.
+        if: runner.os == 'macOS'
+        run: |
+          xcodebuild -version
+          swift --version
+          echo "selected: $(xcode-select -p)"
+          echo "available:"; ls -d /Applications/Xcode*.app 2>/dev/null || echo "  (only the default)"
+
+      - name: Set up the toolchain
+        uses: ./.github/actions/setup
+
+      - name: Record upstream's test vectors
+        # **This step is the protection, not a convenience.** Each replay guards its own vector file
+        # with an assumption, so a missing file *skips* the whole test and the `replayed >= N` floor
+        # inside it never runs — a skipped test runs nothing. The floor catches a set that is partly
+        # there, which is a different failure. This comment used to claim the replays fail rather
+        # than skip on a fresh clone, which read as though forgetting this step would be loud.
+        #
+        # The vectors are gitignored by design, being derived from the pinned upstream packages.
+        run: ./scripts/record-upstream-vectors.sh
+
+      - name: Render upstream's Vega-Lite scenes
+        # Same reason as the vectors above, and a much bigger hole. The scene half of the Vega-Lite
+        # differential pair is gitignored — sixteen megabytes of output nobody reads a diff of — and
+        # `VegaLiteFixtureDifferentialTest` responds to its absence with an assumption, not a failure.
+        # So 1126 tests, the gate that catches a specification which matches upstream property for
+        # property and still draws the wrong chart, skipped in every run of this workflow. Rendering
+        # them here arms it. This runs on both hosts: the Vega-Lite oracle step below is Linux-only,
+        # and macOS needs the scenes just as much.
+        run: ./scripts/vega-lite-oracle.sh --references-only
+
+      - name: Check
+        # `--fast` because this workflow runs the two differential oracles as their own steps below,
+        # on Linux only, and `check.sh` would otherwise run them a second time — on both hosts, since
+        # node is installed here. The split is deliberate: the oracles re-run `:vega-runtime:jvmTest`
+        # under `--tests` filters, which *replaces* the test-results directory, and the count assertion
+        # further down has to read the results of this step rather than of a filtered re-run.
+        #
+        # Everything else `check.sh` gained is wanted here: on macOS it now runs the Swift suite, the
+        # exported-API snapshot and the iOS demo's type-check, which used to be three separate steps
+        # in this file and one that was missing from the local gate entirely.
+        env:
+          # Asks `swift-test.sh` for xUnit XML so the Apple suite's results can be merged into
+          # SUPPORTED_FEATURES.md by the `capabilities` job. macOS-only in effect; on Linux the
+          # Swift gate skips and the variable goes unread.
+          SWIFT_XUNIT_OUTPUT: ${{ runner.temp }}/swift-xunit.xml
+        run: ./scripts/check.sh --fast
+
+      - name: Snapshot what check.sh ran
+        # Taken here, before the oracle steps, because a Gradle test task *replaces* its results
+        # directory. `oracle.sh` re-runs `:vega-runtime:jvmTest` under `--tests` filters, so after it
+        # the directory holds the four fixture classes it asked for and no trace of the other
+        # forty-two — which read as a suite that had shrunk from 2787 tests to 2276 when it had not.
+        # The counts below are of `check.sh`'s run, which is the run being asserted about.
+        if: always()
+        run: |
+          set -euo pipefail
+          for xml in */build/test-results/*/*.xml; do
+            [ -f "$xml" ] || continue
+            destination="/tmp/check-test-results/$(dirname "$xml")"
+            mkdir -p "$destination"
+            cp "$xml" "$destination/"
+          done
+
+      - name: Differential tests against upstream Vega
+        if: matrix.oracles == 'true'
+        run: ./scripts/oracle.sh
+
+      - name: Differential tests against upstream Vega-Lite
+        if: matrix.oracles == 'true'
+        run: ./scripts/vega-lite-oracle.sh
+
+      # The iOS simulator suite used to be a step of its own here, because this project's machine
+      # was believed to have no simulator runtime. It has one, so `check.sh` runs
+      # `iosSimulatorArm64Test` itself now and a separate step would only run it twice. That
+      # direction matters: a gate that lives only in this file is one nobody runs before landing,
+      # which is the failure the header above describes and which this exact step demonstrated — it
+      # was the step that caught a zone pin the local gate could not see.
+
+      - name: Check every declared target is in the module metadata
+        # macOS only, and deliberately: on any other host it is *expected* to fail, because Kotlin
+        # creates no publication for a target the host cannot compile.
+        if: runner.os == 'macOS'
+        run: ./gradlew verifyPublishedVariants
+
+      - name: Build and check the Central bundle
+        # Not only at release time. A publication that would be missing from the bundle is much
+        # cheaper to find on an ordinary run of `main` than on the one run that uploads it.
+        if: runner.os == 'macOS'
+        run: ./gradlew centralBundle verifyCentralBundle --no-configuration-cache
+
+      - name: Say how many tests actually ran
+        # The rule lives in `scripts/test-counts.py` so this and `scripts/check.sh` run the *same*
+        # one. It was a heredoc here, and that was a hole rather than a detail: `check.sh` is the
+        # pre-landing gate, so a rule only CI knows is a rule that lands broken. It cost three red
+        # runs on `main` before anybody looked at the workflow.
+        if: always()
+        run: python3 scripts/test-counts.py "${{ runner.os }}" /tmp/check-test-results --ci
+
+      - name: Upload test reports
+        # **Always, not only on failure.** These were a debugging aid; they are now an input.
+        # `SUPPORTED_FEATURES.md`'s status column is generated from the union of every job's
+        # results, so a green job that uploaded nothing would render its own rows as unproven —
+        # the document would be reporting on the upload rather than on the tests.
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: test-reports-${{ matrix.os }}
+          path: |
+            **/build/reports/tests/**
+            **/build/test-results/**/*.xml
+            ${{ runner.temp }}/swift-xunit.xml
+            build/ios-ui-tests/ios-ui-tests.xml
+            build/upstream-transform-ledger.txt
+          retention-days: 14
