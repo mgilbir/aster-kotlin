@@ -4,10 +4,14 @@ Notable changes, newest first. The release workflow reads the section for the
 version it is publishing and uses it as the release notes, so a version without a
 section here does not get released.
 
-## Unreleased
+## 0.7.1
 
-Vega 6.4.0, and everything it added. Four changes are source- or binary-incompatible, taken from
-the API dumps against v0.7.0:
+Vega 6.4.0, and everything it added: the `isoweek` time unit and functions, the 37 easing curves,
+`interpolateLinear`, `geoTranslate` and the `container:resize` event, each checked against
+upstream. Four older defects the work turned up are fixed with it.
+
+**Numbered as a patch, but not every change is compatible.** Four are source- or
+binary-incompatible, taken from the API dumps against v0.7.0:
 
 - `TimeInterval` has a new entry, `ISOWEEK`, so an exhaustive `when` over it no longer compiles.
 - `EventConfig` has a new last property, `container`. Kotlin callers keep compiling, since it has a
