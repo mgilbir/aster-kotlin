@@ -7,7 +7,7 @@ Status: accepted (2026-08-18)
 A chart's appearance is guarded at three levels, and **none of them is a reference PNG**:
 
 1. **The scene graph, against upstream.** Every fixture is compiled by this engine and by the pinned
-   `vega@6.3.1`, and the two scenes are compared mark by mark and scale by scale at `1e-6`. That is the
+   `vega@6.4.0`, and the two scenes are compared mark by mark and scale by scale at `1e-6`. That is the
    differential corpus — 193 Vega fixtures and 282 Vega-Lite ones — and it is what says a chart is
    *right* rather than merely unchanged.
 2. **Canonical snapshots and SVG goldens, against this repository's own last answer.** `SceneSnapshot`

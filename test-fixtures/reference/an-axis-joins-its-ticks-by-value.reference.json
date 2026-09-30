@@ -311,5 +311,5 @@
     "width": 316
   },
   "spec": "an-axis-joins-its-ticks-by-value.vg.json",
-  "vegaVersion": "6.3.1"
+  "vegaVersion": "6.4.0"
 }

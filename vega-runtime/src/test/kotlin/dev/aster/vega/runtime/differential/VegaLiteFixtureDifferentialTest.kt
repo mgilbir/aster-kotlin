@@ -173,7 +173,7 @@ class VegaLiteFixtureDifferentialTest {
   @Test
   fun `every reference was generated from the pinned upstream version`() {
     for (name in fixtures()) {
-      assertEquals("6.3.1", compile(name).first.vegaVersion, name)
+      assertEquals("6.4.0", compile(name).first.vegaVersion, name)
     }
   }
 

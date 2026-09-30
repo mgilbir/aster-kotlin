@@ -344,5 +344,5 @@
     "width": 288
   },
   "spec": "a-reversed-span-still-has-a-step.vg.json",
-  "vegaVersion": "6.3.1"
+  "vegaVersion": "6.4.0"
 }

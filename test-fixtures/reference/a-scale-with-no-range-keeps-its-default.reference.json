@@ -470,5 +470,5 @@
     "width": 483
   },
   "spec": "a-scale-with-no-range-keeps-its-default.vg.json",
-  "vegaVersion": "6.3.1"
+  "vegaVersion": "6.4.0"
 }

@@ -4,6 +4,23 @@ Notable changes, newest first. The release workflow reads the section for the
 version it is publishing and uses it as the release notes, so a version without a
 section here does not get released.
 
+## Unreleased
+
+### Changed
+
+- **The oracle is Vega 6.4.0**, up from 6.3.1; Vega-Lite stays at 6.4.3. Every reference in the
+  corpus was regenerated from it, and none of the 260 Vega references moved except for its version
+  stamp: nothing an existing fixture draws changed between the two releases.
+
+### Fixed
+
+- **An ordinal scale over a continuous scheme honours `count`**, as upstream has since 6.4.0
+  (vega/vega#4270). `{"scheme": "blues", "count": 3}` over six values now reads three blues off the
+  ramp and cycles them, where it used to sample one blue per value. With no `count` the domain's
+  size is used as before, and a domain that is still empty gets five colours rather than none. The
+  new fixture `an-ordinal-ramp-takes-its-count` also covers a signal inside a literal part of a
+  domain union (vega/vega#4325), which this engine already resolved and upstream now does too.
+
 ## 0.7.0
 
 Almost all of this release is about agreeing with upstream Vega and Vega-Lite in places nothing
